@@ -6,7 +6,7 @@ JS Client Application for Registry
 ## Build
 
 ```
-# git clone https://github.com/DroneDB/MiniReg --recurse-submodules && cd MiniReg
+# git clone https://github.com/DroneDB/Hub --recurse-submodules && cd Hub
 # npm install -g webpack@4
 # npm install
 # webpack
