@@ -1,0 +1,10 @@
+#app{
+    display: flex;
+    flex-direction: column;
+    &.fullpage{
+        height: 100%;
+        & > div#views{
+            height: 100%;
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "hub",
+  "version": "1.0.0",
+  "description": "JS Client Application for Registry",
+  "main": "webpack.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DroneDB/Hub.git"
+  },
+  "author": "",
+  "license": "AGPLv3",
+  "bugs": {
+    "url": "https://github.com/DroneDB/Hub/issues"
+  },
+  "homepage": "https://github.com/DroneDB/Hub#readme",
+  "dependencies": {
+    "commonui": "file:vendor/commonui",
+    "copy-webpack-plugin": "^6.4.0",
+    "vue-router": "^3.4.9"
+  },
+  "devDependencies": {
+    "webpack-livereload-plugin": "^2.3.0"
+  }
+}
