@@ -9,8 +9,7 @@ import Login from './components/Login.vue';
 import UserHome from './components/UserHome.vue';
 import ViewDataset from './components/ViewDataset.vue';
 import reg from './libs/sharedRegistry';
-
-const APP_NAME = "DroneDB";
+import { setTitle } from './libs/utils';
 
 window.addEventListener('load', function(){
     Vue.use(VueRouter);
@@ -27,7 +26,7 @@ window.addEventListener('load', function(){
 
     // Set titles
     router.beforeEach((to, _, next) => {
-        document.title = to.meta.title + ` - ${APP_NAME}`;
+        setTitle(to.meta.title);
         next();
     });
 

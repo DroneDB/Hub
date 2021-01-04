@@ -38,6 +38,7 @@
 <script>
 import Message from 'commonui/components/Message.vue';
 import ddb from 'ddb';
+import { setTitle } from '../libs/utils';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -54,6 +55,8 @@ export default {
         }
     },
     mounted: async function(){
+        setTitle(this.$route.params.org);
+        
         try{
             this.org = reg.Organization(this.$route.params.org);
             this.datasets = await this.org.datasets();

@@ -40,6 +40,7 @@ import Panel from 'commonui/components/Panel.vue';
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
 import reg from '../libs/sharedRegistry';
+import { setTitle } from '../libs/utils';
 
 export default {
     props: ["org", "ds"],
@@ -75,6 +76,7 @@ export default {
     },
     mounted: function(){
         document.getElementById("app").classList.add("fullpage");
+        setTitle(this.$route.params.ds);
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
