@@ -1,5 +1,4 @@
 import 'commonui/main';
-import 'regenerator-runtime';
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 
