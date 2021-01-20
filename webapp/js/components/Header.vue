@@ -182,6 +182,7 @@ export default {
     width: 100%;
     box-shadow: 0px 2px 4px -2px #000000;
     display: flex;
+    z-index: 2;
     .logo{
         margin-top: 4px;
     }

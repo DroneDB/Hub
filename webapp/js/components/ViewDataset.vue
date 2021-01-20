@@ -17,7 +17,15 @@
             </TabSwitcher>
         </div>
         <Panel split="horizontal" class="container vertical" amount="50%">
-            <Explorer :files="fileBrowserFiles" @folderOpened="handleFileSelectionChanged" @openProperties="handleExplorerOpenProperties" />
+            <TabSwitcher :tabs="explorerTabs" 
+                        position="top" 
+                        buttonWidth="auto"
+                        :hideSingle="true"
+                        ref="explorerTabSwitcher" >
+                <template v-slot:explorer>
+                    <Explorer :files="fileBrowserFiles" @folderOpened="handleFileSelectionChanged" @openProperties="handleExplorerOpenProperties" />
+                </template>
+            </TabSwitcher>
             <Map :files="fileBrowserFiles" />
         </Panel>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
@@ -36,6 +44,7 @@ import Explorer from 'commonui/components/Explorer.vue';
 import Properties from 'commonui/components/Properties.vue';
 import TabSwitcher from 'commonui/components/TabSwitcher.vue';
 import Panel from 'commonui/components/Panel.vue';
+import Test from 'commonui/components/Test.vue';
 
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
@@ -67,16 +76,33 @@ export default {
                 icon: 'wrench',
                 key: 'settings' 
             }],
+            explorerTabs: [{
+                label: 'Files',
+                icon: 'file',
+                key: 'explorer' 
+            }],
             fileBrowserFiles: [],
             showProperties: false,
             selectedUsingFileBrowserList: false,
             dataset: reg.Organization(this.$route.params.org)
-                               .Dataset(this.$route.params.ds)
+                               .Dataset(this.$route.params.ds),
+
+            test: "REMOVE ME!"
         }
     },
     mounted: function(){
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
+
+        // TODO REMOVE
+        setTimeout(() =>{
+        this.$refs.explorerTabSwitcher.addTab({
+            label: "Test",
+            icon: "wrench",
+            key: "test",
+            component: Test,
+        });
+        }, 1000);
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
