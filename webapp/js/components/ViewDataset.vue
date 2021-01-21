@@ -16,18 +16,21 @@
                 </template>
             </TabSwitcher>
         </div>
-        <Panel split="horizontal" class="container vertical" amount="50%">
-            <TabSwitcher :tabs="explorerTabs" 
-                        position="top" 
-                        buttonWidth="auto"
-                        :hideSingle="true"
-                        ref="explorerTabSwitcher" >
-                <template v-slot:explorer>
-                    <Explorer :files="fileBrowserFiles" @folderOpened="handleFileSelectionChanged" @openProperties="handleExplorerOpenProperties" />
-                </template>
-            </TabSwitcher>
-            <Map :files="fileBrowserFiles" />
-        </Panel>
+        <TabSwitcher :tabs="mainTabs" 
+                    position="top" 
+                    buttonWidth="auto"
+                    :hideSingle="true"
+                    ref="mainTabSwitcher" >
+            <template v-slot:map>
+                <Panel split="horizontal" class="container vertical" amount="50%">
+                    <Explorer ref="explorer" 
+                            :files="fileBrowserFiles" 
+                            @folderOpened="handleFileSelectionChanged" 
+                            @openProperties="handleExplorerOpenProperties" />
+                    <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
+                </Panel>
+            </template>
+        </TabSwitcher>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
 </div>
@@ -44,7 +47,7 @@ import Explorer from 'commonui/components/Explorer.vue';
 import Properties from 'commonui/components/Properties.vue';
 import TabSwitcher from 'commonui/components/TabSwitcher.vue';
 import Panel from 'commonui/components/Panel.vue';
-import Test from 'commonui/components/Test.vue';
+import Markdown from 'commonui/components/Markdown.vue';
 
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
@@ -70,39 +73,27 @@ export default {
             tabs: [{
                 label: 'Browser',
                 icon: 'folder open',
-                key: 'filebrowser' 
+                key: 'filebrowser'
             },{
                 label: 'Settings',
                 icon: 'wrench',
-                key: 'settings' 
+                key: 'settings'
             }],
-            explorerTabs: [{
-                label: 'Files',
-                icon: 'file',
-                key: 'explorer' 
+            mainTabs: [{
+                label: 'Map',
+                icon: 'map',
+                key: 'map' 
             }],
             fileBrowserFiles: [],
             showProperties: false,
             selectedUsingFileBrowserList: false,
             dataset: reg.Organization(this.$route.params.org)
-                               .Dataset(this.$route.params.ds),
-
-            test: "REMOVE ME!"
+                               .Dataset(this.$route.params.ds)
         }
     },
     mounted: function(){
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
-
-        // TODO REMOVE
-        setTimeout(() =>{
-        this.$refs.explorerTabSwitcher.addTab({
-            label: "Test",
-            icon: "wrench",
-            key: "test",
-            component: Test,
-        });
-        }, 1000);
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
@@ -120,6 +111,17 @@ export default {
         rootNodes: async function () {
             const entries = await this.dataset.info();
 
+            // Add license / readme tabs
+            if (entries.length === 1){
+                const entry = entries[0];
+                if (entry.meta.readme){
+                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), "Readme", "book");
+                }
+                if (entry.meta.license){
+                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), "License", "balance scale");
+                }
+            }
+
             return entries.map(e => { return {
                     icon: icons.getForType(e.type),
                     label: pathutils.basename(e.path),
@@ -128,6 +130,19 @@ export default {
                     entry: e
                 };
             });
+        },
+
+        addMarkdownTab: function(uri, label, icon, opts = {}){
+            this.$refs.mainTabSwitcher.addTab({
+                label,
+                icon,
+                key: label.toLowerCase(),
+                hideLabel: !!opts.hideLabel,
+                component: Markdown,
+                props: {
+                    uri
+                }
+            }, !!opts.activate, !!opts.prepend);
         },
 
         handleFileSelectionChanged: function (fileBrowserFiles) {
@@ -144,6 +159,10 @@ export default {
         },
         handleCloseProperties: function () {
             this.showProperties = false;
+        },
+
+        handleScrollTo: function(file){
+            this.$refs.explorer.scrollTo(file);
         },
 
         handleUnauthorized: function(){
