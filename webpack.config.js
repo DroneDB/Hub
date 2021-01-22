@@ -74,6 +74,7 @@ module.exports = {
         new CopyPlugin({
           patterns: [
             { from: 'webapp/public', to: '' },
+            { from : 'vendor/commonui/public', to: ''}
           ]
         })
     ],
