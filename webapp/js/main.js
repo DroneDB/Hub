@@ -19,13 +19,14 @@ window.addEventListener('load', function(){
         { path: '/r/:org', name: "UserHome", components: {content: UserHome, header: Header}, meta: { title: "Home"}},
 
         // TODO: add an actual home page
-        { path: '/', name: "Login", components: {content: Login, header: Header}, meta: { title: "Login" } },
+        { path: '/', name: "LoginHome", components: {content: Login, header: Header}, meta: { title: "Login" } },
     ];
     const router = new VueRouter({ mode: "history", routes });
 
-    // Set titles
-    router.beforeEach((to, _, next) => {
+    // Set titles, keep track of previous routes
+    router.beforeEach((to, prev, next) => {
         setTitle(to.meta.title);
+        to.meta.prev = prev;
         next();
     });
 

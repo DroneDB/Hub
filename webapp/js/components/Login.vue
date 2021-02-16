@@ -3,26 +3,31 @@
     <div class="ui grid stackable">
         <div class="five wide column"></div>
         <div class="six wide column">
-            <h2>Welcome Back</h2>
-            <p>Sign in with your credentials</p>
-            <form class="ui large form">
-                <div class="ui segment">
-                    <div class="field">
-                        <div class="ui left icon input">
-                            <i class="user icon"></i>
-                            <input v-on:keyup.enter="login" v-model="username" autocomplete="off" type="text" name="username" 
-                                    placeholder="Username" autocorrect="off" autocapitalize="none">
+            <div v-if="xAuthInProgress">
+                <i class="icon circle notch spin" />
+            </div>
+            <div v-else>
+                <h2>Welcome Back</h2>
+                <p>Sign in with your credentials</p>
+                <form class="ui large form">
+                    <div class="ui segment">
+                        <div class="field">
+                            <div class="ui left icon input">
+                                <i class="user icon"></i>
+                                <input v-on:keyup.enter="login" v-model="username" autocomplete="off" type="text" name="username" 
+                                        placeholder="Username" autocorrect="off" autocapitalize="none">
+                            </div>
                         </div>
-                    </div>
-                    <div class="field">
-                        <div class="ui left icon input">
-                            <i class="key icon"></i>
-                            <input v-on:keyup.enter="login" v-model="password" type="password" name="password" placeholder="Password">
+                        <div class="field">
+                            <div class="ui left icon input">
+                                <i class="key icon"></i>
+                                <input v-on:keyup.enter="login" v-model="password" type="password" name="password" placeholder="Password">
+                            </div>
                         </div>
+                        <div @click="login" :class="{loading: loggingIn}" class="ui fluid large primary submit button">Login</div>
                     </div>
-                    <div @click="login" :class="{loading: loggingIn}" class="ui fluid large primary submit button">Login</div>
-                </div>
-            </form>
+                </form>
+            </div>
             <Message bindTo="error" />
         </div>
         <div class="five wide column"></div>
@@ -33,6 +38,7 @@
 <script>
 import Message from 'commonui/components/Message.vue';
 import reg from '../libs/sharedRegistry';
+import { getCookie } from '../libs/utils';
 
 export default {
   components: {
@@ -43,6 +49,7 @@ export default {
           error: "",
 
           loggingIn: false,
+          xAuthInProgress: false,
           username: "",
           password: ""
       }
@@ -50,6 +57,28 @@ export default {
   beforeMount: function(){
       if (reg.isLoggedIn()){
           this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+      }else if (getCookie("xAuthToken")){
+          // Try to log-in using the xAuthToken
+          this.xAuthInProgress = true;
+      }
+  },
+  mounted: async function(){
+      if (this.xAuthInProgress){
+        try{
+            let res = await reg.login(null, null, getCookie("xAuthToken"));
+            let redirectTo = this.$router.history.current.meta.prev.path;
+
+            // Redirect to previous path, unless it's the same as the current login path
+            // in which case redirect to home
+            if (['/', '/login'].indexOf(this.$router.history.current.path) !== -1 && res.username){
+                redirectTo = `/r/${res.username}`;
+            }
+
+            this.$router.push({path: redirectTo});
+        }catch(e){
+            console.error(e);
+        }
+        this.xAuthInProgress = false;
       }
   },
   methods: {

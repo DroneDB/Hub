@@ -61,7 +61,11 @@ export default {
             this.org = reg.Organization(this.$route.params.org);
             this.datasets = await this.org.datasets();
         }catch(e){
-            this.error = e.message;
+            if (e.message === "Unauthorized"){
+                this.$router.push({name: "Login"}).catch(()=>{});
+            }else{
+                this.error = e.message;
+            }
         }
         this.loading = false;
     },

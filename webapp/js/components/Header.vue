@@ -38,6 +38,7 @@ import { utils } from 'ddb';
 import mouse from 'commonui/mouse';
 import reg from '../libs/sharedRegistry';
 import Alert from 'commonui/components/Alert';
+import { clearCookie } from '../libs/utils';
 
 export default {
   components: {
