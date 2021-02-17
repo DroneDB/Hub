@@ -17,3 +17,15 @@ export function getCookie(key){
 export function clearCookie(key){
     document.cookie = `${key}=;-1;path=/`;
 }
+
+export function queryParams(location){
+    let params = {};
+    let paramsRaw = (location.search.replace("?", "").match(/([^&=]+)=?([^&]*)/g) || []);
+    for (let i in paramsRaw){
+      let parts = paramsRaw[i].split("=");
+      if (parts[1] !== undefined){
+          params[parts[0]] = parts[1];
+      }
+    }
+    return params;
+};
