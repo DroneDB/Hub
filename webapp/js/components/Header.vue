@@ -38,7 +38,7 @@ import { utils } from 'ddb';
 import mouse from 'commonui/mouse';
 import reg from '../libs/sharedRegistry';
 import Alert from 'commonui/components/Alert';
-import { clearCookie } from '../libs/utils';
+import { xAuthLogout } from '../libs/xauth';
 
 export default {
   components: {
@@ -147,8 +147,9 @@ export default {
           this.loggedIn = false;
       },
 
-      logout: function(){
+      logout: async function(){
           reg.logout();
+          await xAuthLogout();
           this.login();
       },
 

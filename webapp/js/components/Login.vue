@@ -38,7 +38,7 @@
 <script>
 import Message from 'commonui/components/Message.vue';
 import reg from '../libs/sharedRegistry';
-import { getCookie } from '../libs/utils';
+import { xAuthAvailable, getXAuthToken } from '../libs/xauth';
 
 export default {
   components: {
@@ -57,7 +57,7 @@ export default {
   beforeMount: function(){
       if (reg.isLoggedIn()){
           this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
-      }else if (getCookie("xAuthToken")){
+      }else if (xAuthAvailable()){
           // Try to log-in using the xAuthToken
           this.xAuthInProgress = true;
       }
@@ -65,7 +65,7 @@ export default {
   mounted: async function(){
       if (this.xAuthInProgress){
         try{
-            let res = await reg.login(null, null, getCookie("xAuthToken"));
+            let res = await reg.login(null, null, getXAuthToken());
             let redirectTo = this.$router.history.current.meta.prev.path;
 
             // Redirect to previous path, unless it's the same as the current login path
