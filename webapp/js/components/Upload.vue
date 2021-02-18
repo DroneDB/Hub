@@ -13,7 +13,7 @@
                 <div v-if="Object.keys(fileUploadStatus).length === 0">
                     <i class="icon circle notch spin" />
                 </div>
-                <div v-for="f in Object.keys(fileUploadStatus)" class="progress-indicator">
+                <div v-if="!inIframe" v-for="f in Object.keys(fileUploadStatus)" class="progress-indicator">
                     <div class="ui indicating progress small success">
                         <div class="bar" :style="{'min-width': (fileUploadStatus[f]).toFixed(2) + '%'}">
                             <div class="progress"></div>
@@ -41,7 +41,7 @@
                     <div class="header">
                     Success!
                     </div>
-                    Your files have been uploaded to the secret URL: <a :href="fullUrl">{{ fullUrl }}</a>
+                    Your files have been uploaded to the secret URL: <a :href="fullUrl" target="_blank">{{ fullUrl }}</a>
                 </div>
             </div>
 
@@ -61,6 +61,7 @@ import Message from 'commonui/components/Message.vue';
 import ddb from 'ddb';
 import { bytesToSize } from 'commonui/classes/utils';
 import Dropzone from '../vendor/dropzone';
+import { inIframe } from '../libs/utils';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -77,6 +78,7 @@ export default {
             fileUploadStatus: {},
             filesCount: 0,
             uploadedFiles: 0,
+            inIframe: inIframe(),
 
             totalBytes: 0,
             totalBytesSent: 0,
