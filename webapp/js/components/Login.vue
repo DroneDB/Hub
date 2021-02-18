@@ -66,15 +66,7 @@ export default {
       if (this.xAuthInProgress){
         try{
             let res = await reg.login(null, null, getXAuthToken());
-            let redirectTo = this.$router.history.current.meta.prev.path;
-
-            // Redirect to previous path, unless it's the same as the current login path
-            // in which case redirect to home
-            if (['/', '/login'].indexOf(this.$router.history.current.path) !== -1 && res.username){
-                redirectTo = `/r/${res.username}`;
-            }
-
-            this.$router.push({path: redirectTo});
+            this.redirectToPrevRoute();
         }catch(e){
             console.error(e);
         }
@@ -82,6 +74,18 @@ export default {
       }
   },
   methods: {
+      redirectToPrevRoute: function(){
+            let redirectTo = this.$router.history.current.meta.prev.path;
+
+            // Redirect to previous path, unless it's the same as the current login path
+            // in which case redirect to home
+            console.log(redirectTo);
+            if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()){
+                this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+            }else{
+                this.$router.push({path: redirectTo});
+            }
+      },
       login: async function(e){
         e.preventDefault();
         this.loggingIn = true;
@@ -89,7 +93,7 @@ export default {
         
         try{
             await reg.login(this.username, this.password);
-            this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+            this.redirectToPrevRoute();
         }catch(e){
             this.error = e.message;
         }

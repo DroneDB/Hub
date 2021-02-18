@@ -9,7 +9,7 @@
     </div>
     <div v-else>
         <div v-if="datasets.length === 0">
-        There are no datasets here. Create one by using the <a href="https://dronedb.app/dashboard#downloads">DroneDB app</a>.
+        There are no datasets here. Create one by <a href="javascript:void(0)" @click="upload">uploading some files</a> or by using the <a href="https://dronedb.app/dashboard#downloads">DroneDB Desktop app</a>.
         </div>
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment">
@@ -109,6 +109,10 @@ export default {
                 org: this.$route.params.org,
                 ds: ds.slug 
             }});
+        },
+
+        upload: function(){
+            this.$router.push({name: "Upload"});
         }
     }
 }

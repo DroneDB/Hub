@@ -7,24 +7,26 @@ import Header from './components/Header.vue';
 import Login from './components/Login.vue';
 import UserHome from './components/UserHome.vue';
 import ViewDataset from './components/ViewDataset.vue';
+import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
-import { setTitle, queryParams } from './libs/utils';
+import { setTitle, queryParams, inIframe } from './libs/utils';
 
 window.addEventListener('load', function(){
     let hdr = Header;
 
-    const embed = !!queryParams(window.location).embed;
+    // Hide header if ?embed=1 is in URL
+    const embed = !!queryParams(window.location).embed || inIframe();
     if (embed) hdr = null;
 
     Vue.use(VueRouter);
         
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: {content: ViewDataset, header: hdr}, meta: { title: "View Dataset"}},
-        { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" } },
+        { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
         { path: '/r/:org', name: "UserHome", components: {content: UserHome, header: hdr}, meta: { title: "Home"}},
-
+        { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
         // TODO: add an actual home page
-        { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" } },
+        { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" }},
     ];
     const router = new VueRouter({ mode: "history", routes });
 

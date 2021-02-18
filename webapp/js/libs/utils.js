@@ -29,3 +29,11 @@ export function queryParams(location){
     }
     return params;
 };
+
+export function inIframe(){
+    try {
+        return window.self !== window.top;
+    } catch (e) {
+        return true;
+    }
+}

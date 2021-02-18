@@ -26,6 +26,10 @@
             <i class="icon user"></i>
             <div class="menu" ref="menu">
                 <div class="header">{{ username }} </div>
+                <div class="divider"></div>
+                <div class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
+                <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
+                <div class="divider"></div>
                 <div class="item" @click="logout" >Logout</div>
             </div>
         </div>
@@ -116,6 +120,12 @@ export default {
       mouse.off('click', this.hideMenu);
   },
   methods: {
+      uploadFiles: function(){
+          this.$router.push({name: "Upload"});
+      },
+      myDatasets: function(){
+          this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+      },
       handleDownload: async function(e){
           if (this.downloadUrl === "javascript:void(0)"){
               const { org, ds } = this.params;
