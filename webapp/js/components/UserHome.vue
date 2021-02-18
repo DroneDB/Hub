@@ -122,6 +122,7 @@ export default {
 #userhome {
     margin: 12px;
     margin-top: 16px;
+    padding-bottom: 16px;
     .datasets{
         a{
             font-size: 120%;

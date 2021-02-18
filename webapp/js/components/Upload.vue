@@ -50,7 +50,7 @@
     </div>
 
     <div class="droparea" :class="{hide: url || uploading}" ref="droparea">
-        <div ref="btnUpload" @click="handleUpload" class="ui large primary submit button"><i class="cloud upload icon"></i> Upload Files</div>
+        <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i class="cloud upload icon"></i> Upload Files</div>
     </div>
 
 </div>
