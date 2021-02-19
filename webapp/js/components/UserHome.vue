@@ -60,6 +60,7 @@ export default {
         try{
             this.org = reg.Organization(this.$route.params.org);
             this.datasets = await this.org.datasets();
+            this.datasets.sort((a, b) => new Date(a.creationDate).getTime() < new Date(b.creationDate).getTime() ? 1 : -1);
         }catch(e){
             if (e.message === "Unauthorized"){
                 this.$router.push({name: "Login"}).catch(()=>{});
