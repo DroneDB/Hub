@@ -118,9 +118,10 @@ export default {
             uploadMultiple: false,
             autoProcessQueue: false,
             createImageThumbnails: false,
+            maxFilesize: Number.MAX_SAFE_INTEGER,
             previewTemplate: '<div style="display:none"></div>',
             clickable: this.$refs.btnUpload,
-            chunkSize: 2147483647, // TODO: support for chunked uploads, read maxuploadChunkSize
+            chunkSize: Number.MAX_SAFE_INTEGER,
             timeout: 2147483647
         });
 
@@ -140,7 +141,8 @@ export default {
                 this.uploading = false;
             }
             this.$delete(this.fileUploadStatus, file.name);
-            this.dz.processQueue();
+
+            setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
         })
         .on("uploadprogress", (file, progress, bytesSent) => {
             const now = new Date().getTime();
@@ -205,7 +207,8 @@ export default {
                 }
             }
             this.$delete(this.fileUploadStatus, file.name);
-            this.dz.processQueue();
+
+            setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
         })
         .on("sending", (file, xhr, formData) => {
             // Send filename
