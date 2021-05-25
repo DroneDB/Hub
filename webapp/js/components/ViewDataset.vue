@@ -34,7 +34,6 @@
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
 </div>
-</div>
 </template>
 
 <script>
