@@ -22,7 +22,8 @@
                     :hideSingle="true"
                     ref="mainTabSwitcher" >
             <template v-slot:map>
-                <Panel split="horizontal" class="container vertical" amount="50%">
+                <Toolbar :tools="tools" ref="toolbar" />
+                <Panel split="horizontal" class="container vertical" amount="50%">                    
                     <Explorer ref="explorer" 
                             :files="fileBrowserFiles" 
                             @folderOpened="handleFileSelectionChanged" 
@@ -33,6 +34,18 @@
         </TabSwitcher>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
+
+    <sui-modal v-model="uploadDialogOpen">
+      <sui-modal-header>Upload new files</sui-modal-header>
+      <sui-modal-content>        
+        <dataset-upload :organization="dataset.org" :dataset="dataset.ds"></dataset-upload>
+      </sui-modal-content>
+      <sui-modal-actions>
+        <sui-button positive @click.native="uploadDialogOpen=false">
+          Close
+        </sui-button>
+      </sui-modal-actions>
+    </sui-modal>
 </div>
 </template>
 
@@ -47,6 +60,8 @@ import Properties from 'commonui/components/Properties.vue';
 import TabSwitcher from 'commonui/components/TabSwitcher.vue';
 import Panel from 'commonui/components/Panel.vue';
 import Markdown from 'commonui/components/Markdown.vue';
+import Toolbar from 'commonui/components/Toolbar.vue';
+import DatasetUpload from './DatasetUpload.vue';
 
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
@@ -64,7 +79,9 @@ export default {
         Properties,
         TabSwitcher,
         Settings,
-        Panel
+        Panel,
+        Toolbar,
+        DatasetUpload
     },
     data: function () {
         return {
@@ -87,7 +104,34 @@ export default {
             showProperties: false,
             selectedUsingFileBrowserList: false,
             dataset: reg.Organization(this.$route.params.org)
-                               .Dataset(this.$route.params.ds)
+                               .Dataset(this.$route.params.ds),
+            uploadDialogOpen: false,
+            tools: [
+                {
+                    id: 'upload',
+                    title: "Upload",
+                    icon: "upload",
+                    onClick: () => {
+                        this.uploadDialogOpen = true;
+                    }
+                },
+                {
+                    id: 'rename',
+                    title: "Rename",
+                    icon: "edit",
+                    onClick: () => {
+                        alert("edit");
+                    }
+                },
+                {
+                    id: 'remove',
+                    title: "Remove",
+                    icon: "trash alternate",
+                    onClick: () => {
+                        alert("remove");
+                    }
+                },
+            ],
         }
     },
     mounted: function(){
