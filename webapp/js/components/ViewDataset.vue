@@ -65,6 +65,20 @@
         </sui-button>
       </sui-modal-actions>
     </sui-modal>
+    <sui-modal v-model="renameDialogOpen">
+      <sui-modal-header>Rename / Move</sui-modal-header>
+      <sui-modal-content>        
+        New path:&nbsp;&nbsp;<sui-input icon="edit" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" />
+      </sui-modal-content>
+      <sui-modal-actions>
+        <sui-button @click.native="renameDialogOpen=false">
+          Close
+        </sui-button>
+        <sui-button positive @click.native="renameSelectedFile">
+          Rename
+        </sui-button>
+      </sui-modal-actions>
+    </sui-modal>
 </div>
 </template>
 
@@ -125,7 +139,9 @@ export default {
             dataset: reg.Organization(this.$route.params.org)
                                .Dataset(this.$route.params.ds),
             uploadDialogOpen: false,
-            removeDialogOpen: false            
+            removeDialogOpen: false,
+            renameDialogOpen: false,
+            renamePath: null         
         };
     },
     mounted: function(){
@@ -160,7 +176,8 @@ export default {
                     title: "Rename",
                     icon: "edit",
                     onClick: () => {
-                        alert("edit");
+                        this.renamePath = this.selectedFiles[0].entry.path;
+                        this.renameDialogOpen = true;
                     }
                 });
             }
@@ -217,11 +234,14 @@ export default {
         },
         deleteSelectedFiles: function() {
             
-            for(var file of this.selectedFiles) {                
+            for(var file of this.selectedFiles)                 
                 this.dataset.deleteObj(file.entry.path);
-            }
-
+            
             this.removeDialogOpen = false;
+        },
+        renameSelectedFile: function() {
+            this.dataset.moveObj(this.selectedFiles[0].entry.path, this.renamePath);
+            this.renameDialogOpen = false;
         },
         handleFileSelectionChanged: function (fileBrowserFiles) {
             this.fileBrowserFiles.forEach(f => f.selected = false);
