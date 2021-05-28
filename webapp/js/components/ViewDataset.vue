@@ -46,6 +46,25 @@
         </sui-button>
       </sui-modal-actions>
     </sui-modal>
+    <sui-modal v-model="removeDialogOpen">
+      <sui-modal-header>Remove</sui-modal-header>
+      <sui-modal-content>        
+        Are you sure to delete the following items?<br />
+        <div class="ui bulleted list">
+            <div class="item" v-for="file in selectedFiles">
+                {{file.label}}
+            </div>
+        </div>
+      </sui-modal-content>
+      <sui-modal-actions>
+        <sui-button @click.native="removeDialogOpen=false">
+          Close
+        </sui-button>
+        <sui-button negative @click.native="deleteSelectedFiles">
+          Remove
+        </sui-button>
+      </sui-modal-actions>
+    </sui-modal>
 </div>
 </template>
 
@@ -106,33 +125,8 @@ export default {
             dataset: reg.Organization(this.$route.params.org)
                                .Dataset(this.$route.params.ds),
             uploadDialogOpen: false,
-            tools: [
-                {
-                    id: 'upload',
-                    title: "Upload",
-                    icon: "upload",
-                    onClick: () => {
-                        this.uploadDialogOpen = true;
-                    }
-                },
-                {
-                    id: 'rename',
-                    title: "Rename",
-                    icon: "edit",
-                    onClick: () => {
-                        alert("edit");
-                    }
-                },
-                {
-                    id: 'remove',
-                    title: "Remove",
-                    icon: "trash alternate",
-                    onClick: () => {
-                        alert("remove");
-                    }
-                },
-            ],
-        }
+            removeDialogOpen: false            
+        };
     },
     mounted: function(){
         document.getElementById("app").classList.add("fullpage");
@@ -148,7 +142,42 @@ export default {
             } else {
                 return this.fileBrowserFiles.filter(f => f.selected);
             }
-        }
+        },
+        tools: function() {
+
+            var tools = [{
+                    id: 'upload',
+                    title: "Upload",
+                    icon: "upload",
+                    onClick: () => {
+                        this.uploadDialogOpen = true;
+                    }
+                }];
+
+            if (this.selectedFiles.length == 1) {
+                tools.push({
+                    id: 'rename',
+                    title: "Rename",
+                    icon: "edit",
+                    onClick: () => {
+                        alert("edit");
+                    }
+                });
+            }
+
+            if (this.selectedFiles.length > 0) {
+                tools.push({
+                    id: 'remove',
+                    title: "Remove",
+                    icon: "trash alternate",
+                    onClick: () => {
+                        this.removeDialogOpen = true;
+                    }
+                });
+            }
+
+            return tools;
+        },
     },
     methods: {
         rootNodes: async function () {
@@ -173,8 +202,7 @@ export default {
                     entry: e
                 };
             });
-        },
-
+        },        
         addMarkdownTab: function(uri, label, icon, opts = {}){
             this.$refs.mainTabSwitcher.addTab({
                 label,
@@ -187,7 +215,14 @@ export default {
                 }
             }, !!opts.activate, !!opts.prepend);
         },
+        deleteSelectedFiles: function() {
+            
+            for(var file of this.selectedFiles) {                
+                this.dataset.deleteObj(file.entry.path);
+            }
 
+            this.removeDialogOpen = false;
+        },
         handleFileSelectionChanged: function (fileBrowserFiles) {
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
