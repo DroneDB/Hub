@@ -48,7 +48,7 @@
     </div>
 
     <div class="droparea" :class="{hide: done || uploading}" ref="droparea">
-        <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i class="cloud upload icon"></i> Upload Files</div>
+        <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i class="cloud upload icon"></i> Browse</div>
     </div>
 
 </div>
@@ -100,13 +100,10 @@ export default {
         }
     },
     beforeMount: function(){
-        /*if (!reg.isLoggedIn()){
-            this.$router.push({name: "Login"}).catch(()=>{});
-        }*/
+
     },
     mounted: async function(){
         Dropzone.autoDiscover = false;
-        //this.uploadToken = null;
         const MAX_RETRIES = 30;
 
         this.dz = new Dropzone(this.$refs.droparea, {
@@ -124,22 +121,10 @@ export default {
         });
 
         this.dz.on("processing", (file) => {
-            //if (!this.uploadToken) this.dz.cancelUpload(file);
             this.dz.options.url = `/orgs/${this.organization}/ds/${this.dataset}/obj`;
             this.$set(this.fileUploadStatus, file.name, 0);
         })
         .on("error", (file, message) => {
-            //debugger;
-            // Retry
-            /*if (file.retries < MAX_RETRIES){
-                console.log("Error uploading ", file, " put back in queue...");
-                file.status = Dropzone.QUEUED;
-            }else{
-                this.dz.cancelUpload(file);
-                this.error = `Failed to upload ${file.name} after 30 retries`;
-                this.uploading = false;
-                this.done = false;
-            }*/
             this.error = ((this.error != null && this.error.length > 0) ? this.error + '<br /><br />' : '') + `Failed to upload ${file.name}<br />${message.error}`;
             this.dz.cancelUpload(file);
             file.status = Dropzone.CANCELED;
@@ -195,22 +180,6 @@ export default {
                 //this.error = err;
                 this.dz.removeFile(file);
             }
-                /*else{
-                let err = `Failed to upload ${file.name}, retrying... (${file.retries})`;
-                console.error(err);
-
-                // Update progress
-                this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
-                file.status = Dropzone.QUEUED;
-                file.deltaBytesSent = 0;
-                file.trackedBytesSent = 0;
-                file.retries++;
-
-                if (file.retries > MAX_RETRIES){
-                    this.dz.cancelUpload(file);
-                    this.error = err;
-                }
-            }*/
 
             this.$delete(this.fileUploadStatus, file.name);
 
@@ -222,19 +191,7 @@ export default {
         })
         .on("queuecomplete", async (files) => {
             // Commit
-            if (this.uploadedFiles - this.filesCount === 0){
-                /*try{
-                    const r = await reg.makeRequest(`/share/commit/${this.uploadToken}`, "POST");
-                    if (r.url){
-                        this.url = r.url;
-                    }else if (r.error){
-                        this.error = r.error;
-                    }else{
-                        this.error = `Cannot upload files: ${JSON.stringify(r)}`;
-                    }
-                }catch(e){
-                    this.error = e.message;
-                }*/
+            if (this.uploadedFiles - this.filesCount === 0){                
                 this.uploading = false;
                 this.done = true;
             }
