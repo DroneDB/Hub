@@ -34,57 +34,18 @@
         </TabSwitcher>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
-
-    <sui-modal v-model="uploadDialogOpen">
-      <sui-modal-header>Upload new files</sui-modal-header>
-      <sui-modal-content>        
-        <dataset-upload :organization="dataset.org" :dataset="dataset.ds"></dataset-upload>
-      </sui-modal-content>
-      <sui-modal-actions>
-        <sui-button positive @click.native="uploadDialogOpen=false">
-          Close
-        </sui-button>
-      </sui-modal-actions>
-    </sui-modal>
-    <sui-modal v-model="removeDialogOpen">
-      <sui-modal-header>Remove</sui-modal-header>
-      <sui-modal-content>        
-        Are you sure to delete the following items?<br />
-        <div class="ui bulleted list">
-            <div class="item" v-for="file in selectedFiles">
-                {{file.label}}
-            </div>
-        </div>
-      </sui-modal-content>
-      <sui-modal-actions>
-        <sui-button @click.native="removeDialogOpen=false">
-          Close
-        </sui-button>
-        <sui-button negative @click.native="deleteSelectedFiles">
-          Remove
-        </sui-button>
-      </sui-modal-actions>
-    </sui-modal>
-    <sui-modal v-model="renameDialogOpen">
-      <sui-modal-header>Rename / Move</sui-modal-header>
-      <sui-modal-content>        
-        New path:&nbsp;&nbsp;<sui-input icon="edit" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" />
-      </sui-modal-content>
-      <sui-modal-actions>
-        <sui-button @click.native="renameDialogOpen=false">
-          Close
-        </sui-button>
-        <sui-button positive @click.native="renameSelectedFile">
-          Rename
-        </sui-button>
-      </sui-modal-actions>
-    </sui-modal>
+    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="uploadDialogOpen = false" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
+    <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
+    <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
 </div>
 </template>
 
 <script>
 import Header from './Header.vue';
 import Settings from './Settings.vue';
+import AddToDatasetDialog from './AddToDatasetDialog.vue';
+import DeleteDialog from './DeleteDialog.vue';
+import RenameDialog from './RenameDialog.vue';
 import Message from 'commonui/components/Message.vue';
 import FileBrowser from 'commonui/components/FileBrowser.vue';
 import Map from 'commonui/components/Map.vue';
@@ -94,7 +55,6 @@ import TabSwitcher from 'commonui/components/TabSwitcher.vue';
 import Panel from 'commonui/components/Panel.vue';
 import Markdown from 'commonui/components/Markdown.vue';
 import Toolbar from 'commonui/components/Toolbar.vue';
-import DatasetUpload from './DatasetUpload.vue';
 
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
@@ -114,7 +74,9 @@ export default {
         Settings,
         Panel,
         Toolbar,
-        DatasetUpload
+        AddToDatasetDialog,
+        DeleteDialog,
+        RenameDialog
     },
     data: function () {
         return {
@@ -139,7 +101,7 @@ export default {
             dataset: reg.Organization(this.$route.params.org)
                                .Dataset(this.$route.params.ds),
             uploadDialogOpen: false,
-            removeDialogOpen: false,
+            deleteDialogOpen: false,
             renameDialogOpen: false,
             renamePath: null         
         };
@@ -188,7 +150,7 @@ export default {
                     title: "Remove",
                     icon: "trash alternate",
                     onClick: () => {
-                        this.removeDialogOpen = true;
+                        this.deleteDialogOpen = true;
                     }
                 });
             }
@@ -232,6 +194,22 @@ export default {
                 }
             }, !!opts.activate, !!opts.prepend);
         },
+        handleRenameClose: function(id, newPath) {
+            
+            if (id == "rename") {
+                if (newPath == null || newPath.length == 0) return;
+                this.renameSelectedFile(newPath);
+            }
+
+            this.renameDialogOpen = false;
+        },
+        handleDeleteClose: function(id) {
+            if (id == "remove") {
+                this.deleteSelectedFiles();
+            }
+
+            this.deleteDialogOpen = false;
+        },
         deleteSelectedFiles: function() {
             
             for(var file of this.selectedFiles)                 
@@ -239,8 +217,8 @@ export default {
             
             this.removeDialogOpen = false;
         },
-        renameSelectedFile: function() {
-            this.dataset.moveObj(this.selectedFiles[0].entry.path, this.renamePath);
+        renameSelectedFile: function(newPath) {
+            this.dataset.moveObj(this.selectedFiles[0].entry.path, newPath);
             this.renameDialogOpen = false;
         },
         handleFileSelectionChanged: function (fileBrowserFiles) {
