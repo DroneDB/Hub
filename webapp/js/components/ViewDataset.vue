@@ -37,6 +37,9 @@
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="uploadDialogOpen = false" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
+    <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
+        The file has been saved successfully
+    </Alert>
 </div>
 </template>
 
@@ -55,6 +58,7 @@ import TabSwitcher from 'commonui/components/TabSwitcher.vue';
 import Panel from 'commonui/components/Panel.vue';
 import Markdown from 'commonui/components/Markdown.vue';
 import Toolbar from 'commonui/components/Toolbar.vue';
+import Alert from 'commonui/components/Alert.vue';
 
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
@@ -76,7 +80,8 @@ export default {
         Toolbar,
         AddToDatasetDialog,
         DeleteDialog,
-        RenameDialog
+        RenameDialog,
+        Alert
     },
     data: function () {
         return {
@@ -103,6 +108,7 @@ export default {
             uploadDialogOpen: false,
             deleteDialogOpen: false,
             renameDialogOpen: false,
+            saveOkOpen: false,
             renamePath: null         
         };
     },
@@ -185,6 +191,7 @@ export default {
         addMarkdownTab: function(uri, path, label, icon, opts = {}){
 
             var ds = this.dataset;
+            var showOk = this.showOkSave;
 
             this.$refs.mainTabSwitcher.addTab({
                 label,
@@ -197,14 +204,14 @@ export default {
                 },
                 on: {
                     onSave: async function(newContent) {
-
-                        alert("save in: " + newContent);
-                        //debugger;
-                        //const res = await ds.writeObj(path, newContent);
-                        //debugger;
+                        const res = await ds.writeObj(path, newContent);
+                        showOk();
                     }
                 }
             }, !!opts.activate, !!opts.prepend);
+        },
+        showOkSave: function() {
+            this.saveOkOpen = true;
         },
         handleRenameClose: function(id, newPath) {
             
@@ -247,6 +254,9 @@ export default {
         },
         handleCloseProperties: function () {
             this.showProperties = false;
+        },
+        handleSaveOkClose: function() {
+            this.saveOkOpen = false;
         },
 
         handleScrollTo: function(file){
