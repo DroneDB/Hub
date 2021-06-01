@@ -4,7 +4,7 @@
             maxWidth="70%"
             :fixedSize="true">
 
-        New path:&nbsp;&nbsp;<sui-input icon="edit" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" />
+        New path:&nbsp;&nbsp;<input v-model="renamePath" :error="renamePath == null || renamePath.length == 0" />
         
         <div class="buttons">
             <button @click="close('close')" class="ui button">
