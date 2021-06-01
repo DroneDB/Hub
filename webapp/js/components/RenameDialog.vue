@@ -10,7 +10,7 @@
             <button @click="close('close')" class="ui button">
                 Close
             </button>
-            <button @click="rename()" class="ui button positive">
+            <button @click="rename()" :disabled="renamePath == null || renamePath.length == 0" class="ui button positive">
                 Rename
             </button>
         </div>
