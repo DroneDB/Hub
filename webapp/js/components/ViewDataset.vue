@@ -166,10 +166,10 @@ export default {
             if (entries.length === 1){
                 const entry = entries[0];
                 if (entry.meta.readme){
-                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), "Readme", "book");
+                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), entry.meta.readme, "Readme", "book");
                 }
                 if (entry.meta.license){
-                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), "License", "balance scale");
+                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), entry.meta.license, "License", "balance scale");
                 }
             }
 
@@ -182,7 +182,10 @@ export default {
                 };
             });
         },        
-        addMarkdownTab: function(uri, label, icon, opts = {}){
+        addMarkdownTab: function(uri, path, label, icon, opts = {}){
+
+            var ds = this.dataset;
+
             this.$refs.mainTabSwitcher.addTab({
                 label,
                 icon,
@@ -191,6 +194,15 @@ export default {
                 component: Markdown,
                 props: {
                     uri
+                },
+                on: {
+                    onSave: async function(newContent) {
+
+                        alert("save in: " + newContent);
+                        //debugger;
+                        //const res = await ds.writeObj(path, newContent);
+                        //debugger;
+                    }
                 }
             }, !!opts.activate, !!opts.prepend);
         },

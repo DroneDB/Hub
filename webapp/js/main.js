@@ -11,7 +11,6 @@ import ViewDataset from './components/ViewDataset.vue';
 import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
 import { setTitle, queryParams, inIframe } from './libs/utils';
-import SuiVue from 'semantic-ui-vue';
 
 window.addEventListener('load', function(){
     let hdr = Header;
@@ -21,7 +20,6 @@ window.addEventListener('load', function(){
     if (embed) hdr = null;
 
     Vue.use(VueRouter);
-    Vue.use(SuiVue);
         
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: {content: ViewDataset, header: hdr}, meta: { title: "View Dataset"}},
