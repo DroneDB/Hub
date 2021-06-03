@@ -50,7 +50,6 @@
     <div class="droparea" :class="{hide: done || uploading}" ref="droparea">
         <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i class="cloud upload icon"></i> Browse</div>
     </div>
-
 </div>
 </template>
 
@@ -59,7 +58,6 @@ import Message from 'commonui/components/Message.vue';
 import ddb from 'ddb';
 import { bytesToSize } from 'commonui/classes/utils';
 import Dropzone from '../vendor/dropzone';
-//import { inIframe } from '../libs/utils';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -68,7 +66,7 @@ export default {
     components: {
         Message
     },
-    props: ['organization', 'dataset'],
+    props: ['organization', 'dataset', 'path'],
     data: function () {
         return {
             error: "",
@@ -187,7 +185,7 @@ export default {
         })
         .on("sending", (file, xhr, formData) => {
             // Send filename
-            formData.append("path", file.name);
+            formData.append("path", this.path == null ? file.name : this.path + "/" + file.name);
         })
         .on("queuecomplete", async (files) => {
             // Commit

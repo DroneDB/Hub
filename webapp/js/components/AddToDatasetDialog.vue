@@ -4,7 +4,7 @@
             maxWidth="70%"
             :fixedSize="true">
         
-        <DatasetUpload :organization="organization" :dataset="dataset"></DatasetUpload>
+        <DatasetUpload :organization="organization" :dataset="dataset" :path="path"></DatasetUpload>
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
@@ -23,7 +23,7 @@ export default {
       DatasetUpload
   },
 
-  props: ['organization', 'dataset'],
+  props: ['organization', 'dataset', 'path'],
   
   data: function(){
       return {};

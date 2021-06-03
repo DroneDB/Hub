@@ -34,12 +34,13 @@
         </TabSwitcher>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
-    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="uploadDialogOpen = false" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
+    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="uploadDialogOpen = false" :path="getPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
         The file has been saved successfully
     </Alert>
+    <Loader v-if="isBusy"></Loader>
 </div>
 </template>
 
@@ -59,6 +60,7 @@ import Panel from 'commonui/components/Panel.vue';
 import Markdown from 'commonui/components/Markdown.vue';
 import Toolbar from 'commonui/components/Toolbar.vue';
 import Alert from 'commonui/components/Alert.vue';
+import Loader from 'commonui/components/Loader.vue';
 
 import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
@@ -81,7 +83,8 @@ export default {
         AddToDatasetDialog,
         DeleteDialog,
         RenameDialog,
-        Alert
+        Alert,
+        Loader
     },
     data: function () {
         return {
@@ -109,7 +112,8 @@ export default {
             deleteDialogOpen: false,
             renameDialogOpen: false,
             saveOkOpen: false,
-            renamePath: null         
+            renamePath: null,
+            isBusy: false     
         };
     },
     mounted: function(){
@@ -126,6 +130,18 @@ export default {
             } else {
                 return this.fileBrowserFiles.filter(f => f.selected);
             }
+        },
+        getPath: function() {
+            if (this.fileBrowserFiles.length == 0) return null;
+
+            var cur = this.fileBrowserFiles[0].entry.path;
+            
+            var idx = cur.lastIndexOf('/');
+
+            if (idx == -1) return null;
+
+            return cur.substr(0, idx);
+            
         },
         tools: function() {
 
@@ -192,6 +208,7 @@ export default {
 
             var ds = this.dataset;
             var showOk = this.showOkSave;
+            var setBusy = this.setBusy;
 
             this.$refs.mainTabSwitcher.addTab({
                 label,
@@ -204,7 +221,9 @@ export default {
                 },
                 on: {
                     onSave: async function(newContent) {
-                        const res = await ds.writeObj(path, newContent);
+                        setBusy(true);
+                        await ds.writeObj(path, newContent);
+                        setBusy(false);
                         showOk();
                     }
                 }
@@ -213,32 +232,39 @@ export default {
         showOkSave: function() {
             this.saveOkOpen = true;
         },
-        handleRenameClose: function(id, newPath) {
+        setBusy: function(busy) {
+            this.isBusy = busy;
+        },
+        handleRenameClose: async function(id, newPath) {
             
             if (id == "rename") {
                 if (newPath == null || newPath.length == 0) return;
-                this.renameSelectedFile(newPath);
+                await this.renameSelectedFile(newPath);
             }
 
             this.renameDialogOpen = false;
         },
-        handleDeleteClose: function(id) {
+        handleDeleteClose: async function(id) {
             if (id == "remove") {
-                this.deleteSelectedFiles();
+                await this.deleteSelectedFiles();
             }
 
             this.deleteDialogOpen = false;
         },
-        deleteSelectedFiles: function() {
-            
+        deleteSelectedFiles: async function() {
+
+            this.isBusy = true;
+
             for(var file of this.selectedFiles)                 
-                this.dataset.deleteObj(file.entry.path);
+                await this.dataset.deleteObj(file.entry.path);
             
-            this.removeDialogOpen = false;
+            this.isBusy = false;
+           
         },
-        renameSelectedFile: function(newPath) {
-            this.dataset.moveObj(this.selectedFiles[0].entry.path, newPath);
-            this.renameDialogOpen = false;
+        renameSelectedFile: async function(newPath) {
+            this.isBusy = true;
+            await this.dataset.moveObj(this.selectedFiles[0].entry.path, newPath);
+            this.isBusy = false;
         },
         handleFileSelectionChanged: function (fileBrowserFiles) {
             this.fileBrowserFiles.forEach(f => f.selected = false);
