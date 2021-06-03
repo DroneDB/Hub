@@ -113,7 +113,7 @@ export default {
             renameDialogOpen: false,
             saveOkOpen: false,
             renamePath: null,
-            isBusy: false     
+            isBusy: false  
         };
     },
     mounted: function(){
@@ -132,15 +132,10 @@ export default {
             }
         },
         getPath: function() {
+
             if (this.fileBrowserFiles.length == 0) return null;
 
-            var cur = this.fileBrowserFiles[0].entry.path;
-            
-            var idx = cur.lastIndexOf('/');
-
-            if (idx == -1) return null;
-
-            return cur.substr(0, idx);
+            return pathutils.getParentFolder(this.fileBrowserFiles[0].entry.path);
             
         },
         tools: function() {
@@ -255,15 +250,19 @@ export default {
 
             this.isBusy = true;
 
-            for(var file of this.selectedFiles)                 
+            for(var file of this.selectedFiles) {            
                 await this.dataset.deleteObj(file.entry.path);
+                this.$root.$emit('entryDeleted', file.entry.path);
+            }
             
             this.isBusy = false;
            
         },
         renameSelectedFile: async function(newPath) {
             this.isBusy = true;
-            await this.dataset.moveObj(this.selectedFiles[0].entry.path, newPath);
+            var oldPath = this.selectedFiles[0].entry.path;
+            await this.dataset.moveObj(oldPath, newPath);
+            this.$root.$emit('entryChanged', oldPath, newPath);
             this.isBusy = false;
         },
         handleFileSelectionChanged: function (fileBrowserFiles) {
