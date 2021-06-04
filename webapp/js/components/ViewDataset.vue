@@ -34,7 +34,7 @@
         </TabSwitcher>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
-    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="uploadDialogOpen = false" :path="getPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
+    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="getPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
@@ -66,6 +66,7 @@ import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
 import reg from '../libs/sharedRegistry';
 import { setTitle } from '../libs/utils';
+import { clone } from 'commonui/classes/utils';
 
 export default {
     props: ["org", "ds"],
@@ -249,20 +250,23 @@ export default {
         deleteSelectedFiles: async function() {
 
             this.isBusy = true;
-
+            var deleted = [];
             for(var file of this.selectedFiles) {            
                 await this.dataset.deleteObj(file.entry.path);
-                this.$root.$emit('entryDeleted', file.entry.path);
+                deleted.push(file.entry.path);
             }
-            
+
+            this.$root.$emit('refreshEntries', 'deleted', deleted);
+           
             this.isBusy = false;
            
         },
         renameSelectedFile: async function(newPath) {
             this.isBusy = true;
-            var oldPath = this.selectedFiles[0].entry.path;
+            var item = this.selectedFiles[0];
+            var oldPath = item.entry.path;
             await this.dataset.moveObj(oldPath, newPath);
-            this.$root.$emit('entryChanged', oldPath, newPath);
+            this.$root.$emit('refreshEntries', 'rename', item, newPath);
             this.isBusy = false;
         },
         handleFileSelectionChanged: function (fileBrowserFiles) {
@@ -282,6 +286,13 @@ export default {
         },
         handleSaveOkClose: function() {
             this.saveOkOpen = false;
+        },
+        handleAddClose: function(uploaded) {
+            this.uploadDialogOpen = false;
+            //console.log(clone(uploaded));
+            //debugger;
+            if (uploaded.length != 0)
+            	this.$root.$emit('refreshEntries', 'add');
         },
 
         handleScrollTo: function(file){

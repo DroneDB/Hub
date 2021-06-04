@@ -1,12 +1,12 @@
 <template>
-    <Window title="Rename / Move" id="rename" @onClose="close('close')" 
+    <Window title="Rename / Move" id="rename" @onClose="close" 
             :modal="true"
             maxWidth="70%"
             :fixedSize="true">
         
-        <DatasetUpload :organization="organization" :dataset="dataset" :path="path"></DatasetUpload>
+        <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded"></DatasetUpload>
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
+            <button @click="close" class="ui button">
                 Close
             </button>
         </div>
@@ -16,6 +16,7 @@
 <script>
 import Window from 'commonui/components/Window.vue';
 import DatasetUpload from './DatasetUpload.vue';
+import { clone } from 'commonui/classes/utils';
 
 export default {
   components: {
@@ -24,15 +25,20 @@ export default {
   },
 
   props: ['organization', 'dataset', 'path'],
-  
+    
   data: function(){
-      return {};
+      return {
+          uploaded: []
+      };
   },
   mounted: function(){
   },
   methods: {
-      close: function(buttonId){
-          this.$emit('onClose', buttonId);
+      close: function(){
+          this.$emit('onClose', this.uploaded);
+      },
+      onUploaded: function(file) {
+          this.uploaded.push(file);
       }
   }
 }

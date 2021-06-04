@@ -171,6 +171,7 @@ export default {
                 // use the file size as the true number of bytes
                 this.totalBytesSent = this.totalBytesSent + file.size;
                 if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
+                this.$emit('onUpload', file);
             } else {
                 //let err = `Failed to upload ${file.name}`;
                 //console.error(err);
