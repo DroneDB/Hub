@@ -1,7 +1,6 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
-
     <Panel split="vertical" class="container main" amount="25%">
         <div class="sidebar">
             <TabSwitcher :tabs="tabs">
@@ -37,6 +36,7 @@
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="getPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
+    <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
         The file has been saved successfully
     </Alert>
@@ -50,6 +50,7 @@ import Settings from './Settings.vue';
 import AddToDatasetDialog from './AddToDatasetDialog.vue';
 import DeleteDialog from './DeleteDialog.vue';
 import RenameDialog from './RenameDialog.vue';
+import NewFolderDialog from './NewFolderDialog.vue';
 import Message from 'commonui/components/Message.vue';
 import FileBrowser from 'commonui/components/FileBrowser.vue';
 import Map from 'commonui/components/Map.vue';
@@ -84,6 +85,7 @@ export default {
         AddToDatasetDialog,
         DeleteDialog,
         RenameDialog,
+        NewFolderDialog,
         Alert,
         Loader
     },
@@ -112,9 +114,11 @@ export default {
             uploadDialogOpen: false,
             deleteDialogOpen: false,
             renameDialogOpen: false,
+            createFolderDialogOpen: false,
             saveOkOpen: false,
             renamePath: null,
-            isBusy: false  
+            isBusy: false,
+            currentPath: null
         };
     },
     mounted: function(){
@@ -147,6 +151,13 @@ export default {
                     icon: "upload",
                     onClick: () => {
                         this.uploadDialogOpen = true;
+                    }
+                }, {
+                    id: 'newfolder',
+                    title: "Create folder",
+                    icon: "folder",
+                    onClick: () => {
+                        this.createFolderDialogOpen = true;
                     }
                 }];
 
@@ -269,7 +280,21 @@ export default {
             this.$root.$emit('refreshEntries', 'rename', item, newPath);
             this.isBusy = false;
         },
-        handleFileSelectionChanged: function (fileBrowserFiles) {
+
+        createFolder: async function(newPath) {
+            this.isBusy = true;
+            //debugger;
+            
+            if (typeof this.currentPath !== 'undefined' && this.currentPath != null) newPath = this.currentPath + "/" + newPath;
+
+            await this.dataset.createFolder(newPath);
+            this.$root.$emit('refreshEntries', 'newFolder', newPath);
+            this.isBusy = false;
+        },
+
+        handleFileSelectionChanged: function (fileBrowserFiles, path) {
+            this.currentPath = path;
+
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
         },
@@ -283,6 +308,15 @@ export default {
         },
         handleCloseProperties: function () {
             this.showProperties = false;
+        },
+        handleNewFolderClose: async function(id, newFolderPath) {
+
+            if (id == "createFolder") {
+                if (newFolderPath == null || newFolderPath.length == 0) return;
+                await this.createFolder(newFolderPath);
+            }
+
+            this.createFolderDialogOpen = false;
         },
         handleSaveOkClose: function() {
             this.saveOkOpen = false;
