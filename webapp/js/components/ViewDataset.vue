@@ -138,7 +138,8 @@ export default {
         },
         getPath: function() {
 
-            if (this.fileBrowserFiles.length == 0) return null;
+            if (this.fileBrowserFiles.length == 0)                 
+                return (typeof this.currentPath == 'undefined' || this.currentPath == null) ? null : this.currentPath;
 
             return pathutils.getParentFolder(this.fileBrowserFiles[0].entry.path);
             
