@@ -263,12 +263,15 @@ export default {
 
             this.isBusy = true;
             var deleted = [];
+
             for(var file of this.selectedFiles) {            
                 await this.dataset.deleteObj(file.entry.path);
                 deleted.push(file.entry.path);
             }
 
-            this.$root.$emit('refreshEntries', 'deleted', deleted);
+            this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
+
+            this.$root.$emit('deletedEntries', deleted);
            
             this.isBusy = false;
            
