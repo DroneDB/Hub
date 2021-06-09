@@ -13,9 +13,12 @@ module.exports = {
     
     output: {
         path: path.join(__dirname, './build'),
-        filename: "[name].js"
+        filename: "[name].js",
+        sourceMapFilename: "[name].js.map"
         // publicPath: "/build/"
     },
+    
+    devtool: "source-map",
 
     module: {
         rules: [

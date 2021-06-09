@@ -22,6 +22,7 @@
     "vue-router": "^3.4.9"
   },
   "devDependencies": {
+    "prettier": "2.3.1",
     "webpack-livereload-plugin": "^2.3.0"
   }
 }
