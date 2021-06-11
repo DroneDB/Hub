@@ -15,8 +15,8 @@
                 </template>
             </TabSwitcher>
         </div>
-        <TabSwitcher :tabs="mainTabs" 
-                    position="top" 
+        <TabSwitcher :tabs="mainTabs"
+                    position="top"
                     buttonWidth="auto"
                     :hideSingle="true"
                     ref="mainTabSwitcher" >
@@ -63,11 +63,13 @@ import Toolbar from 'commonui/components/Toolbar.vue';
 import Alert from 'commonui/components/Alert.vue';
 import Loader from 'commonui/components/Loader.vue';
 
-import { pathutils } from 'ddb';
 import icons from 'commonui/classes/icons';
 import reg from '../libs/sharedRegistry';
 import { setTitle } from '../libs/utils';
 import { clone } from 'commonui/classes/utils';
+
+import ddb from 'ddb';
+const { pathutils } = ddb;
 
 export default {
     props: ["org", "ds"],
@@ -268,9 +270,10 @@ export default {
                 await this.dataset.deleteObj(file.entry.path);
                 deleted.push(file.entry.path);
             }
-
+            
             this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
 
+            //console.log(clone(this.rootNodes));
             this.$root.$emit('deletedEntries', deleted);
            
             this.isBusy = false;
@@ -281,7 +284,7 @@ export default {
             var item = this.selectedFiles[0];
             var oldPath = item.entry.path;
             await this.dataset.moveObj(oldPath, newPath);
-            this.$root.$emit('refreshEntries', 'rename', item, newPath);
+            //this.$root.$emit('refreshEntries', 'rename', item, newPath);
             this.isBusy = false;
         },
 
@@ -291,8 +294,79 @@ export default {
             
             if (typeof this.currentPath !== 'undefined' && this.currentPath != null) newPath = this.currentPath + "/" + newPath;
 
-            await this.dataset.createFolder(newPath);
-            this.$root.$emit('refreshEntries', 'newFolder', newPath);
+            var entry = await this.dataset.createFolder(newPath);
+
+            const getChildren = async function () {
+                try {
+                    const entries = await ddb.fetchEntries(this.path, {
+                        withHash: false,
+                        recursive: true,
+                        maxRecursionDepth: 1,
+                        stopOnError: false
+                    });
+
+                    return entries.filter(entry => {
+                            return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
+                        })
+                        .sort((a, b) => {
+                            // Folders first
+                            let aDir = ddb.entry.isDirectory(a);
+                            let bDir = ddb.entry.isDirectory(b);
+
+                            if (aDir && !bDir) return -1;
+                            else if (!aDir && bDir) return 1;
+                            else {
+                                // then filename ascending
+                                return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
+                            }
+                        })
+                        .map(entry => {
+                            const base = pathutils.basename(entry.path);
+
+                            return {
+                                icon: icons.getForType(entry.type),
+                                label: base,
+                                path: pathutils.join(this.path, base),
+                                getChildren: ddb.entry.isDirectory(entry) ? getChildren : null,
+                                selected: false,
+                                entry
+                            }
+                        });
+                } catch (e) {
+                    if (e.message == "Unauthorized"){
+                        this.$emit('unauthorized');
+                    }else{
+                        console.error(e);
+                    }
+                    return [];
+                }
+            };
+
+            const base = pathutils.basename(entry.path);
+
+            this.fileBrowserFiles.push({
+                icon: icons.getForType(entry.type),
+                label: base,
+                path: base,//pathutils.join(this.currentPath, base),
+                getChildren: ddb.entry.isDirectory(entry) ? getChildren : null,
+                selected: false,
+                entry
+            });            
+
+            this.fileBrowserFiles = this.fileBrowserFiles.sort((a, b) => {
+                                // Folders first
+                                let aDir = ddb.entry.isDirectory(a);
+                                let bDir = ddb.entry.isDirectory(b);
+
+                                if (aDir && !bDir) return -1;
+                                else if (!aDir && bDir) return 1;
+                                else {
+                                    // then filename ascending
+                                    return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
+                                }
+                            });
+
+            this.$root.$emit('addEntries', [entry]);
             this.isBusy = false;
         },
 
@@ -327,10 +401,12 @@ export default {
         },
         handleAddClose: function(uploaded) {
             this.uploadDialogOpen = false;
+            this.$root.$emit('addEntries', uploaded);
+
             //console.log(clone(uploaded));
             //debugger;
-            if (uploaded.length != 0)
-            	this.$root.$emit('refreshEntries', 'add');
+            //if (uploaded.length != 0)
+            //    this.$root.$emit('addEntries', uploaded);
         },
 
         handleScrollTo: function(file){

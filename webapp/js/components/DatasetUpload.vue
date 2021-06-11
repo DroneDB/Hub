@@ -163,7 +163,7 @@ export default {
             this.dz.processQueue();
            
         })
-        .on("complete", (file) => {
+        .on("complete", (file, res) => {
             if (file.status === "success"){
                 this.uploadedFiles = this.uploadedFiles + 1;
 
@@ -171,7 +171,8 @@ export default {
                 // use the file size as the true number of bytes
                 this.totalBytesSent = this.totalBytesSent + file.size;
                 if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
-                this.$emit('onUpload', file);
+                
+                this.$emit('onUpload', JSON.parse(file.xhr.response));
             } else {
                 //let err = `Failed to upload ${file.name}`;
                 //console.error(err);
