@@ -296,59 +296,12 @@ export default {
 
             var entry = await this.dataset.createFolder(newPath);
 
-            const getChildren = async function () {
-                try {
-                    const entries = await ddb.fetchEntries(this.path, {
-                        withHash: false,
-                        recursive: true,
-                        maxRecursionDepth: 1,
-                        stopOnError: false
-                    });
-
-                    return entries.filter(entry => {
-                            return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
-                        })
-                        .sort((a, b) => {
-                            // Folders first
-                            let aDir = ddb.entry.isDirectory(a);
-                            let bDir = ddb.entry.isDirectory(b);
-
-                            if (aDir && !bDir) return -1;
-                            else if (!aDir && bDir) return 1;
-                            else {
-                                // then filename ascending
-                                return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                            }
-                        })
-                        .map(entry => {
-                            const base = pathutils.basename(entry.path);
-
-                            return {
-                                icon: icons.getForType(entry.type),
-                                label: base,
-                                path: pathutils.join(this.path, base),
-                                getChildren: ddb.entry.isDirectory(entry) ? getChildren : null,
-                                selected: false,
-                                entry
-                            }
-                        });
-                } catch (e) {
-                    if (e.message == "Unauthorized"){
-                        this.$emit('unauthorized');
-                    }else{
-                        console.error(e);
-                    }
-                    return [];
-                }
-            };
-
             const base = pathutils.basename(entry.path);
 
             this.fileBrowserFiles.push({
                 icon: icons.getForType(entry.type),
                 label: base,
                 path: base,//pathutils.join(this.currentPath, base),
-                getChildren: ddb.entry.isDirectory(entry) ? getChildren : null,
                 selected: false,
                 entry
             });            
@@ -401,6 +354,20 @@ export default {
         },
         handleAddClose: function(uploaded) {
             this.uploadDialogOpen = false;
+
+            for(var entry of uploaded) {
+
+                const base = pathutils.basename(entry.path);
+
+                this.fileBrowserFiles.push({
+                    icon: icons.getForType(entry.type),
+                    label: base,
+                    path: (typeof this.currentPath !== 'undefined' && this.currentPath != null) ? pathutils.join(this.currentPath, base) : base,
+                    selected: false,
+                    entry
+                });    
+            }
+
             this.$root.$emit('addEntries', uploaded);
 
             //console.log(clone(uploaded));
