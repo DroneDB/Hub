@@ -34,7 +34,7 @@
         </TabSwitcher>
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
-    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="getPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
+    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
@@ -139,12 +139,6 @@ export default {
                 return this.fileBrowserFiles.filter(f => f.selected);
             }
         },
-        getPath: function() {
-            if (this.fileBrowserFiles.length == 0)                 
-                return (typeof this.currentPath == 'undefined' || this.currentPath == null) ? null : this.currentPath;
-            return pathutils.getParentFolder(this.fileBrowserFiles[0].entry.path);
-            
-        },
         tools: function() {
 
             var tools = [{
@@ -238,6 +232,26 @@ export default {
                 }
             }, !!opts.activate, !!opts.prepend);
         },
+
+        sortFiles: function() {
+            this.fileBrowserFiles = this.fileBrowserFiles.sort((n1, n2) => {
+
+                                var a = n1.entry;
+                                var b = n2.entry;
+
+                                // Folders first
+                                let aDir = ddb.entry.isDirectory(a);
+                                let bDir = ddb.entry.isDirectory(b);
+
+                                if (aDir && !bDir) return -1;
+                                else if (!aDir && bDir) return 1;
+                                else {
+                                    // then filename ascending
+                                    return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
+                                }
+                            });
+        },
+
         showOkSave: function() {
             this.saveOkOpen = true;
         },
@@ -273,7 +287,7 @@ export default {
             this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
 
             //console.log(clone(this.rootNodes));
-            this.$root.$emit('deletedEntries', deleted);
+            this.$root.$emit('deleteEntries', deleted);
            
             this.isBusy = false;
            
@@ -283,7 +297,24 @@ export default {
             var item = this.selectedFiles[0];
             var oldPath = item.entry.path;
             await this.dataset.moveObj(oldPath, newPath);
-            //this.$root.$emit('refreshEntries', 'rename', item, newPath);
+                        
+            // Let's remove both the new file path and the old one because it could be a replace
+            this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
+
+            var newItem = clone(item);
+            newItem.path = this.dataset.remoteUri(newPath),//pathutils.join(this.currentPath, base),
+            newItem.label = pathutils.basename(newPath);
+            newItem.entry.path = newPath;
+
+            console.log(pathutils.getParentFolder(newPath));            
+            if (pathutils.getParentFolder(newPath) == this.currentPath) 
+                this.fileBrowserFiles.push(newItem);
+
+            this.$root.$emit('deleteEntries', [oldPath]);
+            this.$root.$emit('addItems', [newItem]);
+
+            this.sortFiles();
+
             this.isBusy = false;
         },
 
@@ -297,28 +328,19 @@ export default {
 
             const base = pathutils.basename(entry.path);
 
-            this.fileBrowserFiles.push({
+            var folderItem = {
                 icon: icons.getForType(entry.type),
                 label: base,
                 path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
                 selected: false,
                 entry
-            });            
+            };
 
-            this.fileBrowserFiles = this.fileBrowserFiles.sort((a, b) => {
-                                // Folders first
-                                let aDir = ddb.entry.isDirectory(a);
-                                let bDir = ddb.entry.isDirectory(b);
+            this.fileBrowserFiles.push(folderItem);            
 
-                                if (aDir && !bDir) return -1;
-                                else if (!aDir && bDir) return 1;
-                                else {
-                                    // then filename ascending
-                                    return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                                }
-                            });
+            this.sortFiles();
 
-            this.$root.$emit('addEntries', [entry]);
+            this.$root.$emit('addItems', [folderItem]);
             this.isBusy = false;
         },
 
@@ -349,7 +371,7 @@ export default {
             this.showProperties = false;
         },
         handleNewFolderClose: async function(id, newFolderPath) {
-            debugger;
+            //debugger;
             if (id == "createFolder") {
                 if (newFolderPath == null || newFolderPath.length == 0) return;
                 await this.createFolder(newFolderPath);
@@ -366,20 +388,34 @@ export default {
 
             if (uploaded.length == 0) return;
 
+            var items = [];
+
             for(var entry of uploaded) {
+
+                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0) {
+                    console.log("Skipping " + entry.path);
+                    continue;
+                }
 
                 const base = pathutils.basename(entry.path);
 
-                this.fileBrowserFiles.push({
+                var item = {
                     icon: icons.getForType(entry.type),
                     label: base,
-                    path: (typeof this.currentPath !== 'undefined' && this.currentPath != null) ? pathutils.join(this.currentPath, base) : base,
+                    path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
+                    //path: (typeof this.currentPath !== 'undefined' && this.currentPath != null) ? pathutils.join(this.currentPath, base) : base,
                     selected: false,
                     entry
-                });    
+                };
+
+                this.fileBrowserFiles.push(item);
+                items.push(item);    
             }
 
-            this.$root.$emit('addEntries', uploaded);
+            this.sortFiles();
+
+            if (items.length > 0) 
+                this.$root.$emit('addItems', items);
 
         },
 

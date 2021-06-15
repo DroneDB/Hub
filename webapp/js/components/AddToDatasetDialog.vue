@@ -1,5 +1,5 @@
 <template>
-    <Window title="Rename / Move" id="rename" @onClose="close" 
+    <Window title="Add to dataset" id="rename" @onClose="close" 
             :modal="true"
             maxWidth="70%"
             :fixedSize="true">

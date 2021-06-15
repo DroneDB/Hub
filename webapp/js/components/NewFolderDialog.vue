@@ -4,7 +4,7 @@
             maxWidth="70%"
             :fixedSize="true">
 
-        New folder name:&nbsp;&nbsp;<input v-model="newFolderPath" :error="newFolderPath == null || newFolderPath.length == 0" />
+        New folder name:&nbsp;&nbsp;<input v-model="newFolderPath" :error="newFolderPath == null || newFolderPath.length == 0" autofocus />
         
         <div class="buttons">
             <button @click="close('close')" class="ui button">
