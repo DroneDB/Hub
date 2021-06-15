@@ -8,7 +8,7 @@
                     <FileBrowser :rootNodes="rootNodes" 
                         @selectionChanged="handleFileSelectionChanged" 
                         @openProperties="handleFileBrowserOpenProperties"
-                        @unauthorized="handleUnauthorized" />
+                        @error="handleError" />
                 </template>
                 <template v-slot:settings>
                     <Settings :dataset="dataset" />
@@ -40,6 +40,10 @@
     <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
         The file has been saved successfully
     </Alert>
+    <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
+        {{errorMessage}}
+    </Alert>
+
     <Loader v-if="isBusy"></Loader>
 </div>
 </template>
@@ -120,7 +124,10 @@ export default {
             saveOkOpen: false,
             renamePath: null,
             isBusy: false,
-            currentPath: null
+            currentPath: null,
+            errorDialogOpen: false,
+            errorMessage: null,
+            errorMessageTitle: null,
         };
     },
     mounted: function(){
@@ -184,6 +191,9 @@ export default {
     },
     methods: {
         rootNodes: async function () {
+
+            try {
+
             const entries = await this.dataset.info();
 
             // Add license / readme tabs
@@ -205,6 +215,11 @@ export default {
                     entry: e
                 };
             });
+
+            } catch (e) {
+                this.showError(e, "Dataset");
+                return [];
+            }
         },        
         addMarkdownTab: function(uri, path, label, icon, opts = {}){
 
@@ -250,7 +265,11 @@ export default {
                                 }
                             });
         },
-
+        showError: function(text, title) {
+            this.errorMessage = text;
+            this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
+            this.errorDialogOpen = true;
+        },
         showOkSave: function() {
             this.saveOkOpen = true;
         },
@@ -276,90 +295,108 @@ export default {
         deleteSelectedFiles: async function() {
 
             this.isBusy = true;
-            var deleted = [];
 
-            for(var file of this.selectedFiles) {            
-                await this.dataset.deleteObj(file.entry.path);
-                deleted.push(file.entry.path);
-            }
-            
-            this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
+            try {
+                var deleted = [];
 
-            //console.log(clone(this.rootNodes));
-            this.$root.$emit('deleteEntries', deleted);
+                for(var file of this.selectedFiles) {            
+                    await this.dataset.deleteObj(file.entry.path);
+                    deleted.push(file.entry.path);
+                }
+                
+                this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
+
+                //console.log(clone(this.rootNodes));
+                this.$root.$emit('deleteEntries', deleted);
            
+            } catch(e) {
+                this.showError(e, "Delete");
+            }
+
             this.isBusy = false;
            
         },
         renameSelectedFile: async function(newPath) {
+
             this.isBusy = true;
-            var item = this.selectedFiles[0];
-            var oldPath = item.entry.path;
-            await this.dataset.moveObj(oldPath, newPath);
-                        
-            // Let's remove both the new file path and the old one because it could be a replace
-            this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
-            var newItem = clone(item);
-            newItem.path = this.dataset.remoteUri(newPath),//pathutils.join(this.currentPath, base),
-            newItem.label = pathutils.basename(newPath);
-            newItem.entry.path = newPath;
+            if (this.selectedFiles.length == 0) return;
 
-            console.log(pathutils.getParentFolder(newPath));            
-            if (pathutils.getParentFolder(newPath) == this.currentPath) 
-                this.fileBrowserFiles.push(newItem);
+            try {
 
-            this.$root.$emit('deleteEntries', [oldPath]);
-            this.$root.$emit('addItems', [newItem]);
+                var item = this.selectedFiles[0];
+                var oldPath = item.entry.path;
+                await this.dataset.moveObj(oldPath, newPath);
+                            
+                // Let's remove both the new file path and the old one because it could be a replace
+                this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
-            this.sortFiles();
+                var newItem = clone(item);
+                newItem.path = this.dataset.remoteUri(newPath),
+                newItem.label = pathutils.basename(newPath);
+                newItem.entry.path = newPath;
+
+                // Let's add it to our explorer (we are in the same folder)
+                if (pathutils.getParentFolder(newPath) == this.currentPath) 
+                    this.fileBrowserFiles.push(newItem);
+
+                // Tell filebrowser to remove the file in the old location and add to the new location
+                this.$root.$emit('deleteEntries', [oldPath]);
+                this.$root.$emit('addItems', [newItem]);
+
+                this.sortFiles();
+
+            } catch(e) {
+                this.showError(e, "Rename file");
+            }
 
             this.isBusy = false;
         },
 
         createFolder: async function(newPath) {
-            this.isBusy = true;
-            //debugger;
             
-            if (typeof this.currentPath !== 'undefined' && this.currentPath != null) newPath = this.currentPath + "/" + newPath;
+            this.isBusy = true;
+            
+            if (typeof this.currentPath !== 'undefined' && this.currentPath != null) 
+                newPath = this.currentPath + "/" + newPath;
 
-            var entry = await this.dataset.createFolder(newPath);
+            try {
 
-            const base = pathutils.basename(entry.path);
+                var entry = await this.dataset.createFolder(newPath);
 
-            var folderItem = {
-                icon: icons.getForType(entry.type),
-                label: base,
-                path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
-                selected: false,
-                entry
-            };
+                const base = pathutils.basename(entry.path);
 
-            this.fileBrowserFiles.push(folderItem);            
+                var folderItem = {
+                    icon: icons.getForType(entry.type),
+                    label: base,
+                    path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),
+                    selected: false,
+                    entry
+                };
 
-            this.sortFiles();
+                this.fileBrowserFiles.push(folderItem);            
 
-            this.$root.$emit('addItems', [folderItem]);
+                this.sortFiles();
+
+                // Tell filebrowser to add items
+                this.$root.$emit('addItems', [folderItem]);
+
+            } catch(e) {
+                this.showError(e, "Create folder");
+            }
+
             this.isBusy = false;
         },
-        handleFolderOpened: function(folder) {
-            console.log(clone(folder));
-            debugger;
-        },
+
         handleFileSelectionChanged: function (fileBrowserFiles, path) {
-            //this.currentPath = path;
-            //console.log(clone(path));
-            //console.log(clone(fileBrowserFiles));
-            //debugger;
-            console.log("In handleFileSelectionChanged");
-            console.log(clone(fileBrowserFiles));
-            console.log(clone(path));
-            
+        
             if (typeof fileBrowserFiles === 'undefined') return;
 
             this.fileBrowserFiles.forEach(f => f.selected = (f.entry.path == path));
             this.fileBrowserFiles = fileBrowserFiles;
-            this.currentPath = (typeof path !== 'undefined') ? path : (fileBrowserFiles.length > 0) ? pathutils.getParentFolder(fileBrowserFiles[0].entry.path) : null;
+            this.currentPath = (typeof path !== 'undefined') ? path : 
+                                    (fileBrowserFiles.length > 0) ? pathutils.getParentFolder(fileBrowserFiles[0].entry.path) : null;
+
         },
         handleExplorerOpenProperties: function () {
             this.showProperties = true;
@@ -369,11 +406,14 @@ export default {
             this.showProperties = true;
             this.selectedUsingFileBrowserList = true;
         },
+        handleErrorDialogClose: function () {
+            this.errorDialogOpen = false;
+        },
         handleCloseProperties: function () {
             this.showProperties = false;
         },
         handleNewFolderClose: async function(id, newFolderPath) {
-            //debugger;
+
             if (id == "createFolder") {
                 if (newFolderPath == null || newFolderPath.length == 0) return;
                 await this.createFolder(newFolderPath);
@@ -394,28 +434,28 @@ export default {
 
             for(var entry of uploaded) {
 
-                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0) {
-                    console.log("Skipping " + entry.path);
+                // Don't add the same file twice
+                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)                    
                     continue;
-                }
-
+                
                 const base = pathutils.basename(entry.path);
 
                 var item = {
                     icon: icons.getForType(entry.type),
                     label: base,
                     path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
-                    //path: (typeof this.currentPath !== 'undefined' && this.currentPath != null) ? pathutils.join(this.currentPath, base) : base,
                     selected: false,
                     entry
                 };
 
+                // Add the file to the explorer
                 this.fileBrowserFiles.push(item);
                 items.push(item);    
             }
 
             this.sortFiles();
 
+            // Only if any add is necessary, send addItems message to filebrowser
             if (items.length > 0) 
                 this.$root.$emit('addItems', items);
 
@@ -425,8 +465,8 @@ export default {
             this.$refs.explorer.scrollTo(file);
         },
 
-        handleUnauthorized: function(){
-
+        handleError: function(e){            
+            this.showError(e, "Error");            
         }
     },
     watch: {
