@@ -21,6 +21,7 @@
                     :hideSingle="true"
                     ref="mainTabSwitcher" >
             <template v-slot:map>
+                <div style="padding: 4px">{{currentPath}}</div>
                 <Toolbar :tools="tools" ref="toolbar" />
                 <Panel split="horizontal" class="container vertical" amount="50%">                    
                     <Explorer ref="explorer" 
@@ -139,10 +140,8 @@ export default {
             }
         },
         getPath: function() {
-
             if (this.fileBrowserFiles.length == 0)                 
                 return (typeof this.currentPath == 'undefined' || this.currentPath == null) ? null : this.currentPath;
-
             return pathutils.getParentFolder(this.fileBrowserFiles[0].entry.path);
             
         },
@@ -301,7 +300,7 @@ export default {
             this.fileBrowserFiles.push({
                 icon: icons.getForType(entry.type),
                 label: base,
-                path: base,//pathutils.join(this.currentPath, base),
+                path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
                 selected: false,
                 entry
             });            
@@ -324,10 +323,19 @@ export default {
         },
 
         handleFileSelectionChanged: function (fileBrowserFiles, path) {
-            this.currentPath = path;
+            //this.currentPath = path;
+            //console.log(clone(path));
+            //console.log(clone(fileBrowserFiles));
+            //debugger;
+            console.log("In handleFileSelectionChanged");
+            console.log(clone(fileBrowserFiles));
+            console.log(clone(path));
+            
+            if (typeof fileBrowserFiles === 'undefined') return;
 
-            this.fileBrowserFiles.forEach(f => f.selected = false);
+            this.fileBrowserFiles.forEach(f => f.selected = (f.entry.path == path));
             this.fileBrowserFiles = fileBrowserFiles;
+            this.currentPath = (typeof path !== 'undefined') ? path : (fileBrowserFiles.length > 0) ? pathutils.getParentFolder(fileBrowserFiles[0].entry.path) : null;
         },
         handleExplorerOpenProperties: function () {
             this.showProperties = true;
@@ -341,7 +349,7 @@ export default {
             this.showProperties = false;
         },
         handleNewFolderClose: async function(id, newFolderPath) {
-
+            debugger;
             if (id == "createFolder") {
                 if (newFolderPath == null || newFolderPath.length == 0) return;
                 await this.createFolder(newFolderPath);
@@ -353,7 +361,10 @@ export default {
             this.saveOkOpen = false;
         },
         handleAddClose: function(uploaded) {
+            
             this.uploadDialogOpen = false;
+
+            if (uploaded.length == 0) return;
 
             for(var entry of uploaded) {
 
@@ -370,10 +381,6 @@ export default {
 
             this.$root.$emit('addEntries', uploaded);
 
-            //console.log(clone(uploaded));
-            //debugger;
-            //if (uploaded.length != 0)
-            //    this.$root.$emit('addEntries', uploaded);
         },
 
         handleScrollTo: function(file){
