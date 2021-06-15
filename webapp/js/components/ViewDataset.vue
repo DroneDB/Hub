@@ -26,7 +26,6 @@
                 <Panel split="horizontal" class="container vertical" amount="50%">                    
                     <Explorer ref="explorer" 
                             :files="fileBrowserFiles" 
-                            @folderOpened="handleFileSelectionChanged" 
                             @openProperties="handleExplorerOpenProperties" />
                     <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
                 </Panel>
@@ -343,7 +342,10 @@ export default {
             this.$root.$emit('addItems', [folderItem]);
             this.isBusy = false;
         },
-
+        handleFolderOpened: function(folder) {
+            console.log(clone(folder));
+            debugger;
+        },
         handleFileSelectionChanged: function (fileBrowserFiles, path) {
             //this.currentPath = path;
             //console.log(clone(path));
