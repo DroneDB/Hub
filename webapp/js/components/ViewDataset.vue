@@ -248,6 +248,7 @@ export default {
         },
 
         sortFiles: function() {
+            this.$log.info("ViewDataset.sortFiles");
             this.fileBrowserFiles = this.fileBrowserFiles.sort((n1, n2) => {
 
                                 var a = n1.entry;
@@ -362,16 +363,25 @@ export default {
 
             try {
 
+                this.$log.info("In ViewDataset.createFolder");
                 var entry = await this.dataset.createFolder(newPath);
 
                 const base = pathutils.basename(entry.path);
 
+                this.$log.info("Creating folder", clone(entry));
+                this.$log.info("Current path", this.currentPath);
+
+                var remoteUri = this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base);
+
+                this.$log.info("Remote uri", remoteUri);
+
                 var folderItem = {
                     icon: icons.getForType(entry.type),
                     label: base,
-                    path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),
+                    path: remoteUri,
                     selected: false,
-                    entry
+                    entry,
+                    isExpandable: ddb.entry.isDirectory(entry)
                 };
 
                 this.fileBrowserFiles.push(folderItem);            
@@ -445,7 +455,8 @@ export default {
                     label: base,
                     path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
                     selected: false,
-                    entry
+                    entry,
+                    isExpandable: false
                 };
 
                 // Add the file to the explorer
