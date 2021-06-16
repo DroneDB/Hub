@@ -66,7 +66,7 @@ export default {
     components: {
         Message
     },
-    props: ['organization', 'dataset', 'path'],
+    props: ['organization', 'dataset', 'path', 'open'],
     data: function () {
         return {
             error: null,
@@ -201,6 +201,10 @@ export default {
             this.uploadedFiles = 0;
             this.done = false;
         });
+
+        if (this.open) {
+            this.$refs.btnUpload.click();
+        }
     },
     methods: {
         resetUpload: function(){

@@ -4,7 +4,7 @@
             
             :fixedSize="true">
         <div style="width: 400px">
-            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded"></DatasetUpload>
+            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded" :open="true"></DatasetUpload>
         </div>
         <div class="buttons">
             <button @click="close" class="ui button">
