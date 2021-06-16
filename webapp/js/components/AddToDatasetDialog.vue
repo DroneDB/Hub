@@ -1,10 +1,11 @@
 <template>
     <Window title="Add to dataset" id="rename" @onClose="close" 
             :modal="true"
-            maxWidth="70%"
+            
             :fixedSize="true">
-        
-        <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded"></DatasetUpload>
+        <div style="width: 400px">
+            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded"></DatasetUpload>
+        </div>
         <div class="buttons">
             <button @click="close" class="ui button">
                 Close

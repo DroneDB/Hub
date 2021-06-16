@@ -35,7 +35,7 @@
         </div>
     </div>
     <div v-if="done">
-        <div class="ui icon positive message">
+        <div class="ui icon positive message" v-if="error==null">
             <i class="check circle outline icon"></i> 
             <div class="content">
                 <div class="header">
@@ -69,7 +69,7 @@ export default {
     props: ['organization', 'dataset', 'path'],
     data: function () {
         return {
-            error: "",
+            error: null,
             
             uploading: false,
             fileUploadStatus: {},
@@ -175,7 +175,7 @@ export default {
                 this.$emit('onUpload', JSON.parse(file.xhr.response));
             } else {
                 //let err = `Failed to upload ${file.name}`;
-                //console.error(err);
+                this.$log.warn(`Failed to upload ${file.name}`);
                 this.dz.cancelUpload(file);   
                 //this.error = err;
                 this.dz.removeFile(file);
@@ -208,7 +208,7 @@ export default {
             this.totalBytes = 0;
             this.lastUpdated = 0;
             this.totalBytesSent = 0;            
-            this.error = "";
+            this.error = null;
             this.uploading = false;
             this.done = false;
             //this.uploadToken = null;
