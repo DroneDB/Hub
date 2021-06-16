@@ -12,6 +12,20 @@ import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
 import { setTitle, queryParams, inIframe } from './libs/utils';
 
+import VueLogger from 'vuejs-logger';
+
+const isProduction = process.env.NODE_ENV === 'production';
+ 
+const options = {
+    isEnabled: true,
+    logLevel : isProduction ? 'error' : 'debug',
+    stringifyArguments : false,
+    showLogLevel : true,
+    showMethodName : true,
+    separator: '|',
+    showConsoleColors: true
+};
+ 
 window.addEventListener('load', function(){
     let hdr = Header;
 
@@ -19,6 +33,7 @@ window.addEventListener('load', function(){
     const embed = !!queryParams(window.location).embed || inIframe();
     if (embed) hdr = null;
 
+    Vue.use(VueLogger, options);
     Vue.use(VueRouter);
         
     const routes = [

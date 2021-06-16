@@ -19,7 +19,8 @@
   "dependencies": {
     "commonui": "file:vendor/commonui",
     "copy-webpack-plugin": "^6.4.0",
-    "vue-router": "^3.4.9"
+    "vue-router": "^3.4.9",
+    "vuejs-logger": "1.5.5"
   },
   "devDependencies": {
     "prettier": "2.3.1",

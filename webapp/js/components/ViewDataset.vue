@@ -150,7 +150,7 @@ export default {
             var tools = [{
                     id: 'upload',
                     title: "Upload",
-                    icon: "upload",
+                    icon: "plus",
                     onClick: () => {
                         this.uploadDialogOpen = true;
                     }
