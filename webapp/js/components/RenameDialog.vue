@@ -3,9 +3,9 @@
             :modal="true"
             maxWidth="70%"
             :fixedSize="true">
-
-        New path:&nbsp;&nbsp;<input v-model="renamePath" :error="renamePath == null || renamePath.length == 0" autofocus />
-        
+        <div style="width: 400px">
+            New path:&nbsp;&nbsp;<input style="width: 100%" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" autofocus />
+        </div>
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
