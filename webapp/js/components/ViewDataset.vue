@@ -295,6 +295,8 @@ export default {
         },
         deleteSelectedFiles: async function() {
 
+            this.$log.info("ViewDataset.deleteSelectedFiles");
+
             this.isBusy = true;
 
             try {
@@ -307,7 +309,6 @@ export default {
                 
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
 
-                //console.log(clone(this.rootNodes));
                 this.$root.$emit('deleteEntries', deleted);
            
             } catch(e) {
@@ -318,6 +319,8 @@ export default {
            
         },
         renameSelectedFile: async function(newPath) {
+
+            this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
 
             this.isBusy = true;
 
@@ -356,6 +359,8 @@ export default {
 
         createFolder: async function(newPath) {
             
+            this.$log.info("ViewDataset.createFolder(newPath)", newPath);
+
             this.isBusy = true;
             
             if (typeof this.currentPath !== 'undefined' && this.currentPath != null) 
@@ -363,7 +368,6 @@ export default {
 
             try {
 
-                this.$log.info("In ViewDataset.createFolder");
                 var entry = await this.dataset.createFolder(newPath);
 
                 const base = pathutils.basename(entry.path);
@@ -381,6 +385,7 @@ export default {
                     path: remoteUri,
                     selected: false,
                     entry,
+                    empty: true,
                     isExpandable: ddb.entry.isDirectory(entry)
                 };
 
@@ -402,8 +407,11 @@ export default {
         
             if (typeof fileBrowserFiles === 'undefined') return;
 
+            this.$log.info("ViewDataset.handleFileSelectionChanged(fileBrowserFiles, path)", fileBrowserFiles, path);
+
             this.fileBrowserFiles.forEach(f => f.selected = (f.entry.path == path));
             this.fileBrowserFiles = fileBrowserFiles;
+            this.sortFiles();
             this.currentPath = (typeof path !== 'undefined') ? path : 
                                     (fileBrowserFiles.length > 0) ? pathutils.getParentFolder(fileBrowserFiles[0].entry.path) : null;
 
@@ -454,7 +462,6 @@ export default {
                     icon: icons.getForType(entry.type),
                     label: base,
                     path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
-                    selected: false,
                     entry,
                     isExpandable: false
                 };
