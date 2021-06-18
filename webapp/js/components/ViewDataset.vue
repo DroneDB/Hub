@@ -212,7 +212,8 @@ export default {
                     label: pathutils.basename(e.path),
                     path: e.path,
                     expanded: true,
-                    entry: e
+                    entry: e,
+                    isExpandable: ddb.entry.isDirectory(e)
                 };
             });
 
@@ -463,7 +464,8 @@ export default {
                     label: base,
                     path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
                     entry,
-                    isExpandable: false
+                    isExpandable: ddb.entry.isDirectory(entry),
+                    selected: false
                 };
 
                 // Add the file to the explorer
