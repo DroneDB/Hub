@@ -413,7 +413,8 @@ export default {
             this.fileBrowserFiles.forEach(f => f.selected = (f.entry.path == path));
             this.fileBrowserFiles = fileBrowserFiles;
             this.sortFiles();
-            this.currentPath = (typeof path !== 'undefined') ? path : 
+            
+            this.currentPath = (typeof path !== 'undefined' && path != null) ? (ddb.utils.isDDBUri(path) ? null : path) : 
                                     (fileBrowserFiles.length > 0) ? pathutils.getParentFolder(fileBrowserFiles[0].entry.path) : null;
 
         },
