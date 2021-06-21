@@ -2,6 +2,7 @@
 import 'commonui/main';
 import Vue from 'vue';
 import VueRouter from 'vue-router';
+import VueLogger from 'vuejs-logger';
 
 import '../css/app.scss';
 import Header from './components/Header.vue';
@@ -12,21 +13,21 @@ import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
 import { setTitle, queryParams, inIframe } from './libs/utils';
 
-import VueLogger from 'vuejs-logger';
-
-const isProduction = process.env.NODE_ENV === 'production';
- 
-const options = {
-    isEnabled: true,
-    logLevel : isProduction ? 'error' : 'debug',
-    stringifyArguments : false,
-    showLogLevel : true,
-    showMethodName : true,
-    separator: '|',
-    showConsoleColors: true
-};
- 
 window.addEventListener('load', function(){
+    const isProduction = window.location.href.indexOf("localhost") !== -1 ||
+                        window.location.href.indexOf("192.168.") !== -1 ||
+                        window.location.href.indexOf("127.0.0.1") !== -1;
+
+    const options = {
+        isEnabled: true,
+        logLevel : isProduction ? 'error' : 'debug',
+        stringifyArguments : false,
+        showLogLevel : true,
+        showMethodName : true,
+        separator: '|',
+        showConsoleColors: true
+    };
+
     let hdr = Header;
 
     // Hide header if ?embed=1 is in URL
@@ -78,9 +79,7 @@ window.addEventListener('load', function(){
     document.getElementById("main-loading").style.display = 'none';
 
     // Live reload
-    if (window.location.href.indexOf("localhost") !== -1 ||
-        window.location.href.indexOf("192.168.") !== -1 ||
-        window.location.href.indexOf("127.0.0.1") !== -1){
+    if (isProduction){
         const livereload = document.createElement("script");
         livereload.src = `${window.location.protocol}//${window.location.hostname}:35729/livereload.js`;
         document.body.appendChild(livereload);
