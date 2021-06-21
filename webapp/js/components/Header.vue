@@ -10,7 +10,6 @@
             <li>Features are still missing! This is a chance for you to <a href="https://dronedb.app/contact">let us know what you'd like to see added next</a> :)</li>
         </ul>
     </Alert>
-
     <div class="right">
         <a :href="downloadUrl"
             @click="handleDownload"

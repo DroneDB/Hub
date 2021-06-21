@@ -13,9 +13,12 @@ module.exports = {
     
     output: {
         path: path.join(__dirname, './build'),
-        filename: "[name].js"
+        filename: "[name].js",
+        sourceMapFilename: "[name].js.map"
         // publicPath: "/build/"
     },
+    
+    devtool: "source-map",
 
     module: {
         rules: [
@@ -64,7 +67,12 @@ module.exports = {
             },
             {
                 test: /\.(png|woff|woff2|eot|ttf|svg|jpg|gif)$/, 
-                loader: 'url-loader?limit=100000' 
+                use: {
+                    loader: 'url-loader',
+                    options: {
+                        limit: 131072
+                    }
+                } 
             }
         ]
     },
