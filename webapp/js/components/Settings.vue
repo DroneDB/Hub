@@ -41,12 +41,12 @@ Only you and people in your organization can see and download the data.
 </div>
 
 <div class="extra" v-if="readme == null">
-    <button @click="addReadme()" class="ui button">
+    <button @click="addMeta('readme')" class="ui button">
         Add readme
     </button>
 </div>
 <div class="extra" v-if="license == null">
-    <button @click="addLicense()" class="ui button">
+    <button @click="addMeta('license')" class="ui button">
         Add license
     </button>
 </div>
@@ -121,7 +121,10 @@ export default {
             }catch(e){
                 this.error = e.message;
             }
-        }
+        },
+        addMeta: function(meta) {
+
+        }     
     }
 }
 </script>
