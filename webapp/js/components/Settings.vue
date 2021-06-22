@@ -40,6 +40,17 @@ Anybody with the <a :href="currentUrl">link</a> to this page can see and downloa
 Only you and people in your organization can see and download the data. 
 </div>
 
+<div class="extra" v-if="readme == null">
+    <button @click="addReadme()" class="ui button">
+        Add readme
+    </button>
+</div>
+<div class="extra" v-if="license == null">
+    <button @click="addLicense()" class="ui button">
+        Add license
+    </button>
+</div>
+
 </div>
 </template>
 
@@ -61,7 +72,9 @@ export default {
         return {
             error: "",
             meta: null,
-            loading: true
+            loading: true,
+            readme: null,
+            license: null
         }
     },
     mounted: async function(){
@@ -71,8 +84,12 @@ export default {
         mouse.on("click", this.hideVisibilityMenu);
 
         try{
-            const info = await this.dataset.info();
+            const info = await this.dataset.info();            
             this.meta = info[0].meta;
+            
+            this.readme = (typeof this.meta.readme !== 'undefined') ? this.meta.readme : null;
+            this.license = (typeof this.meta.license !== 'undefined') ? this.meta.license : null;
+
         }catch(e){
             this.error = e.message;
         }
@@ -123,6 +140,9 @@ export default {
     }
     a{
         text-decoration: underline;
+    }
+    .extra {
+        margin-top: 12px;
     }
 }
 </style>

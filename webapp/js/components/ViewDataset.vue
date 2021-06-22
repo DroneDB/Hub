@@ -128,6 +128,8 @@ export default {
             errorDialogOpen: false,
             errorMessage: null,
             errorMessageTitle: null,
+            readme: null,
+            license: null
         };
     },
     mounted: function(){
@@ -201,9 +203,11 @@ export default {
                 const entry = entries[0];
                 if (entry.meta.readme){
                     this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), entry.meta.readme, "Readme", "book");
+                    this.readme = entry.meta.readme;
                 }
                 if (entry.meta.license){
                     this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), entry.meta.license, "License", "balance scale");
+                    this.license = entry.meta.license;
                 }
             }
 
@@ -309,6 +313,14 @@ export default {
                 }
                 
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
+
+                if (deleted.includes('README.md')) {
+                    this.$refs.mainTabSwitcher.removeTab("readme");
+                }
+
+                if (deleted.includes('LICENSE.md')) {
+                    this.$refs.mainTabSwitcher.removeTab("license");
+                }
 
                 this.$root.$emit('deleteEntries', deleted);
            
@@ -476,9 +488,26 @@ export default {
 
             this.sortFiles();
 
+            if (uploaded.find(item => item.path == 'README.md')) {
+
+                var remoteUri = this.dataset.remoteUri("README.md");
+                this.$root.$emit('refreshMarkdown', remoteUri);
+    
+                this.addMarkdownTab(remoteUri, "README.md", "Readme", "book");
+            }
+
+            if (uploaded.find(item => item.path == 'LICENSE.md')) {   
+
+                var remoteUri = this.dataset.remoteUri("LICENSE.md");
+                this.$root.$emit('refreshMarkdown', remoteUri);
+                   
+                this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale");
+            }
+
             // Only if any add is necessary, send addItems message to filebrowser
-            if (items.length > 0) 
+            if (items.length > 0) {
                 this.$root.$emit('addItems', items);
+            }
 
         },
 
