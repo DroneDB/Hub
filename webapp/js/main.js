@@ -14,9 +14,9 @@ import reg from './libs/sharedRegistry';
 import { setTitle, queryParams, inIframe } from './libs/utils';
 
 window.addEventListener('load', function(){
-    const isProduction = window.location.href.indexOf("localhost") !== -1 ||
-                        window.location.href.indexOf("192.168.") !== -1 ||
-                        window.location.href.indexOf("127.0.0.1") !== -1;
+    const isProduction = window.location.href.indexOf("localhost") == -1 &&
+                        window.location.href.indexOf("192.168.") == -1 &&
+                        window.location.href.indexOf("127.0.0.1") == -1;
 
     const options = {
         isEnabled: true,
@@ -79,7 +79,7 @@ window.addEventListener('load', function(){
     document.getElementById("main-loading").style.display = 'none';
 
     // Live reload
-    if (isProduction){
+    if (!isProduction){
         const livereload = document.createElement("script");
         livereload.src = `${window.location.protocol}//${window.location.hostname}:35729/livereload.js`;
         document.body.appendChild(livereload);
