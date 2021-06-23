@@ -40,12 +40,24 @@ Anybody with the <a :href="currentUrl">link</a> to this page can see and downloa
 Only you and people in your organization can see and download the data. 
 </div>
 
+<div class="extra" v-if="readme == null">
+    <button @click="addMeta('readme')" class="ui button">
+        Add readme
+    </button>
+</div>
+<div class="extra" v-if="license == null">
+    <button @click="addMeta('license')" class="ui button">
+        Add license
+    </button>
+</div>
+
 </div>
 </template>
 
 <script>
 import Message from 'commonui/components/Message.vue';
 import mouse from 'commonui/mouse';
+import { clone } from 'commonui/classes/utils';
 
 export default {
     props: {
@@ -61,7 +73,9 @@ export default {
         return {
             error: "",
             meta: null,
-            loading: true
+            loading: true,
+            readme: null,
+            license: null
         }
     },
     mounted: async function(){
@@ -71,11 +85,27 @@ export default {
         mouse.on("click", this.hideVisibilityMenu);
 
         try{
-            const info = await this.dataset.info();
+            const info = await this.dataset.info();            
             this.meta = info[0].meta;
+            
+            this.readme = (typeof this.meta.readme !== 'undefined') ? this.meta.readme : null;
+            this.license = (typeof this.meta.license !== 'undefined') ? this.meta.license : null;
+
         }catch(e){
             this.error = e.message;
         }
+
+        this.$root.$on('deleteEntries', async (deleted) => {
+
+            if (deleted.includes('README.md')) {
+                this.readme = null;
+            }
+
+            if (deleted.includes('LICENSE.md')) {
+                this.license = null;
+            }
+
+        });
 
         this.loading = false;
     },
@@ -104,7 +134,35 @@ export default {
             }catch(e){
                 this.error = e.message;
             }
-        }
+        },
+        addMeta: async function(meta) {
+            
+            this.loading = true;
+
+            var entry = null;
+
+            switch(meta) {
+                case "license":
+
+                    entry = await this.dataset.writeObj("LICENSE.md", "Template License");
+                    this.license = "LICENSE.md";
+
+                    break;
+
+                case "readme":
+
+                    entry = await this.dataset.writeObj("README.md", "Template Readme");
+                    this.readme = "README.md";
+
+                    break;
+            }
+
+            this.$log.info(clone(entry));
+
+            this.$emit('addMeta', meta, entry);
+
+            this.loading = false;
+        }     
     }
 }
 </script>
@@ -123,6 +181,9 @@ export default {
     }
     a{
         text-decoration: underline;
+    }
+    .extra {
+        margin-top: 12px;
     }
 }
 </style>

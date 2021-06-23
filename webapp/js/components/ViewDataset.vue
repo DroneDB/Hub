@@ -11,7 +11,7 @@
                         @error="handleError" />
                 </template>
                 <template v-slot:settings>
-                    <Settings :dataset="dataset" />
+                    <Settings :dataset="dataset" @addMeta="handleAddMeta" />
                 </template>
             </TabSwitcher>
         </div>
@@ -21,7 +21,7 @@
                     :hideSingle="true"
                     ref="mainTabSwitcher" >
             <template v-slot:map>
-                <div style="padding: 4px">{{currentPath}}</div>
+                <div style="padding: 4px" v-if="currentPath != null">{{currentPath}}</div>
                 <Toolbar :tools="tools" ref="toolbar" />
                 <Panel split="horizontal" class="container vertical" amount="50%">                    
                     <Explorer ref="explorer" 
@@ -128,6 +128,8 @@ export default {
             errorDialogOpen: false,
             errorMessage: null,
             errorMessageTitle: null,
+            readme: null,
+            license: null
         };
     },
     mounted: function(){
@@ -201,9 +203,11 @@ export default {
                 const entry = entries[0];
                 if (entry.meta.readme){
                     this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), entry.meta.readme, "Readme", "book");
+                    this.readme = entry.meta.readme;
                 }
                 if (entry.meta.license){
                     this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), entry.meta.license, "License", "balance scale");
+                    this.license = entry.meta.license;
                 }
             }
 
@@ -309,6 +313,14 @@ export default {
                 }
                 
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
+
+                if (deleted.includes('README.md')) {
+                    this.$refs.mainTabSwitcher.removeTab("readme");
+                }
+
+                if (deleted.includes('LICENSE.md')) {
+                    this.$refs.mainTabSwitcher.removeTab("license");
+                }
 
                 this.$root.$emit('deleteEntries', deleted);
            
@@ -476,9 +488,56 @@ export default {
 
             this.sortFiles();
 
+            if (uploaded.find(item => item.path == 'README.md')) {
+                this.addReadme();
+            }
+
+            if (uploaded.find(item => item.path == 'LICENSE.md')) {   
+                this.addLicense();
+            }
+
             // Only if any add is necessary, send addItems message to filebrowser
-            if (items.length > 0) 
+            if (items.length > 0) {
                 this.$root.$emit('addItems', items);
+            }
+
+        },
+
+        addLicense: async function() {
+            this.$log.info("addLicense");
+            
+            var remoteUri = this.dataset.remoteUri("LICENSE.md");
+            this.$root.$emit('refreshMarkdown', remoteUri);
+                
+            this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale");
+        },
+
+        addReadme: async function() {
+            this.$log.info("addReadme");
+
+            var remoteUri = this.dataset.remoteUri("README.md");
+            this.$root.$emit('refreshMarkdown', remoteUri);
+
+            this.addMarkdownTab(remoteUri, "README.md", "Readme", "book");
+        },
+
+        handleAddMeta: async function(meta, entry) {
+            this.$log.info("handleAddMeta(meta, entry)", meta, clone(entry));
+            /*éswitch(meta) {
+                case "license":
+
+                    this.addLicense();
+
+                    break;
+                case "readme":
+
+                    this.addReadme();
+
+                    break;
+
+            }*/
+
+            this.handleAddClose([entry]);
 
         },
 
