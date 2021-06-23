@@ -11,7 +11,7 @@
                         @error="handleError" />
                 </template>
                 <template v-slot:settings>
-                    <Settings :dataset="dataset" />
+                    <Settings :dataset="dataset" @addMeta="handleAddMeta" />
                 </template>
             </TabSwitcher>
         </div>
@@ -489,25 +489,55 @@ export default {
             this.sortFiles();
 
             if (uploaded.find(item => item.path == 'README.md')) {
-
-                var remoteUri = this.dataset.remoteUri("README.md");
-                this.$root.$emit('refreshMarkdown', remoteUri);
-    
-                this.addMarkdownTab(remoteUri, "README.md", "Readme", "book");
+                this.addReadme();
             }
 
             if (uploaded.find(item => item.path == 'LICENSE.md')) {   
-
-                var remoteUri = this.dataset.remoteUri("LICENSE.md");
-                this.$root.$emit('refreshMarkdown', remoteUri);
-                   
-                this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale");
+                this.addLicense();
             }
 
             // Only if any add is necessary, send addItems message to filebrowser
             if (items.length > 0) {
                 this.$root.$emit('addItems', items);
             }
+
+        },
+
+        addLicense: async function() {
+            this.$log.info("addLicense");
+            
+            var remoteUri = this.dataset.remoteUri("LICENSE.md");
+            this.$root.$emit('refreshMarkdown', remoteUri);
+                
+            this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale");
+        },
+
+        addReadme: async function() {
+            this.$log.info("addReadme");
+
+            var remoteUri = this.dataset.remoteUri("README.md");
+            this.$root.$emit('refreshMarkdown', remoteUri);
+
+            this.addMarkdownTab(remoteUri, "README.md", "Readme", "book");
+        },
+
+        handleAddMeta: async function(meta, entry) {
+            this.$log.info("handleAddMeta(meta, entry)", meta, clone(entry));
+            /*éswitch(meta) {
+                case "license":
+
+                    this.addLicense();
+
+                    break;
+                case "readme":
+
+                    this.addReadme();
+
+                    break;
+
+            }*/
+
+            this.handleAddClose([entry]);
 
         },
 

@@ -57,6 +57,7 @@ Only you and people in your organization can see and download the data.
 <script>
 import Message from 'commonui/components/Message.vue';
 import mouse from 'commonui/mouse';
+import { clone } from 'commonui/classes/utils';
 
 export default {
     props: {
@@ -94,6 +95,18 @@ export default {
             this.error = e.message;
         }
 
+        this.$root.$on('deleteEntries', async (deleted) => {
+
+            if (deleted.includes('README.md')) {
+                this.readme = null;
+            }
+
+            if (deleted.includes('LICENSE.md')) {
+                this.license = null;
+            }
+
+        });
+
         this.loading = false;
     },
     beforeDestroy: function(){
@@ -122,8 +135,33 @@ export default {
                 this.error = e.message;
             }
         },
-        addMeta: function(meta) {
+        addMeta: async function(meta) {
+            
+            this.loading = true;
 
+            var entry = null;
+
+            switch(meta) {
+                case "license":
+
+                    entry = await this.dataset.writeObj("LICENSE.md", "Template License");
+                    this.license = "LICENSE.md";
+
+                    break;
+
+                case "readme":
+
+                    entry = await this.dataset.writeObj("README.md", "Template Readme");
+                    this.readme = "README.md";
+
+                    break;
+            }
+
+            this.$log.info(clone(entry));
+
+            this.$emit('addMeta', meta, entry);
+
+            this.loading = false;
         }     
     }
 }
