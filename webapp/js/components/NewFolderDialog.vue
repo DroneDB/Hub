@@ -1,10 +1,10 @@
 <template>
-    <Window title="Create new folder" id="newFolder" @onClose="close('close')" 
+    <Window title="Create folder" id="newFolder" @onClose="close('close')" 
             :modal="true"
             maxWidth="70%"
             :fixedSize="true">
 
-        New folder name:&nbsp;&nbsp;<input v-model="newFolderPath" :error="newFolderPath == null || newFolderPath.length == 0" autofocus />
+        <input class="newFolderInput" ref="newFolderInput" v-model="newFolderPath" :error="newFolderPath == null || newFolderPath.length == 0" />
         
         <div class="buttons">
             <button @click="close('close')" class="ui button">
@@ -33,6 +33,9 @@ export default {
       };
   },
   mounted: function(){
+      this.$nextTick(() => {
+        this.$refs.newFolderInput.focus();
+      });
   },
   methods: {
       close: function(buttonId){
@@ -46,8 +49,16 @@ export default {
 </script>
 
 <style scoped>
+.newFolderInput{
+    width: 100%;
+    margin-top: 8px;
+    padding: 4px;
+}
 .buttons{
     margin-top: 16px;
     text-align: right;
+    button{
+        margin: 0;
+    }
 }
 </style>
