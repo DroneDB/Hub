@@ -1,11 +1,11 @@
 <template>
-    <Window title="Rename / Move" id="rename" @onClose="close('close')" 
+    <Window title="Rename" id="rename" @onClose="close('close')" 
             :modal="true"
             maxWidth="70%"
             :fixedSize="true">
-        <div style="width: 400px">
-            New path:&nbsp;&nbsp;<input style="width: 100%" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" autofocus />
-        </div>
+
+        <input class="renameInput" ref="renameInput" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" autofocus />
+
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
@@ -34,6 +34,9 @@ export default {
   },
   mounted: function(){
       this.renamePath = this.path;
+      this.$nextTick(() => {
+          this.$refs.renameInput.focus();
+      });
   },
   methods: {
       close: function(buttonId){
@@ -47,6 +50,10 @@ export default {
 </script>
 
 <style scoped>
+.renameInput{
+    margin-top: 8px;
+    width: 100%;
+}
 .buttons{
     margin-top: 16px;
     text-align: right;
