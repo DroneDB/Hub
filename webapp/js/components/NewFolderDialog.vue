@@ -4,13 +4,18 @@
             maxWidth="70%"
             :fixedSize="true">
 
-        <input class="newFolderInput" ref="newFolderInput" v-model="newFolderPath" :error="newFolderPath == null || newFolderPath.length == 0" />
+        <input class="newFolderInput" 
+                ref="newFolderInput" 
+                v-on:keyup.enter="createFolder"
+                v-on:keyup.esc="close"                
+                v-model="newFolderPath" 
+                :error="!newFolderPath" />
         
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
             </button>
-            <button @click="createFolder()" :disabled="newFolderPath == null || newFolderPath.length == 0" class="ui button positive">
+            <button @click="createFolder" :disabled="!newFolderPath" class="ui button positive">
                 Create folder
             </button>
         </div>
@@ -42,7 +47,9 @@ export default {
           this.$emit('onClose', buttonId);
       },
       createFolder: function(){
-          this.$emit('onClose', "createFolder", this.newFolderPath);
+          if (this.newFolderPath){
+            this.$emit('onClose', "createFolder", this.newFolderPath);
+          }
       }
   }
 }

@@ -4,13 +4,19 @@
             maxWidth="70%"
             :fixedSize="true">
 
-        <input class="renameInput" ref="renameInput" v-model="renamePath" :error="renamePath == null || renamePath.length == 0" autofocus />
+        <input class="renameInput" 
+                ref="renameInput" 
+                v-on:keyup.enter="rename"
+                v-on:keyup.esc="close"
+                
+                v-model="renamePath" 
+                :error="renamePath == null || renamePath.length == 0" />
 
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
             </button>
-            <button @click="rename()" :disabled="renamePath == null || renamePath.length == 0" class="ui button positive">
+            <button @click="rename" :disabled="!renamePath" class="ui button positive">
                 Rename
             </button>
         </div>
@@ -43,7 +49,9 @@ export default {
           this.$emit('onClose', buttonId);
       },
       rename: function(){
-          this.$emit('onClose', "rename", this.renamePath);
+          if (this.renamePath){
+            this.$emit('onClose', "rename", this.renamePath);
+          }
       }
   }
 }
