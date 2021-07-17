@@ -21,11 +21,11 @@
                     :hideSingle="true"
                     ref="mainTabSwitcher" >
             <template v-slot:map>
-                <div style="padding: 4px" v-if="currentPath != null">{{currentPath}}</div>
                 <Toolbar :tools="tools" ref="toolbar" />
                 <Panel split="horizontal" class="container vertical" amount="50%">                    
                     <Explorer ref="explorer" 
-                            :files="fileBrowserFiles" 
+                            :files="fileBrowserFiles"
+                            :currentPath="currentPath"
                             @openProperties="handleExplorerOpenProperties" />
                     <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
                 </Panel>
