@@ -37,9 +37,6 @@
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
-    <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
-        The file has been saved successfully
-    </Alert>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
         {{errorMessage}}
     </Alert>
@@ -120,7 +117,6 @@ export default {
             deleteDialogOpen: false,
             renameDialogOpen: false,
             createFolderDialogOpen: false,
-            saveOkOpen: false,
             renamePath: null,
             isBusy: false,
             currentPath: null,
@@ -389,9 +385,6 @@ export default {
             }
 
             this.createFolderDialogOpen = false;
-        },
-        handleSaveOkClose: function() {
-            this.saveOkOpen = false;
         },
         handleAddClose: function(uploaded) {
             
