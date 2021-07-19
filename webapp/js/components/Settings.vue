@@ -41,13 +41,13 @@ Only you and people in your organization can see and download the data.
 </div>
 
 <div class="extra" v-if="readme == null">
-    <button @click="addMeta('readme')" class="ui button">
-        Add readme
+    <button @click="addMeta('readme')" class="ui button basic icon">
+        <i class="icon book"/> Add Readme
     </button>
 </div>
 <div class="extra" v-if="license == null">
-    <button @click="addMeta('license')" class="ui button">
-        Add license
+    <button @click="addMeta('license')" class="ui button basic icon">
+        <i class="icon balance scale" /> Add License
     </button>
 </div>
 
@@ -144,14 +144,14 @@ export default {
             switch(meta) {
                 case "license":
 
-                    entry = await this.dataset.writeObj("LICENSE.md", "Template License");
+                    entry = await this.dataset.writeObj("LICENSE.md", "# License\n");
                     this.license = "LICENSE.md";
 
                     break;
 
                 case "readme":
 
-                    entry = await this.dataset.writeObj("README.md", "Template Readme");
+                    entry = await this.dataset.writeObj("README.md", "# Readme\n");
                     this.readme = "README.md";
 
                     break;

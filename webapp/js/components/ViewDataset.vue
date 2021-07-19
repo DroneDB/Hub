@@ -183,11 +183,6 @@ export default {
             }
         },        
         addMarkdownTab: function(uri, path, label, icon, opts = {}){
-
-            var ds = this.dataset;
-            var showOk = this.showOkSave;
-            var setBusy = this.setBusy;
-
             this.$refs.mainTabSwitcher.addTab({
                 label,
                 icon,
@@ -196,14 +191,6 @@ export default {
                 component: Markdown,
                 props: {
                     uri
-                },
-                on: {
-                    onSave: async function(newContent) {
-                        setBusy(true);
-                        await ds.writeObj(path, newContent);
-                        setBusy(false);
-                        showOk();
-                    }
                 }
             }, !!opts.activate, !!opts.prepend);
         },
@@ -231,12 +218,6 @@ export default {
             this.errorMessage = text;
             this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
             this.errorDialogOpen = true;
-        },
-        showOkSave: function() {
-            this.saveOkOpen = true;
-        },
-        setBusy: function(busy) {
-            this.isBusy = busy;
         },
         handleRenameClose: async function(id, newPath) {
             
