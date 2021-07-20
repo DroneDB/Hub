@@ -53,6 +53,7 @@ import NewFolderDialog from './NewFolderDialog.vue';
 import Message from 'commonui/components/Message.vue';
 import FileBrowser from 'commonui/components/FileBrowser.vue';
 import Map from 'commonui/components/Map.vue';
+import Potree from 'commonui/components/Potree.vue';
 import Explorer from 'commonui/components/Explorer.vue';
 import Properties from 'commonui/components/Properties.vue';
 import TabSwitcher from 'commonui/components/TabSwitcher.vue';
@@ -95,6 +96,10 @@ export default {
                 label: 'Map',
                 icon: 'map',
                 key: 'map'
+            },{
+                label: '3D',
+                icon: 'cube',
+                key: 'potree'
             },{
                 label: 'Files',
                 icon: 'folder open',
