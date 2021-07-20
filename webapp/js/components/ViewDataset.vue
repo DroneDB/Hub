@@ -1,36 +1,34 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
-    <Panel split="vertical" class="container main" amount="25%">
+    <Panel split="vertical" class="container main" amount="23.6%">
         <div class="sidebar">
-            <TabSwitcher :tabs="tabs">
-                <template v-slot:filebrowser>
-                    <FileBrowser :rootNodes="rootNodes" 
-                        @selectionChanged="handleFileSelectionChanged" 
-                        @openProperties="handleFileBrowserOpenProperties"
-                        @error="handleError" />
-                </template>
-                <template v-slot:settings>
-                    <Settings :dataset="dataset" @addMeta="handleAddMeta" />
-                </template>
-            </TabSwitcher>
+            <FileBrowser :rootNodes="rootNodes" 
+                @selectionChanged="handleFileSelectionChanged" 
+                @openProperties="handleFileBrowserOpenProperties"
+                @error="handleError" />
         </div>
+
         <TabSwitcher :tabs="mainTabs"
-                    position="top"
-                    buttonWidth="auto"
-                    :hideSingle="true"
-                    ref="mainTabSwitcher" >
+                position="top"
+                buttonWidth="auto"
+                :hideSingle="true"
+                ref="mainTabSwitcher" >
             <template v-slot:map>
-                <Panel split="horizontal" class="container vertical" amount="50%">
-                    <Explorer ref="explorer"
-                            :files="fileBrowserFiles"
-                            :tools="explorerTools"
-                            :currentPath="currentPath"
-                            @openProperties="handleExplorerOpenProperties" />
-                    <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
-                </Panel>
+                <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
+            </template>
+            <template v-slot:explorer>
+                <Explorer ref="explorer"
+                    :files="fileBrowserFiles"
+                    :tools="explorerTools"
+                    :currentPath="currentPath"
+                    @openProperties="handleExplorerOpenProperties" />
+            </template>
+            <template v-slot:settings>
+                <Settings :dataset="dataset" @addMeta="handleAddMeta" />
             </template>
         </TabSwitcher>
+
         <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
     </Panel>
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
@@ -93,19 +91,18 @@ export default {
     data: function () {
         return {
             error: "",
-            tabs: [{
-                label: 'Browser',
+            mainTabs: [{
+                label: 'Map',
+                icon: 'map',
+                key: 'map'
+            },{
+                label: 'Files',
                 icon: 'folder open',
-                key: 'filebrowser'
+                key: 'explorer'
             },{
                 label: 'Settings',
                 icon: 'wrench',
                 key: 'settings'
-            }],
-            mainTabs: [{
-                label: 'Map',
-                icon: 'map',
-                key: 'map' 
             }],
             fileBrowserFiles: [],
             showProperties: false,
@@ -397,7 +394,7 @@ export default {
             for(var entry of uploaded) {
 
                 // Don't add the same file twice
-                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)                    
+                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)
                     continue;
                 
                 const base = pathutils.basename(entry.path);
@@ -413,7 +410,7 @@ export default {
 
                 // Add the file to the explorer
                 this.fileBrowserFiles.push(item);
-                items.push(item);    
+                items.push(item);
             }
 
             this.sortFiles();

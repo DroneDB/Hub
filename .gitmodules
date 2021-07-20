@@ -6,3 +6,6 @@
 	path = vendor/commonui
 	url = https://github.com/DroneDB/CommonUI
 	branch = master
+[submodule "webapp/public/potree"]
+	path = webapp/public/potree
+	url = https://github.com/DroneDB/PotreeBuild
