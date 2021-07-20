@@ -21,11 +21,11 @@
                     :hideSingle="true"
                     ref="mainTabSwitcher" >
             <template v-slot:map>
-                <div style="padding: 4px" v-if="currentPath != null">{{currentPath}}</div>
-                <Toolbar :tools="tools" ref="toolbar" />
-                <Panel split="horizontal" class="container vertical" amount="50%">                    
-                    <Explorer ref="explorer" 
-                            :files="fileBrowserFiles" 
+                <Panel split="horizontal" class="container vertical" amount="50%">
+                    <Explorer ref="explorer"
+                            :files="fileBrowserFiles"
+                            :tools="explorerTools"
+                            :currentPath="currentPath"
                             @openProperties="handleExplorerOpenProperties" />
                     <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
                 </Panel>
@@ -37,9 +37,6 @@
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
-    <Alert title="File saved" v-if="saveOkOpen" @onClose="handleSaveOkClose">
-        The file has been saved successfully
-    </Alert>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
         {{errorMessage}}
     </Alert>
@@ -63,7 +60,6 @@ import Properties from 'commonui/components/Properties.vue';
 import TabSwitcher from 'commonui/components/TabSwitcher.vue';
 import Panel from 'commonui/components/Panel.vue';
 import Markdown from 'commonui/components/Markdown.vue';
-import Toolbar from 'commonui/components/Toolbar.vue';
 import Alert from 'commonui/components/Alert.vue';
 import Loader from 'commonui/components/Loader.vue';
 
@@ -87,7 +83,6 @@ export default {
         TabSwitcher,
         Settings,
         Panel,
-        Toolbar,
         AddToDatasetDialog,
         DeleteDialog,
         RenameDialog,
@@ -115,13 +110,13 @@ export default {
             fileBrowserFiles: [],
             showProperties: false,
             selectedUsingFileBrowserList: false,
+            explorerTools: [],
             dataset: reg.Organization(this.$route.params.org)
                                .Dataset(this.$route.params.ds),
             uploadDialogOpen: false,
             deleteDialogOpen: false,
             renameDialogOpen: false,
             createFolderDialogOpen: false,
-            saveOkOpen: false,
             renamePath: null,
             isBusy: false,
             currentPath: null,
@@ -146,50 +141,7 @@ export default {
             } else {
                 return this.fileBrowserFiles.filter(f => f.selected);
             }
-        },
-        tools: function() {
-
-            var tools = [{
-                    id: 'upload',
-                    title: "Upload",
-                    icon: "plus",
-                    onClick: () => {
-                        this.uploadDialogOpen = true;
-                    }
-                }, {
-                    id: 'newfolder',
-                    title: "Create folder",
-                    icon: "folder",
-                    onClick: () => {
-                        this.createFolderDialogOpen = true;
-                    }
-                }];
-
-            if (this.selectedFiles.length == 1) {
-                tools.push({
-                    id: 'rename',
-                    title: "Rename",
-                    icon: "edit",
-                    onClick: () => {
-                        this.renamePath = this.selectedFiles[0].entry.path;
-                        this.renameDialogOpen = true;
-                    }
-                });
-            }
-
-            if (this.selectedFiles.length > 0) {
-                tools.push({
-                    id: 'remove',
-                    title: "Remove",
-                    icon: "trash alternate",
-                    onClick: () => {
-                        this.deleteDialogOpen = true;
-                    }
-                });
-            }
-
-            return tools;
-        },
+        }
     },
     methods: {
         rootNodes: async function () {
@@ -227,11 +179,6 @@ export default {
             }
         },        
         addMarkdownTab: function(uri, path, label, icon, opts = {}){
-
-            var ds = this.dataset;
-            var showOk = this.showOkSave;
-            var setBusy = this.setBusy;
-
             this.$refs.mainTabSwitcher.addTab({
                 label,
                 icon,
@@ -240,14 +187,6 @@ export default {
                 component: Markdown,
                 props: {
                     uri
-                },
-                on: {
-                    onSave: async function(newContent) {
-                        setBusy(true);
-                        await ds.writeObj(path, newContent);
-                        setBusy(false);
-                        showOk();
-                    }
                 }
             }, !!opts.activate, !!opts.prepend);
         },
@@ -275,12 +214,6 @@ export default {
             this.errorMessage = text;
             this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
             this.errorDialogOpen = true;
-        },
-        showOkSave: function() {
-            this.saveOkOpen = true;
-        },
-        setBusy: function(busy) {
-            this.isBusy = busy;
         },
         handleRenameClose: async function(id, newPath) {
             
@@ -453,9 +386,6 @@ export default {
 
             this.createFolderDialogOpen = false;
         },
-        handleSaveOkClose: function() {
-            this.saveOkOpen = false;
-        },
         handleAddClose: function(uploaded) {
             
             this.uploadDialogOpen = false;
@@ -523,30 +453,15 @@ export default {
 
         handleAddMeta: async function(meta, entry) {
             this.$log.info("handleAddMeta(meta, entry)", meta, clone(entry));
-            /*éswitch(meta) {
-                case "license":
-
-                    this.addLicense();
-
-                    break;
-                case "readme":
-
-                    this.addReadme();
-
-                    break;
-
-            }*/
-
             this.handleAddClose([entry]);
-
         },
 
         handleScrollTo: function(file){
             this.$refs.explorer.scrollTo(file);
         },
 
-        handleError: function(e){            
-            this.showError(e, "Error");            
+        handleError: function(e){
+            this.showError(e, "Error");
         }
     },
     watch: {
@@ -555,6 +470,49 @@ export default {
             handler: function (newVal, oldVal) {
                 const $header = this.$parent.$children[0];
                 $header.selectedFiles = this.selectedFiles;
+            }
+        },
+
+        selectedFiles: {
+            handler: function(){
+                this.explorerTools = [{
+                    id: 'upload',
+                    title: "Upload",
+                    icon: "plus",
+                    onClick: () => {
+                        this.uploadDialogOpen = true;
+                    }
+                }, {
+                    id: 'newfolder',
+                    title: "Create folder",
+                    icon: "folder",
+                    onClick: () => {
+                        this.createFolderDialogOpen = true;
+                    }
+                }];
+
+                if (this.selectedFiles.length == 1) {
+                    this.explorerTools.push({
+                        id: 'rename',
+                        title: "Rename",
+                        icon: "edit",
+                        onClick: () => {
+                            this.renamePath = this.selectedFiles[0].entry.path;
+                            this.renameDialogOpen = true;
+                        }
+                    });
+                }
+
+                if (this.selectedFiles.length > 0) {
+                    this.explorerTools.push({
+                        id: 'remove',
+                        title: "Remove",
+                        icon: "trash alternate",
+                        onClick: () => {
+                            this.deleteDialogOpen = true;
+                        }
+                    });
+                }
             }
         }
     }
