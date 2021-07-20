@@ -17,6 +17,9 @@
             <template v-slot:map>
                 <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
             </template>
+            <template v-slot:potree>
+                <Potree :files="fileBrowserFiles" />
+            </template>
             <template v-slot:explorer>
                 <Explorer ref="explorer"
                     :files="fileBrowserFiles"
@@ -77,6 +80,7 @@ export default {
         Message,
         FileBrowser,
         Map,
+        Potree,
         Explorer,
         Properties,
         TabSwitcher,
