@@ -151,11 +151,11 @@ export default {
             if (entries.length === 1){
                 const entry = entries[0];
                 if (entry.meta.readme){
-                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), entry.meta.readme, "Readme", "book");
+                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), entry.meta.readme, "Readme", "book", false);
                     this.readme = entry.meta.readme;
                 }
                 if (entry.meta.license){
-                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), entry.meta.license, "License", "balance scale");
+                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), entry.meta.license, "License", "balance scale", false);
                     this.license = entry.meta.license;
                 }
             }
@@ -175,17 +175,17 @@ export default {
                 return [];
             }
         },        
-        addMarkdownTab: function(uri, path, label, icon, opts = {}){
+        addMarkdownTab: function(uri, path, label, icon, activate){
             this.$refs.mainTabSwitcher.addTab({
                 label,
                 icon,
                 key: label.toLowerCase(),
-                hideLabel: !!opts.hideLabel,
+                hideLabel: false,
                 component: Markdown,
                 props: {
                     uri
                 }
-            }, !!opts.activate, !!opts.prepend);
+            }, {tabIndex: -1, activate }); // Add before "settings" tab
         },
 
         sortFiles: function() {
@@ -436,7 +436,7 @@ export default {
             var remoteUri = this.dataset.remoteUri("LICENSE.md");
             this.$root.$emit('refreshMarkdown', remoteUri);
                 
-            this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale");
+            this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale", true);
         },
 
         addReadme: async function() {
@@ -445,7 +445,7 @@ export default {
             var remoteUri = this.dataset.remoteUri("README.md");
             this.$root.$emit('refreshMarkdown', remoteUri);
 
-            this.addMarkdownTab(remoteUri, "README.md", "Readme", "book");
+            this.addMarkdownTab(remoteUri, "README.md", "Readme", "book", true);
         },
 
         handleAddMeta: async function(meta, entry) {
