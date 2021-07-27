@@ -94,7 +94,7 @@ module.exports = {
         alias: {
             'commonui': path.resolve(__dirname, 'vendor/commonui/'),
             'vue$': 'vue/dist/vue.esm.js',
-            'ddb': path.resolve(__dirname, 'vendor/ddb/nodejs/js')
+            'ddb': path.resolve(__dirname, 'vendor/ddb_js')
         },
         extensions: ['*', '.js', '.vue', '.json']
     },
