@@ -22,7 +22,7 @@
                     </div>
                 </div>
                 <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
-                    <span>Remaining: {{ uploadedFiles }} / {{ filesCount }} files ({{ humanRemainingBytes }})</span>
+                    <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
                 </div>
                 <div class="ui bottom attached progress">
                     <div class="bar" :style="{'min-width': totalProgress + '%'}"></div>
