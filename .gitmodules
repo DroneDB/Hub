@@ -5,3 +5,4 @@
 [submodule "vendor/ddb_js"]
 	path = vendor/ddb_js
 	url = https://github.com/DroneDB/DDB.js
+	branch = master
