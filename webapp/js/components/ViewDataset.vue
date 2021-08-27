@@ -33,7 +33,7 @@
             </template>
         </TabSwitcher>
 
-        <Properties v-if="showProperties" :files="selectedFiles" @onClose="handleCloseProperties" />
+        <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
@@ -143,10 +143,13 @@ export default {
     },
     computed: {
         selectedFiles: function () {
-            if (this.selectedUsingFileBrowserList) {
+            return this.fileBrowserFiles.filter(f => f.selected);
+        },
+        contextMenuFiles: function(){
+            if (this.selectedUsingFileBrowserList){
                 return this.fileBrowserFiles;
-            } else {
-                return this.fileBrowserFiles.filter(f => f.selected);
+            }else{
+                return this.selectedFiles;
             }
         }
     },
