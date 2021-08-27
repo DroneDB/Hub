@@ -4,7 +4,8 @@
     <Panel split="vertical" class="container main" amount="23.6%">
         <div class="sidebar">
             <FileBrowser :rootNodes="rootNodes" 
-                @selectionChanged="handleFileSelectionChanged" 
+                @selectionChanged="handleFileSelectionChanged"
+                @currentUriChanged="handleCurrentUriChanged"
                 @openProperties="handleFileBrowserOpenProperties"
                 @error="handleError" />
         </div>
@@ -71,7 +72,7 @@ import { setTitle } from '../libs/utils';
 import { clone } from 'commonui/classes/utils';
 
 import ddb from 'ddb';
-const { pathutils } = ddb;
+const { pathutils, utils } = ddb;
 
 export default {
     props: ["org", "ds"],
@@ -200,21 +201,20 @@ export default {
         sortFiles: function() {
             this.$log.info("ViewDataset.sortFiles");
             this.fileBrowserFiles = this.fileBrowserFiles.sort((n1, n2) => {
+                    var a = n1.entry;
+                    var b = n2.entry;
 
-                                var a = n1.entry;
-                                var b = n2.entry;
+                    // Folders first
+                    let aDir = ddb.entry.isDirectory(a);
+                    let bDir = ddb.entry.isDirectory(b);
 
-                                // Folders first
-                                let aDir = ddb.entry.isDirectory(a);
-                                let bDir = ddb.entry.isDirectory(b);
-
-                                if (aDir && !bDir) return -1;
-                                else if (!aDir && bDir) return 1;
-                                else {
-                                    // then filename ascending
-                                    return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                                }
-                            });
+                    if (aDir && !bDir) return -1;
+                    else if (!aDir && bDir) return 1;
+                    else {
+                        // then filename ascending
+                        return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
+                    }
+                });
         },
         showError: function(text, title) {
             this.errorMessage = text;
@@ -246,7 +246,7 @@ export default {
             try {
                 var deleted = [];
 
-                for(var file of this.selectedFiles) {            
+                for(var file of this.selectedFiles) {
                     await this.dataset.deleteObj(file.entry.path);
                     deleted.push(file.entry.path);
                 }
@@ -315,8 +315,7 @@ export default {
 
             this.isBusy = true;
             
-            if (typeof this.currentPath !== 'undefined' && this.currentPath != null) 
-                newPath = this.currentPath + "/" + newPath;
+            newPath = this.currentPath ? this.currentPath + "/" + newPath : newPath;
 
             try {
 
@@ -355,20 +354,18 @@ export default {
             this.isBusy = false;
         },
 
-        handleFileSelectionChanged: function (fileBrowserFiles, path) {
+        handleFileSelectionChanged: function (fileBrowserFiles) {
         
-            if (typeof fileBrowserFiles === 'undefined') return;
+            this.$log.info("ViewDataset.handleFileSelectionChanged(fileBrowserFiles)", fileBrowserFiles);
 
-            this.$log.info("ViewDataset.handleFileSelectionChanged(fileBrowserFiles, path)", fileBrowserFiles, path);
-
-            this.fileBrowserFiles.forEach(f => f.selected = (f.entry.path == path));
+            this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
-            this.sortFiles();
-            
-            this.currentPath = (typeof path !== 'undefined' && path != null) ? (ddb.utils.isDDBUri(path) ? null : path) : 
-                                    (fileBrowserFiles.length > 0) ? pathutils.getParentFolder(fileBrowserFiles[0].entry.path) : null;
-
         },
+
+        handleCurrentUriChanged: function(currentUri){
+            this.currentPath = currentUri != null ? utils.pathFromUri(currentUri).replace(/^\//, "") : null;
+        },
+
         handleExplorerOpenProperties: function () {
             this.showProperties = true;
             this.selectedUsingFileBrowserList = false;
