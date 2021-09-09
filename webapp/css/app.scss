@@ -8,3 +8,12 @@
         }
     }
 }
+
+body:fullscreen {
+    background: #fefefe;
+
+    &::backdrop {
+        background: #fefefe;
+    }
+}
+
