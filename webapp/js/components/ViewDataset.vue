@@ -158,30 +158,30 @@ export default {
 
             try {
 
-            const entries = await this.dataset.info();
+                const entries = await this.dataset.info();
 
-            // Add license / readme tabs
-            if (entries.length === 1){
-                const entry = entries[0];
-                if (entry.meta.readme){
-                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.readme), entry.meta.readme, "Readme", "book", false);
-                    this.readme = entry.meta.readme;
+                // Add license / readme tabs
+                if (entries.length === 1){
+                    const entry = entries[0];
+                    if (typeof entry.properties.readme !== 'undefined'){
+                        this.addMarkdownTab(this.dataset.remoteUri(entry.properties.readme), entry.properties.readme, "Readme", "book", false);
+                        this.readme = entry.properties.readme;
+                    }
+                    if (typeof entry.properties.license !== 'undefined'){
+                        this.addMarkdownTab(this.dataset.remoteUri(entry.properties.license), entry.properties.license, "License", "balance scale", false);
+                        this.license = entry.properties.license;
+                    }
                 }
-                if (entry.meta.license){
-                    this.addMarkdownTab(this.dataset.remoteUri(entry.meta.license), entry.meta.license, "License", "balance scale", false);
-                    this.license = entry.meta.license;
-                }
-            }
 
-            return entries.map(e => { return {
-                    icon: icons.getForType(e.type),
-                    label: pathutils.basename(e.path),
-                    path: e.path,
-                    expanded: true,
-                    entry: e,
-                    isExpandable: ddb.entry.isDirectory(e)
-                };
-            });
+                return entries.map(e => { return {
+                        icon: icons.getForType(e.type),
+                        label: pathutils.basename(e.path),
+                        path: e.path,
+                        expanded: true,
+                        entry: e,
+                        isExpandable: ddb.entry.isDirectory(e)
+                    };
+                });
 
             } catch (e) {
                 this.showError(e, "Dataset");

@@ -86,10 +86,10 @@ export default {
 
         try{
             const info = await this.dataset.info();            
-            this.meta = info[0].meta;
-            
-            this.readme = (typeof this.meta.readme !== 'undefined') ? this.meta.readme : null;
-            this.license = (typeof this.meta.license !== 'undefined') ? this.meta.license : null;
+            this.properties = info[0].properties;
+
+            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
+            this.license = (typeof this.properties.license !== 'undefined') ? this.properties.license : null;
 
         }catch(e){
             this.error = e.message;
@@ -117,7 +117,7 @@ export default {
             return window.location.href;
         },
         isPublic: function(){
-            return this.meta && this.meta.public;
+            return this.properties && this.properties.public;
         }
     },
     methods: {
@@ -130,7 +130,7 @@ export default {
         },
         setPublic: async function(flag){
             try{
-                this.meta = await this.dataset.setPublic(flag);
+                this.properties = await this.dataset.setPublic(flag);
             }catch(e){
                 this.error = e.message;
             }
