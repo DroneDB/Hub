@@ -187,7 +187,7 @@ export default {
         })
         .on("sending", (file, xhr, formData) => {
             // Send filename
-            formData.append("path", this.path == null ? file.name : this.path + "/" + file.name);
+            formData.append("path", !this.path ? file.name : (this.path + "/" + file.name));
         })
         .on("queuecomplete", async (files) => {
             // Commit
