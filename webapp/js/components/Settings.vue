@@ -184,6 +184,9 @@ export default {
     }
     .extra {
         margin-top: 12px;
+        .button{
+            color: #030A03 !important;
+        }
     }
 }
 </style>
