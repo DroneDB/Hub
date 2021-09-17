@@ -1,8 +1,8 @@
 <template>
 <div id="header">
-    <a :href="homeUrl" class="logo"><img style="width: 140px;" src="/images/banner.svg" alt="DroneDB"></a>
+    <a :href="homeUrl" class="logo"><img style="width: 140px;" src="/images/banner.svg"></a>
     
-    <a class="ui orange label alert" @click="showDisclaimer = !showDisclaimer"><i class="icon warning"></i> This is a test hub</a>
+    <a class="ui orange label alert mobile hide" @click="showDisclaimer = !showDisclaimer"><i class="icon warning"></i> This is a test hub</a>
     <Alert v-if="showDisclaimer" @onClose="showDisclaimer = false" title="This is a Test Hub">
         <ul>
             <li>We will not guarantee data retention! Your data might be removed without notice.</li>
@@ -15,8 +15,8 @@
             @click="handleDownload"
             v-if="showDownload"
             title="Download"
-            class="ui button primary download">
-                <i class="icon download"></i> {{ downloadLabel }}
+            class="ui button primary icon download">
+                <i :class="{hidden: !showDownloadIcon}" class="icon download"></i><span :class="{'mobile hide': showDownloadIcon}"> {{ downloadLabel }}</span>
         </a>
         <button v-if="!loggedIn" class="ui button primary" @click="login"><i class="icon lock"></i> Sign In</button>
         <div v-else class="circular ui icon top right pointing dropdown button user-menu" 
@@ -42,6 +42,7 @@ import mouse from 'commonui/mouse';
 import reg from '../libs/sharedRegistry';
 import Alert from 'commonui/components/Alert';
 import { xAuthLogout } from '../libs/xauth';
+import { isMobile } from 'commonui/classes/responsive';
 
 export default {
   components: {
@@ -93,6 +94,11 @@ export default {
           }else{
               return "Download";
           }
+      },
+
+      showDownloadIcon: function(){
+          if (!isMobile()) return true;
+          else return this.selectedFiles.length == 0;
       }
   },
   mounted: function(){
@@ -189,22 +195,33 @@ export default {
 #header{
     margin: 0;
     padding: 8px;
-    padding-top: 12px;
+    padding-top: 8px;
     width: 100%;
     box-shadow: 0px 2px 4px -2px #000000;
     display: flex;
     z-index: 2;
     .logo{
-        margin-top: 4px;
+        margin-top: 6px;
     }
     .right{
         margin-left: auto;
     }
     .user-menu{
-        margin-left: 8px;
+        margin-left: 6px;
     }
-    .button.download{
-        min-width: 140px;
+}
+@media only screen and (min-width: 768px){
+    #header{
+        .button.download{
+            min-width: 120px;
+        }
+    }
+}
+@media only screen and (max-width: 767px) {
+    #header{
+        .button.download{
+            min-width: 38px;
+        }
     }
 }
 </style>

@@ -49,7 +49,7 @@
         </div>
     </div>
 
-    <div class="droparea" :class="{hide: url || uploading}" ref="droparea">
+    <div class="droparea" :class="{hidden: url || uploading}" ref="droparea">
         <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i class="cloud upload icon"></i> Upload Files</div>
     </div>
 
@@ -286,7 +286,7 @@ export default {
         margin-bottom: 36px;
     }
 }
-.hide{
+.hidden{
     visibility: hidden;
 }
 </style>

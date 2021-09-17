@@ -47,7 +47,7 @@
         <div @click="resetUpload" class="ui primary submit button"><i class="redo icon"></i> Upload More</div>
     </div>
 
-    <div class="droparea" :class="{hide: done || uploading}" ref="droparea">
+    <div class="droparea" :class="{hidden: done || uploading}" ref="droparea">
         <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i class="cloud upload icon"></i> Browse</div>
     </div>
 </div>
@@ -258,7 +258,7 @@ export default {
         margin-bottom: 36px;
     }
 }
-.hide{
+.hidden{
     visibility: hidden;
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
-    <Panel split="vertical" class="container main" amount="23.6%">
+    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="50%" tabletAmount="30%" mobileCollapsed>
         <div class="sidebar">
             <FileBrowser :rootNodes="rootNodes" 
                 @selectionChanged="handleFileSelectionChanged"
@@ -95,25 +95,32 @@ export default {
         Loader
     },
     data: function () {
-        return {
-            error: "",
-            mainTabs: [{
-                label: 'Map',
-                icon: 'map',
-                key: 'map'
-            },{
+        let mainTabs = [{
+            label: 'Map',
+            icon: 'map',
+            key: 'map'
+        }];
+        if (window.WebGL2RenderingContext){
+            mainTabs.push({
                 label: '3D',
                 icon: 'cube',
                 key: 'potree'
-            },{
+            });
+        }
+
+        mainTabs = mainTabs.concat([{
                 label: 'Files',
                 icon: 'folder open',
                 key: 'explorer'
-            },{
+            }, {
                 label: 'Settings',
                 icon: 'wrench',
                 key: 'settings'
-            }],
+            }]);
+
+        return {
+            error: "",
+            mainTabs: mainTabs,
             fileBrowserFiles: [],
             showProperties: false,
             selectedUsingFileBrowserList: false,
