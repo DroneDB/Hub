@@ -4,7 +4,8 @@
 
     <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="50%" tabletAmount="30%" mobileCollapsed>
         <div class="sidebar">
-            <FileBrowser :rootNodes="rootNodes" 
+            <FileBrowser :rootNodes="rootNodes"
+                @openItem="handleOpenItem"
                 @selectionChanged="handleFileSelectionChanged"
                 @currentUriChanged="handleCurrentUriChanged"
                 @openProperties="handleFileBrowserOpenProperties"
@@ -69,6 +70,7 @@ import icons from 'commonui/classes/icons';
 import reg from '../libs/sharedRegistry';
 import { setTitle } from '../libs/utils';
 import { clone } from 'commonui/classes/utils';
+import shell from 'commonui/dynamic/shell';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -179,18 +181,27 @@ export default {
                 this.showError(e, "Dataset");
                 return [];
             }
-        },        
-        addMarkdownTab: function(uri, path, label, icon, activate){
-            this.$refs.mainTabSwitcher.addTab({
-                label,
-                icon,
-                key: label.toLowerCase(),
-                hideLabel: false,
-                component: Markdown,
-                props: {
-                    uri
-                }
-            }, {tabIndex: -1, activate }); // Add before "settings" tab
+        },
+        handleOpenItem: function(node){
+            if (node.entry.type === ddb.entry.type.MARKDOWN){
+                this.addMarkdownTab(node.path, node.label, "book", true);
+            }else{
+                shell.openItem(node.path);
+            }
+        },
+        addMarkdownTab: function(uri, label, icon, activate){
+            if (!this.$refs.mainTabSwitcher.hasTab(label)){
+                this.$refs.mainTabSwitcher.addTab({
+                    label,
+                    icon,
+                    key: label,
+                    hideLabel: false,
+                    component: Markdown,
+                    props: {
+                        uri
+                    }
+                }, { activate });
+            }
         },
 
         sortFiles: function() {
@@ -415,8 +426,14 @@ export default {
 
         },
 
-        handleAddMarkdown: async function(document, entry) {
+        handleAddMarkdown: function(document, entry) {
             this.handleAddClose([entry]);
+            this.handleOpenItem({
+                label: document,
+                entry,
+                path: this.dataset.remoteUri(document)
+            });
+            this.showSettings = false;
         },
 
         handleScrollTo: function(file){

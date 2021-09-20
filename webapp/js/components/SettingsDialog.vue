@@ -10,7 +10,7 @@
     <div v-if="loading" class="loading">
         <i class="icon circle notch spin" />
     </div>
-    <div v-else>
+    <div class="content" v-else>
         <h4 class="ui header">
         <i class="icon" :class="{unlock: isPublic, lock: !isPublic}"></i>
         <div class="content">
@@ -155,6 +155,10 @@ export default {
     min-height: 200px;
     padding: 8px;
     margin-top: 12px;
+    .content{
+        padding: 4px 8px 8px 8px;
+        margin-bottom: 32px;
+    }
     .loading{
         padding: 16px;
     }
