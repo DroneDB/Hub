@@ -1,8 +1,7 @@
 <template>
     <Window title="Add to dataset" id="rename" @onClose="close" 
-            :modal="true"
-            
-            :fixedSize="true">
+            modal            
+            fixedSize>
         <div style="width: 400px">
             <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded" :open="true"></DatasetUpload>
         </div>

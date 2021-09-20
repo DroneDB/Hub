@@ -1,8 +1,8 @@
 <template>
     <Window title="Create folder" id="newFolder" @onClose="close('close')" 
-            :modal="true"
+            modal
             maxWidth="70%"
-            :fixedSize="true">
+            fixedSize>
 
         <input class="newFolderInput" 
                 ref="newFolderInput" 

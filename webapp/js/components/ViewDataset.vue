@@ -1,6 +1,7 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
+
     <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="50%" tabletAmount="30%" mobileCollapsed>
         <div class="sidebar">
             <FileBrowser :rootNodes="rootNodes" 
@@ -28,13 +29,11 @@
                     :currentPath="currentPath"
                     @openProperties="handleExplorerOpenProperties" />
             </template>
-            <template v-slot:settings>
-                <Settings :dataset="dataset" @addProperties="handleAddProperties" />
-            </template>
         </TabSwitcher>
 
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
+    <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
@@ -49,7 +48,7 @@
 
 <script>
 import Header from './Header.vue';
-import Settings from './Settings.vue';
+import SettingsDialog from './SettingsDialog.vue';
 import AddToDatasetDialog from './AddToDatasetDialog.vue';
 import DeleteDialog from './DeleteDialog.vue';
 import RenameDialog from './RenameDialog.vue';
@@ -85,7 +84,7 @@ export default {
         Explorer,
         Properties,
         TabSwitcher,
-        Settings,
+        SettingsDialog,
         Panel,
         AddToDatasetDialog,
         DeleteDialog,
@@ -112,10 +111,6 @@ export default {
                 label: 'Files',
                 icon: 'folder open',
                 key: 'explorer'
-            }, {
-                label: 'Settings',
-                icon: 'wrench',
-                key: 'settings'
             }]);
 
         return {
@@ -137,13 +132,16 @@ export default {
             errorDialogOpen: false,
             errorMessage: null,
             errorMessageTitle: null,
-            readme: null,
-            license: null
+            showSettings: false
         };
     },
     mounted: function(){
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
+
+        this.$root.$on('openSettings', () => {
+            this.showSettings = true;
+        });
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
@@ -166,19 +164,6 @@ export default {
             try {
 
                 const entries = await this.dataset.info();
-
-                // Add license / readme tabs
-                if (entries.length === 1){
-                    const entry = entries[0];
-                    if (typeof entry.properties.readme !== 'undefined'){
-                        this.addMarkdownTab(this.dataset.remoteUri(entry.properties.readme), entry.properties.readme, "Readme", "book", false);
-                        this.readme = entry.properties.readme;
-                    }
-                    if (typeof entry.properties.license !== 'undefined'){
-                        this.addMarkdownTab(this.dataset.remoteUri(entry.properties.license), entry.properties.license, "License", "balance scale", false);
-                        this.license = entry.properties.license;
-                    }
-                }
 
                 return entries.map(e => { return {
                         icon: icons.getForType(e.type),
@@ -231,6 +216,9 @@ export default {
             this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
             this.errorDialogOpen = true;
         },
+        handleSettingsClose: function(){
+            this.showSettings = false;
+        },
         handleRenameClose: async function(id, newPath) {
             
             if (id == "rename") {
@@ -262,14 +250,6 @@ export default {
                 }
                 
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
-
-                if (deleted.includes('README.md')) {
-                    this.$refs.mainTabSwitcher.removeTab("readme");
-                }
-
-                if (deleted.includes('LICENSE.md')) {
-                    this.$refs.mainTabSwitcher.removeTab("license");
-                }
 
                 this.$root.$emit('deleteEntries', deleted);
            
@@ -365,9 +345,6 @@ export default {
         },
 
         handleFileSelectionChanged: function (fileBrowserFiles) {
-        
-            this.$log.info("ViewDataset.handleFileSelectionChanged(fileBrowserFiles)", fileBrowserFiles);
-
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
         },
@@ -431,14 +408,6 @@ export default {
 
             this.sortFiles();
 
-            if (uploaded.find(item => item.path == 'README.md')) {
-                this.addReadme();
-            }
-
-            if (uploaded.find(item => item.path == 'LICENSE.md')) {   
-                this.addLicense();
-            }
-
             // Only if any add is necessary, send addItems message to filebrowser
             if (items.length > 0) {
                 this.$root.$emit('addItems', items);
@@ -446,25 +415,7 @@ export default {
 
         },
 
-        addLicense: async function() {
-            this.$log.info("addLicense");
-            
-            var remoteUri = this.dataset.remoteUri("LICENSE.md");
-            this.$root.$emit('refreshMarkdown', remoteUri);
-                
-            this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale", true);
-        },
-
-        addReadme: async function() {
-            this.$log.info("addReadme");
-
-            var remoteUri = this.dataset.remoteUri("README.md");
-            this.$root.$emit('refreshMarkdown', remoteUri);
-
-            this.addMarkdownTab(remoteUri, "README.md", "Readme", "book", true);
-        },
-
-        handleAddProperties: async function(meta, entry) {
+        handleAddMarkdown: async function(document, entry) {
             this.handleAddClose([entry]);
         },
 

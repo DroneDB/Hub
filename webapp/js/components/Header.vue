@@ -18,7 +18,15 @@
             class="ui button primary icon download">
                 <i :class="{hidden: !showDownloadIcon}" class="icon download"></i><span :class="{'mobile hide': showDownloadIcon}"> {{ downloadLabel }}</span>
         </a>
-        <button v-if="!loggedIn" class="ui button primary" @click="login"><i class="icon lock"></i> Sign In</button>
+
+        <a href="javascript:void(0)"
+            @click="handleSettings"
+            v-if="showSettings"
+            title="Settings"
+            class="ui circular button default icon settings">
+                <i class="icon wrench"></i>
+        </a>
+        <button v-if="!loggedIn" class="ui button primary icon" @click="login"><i class="icon lock"></i><span class="mobile hide"> Sign In</span></button>
         <div v-else class="circular ui icon top right pointing dropdown button user-menu" 
             @click.stop="toggleMenu"
             :title="username">
@@ -54,6 +62,7 @@ export default {
           loggedIn: reg.isLoggedIn(),
           params: this.$route.params,
           showDownload: !!this.$route.params.ds,
+          showSettings: reg.isLoggedIn(),
           selectedFiles: [],
 
           showDisclaimer: false
@@ -115,6 +124,11 @@ export default {
           // logic in the future to see who has access
           // to download files?
           this.showDownload = !!params.ds; 
+
+          // TODO: we need to show this to users that
+          // have write access, not everyone
+          this.showSettings = reg.isLoggedIn();
+
           this.params = params;
       }
   },
@@ -150,6 +164,10 @@ export default {
           }else{
               // href will handle it
           }
+      },
+
+      handleSettings: function(){
+        this.$root.$emit("openSettings");
       },
 
       onRegLogin: function(username){
@@ -206,7 +224,7 @@ export default {
     .right{
         margin-left: auto;
     }
-    .user-menu{
+    .user-menu,.settings{
         margin-left: 6px;
     }
 }
