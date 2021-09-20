@@ -29,7 +29,7 @@
                     @openProperties="handleExplorerOpenProperties" />
             </template>
             <template v-slot:settings>
-                <Settings :dataset="dataset" @addMeta="handleAddMeta" />
+                <Settings :dataset="dataset" @addProperties="handleAddProperties" />
             </template>
         </TabSwitcher>
 
@@ -464,8 +464,7 @@ export default {
             this.addMarkdownTab(remoteUri, "README.md", "Readme", "book", true);
         },
 
-        handleAddMeta: async function(meta, entry) {
-            this.$log.info("handleAddMeta(meta, entry)", meta, clone(entry));
+        handleAddProperties: async function(meta, entry) {
             this.handleAddClose([entry]);
         },
 

@@ -41,12 +41,12 @@ Only you and people in your organization can see and download the data.
 </div>
 
 <div class="extra" v-if="readme == null">
-    <button @click="addMeta('readme')" class="ui button basic icon">
+    <button @click="addProperties('readme')" class="ui button basic icon">
         <i class="icon book"/> Add Readme
     </button>
 </div>
 <div class="extra" v-if="license == null">
-    <button @click="addMeta('license')" class="ui button basic icon">
+    <button @click="addProperties('license')" class="ui button basic icon">
         <i class="icon balance scale" /> Add License
     </button>
 </div>
@@ -72,7 +72,7 @@ export default {
     data: function () {
         return {
             error: "",
-            meta: null,
+            properties: null,
             loading: true,
             readme: null,
             license: null
@@ -85,7 +85,7 @@ export default {
         mouse.on("click", this.hideVisibilityMenu);
 
         try{
-            const info = await this.dataset.info();            
+            const info = await this.dataset.info();
             this.properties = info[0].properties;
 
             this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
@@ -135,13 +135,13 @@ export default {
                 this.error = e.message;
             }
         },
-        addMeta: async function(meta) {
+        addProperties: async function(properties) {
             
             this.loading = true;
 
             var entry = null;
 
-            switch(meta) {
+            switch(properties) {
                 case "license":
 
                     entry = await this.dataset.writeObj("LICENSE.md", "# License\n");
@@ -159,7 +159,7 @@ export default {
 
             this.$log.info(clone(entry));
 
-            this.$emit('addMeta', meta, entry);
+            this.$emit('addProperties', properties, entry);
 
             this.loading = false;
         }     
