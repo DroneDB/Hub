@@ -2,9 +2,9 @@
 <div id="browser" class="cui app">
     <Message bindTo="error" />
 
-    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="50%" tabletAmount="30%" mobileCollapsed>
+    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed>
         <div class="sidebar">
-            <FileBrowser :rootNodes="rootNodes"
+            <FileBrowser v-if="!isMobile" :rootNodes="rootNodes"
                 @openItem="handleOpenItem"
                 @selectionChanged="handleFileSelectionChanged"
                 @currentUriChanged="handleCurrentUriChanged"
@@ -17,8 +17,16 @@
                 buttonWidth="auto"
                 :hideSingle="true"
                 ref="mainTabSwitcher" >
+            <template v-if="isMobile" v-slot:filebrowser>
+                <FileBrowser :rootNodes="rootNodes"
+                    @openItem="handleOpenItem"
+                    @selectionChanged="handleFileSelectionChanged"
+                    @currentUriChanged="handleCurrentUriChanged"
+                    @openProperties="handleFileBrowserOpenProperties"
+                    @error="handleError" />
+            </template>
             <template v-slot:map>
-                <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
+                <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
             </template>
             <template v-slot:potree>
                 <Potree :files="fileBrowserFiles" />
@@ -28,6 +36,7 @@
                     :files="fileBrowserFiles"
                     :tools="explorerTools"
                     :currentPath="currentPath"
+                    @openItem="handleOpenItem"
                     @openProperties="handleExplorerOpenProperties" />
             </template>
         </TabSwitcher>
@@ -71,6 +80,7 @@ import reg from '../libs/sharedRegistry';
 import { setTitle } from '../libs/utils';
 import { clone } from 'commonui/classes/utils';
 import shell from 'commonui/dynamic/shell';
+import { isMobile } from 'commonui/classes/responsive';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -96,11 +106,20 @@ export default {
         Loader
     },
     data: function () {
+        const mobile = isMobile();
+
         let mainTabs = [{
             label: 'Map',
             icon: 'map',
             key: 'map'
         }];
+        if (mobile){
+            mainTabs.unshift({
+                label: 'Browser',
+                icon: 'sitemap',
+                key: 'filebrowser'
+            });
+        }
         if (window.WebGL2RenderingContext){
             mainTabs.push({
                 label: '3D',
@@ -117,6 +136,7 @@ export default {
 
         return {
             error: "",
+            isMobile: mobile,
             mainTabs: mainTabs,
             fileBrowserFiles: [],
             showProperties: false,
@@ -184,23 +204,24 @@ export default {
         },
         handleOpenItem: function(node){
             if (node.entry.type === ddb.entry.type.MARKDOWN){
-                this.addMarkdownTab(node.path, node.label, "book", true);
+                this.addMarkdownTab(node.path, node.label, "book");
             }else{
                 shell.openItem(node.path);
             }
         },
-        addMarkdownTab: function(uri, label, icon, activate){
+        addMarkdownTab: function(uri, label, icon){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
                 this.$refs.mainTabSwitcher.addTab({
                     label,
                     icon,
                     key: label,
                     hideLabel: false,
+                    canClose: true,
                     component: Markdown,
                     props: {
                         uri
                     }
-                }, { activate });
+                }, { activate: true });
             }
         },
 
