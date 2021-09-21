@@ -1,6 +1,6 @@
 <template>
 <div id="header">
-    <a :href="homeUrl" class="logo"><img style="width: 140px;" src="/images/banner.svg"></a>
+    <a :href="homeUrl" class="logo"><img src="/images/banner.svg"></a>
     
     <a class="ui orange label alert mobile hide" @click="showDisclaimer = !showDisclaimer"><i class="icon warning"></i> This is a test hub</a>
     <Alert v-if="showDisclaimer" @onClose="showDisclaimer = false" title="This is a Test Hub">
@@ -220,6 +220,16 @@ export default {
     z-index: 2;
     .logo{
         margin-top: 6px;
+        & > img{
+            width: 140px;
+        }
+
+        @media only screen and (max-width: 767px) {
+            & > img{
+                width: 160px;
+                margin-top: 2px;
+            }
+        }
     }
     .right{
         margin-left: auto;

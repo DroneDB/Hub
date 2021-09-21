@@ -160,6 +160,7 @@ export default {
         margin-bottom: 32px;
     }
     .loading{
+        text-align: center;
         padding: 16px;
     }
     .ui.header{
