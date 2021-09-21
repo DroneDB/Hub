@@ -315,8 +315,9 @@ export default {
                 newItem.entry.path = newPath;
 
                 // Let's add it to our explorer (we are in the same folder)
-                if (pathutils.getParentFolder(newPath) == this.currentPath) 
+                if (pathutils.getParentFolder(newPath) == (this.currentPath || null)){
                     this.fileBrowserFiles.push(newItem);
+                } 
 
                 // Tell filebrowser to remove the file in the old location and add to the new location
                 this.$root.$emit('deleteEntries', [oldPath]);
