@@ -377,10 +377,14 @@ export default {
         },
 
         handleExplorerOpenProperties: function () {
+
+            if (this.selectedFiles.length == 0) return;
+
             this.showProperties = true;
             this.selectedUsingFileBrowserList = false;
         },
         handleFileBrowserOpenProperties: function () {
+
             this.showProperties = true;
             this.selectedUsingFileBrowserList = true;
         },
