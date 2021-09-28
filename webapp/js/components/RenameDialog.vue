@@ -1,8 +1,8 @@
 <template>
     <Window title="Rename" id="rename" @onClose="close('close')" 
-            :modal="true"
+            modal
             maxWidth="70%"
-            :fixedSize="true">
+            fixedSize>
 
         <input class="renameInput" 
                 ref="renameInput" 

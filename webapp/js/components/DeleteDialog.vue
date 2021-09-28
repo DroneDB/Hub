@@ -1,8 +1,8 @@
 <template>
     <Window title="Confirm delete" id="remove" @onClose="close('close')" 
-            :modal="true"
+            modal
             maxWidth="70%"
-            :fixedSize="true">
+            fixedSize>
 
         Are you sure to delete the following items?<br />
         <div class="ui bulleted list">

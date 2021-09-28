@@ -1,9 +1,11 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
-    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="50%" tabletAmount="30%" mobileCollapsed>
+
+    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed>
         <div class="sidebar">
-            <FileBrowser :rootNodes="rootNodes" 
+            <FileBrowser v-if="!isMobile" :rootNodes="rootNodes"
+                @openItem="handleOpenItem"
                 @selectionChanged="handleFileSelectionChanged"
                 @currentUriChanged="handleCurrentUriChanged"
                 @openProperties="handleFileBrowserOpenProperties"
@@ -15,8 +17,16 @@
                 buttonWidth="auto"
                 :hideSingle="true"
                 ref="mainTabSwitcher" >
+            <template v-if="isMobile" v-slot:filebrowser>
+                <FileBrowser :rootNodes="rootNodes"
+                    @openItem="handleOpenItem"
+                    @selectionChanged="handleFileSelectionChanged"
+                    @currentUriChanged="handleCurrentUriChanged"
+                    @openProperties="handleFileBrowserOpenProperties"
+                    @error="handleError" />
+            </template>
             <template v-slot:map>
-                <Map :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
+                <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
             </template>
             <template v-slot:potree>
                 <Potree :files="fileBrowserFiles" />
@@ -26,15 +36,14 @@
                     :files="fileBrowserFiles"
                     :tools="explorerTools"
                     :currentPath="currentPath"
+                    @openItem="handleOpenItem"
                     @openProperties="handleExplorerOpenProperties" />
-            </template>
-            <template v-slot:settings>
-                <Settings :dataset="dataset" @addMeta="handleAddMeta" />
             </template>
         </TabSwitcher>
 
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
+    <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
@@ -49,7 +58,7 @@
 
 <script>
 import Header from './Header.vue';
-import Settings from './Settings.vue';
+import SettingsDialog from './SettingsDialog.vue';
 import AddToDatasetDialog from './AddToDatasetDialog.vue';
 import DeleteDialog from './DeleteDialog.vue';
 import RenameDialog from './RenameDialog.vue';
@@ -70,6 +79,8 @@ import icons from 'commonui/classes/icons';
 import reg from '../libs/sharedRegistry';
 import { setTitle } from '../libs/utils';
 import { clone } from 'commonui/classes/utils';
+import shell from 'commonui/dynamic/shell';
+import { isMobile } from 'commonui/classes/responsive';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -85,7 +96,7 @@ export default {
         Explorer,
         Properties,
         TabSwitcher,
-        Settings,
+        SettingsDialog,
         Panel,
         AddToDatasetDialog,
         DeleteDialog,
@@ -95,11 +106,20 @@ export default {
         Loader
     },
     data: function () {
+        const mobile = isMobile();
+
         let mainTabs = [{
             label: 'Map',
             icon: 'map',
             key: 'map'
         }];
+        if (mobile){
+            mainTabs.unshift({
+                label: 'Browser',
+                icon: 'sitemap',
+                key: 'filebrowser'
+            });
+        }
         if (window.WebGL2RenderingContext){
             mainTabs.push({
                 label: '3D',
@@ -112,14 +132,11 @@ export default {
                 label: 'Files',
                 icon: 'folder open',
                 key: 'explorer'
-            }, {
-                label: 'Settings',
-                icon: 'wrench',
-                key: 'settings'
             }]);
 
         return {
             error: "",
+            isMobile: mobile,
             mainTabs: mainTabs,
             fileBrowserFiles: [],
             showProperties: false,
@@ -137,13 +154,16 @@ export default {
             errorDialogOpen: false,
             errorMessage: null,
             errorMessageTitle: null,
-            readme: null,
-            license: null
+            showSettings: false
         };
     },
     mounted: function(){
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
+
+        this.$root.$on('openSettings', () => {
+            this.showSettings = true;
+        });
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
@@ -167,19 +187,6 @@ export default {
 
                 const entries = await this.dataset.info();
 
-                // Add license / readme tabs
-                if (entries.length === 1){
-                    const entry = entries[0];
-                    if (typeof entry.properties.readme !== 'undefined'){
-                        this.addMarkdownTab(this.dataset.remoteUri(entry.properties.readme), entry.properties.readme, "Readme", "book", false);
-                        this.readme = entry.properties.readme;
-                    }
-                    if (typeof entry.properties.license !== 'undefined'){
-                        this.addMarkdownTab(this.dataset.remoteUri(entry.properties.license), entry.properties.license, "License", "balance scale", false);
-                        this.license = entry.properties.license;
-                    }
-                }
-
                 return entries.map(e => { return {
                         icon: icons.getForType(e.type),
                         label: pathutils.basename(e.path),
@@ -194,18 +201,28 @@ export default {
                 this.showError(e, "Dataset");
                 return [];
             }
-        },        
-        addMarkdownTab: function(uri, path, label, icon, activate){
-            this.$refs.mainTabSwitcher.addTab({
-                label,
-                icon,
-                key: label.toLowerCase(),
-                hideLabel: false,
-                component: Markdown,
-                props: {
-                    uri
-                }
-            }, {tabIndex: -1, activate }); // Add before "settings" tab
+        },
+        handleOpenItem: function(node){
+            if (node.entry.type === ddb.entry.type.MARKDOWN){
+                this.addMarkdownTab(node.path, node.label, "book");
+            }else{
+                shell.openItem(node.path);
+            }
+        },
+        addMarkdownTab: function(uri, label, icon){
+            if (!this.$refs.mainTabSwitcher.hasTab(label)){
+                this.$refs.mainTabSwitcher.addTab({
+                    label,
+                    icon,
+                    key: label,
+                    hideLabel: false,
+                    canClose: true,
+                    component: Markdown,
+                    props: {
+                        uri
+                    }
+                }, { activate: true });
+            }
         },
 
         sortFiles: function() {
@@ -230,6 +247,9 @@ export default {
             this.errorMessage = text;
             this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
             this.errorDialogOpen = true;
+        },
+        handleSettingsClose: function(){
+            this.showSettings = false;
         },
         handleRenameClose: async function(id, newPath) {
             
@@ -263,14 +283,6 @@ export default {
                 
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
 
-                if (deleted.includes('README.md')) {
-                    this.$refs.mainTabSwitcher.removeTab("readme");
-                }
-
-                if (deleted.includes('LICENSE.md')) {
-                    this.$refs.mainTabSwitcher.removeTab("license");
-                }
-
                 this.$root.$emit('deleteEntries', deleted);
            
             } catch(e) {
@@ -303,8 +315,9 @@ export default {
                 newItem.entry.path = newPath;
 
                 // Let's add it to our explorer (we are in the same folder)
-                if (pathutils.getParentFolder(newPath) == this.currentPath) 
+                if (pathutils.getParentFolder(newPath) == (this.currentPath || null)){
                     this.fileBrowserFiles.push(newItem);
+                } 
 
                 // Tell filebrowser to remove the file in the old location and add to the new location
                 this.$root.$emit('deleteEntries', [oldPath]);
@@ -365,9 +378,6 @@ export default {
         },
 
         handleFileSelectionChanged: function (fileBrowserFiles) {
-        
-            this.$log.info("ViewDataset.handleFileSelectionChanged(fileBrowserFiles)", fileBrowserFiles);
-
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
         },
@@ -435,14 +445,6 @@ export default {
 
             this.sortFiles();
 
-            if (uploaded.find(item => item.path == 'README.md')) {
-                this.addReadme();
-            }
-
-            if (uploaded.find(item => item.path == 'LICENSE.md')) {   
-                this.addLicense();
-            }
-
             // Only if any add is necessary, send addItems message to filebrowser
             if (items.length > 0) {
                 this.$root.$emit('addItems', items);
@@ -450,27 +452,14 @@ export default {
 
         },
 
-        addLicense: async function() {
-            this.$log.info("addLicense");
-            
-            var remoteUri = this.dataset.remoteUri("LICENSE.md");
-            this.$root.$emit('refreshMarkdown', remoteUri);
-                
-            this.addMarkdownTab(remoteUri, "LICENSE.md", "License", "balance scale", true);
-        },
-
-        addReadme: async function() {
-            this.$log.info("addReadme");
-
-            var remoteUri = this.dataset.remoteUri("README.md");
-            this.$root.$emit('refreshMarkdown', remoteUri);
-
-            this.addMarkdownTab(remoteUri, "README.md", "Readme", "book", true);
-        },
-
-        handleAddMeta: async function(meta, entry) {
-            this.$log.info("handleAddMeta(meta, entry)", meta, clone(entry));
+        handleAddMarkdown: function(document, entry) {
             this.handleAddClose([entry]);
+            this.handleOpenItem({
+                label: document,
+                entry,
+                path: this.dataset.remoteUri(document)
+            });
+            this.showSettings = false;
         },
 
         handleScrollTo: function(file){

@@ -1,11 +1,16 @@
 <template>
-<div class="settings">
+    <Window title="Settings" id="settings" @onClose="close('close')" 
+            modal
+            maxWidth="70%"
+            fixedSize
+            fixedPosition
+            closeModalOnClick>
     <Message bindTo="error" />
 
     <div v-if="loading" class="loading">
         <i class="icon circle notch spin" />
     </div>
-    <div v-else>
+    <div class="content" v-else>
         <h4 class="ui header">
         <i class="icon" :class="{unlock: isPublic, lock: !isPublic}"></i>
         <div class="content">
@@ -23,41 +28,33 @@
             </div>
         </div>
         </h4>
+
+        <div class="description" v-if="isPublic">
+        Anybody with the <a :href="currentUrl">link</a> to this page can see and download the data.
+        </div>
+        <div class="description" v-else>
+        Only you and people in your organization can see and download the data. 
+        </div>
+
+        <div class="extra" v-if="readme == null">
+            <button @click="addDocument('README.md')" class="ui button basic icon">
+                <i class="icon book"/> Add Readme
+            </button>
+        </div>
+        <div class="extra" v-if="license == null">
+            <button @click="addDocument('LICENSE.md')" class="ui button basic icon">
+                <i class="icon balance scale" /> Add License
+            </button>
+        </div>
     </div>
-
-<!--
-<h4 class="ui header">
-  <i class="key icon"></i>
-  <div class="content">
-    Password: not set
-  </div>
-</h4>-->
-
-<div class="description" v-if="isPublic">
-Anybody with the <a :href="currentUrl">link</a> to this page can see and download the data.
-</div>
-<div class="description" v-else>
-Only you and people in your organization can see and download the data. 
-</div>
-
-<div class="extra" v-if="readme == null">
-    <button @click="addMeta('readme')" class="ui button basic icon">
-        <i class="icon book"/> Add Readme
-    </button>
-</div>
-<div class="extra" v-if="license == null">
-    <button @click="addMeta('license')" class="ui button basic icon">
-        <i class="icon balance scale" /> Add License
-    </button>
-</div>
-
-</div>
+</Window>
 </template>
 
 <script>
 import Message from 'commonui/components/Message.vue';
 import mouse from 'commonui/mouse';
 import { clone } from 'commonui/classes/utils';
+import Window from 'commonui/components/Window.vue';
 
 export default {
     props: {
@@ -67,12 +64,12 @@ export default {
         }
     },
     components: {
-        Message
+        Message, Window
     },
     data: function () {
         return {
             error: "",
-            meta: null,
+            properties: null,
             loading: true,
             readme: null,
             license: null
@@ -85,7 +82,7 @@ export default {
         mouse.on("click", this.hideVisibilityMenu);
 
         try{
-            const info = await this.dataset.info();            
+            const info = await this.dataset.info();
             this.properties = info[0].properties;
 
             this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
@@ -94,18 +91,6 @@ export default {
         }catch(e){
             this.error = e.message;
         }
-
-        this.$root.$on('deleteEntries', async (deleted) => {
-
-            if (deleted.includes('README.md')) {
-                this.readme = null;
-            }
-
-            if (deleted.includes('LICENSE.md')) {
-                this.license = null;
-            }
-
-        });
 
         this.loading = false;
     },
@@ -121,6 +106,9 @@ export default {
         }
     },
     methods: {
+        close: function(buttonId){
+          this.$emit('onClose', buttonId);
+        },
         toggleVisibilityMenu: function(){
             if (this.$refs.visibilityMenu) this.$refs.visibilityMenu.style.display = this.$refs.visibilityMenu.style.display === 'block' ? 
                                                         'none' : 'block';
@@ -135,31 +123,26 @@ export default {
                 this.error = e.message;
             }
         },
-        addMeta: async function(meta) {
+        addDocument: async function(document) {
             
             this.loading = true;
 
             var entry = null;
 
-            switch(meta) {
-                case "license":
-
-                    entry = await this.dataset.writeObj("LICENSE.md", "# License\n");
-                    this.license = "LICENSE.md";
-
+            switch(document) {
+                case "LICENSE.md":
+                    entry = await this.dataset.writeObj(document, "# License\n");
+                    this.license = document;
                     break;
-
-                case "readme":
-
-                    entry = await this.dataset.writeObj("README.md", "# Readme\n");
-                    this.readme = "README.md";
-
+                case "README.md":
+                    entry = await this.dataset.writeObj(document, "# Readme\n");
+                    this.readme = document;
                     break;
+                default:
+                    throw new Error("Invalid document: " + document);
             }
 
-            this.$log.info(clone(entry));
-
-            this.$emit('addMeta', meta, entry);
+            this.$emit('addMarkdown', document, entry);
 
             this.loading = false;
         }     
@@ -168,10 +151,21 @@ export default {
 </script>
 
 <style scoped>
-.settings{
+#settings{
     min-height: 200px;
     padding: 8px;
     margin-top: 12px;
+    .content{
+        padding: 4px 8px 8px 8px;
+        margin-bottom: 32px;
+    }
+    .loading{
+        text-align: center;
+        padding: 16px;
+    }
+    .ui.header{
+        padding-top: 6px;
+    }
     .visibility{
         font-size: 110%;
     }

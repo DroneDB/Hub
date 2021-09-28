@@ -17,7 +17,6 @@ body:fullscreen {
     }
 }
 
-
 /* Mobile */
 
 @media only screen and (max-width: 767px) {
@@ -28,6 +27,16 @@ body:fullscreen {
     [class*="widescreen monitor only"]:not(.mobile),
     [class*="or lower hide"] {
       display: none !important;
+    }
+
+    body,button, input, optgroup, select, textarea{
+        font-size: 120%;
+    }
+    .ui.button, .ui.buttons .button, .ui.buttons .or,
+    .ui.dropdown .menu,
+    .ui.dropdown .menu>.item,
+    i.icon, i.icons{
+        font-size: 1.2rem;
     }
   }
   
@@ -44,8 +53,7 @@ body:fullscreen {
       display: none !important;
     }
   }
-  
-  
+
   /* Computer / Desktop / iPad Landscape */
   
   @media only screen and (min-width: 992px) and (max-width: 1199px) {
