@@ -292,24 +292,17 @@ export default {
             this.isBusy = false;
            
         },
-        renameSelectedFile: async function(newPath) {
-
-            this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
-
-            this.isBusy = true;
-
-            if (this.selectedFiles.length == 0) return;
+        renameFile: async function(file, newPath) {
 
             try {
 
-                var item = this.selectedFiles[0];
-                var oldPath = item.entry.path;
+                var oldPath = file.entry.path;
                 await this.dataset.moveObj(oldPath, newPath);
                             
                 // Let's remove both the new file path and the old one because it could be a replace
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
-                var newItem = clone(item);
+                var newItem = clone(file);
                 newItem.path = this.dataset.remoteUri(newPath),
                 newItem.label = pathutils.basename(newPath);
                 newItem.entry.path = newPath;
@@ -329,6 +322,18 @@ export default {
                 this.showError(e, "Rename file");
             }
 
+        },
+
+        renameSelectedFile: async function(newPath) {
+
+            this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
+
+            this.isBusy = true;
+
+            if (this.selectedFiles.length == 0) return;
+
+            await this.renameFile(this.selectedFiles[0], newPath);
+            
             this.isBusy = false;
         },
 
@@ -429,10 +434,11 @@ export default {
                 
                 const base = pathutils.basename(entry.path);
 
+                debugger;
                 var item = {
                     icon: icons.getForType(entry.type),
                     label: base,
-                    path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
+                    path: this.dataset.remoteUri((this.currentPath != null && this.currentPath.length > 0) ? pathutils.join(this.currentPath, base) : base),
                     entry,
                     isExpandable: ddb.entry.isDirectory(entry),
                     selected: false
