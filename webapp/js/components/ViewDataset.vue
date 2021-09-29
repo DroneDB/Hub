@@ -37,7 +37,8 @@
                     :tools="explorerTools"
                     :currentPath="currentPath"
                     @openItem="handleOpenItem"
-                    @openProperties="handleExplorerOpenProperties" />
+                    @openProperties="handleExplorerOpenProperties"
+                    @moveItem="handleMoveItem" />
             </template>
         </TabSwitcher>
 
@@ -208,6 +209,11 @@ export default {
             }else{
                 shell.openItem(node.path);
             }
+        },
+
+        handleMoveItem: async function(node, path){
+            this.$log.info("ViewDataset.handleMoveItem");
+            await this.renameFile(node, path);
         },
         addMarkdownTab: function(uri, label, icon){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
@@ -434,7 +440,6 @@ export default {
                 
                 const base = pathutils.basename(entry.path);
 
-                debugger;
                 var item = {
                     icon: icons.getForType(entry.type),
                     label: base,
