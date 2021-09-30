@@ -165,6 +165,38 @@ export default {
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
         });
+
+        this.$root.$on('moveItem', async (sourceItem, destItem) => {
+            console.log("In ViewDataset", clone(sourceItem), clone(destItem));
+            
+            if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
+                console.log("Cannot move root");
+                return;
+            }
+
+            var destPath = "";
+            var sourceItemName = pathutils.basename(sourceItem.entry.path);
+
+            // Folder magics: if dest is file let's use its parent.
+            if (ddb.entry.isDirectory(destItem.entry))
+                destPath = destItem.entry.type == ddb.entry.type.DRONEDB ? sourceItemName : pathutils.join(destItem.entry.path, sourceItemName) ;
+            else {
+                var destParentFolder = pathutils.getParentFolder(destItem.entry.path);            
+                destPath = destParentFolder == null ? sourceItemName : pathutils.join(destParentFolder, sourceItemName);
+            }
+
+            if (destPath.startsWith(sourceItem.entry.path)) {
+                console.log("Cannot move a file onto itself");
+                return;
+            }
+            
+            console.log(`Moving ${sourceItem.entry.path} -> ${destPath}`);
+
+            this.isBusy = true;
+            await this.renameFile(sourceItem, destPath);
+            this.isBusy = false;            
+
+        });
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
