@@ -167,10 +167,9 @@ export default {
         });
 
         this.$root.$on('moveItem', async (sourceItem, destItem) => {
-            console.log("In ViewDataset", clone(sourceItem), clone(destItem));
             
             if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
-                console.log("Cannot move root");
+                this.$log.info("Cannot move root");
                 return;
             }
 
@@ -186,11 +185,11 @@ export default {
             }
 
             if (destPath.startsWith(sourceItem.entry.path)) {
-                console.log("Cannot move a file onto itself");
+                this.$log.info("Cannot move a file onto itself");
                 return;
             }
             
-            console.log(`Moving ${sourceItem.entry.path} -> ${destPath}`);
+            this.$log.info(`Moving ${sourceItem.entry.path} -> ${destPath}`);
 
             this.isBusy = true;
             await this.renameFile(sourceItem, destPath);
