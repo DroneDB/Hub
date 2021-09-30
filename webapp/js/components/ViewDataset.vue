@@ -37,7 +37,8 @@
                     :tools="explorerTools"
                     :currentPath="currentPath"
                     @openItem="handleOpenItem"
-                    @openProperties="handleExplorerOpenProperties" />
+                    @openProperties="handleExplorerOpenProperties"
+                    @moveItem="handleMoveItem" />
             </template>
         </TabSwitcher>
 
@@ -164,6 +165,37 @@ export default {
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
         });
+
+        this.$root.$on('moveItem', async (sourceItem, destItem) => {
+            
+            if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
+                this.$log.info("Cannot move root");
+                return;
+            }
+
+            var destPath = "";
+            var sourceItemName = pathutils.basename(sourceItem.entry.path);
+
+            // Folder magics: if dest is file let's use its parent.
+            if (ddb.entry.isDirectory(destItem.entry))
+                destPath = destItem.entry.type == ddb.entry.type.DRONEDB ? sourceItemName : pathutils.join(destItem.entry.path, sourceItemName) ;
+            else {
+                var destParentFolder = pathutils.getParentFolder(destItem.entry.path);            
+                destPath = destParentFolder == null ? sourceItemName : pathutils.join(destParentFolder, sourceItemName);
+            }
+
+            if (destPath.startsWith(sourceItem.entry.path)) {
+                this.$log.info("Cannot move a file onto itself");
+                return;
+            }
+            
+            this.$log.info(`Moving ${sourceItem.entry.path} -> ${destPath}`);
+
+            this.isBusy = true;
+            await this.renameFile(sourceItem, destPath);
+            this.isBusy = false;            
+
+        });
     },
     beforeDestroy: function(){
         document.getElementById("app").classList.remove("fullpage");
@@ -208,6 +240,11 @@ export default {
             }else{
                 shell.openItem(node.path);
             }
+        },
+
+        handleMoveItem: async function(node, path){
+            this.$log.info("ViewDataset.handleMoveItem");
+            await this.renameFile(node, path);
         },
         addMarkdownTab: function(uri, label, icon){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
@@ -292,24 +329,17 @@ export default {
             this.isBusy = false;
            
         },
-        renameSelectedFile: async function(newPath) {
-
-            this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
-
-            this.isBusy = true;
-
-            if (this.selectedFiles.length == 0) return;
+        renameFile: async function(file, newPath) {
 
             try {
 
-                var item = this.selectedFiles[0];
-                var oldPath = item.entry.path;
+                var oldPath = file.entry.path;
                 await this.dataset.moveObj(oldPath, newPath);
                             
                 // Let's remove both the new file path and the old one because it could be a replace
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
-                var newItem = clone(item);
+                var newItem = clone(file);
                 newItem.path = this.dataset.remoteUri(newPath),
                 newItem.label = pathutils.basename(newPath);
                 newItem.entry.path = newPath;
@@ -329,6 +359,18 @@ export default {
                 this.showError(e, "Rename file");
             }
 
+        },
+
+        renameSelectedFile: async function(newPath) {
+
+            this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
+
+            this.isBusy = true;
+
+            if (this.selectedFiles.length == 0) return;
+
+            await this.renameFile(this.selectedFiles[0], newPath);
+            
             this.isBusy = false;
         },
 
@@ -432,7 +474,7 @@ export default {
                 var item = {
                     icon: icons.getForType(entry.type),
                     label: base,
-                    path: this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base),//pathutils.join(this.currentPath, base),
+                    path: this.dataset.remoteUri((this.currentPath != null && this.currentPath.length > 0) ? pathutils.join(this.currentPath, base) : base),
                     entry,
                     isExpandable: ddb.entry.isDirectory(entry),
                     selected: false
