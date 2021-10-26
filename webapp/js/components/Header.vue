@@ -20,15 +20,17 @@
                 <i :class="{hidden: !showDownloadIcon}" class="icon download"></i><span :class="{'mobile hide': showDownloadIcon}"> {{ downloadLabel }}</span>
         </a>
 
-        <sui-popup flowing v-if="loggedIn && storageInfo.total != null">
+        <sui-popup flowing v-if="loggedIn && storageInfo && storageInfo.total != null">
             <sui-popup-content>
                 Used {{storageInfo.used | bytes}} on {{storageInfo.total | bytes}} total
                 <span v-if="storageInfo.free > 0">, {{storageInfo.free | bytes}} free</span>
                 <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span></sui-popup-content>
-            <sui-button :color="storageInfo.usedPercentage >= 1 ? 'red' : (storageInfo.usedPercentage >= 0.75 ? 'yellow' : '')" basic circular slot="trigger"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</sui-button>
+            <sui-button :color="storageInfo.usedPercentage >= 1 ? 'red' : (storageInfo.usedPercentage >= 0.75 ? 'yellow' : 'grey')" basic circular slot="trigger">
+                <i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}
+            </sui-button>
         </sui-popup>
         
-        <sui-popup flowing v-if="loggedIn && storageInfo.total == null">
+        <sui-popup flowing v-if="loggedIn && storageInfo && storageInfo.total == null">
             <sui-popup-content>Used {{storageInfo.used | bytes}}</sui-popup-content>
             <sui-button basic circular icon="hdd outline" slot="trigger"></sui-button>
         </sui-popup>
