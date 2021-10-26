@@ -11,6 +11,7 @@
         </ul>
     </Alert>
     <div class="right">
+
         <a :href="downloadUrl"
             @click="handleDownload"
             v-if="showDownload"
@@ -18,6 +19,19 @@
             class="ui button primary icon download">
                 <i :class="{hidden: !showDownloadIcon}" class="icon download"></i><span :class="{'mobile hide': showDownloadIcon}"> {{ downloadLabel }}</span>
         </a>
+
+        <sui-popup flowing v-if="loggedIn && storageInfo.total != null">
+            <sui-popup-content>
+                Used {{storageInfo.used | bytes}} on {{storageInfo.total | bytes}} total
+                <span v-if="storageInfo.free > 0">, {{storageInfo.free | bytes}} free</span>
+                <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span></sui-popup-content>
+            <sui-button :color="storageInfo.usedPercentage >= 1 ? 'red' : (storageInfo.usedPercentage >= 0.75 ? 'yellow' : '')" basic circular slot="trigger"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</sui-button>
+        </sui-popup>
+        
+        <sui-popup flowing v-if="loggedIn && storageInfo.total == null">
+            <sui-popup-content>Used {{storageInfo.used | bytes}}</sui-popup-content>
+            <sui-button basic circular icon="hdd outline" slot="trigger"></sui-button>
+        </sui-popup>
 
         <a href="javascript:void(0)"
             @click="handleSettings"
@@ -51,6 +65,7 @@ import reg from '../libs/sharedRegistry';
 import Alert from 'commonui/components/Alert';
 import { xAuthLogout } from '../libs/xauth';
 import { isMobile } from 'commonui/classes/responsive';
+import Vue2Filters from 'vue2-filters';
 
 export default {
   components: {
@@ -64,10 +79,11 @@ export default {
           showDownload: !!this.$route.params.ds,
           showSettings: reg.isLoggedIn(),
           selectedFiles: [],
-
+          storageInfo: null,
           showDisclaimer: false
       }
   },
+  mixins: [Vue2Filters.mixin],
   computed: {
       homeUrl: function(){
           if (this.loggedIn){
@@ -115,6 +131,16 @@ export default {
 
       reg.addEventListener('login', this.onRegLogin);
       reg.addEventListener('logout', this.onRegLogout);
+
+        this.$root.$on('addItems', () => {
+            this.refreshStorageInfo();
+        });
+                
+        this.$root.$on('deleteEntries', () => {
+            this.refreshStorageInfo();
+        });
+
+      this.refreshStorageInfo();
   },
   watch: {
       $route: function(to, from){
@@ -139,6 +165,10 @@ export default {
       mouse.off('click', this.hideMenu);
   },
   methods: {
+
+      refreshStorageInfo: async function() {
+          this.storageInfo = await reg.getStorageInfo();
+      },
       uploadFiles: function(){
           this.$router.push({name: "Upload"});
       },

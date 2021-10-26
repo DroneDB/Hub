@@ -3,6 +3,8 @@ import 'commonui/main';
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 import VueLogger from 'vuejs-logger';
+import Vue2Filters from 'vue2-filters';
+import SuiVue from 'semantic-ui-vue';
 
 import '../css/app.scss';
 import Header from './components/Header.vue';
@@ -36,7 +38,9 @@ window.addEventListener('load', function(){
 
     Vue.use(VueLogger, options);
     Vue.use(VueRouter);
-        
+    Vue.use(Vue2Filters);
+    Vue.use(SuiVue);
+    
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: {content: ViewDataset, header: hdr}, meta: { title: "View Dataset"}},
         { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
