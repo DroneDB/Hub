@@ -24,7 +24,8 @@
             <sui-popup-content>
                 Used {{storageInfo.used | bytes}} on {{storageInfo.total | bytes}} total
                 <span v-if="storageInfo.free > 0">, {{storageInfo.free | bytes}} free</span>
-                <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span></sui-popup-content>
+                <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span>
+            </sui-popup-content>
             <sui-button :color="storageInfo.usedPercentage >= 1 ? 'red' : (storageInfo.usedPercentage >= 0.75 ? 'yellow' : 'grey')" basic circular slot="trigger">
                 <i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}
             </sui-button>
@@ -67,7 +68,7 @@ import reg from '../libs/sharedRegistry';
 import Alert from 'commonui/components/Alert';
 import { xAuthLogout } from '../libs/xauth';
 import { isMobile } from 'commonui/classes/responsive';
-import Vue2Filters from 'vue2-filters';
+import { bytesToSize } from '../../../vendor/commonui/classes/utils';
 
 export default {
   components: {
@@ -85,7 +86,15 @@ export default {
           showDisclaimer: false
       }
   },
-  mixins: [Vue2Filters.mixin],
+  filters: {
+    percent: function (value, places) {
+        if (!value) return ''
+        return (value * 100).toFixed(places) + "%";
+    },
+    bytes: function (value) {
+        return bytesToSize(value);
+    }
+  },
   computed: {
       homeUrl: function(){
           if (this.loggedIn){

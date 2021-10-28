@@ -22,7 +22,6 @@
     "portal-vue": "^2.1.7",
     "semantic-ui-vue": "^0.11.0",
     "vue-router": "^3.4.9",
-    "vue2-filters": "^0.13.0",
     "vuejs-logger": "1.5.5"
   },
   "devDependencies": {
