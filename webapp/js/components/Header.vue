@@ -20,21 +20,24 @@
                 <i :class="{hidden: !showDownloadIcon}" class="icon download"></i><span :class="{'mobile hide': showDownloadIcon}"> {{ downloadLabel }}</span>
         </a>
 
-        <sui-popup flowing v-if="loggedIn && storageInfo && storageInfo.total != null">
-            <sui-popup-content>
+        <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
+            <div>
                 Used {{storageInfo.used | bytes}} on {{storageInfo.total | bytes}} total
                 <span v-if="storageInfo.free > 0">, {{storageInfo.free | bytes}} free</span>
                 <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span>
-            </sui-popup-content>
-            <sui-button :color="storageInfo.usedPercentage >= 1 ? 'red' : (storageInfo.usedPercentage >= 0.75 ? 'yellow' : 'grey')" basic circular slot="trigger">
-                <i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}
-            </sui-button>
-        </sui-popup>
-        
-        <sui-popup flowing v-if="loggedIn && storageInfo && storageInfo.total == null">
-            <sui-popup-content>Used {{storageInfo.used | bytes}}</sui-popup-content>
-            <sui-button basic circular icon="hdd outline" slot="trigger"></sui-button>
-        </sui-popup>
+            </div>
+        </Alert>
+
+        <button @click="storageInfoDialogOpen = true" v-if="loggedIn && storageInfo && storageInfo.total != null" class="ui button basic circular" 
+            v-bind:class="{ 'red': storageInfo.usedPercentage >= 1, 
+                    'yellow' : storageInfo.usedPercentage >= 0.75 && storageInfo.usedPercentage < 1,
+                     'grey' : storageInfo.usedPercentage < 0.75 }">
+            <i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}
+        </button>
+
+        <button v-if="loggedIn && storageInfo && storageInfo.total == null"  class="ui button basic circular">
+            <i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}
+        </button>
 
         <a href="javascript:void(0)"
             @click="handleSettings"
@@ -83,7 +86,8 @@ export default {
           showSettings: reg.isLoggedIn(),
           selectedFiles: [],
           storageInfo: null,
-          showDisclaimer: false
+          showDisclaimer: false,
+          storageInfoDialogOpen: false
       }
   },
   filters: {
@@ -176,6 +180,10 @@ export default {
       mouse.off('click', this.hideMenu);
   },
   methods: {
+
+    handleStorageInfoDialogClose: function () {
+        this.storageInfoDialogOpen = false;
+    },
 
       refreshStorageInfo: async function() {
           this.storageInfo = await reg.getStorageInfo();
