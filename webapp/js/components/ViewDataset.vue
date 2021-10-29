@@ -9,6 +9,8 @@
                 @selectionChanged="handleFileSelectionChanged"
                 @currentUriChanged="handleCurrentUriChanged"
                 @openProperties="handleFileBrowserOpenProperties"
+                @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
+                @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                 @error="handleError" />
         </div>
 
@@ -23,6 +25,8 @@
                     @selectionChanged="handleFileSelectionChanged"
                     @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
+                    @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
+                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                     @error="handleError" />
             </template>
             <template v-slot:map>
@@ -37,8 +41,9 @@
                     :tools="explorerTools"
                     :currentPath="currentPath"
                     @openItem="handleOpenItem"
-                    @openProperties="handleExplorerOpenProperties"
-                    @moveItem="handleMoveItem" />
+                    @deleteSelecteditems="openDeleteItemsDialog"
+                    @moveSelectedItems="openRenameItemsDialog"
+                    @openProperties="handleExplorerOpenProperties" />
             </template>
         </TabSwitcher>
 
@@ -304,6 +309,32 @@ export default {
 
             this.deleteDialogOpen = false;
         },
+
+        openDeleteItemsDialog: function() {
+            this.deleteDialogOpen = true;
+        },
+
+        openDeleteItemsDialogFromFileBrowser: function() {
+            this.deleteDialogOpen = true;
+            this.selectedUsingFileBrowserList = true;
+        },
+
+        openRenameItemsDialog: function() {
+            
+            if (this.selectedFiles.length != 1) return;
+
+            this.selectedUsingFileBrowserList = false;
+            this.renamePath = this.selectedFiles[0].entry.path;
+            this.renameDialogOpen = true;
+        },
+
+        openRenameItemsDialogFromFileBrowser: function() {
+
+            this.renameDialogOpen = true;
+            this.renamePath = this.fileBrowserFiles[0].entry.path;
+            this.selectedUsingFileBrowserList = true;
+        },
+
         deleteSelectedFiles: async function() {
 
             this.$log.info("ViewDataset.deleteSelectedFiles");
@@ -332,7 +363,6 @@ export default {
         renameFile: async function(file, newPath) {
 
             try {
-
                 var oldPath = file.entry.path;
                 await this.dataset.moveObj(oldPath, newPath);
                             
@@ -365,11 +395,23 @@ export default {
 
             this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
 
+            var source;
+
+            if (this.selectedUsingFileBrowserList) {
+
+                if (this.fileBrowserFiles.length == 0) return;
+
+                source = this.fileBrowserFiles[0];
+
+            } else {
+                if (this.selectedFiles.length == 0) return;
+
+                source = this.selectedFiles[0];
+            }
+
             this.isBusy = true;
 
-            if (this.selectedFiles.length == 0) return;
-
-            await this.renameFile(this.selectedFiles[0], newPath);
+            await this.renameFile(source, newPath);
             
             this.isBusy = false;
         },
