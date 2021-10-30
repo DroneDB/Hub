@@ -51,7 +51,7 @@
     </Panel>
     <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
-    <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
+    <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
@@ -160,7 +160,7 @@ export default {
             errorDialogOpen: false,
             errorMessage: null,
             errorMessageTitle: null,
-            showSettings: false
+            showSettings: false,
         };
     },
     mounted: function(){
@@ -311,12 +311,17 @@ export default {
         },
 
         openDeleteItemsDialog: function() {
+
+            if (this.selectedFiles.length == 0) return;
+
+            this.selectedUsingFileBrowserList = false;
             this.deleteDialogOpen = true;
         },
 
         openDeleteItemsDialogFromFileBrowser: function() {
-            this.deleteDialogOpen = true;
+            
             this.selectedUsingFileBrowserList = true;
+            this.deleteDialogOpen = true;
         },
 
         openRenameItemsDialog: function() {
@@ -344,7 +349,7 @@ export default {
             try {
                 var deleted = [];
 
-                for(var file of this.selectedFiles) {
+                for(var file of this.contextMenuFiles) {
                     await this.dataset.deleteObj(file.entry.path);
                     deleted.push(file.entry.path);
                 }
@@ -598,7 +603,8 @@ export default {
                         id: 'remove',
                         title: "Remove",
                         icon: "trash alternate",
-                        onClick: () => {
+                        onClick: () => {                 
+                            this.selectedUsingFileBrowserList = false;        
                             this.deleteDialogOpen = true;
                         }
                     });
