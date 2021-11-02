@@ -30,9 +30,13 @@ window.addEventListener('load', function(){
 
     let hdr = Header;
 
+    var params = queryParams(window.location);
+
     // Hide header if ?embed=1 is in URL
-    const embed = !!queryParams(window.location).embed || inIframe();
+    const embed = !!params.embed || inIframe();
     if (embed) hdr = null;
+
+    Vue.prototype.$view = params.view ? params.view : null;
 
     Vue.use(VueLogger, options);
     Vue.use(VueRouter);

@@ -1,8 +1,18 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
-
-    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed>
+    <Map v-if="$view === 'map'" :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
+    <Potree v-else-if="$view === '3d'" :files="fileBrowserFiles" />
+    <Explorer v-else-if="$view === 'files'" ref="explorer"
+                    :files="fileBrowserFiles"
+                    :tools="explorerTools"
+                    :currentPath="currentPath"
+                    @openItem="handleOpenItem"
+                    @deleteSelecteditems="openDeleteItemsDialog"
+                    @moveSelectedItems="openRenameItemsDialog"
+                    @moveItem="handleMoveItem"
+                    @openProperties="handleExplorerOpenProperties" />
+    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed v-show="$view === null">
         <div class="sidebar">
             <FileBrowser v-if="!isMobile" :rootNodes="rootNodes"
                 @openItem="handleOpenItem"
@@ -47,7 +57,6 @@
                     @openProperties="handleExplorerOpenProperties" />
             </template>
         </TabSwitcher>
-
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
     <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
@@ -57,8 +66,7 @@
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
         {{errorMessage}}
-    </Alert>
-
+    </Alert>    
     <Loader v-if="isBusy"></Loader>
 </div>
 </template>
