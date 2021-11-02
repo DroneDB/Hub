@@ -43,6 +43,7 @@
                     @openItem="handleOpenItem"
                     @deleteSelecteditems="openDeleteItemsDialog"
                     @moveSelectedItems="openRenameItemsDialog"
+                    @moveItem="handleMoveItem"
                     @openProperties="handleExplorerOpenProperties" />
             </template>
         </TabSwitcher>
