@@ -130,19 +130,28 @@ export default {
             this.dz.options.url = `/share/upload/${this.uploadToken}`;
             this.$set(this.fileUploadStatus, file.name, 0);
         })
-        .on("error", (file) => {
-            // Retry
-            if (file.retries < MAX_RETRIES){
-                console.log("Error uploading ", file, " put back in queue...");
-                file.status = Dropzone.QUEUED;
-            }else{
+        .on("error", (file, res) => {
+            
+            if (res.noRetry) {
                 this.dz.cancelUpload(file);
-                this.error = `Failed to upload ${file.name} after 30 retries`;
+                this.error = `Failed to upload ${file.name}: ${res.error}`;
                 this.uploading = false;
-            }
-            this.$delete(this.fileUploadStatus, file.name);
+                file.status = Dropzone.CANCELED;
+            } else {
 
-            setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
+                // Retry
+                if (file.retries < MAX_RETRIES){
+                    console.log("Error uploading ", res, file, " put back in queue...");
+                    file.status = Dropzone.QUEUED;
+                }else{
+                    this.dz.cancelUpload(file);
+                    this.error = `Failed to upload ${file.name} after 30 retries`;
+                    this.uploading = false;
+                }
+                this.$delete(this.fileUploadStatus, file.name);
+                setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
+            }
+
         })
         .on("uploadprogress", (file, progress, bytesSent) => {
             const now = new Date().getTime();
@@ -190,10 +199,16 @@ export default {
                 // use the file size as the true number of bytes
                 this.totalBytesSent = this.totalBytesSent + file.size;
                 if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
-            }else{
-                let err = `Failed to upload ${file.name}, retrying... (${file.retries})`;
-                console.error(err);
+            } else {
+                
+                var res = JSON.parse(file.xhr.response);
+                if (res && res.noRetry) {
+                    this.dz.cancelUpload(file);
+                    return;
+                }
 
+                let err = `Failed to upload ${file.name}, retrying... (${file.retries})`;
+                
                 // Update progress
                 this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
                 file.status = Dropzone.QUEUED;

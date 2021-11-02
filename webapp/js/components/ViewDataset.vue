@@ -9,6 +9,8 @@
                 @selectionChanged="handleFileSelectionChanged"
                 @currentUriChanged="handleCurrentUriChanged"
                 @openProperties="handleFileBrowserOpenProperties"
+                @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
+                @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                 @error="handleError" />
         </div>
 
@@ -23,6 +25,8 @@
                     @selectionChanged="handleFileSelectionChanged"
                     @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
+                    @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
+                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                     @error="handleError" />
             </template>
             <template v-slot:map>
@@ -37,16 +41,18 @@
                     :tools="explorerTools"
                     :currentPath="currentPath"
                     @openItem="handleOpenItem"
-                    @openProperties="handleExplorerOpenProperties"
-                    @moveItem="handleMoveItem" />
+                    @deleteSelecteditems="openDeleteItemsDialog"
+                    @moveSelectedItems="openRenameItemsDialog"
+                    @moveItem="handleMoveItem"
+                    @openProperties="handleExplorerOpenProperties" />
             </template>
         </TabSwitcher>
 
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
     <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
-    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
-    <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="selectedFiles"></DeleteDialog>
+    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true"></AddToDatasetDialog>
+    <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
@@ -155,7 +161,8 @@ export default {
             errorDialogOpen: false,
             errorMessage: null,
             errorMessageTitle: null,
-            showSettings: false
+            showSettings: false,
+            filesToUpload: null            
         };
     },
     mounted: function(){
@@ -164,6 +171,11 @@ export default {
 
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
+        });
+
+        this.$root.$on('uploadItems', msg => {
+            this.filesToUpload = msg.files;
+            this.uploadDialogOpen = true;
         });
 
         this.$root.$on('moveItem', async (sourceItem, destItem) => {
@@ -304,6 +316,37 @@ export default {
 
             this.deleteDialogOpen = false;
         },
+
+        openDeleteItemsDialog: function() {
+
+            if (this.selectedFiles.length == 0) return;
+
+            this.selectedUsingFileBrowserList = false;
+            this.deleteDialogOpen = true;
+        },
+
+        openDeleteItemsDialogFromFileBrowser: function() {
+            
+            this.selectedUsingFileBrowserList = true;
+            this.deleteDialogOpen = true;
+        },
+
+        openRenameItemsDialog: function() {
+            
+            if (this.selectedFiles.length != 1) return;
+
+            this.selectedUsingFileBrowserList = false;
+            this.renamePath = this.selectedFiles[0].entry.path;
+            this.renameDialogOpen = true;
+        },
+
+        openRenameItemsDialogFromFileBrowser: function() {
+
+            this.renameDialogOpen = true;
+            this.renamePath = this.fileBrowserFiles[0].entry.path;
+            this.selectedUsingFileBrowserList = true;
+        },
+
         deleteSelectedFiles: async function() {
 
             this.$log.info("ViewDataset.deleteSelectedFiles");
@@ -313,7 +356,7 @@ export default {
             try {
                 var deleted = [];
 
-                for(var file of this.selectedFiles) {
+                for(var file of this.contextMenuFiles) {
                     await this.dataset.deleteObj(file.entry.path);
                     deleted.push(file.entry.path);
                 }
@@ -332,7 +375,6 @@ export default {
         renameFile: async function(file, newPath) {
 
             try {
-
                 var oldPath = file.entry.path;
                 await this.dataset.moveObj(oldPath, newPath);
                             
@@ -365,11 +407,23 @@ export default {
 
             this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
 
+            var source;
+
+            if (this.selectedUsingFileBrowserList) {
+
+                if (this.fileBrowserFiles.length == 0) return;
+
+                source = this.fileBrowserFiles[0];
+
+            } else {
+                if (this.selectedFiles.length == 0) return;
+
+                source = this.selectedFiles[0];
+            }
+
             this.isBusy = true;
 
-            if (this.selectedFiles.length == 0) return;
-
-            await this.renameFile(this.selectedFiles[0], newPath);
+            await this.renameFile(source, newPath);
             
             this.isBusy = false;
         },
@@ -458,7 +512,8 @@ export default {
         handleAddClose: function(uploaded) {
             
             this.uploadDialogOpen = false;
-
+            this.filesToUpload = null;
+            
             if (uploaded.length == 0) return;
 
             var items = [];
@@ -556,7 +611,8 @@ export default {
                         id: 'remove',
                         title: "Remove",
                         icon: "trash alternate",
-                        onClick: () => {
+                        onClick: () => {                 
+                            this.selectedUsingFileBrowserList = false;        
                             this.deleteDialogOpen = true;
                         }
                     });

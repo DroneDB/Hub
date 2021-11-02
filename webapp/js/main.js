@@ -36,7 +36,7 @@ window.addEventListener('load', function(){
 
     Vue.use(VueLogger, options);
     Vue.use(VueRouter);
-        
+    
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: {content: ViewDataset, header: hdr}, meta: { title: "View Dataset"}},
         { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},

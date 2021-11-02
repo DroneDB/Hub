@@ -3,7 +3,7 @@
             modal            
             fixedSize>
         <div style="width: 400px">
-            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded" :open="true"></DatasetUpload>
+            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded" :open="open" :filesToUpload="filesToUpload"></DatasetUpload>
         </div>
         <div class="buttons">
             <button @click="close" class="ui button">
@@ -24,11 +24,11 @@ export default {
       DatasetUpload
   },
 
-  props: ['organization', 'dataset', 'path'],
+  props: ['organization', 'dataset', 'path', 'open', 'filesToUpload'],
     
   data: function(){
       return {
-          uploaded: []
+          uploaded: []          
       };
   },
   mounted: function(){

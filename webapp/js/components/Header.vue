@@ -11,6 +11,7 @@
         </ul>
     </Alert>
     <div class="right">
+
         <a :href="downloadUrl"
             @click="handleDownload"
             v-if="showDownload"
@@ -18,6 +19,25 @@
             class="ui button primary icon download">
                 <i :class="{hidden: !showDownloadIcon}" class="icon download"></i><span :class="{'mobile hide': showDownloadIcon}"> {{ downloadLabel }}</span>
         </a>
+
+        <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
+            <div>
+                Used {{storageInfo.used | bytes}} on {{storageInfo.total | bytes}} total
+                <span v-if="storageInfo.free > 0">, {{storageInfo.free | bytes}} free</span>
+                <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span>
+            </div>
+        </Alert>
+
+        <button @click="storageInfoDialogOpen = true" v-if="loggedIn && storageInfo && storageInfo.total != null" class="ui button basic circular mobile hide" 
+            v-bind:class="{ 'red': storageInfo.usedPercentage >= 1, 
+                    'yellow' : storageInfo.usedPercentage >= 0.75 && storageInfo.usedPercentage < 1,
+                     'grey' : storageInfo.usedPercentage < 0.75 }">
+            <i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}
+        </button>
+
+        <button v-if="loggedIn && storageInfo && storageInfo.total == null"  class="ui button basic circular mobile hide">
+            <i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}
+        </button>
 
         <a href="javascript:void(0)"
             @click="handleSettings"
@@ -36,8 +56,11 @@
                 <div class="divider"></div>
                 <div class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
                 <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
+                <div class="divider mobile only" v-if="storageInfo"></div>
+                <div class="item mobile only" @click="storageInfoDialogOpen = true" v-if="storageInfo && storageInfo.total != null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</div>
+                <div class="item mobile only" v-if="storageInfo && storageInfo.total == null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}</div>
                 <div class="divider"></div>
-                <div class="item" @click="logout" >Logout</div>
+                <div class="item" @click="logout" ><i class="icon sign-out"></i> Logout</div>
             </div>
         </div>
     </div>
@@ -51,6 +74,7 @@ import reg from '../libs/sharedRegistry';
 import Alert from 'commonui/components/Alert';
 import { xAuthLogout } from '../libs/xauth';
 import { isMobile } from 'commonui/classes/responsive';
+import { bytesToSize } from '../../../vendor/commonui/classes/utils';
 
 export default {
   components: {
@@ -64,9 +88,19 @@ export default {
           showDownload: !!this.$route.params.ds,
           showSettings: reg.isLoggedIn(),
           selectedFiles: [],
-
-          showDisclaimer: false
+          storageInfo: null,
+          showDisclaimer: false,
+          storageInfoDialogOpen: false
       }
+  },
+  filters: {
+    percent: function (value, places) {
+        if (!value) return ''
+        return (value * 100).toFixed(places) + "%";
+    },
+    bytes: function (value) {
+        return bytesToSize(value);
+    }
   },
   computed: {
       homeUrl: function(){
@@ -115,6 +149,16 @@ export default {
 
       reg.addEventListener('login', this.onRegLogin);
       reg.addEventListener('logout', this.onRegLogout);
+
+        this.$root.$on('addItems', () => {
+            this.refreshStorageInfo();
+        });
+                
+        this.$root.$on('deleteEntries', () => {
+            this.refreshStorageInfo();
+        });
+
+      this.refreshStorageInfo();
   },
   watch: {
       $route: function(to, from){
@@ -139,6 +183,14 @@ export default {
       mouse.off('click', this.hideMenu);
   },
   methods: {
+
+    handleStorageInfoDialogClose: function () {
+        this.storageInfoDialogOpen = false;
+    },
+
+      refreshStorageInfo: async function() {
+          this.storageInfo = await reg.getStorageInfo();
+      },
       uploadFiles: function(){
           this.$router.push({name: "Upload"});
       },
