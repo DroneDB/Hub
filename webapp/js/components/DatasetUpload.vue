@@ -66,7 +66,7 @@ export default {
     components: {
         Message
     },
-    props: ['organization', 'dataset', 'path', 'open'],
+    props: ['organization', 'dataset', 'path', 'open', 'filesToUpload'],
     data: function () {
         return {
             error: null,
@@ -202,8 +202,14 @@ export default {
             this.done = false;
         });
 
-        if (this.open) {
-            this.$refs.btnUpload.click();
+        if (this.filesToUpload != null && this.filesToUpload.length > 0) {
+            this.dz.emit("addedfiles", this.filesToUpload);
+            this.dz.handleFiles(this.filesToUpload);
+            this.dz.processQueue();
+        } else {
+            if (this.open) {
+                this.$refs.btnUpload.click();
+            }
         }
     },
     methods: {

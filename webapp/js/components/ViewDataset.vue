@@ -51,7 +51,7 @@
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
     <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
-    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"></AddToDatasetDialog>
+    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
     <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
@@ -162,6 +162,7 @@ export default {
             errorMessage: null,
             errorMessageTitle: null,
             showSettings: false,
+            filesToUpload: null            
         };
     },
     mounted: function(){
@@ -170,6 +171,11 @@ export default {
 
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
+        });
+
+        this.$root.$on('uploadItems', msg => {
+            this.filesToUpload = msg.files;
+            this.uploadDialogOpen = true;
         });
 
         this.$root.$on('moveItem', async (sourceItem, destItem) => {
@@ -506,7 +512,8 @@ export default {
         handleAddClose: function(uploaded) {
             
             this.uploadDialogOpen = false;
-
+            this.filesToUpload = null;
+            
             if (uploaded.length == 0) return;
 
             var items = [];
