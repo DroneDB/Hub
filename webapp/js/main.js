@@ -36,7 +36,10 @@ window.addEventListener('load', function(){
     const embed = !!params.embed || inIframe();
     if (embed) hdr = null;
 
-    Vue.prototype.$view = params.view ? params.view : null;
+    var allowedViews = ['explorer', 'potree', 'map', null];
+    Vue.prototype.$view = allowedViews.includes(params.view) ? params.view : null;
+    Vue.prototype.$embed = params.embed ? true : false;
+    Vue.prototype.$only = params.only ? true : false;
 
     Vue.use(VueLogger, options);
     Vue.use(VueRouter);
