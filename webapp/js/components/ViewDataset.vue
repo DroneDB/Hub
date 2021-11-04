@@ -1,10 +1,9 @@
 <template>
 <div id="browser" class="cui app">
     <Message bindTo="error" />
-
     <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed>
-        <div class="sidebar">
-            <FileBrowser v-if="!isMobile" :rootNodes="rootNodes"
+        <div class="sidebar" v-show="!$only" >
+            <FileBrowser v-show="!isMobile" :rootNodes="rootNodes"
                 @openItem="handleOpenItem"
                 @selectionChanged="handleFileSelectionChanged"
                 @currentUriChanged="handleCurrentUriChanged"
@@ -13,8 +12,7 @@
                 @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                 @error="handleError" />
         </div>
-
-        <TabSwitcher :tabs="mainTabs"
+        <TabSwitcher :tabs="mainTabs" :selectedTab="startTab"
                 position="top"
                 buttonWidth="auto"
                 :hideSingle="true"
@@ -36,7 +34,7 @@
                 <Potree :files="fileBrowserFiles" />
             </template>
             <template v-slot:explorer>
-                <Explorer ref="explorer"
+                <Explorer ref="explorer" 
                     :files="fileBrowserFiles"
                     :tools="explorerTools"
                     :currentPath="currentPath"
@@ -47,9 +45,8 @@
                     @openProperties="handleExplorerOpenProperties" />
             </template>
         </TabSwitcher>
-
-        <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     </Panel>
+    <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
     <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
@@ -57,8 +54,7 @@
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
         {{errorMessage}}
-    </Alert>
-
+    </Alert>    
     <Loader v-if="isBusy"></Loader>
 </div>
 </template>
@@ -115,33 +111,76 @@ export default {
     data: function () {
         const mobile = isMobile();
 
-        let mainTabs = [{
-            label: 'Map',
-            icon: 'map',
-            key: 'map'
-        }];
-        if (mobile){
-            mainTabs.unshift({
-                label: 'Browser',
-                icon: 'sitemap',
-                key: 'filebrowser'
-            });
-        }
-        if (window.WebGL2RenderingContext){
-            mainTabs.push({
-                label: '3D',
-                icon: 'cube',
-                key: 'potree'
-            });
-        }
+        var mainTabs = [];
+        var startTab = null;
 
-        mainTabs = mainTabs.concat([{
+        if (!this.$only || this.$view == null) {
+
+            mainTabs.push({
+                label: 'Map',
+                icon: 'map',
+                key: 'map'
+            });
+
+            if (mobile){
+                mainTabs.unshift({
+                    label: 'Browser',
+                    icon: 'sitemap',
+                    key: 'filebrowser'
+                });
+            }
+            if (window.WebGL2RenderingContext){
+                mainTabs.push({
+                    label: '3D',
+                    icon: 'cube',
+                    key: 'potree'
+                });
+            }
+
+            mainTabs = mainTabs.concat([{
                 label: 'Files',
                 icon: 'folder open',
                 key: 'explorer'
             }]);
 
+            startTab = this.$view;
+
+        } else {
+            switch(this.$view) {
+                case 'map':
+
+                    mainTabs.push({
+                        label: 'Map',
+                        icon: 'map',
+                        key: 'map'
+                    });
+
+                    break;
+
+                case 'explorer':
+
+                    mainTabs.push({
+                        label: 'Files',
+                        icon: 'folder open',
+                        key: 'explorer'
+                    });
+
+                    break;
+
+                case 'potree':
+
+                    mainTabs.push({
+                        label: '3D',
+                        icon: 'cube',
+                        key: 'potree'
+                    });
+
+                    break;
+            }
+        }
+
         return {
+            startTab: startTab,
             error: "",
             isMobile: mobile,
             mainTabs: mainTabs,
@@ -572,7 +611,8 @@ export default {
             deep: true,
             handler: function (newVal, oldVal) {
                 const $header = this.$parent.$children[0];
-                $header.selectedFiles = this.selectedFiles;
+                if (!this.$embed)
+                    $header.selectedFiles = this.selectedFiles;
             }
         },
 
