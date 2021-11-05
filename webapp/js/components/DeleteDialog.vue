@@ -5,7 +5,7 @@
             fixedSize>
 
         Are you sure to delete the following items?<br />
-        <div class="ui bulleted list">
+        <div class="ui bulleted list" style="max-height: 300px; overflow-y: auto">
             <div class="item" v-for="file in files">
                 {{file.label}}
             </div>
@@ -49,4 +49,7 @@ export default {
     margin-top: 16px;
     text-align: right;
 }
+
+
+
 </style>
