@@ -2,14 +2,6 @@
 <div id="header">
     <a :href="homeUrl" class="logo"><img src="/images/banner.svg"></a>
     
-    <a class="ui orange label alert mobile hide" @click="showDisclaimer = !showDisclaimer"><i class="icon warning"></i> This is a test hub</a>
-    <Alert v-if="showDisclaimer" @onClose="showDisclaimer = false" title="This is a Test Hub">
-        <ul>
-            <li>We will not guarantee data retention! Your data might be removed without notice.</li>
-            <li>Do not store sensitive data, as there could be bugs.</li>
-            <li>Features are still missing! This is a chance for you to <a href="https://dronedb.app/contact">let us know what you'd like to see added next</a> :)</li>
-        </ul>
-    </Alert>
     <div class="right">
 
         <a :href="downloadUrl"
@@ -89,7 +81,6 @@ export default {
           showSettings: reg.isLoggedIn(),
           selectedFiles: [],
           storageInfo: null,
-          showDisclaimer: false,
           storageInfoDialogOpen: false
       }
   },
