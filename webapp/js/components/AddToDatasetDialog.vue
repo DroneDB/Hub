@@ -1,14 +1,20 @@
 <template>
-    <Window title="Add to dataset" id="rename" @onClose="close" 
-            modal            
+    <Window title="Add to dataset" id="addToDataset" @onClose="close" 
+            modal
             fixedSize>
-        <div style="width: 400px">
-            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded" :open="open" :filesToUpload="filesToUpload"></DatasetUpload>
-        </div>
-        <div class="buttons">
-            <button @click="close" class="ui button">
-                Close
-            </button>
+        <div style="min-width: 320px"> 
+            <DatasetUpload :organization="organization" 
+                            :dataset="dataset" 
+                            :path="path" 
+                            @onUpload="onUploaded"
+                            @done="done"
+                            :open="open"
+                            :filesToUpload="filesToUpload"></DatasetUpload>
+            <div class="buttons">
+                <button @click="close" class="ui button">
+                    Close
+                </button>
+            </div>
         </div>
     </Window>
 </template>
@@ -34,11 +40,14 @@ export default {
   mounted: function(){
   },
   methods: {
-      close: function(){
-          this.$emit('onClose', this.uploaded);
+      close: function(uploadSuccess){
+          this.$emit('onClose', this.uploaded, uploadSuccess);
       },
       onUploaded: function(file) {
           this.uploaded.push(file);
+      },
+      done: function(){
+          this.close(true);
       }
   }
 }

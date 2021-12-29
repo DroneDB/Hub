@@ -54,8 +54,9 @@
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
         {{errorMessage}}
-    </Alert>    
+    </Alert>
     <Loader v-if="isBusy"></Loader>
+    <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{flash}}</Flash>
 </div>
 </template>
 
@@ -77,6 +78,7 @@ import Panel from 'commonui/components/Panel.vue';
 import Markdown from 'commonui/components/Markdown.vue';
 import Alert from 'commonui/components/Alert.vue';
 import Loader from 'commonui/components/Loader.vue';
+import Flash from 'commonui/components/Flash.vue';
 
 import icons from 'commonui/classes/icons';
 import reg from '../libs/sharedRegistry';
@@ -106,7 +108,8 @@ export default {
         RenameDialog,
         NewFolderDialog,
         Alert,
-        Loader
+        Loader,
+        Flash
     },
     data: function () {
         const mobile = isMobile();
@@ -201,7 +204,8 @@ export default {
             errorMessage: null,
             errorMessageTitle: null,
             showSettings: false,
-            filesToUpload: null            
+            filesToUpload: null,
+            flash: ""       
         };
     },
     mounted: function(){
@@ -548,7 +552,7 @@ export default {
 
             this.createFolderDialogOpen = false;
         },
-        handleAddClose: function(uploaded) {
+        handleAddClose: function(uploaded, uploadSuccess) {
             
             this.uploadDialogOpen = false;
             this.filesToUpload = null;
@@ -586,6 +590,8 @@ export default {
                 this.$root.$emit('addItems', items);
             }
 
+            // Show flash
+            if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} files`;
         },
 
         handleAddMarkdown: function(document, entry) {
@@ -604,6 +610,10 @@ export default {
 
         handleError: function(e){
             this.showError(e, "Error");
+        },
+
+        closeFlash: function(){
+            this.flash = "";
         }
     },
     watch: {

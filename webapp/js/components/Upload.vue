@@ -33,20 +33,6 @@
                 <i class="stop circle outline icon"></i> Cancel
             </button>
         </div>
-
-        <div v-if="url">
-            <div class="ui icon positive message">
-                <i class="check circle outline icon"></i> 
-                <div class="content">
-                    <div class="header">
-                    Success!
-                    </div>
-                    Your files have been uploaded to the secret URL: <a :href="fullUrl" target="_blank">{{ fullUrl }}</a>
-                </div>
-            </div>
-
-            <div @click="resetUpload" class="ui primary submit button"><i class="redo icon"></i> Upload More</div>
-        </div>
     </div>
 
     <div class="droparea" :class="{hidden: url || uploading}" ref="droparea">
@@ -235,7 +221,7 @@ export default {
                 try{
                     const r = await reg.makeRequest(`/share/commit/${this.uploadToken}`, "POST");
                     if (r.url){
-                        this.url = r.url;
+                        location.href = r.url;
                     }else if (r.error){
                         this.error = r.error;
                     }else{

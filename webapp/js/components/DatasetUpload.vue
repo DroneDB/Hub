@@ -194,6 +194,7 @@ export default {
             if (this.uploadedFiles - this.filesCount === 0){                
                 this.uploading = false;
                 this.done = true;
+                this.$emit("done");
             }
         })
         .on("reset", () => {
@@ -239,7 +240,7 @@ export default {
 </script>
 
 <style scoped>
-.button, .container, .error-msg {
+.button, .error-msg {
     margin: 16px;
 }
 .container {

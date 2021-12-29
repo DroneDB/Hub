@@ -8,9 +8,6 @@
         <i class="icon circle notch spin" />
     </div>
     <div v-else>
-        <div v-if="datasets.length === 0">
-        There are no datasets here. Create one by <a href="javascript:void(0)" @click="upload">uploading some files</a> or by using the <a href="https://dronedb.app/dashboard#downloads">DroneDB Desktop app</a>.
-        </div>
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment">
                 <div class="ui middle aligned divided list">
@@ -61,6 +58,9 @@ export default {
             this.org = reg.Organization(this.$route.params.org);
             this.datasets = await this.org.datasets();
             this.datasets.sort((a, b) => new Date(a.creationDate).getTime() < new Date(b.creationDate).getTime() ? 1 : -1);
+            if (this.datasets.length === 0){
+                this.$router.push({name: "Upload"}).catch(()=>{});
+            }
         }catch(e){
             if (e.message === "Unauthorized"){
                 this.$router.push({name: "Login"}).catch(()=>{});
