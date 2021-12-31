@@ -50,7 +50,7 @@
     <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
     <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true"></AddToDatasetDialog>
     <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
-    <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :path="renamePath"></RenameDialog>
+    <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
     <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
     <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
         {{errorMessage}}
@@ -64,9 +64,9 @@
 import Header from './Header.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import AddToDatasetDialog from './AddToDatasetDialog.vue';
-import DeleteDialog from './DeleteDialog.vue';
-import RenameDialog from './RenameDialog.vue';
-import NewFolderDialog from './NewFolderDialog.vue';
+import DeleteDialog from 'commonui/components/DeleteDialog.vue';
+import RenameDialog from 'commonui/components/RenameDialog.vue';
+import NewFolderDialog from 'commonui/components/NewFolderDialog.vue';
 import Message from 'commonui/components/Message.vue';
 import FileBrowser from 'commonui/components/FileBrowser.vue';
 import Map from 'commonui/components/Map.vue';
@@ -86,6 +86,7 @@ import { setTitle } from '../libs/utils';
 import { clone } from 'commonui/classes/utils';
 import shell from 'commonui/dynamic/shell';
 import { isMobile } from 'commonui/classes/responsive';
+import { renameDataset, entryLabel } from '../libs/registryUtils';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -197,7 +198,7 @@ export default {
             deleteDialogOpen: false,
             renameDialogOpen: false,
             createFolderDialogOpen: false,
-            renamePath: null,
+            fileToRename: null,
             isBusy: false,
             currentPath: null,
             errorDialogOpen: false,
@@ -274,9 +275,14 @@ export default {
 
                 const entries = await this.dataset.info();
 
+                // Set title
+                if (entries.length > 0 && entries[0]?.properties?.meta?.name){
+                    setTitle(entries[0]?.properties?.meta?.name.data);
+                }
+
                 return entries.map(e => { return {
                         icon: icons.getForType(e.type),
-                        label: pathutils.basename(e.path),
+                        label: utils.entryLabel(e),
                         path: e.path,
                         expanded: true,
                         entry: e,
@@ -285,6 +291,7 @@ export default {
                 });
 
             } catch (e) {
+                console.log(e)
                 this.showError(e, "Dataset");
                 return [];
             }
@@ -343,11 +350,25 @@ export default {
         handleSettingsClose: function(){
             this.showSettings = false;
         },
-        handleRenameClose: async function(id, newPath) {
-            
+        handleRenameClose: async function(id, newPath, entry) {
             if (id == "rename") {
                 if (newPath == null || newPath.length == 0) return;
                 await this.renameSelectedFile(newPath);
+            }else if (id == "renameddb"){
+                if (newPath == null || newPath.length == 0) return;
+                this.isBusy = true;
+                try{
+                    const newDs = await renameDataset(this.$route.params.org, this.$route.params.ds, newPath);
+                    this.$router.push({name: "ViewDataset", params: {
+                        org: this.$route.params.org,
+                        ds: newDs.slug
+                    }});
+                    location.reload(true);
+                }catch(e){
+                    this.showError(e, "Rename");
+                }
+                this.isBusy = false;
+                
             }
 
             this.renameDialogOpen = false;
@@ -379,14 +400,14 @@ export default {
             if (this.selectedFiles.length != 1) return;
 
             this.selectedUsingFileBrowserList = false;
-            this.renamePath = this.selectedFiles[0].entry.path;
+            this.fileToRename = this.selectedFiles[0];
             this.renameDialogOpen = true;
         },
 
         openRenameItemsDialogFromFileBrowser: function() {
 
             this.renameDialogOpen = true;
-            this.renamePath = this.fileBrowserFiles[0].entry.path;
+            this.fileToRename = this.fileBrowserFiles[0];
             this.selectedUsingFileBrowserList = true;
         },
 
@@ -591,7 +612,7 @@ export default {
             }
 
             // Show flash
-            if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} files`;
+            if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} file${uploaded.length > 1 ? "s" : ""}`;
         },
 
         handleAddMarkdown: function(document, entry) {
@@ -650,7 +671,7 @@ export default {
                         title: "Rename",
                         icon: "edit",
                         onClick: () => {
-                            this.renamePath = this.selectedFiles[0].entry.path;
+                            this.fileToRename = this.selectedFiles[0];
                             this.renameDialogOpen = true;
                         }
                     });

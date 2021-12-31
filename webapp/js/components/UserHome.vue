@@ -23,7 +23,7 @@
                                 :disabled="ds.deleting"><i class="ui icon trash"></i></button>
                         </div>
                         
-                        <a href="javascript:void(0)" @click.stop="viewDataset(ds)"><i class="large database icon"></i> {{ds.slug}}</a>
+                        <a href="javascript:void(0)" @click.stop="viewDataset(ds)"><i class="large database icon"></i> {{datasetName(ds)}}</a>
                     </div>
                 </div>
             </div>
@@ -36,6 +36,7 @@
 import Message from 'commonui/components/Message.vue';
 import ddb from 'ddb';
 import { setTitle } from '../libs/utils';
+import { renameDataset, datasetName } from '../libs/registryUtils';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -71,6 +72,8 @@ export default {
         this.loading = false;
     },
     methods: {
+        datasetName,
+
         async handleDelete(ds){
             if (window.confirm(`Are you sure you want to delete ${ds.slug}?`)){
                 this.$set(ds, 'deleting', true);
@@ -88,14 +91,15 @@ export default {
 
         async handleRename(ds){
             // TODO: add proper modal
-            var newSlug;
+            var newName;
 
-            if (newSlug = window.prompt("Enter new dataset name:", ds.slug)){
+            if (newName = window.prompt("Enter new dataset name:", datasetName(ds))){
                 this.$set(ds, 'renaming', true);
                 try{
                     var newDs;
-                    if (newDs = await this.org.Dataset(ds.slug).rename(newSlug)){
+                    if (newDs = await renameDataset(this.$route.params.org, ds.slug, newName)){
                         ds.slug = newDs.slug;
+                        ds.properties.meta.name = newDs.properties.meta.name;
                     }
                 }catch(e){
                     console.log(e.message);
