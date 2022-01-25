@@ -90,7 +90,7 @@ export default {
         },
 
         async handleRename(ds){
-            // TODO: add proper modal
+            
             var newName;
 
             if (newName = window.prompt("Enter new dataset name:", datasetName(ds))){
