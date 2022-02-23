@@ -54,9 +54,9 @@
 </template>
 
 <script>
-import Message from 'commonui/components/Message.vue';
+import Message from './Message.vue';
 import ddb from 'ddb';
-import { bytesToSize } from 'commonui/classes/utils';
+import { bytesToSize } from '../libs/utils';
 import Dropzone from '../vendor/dropzone';
 
 const { Registry } = ddb;

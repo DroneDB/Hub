@@ -61,12 +61,12 @@
 
 <script>
 import { utils } from 'ddb';
-import mouse from 'commonui/mouse';
+import mouse from '../libs/mouse';
 import reg from '../libs/sharedRegistry';
-import Alert from 'commonui/components/Alert';
+import Alert from './Alert';
 import { xAuthLogout } from '../libs/xauth';
-import { isMobile } from 'commonui/classes/responsive';
-import { bytesToSize } from '../../../vendor/commonui/classes/utils';
+import { isMobile } from '../libs/responsive';
+import { bytesToSize } from '../libs/utils';
 
 export default {
   components: {

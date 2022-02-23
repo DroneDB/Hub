@@ -33,7 +33,7 @@
 </template>
 
 <script>
-import Message from 'commonui/components/Message.vue';
+import Message from './Message.vue';
 import ddb from 'ddb';
 import { setTitle } from '../libs/utils';
 import { renameDataset, datasetName } from '../libs/registryUtils';

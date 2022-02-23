@@ -1,3 +1,89 @@
+@import './semantic.min.css';
+
+html{
+    overflow: hidden;
+}
+body{
+    color: #030A03;
+    background: #fefefe;
+}
+
+*{
+    user-select: none;
+}
+
+.hidden{
+    display: none !important;
+}
+
+.spin {
+    animation: rotation 2s infinite linear;
+}
+
+.circle.notch{
+    height: 17px;
+    line-height: 17px;
+    width: 22px;
+}
+
+.cui.select.icon{
+    position: relative;
+
+    select{
+        text-indent: 24px;
+    }
+
+    i{
+        position: absolute;
+        left: 13px;
+        z-index: 1;
+        top: 10px;
+        opacity: 0.5;
+        color: rgba(0,0,0,0.87);
+    }
+}
+
+.cui.app {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .container {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
+
+        &.vertical {
+            flex-direction: column;
+        }
+
+        &.main {
+            height: 100%;
+            // height: calc(100% - 32px);
+        }
+    }
+
+    .sidebar {
+        display: flex;
+        flex-direction: column;
+        overflow: auto;
+
+        height: 100%;
+    }
+}
+ 
+@keyframes rotation {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 #app{
     display: flex;
     flex-direction: column;

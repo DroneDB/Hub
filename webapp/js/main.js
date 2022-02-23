@@ -1,10 +1,14 @@
 
-import 'commonui/main';
+import 'regenerator-runtime';
+import '../css/app.scss';
+import './libs/keyboard';
+import './libs/mouse';
+import './dynamic/web';
+
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 import VueLogger from 'vuejs-logger';
 
-import '../css/app.scss';
 import Header from './components/Header.vue';
 import Login from './components/Login.vue';
 import UserHome from './components/UserHome.vue';

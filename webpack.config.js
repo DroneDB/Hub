@@ -84,8 +84,7 @@ module.exports = {
         }),
         new CopyPlugin({
           patterns: [
-            { from: 'webapp/public', to: '' },
-            { from : 'vendor/commonui/public', to: ''}
+            { from: 'webapp/public', to: '' }
           ]
         })
     ],
@@ -96,7 +95,6 @@ module.exports = {
 
     resolve: {
         alias: {
-            'commonui': path.resolve(__dirname, 'vendor/commonui/'),
             'vue$': 'vue/dist/vue.esm.js',
             'ddb': path.resolve(__dirname, 'vendor/ddb_js')
         },

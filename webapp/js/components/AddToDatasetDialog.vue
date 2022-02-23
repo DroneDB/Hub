@@ -20,9 +20,9 @@
 </template>
 
 <script>
-import Window from 'commonui/components/Window.vue';
+import Window from './Window.vue';
 import DatasetUpload from './DatasetUpload.vue';
-import { clone } from 'commonui/classes/utils';
+import { clone } from '../libs/utils';
 
 export default {
   components: {
