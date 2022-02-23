@@ -36,7 +36,7 @@
 </template>
 
 <script>
-import Message from 'commonui/components/Message.vue';
+import Message from './Message.vue';
 import reg from '../libs/sharedRegistry';
 import { xAuthAvailable, getXAuthToken } from '../libs/xauth';
 

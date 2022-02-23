@@ -51,10 +51,10 @@
 </template>
 
 <script>
-import Message from 'commonui/components/Message.vue';
-import mouse from 'commonui/mouse';
-import { clone } from 'commonui/classes/utils';
-import Window from 'commonui/components/Window.vue';
+import Message from './Message.vue';
+import mouse from '../libs/mouse';
+import { clone } from '../libs/utils';
+import Window from './Window.vue';
 
 export default {
     props: {
