@@ -62,6 +62,8 @@ export default {
       // Trigger first onTabActivated
       const node = this.getNodeFor(this.activeTab);
       if (node.onTabActivated) node.onTabActivated();
+
+      this.tabMap = {};
   },
   computed: {
       tabButtons: function(){
@@ -81,6 +83,15 @@ export default {
           return this.$children.find(c => c.$vnode.tag === tag);
       },
 
+      activateTab(tabKey){
+          const tab = this.getTabFor(tabKey);
+          if (tab) this.setActiveTab(tab);
+      },
+
+      getTabFor(tabKey){
+          return this.tabMap[tabKey];
+      },
+
       setActiveTab: function(tab){
           if (this.activeTab !== tab.key){
             const curNode = this.getNodeFor(this.activeTab);
@@ -91,10 +102,19 @@ export default {
             this.activeTab = tab.key;
             this.tabButtons.setActiveTab(tab, false);
 
-            const node = this.getNodeFor(tab.key);
-            if (node && node.onTabActivated !== undefined){
-                node.onTabActivated();
-            }
+            // The Vue node is not available
+            // until the next tick
+            this.$nextTick(() => {
+                const node = this.getNodeFor(tab.key);
+
+                if (node && node.route !== undefined){
+                    
+                }
+
+                if (node && node.onTabActivated !== undefined){
+                    node.onTabActivated();
+                }
+            });
           }
       },
 
@@ -143,6 +163,8 @@ export default {
                 this.setActiveTab(tab);
                 this.$forceUpdate();
             }
+
+            this.tabMap[tab.key] = tab;
           });
       },
 
@@ -170,6 +192,7 @@ export default {
 
             this.$slots[tabKey][0].componentInstance.$destroy();
             delete this.$slots[tabKey];
+            delete this.tabMap[tabKey];
           }else{
               console.warn(`Cannot remove tab with key: ${tabKey}`);
           }

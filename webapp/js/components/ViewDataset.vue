@@ -2,7 +2,7 @@
 <div id="browser" class="cui app">
     <Message bindTo="error" />
     <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed>
-        <div class="sidebar" v-show="!$only" >
+        <div class="sidebar" >
             <FileBrowser v-show="!isMobile" :rootNodes="rootNodes"
                 @openItem="handleOpenItem"
                 @selectionChanged="handleFileSelectionChanged"
@@ -15,7 +15,7 @@
         <TabSwitcher :tabs="mainTabs" :selectedTab="startTab"
                 position="top"
                 buttonWidth="auto"
-                :hideSingle="true"
+                :hideSingle="false"
                 ref="mainTabSwitcher" >
             <template v-if="isMobile" v-slot:filebrowser>
                 <FileBrowser :rootNodes="rootNodes"
@@ -39,6 +39,7 @@
                     :tools="explorerTools"
                     :currentPath="currentPath"
                     @openItem="handleOpenItem"
+                    @createFolder="handleCreateFolder"
                     @deleteSelecteditems="openDeleteItemsDialog"
                     @moveSelectedItems="openRenameItemsDialog"
                     @moveItem="handleMoveItem"
@@ -116,75 +117,23 @@ export default {
         const mobile = isMobile();
 
         var mainTabs = [];
-        var startTab = null;
 
-        if (!this.$only || this.$view == null) {
-
-            mainTabs.push({
-                label: 'Map',
-                icon: 'map',
-                key: 'map'
+        if (mobile){
+            mainTabs.unshift({
+                label: 'Browser',
+                icon: 'sitemap',
+                key: 'filebrowser'
             });
-
-            if (mobile){
-                mainTabs.unshift({
-                    label: 'Browser',
-                    icon: 'sitemap',
-                    key: 'filebrowser'
-                });
-            }
-            if (window.WebGL2RenderingContext){
-                mainTabs.push({
-                    label: '3D',
-                    icon: 'cube',
-                    key: 'potree'
-                });
-            }
-
-            mainTabs = mainTabs.concat([{
-                label: 'Files',
-                icon: 'folder open',
-                key: 'explorer'
-            }]);
-
-            startTab = this.$view;
-
-        } else {
-            switch(this.$view) {
-                case 'map':
-
-                    mainTabs.push({
-                        label: 'Map',
-                        icon: 'map',
-                        key: 'map'
-                    });
-
-                    break;
-
-                case 'explorer':
-
-                    mainTabs.push({
-                        label: 'Files',
-                        icon: 'folder open',
-                        key: 'explorer'
-                    });
-
-                    break;
-
-                case 'potree':
-
-                    mainTabs.push({
-                        label: '3D',
-                        icon: 'cube',
-                        key: 'potree'
-                    });
-
-                    break;
-            }
         }
 
+        mainTabs = mainTabs.concat([{
+            label: 'Files',
+            icon: 'folder open',
+            key: 'explorer'
+        }]);
+
         return {
-            startTab: startTab,
+            startTab: mainTabs[0].key,
             error: "",
             isMobile: mobile,
             mainTabs: mainTabs,
@@ -305,8 +254,11 @@ export default {
         },
 
         handleMoveItem: async function(node, path){
-            this.$log.info("ViewDataset.handleMoveItem");
             await this.renameFile(node, path);
+        },
+        handleCreateFolder: function(){ 
+            console.log("CALL")
+            this.createFolderDialogOpen = true;
         },
         addMarkdownTab: function(uri, label, icon){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
@@ -321,6 +273,8 @@ export default {
                         uri
                     }
                 }, { activate: true });
+            }else{
+                this.$refs.mainTabSwitcher.activateTab(label);
             }
         },
 
@@ -413,8 +367,6 @@ export default {
 
         deleteSelectedFiles: async function() {
 
-            this.$log.info("ViewDataset.deleteSelectedFiles");
-
             this.isBusy = true;
 
             try {
@@ -469,8 +421,6 @@ export default {
 
         renameSelectedFile: async function(newPath) {
 
-            this.$log.info("ViewDataset.renameSelectedFile(newPath)", newPath);
-
             var source;
 
             if (this.selectedUsingFileBrowserList) {
@@ -494,8 +444,6 @@ export default {
 
         createFolder: async function(newPath) {
             
-            this.$log.info("ViewDataset.createFolder(newPath)", newPath);
-
             this.isBusy = true;
             
             newPath = this.currentPath ? this.currentPath + "/" + newPath : newPath;
@@ -505,9 +453,6 @@ export default {
                 var entry = await this.dataset.createFolder(newPath);
 
                 const base = pathutils.basename(entry.path);
-
-                this.$log.info("Creating folder", clone(entry));
-                this.$log.info("Current path", this.currentPath);
 
                 var remoteUri = this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base);
 
@@ -685,6 +630,30 @@ export default {
                         onClick: () => {                 
                             this.selectedUsingFileBrowserList = false;        
                             this.deleteDialogOpen = true;
+                        }
+                    });
+                }
+
+                if (this.selectedFiles.length === 1){
+                    this.explorerTools.push({
+                        id: 'separator'
+                    });
+
+                    this.explorerTools.push({
+                        id: 'get-link',
+                        title: "Get Link",
+                        icon: "linkify",
+                        onClick: () => {
+                            
+                        }
+                    });
+
+                    this.explorerTools.push({
+                        id: 'open-item',
+                        title: "Open Item",
+                        icon: "folder open outline",
+                        onClick: () => {
+                            this.handleOpenItem(this.selectedFiles[0]);
                         }
                     });
                 }

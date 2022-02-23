@@ -82,12 +82,19 @@ export default {
 
         contextMenu = contextMenu.concat([{
                     label: 'Open Item',
-                    icon: 'share',
+                    icon: 'folder open outline',
                     isVisible: () => { return this.selectedFiles.length > 0; },
                     click: () => {
                         this.selectedFiles.forEach(f => {
                             this.$emit('openItem', f);
                         });
+                    }
+                },{
+                    label: "Create Folder",
+                    icon: 'folder',
+                    accelerator: "CmdOrCtrl+N",
+                    click: () => {
+                        this.$emit("createFolder");
                     }
                 },{
                     label: "Select All/None",
@@ -328,7 +335,6 @@ export default {
                 this.selectRange(this.rangeStartThumb, thumb, this.$refs.thumbs);
             } else {
 
-                this.$log.info("File", clone(file));
                 // Single selection
                 if (mouseBtn === Mouse.RIGHT) {
                     if (!file.selected) this.selectedFiles.forEach(f => f.selected = false);

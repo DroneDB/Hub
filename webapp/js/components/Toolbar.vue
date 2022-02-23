@@ -1,7 +1,8 @@
 <template>
     <div class="toolbar" :class="className" >
         <template v-for="tool in dataTools">
-            <div class="button" 
+            <div class="separator" v-if="tool.id === 'separator'"></div>
+            <div v-else class="button" 
                     :class="{selected: tool.selected, disabled: tool.disabled}" 
                     :title="tool.title"
                     @click="toggleTool(tool.id)">
@@ -190,6 +191,14 @@ export default {
 
     &.top-border{
         border-top: 1px solid #030A03;
+    }
+
+    .separator{
+        border-left: 1px solid #dddddd;
+        margin-top: 5px;
+        margin-bottom: 3px;
+        margin-left: 6px;
+        margin-right: 6px;
     }
 }
 </style>
