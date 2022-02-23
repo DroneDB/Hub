@@ -95,7 +95,8 @@ export default {
             if (tree.includes(ourPath))
                 await this.expand();
 
-            if (tree[tree.length-1] == ourPath)
+            if (tree[tree.length-1] === ourPath ||
+                (tree[tree.length-1] === "/" && this.node.root))
                 this.$emit('opened', this, "explorer");  
             
         });
