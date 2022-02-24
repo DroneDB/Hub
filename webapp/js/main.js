@@ -55,6 +55,7 @@ window.addEventListener('load', function(){
         { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
         // TODO: add an actual home page
         { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" }},
+        { path: '*', redirect: '/' }
     ];
     const router = new VueRouter({ mode: "history", routes });
 
