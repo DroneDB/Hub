@@ -25,6 +25,7 @@
     "@turf/meta": "^6.0.2",
     "@vue/devtools": "^5.3.3",
     "babel-loader": "^8.0.0-beta.4",
+    "copy-webpack-plugin": "^6.4.0",
     "css-loader": "^1.0.0",
     "file-loader": "^4.0.0",
     "markdown-it": "^12.0.4",
@@ -36,12 +37,11 @@
     "url-loader": "^2.0.1",
     "vue": "^2.6.11",
     "vue-loader": "^15.2.4",
+    "vue-router": "^3.4.9",
     "vue-style-loader": "^4.1.0",
     "vue-template-compiler": "^2.5.16",
-    "webpack": "^4.46.0",
-    "copy-webpack-plugin": "^6.4.0",
-    "vue-router": "^3.4.9",
-    "vuejs-logger": "1.5.5"
+    "vuejs-logger": "1.5.5",
+    "webpack": "^4.46.0"
   },
   "devDependencies": {
     "prettier": "2.3.1",
