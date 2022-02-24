@@ -93,7 +93,6 @@ import ddb from 'ddb';
 const { pathutils, utils } = ddb;
 
 export default {
-    props: ["org", "ds"],
     components: {
         Header,
         Message,
@@ -130,6 +129,12 @@ export default {
             label: 'Files',
             icon: 'folder open',
             key: 'explorer'
+        }]);
+
+        mainTabs = mainTabs.concat([{
+            label: 'Map',
+            icon: 'map',
+            key: 'map'
         }]);
 
         return {
