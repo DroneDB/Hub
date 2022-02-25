@@ -5,7 +5,7 @@
     <div class="top-banner ui equal width grid middle aligned">
         <div class="column">
             <h1>Organizations</h1>
-            <p>Organizations are groups of users that share datasets.</p>
+            <p>Organizations are groups of datasets managed by a single owner.</p>
         </div>
         <div class="column right aligned">
             <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Organization</button>
@@ -26,10 +26,10 @@
                         <div v-else><i class="large lock icon"></i>Private</div>
                     </div>
                     <div class="one wide column right aligned">
-                        <button @click="handleRename(org)" class="ui button icon small grey"
-                                    :class="{loading: org.renaming}"
-                                    :disabled="org.renaming">
-                                    <i class="ui icon edit outline"></i>
+                        <button @click="handleEdit(org)" class="ui button icon small grey"
+                                    :class="{loading: org.editing}"
+                                    :disabled="org.editing">
+                                    <i class="ui icon pencil"></i>
                         </button>
                         <button @click.stop="handleDelete(org)" class="ui button icon small negative" 
                                 :class="{loading: org.deleting}"
@@ -37,36 +37,16 @@
                         </button>
                     </div>
                 </div>
-                <!--<div class="ui middle aligned divided list">
-                    <div class="item">
-                        <div><i class="large users icon"></i></div>
-                        <div><i class="large users icon"></i></div>
-                        <div><i class="large users icon"></i></div>
-                        <div><i class="large users icon"></i></div>
-                        <div><i class="large users icon"></i></div>
-                        <div class="right floated">
-                            <button @click="handleRename(org)" class="ui button icon small grey"
-                                    :class="{loading: org.renaming}"
-                                    :disabled="org.renaming">
-                                    <i class="ui icon edit outline"></i>
-                            </button>
-                            <button @click.stop="handleDelete(org)" class="ui button icon small negative" 
-                                :class="{loading: org.deleting}"
-                                :disabled="org.deleting"><i class="ui icon trash"></i></button>
-                        </div>
-                        
-                        <a href="javascript:void(0)" @click.stop="viewOrganization(org)"><i class="large factory icon"></i> {{org.name}}</a>
-                        
-                    </div>
-                </div>-->
             </div>
         </div>
     </div>
+    <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug"></DeleteOrganizationDialog>
 </div>
 </template>
 
 <script>
 import Message from './Message.vue';
+import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import ddb from 'ddb';
 import { setTitle } from '../libs/utils';
 
@@ -75,13 +55,16 @@ const reg = new Registry(window.location.origin);
 
 export default {
     components: {
-        Message
+        Message,
+        DeleteOrganizationDialog
     },
     data: function () {
         return {
             error: "",
             organizations: [],
-            loading: true
+            loading: true,
+            deleteDialogOpen: false,
+            currentOrgSlug: null
         }
     },
     mounted: async function(){
@@ -95,7 +78,7 @@ export default {
                 return {
                     slug: org.slug,
                     name: org.name,
-                    renaming: false,
+                    editing: false,
                     deleting: false,
                     description: org.description,
                     creationDate: Date.parse(org.creationDate),
@@ -119,7 +102,10 @@ export default {
     },
     methods: {       
 
-        async handleDelete(ds){
+        handleDelete(org) {
+
+            this.currentOrgSlug = org.slug;
+            this.deleteDialogOpen = true;
             /*
             if (window.confirm(`Are you sure you want to delete ${ds.slug}?`)){
                 this.$set(ds, 'deleting', true);
@@ -135,7 +121,35 @@ export default {
             }*/
         },
 
-        async handleRename(ds){
+        handleDeleteClose(res) {
+            console.log(res);
+            this.deleteDialogOpen = false;
+
+            if (res == "close") {
+                this.currentOrgSlug = null;
+                return;
+            }
+
+/*
+            if (res == "delete") {
+                this.$set(this.organizations.find(o => o.slug == this.currentOrgSlug), 'deleting', true);
+                try{
+                    if (await reg.deleteOrganization(this.currentOrgSlug)){
+                        this.organizations = this.organizations.filter(o => o.slug != this.currentOrgSlug);
+                    }
+                }catch(e){
+                    console.log(e.message);
+                    this.error = e.message;
+                }
+                this.$set(this.organizations.find(o => o.slug == this.currentOrgSlug), 'deleting', false);
+            }*/
+
+            //this.currentOrgSlug = null;
+
+
+        },
+
+        handleEdit(ds){
             // TODO: add proper modal
             /*var newName;
 
