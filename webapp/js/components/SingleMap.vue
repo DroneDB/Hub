@@ -5,7 +5,7 @@
             <i class="icon circle notch spin" />
         </div>
 
-        <div v-else-if="!error" ref="map-container" class="map-container">
+        <div ref="map-container" class="map-container" :class="{loaded: !!error && !loading}">
             <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
                 <option v-for="(v, k) in basemaps" :value="k">
                     {{ v.label }}
@@ -37,7 +37,7 @@ export default {
   components: {
       Map, Message
   },
-  props: ["file"],
+  props: ["uri"],
   data: function(){
       return {
         error: "",
@@ -49,38 +49,35 @@ export default {
       };
   },
   mounted: async function(){
-      if (this.$route.params.encodedPath){
+    let ds, path;
+    const standalone = this.$route.params.encodedPath !== undefined;
+
+    if (standalone){
+        ds = reg.Organization(this.$route.params.org)
+                                .Dataset(this.$route.params.ds);
         // Load file info from network
-        const path = b64decode(this.$route.params.encodedPath);
-        const ds = reg.Organization(this.$route.params.org)
-                               .Dataset(this.$route.params.ds);
-        try{
-            const entries = await ds.list(path);
-            if (entries.length){
-                this.entry = entries[0];
-                this.ddbURI = ds.remoteUri(path);
-            }else{
-                this.error = `Cannot find: ${path}. It might have been renamed or moved.`;
-            }
+        path = b64decode(this.$route.params.encodedPath);
+        this.ddbURI = ds.remoteUri(path);
+    }else if (this.uri){
+        [ds, path] = ddb.utils.datasetPathFromUri(this.uri);
+        this.ddbURI = this.uri;
+    }else{
+        this.error = "Invalid uri";
+        return;
+    }
 
-        }catch(e){
-            this.error = e.message;
-        }
+    try{
+        this.entry = await ds.listOne(path);
+        if (this.$route.params.encodedPath) setTitle(`${ddb.pathutils.basename(this.entry.path)} - Map`);
+    }catch(e){
+        this.error = e.message;
+    }
 
-        setTitle(`${ddb.pathutils.basename(this.entry.path)} - Map`);
-      }else if (this.file){
-          // We already have the file info
-          this.entry = this.file.entry;
-          this.ddbURI = this.file.path;
-      }else{
-          this.error = "Invalid file";
-          return;
-      }
+    this.loading = false;
 
-      this.loading = false;
-      this.$nextTick(() => {
+    this.$nextTick(() => {
         this.loadMap();
-      });
+    });
   },
   beforeDestroy: function(){
   },
@@ -91,7 +88,6 @@ export default {
         const { entry } = this;
 
         this.loaded = true;
-        this._updateMap = null;
 
         this.basemapLayer = new TileLayer({
             source: new XYZ({
@@ -104,6 +100,7 @@ export default {
         const rasters = this.rasterLayer.getLayers();
         const ext = createEmptyExtent();
 
+            console.log(entry);
         if (entry.polygon_geom && (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.POINTCLOUD)){
             const extent = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
             const tileLayer = new TileLayer({
@@ -138,6 +135,7 @@ export default {
 
         setTimeout(() => this.map.updateSize(), 1);
 
+            console.log(ext)
         if (!isEmptyExtent(ext)){
             setTimeout(() => {
                 this.map.getView().fit(ext, { 
@@ -153,13 +151,9 @@ export default {
         this.map.updateSize();
       },
       onTabActivated: function(){
-        if (!this.loaded){
-            this.loadMap();
-        }else{
-            this.$nextTick(() => {
-                if (this.map) this.map.updateSize();
-            });
-        }
+        this.$nextTick(() => {
+            if (this.map) this.map.updateSize();
+        });
       },
       updateBasemap: function(){
           const basemap = this.basemaps[this.selectedBasemap];
@@ -179,11 +173,15 @@ export default {
     flex-direction: column;
 }
 .map-container{
+    visibility: hidden;
     -webkit-tap-highlight-color:  rgba(255, 255, 255, 0); 
     position: relative;
     width: 100%;
     height: 100%;
-
+    &.loaded{
+        visibility: visible;
+    }
+    
     #basemap-selector{
         position: absolute;
         right: 8px;

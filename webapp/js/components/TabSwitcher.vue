@@ -85,11 +85,21 @@ export default {
 
       activateTab(tabKey){
           const tab = this.getTabFor(tabKey);
-          if (tab) this.setActiveTab(tab);
+          if (tab){
+              this.setActiveTab(tab);
+          }
       },
 
       getTabFor(tabKey){
           return this.tabMap[tabKey];
+      },
+
+      getActiveTabIndex: function(){
+          let i = 0;
+          for (; i < this.dynTabs.length; i++){
+              if (this.dynTabs[i].key === this.activeTab) break;
+          }
+          return i < this.dynTabs.length ? i : 0;
       },
 
       setActiveTab: function(tab){
@@ -99,6 +109,7 @@ export default {
                 curNode.onTabDeactivating();
             }
             
+            this.lastTabIndex = this.getActiveTabIndex();
             this.activeTab = tab.key;
             this.tabButtons.setActiveTab(tab, false);
 
@@ -106,10 +117,6 @@ export default {
             // until the next tick
             this.$nextTick(() => {
                 const node = this.getNodeFor(tab.key);
-
-                if (node && node.route !== undefined){
-                    
-                }
 
                 if (node && node.onTabActivated !== undefined){
                     node.onTabActivated();
@@ -171,7 +178,7 @@ export default {
       removeTab: function(tabKey){
           const tabIndex = this.dynTabs.findIndex(t => t.key === tabKey);
           if (tabIndex !== -1){
-            let tabToActivate = tabIndex - 1;
+            let tabToActivate = this.lastTabIndex !== undefined ? this.lastTabIndex : (tabIndex - 1);
 
             // Last tab?
             if (tabToActivate < 0){

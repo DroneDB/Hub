@@ -517,7 +517,7 @@ export default {
       },
       onPanelResized: function(){
         // Redraw when map is resized (via panels)
-        this.map.updateSize();
+        if (this.map) this.map.updateSize();
       },
       onTabActivated: function(){
         if (!this.loaded){

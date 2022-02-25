@@ -71,6 +71,7 @@ import NewFolderDialog from './NewFolderDialog.vue';
 import Message from './Message.vue';
 import FileBrowser from './FileBrowser.vue';
 import Map from './Map.vue';
+import SingleMap from './SingleMap.vue';
 import Potree from './Potree.vue';
 import Explorer from './Explorer.vue';
 import Properties from './Properties.vue';
@@ -250,9 +251,12 @@ export default {
                 return [];
             }
         },
+        
         handleOpenItem: function(node){
             if (node.entry.type === ddb.entry.type.MARKDOWN){
-                this.addMarkdownTab(node.path, node.label, "book");
+                this.addComponentTab(node.path, node.label, "book", Markdown);
+            }else if (node.entry.type === ddb.entry.type.GEORASTER){
+                this.addComponentTab(node.path, node.label, "map", SingleMap);
             }else{
                 shell.openItem(node.path);
             }
@@ -262,10 +266,9 @@ export default {
             await this.renameFile(node, path);
         },
         handleCreateFolder: function(){ 
-            console.log("CALL")
             this.createFolderDialogOpen = true;
         },
-        addMarkdownTab: function(uri, label, icon){
+        addComponentTab: function(uri, label, icon, component){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
                 this.$refs.mainTabSwitcher.addTab({
                     label,
@@ -273,7 +276,7 @@ export default {
                     key: label,
                     hideLabel: false,
                     canClose: true,
-                    component: Markdown,
+                    component,
                     props: {
                         uri
                     }
