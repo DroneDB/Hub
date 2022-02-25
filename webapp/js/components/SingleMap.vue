@@ -1,11 +1,8 @@
 <template>
     <div class="singleMap">
-        <Message bindTo="error" noDismiss />
-        <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
-        </div>
+        <TabViewLoader @loaded="loadMap" titleSuffix="Map" />
 
-        <div ref="map-container" class="map-container" :class="{loaded: !!error && !loading}">
+        <div ref="map-container" class="map-container">
             <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
                 <option v-for="(v, k) in basemaps" :value="k">
                     {{ v.label }}
@@ -16,8 +13,6 @@
 </template>
 
 <script>
-import Message from './Message';
-import { setTitle } from '../libs/utils';
 
 import 'ol/ol.css';
 import {Map, View} from 'ol';
@@ -27,15 +22,14 @@ import {createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as ex
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
+import TabViewLoader from './TabViewLoader';
 import XYZ from 'ol/source/XYZ';
 import {transformExtent} from 'ol/proj';
 import { Basemaps } from '../libs/basemaps';
-import reg from '../libs/sharedRegistry';
-import { b64encode, b64decode } from '../libs/base64';
 
 export default {
   components: {
-      Map, Message
+      Map, TabViewLoader
   },
   props: ["uri"],
   data: function(){
@@ -49,35 +43,7 @@ export default {
       };
   },
   mounted: async function(){
-    let ds, path;
-    const standalone = this.$route.params.encodedPath !== undefined;
-
-    if (standalone){
-        ds = reg.Organization(this.$route.params.org)
-                                .Dataset(this.$route.params.ds);
-        // Load file info from network
-        path = b64decode(this.$route.params.encodedPath);
-        this.ddbURI = ds.remoteUri(path);
-    }else if (this.uri){
-        [ds, path] = ddb.utils.datasetPathFromUri(this.uri);
-        this.ddbURI = this.uri;
-    }else{
-        this.error = "Invalid uri";
-        return;
-    }
-
-    try{
-        this.entry = await ds.listOne(path);
-        if (this.$route.params.encodedPath) setTitle(`${ddb.pathutils.basename(this.entry.path)} - Map`);
-    }catch(e){
-        this.error = e.message;
-    }
-
-    this.loading = false;
-
-    this.$nextTick(() => {
-        this.loadMap();
-    });
+    
   },
   beforeDestroy: function(){
   },
@@ -100,7 +66,6 @@ export default {
         const rasters = this.rasterLayer.getLayers();
         const ext = createEmptyExtent();
 
-            console.log(entry);
         if (entry.polygon_geom && (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.POINTCLOUD)){
             const extent = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
             const tileLayer = new TileLayer({
@@ -135,7 +100,6 @@ export default {
 
         setTimeout(() => this.map.updateSize(), 1);
 
-            console.log(ext)
         if (!isEmptyExtent(ext)){
             setTimeout(() => {
                 this.map.getView().fit(ext, { 
@@ -173,14 +137,10 @@ export default {
     flex-direction: column;
 }
 .map-container{
-    visibility: hidden;
     -webkit-tap-highlight-color:  rgba(255, 255, 255, 0); 
     position: relative;
     width: 100%;
     height: 100%;
-    &.loaded{
-        visibility: visible;
-    }
     
     #basemap-selector{
         position: absolute;
@@ -188,12 +148,5 @@ export default {
         top: 8px;
         z-index: 1;
     }
-}
-.loading{
-    padding: 12px;
-    text-align: center;
-}
-.message.warning{
-    margin: 12px;
 }
 </style>

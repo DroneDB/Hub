@@ -1,8 +1,10 @@
 <template>
     <div id="potree">
-        <Message bindTo="error" />
+        <TabViewLoader @loaded="handleLoad" titleSuffix="Point Cloud" />
+
+        <Message bindTo="error" noDismiss />
         <div v-if="loading" class="loading">
-            <p>3D Loading...</p> 
+            <p>Loading point cloud...</p> 
             <i class="icon circle notch spin" />
         </div>
 
@@ -16,13 +18,14 @@
 <script>
 import ddb from 'ddb';
 import Message from './Message';
+import TabViewLoader from './TabViewLoader';
 import { loadResources } from '../libs/lazy';
 
 export default {
   components: {
-      Message
+      Message, TabViewLoader
   },
-  props: ['files'],
+  props: ['uri'],
   data: function(){
       return {
           error: "",
@@ -34,33 +37,40 @@ export default {
   },
   
   methods:{
-      onTabDeactivating: function(){
-          if (this.viewer){
-              // this.viewer.renderer.setAnimationLoop(); // Stop
-          }
-      },
-      onPanelResized: function(){
-        // Redraw when map is resized (via panels)
-        // this.map.updateSize();
-      },
-      loadPointClouds: async function(){
-        if (!this.viewer) return;
+      handleLoad: async function(){
+        try{
+            // Quick type check
+            if (this.entry.type !== ddb.entry.type.POINTCLOUD) throw new Error(`${this.entry.path} cannot be opened as a point cloud`);
 
-        if (!this.reloadingPointClouds){
-            this.reloadingPointClouds = true;
-            try{
-                const pointCloudFiles = this.files.filter(f => f.entry.type === ddb.entry.type.POINTCLOUD);
-                await Promise.all(pointCloudFiles.map(this.addPointCloud));
-                this.viewer.fitToScreen();
-                if (pointCloudFiles.length === 0) this.error = "No point cloud files selected. Select one or more point cloud files to display them.";
-            }catch(e){
-                this.error = e.message;
-            }finally{
-                this.reloadingPointClouds = false;
-            }
+            this.loading = true;
+
+            await loadResources("/potree/build/potree/potree.isolated.min.css");
+            await loadResources("/potree/libs/jquery-ui/jquery-ui.min.css");
+            await loadResources("/potree/libs/spectrum/spectrum.css");
+            await loadResources("/potree/libs/jstree/themes/mixed/style.css");
+            await loadResources("/potree/libs/jquery/jquery-3.1.1.min.js");                
+            await loadResources("/potree/libs/spectrum/spectrum.js");
+            await loadResources("/potree/libs/jquery-ui/jquery-ui.min.js");
+            await loadResources("/potree/libs/three.js/build/three.min.js");
+            await loadResources("/potree/libs/three.js/extra/lines.js");
+            await loadResources("/potree/libs/other/BinaryHeap.js");
+            await loadResources("/potree/libs/tween/tween.min.js");
+            await loadResources("/potree/libs/d3/d3.js");
+            await loadResources("/potree/libs/proj4/proj4.js");
+            await loadResources("/potree/libs/i18next/i18next.js");
+            await loadResources("/potree/libs/jstree/jstree.js");
+            await loadResources("/potree/build/potree/potree.js");
+            await loadResources("/potree/libs/plasio/js/laslaz.js");
+
+            await this.loadViewer();
+
+        }catch(e){
+            this.error = e.message;
+        }finally{
+            this.loading = false;
         }
       },
-      reloadViewer: async function(){
+      loadViewer: async function(){
         this.error = "";
 
         if (this.viewer){
@@ -98,20 +108,21 @@ export default {
 
         this.loaded = true;
         this.viewer = viewer;
-        console.log(this.viewer);
 
-        await this.loadPointClouds();
+        await this.addPointCloud(this.dataset.Entry(this.entry));
+        this.viewer.fitToScreen();
+        // if (pointCloudFiles.length === 0) this.error = "No point cloud files selected. Select one or more point cloud files to display them.";
       },
-      addPointCloud: async function(file){
-          return new Promise(async (resolve, reject) => {
-            const entry = ddb.utils.entryFromFile(file);
 
+      addPointCloud: async function(entry){
+          return new Promise(async (resolve, reject) => {
             try{
                 const eptUrl = await entry.getEpt();
+                const basename = ddb.pathutils.basename(entry.path);
 
-                Potree.loadPointCloud(eptUrl, file.label, e => {
+                Potree.loadPointCloud(eptUrl, basename, e => {
                     if (e.type == "loading_failed"){
-                        reject(new Error(`Cannot load ${file.label}, we're still building it. Try again in a few minutes.`));
+                        reject(new Error(`Cannot load ${entry.path}, we're still building it. Try again in a few minutes.`));
                         return;
                     }
 
@@ -121,71 +132,9 @@ export default {
                     resolve();
                 });
             }catch(e){
-                reject(new Error(`${file.label} is being built. Try to refresh the page in a few minutes!`));
+                reject(new Error(`${entry.path} is being built. Try to refresh the page in a few minutes!`));
             }
           });
-      },
-      onTabActivated: async function(){
-          // Load!
-          if (!this.loaded && !this.loading){
-              try{
-                this.loading = true;
-                // await loadResources("/potree/libs/openlayers3/ol.css");
-                // await loadResources("/potree/libs/openlayers3/ol.js");
-
-                await loadResources("/potree/build/potree/potree.isolated.min.css");
-                await loadResources("/potree/libs/jquery-ui/jquery-ui.min.css");
-                await loadResources("/potree/libs/spectrum/spectrum.css");
-                await loadResources("/potree/libs/jstree/themes/mixed/style.css");
-                await loadResources("/potree/libs/jquery/jquery-3.1.1.min.js");                
-                await loadResources("/potree/libs/spectrum/spectrum.js");
-                await loadResources("/potree/libs/jquery-ui/jquery-ui.min.js");
-                await loadResources("/potree/libs/three.js/build/three.min.js");
-                await loadResources("/potree/libs/three.js/extra/lines.js");
-                await loadResources("/potree/libs/other/BinaryHeap.js");
-                await loadResources("/potree/libs/tween/tween.min.js");
-                await loadResources("/potree/libs/d3/d3.js");
-                await loadResources("/potree/libs/proj4/proj4.js");
-                await loadResources("/potree/libs/i18next/i18next.js");
-                await loadResources("/potree/libs/jstree/jstree.js");
-                await loadResources("/potree/build/potree/potree.js");
-                await loadResources("/potree/libs/plasio/js/laslaz.js");
-
-                await this.reloadViewer();
-
-              }catch(e){
-                this.error = e.message;
-              }finally{
-                this.loading = false;
-              }
-          }
-      }
-  },
-  watch: {
-      files: {
-        deep: true,
-        handler: function(newVal, oldVal){
-            if (!window.Potree) return; // Potree not available
-
-            // Prevent multiple updates
-            if (this._updatePotree){
-                clearTimeout(this._updatePotree);
-                this._updatePotree = null;
-            }
-
-            this._updatePotree = setTimeout(() => {
-                // Do we need to redraw the features?
-                // Count has changed or first or last items are different
-                if (newVal.length !== oldVal.length || 
-                    newVal[0] !== oldVal[0] || 
-                    newVal[newVal.length - 1] !== oldVal[oldVal.length - 1]){
-                   this.reloadViewer();
-                }else{
-                    // Just update (selection change)
-                    // TODO
-                }
-            }, 5);
-        }
       }
   }
 }

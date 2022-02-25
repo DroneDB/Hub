@@ -89,9 +89,30 @@ import { clone } from '../libs/utils';
 import shell from '../dynamic/shell';
 import { isMobile } from '../libs/responsive';
 import { renameDataset, entryLabel } from '../libs/registryUtils';
+import { b64encode } from '../libs/base64';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
+
+const TabInfo = {
+    map: {
+        icon: 'map',
+        component: SingleMap
+    },
+    markdown: {
+        icon: 'book',
+        component: Markdown
+    },
+    pointcloud: {
+        icon: 'cube',
+        component: Potree
+    }
+};
+const TabViewDefaults = {
+    [ddb.entry.type.MARKDOWN]: 'markdown',
+    [ddb.entry.type.GEORASTER]: 'map',
+    [ddb.entry.type.POINTCLOUD]: 'pointcloud'
+}
 
 export default {
     components: {
@@ -252,11 +273,15 @@ export default {
             }
         },
         
-        handleOpenItem: function(node){
-            if (node.entry.type === ddb.entry.type.MARKDOWN){
-                this.addComponentTab(node.path, node.label, "book", Markdown);
-            }else if (node.entry.type === ddb.entry.type.GEORASTER){
-                this.addComponentTab(node.path, node.label, "map", SingleMap);
+        handleOpenItem: function(node, view){
+            const t = node.entry.type;
+            if (!view) view = TabViewDefaults[t];
+            if (view){
+                // const { icon, component } = TabInfo[view];
+                // this.addComponentTab(node.path, node.label, icon, component, view);
+                const [_, path] = ddb.utils.datasetPathFromUri(node.path);
+                const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
+                window.open(url, `${path}-${view}`);
             }else{
                 shell.openItem(node.path);
             }
@@ -268,12 +293,12 @@ export default {
         handleCreateFolder: function(){ 
             this.createFolderDialogOpen = true;
         },
-        addComponentTab: function(uri, label, icon, component){
+        addComponentTab: function(uri, label, icon, component, view){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
                 this.$refs.mainTabSwitcher.addTab({
                     label,
                     icon,
-                    key: label,
+                    key: `${uri}-${view}`,
                     hideLabel: false,
                     canClose: true,
                     component,
@@ -640,12 +665,22 @@ export default {
                             this.deleteDialogOpen = true;
                         }
                     });
-                }
 
-                if (this.selectedFiles.length === 1){
                     this.explorerTools.push({
                         id: 'separator'
                     });
+
+                    this.explorerTools.push({
+                        id: 'open',
+                        title: "Open",
+                        icon: "folder open outline",
+                        onClick: () => {
+                            this.handleOpenItem(this.selectedFiles[0]);
+                        }
+                    });
+                }
+
+                if (this.selectedFiles.length === 1){
 
                     this.explorerTools.push({
                         id: 'get-link',
@@ -653,15 +688,6 @@ export default {
                         icon: "linkify",
                         onClick: () => {
                             
-                        }
-                    });
-
-                    this.explorerTools.push({
-                        id: 'open-item',
-                        title: "Open Item",
-                        icon: "folder open outline",
-                        onClick: () => {
-                            this.handleOpenItem(this.selectedFiles[0]);
                         }
                     });
                 }
