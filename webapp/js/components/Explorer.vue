@@ -108,6 +108,15 @@ export default {
                         });
                     }
                 },{
+                    label: 'Open 3D Model',
+                    icon: 'cube',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'model');
+                        });
+                    }
+                },{
                     label: 'Open Markdown',
                     icon: 'book',
                     isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },
@@ -145,15 +154,6 @@ export default {
                         this.$emit("openProperties");
                     }
                 },
-                // {
-                //     label: "Get Link",
-                //     isVisible: () => { return this.selectedFiles.length === 1; },
-                //     icon: 'linkify',
-                //     accelerator: "CmdOrCtrl+L",
-                //     click: () => {
-                //         console.log("TODO!")
-                //     }
-                // },
                 {
                     label: "Rename",
                     icon: 'pencil alternate',

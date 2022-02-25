@@ -30,9 +30,6 @@
             <template v-slot:map>
                 <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
             </template>
-            <template v-slot:potree>
-                <Potree :files="fileBrowserFiles" />
-            </template>
             <template v-slot:explorer>
                 <Explorer ref="explorer" 
                     :files="fileBrowserFiles"
@@ -71,8 +68,6 @@ import NewFolderDialog from './NewFolderDialog.vue';
 import Message from './Message.vue';
 import FileBrowser from './FileBrowser.vue';
 import Map from './Map.vue';
-import SingleMap from './SingleMap.vue';
-import Potree from './Potree.vue';
 import Explorer from './Explorer.vue';
 import Properties from './Properties.vue';
 import TabSwitcher from './TabSwitcher.vue';
@@ -94,24 +89,11 @@ import { b64encode } from '../libs/base64';
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
 
-const TabInfo = {
-    map: {
-        icon: 'map',
-        component: SingleMap
-    },
-    markdown: {
-        icon: 'book',
-        component: Markdown
-    },
-    pointcloud: {
-        icon: 'cube',
-        component: Potree
-    }
-};
-const TabViewDefaults = {
+const OpenItemDefaults = {
     [ddb.entry.type.MARKDOWN]: 'markdown',
     [ddb.entry.type.GEORASTER]: 'map',
-    [ddb.entry.type.POINTCLOUD]: 'pointcloud'
+    [ddb.entry.type.POINTCLOUD]: 'pointcloud',
+    [ddb.entry.type.MODEL]: 'model',
 }
 
 export default {
@@ -120,7 +102,6 @@ export default {
         Message,
         FileBrowser,
         Map,
-        Potree,
         Explorer,
         Properties,
         TabSwitcher,
@@ -275,10 +256,8 @@ export default {
         
         handleOpenItem: function(node, view){
             const t = node.entry.type;
-            if (!view) view = TabViewDefaults[t];
+            if (!view) view = OpenItemDefaults[t];
             if (view){
-                // const { icon, component } = TabInfo[view];
-                // this.addComponentTab(node.path, node.label, icon, component, view);
                 const [_, path] = ddb.utils.datasetPathFromUri(node.path);
                 const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
                 window.open(url, `${path}-${view}`);
@@ -676,18 +655,6 @@ export default {
                         icon: "folder open outline",
                         onClick: () => {
                             this.handleOpenItem(this.selectedFiles[0]);
-                        }
-                    });
-                }
-
-                if (this.selectedFiles.length === 1){
-
-                    this.explorerTools.push({
-                        id: 'get-link',
-                        title: "Get Link",
-                        icon: "linkify",
-                        onClick: () => {
-                            
                         }
                     });
                 }

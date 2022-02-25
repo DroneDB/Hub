@@ -16,6 +16,7 @@ import NotFound from './components/NotFound.vue';
 import ViewDataset from './components/ViewDataset.vue';
 import SingleMap from './components/SingleMap.vue';
 import Potree from './components/Potree.vue';
+import Nexus from './components/Nexus.vue';
 import Markdown from './components/Markdown.vue';
 import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
@@ -54,6 +55,7 @@ window.addEventListener('load', function(){
         { path: '/r/:org/:ds/view/:encodedPath/map', name: "SingleMap", components: {content: SingleMap, header: hdr}, meta: { title: "Map"}},
         { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: "PointCloud", components: {content: Potree, header: hdr}, meta: { title: "Point Cloud"}},
         { path: '/r/:org/:ds/view/:encodedPath/markdown', name: "Markdown", components: {content: Markdown, header: hdr}, meta: { title: "Markdown"}},
+        { path: '/r/:org/:ds/view/:encodedPath/model', name: "Model", components: {content: Nexus, header: hdr}, meta: { title: "Model"}},
         { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
         { path: '/r/:org', name: "UserHome", components: {content: UserHome, header: hdr}, meta: { title: "Home"}},
         { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
