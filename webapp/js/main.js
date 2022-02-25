@@ -14,7 +14,7 @@ import Login from './components/Login.vue';
 import UserHome from './components/UserHome.vue';
 import NotFound from './components/NotFound.vue';
 import ViewDataset from './components/ViewDataset.vue';
-import Organizations from './components/Organizations.vue';
+import Organizations from './components/organizations/Organizations.vue';
 import SingleMap from './components/SingleMap.vue';
 import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
