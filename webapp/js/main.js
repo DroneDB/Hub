@@ -14,6 +14,7 @@ import Login from './components/Login.vue';
 import UserHome from './components/UserHome.vue';
 import NotFound from './components/NotFound.vue';
 import ViewDataset from './components/ViewDataset.vue';
+import Organizations from './components/Organizations.vue';
 import SingleMap from './components/SingleMap.vue';
 import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
@@ -52,6 +53,7 @@ window.addEventListener('load', function () {
         { path: '/r/:org/:ds/view/:encodedPath/map', name: "SingleMap", components: {content: SingleMap, header: hdr}, meta: { title: "Map"}},
         { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
         { path: '/r/:org', name: "UserHome", components: {content: UserHome, header: hdr}, meta: { title: "Home"}},
+        { path: '/r', name: "Organizations", components: {content: Organizations, header: hdr}, meta: { title: "Organizations"}},
         { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
         // TODO: add an actual home page
         { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" }},
