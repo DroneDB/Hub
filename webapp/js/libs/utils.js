@@ -119,3 +119,11 @@ export function debounce (fn, delay) {
         }, delay);
     };
 }
+
+export function sortObjectKeys(unorderedObj){
+    return Object.keys(unorderedObj).sort().reduce(
+        (obj, key) => { 
+            obj[key] = unorderedObj[key]; 
+            return obj;
+        }, {});
+}

@@ -58,7 +58,7 @@ export default {
 
         contextMenu = contextMenu.concat([{
                 label: 'Open Item',
-                icon: 'share',
+                icon: 'folder open outline',
                 isVisible: () => { return this.lastSelectedNode !== null; },
                 click: () => {
                     if (this.lastSelectedNode !== null) this.$emit('openItem', this.lastSelectedNode.node);
@@ -142,8 +142,6 @@ export default {
                 return;
             };
 
-            this.$log.info("search");
-            
             try {
 
                 var rootPath = this.nodes[0].path;
@@ -153,10 +151,7 @@ export default {
                 if (!query.includes('*') && !query.includes('*'))
                     query = "*" + query + "*";
                 
-                this.$log.info("Expanded query '" + query + "'");
-
                 const entries = await ddb.searchEntries(rootPath, query);
-                this.$log.info("Items", clone(entries));
 
                 var res = entries.filter(entry => {
                         return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
@@ -185,8 +180,6 @@ export default {
                         }
                     });
 
-                this.$log.info("Entries", clone(res));
-
                 this.searchStaticPaths = {};
                 this.searchStaticPaths[rootPath] = res;
                 
@@ -207,8 +200,6 @@ export default {
         },
 
         getChildren: async function(path) {
-
-            this.$log.info("getChildren(path)", path);
 
             if (this.searchStaticPaths != null && (typeof this.searchStaticPaths[path] !== 'undefined')) {
                 this.$log.info("using static path");
@@ -265,8 +256,6 @@ export default {
         },
 
         refreshNodes: async function() {
-
-            this.$log.info("refreshNodes");
 
             this.nodes = [];
             this.loading = true;
