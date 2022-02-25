@@ -1,6 +1,6 @@
 <template>
     <div v-if="parentRef[bindTo]" class="ui message" :class="className">
-        <i class="close icon" @click="dismiss"></i>
+        <i class="close icon" @click="dismiss" v-if="!noDismiss"></i>
         <span v-html="parentRef[bindTo]" />
     </div>
 </template>
@@ -15,6 +15,10 @@ export default {
       className: {
           type: String,
           default: "warning"
+      },
+      noDismiss: {
+          type: Boolean,
+          default: false
       }
   },
   data: function(){
