@@ -111,6 +111,7 @@ export default {
 
         await this.addPointCloud(this.dataset.Entry(this.entry));
         this.viewer.fitToScreen();
+        window.viewer = viewer;
         // if (pointCloudFiles.length === 0) this.error = "No point cloud files selected. Select one or more point cloud files to display them.";
       },
 
