@@ -17,15 +17,15 @@
     <div v-else>
         <div v-for="org in organizations" class="ui segments organization">            
             <div class="ui segment" @click="viewOrganization(org)">
-                <div class="ui grid middle aligned">
-                    <div class="four wide column left aligned main-col"><i class="large users icon"></i>{{org.slug}}</div>
-                    <div class="five wide column left aligned">{{org.name ? org.name : '—'}}</div>
-                    <div class="four wide column left aligned">{{org.owner ? org.owner : '—'}}</div>
-                    <div class="two wide column left aligned">
+                <div class="ui grid middle aligned flex-container">
+                    <div class="flex-item column left aligned main-col"><i class="large users icon"></i>{{org.slug}}</div>
+                    <div class="flex-item column left aligned">{{org.name ? org.name : '—'}}</div>
+                    <div class="flex-item column left aligned">{{org.owner ? org.owner : '—'}}</div>
+                    <div class="flex-item column left aligned">
                         <div v-if="org.isPublic"><i class="large globe icon"></i>Public</div>
                         <div v-else><i class="large lock icon"></i>Private</div>
                     </div>
-                    <div class="one wide column right aligned">
+                    <div class="flex-item column actions right aligned">
                         <button v-if="org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleEdit(org)" class="ui button icon small grey"
                                     :class="{loading: org.editing}"
                                     :disabled="org.editing">
@@ -313,7 +313,7 @@ export default {
                 cursor: pointer;
             }
         }
-        
+       
         .column {
             font-size: large;
         }
@@ -332,6 +332,73 @@ export default {
             align-items: center;            
         }
 
+    }
+
+    .flex-container {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: space-between;
+        align-content: stretch;
+        align-items: flex-start;
+    }
+
+    .flex-item:nth-child(1) {
+        order: 0;
+        flex: 1 1 100px;
+        align-self: auto;
+
+        @media screen and (max-width: 576px) {
+            flex-grow: 0;
+            text-align: center;
+
+            i.icon {
+                margin-right: 0;
+            }
+        }
+
+    }
+
+    .flex-item:nth-child(2) {
+        order: 0;
+        flex: 1 1 auto;
+        align-self: auto;
+    }
+
+    .flex-item:nth-child(3) {
+        order: 0;
+        flex: 1 1 auto;
+        align-self: auto;
+
+        @media screen and (max-width: 576px) {
+            display: none;
+        }
+
+    }
+
+    .flex-item:nth-child(4) {
+        order: 0;
+        flex: 0.5 1 auto;
+        align-self: auto;
+
+        
+        @media screen and (max-width: 768px) {
+            text-align: center;
+            
+            i.icon {
+                margin-right: 0;
+            }
+        }
+
+        @media screen and (max-width: 576px) {
+            display: none;
+        }
+    }
+
+    .flex-item:nth-child(5) {
+        order: 0;
+        flex: 0.5 1 100px;
+        align-self: auto;
     }
 
 

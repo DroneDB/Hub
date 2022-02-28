@@ -5,18 +5,18 @@
             fixedSize>
 
         <div class="ui form">
-            <div class="fields">
-                <div class="seven wide field">
-                    <label>Slug</label>
-                    <input type="text" v-model="org.slug" :disabled="mode == 'edit'" placeholder="Slug" />
+            <div class="fields" v-if="mode == 'new'">
+                <div class="eight wide field">
+                    <input type="text" pattern="[a-z0-9_]+" required v-model="org.slug" @keydown="filterKeys($event)" placeholder="Slug" />
                 </div>
-                <div class="seven wide field">
-                    <label>Name</label>
+                <div class="eight wide field">
                     <input type="text" v-model="org.name" placeholder="Name" />
                 </div>
             </div>
+            <div class="field" v-else>
+                <input type="text" v-model="org.name" placeholder="Name" />
+            </div>
             <div class="field">
-                <label>Description</label>
                 <textarea v-model="org.description" placeholder="Description"></textarea>
             </div>
             <div class="inline field">
@@ -40,6 +40,9 @@
 
 <script>
 import Window from '../Window.vue';
+
+
+var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
@@ -81,13 +84,25 @@ export default {
 
     },
     methods: {
+        filterKeys(e) {
+
+            // Allow backspace, canc, left arrow, right arrow and tab
+            if (e.keyCode == 8 || e.keyCode == 46 || e.keyCode == 37 || e.keyCode == 39 || e.keyCode == 9) {
+                return;
+            }
+
+            // Allow only lowercase letters and numbers
+            if (!re.test(e.key)) {
+                e.preventDefault();
+            }
+        },
         close: function(buttonId, obj){
             this.$emit('onClose', buttonId, obj);
         },
         isValid: function(){
 
+
             // organization slug can contain only letters, numbers, dashes and underscores
-            var re = /^[a-zA-Z0-9\-_]+$/;
 
             return this.org.slug && re.test(this.org.slug) && this.org.name;
         }
@@ -102,5 +117,10 @@ export default {
 }
 .form {
     margin-bottom: 20px;
+    
+
+}
+.content {
+    overflow: hidden;
 }
 </style>
