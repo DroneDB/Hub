@@ -7,8 +7,11 @@
             <p>Loading point cloud...</p> 
             <i class="icon circle notch spin" />
         </div>
-
+        
         <div class="potree-container" :class="{loading}">
+            <button class="ui inverted basic button" id="back-button" @click="handleHistoryBack()">
+                <i class="icon arrow left" />&nbsp;Back
+            </button>
             <div id="potree_sidebar_container" ref="sidebar"> </div>
             <div id="potree_render_area" ref="container"></div>
         </div>
@@ -37,6 +40,10 @@ export default {
   },
   
   methods:{
+
+      handleHistoryBack: function(){
+          window.history.back();
+      },
       handleLoad: async function(){
         try{
             // Quick type check
@@ -310,6 +317,13 @@ export default {
 
     #profile_window{
         z-index: 999999999999 !important;
+    }
+
+    #back-button {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 999999999999;
     }
 }
 </style>
