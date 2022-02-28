@@ -12,7 +12,12 @@ import VueLogger from 'vuejs-logger';
 import Header from './components/Header.vue';
 import Login from './components/Login.vue';
 import UserHome from './components/UserHome.vue';
+import NotFound from './components/NotFound.vue';
 import ViewDataset from './components/ViewDataset.vue';
+import SingleMap from './components/SingleMap.vue';
+import Potree from './components/Potree.vue';
+import Nexus from './components/Nexus.vue';
+import Markdown from './components/Markdown.vue';
 import Upload from './components/Upload.vue';
 import reg from './libs/sharedRegistry';
 import { setTitle, queryParams, inIframe } from './libs/utils';
@@ -40,21 +45,23 @@ window.addEventListener('load', function(){
     const embed = !!params.embed || inIframe();
     if (embed) hdr = null;
 
-    var allowedViews = ['explorer', 'potree', 'map', null];
-    Vue.prototype.$view = allowedViews.includes(params.view) ? params.view : null;
     Vue.prototype.$embed = params.embed ? true : false;
-    Vue.prototype.$only = params.only ? true : false;
 
     Vue.use(VueLogger, options);
     Vue.use(VueRouter);
     
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: {content: ViewDataset, header: hdr}, meta: { title: "View Dataset"}},
+        { path: '/r/:org/:ds/view/:encodedPath/map', name: "SingleMap", components: {content: SingleMap, header: hdr}, meta: { title: "Map"}},
+        { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: "PointCloud", components: {content: Potree, header: hdr}, meta: { title: "Point Cloud"}},
+        { path: '/r/:org/:ds/view/:encodedPath/markdown', name: "Markdown", components: {content: Markdown, header: hdr}, meta: { title: "Markdown"}},
+        { path: '/r/:org/:ds/view/:encodedPath/model', name: "Model", components: {content: Nexus, header: hdr}, meta: { title: "Model"}},
         { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
         { path: '/r/:org', name: "UserHome", components: {content: UserHome, header: hdr}, meta: { title: "Home"}},
         { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
         // TODO: add an actual home page
         { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" }},
+        { path: '*', name: "NotFound", components: {content: NotFound, header: hdr}, meta: { title: "Not Found"}}
     ];
     const router = new VueRouter({ mode: "history", routes });
 

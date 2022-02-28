@@ -1,5 +1,7 @@
 <template>
     <div class="markdown">
+        <TabViewLoader @loaded="handleLoad" titleSuffix="Markdown" />
+
         <Message bindTo="error" />
         <div v-if="loading" class="loading">
             <i class="icon circle notch spin" />
@@ -19,17 +21,18 @@
 
 <script>
 import Message from './Message';
+import TabViewLoader from './TabViewLoader';
 import ddb from 'ddb';
 import MarkdownIt from 'markdown-it';
 
 export default {
   components: {
-      Message
+      TabViewLoader, Message
   },
   props: {
       uri: { // DDB uri
           type: String,
-          required: true
+          required: false
       },
       editable: {
           type: Boolean,
@@ -47,21 +50,23 @@ export default {
       }
   },
 
-  mounted: async function(){
-      const [dataset, path] = ddb.utils.datasetPathFromUri(this.uri);
-      this.dataset = dataset;
-      this.path = path;
-
-      try{
-        this.rawContent = await dataset.getFileContents(path);
-        this.updateMarkdown();
-      }catch(e){
-        this.error = `Cannot fetch ${this.uri}: ${e}`;
-      }
-      this.loading = false;
-  },
-
   methods: {
+      handleLoad: async function(){
+        // Quick type check
+        if (this.entry.type !== ddb.entry.type.MARKDOWN) throw new Error(`${this.entry.path} cannot be opened as markdown`);
+
+        const [dataset, path] = ddb.utils.datasetPathFromUri(this.ddbURI);
+        this.dataset = dataset;
+        this.path = path;
+
+        try{
+            this.rawContent = await dataset.getFileContents(path);
+            this.updateMarkdown();
+        }catch(e){
+            this.error = `Cannot fetch ${this.ddbURI}: ${e}`;
+        }
+        this.loading = false;
+      },
       updateMarkdown: function(){
         const md = new MarkdownIt();
         this.content = md.render(this.rawContent);

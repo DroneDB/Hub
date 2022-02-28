@@ -42,6 +42,7 @@ import Mouse from '../libs/mouse';
 import { rootPath } from '../dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '../libs/utils';
 import { isMobile } from '../libs/responsive';
+import { Basemaps } from '../libs/basemaps';
 
 import {Circle as CircleStyle, Fill, Stroke, Style, Text, Icon} from 'ol/style';
 
@@ -122,23 +123,7 @@ export default {
         selectArea: false,
 
         selectedBasemap: "satellite",
-        basemaps: {
-            'satellite': {
-                label: "Satellite",
-                url: "https://mt0.google.com/vt/lyrs=s&hl=en&x={x}&y={y}&z={z}",
-                attributions: ["&copy; Google Maps"]
-            },
-            'hybrid': {
-                label: "Hybrid",
-                url: "https://mt0.google.com/vt/lyrs=y&hl=en&x={x}&y={y}&z={z}",
-                attributions: ["&copy; Google Maps"]
-            },
-            'osm': {
-                label: "OpenStreetMap",
-                url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-                attributions: ["&copy; OpenStreetMap"]
-            }
-        }
+        basemaps: Basemaps
       };
   },
   mounted: function(){
@@ -532,7 +517,7 @@ export default {
       },
       onPanelResized: function(){
         // Redraw when map is resized (via panels)
-        this.map.updateSize();
+        if (this.map) this.map.updateSize();
       },
       onTabActivated: function(){
         if (!this.loaded){

@@ -5,7 +5,7 @@
     <div v-if="currentPath">
         <div class="ui large breadcrumb" style="margin-top: 1rem; margin-left: 1rem">      
             <span v-for="(b, idx) in breadcrumbs" :key="'B,' + b.name">
-                <a v-if="idx != breadcrumbs.length - 1" class="section" v-on:click="goTo(b)">{{b.name}}</a>
+                <a v-if="idx != breadcrumbs.length - 1" class="section" :class="{home: idx === 0}" v-on:click="goTo(b)">{{b.name}}</a>
                 <div v-if="idx == breadcrumbs.length - 1" class="section active">{{b.name}}</div>
                 <span v-if="idx != breadcrumbs.length - 1" class="divider">/</span>
             </span>            
@@ -81,13 +81,56 @@ export default {
         }
 
         contextMenu = contextMenu.concat([{
-                    label: 'Open Item',
-                    icon: 'share',
+                    label: 'Open',
+                    icon: 'folder open outline',
                     isVisible: () => { return this.selectedFiles.length > 0; },
                     click: () => {
                         this.selectedFiles.forEach(f => {
                             this.$emit('openItem', f);
                         });
+                    }
+                },{
+                    label: 'Open Map',
+                    icon: 'map',
+                    isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'map');
+                        });
+                    }
+                },{
+                    label: 'Open Point Cloud',
+                    icon: 'cube',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'pointcloud');
+                        });
+                    }
+                },{
+                    label: 'Open 3D Model',
+                    icon: 'cube',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'model');
+                        });
+                    }
+                },{
+                    label: 'Open Markdown',
+                    icon: 'book',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'markdown');
+                        });
+                    }
+                },{
+                    label: "Create Folder",
+                    icon: 'folder',
+                    accelerator: "CmdOrCtrl+N",
+                    click: () => {
+                        this.$emit("createFolder");
                     }
                 },{
                     label: "Select All/None",
@@ -153,13 +196,19 @@ export default {
             var bc = [];
 
             for(var el of folders) {
-                
                 cur += '/' + el;
 
                 bc.push({
                     path: cur.substring(1),
                     name: el
                 });
+            }
+
+            if (bc.length > 0){
+                bc.unshift({
+                    path: "/",
+                    name: "~"
+                })
             }
 
             return bc;
@@ -219,7 +268,6 @@ export default {
 
         goTo: function(itm) {
             this.$root.$emit("folderOpened", pathutils.getTree(itm.path));
-            //console.log(path);
         },
 
         startDrag: (evt, item) => {
@@ -328,7 +376,6 @@ export default {
                 this.selectRange(this.rangeStartThumb, thumb, this.$refs.thumbs);
             } else {
 
-                this.$log.info("File", clone(file));
                 // Single selection
                 if (mouseBtn === Mouse.RIGHT) {
                     if (!file.selected) this.selectedFiles.forEach(f => f.selected = false);
@@ -404,12 +451,12 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-    .breadcrumbs{
-        padding: 4px;
+    .breadcrumb{
         word-break: break-all;
         overflow: hidden;
-        border-bottom: 1px solid #030A03;
-        border-top: 1px solid #bbbbbb;
+        .section.home{
+            font-family: monospace;
+        }
     }
 }
 </style>

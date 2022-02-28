@@ -20,17 +20,6 @@
             </div>
         </Alert>
 
-        <button @click="storageInfoDialogOpen = true" v-if="loggedIn && storageInfo && storageInfo.total != null" class="ui button basic circular mobile hide" 
-            v-bind:class="{ 'red': storageInfo.usedPercentage >= 1, 
-                    'yellow' : storageInfo.usedPercentage >= 0.75 && storageInfo.usedPercentage < 1,
-                     'grey' : storageInfo.usedPercentage < 0.75 }">
-            <i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}
-        </button>
-
-        <button v-if="loggedIn && storageInfo && storageInfo.total == null"  class="ui button basic circular mobile hide">
-            <i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}
-        </button>
-
         <a href="javascript:void(0)"
             @click="handleSettings"
             v-if="showSettings"
@@ -48,9 +37,9 @@
                 <div class="divider"></div>
                 <div class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
                 <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
-                <div class="divider mobile only" v-if="storageInfo"></div>
-                <div class="item mobile only" @click="storageInfoDialogOpen = true" v-if="storageInfo && storageInfo.total != null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</div>
-                <div class="item mobile only" v-if="storageInfo && storageInfo.total == null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}</div>
+                <div class="divider only" v-if="storageInfo"></div>
+                <div class="item only" @click="storageInfoDialogOpen = true" v-if="storageInfo && storageInfo.total != null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</div>
+                <div class="item only" v-if="storageInfo && storageInfo.total == null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}</div>
                 <div class="divider"></div>
                 <div class="item" @click="logout" ><i class="icon sign-out"></i> Logout</div>
             </div>
@@ -78,7 +67,7 @@ export default {
           loggedIn: reg.isLoggedIn(),
           params: this.$route.params,
           showDownload: !!this.$route.params.ds,
-          showSettings: reg.isLoggedIn() && !!this.$route.params.ds,
+          showSettings: reg.isLoggedIn() && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
           selectedFiles: [],
           storageInfo: null,
           storageInfoDialogOpen: false

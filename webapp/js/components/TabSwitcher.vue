@@ -62,6 +62,8 @@ export default {
       // Trigger first onTabActivated
       const node = this.getNodeFor(this.activeTab);
       if (node.onTabActivated) node.onTabActivated();
+
+      this.tabMap = {};
   },
   computed: {
       tabButtons: function(){
@@ -81,6 +83,25 @@ export default {
           return this.$children.find(c => c.$vnode.tag === tag);
       },
 
+      activateTab(tabKey){
+          const tab = this.getTabFor(tabKey);
+          if (tab){
+              this.setActiveTab(tab);
+          }
+      },
+
+      getTabFor(tabKey){
+          return this.tabMap[tabKey];
+      },
+
+      getActiveTabIndex: function(){
+          let i = 0;
+          for (; i < this.dynTabs.length; i++){
+              if (this.dynTabs[i].key === this.activeTab) break;
+          }
+          return i < this.dynTabs.length ? i : 0;
+      },
+
       setActiveTab: function(tab){
           if (this.activeTab !== tab.key){
             const curNode = this.getNodeFor(this.activeTab);
@@ -88,13 +109,19 @@ export default {
                 curNode.onTabDeactivating();
             }
             
+            this.lastTabIndex = this.getActiveTabIndex();
             this.activeTab = tab.key;
             this.tabButtons.setActiveTab(tab, false);
 
-            const node = this.getNodeFor(tab.key);
-            if (node && node.onTabActivated !== undefined){
-                node.onTabActivated();
-            }
+            // The Vue node is not available
+            // until the next tick
+            this.$nextTick(() => {
+                const node = this.getNodeFor(tab.key);
+
+                if (node && node.onTabActivated !== undefined){
+                    node.onTabActivated();
+                }
+            });
           }
       },
 
@@ -143,13 +170,15 @@ export default {
                 this.setActiveTab(tab);
                 this.$forceUpdate();
             }
+
+            this.tabMap[tab.key] = tab;
           });
       },
 
       removeTab: function(tabKey){
           const tabIndex = this.dynTabs.findIndex(t => t.key === tabKey);
           if (tabIndex !== -1){
-            let tabToActivate = tabIndex - 1;
+            let tabToActivate = this.lastTabIndex !== undefined ? this.lastTabIndex : (tabIndex - 1);
 
             // Last tab?
             if (tabToActivate < 0){
@@ -170,6 +199,7 @@ export default {
 
             this.$slots[tabKey][0].componentInstance.$destroy();
             delete this.$slots[tabKey];
+            delete this.tabMap[tabKey];
           }else{
               console.warn(`Cannot remove tab with key: ${tabKey}`);
           }

@@ -18,3 +18,4 @@ export async function renameDataset(orgSlug, dsSlug, name){
 export function datasetName(ds){
     return ds.properties.meta?.name?.data || ds.slug;
 }
+
