@@ -41,9 +41,6 @@ export default {
   
   methods:{
 
-      handleHistoryBack: function(){
-          window.history.back();
-      },
       handleLoad: async function(){
         try{
             // Quick type check
@@ -143,8 +140,11 @@ export default {
                 reject(new Error(`${entry.path} is being built. Try to refresh the page in a few minutes!`));
             }
           });
-      }
-  }
+      },
+      handleHistoryBack: function(){
+        this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
+      },
+  }      
 }
 </script>
 
