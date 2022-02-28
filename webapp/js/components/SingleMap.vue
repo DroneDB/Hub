@@ -1,11 +1,8 @@
 <template>
     <div class="singleMap">
-        <Message bindTo="error" noDismiss />
-        <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
-        </div>
+        <TabViewLoader @loaded="loadMap" titleSuffix="Map" />
 
-        <div v-else-if="!error" ref="map-container" class="map-container">
+        <div ref="map-container" class="map-container">
             <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
                 <option v-for="(v, k) in basemaps" :value="k">
                     {{ v.label }}
@@ -16,8 +13,6 @@
 </template>
 
 <script>
-import Message from './Message';
-import { setTitle } from '../libs/utils';
 
 import 'ol/ol.css';
 import {Map, View} from 'ol';
@@ -27,17 +22,16 @@ import {createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as ex
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
+import TabViewLoader from './TabViewLoader';
 import XYZ from 'ol/source/XYZ';
 import {transformExtent} from 'ol/proj';
 import { Basemaps } from '../libs/basemaps';
-import reg from '../libs/sharedRegistry';
-import { b64encode, b64decode } from '../libs/base64';
 
 export default {
   components: {
-      Map, Message
+      Map, TabViewLoader
   },
-  props: ["file"],
+  props: ["uri"],
   data: function(){
       return {
         error: "",
@@ -49,38 +43,7 @@ export default {
       };
   },
   mounted: async function(){
-      if (this.$route.params.encodedPath){
-        // Load file info from network
-        const path = b64decode(this.$route.params.encodedPath);
-        const ds = reg.Organization(this.$route.params.org)
-                               .Dataset(this.$route.params.ds);
-        try{
-            const entries = await ds.list(path);
-            if (entries.length){
-                this.entry = entries[0];
-                this.ddbURI = ds.remoteUri(path);
-            }else{
-                this.error = `Cannot find: ${path}. It might have been renamed or moved.`;
-            }
-
-        }catch(e){
-            this.error = e.message;
-        }
-
-        setTitle(`${ddb.pathutils.basename(this.entry.path)} - Map`);
-      }else if (this.file){
-          // We already have the file info
-          this.entry = this.file.entry;
-          this.ddbURI = this.file.path;
-      }else{
-          this.error = "Invalid file";
-          return;
-      }
-
-      this.loading = false;
-      this.$nextTick(() => {
-        this.loadMap();
-      });
+    
   },
   beforeDestroy: function(){
   },
@@ -91,7 +54,6 @@ export default {
         const { entry } = this;
 
         this.loaded = true;
-        this._updateMap = null;
 
         this.basemapLayer = new TileLayer({
             source: new XYZ({
@@ -153,13 +115,9 @@ export default {
         this.map.updateSize();
       },
       onTabActivated: function(){
-        if (!this.loaded){
-            this.loadMap();
-        }else{
-            this.$nextTick(() => {
-                if (this.map) this.map.updateSize();
-            });
-        }
+        this.$nextTick(() => {
+            if (this.map) this.map.updateSize();
+        });
       },
       updateBasemap: function(){
           const basemap = this.basemaps[this.selectedBasemap];
@@ -183,19 +141,12 @@ export default {
     position: relative;
     width: 100%;
     height: 100%;
-
+    
     #basemap-selector{
         position: absolute;
         right: 8px;
         top: 8px;
         z-index: 1;
     }
-}
-.loading{
-    padding: 12px;
-    text-align: center;
-}
-.message.warning{
-    margin: 12px;
 }
 </style>

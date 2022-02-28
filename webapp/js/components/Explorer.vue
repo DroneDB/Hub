@@ -81,12 +81,48 @@ export default {
         }
 
         contextMenu = contextMenu.concat([{
-                    label: 'Open Item',
+                    label: 'Open',
                     icon: 'folder open outline',
                     isVisible: () => { return this.selectedFiles.length > 0; },
                     click: () => {
                         this.selectedFiles.forEach(f => {
                             this.$emit('openItem', f);
+                        });
+                    }
+                },{
+                    label: 'Open Map',
+                    icon: 'map',
+                    isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'map');
+                        });
+                    }
+                },{
+                    label: 'Open Point Cloud',
+                    icon: 'cube',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'pointcloud');
+                        });
+                    }
+                },{
+                    label: 'Open 3D Model',
+                    icon: 'cube',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'model');
+                        });
+                    }
+                },{
+                    label: 'Open Markdown',
+                    icon: 'book',
+                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'markdown');
                         });
                     }
                 },{
@@ -116,15 +152,6 @@ export default {
                     accelerator: "CmdOrCtrl+P",
                     click: () => {
                         this.$emit("openProperties");
-                    }
-                },
-                {
-                    label: "Get Link",
-                    isVisible: () => { return this.selectedFiles.length === 1; },
-                    icon: 'linkify',
-                    accelerator: "CmdOrCtrl+L",
-                    click: () => {
-                        console.log("TODO!")
                     }
                 },
                 {

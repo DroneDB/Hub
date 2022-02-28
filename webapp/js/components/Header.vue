@@ -67,7 +67,7 @@ export default {
           loggedIn: reg.isLoggedIn(),
           params: this.$route.params,
           showDownload: !!this.$route.params.ds,
-          showSettings: reg.isLoggedIn() && !!this.$route.params.ds,
+          showSettings: reg.isLoggedIn() && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
           selectedFiles: [],
           storageInfo: null,
           storageInfoDialogOpen: false

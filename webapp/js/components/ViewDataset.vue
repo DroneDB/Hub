@@ -30,9 +30,6 @@
             <template v-slot:map>
                 <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
             </template>
-            <template v-slot:potree>
-                <Potree :files="fileBrowserFiles" />
-            </template>
             <template v-slot:explorer>
                 <Explorer ref="explorer" 
                     :files="fileBrowserFiles"
@@ -71,7 +68,6 @@ import NewFolderDialog from './NewFolderDialog.vue';
 import Message from './Message.vue';
 import FileBrowser from './FileBrowser.vue';
 import Map from './Map.vue';
-import Potree from './Potree.vue';
 import Explorer from './Explorer.vue';
 import Properties from './Properties.vue';
 import TabSwitcher from './TabSwitcher.vue';
@@ -88,9 +84,17 @@ import { clone } from '../libs/utils';
 import shell from '../dynamic/shell';
 import { isMobile } from '../libs/responsive';
 import { renameDataset, entryLabel } from '../libs/registryUtils';
+import { b64encode } from '../libs/base64';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
+
+const OpenItemDefaults = {
+    [ddb.entry.type.MARKDOWN]: 'markdown',
+    [ddb.entry.type.GEORASTER]: 'map',
+    [ddb.entry.type.POINTCLOUD]: 'pointcloud',
+    [ddb.entry.type.MODEL]: 'model',
+}
 
 export default {
     components: {
@@ -98,7 +102,6 @@ export default {
         Message,
         FileBrowser,
         Map,
-        Potree,
         Explorer,
         Properties,
         TabSwitcher,
@@ -250,9 +253,14 @@ export default {
                 return [];
             }
         },
-        handleOpenItem: function(node){
-            if (node.entry.type === ddb.entry.type.MARKDOWN){
-                this.addMarkdownTab(node.path, node.label, "book");
+        
+        handleOpenItem: function(node, view){
+            const t = node.entry.type;
+            if (!view) view = OpenItemDefaults[t];
+            if (view){
+                const [_, path] = ddb.utils.datasetPathFromUri(node.path);
+                const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
+                window.open(url, `${path}-${view}`);
             }else{
                 shell.openItem(node.path);
             }
@@ -262,18 +270,17 @@ export default {
             await this.renameFile(node, path);
         },
         handleCreateFolder: function(){ 
-            console.log("CALL")
             this.createFolderDialogOpen = true;
         },
-        addMarkdownTab: function(uri, label, icon){
+        addComponentTab: function(uri, label, icon, component, view){
             if (!this.$refs.mainTabSwitcher.hasTab(label)){
                 this.$refs.mainTabSwitcher.addTab({
                     label,
                     icon,
-                    key: label,
+                    key: `${uri}-${view}`,
                     hideLabel: false,
                     canClose: true,
-                    component: Markdown,
+                    component,
                     props: {
                         uri
                     }
@@ -637,25 +644,14 @@ export default {
                             this.deleteDialogOpen = true;
                         }
                     });
-                }
 
-                if (this.selectedFiles.length === 1){
                     this.explorerTools.push({
                         id: 'separator'
                     });
 
                     this.explorerTools.push({
-                        id: 'get-link',
-                        title: "Get Link",
-                        icon: "linkify",
-                        onClick: () => {
-                            
-                        }
-                    });
-
-                    this.explorerTools.push({
-                        id: 'open-item',
-                        title: "Open Item",
+                        id: 'open',
+                        title: "Open",
                         icon: "folder open outline",
                         onClick: () => {
                             this.handleOpenItem(this.selectedFiles[0]);
