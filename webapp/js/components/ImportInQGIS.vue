@@ -15,10 +15,13 @@
                     From QGIS
                     </div>
                     <div v-if="typeIs('POINTCLOUD')">
-                        Select Layer <i class="arrow right icon"></i> Add Point Cloud Layer <i class="arrow right icon"></i> Source Type Protocol: HTTP(s) <i class="arrow right icon"></i> Copy/paste the URL below:
+                        Layer <i class="arrow right icon"></i> Add Point Cloud Layer <i class="arrow right icon"></i> Source Type Protocol: HTTP(s) <i class="arrow right icon"></i> copy/paste the URL below.
                     </div>
                     <div v-if="typeIs('GEORASTER')">
-                        Select Layer <i class="arrow right icon"></i> Add Raster Layer <i class="arrow right icon"></i> Source Type Protocol: HTTP(s) <i class="arrow right icon"></i> Copy/paste the URL below:
+                        Layer <i class="arrow right icon"></i> Add Raster Layer <i class="arrow right icon"></i> Source Type Protocol: HTTP(s) <i class="arrow right icon"></i> copy/paste the URL below.
+                    </div>
+                    <div class="auth-note" v-if="needsAuth">
+                        <i class="lock icon"></i> For Authentication choose Basic and use your username and password.
                     </div>
                 </div>
             </div>
@@ -49,12 +52,18 @@ export default {
           copyIcon: "copy",
           loading: true,
           error: "",
+          needsAuth: false,
           url: ""
       };
   },
   mounted: async function(){
-      const entry = ddb.utils.entryFromFile(this.file);
+
       try{
+          const [ dataset, _ ] = ddb.utils.datasetPathFromUri(this.file.path);
+          this.needsAuth = !(await dataset.isPublic());
+          console.log(this.needsAuth);
+          const entry = dataset.Entry(this.file.entry);
+
           if (entry.type === ddb.entry.type.POINTCLOUD) this.url = await entry.getEpt();
           else if (entry.type === ddb.entry.type.GEORASTER) this.url = await entry.getCog();
           else throw new Error(`Unknown type: ${entry.type}`);
@@ -84,5 +93,8 @@ export default {
 <style scoped>
 .content{
     width: 420px;
+}
+.auth-note{
+    margin-top: 8px;
 }
 </style>
