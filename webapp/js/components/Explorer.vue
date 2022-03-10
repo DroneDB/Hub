@@ -126,6 +126,15 @@ export default {
                         });
                     }
                 },{
+                    label: 'Import in QGIS',
+                    icon: 'cloud upload',
+                    isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.POINTCLOUD, ddb.entry.type.GEORASTER].indexOf(this.selectedFiles[0].entry.type) !== -1; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('importInQGIS', f);
+                        });
+                    }
+                },{
                     label: "Create Folder",
                     icon: 'folder',
                     accelerator: "CmdOrCtrl+N",

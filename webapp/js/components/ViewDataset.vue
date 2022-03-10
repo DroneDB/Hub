@@ -40,7 +40,8 @@
                     @deleteSelecteditems="openDeleteItemsDialog"
                     @moveSelectedItems="openRenameItemsDialog"
                     @moveItem="handleMoveItem"
-                    @openProperties="handleExplorerOpenProperties" />
+                    @openProperties="handleExplorerOpenProperties"
+                    @importInQGIS="handleImportInQGIS" />
             </template>
         </TabSwitcher>
     </Panel>
@@ -55,6 +56,7 @@
     </Alert>
     <Loader v-if="isBusy"></Loader>
     <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{flash}}</Flash>
+    <ImportInQGIS v-if="qgisFile" @onClose="handleCloseImportInQGIS" :file="qgisFile" />
 </div>
 </template>
 
@@ -76,6 +78,7 @@ import Markdown from './Markdown.vue';
 import Alert from './Alert.vue';
 import Loader from './Loader.vue';
 import Flash from './Flash.vue';
+import ImportInQGIS from './ImportInQGIS.vue';
 
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
@@ -113,7 +116,8 @@ export default {
         NewFolderDialog,
         Alert,
         Loader,
-        Flash
+        Flash,
+        ImportInQGIS
     },
     data: function () {
         const mobile = isMobile();
@@ -163,6 +167,7 @@ export default {
             errorMessageTitle: null,
             showSettings: false,
             filesToUpload: null,
+            qgisFile: null,
             flash: ""       
         };
     },
@@ -264,6 +269,14 @@ export default {
             }else{
                 shell.openItem(node.path);
             }
+        },
+
+        handleImportInQGIS: function(file){
+            this.qgisFile = file;
+        },
+
+        handleCloseImportInQGIS: function(){
+            this.qgisFile = null;
         },
 
         handleMoveItem: async function(node, path){
@@ -649,14 +662,62 @@ export default {
                         id: 'separator'
                     });
 
-                    this.explorerTools.push({
-                        id: 'open',
-                        title: "Open",
-                        icon: "folder open outline",
-                        onClick: () => {
-                            this.handleOpenItem(this.selectedFiles[0]);
+                    let addedOpen = false;
+
+                    if (this.selectedFiles.length === 1){
+                        if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                            this.explorerTools.push({
+                                id: 'open-map',
+                                title: "Open Map",
+                                icon: "map",
+                                onClick: () => {
+                                    this.handleOpenItem(this.selectedFiles[0], 'map');
+                                }
+                            });
+                            this.explorerTools.push({
+                                id: 'import-qgis',
+                                title: "Import in QGIS",
+                                icon: "cloud upload",
+                                onClick: () => {
+                                    this.handleImportInQGIS(this.selectedFiles[0]);
+                                }
+                            });
+                            addedOpen = true;
                         }
-                    });
+                        if ([ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                            this.explorerTools.push({
+                                id: 'open-pointcloud',
+                                title: "Open Point Cloud",
+                                icon: "cube",
+                                onClick: () => {
+                                    this.handleOpenItem(this.selectedFiles[0], 'pointcloud');
+                                }
+                            });
+                            addedOpen = true;
+                        }
+                        if ([ddb.entry.type.MODEL].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                            this.explorerTools.push({
+                                id: 'open-3dmodel',
+                                title: "Open 3D Model",
+                                icon: "cube",
+                                onClick: () => {
+                                    this.handleOpenItem(this.selectedFiles[0], 'model');
+                                }
+                            });
+                            addedOpen = true;
+                        }                        
+                    }
+
+                    if (!addedOpen){
+                        this.explorerTools.push({
+                            id: 'open',
+                            title: "Open",
+                            icon: "folder open outline",
+                            onClick: () => {
+                                this.handleOpenItem(this.selectedFiles[0]);
+                            }
+                        });
+                    }
                 }
             }
         }

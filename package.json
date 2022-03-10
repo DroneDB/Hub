@@ -25,6 +25,7 @@
     "@turf/meta": "^6.0.2",
     "@vue/devtools": "^5.3.3",
     "babel-loader": "^8.0.0-beta.4",
+    "clipboard-copy": "^4.0.1",
     "copy-webpack-plugin": "^6.4.0",
     "css-loader": "^1.0.0",
     "file-loader": "^4.0.0",
