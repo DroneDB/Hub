@@ -9,6 +9,9 @@
         </div>
 
         <div class="container">
+            <button class="ui inverted basic button" id="back-button" @click="handleGoToDataset()">
+                <i class="icon arrow left" />&nbsp;Back
+            </button>
             <canvas ref="canvas"></canvas>
         </div>
     </div>
@@ -124,7 +127,11 @@ export default {
         }
 
         animate();
-      }
+      },
+
+    handleGoToDataset: function(){
+        this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
+    },
   }
 }
 </script>
@@ -145,6 +152,7 @@ export default {
         display: flex;
         width: 100%;
         height: 100%;
+        position: relative;
         canvas{
             display: flex;
             width: 100%;
@@ -161,6 +169,13 @@ export default {
             height: 20px;
             width: 22px;
         }
+    }
+
+    #back-button {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 999999999999;
     }
 }
 </style>
