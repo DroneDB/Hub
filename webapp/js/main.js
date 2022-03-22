@@ -11,7 +11,7 @@ import VueLogger from 'vuejs-logger';
 
 import Header from './components/Header.vue';
 import Login from './components/Login.vue';
-import UserHome from './components/UserHome.vue';
+import Datasets from './components/datasets/Datasets.vue';
 import NotFound from './components/NotFound.vue';
 import ViewDataset from './components/ViewDataset.vue';
 import Organizations from './components/organizations/Organizations.vue';
@@ -58,7 +58,7 @@ window.addEventListener('load', function () {
         { path: '/r/:org/:ds/view/:encodedPath/markdown', name: "Markdown", components: {content: Markdown, header: hdr}, meta: { title: "Markdown"}},
         { path: '/r/:org/:ds/view/:encodedPath/model', name: "Model", components: {content: Nexus, header: hdr}, meta: { title: "Model"}},
         { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
-        { path: '/r/:org', name: "UserHome", components: {content: UserHome, header: hdr}, meta: { title: "Home"}},
+        { path: '/r/:org', name: "Datasets", components: {content: Datasets, header: hdr}, meta: { title: "Datasets"}},
         { path: '/r', name: "Organizations", components: {content: Organizations, header: hdr}, meta: { title: "Organizations"}},
         { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
         // TODO: add an actual home page

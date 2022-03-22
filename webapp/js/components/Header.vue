@@ -36,6 +36,7 @@
                 <div class="header">{{ username }} </div>
                 <div class="divider"></div>
                 <div class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
+                <div class="item" @click="myOrganizations"><i class="icon users"></i> My Organizations</div>
                 <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
                 <div class="divider only" v-if="storageInfo"></div>
                 <div class="item only" @click="storageInfoDialogOpen = true" v-if="storageInfo && storageInfo.total != null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</div>
@@ -85,8 +86,9 @@ export default {
   computed: {
       homeUrl: function(){
           if (this.loggedIn){
-              return `/r/${this.username}`;
-          }else return "/";
+              return "/r";
+              //return `/r/${this.username}`;
+          } else return "/";
       },
 
       downloadUrl: function(){
@@ -175,7 +177,10 @@ export default {
           this.$router.push({name: "Upload"});
       },
       myDatasets: function(){
-          this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+          this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
+      },
+      myOrganizations: function(){
+          this.$router.push({name: "Organizations"});
       },
       handleDownload: async function(e){
           if (this.downloadUrl === "javascript:void(0)"){
