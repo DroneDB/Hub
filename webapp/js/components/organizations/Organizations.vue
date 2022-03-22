@@ -124,23 +124,8 @@ export default {
     methods: {       
 
         handleDelete(org) {
-
             this.currentOrgSlug = org.slug;
             this.deleteDialogOpen = true;
-
-            /*
-            if (window.confirm(`Are you sure you want to delete ${ds.slug}?`)){
-                this.$set(ds, 'deleting', true);
-                try{
-                    if (await this.org.Dataset(ds.slug).delete()){
-                        this.datasets = this.datasets.filter(d => d !== ds);
-                    }
-                }catch(e){
-                    console.log(e.message);
-                    this.error = e.message;
-                }
-                this.$set(ds, 'deleting', false);
-            }*/
         },
 
         async handleDeleteClose(res) {
@@ -261,30 +246,12 @@ export default {
             this.currentMessage = null;
         },
 
-        handleEdit(org){
-
+        handleEdit(org) {
             this.editOrganization(org);
-            // TODO: add proper modal
-            /*var newName;
-
-            if (newName = window.prompt("Enter new dataset name:", datasetName(ds))){
-                this.$set(ds, 'renaming', true);
-                try{
-                    var newDs;
-                    if (newDs = await renameDataset(this.$route.params.org, ds.slug, newName)){
-                        ds.slug = newDs.slug;
-                        ds.properties.meta.name = newDs.properties.meta.name;
-                    }
-                }catch(e){
-                    console.log(e.message);
-                    this.error = e.message;
-                }
-                this.$set(ds, 'renaming', false);
-            }*/
         },
 
         viewOrganization(org){
-            this.$router.push({name: "UserHome", params: {
+            this.$router.push({name: "Datasets", params: {
                 org: org.slug
             }});
         },
