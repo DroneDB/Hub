@@ -4,26 +4,30 @@
             maxWidth="70%"
             fixedSize>
 
-        <div class="ui form">
+        <form class="ui form">
             <div class="fields" v-if="mode == 'new'">
-                <div class="eight wide field">
+                <div class="field">
+                    <label>Slug</label>
                     <input type="text" pattern="[a-z0-9_]+" required v-model="org.slug" @keydown="filterKeys($event)" placeholder="Slug" />
                 </div>
-                <div class="eight wide field">
+                <div class="field">
+                    <label>Name</label>
                     <input type="text" v-model="org.name" placeholder="Name" />
                 </div>
             </div>
             <div class="field" v-else>
+                <label>Name</label>
                 <input type="text" v-model="org.name" placeholder="Name" />
             </div>
             <div class="field">
+                <label>Description</label>
                 <textarea v-model="org.description" placeholder="Description"></textarea>
             </div>
             <div class="inline field">
                 <label>Public</label>
                 <input type="checkbox" v-model="org.isPublic" />
             </div>
-        </div>        
+        </form>        
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
@@ -117,9 +121,22 @@ export default {
 }
 .form {
     margin-bottom: 20px;
-    
-
 }
+
+.fields .field:first-child {
+    padding-left: 0px;
+}
+
+
+.fields .field:last-child {
+    padding-right: 0px;
+}
+
+.ui.form .fields {
+    margin-left: 0;
+    margin-right: 0;
+}
+
 .content {
     overflow: hidden;
 }
