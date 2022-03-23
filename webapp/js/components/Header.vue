@@ -33,7 +33,7 @@
             :title="username">
             <i class="icon user"></i>
             <div class="menu" ref="menu">
-                <div class="header">{{ username }} </div>
+                <div class="header">{{ username }} <span v-if="isAdmin && username != 'admin'"> — <i>admin</i></span></div>
                 <div class="divider"></div>
                 <div class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
                 <div class="item" @click="myOrganizations"><i class="icon users"></i> My Organizations</div>
@@ -66,6 +66,7 @@ export default {
       return {
           username: reg.getUsername(),
           loggedIn: reg.isLoggedIn(),
+          isAdmin: reg.isAdmin(),
           params: this.$route.params,
           showDownload: !!this.$route.params.ds,
           showSettings: reg.isLoggedIn() && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
