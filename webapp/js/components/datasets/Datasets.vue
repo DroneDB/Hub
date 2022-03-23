@@ -196,22 +196,67 @@ export default {
         handleNew() {
             this.newDataset();
         },
-/*
-        async handleDelete(ds){
-            if (window.confirm(`Are you sure you want to delete ${ds.slug}?`)){
-                this.$set(ds, 'deleting', true);
-                try{
-                    if (await this.org.Dataset(ds.slug).delete()){
-                        this.datasets = this.datasets.filter(d => d !== ds);
-                    }
-                }catch(e){
-                    console.log(e.message);
-                    this.error = e.message;
-                }
-                this.$set(ds, 'deleting', false);
-            }
-        },*/
 
+    /*
+        async handleDatasetClose(res, newds) {
+            this.dsDialogOpen = false;
+
+            if (res == "close") {
+                this.dsDialogModel = null;
+                return;
+            }
+
+            if (this.dsDialogMode == "new") {
+                this.dsDialogModel = null;
+                this.dsDialogOpen = false;
+                this.loading = true;
+
+                try {
+                    let ret = await reg.createDataset(neworg.slug, neworg.name, neworg.description, neworg.isPublic);
+                    if (ret) {
+                        this.organizations.push({
+                            slug: neworg.slug,
+                            name: neworg.name,
+                            description: neworg.description,
+                            isPublic: neworg.isPublic
+                        });
+                    } else {
+                        this.error = "Failed to create organization \"" + neworg.slug + "\"";
+                        console.error(ret);
+                    }
+                } catch(e) {
+                    console.error(e);
+                    this.error = "Failed to create organization: " + e.message;
+                }
+                this.loading = false;
+
+            } else if (this.orgDialogMode == "edit") {
+                let org = this.orgDialogModel;
+                this.orgDialogModel = null;
+                this.orgDialogOpen = false;
+                this.loading = true;
+
+                try {
+                    let ret = await reg.updateOrganization(org.slug, neworg.name, neworg.description, neworg.isPublic);
+                    if (ret) {
+                        let orgitem = this.organizations.find(o => o.slug == org.slug);
+                        orgitem.slug = org.slug;
+                        orgitem.name = neworg.name;
+                        orgitem.description = neworg.description;
+                        orgitem.isPublic = neworg.isPublic;
+                    } else {
+                        this.error = "Failed to update organization \"" + org.slug + "\"";
+                        console.error(ret);
+                    }
+                } catch(e) {
+                    console.error(e);
+                    this.error = "Failed to update organization: " + e.message;
+                }
+                this.loading = false;
+            }
+        },
+
+*/
         async handleRename(ds){
             // TODO: add proper modal
             var newName;
