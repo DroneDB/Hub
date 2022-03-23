@@ -4,6 +4,14 @@
     
     <div class="right">
 
+        <a :href="datasetsUrl"           
+            v-if="showBackToDatasets"
+            title="Back to datasets"
+            class="ui button">
+                <i class="icon arrow alternate circle left"></i>
+                Back to datasets
+        </a>
+
         <a :href="downloadUrl"
             @click="handleDownload"
             v-if="showDownload"
@@ -63,13 +71,16 @@ export default {
       Alert
   },
   data: function(){
+
+      const loggedIn = reg.isLoggedIn();
+
       return {
           username: reg.getUsername(),
-          loggedIn: reg.isLoggedIn(),
+          loggedIn: loggedIn,
           isAdmin: reg.isAdmin(),
           params: this.$route.params,
           showDownload: !!this.$route.params.ds,
-          showSettings: reg.isLoggedIn() && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
+          showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
           selectedFiles: [],
           storageInfo: null,
           storageInfoDialogOpen: false
@@ -90,6 +101,10 @@ export default {
               return "/r";
               //return `/r/${this.username}`;
           } else return "/";
+      },
+
+      datasetsUrl: function() {
+        return this.loggedIn ? "/r/" + reg.getUsername() : "/";      
       },
 
       downloadUrl: function(){
@@ -125,7 +140,13 @@ export default {
       showDownloadIcon: function(){
           if (!isMobile()) return true;
           else return this.selectedFiles.length == 0;
-      }
+      },
+
+    showBackToDatasets: function() { 
+        return !!this.$route.params.ds && !isMobile() && reg.isLoggedIn();         
+    }
+
+
   },
   mounted: function(){
       mouse.on('click', this.hideMenu);
