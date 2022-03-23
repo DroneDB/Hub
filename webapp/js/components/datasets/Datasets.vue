@@ -25,8 +25,8 @@
                     <div class="flex-item column left aligned main-col"><i class="large database icon"></i>{{ds.slug}}</div>
                     <div class="flex-item column left aligned">{{org.name ? org.name : '—'}}</div>
                     <div class="flex-item column left aligned">
-                        <span v-if="ds.entries == 0">Empty</span>
-                        <div v-else><div style="margin-bottom: 5px">{{ds.entries}} entries</div><div>{{bytesToSize(ds.size)}}</div></div>
+                        <span v-if="ds.entries == 0">—</span>
+                        <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div><div>{{bytesToSize(ds.size)}}</div></div>
                     </div>
                     <div class="flex-item column left aligned">
                         <div v-if="ds.public"><i class="large globe icon"></i>Public</div>
