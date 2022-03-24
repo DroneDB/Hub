@@ -31,14 +31,22 @@
                     <div class="flex-item column actions right aligned">
                         <button @click.stop="handleEdit(ds)" class="ui button icon small grey"
                                     :class="{loading: ds.editing}"
-                                    :disabled="ds.editing">
+                                    :disabled="ds.editing || ds.deleting">
                                     <i class="ui icon pencil"></i>
                         </button>                        
                         <button @click.stop="handleDelete(ds)" class="ui button icon small negative" 
                                 :class="{loading: ds.deleting}"                                
-                                :disabled="ds.deleting"><i class="ui icon trash"></i>
+                                :disabled="ds.deleting || ds.editing"><i class="ui icon trash"></i>
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+        <div v-if="datasets.length == 0" class="ui segment">
+            <div class="ui grid middle aligned">
+                <div class="column">
+                    <h3>No datasets found</h3>
+                    <p>You can create a new dataset by clicking the create dataset button.</p>
                 </div>
             </div>
         </div>
@@ -108,9 +116,9 @@ export default {
             });
 
             this.datasets.sort((a, b) => new Date(a.creationDate).getTime() < new Date(b.creationDate).getTime() ? 1 : -1);
-            if (this.datasets.length === 0){
+            /*if (this.datasets.length === 0){
                 this.$router.push({name: "Upload"}).catch(()=>{});
-            }
+            }*/
         } catch(e) {
             if (e.message === "Unauthorized"){
                 this.$router.push({name: "Login"}).catch(()=>{});
@@ -275,6 +283,9 @@ export default {
         },        
 
         viewDataset(ds){
+
+            if (ds.editing || ds.deleting) return;
+
             this.$router.push({name: "ViewDataset", params: {
                 org: this.$route.params.org,
                 ds: ds.slug 

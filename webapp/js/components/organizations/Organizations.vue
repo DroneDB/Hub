@@ -28,12 +28,12 @@
                     <div class="flex-item column actions right aligned">
                         <button v-if="org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleEdit(org)" class="ui button icon small grey"
                                     :class="{loading: org.editing}"
-                                    :disabled="org.editing">
+                                    :disabled="org.editing || org.deleting">
                                     <i class="ui icon pencil"></i>
                         </button>
                         <button v-if="org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleDelete(org)" class="ui button icon small negative" 
                                 :class="{loading: org.deleting}"                                
-                                :disabled="org.deleting"><i class="ui icon trash"></i>
+                                :disabled="org.deleting || org.editing"><i class="ui icon trash"></i>
                         </button>
                         <button v-else-if="org.slug == 'public'" @click.stop="showMessage('This is the public organization. It cannot be deleted or edited.')" class="ui button icon small info"
                                 :disabled="org.deleting"><i class="ui icon info"></i>
@@ -42,6 +42,14 @@
                                 :disabled="org.deleting"><i class="ui icon info"></i>
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+        <div v-if="organizations.length == 0" class="ui segment">
+            <div class="ui grid middle aligned">
+                <div class="column">
+                    <h3>No organizations found</h3>
+                    <p>You can create a new organization by clicking the create organization button.</p>
                 </div>
             </div>
         </div>
