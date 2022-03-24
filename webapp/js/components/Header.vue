@@ -4,14 +4,6 @@
     
     <div class="right">
 
-        <a :href="datasetsUrl"           
-            v-if="showBackToDatasets"
-            title="Back to datasets"
-            class="ui button">
-                <i class="icon arrow alternate circle left"></i>
-                Back to datasets
-        </a>
-
         <a :href="downloadUrl"
             @click="handleDownload"
             v-if="showDownload"
@@ -98,8 +90,7 @@ export default {
   computed: {
       homeUrl: function(){
           if (this.loggedIn){
-              return "/r";
-              //return `/r/${this.username}`;
+              return `/r/${this.username}`;
           } else return "/";
       },
 
@@ -141,10 +132,6 @@ export default {
           if (!isMobile()) return true;
           else return this.selectedFiles.length == 0;
       },
-
-    showBackToDatasets: function() { 
-        return !!this.$route.params.ds && !isMobile() && reg.isLoggedIn();         
-    }
 
 
   },
