@@ -5,7 +5,7 @@
     <div class="top-banner ui equal width grid middle aligned">
         <div class="column">
             <h1>{{ $route.params.org }}</h1>
-            <p>Organizations are groups of datasets managed by a single owner.</p>
+            <p>Datasets are the DroneDB databases that belong to this organization.</p>
         </div>
         <div class="column right aligned">
             <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
@@ -14,16 +14,12 @@
     <div v-if="loading" class="loading">
         <i class="icon circle notch spin" />
     </div>
-
-    <div v-if="loading" class="loading">
-        <i class="icon circle notch spin" />
-    </div>
     <div v-else>
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment" @click="viewDataset(ds)">
                 <div class="ui grid middle aligned flex-container">
                     <div class="flex-item column left aligned main-col"><i class="large database icon"></i>{{ds.slug}}</div>
-                    <div class="flex-item column left aligned">{{org.name ? org.name : '—'}}</div>
+                    <div class="flex-item column left aligned">{{ds.name ? ds.name : '—'}}</div>
                     <div class="flex-item column left aligned">
                         <span v-if="ds.entries == 0">—</span>
                         <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div><div>{{bytesToSize(ds.size)}}</div></div>
@@ -98,6 +94,7 @@ export default {
             const tmp = await this.org.datasets();
 
             this.datasets = tmp.map(ds => {
+                console.log(ds);
                 return {
                     slug: ds.slug,
                     creationDate: Date.parse(ds.creationDate),                    
@@ -106,7 +103,7 @@ export default {
                     size: ds.size,
                     editing: false,
                     deleting: false,
-                    name: ds.properties && ds.properties.meta && ds.properties.meta.name && ds.properties.meta.name.data
+                    name: ds.properties?.meta?.name?.data
                 };
             });
 
@@ -162,8 +159,6 @@ export default {
 
         },
 
-        /* missing handleOrganizationClose and datasetDialog impl */
-
         showMessage(msg) {
             this.currentMessage = msg;
             this.messageDialogOpen = true;
@@ -196,9 +191,9 @@ export default {
         handleNew() {
             this.newDataset();
         },
-
-    /*
+    
         async handleDatasetClose(res, newds) {
+
             this.dsDialogOpen = false;
 
             if (res == "close") {
@@ -212,70 +207,72 @@ export default {
                 this.loading = true;
 
                 try {
-                    let ret = await reg.createDataset(neworg.slug, neworg.name, neworg.description, neworg.isPublic);
+                    let ret = await this.org.createDataset(newds.slug, newds.name, newds.isPublic);
                     if (ret) {
-                        this.organizations.push({
-                            slug: neworg.slug,
-                            name: neworg.name,
-                            description: neworg.description,
-                            isPublic: neworg.isPublic
+                        this.datasets.push({
+                            slug: newds.slug,
+                            creationDate: new Date(),                    
+                            public: newds.isPublic,
+                            entries: 0,
+                            size: 0,
+                            editing: false,
+                            deleting: false,
+                            name: newds.name
                         });
                     } else {
-                        this.error = "Failed to create organization \"" + neworg.slug + "\"";
+                        this.error = "Failed to create dataset \"" + newds.slug + "\"";
                         console.error(ret);
                     }
                 } catch(e) {
                     console.error(e);
-                    this.error = "Failed to create organization: " + e.message;
+                    this.error = "Failed to create dataset: " + e.message;
                 }
                 this.loading = false;
 
-            } else if (this.orgDialogMode == "edit") {
-                let org = this.orgDialogModel;
-                this.orgDialogModel = null;
-                this.orgDialogOpen = false;
+            } else if (this.dsDialogMode == "edit") {
+                let ds = this.dsDialogModel;
+                this.dsDialogModel = null;
+                this.dsDialogOpen = false;
                 this.loading = true;
 
+                let dsitem = this.datasets.find(o => o.slug == ds.slug);
+                this.$set(dsitem, 'editing', true);
+
                 try {
-                    let ret = await reg.updateOrganization(org.slug, neworg.name, neworg.description, neworg.isPublic);
+
+                    let dsobj = this.org.Dataset(ds.slug);
+                    let ret = await dsobj.update(newds.name, newds.isPublic);
+
                     if (ret) {
-                        let orgitem = this.organizations.find(o => o.slug == org.slug);
-                        orgitem.slug = org.slug;
-                        orgitem.name = neworg.name;
-                        orgitem.description = neworg.description;
-                        orgitem.isPublic = neworg.isPublic;
+                        
+                        dsitem.slug = ds.slug;
+                        dsitem.name = newds.name;
+                        dsitem.public = newds.isPublic;
+
+                        // Rename
+                        if (newds.slug !== dsitem.slug) {
+
+                            let ren = await dsobj.rename(newds.slug);
+                            if (ren) {
+                                dsitem.slug = newds.slug;
+                            } else {
+                                this.error = `Failed to rename dataset \"${ds.slug}\" to \"${newds.slug}\"`;
+                                console.error(ren);
+                            }
+                        }
+
                     } else {
-                        this.error = "Failed to update organization \"" + org.slug + "\"";
+                        this.error = `Failed to update dataset \"${ds.slug}\"`;
                         console.error(ret);
                     }
                 } catch(e) {
                     console.error(e);
-                    this.error = "Failed to update organization: " + e.message;
+                    this.error = "Failed to update dataset: " + e.message;
                 }
                 this.loading = false;
+                this.$set(dsitem, 'editing', false);
             }
-        },
-
-*/
-        async handleRename(ds){
-            // TODO: add proper modal
-            var newName;
-
-            if (newName = window.prompt("Enter new dataset name:", datasetName(ds))){
-                this.$set(ds, 'renaming', true);
-                try{
-                    var newDs;
-                    if (newDs = await renameDataset(this.$route.params.org, ds.slug, newName)){
-                        ds.slug = newDs.slug;
-                        ds.properties.meta.name = newDs.properties.meta.name;
-                    }
-                }catch(e){
-                    console.log(e.message);
-                    this.error = e.message;
-                }
-                this.$set(ds, 'renaming', false);
-            }
-        },
+        },        
 
         viewDataset(ds){
             this.$router.push({name: "ViewDataset", params: {
