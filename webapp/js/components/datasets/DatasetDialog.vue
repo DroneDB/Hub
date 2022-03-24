@@ -4,10 +4,13 @@
             maxWidth="70%"
             fixedSize>
 
-        <form class="ui form">
+        <form class="ui form" v-bind:class="{ error: checkForSlug && !isValid()}">
             <div class="field">
                 <label>Slug</label>
-                <input type="text" pattern="[a-z0-9_]+" required v-model="ds.slug" @keydown="filterKeys($event)" placeholder="Slug" />
+                <input type="text" pattern="[a-z0-9_]+" required v-model="ds.slug" @keydown="filterKeys($event)" placeholder="Slug" />                
+            </div>
+            <div class="ui error message">                
+                <p>This slug is already in use.</p>
             </div>
             <div class="field">
                 <label>Name</label>
@@ -17,7 +20,7 @@
                 <label>Public</label>
                 <input type="checkbox" v-model="ds.isPublic" />
             </div>
-        </form>        
+        </form>  
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
@@ -35,15 +38,27 @@
 <script>
 import Window from '../Window.vue';
 
-
 var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
         Window
     },
-
-    props: ["mode", "model"],
+    props: {
+        mode: {
+            type: String,
+            default: 'new'        
+        },
+        model: {
+            type: Object,
+            required: false
+        },
+        forbiddenSlugs: {
+            default: [],
+            type: Array,
+            required: false
+        }
+    },
   
     data: function(){
         return {
@@ -52,7 +67,8 @@ export default {
                 name: null,
                 isPublic: false
             },
-            title: null
+            title: null,
+            checkForSlug: false
         };
     },
     mounted: function() { 
@@ -77,6 +93,8 @@ export default {
     methods: {
         filterKeys(e) {
 
+            this.checkForSlug = true;
+
             // Allow backspace, canc, left arrow, right arrow and tab
             if (e.keyCode == 8 || e.keyCode == 46 || e.keyCode == 37 || e.keyCode == 39 || e.keyCode == 9) {
                 return;
@@ -90,10 +108,24 @@ export default {
         close: function(buttonId, obj){
             this.$emit('onClose', buttonId, obj);
         },
-        isValid: function(){
+        isValid: function() {
 
-            // organization slug can contain only letters, numbers, dashes and underscores
-            return this.ds.slug && re.test(this.ds.slug) && this.ds.name;
+            if (this.ds.slug == null || this.ds.slug.length == 0 || !re.test(this.ds.slug)) {
+                return false;
+            }
+
+            if (this.mode == 'new') {
+                if (this.forbiddenSlugs.includes(this.ds.slug)) {
+                    return false;
+                }
+            } else {
+                if (this.ds.slug !== this.model.slug && this.forbiddenSlugs.includes(this.ds.slug)) {
+                    return false;
+                }
+            }
+
+            return true;
+
         }
     }
 }

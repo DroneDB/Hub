@@ -54,7 +54,7 @@
         
     <DeleteDatasetDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :dsSlug="currentDsSlug"></DeleteDatasetDialog>
     <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
-    <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" @onClose="handleDatasetClose"></DatasetDialog>
+    <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs" @onClose="handleDatasetClose"></DatasetDialog>
 
 </div>
 </template>
@@ -90,7 +90,7 @@ export default {
 
             dsDialogModel: null,
             dsDialogMode: null,
-            dsDialogOpen: false,
+            dsDialogOpen: false        
         }
     },
     mounted: async function(){
@@ -127,6 +127,11 @@ export default {
             }
         }
         this.loading = false;
+    },
+    computed: {
+        forbiddenSlugs: function(){
+            return this.datasets.map(ds => ds.slug);
+        }    
     },
     methods: {
         bytesToSize,
