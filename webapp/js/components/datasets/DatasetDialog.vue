@@ -3,13 +3,12 @@
             modal
             maxWidth="70%"
             fixedSize>
-
         <form class="ui form" v-bind:class="{ error: checkForSlug && !isValid()}">
             <div class="field">
                 <label>Slug</label>
                 <input type="text" pattern="[a-z0-9_]+" required v-model="ds.slug" @keydown="filterKeys($event)" placeholder="Slug" />                
             </div>
-            <div class="ui error message">                
+            <div class="ui error message" v-if="ds.slug">                
                 <p>This slug is already in use.</p>
             </div>
             <div class="field">
