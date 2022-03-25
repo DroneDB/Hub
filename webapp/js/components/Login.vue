@@ -56,7 +56,7 @@ export default {
   },
   beforeMount: function(){
       if (reg.isLoggedIn()){
-          this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+          this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
       }else if (xAuthAvailable()){
           // Try to log-in using the xAuthToken
           this.xAuthInProgress = true;
@@ -81,7 +81,8 @@ export default {
             // in which case redirect to home
             console.log(redirectTo);
             if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()){
-                this.$router.push({name: "UserHome", params: {org: reg.getUsername()}});
+                this.$router.push({name: "Organizations"});
+                //this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
             }else{
                 this.$router.push({path: redirectTo});
             }
