@@ -18,7 +18,7 @@
                         <div class="bar" :style="{'min-width': (fileUploadStatus[f]).toFixed(2) + '%'}">
                             <div class="progress"></div>
                         </div>
-                        <div class="label">{{ f }} - {{ (fileUploadStatus[f]).toFixed(2) }}%</div>
+                        <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
                     </div>
                 </div>
                 <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
