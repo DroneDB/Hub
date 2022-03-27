@@ -5,10 +5,9 @@
     <div class="top-banner ui equal width grid middle aligned">
         <div class="column">
             <h1>Organizations</h1>
-            <p>Organizations are groups of datasets managed by a single owner.</p>
         </div>
         <div class="column right aligned">
-            <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Organization</button>
+            <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Add New</button>
         </div>
     </div>
     <div v-if="loading" class="loading">
@@ -18,9 +17,7 @@
         <div v-for="org in organizations" class="ui segments organization">            
             <div class="ui segment" @click="viewOrganization(org)">
                 <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col"><i class="large users icon"></i>{{org.slug}}</div>
-                    <div class="flex-item column left aligned">{{org.name ? org.name : '—'}}</div>
-                    <div class="flex-item column left aligned">{{org.owner ? org.owner : '—'}}</div>
+                    <div class="flex-item column left aligned main-col"><i class="large users icon"></i>{{org.name ? org.name : org.slug}}</div>
                     <div class="flex-item column left aligned">
                         <div v-if="org.isPublic"><i class="large globe icon"></i>Public</div>
                         <div v-else><i class="large lock icon"></i>Private</div>
@@ -274,8 +271,7 @@ export default {
 <style scoped>
 #organizations {
     .top-banner {
-        margin-top: 30px;
-        margin-bottom: 40px;
+        margin-bottom: 12px;
     }
     margin: 12px;
     margin-top: 16px;

@@ -277,6 +277,7 @@ export default {
     height: 100%;
 }
 .uploading{
+    width: 100%;
     text-align: center;
     .circle.notch{
         margin-bottom: 12px;

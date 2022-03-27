@@ -6,11 +6,7 @@ export async function renameDataset(orgSlug, dsSlug, name){
 
     if (name.length > 128) name = name.slice(0, 128);
 
-    let slug = name.toLowerCase();
-    slug = slug.replace(/ /g, "-");
-    slug = slug.replace(/[^a-z0-9_-]/g, "");
-    while(slug.startsWith("_") || slug.startsWith("-")) slug = slug.slice(1);
-
+    let slug = slugFromName(name);
     await ds.metaSet("name", name);
     return await ds.rename(slug);
 };
@@ -19,3 +15,12 @@ export function datasetName(ds){
     return ds.properties.meta?.name?.data || ds.slug;
 }
 
+export function slugFromName(name){
+    if (!name) return null;
+
+    let slug = name.toLowerCase();
+    slug = slug.replace(/ /g, "-");
+    slug = slug.replace(/[^a-z0-9_-]/g, "");
+    while(slug.startsWith("_") || slug.startsWith("-")) slug = slug.slice(1);
+    return slug;
+}
