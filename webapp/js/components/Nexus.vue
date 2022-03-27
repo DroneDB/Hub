@@ -9,7 +9,7 @@
         </div>
 
         <div class="container">
-            <button class="ui inverted basic button" id="back-button" @click="handleGoToDataset()">
+            <button v-if="!loading" class="ui inverted basic button" id="back-button" @click="handleGoToDataset()">
                 <i class="icon arrow left" />&nbsp;Back
             </button>
             <canvas ref="canvas"></canvas>
