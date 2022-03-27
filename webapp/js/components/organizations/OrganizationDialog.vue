@@ -3,48 +3,45 @@
             modal
             maxWidth="70%"
             fixedSize>
-
-        <form class="ui form">
-            <div class="fields" v-if="mode == 'new'">
-                <div class="field">
-                    <label>Slug</label>
-                    <input type="text" pattern="[a-z0-9_]+" required v-model="org.slug" @keydown="filterKeys($event)" placeholder="Slug" />
+        <div class="org-dialog">
+            <form class="ui form">
+                <div class="fields" v-if="mode == 'new'">
+                    <div class="field">
+                        <label>Name</label>
+                        <input type="text" v-model="org.name" placeholder="Name" />
+                    </div>
                 </div>
-                <div class="field">
+                <div class="field" v-else>
                     <label>Name</label>
                     <input type="text" v-model="org.name" placeholder="Name" />
                 </div>
+                <div class="field">
+                    <label>Description</label>
+                    <textarea v-model="org.description" placeholder="Description"></textarea>
+                </div>
+                <div class="inline field">
+                    <label>Public</label>
+                    <input type="checkbox" v-model="org.isPublic" />
+                </div>
+            </form>        
+            <div class="buttons">
+                <button @click="close('close')" class="ui button">
+                    Close
+                </button>
+                <button v-if="mode == 'new'" @click="close('create')" class="ui button primary" :disabled="!isValid()">
+                    Create
+                </button>
+                <button v-else @click="close('save')" class="ui button primary" :disabled="!isValid()">
+                    Save
+                </button>
             </div>
-            <div class="field" v-else>
-                <label>Name</label>
-                <input type="text" v-model="org.name" placeholder="Name" />
-            </div>
-            <div class="field">
-                <label>Description</label>
-                <textarea v-model="org.description" placeholder="Description"></textarea>
-            </div>
-            <div class="inline field">
-                <label>Public</label>
-                <input type="checkbox" v-model="org.isPublic" />
-            </div>
-        </form>        
-        <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
-            <button v-if="mode == 'new'" @click="close('create', org)" class="ui button primary" :disabled="!isValid()">
-                Create
-            </button>
-            <button v-else @click="close('save', org)" class="ui button primary" :disabled="!isValid()">
-                Save
-            </button>
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '../Window.vue';
-
+import { slugFromName } from '../../libs/registryUtils';
 
 var re = /^[a-z0-9\-_]+$/;
 
@@ -58,7 +55,6 @@ export default {
     data: function(){
         return {
             org: {
-                slug: null,
                 name: null,
                 description: null,
                 isPublic: false
@@ -70,17 +66,15 @@ export default {
 
         if (this.mode == 'edit') {
 
-            this.title = "Edit organization " + this.model.slug;
+            this.title = "Edit " + this.model.slug;
 
-            this.org.slug = this.model.slug;
             this.org.name = this.model.name;
             this.org.description = this.model.description;
             this.org.isPublic = this.model.isPublic;
         } else {
 
-            this.title = "Create new organization";
+            this.title = "Add New Organization";
 
-            this.org.slug = null;
             this.org.name = null;
             this.org.description = null;
             this.org.isPublic = false;
@@ -101,26 +95,37 @@ export default {
             }
         },
         close: function(buttonId, obj){
-            this.$emit('onClose', buttonId, obj);
+            this.$emit('onClose', buttonId, {
+                name: this.org.name,
+                description: typeof this.org.description === "string" ? this.org.description : "",
+                isPublic: this.org.isPublic,
+                slug: slugFromName(this.org.name)
+            });
         },
         isValid: function(){
-
-
             // organization slug can contain only letters, numbers, dashes and underscores
-
-            return this.org.slug && re.test(this.org.slug) && this.org.name;
+            const slug = slugFromName(this.org.name);
+            return slug && re.test(slug) && this.org.name;
         }
     }
 }
 </script>
 
 <style scoped>
+.org-dialog{
+    min-width: 320px;
+    padding: 4px;
+}
 .buttons{
     margin-top: 16px;
     text-align: right;
 }
 .form {
     margin-bottom: 20px;
+}
+
+.field{
+    width: 100%;
 }
 
 .fields .field:first-child {

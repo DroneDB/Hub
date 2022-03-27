@@ -4,8 +4,7 @@
 
     <div class="top-banner ui equal width grid middle aligned">
         <div class="column">
-            <h1>{{ $route.params.org }}</h1>
-            <p>Datasets are the DroneDB databases that belong to this organization.</p>
+            <h1>{{ orgName }}</h1>
         </div>
         <div class="column right aligned">
             <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
@@ -18,11 +17,10 @@
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment" @click="viewDataset(ds)">
                 <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col"><i class="large database icon"></i>{{ds.slug}}</div>
-                    <div class="flex-item column left aligned">{{ds.name ? ds.name : '—'}}</div>
+                    <div class="flex-item column left aligned main-col"><i class="large database icon"></i>{{ds.name ? ds.name : ds.slug}}</div>
                     <div class="flex-item column left aligned">
-                        <span v-if="ds.entries == 0">—</span>
-                        <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div><div>{{bytesToSize(ds.size)}}</div></div>
+                        <span v-if="ds.entries == 0">0 files</span>
+                        <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div> <div>{{bytesToSize(ds.size)}}</div></div>
                     </div>
                     <div class="flex-item column left aligned">
                         <div v-if="ds.public"><i class="large globe icon"></i>Public</div>
@@ -90,19 +88,24 @@ export default {
 
             dsDialogModel: null,
             dsDialogMode: null,
-            dsDialogOpen: false        
+            dsDialogOpen: false,
+
+            orgName: this.$route.params.org     
         }
     },
     mounted: async function(){
-        setTitle(this.$route.params.org);
         
         try {
-
+            
             this.org = reg.Organization(this.$route.params.org);
+            const orgInfo = await this.org.info();
+
+            this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
+            setTitle(this.orgName);
+            
             const tmp = await this.org.datasets();
 
             this.datasets = tmp.map(ds => {
-                console.log(ds);
                 return {
                     slug: ds.slug,
                     creationDate: Date.parse(ds.creationDate),                    
@@ -306,10 +309,8 @@ export default {
 
 <style scoped>
 #datasets {
-
     .top-banner {
-        margin-top: 30px;
-        margin-bottom: 40px;
+        margin-bottom: 12px;
     }
 
     margin: 12px;

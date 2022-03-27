@@ -10,11 +10,6 @@
                             @done="done"
                             :open="open"
                             :filesToUpload="filesToUpload"></DatasetUpload>
-            <div class="buttons">
-                <button @click="close" class="ui button">
-                    Close
-                </button>
-            </div>
         </div>
     </Window>
 </template>
