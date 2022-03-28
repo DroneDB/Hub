@@ -2,18 +2,18 @@
 <div id="datasets">
     <Message bindTo="error" />
 
-    <div class="top-banner ui equal width grid middle aligned">
-        <div class="column">
-            <h1>{{ orgName }}</h1>
-        </div>
-        <div class="column right aligned">
-            <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
-        </div>
-    </div>
     <div v-if="loading" class="loading">
         <i class="icon circle notch spin" />
     </div>
     <div v-else>
+        <div class="top-banner ui equal width grid middle aligned">
+            <div class="column">
+                <h1>{{ orgName }}</h1>
+            </div>
+            <div class="column right aligned">
+                <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
+            </div>
+        </div>
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment" @click="viewDataset(ds)">
                 <div class="ui grid middle aligned flex-container">
@@ -90,7 +90,7 @@ export default {
             dsDialogMode: null,
             dsDialogOpen: false,
 
-            orgName: this.$route.params.org     
+            orgName: ""  
         }
     },
     mounted: async function(){
