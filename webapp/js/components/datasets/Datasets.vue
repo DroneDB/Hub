@@ -310,24 +310,12 @@ export default {
 <style scoped>
 #datasets {
     .top-banner {
-        margin-bottom: 12px;
+        margin-top: 12px;
+        margin-bottom: 24px;
     }
 
     margin: 12px;
-    margin-top: 16px;
-    padding-bottom: 16px;
-    /*
-    .datasets{
-        a{
-            font-size: 120%;
-            position: relative;
-            top: 2px;
-        }
-        i.database{
-            color: #030A03;
-        }
-    }*/
-
+    
     .datasets {
 
         .segment {
