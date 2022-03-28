@@ -10,7 +10,7 @@
             <div class="column">
                 <h1>{{ orgName }}</h1>
             </div>
-            <div class="column right aligned">
+            <div class="column right aligned" v-if="isOwner">
                 <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
             </div>
         </div>
@@ -90,7 +90,8 @@ export default {
             dsDialogMode: null,
             dsDialogOpen: false,
 
-            orgName: ""  
+            orgName: "",
+            isOwner: false
         }
     },
     mounted: async function(){
@@ -102,6 +103,8 @@ export default {
 
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
             setTitle(this.orgName);
+        
+            this.isOwner = reg.getUsername() === this.$route.params.org;
             
             const tmp = await this.org.datasets();
 
@@ -119,9 +122,7 @@ export default {
             });
 
             this.datasets.sort((a, b) => new Date(a.creationDate).getTime() < new Date(b.creationDate).getTime() ? 1 : -1);
-            /*if (this.datasets.length === 0){
-                this.$router.push({name: "Upload"}).catch(()=>{});
-            }*/
+
         } catch(e) {
             if (e.message === "Unauthorized"){
                 this.$router.push({name: "Login"}).catch(()=>{});
