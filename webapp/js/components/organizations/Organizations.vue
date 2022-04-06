@@ -7,7 +7,7 @@
             <h1>Organizations</h1>
         </div>
         <div class="column right aligned">
-            <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Add New</button>
+            <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Create Organization</button>
         </div>
     </div>
     <div v-if="loading" class="loading">
@@ -271,11 +271,12 @@ export default {
 <style scoped>
 #organizations {
     .top-banner {
-        margin-bottom: 12px;
+        margin-top: 12px;
+        margin-bottom: 24px;
     }
+
     margin: 12px;
-    margin-top: 16px;
-    padding-bottom: 16px;
+
     .organization {
 
         .segment {
