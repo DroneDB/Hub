@@ -28,7 +28,7 @@
                     @error="handleError" />
             </template>
             <template v-slot:map>
-                <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" />
+                <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" @openItem="handleOpenItem" />
             </template>
             <template v-slot:explorer>
                 <Explorer ref="explorer" 
@@ -97,6 +97,8 @@ const OpenItemDefaults = {
     [ddb.entry.type.GEORASTER]: 'map',
     [ddb.entry.type.POINTCLOUD]: 'pointcloud',
     [ddb.entry.type.MODEL]: 'model',
+    [ddb.entry.type.PANORAMA]: 'panorama',
+    [ddb.entry.type.GEOPANORAMA]: 'panorama'    
 }
 
 export default {
@@ -705,7 +707,18 @@ export default {
                                 }
                             });
                             addedOpen = true;
-                        }                        
+                        }
+                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                            this.explorerTools.push({
+                                id: 'open-panorama',
+                                title: "Open Panorama",
+                                icon: "globe",
+                                onClick: () => {
+                                    this.handleOpenItem(this.selectedFiles[0], 'panorama');
+                                }
+                            });
+                            addedOpen = true;
+                        }           
                     }
 
                     if (!addedOpen){

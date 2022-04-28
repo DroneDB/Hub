@@ -117,6 +117,15 @@ export default {
                         });
                     }
                 },{
+                    label: 'Open Panorama',
+                    icon: 'globe',
+                    isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1; },
+                    click: () => {
+                        this.selectedFiles.forEach(f => {
+                            this.$emit('openItem', f, 'panorama');
+                        });
+                    }
+                },{
                     label: 'Open Markdown',
                     icon: 'book',
                     isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },

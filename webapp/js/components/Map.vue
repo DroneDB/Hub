@@ -264,6 +264,37 @@ export default {
                     color: 'rgba(75, 150, 243, 1)', //'rgba(253, 226, 147, 1)',
                     width: 4
                 })
+            }),
+
+            pano: feats => {
+                let styleId = 'panoDeselected';
+
+                for (let i = 0; i < feats.length; i++){
+                    if (feats[i].file && feats[i].file.selected){
+                        styleId = 'panoSelected';
+                        break;
+                    }
+                }
+
+                return this.styles[styleId];
+            },
+
+            panoDeselected: new Style({
+                image: new Icon({
+                    anchor: [0.5, 0.5],
+                    anchorXUnits: 'fraction',
+                    anchorYUnits: 'fraction',
+                    src: rootPath('images/pano.svg')
+                })
+            }),
+
+            panoSelected: new Style({
+                image: new Icon({
+                    anchor: [0.5, 0.5],
+                    anchorXUnits: 'fraction',
+                    anchorYUnits: 'fraction',
+                    src: rootPath('images/pano-selected.svg')
+                })
             })
         };
 
@@ -443,7 +474,14 @@ export default {
                             outline = new Feature(new Polygon([coords]));
                             outline.getGeometry().transform('EPSG:4326', 'EPSG:3857');
                         }
-                        
+
+                        // Clicked on panorama
+                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(file.entry.type) !== -1){
+                            // Open panorama view
+                            this.$emit('openItem', file, 'panorama');
+                            return;
+                        }
+
                         // Nothing else to do
                         if (!outline) return;
                         
@@ -619,6 +657,14 @@ export default {
                 const extentFeat = new Feature(fromExtent(extent));
                 extentFeat.file = f;
                 this.extentsFeatures.addFeature(extentFeat);
+            }else if (f.entry.type === ddb.entry.type.GEOPANORAMA){
+                const coords = coordAll(f.entry.point_geom)[0];
+                const point = new Point(coords);
+                const feat = new Feature(point);
+                feat.style = 'pano';
+                feat.file = f;
+                feat.getGeometry().transform('EPSG:4326', 'EPSG:3857');
+                features.push(feat);
             }
         });
 

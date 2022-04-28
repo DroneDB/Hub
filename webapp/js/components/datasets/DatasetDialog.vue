@@ -4,13 +4,13 @@
             maxWidth="70%"
             fixedSize>
         <div class="ds-dialog">
-            <form class="ui form" v-bind:class="{ error: !isValid()}">
+            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !isValid()}">
                 <div class="ui error message" v-if="isDuplicateSlug()">                
                     <p>This name is already in use.</p>
                 </div>
                 <div class="field">
                     <label>Name</label>
-                    <input type="text" v-model="ds.name" placeholder="Name" />
+                    <input ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" type="text" v-model="ds.name" placeholder="Name" />
                 </div>
                 <div class="inline field">
                     <label>Public</label>
@@ -68,7 +68,8 @@ export default {
             title: null
         };
     },
-    mounted: function() { 
+    mounted: function() {
+        this.$nextTick(() => this.$refs.name.focus());
 
         if (this.mode == 'edit') {
 

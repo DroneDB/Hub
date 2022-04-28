@@ -11,7 +11,9 @@ const typeIconMap = {
     [entry.type.MARKDOWN]: "book",
     [entry.type.VIDEO]: "file video outline",
     [entry.type.GEOVIDEO]: "film",
-    [entry.type.MODEL]: "cube"
+    [entry.type.MODEL]: "cube",
+    [entry.type.PANORAMA]: "globe",
+    [entry.type.GEOPANORAMA]: "globe"    
 };
 
 export default {

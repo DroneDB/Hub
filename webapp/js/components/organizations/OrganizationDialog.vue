@@ -4,16 +4,12 @@
             maxWidth="70%"
             fixedSize>
         <div class="org-dialog">
-            <form class="ui form">
-                <div class="fields" v-if="mode == 'new'">
+            <form v-on:submit.prevent class="ui form">
+                <div class="fields">
                     <div class="field">
                         <label>Name</label>
-                        <input type="text" v-model="org.name" placeholder="Name" />
+                        <input type="text" ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name" placeholder="Name" />
                     </div>
-                </div>
-                <div class="field" v-else>
-                    <label>Name</label>
-                    <input type="text" v-model="org.name" placeholder="Name" />
                 </div>
                 <div class="field">
                     <label>Description</label>
@@ -63,6 +59,7 @@ export default {
         };
     },
     mounted: function() { 
+        this.$nextTick(() => this.$refs.name.focus());
 
         if (this.mode == 'edit') {
 

@@ -2,7 +2,7 @@
 <div class="tab-view-loader">
     <Message bindTo="error" noDismiss />
     <div v-if="loading" class="loading">
-        <i class="icon circle notch spin" />
+         <p v-if="loadingText">{{ loadingText }}</p> <i class="icon circle notch spin" />
     </div>
 </div>
 </template>
@@ -18,7 +18,7 @@ export default {
   components: {
       Message
   },
-  props: ["titleSuffix"],
+  props: ["titleSuffix", "loadingText"],
   data: function(){
       return {
           loading: true,

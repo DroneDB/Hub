@@ -226,7 +226,7 @@ export default {
                 try {
                     let ret = await this.org.createDataset(newds.slug, newds.name, newds.isPublic);
                     if (ret) {
-                        this.datasets.push({
+                        this.datasets.unshift({
                             slug: newds.slug,
                             creationDate: new Date(),                    
                             public: newds.isPublic,
