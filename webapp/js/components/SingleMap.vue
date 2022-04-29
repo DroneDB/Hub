@@ -22,6 +22,7 @@ import {createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as ex
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
+import olMeasure from './olMeasure';
 import TabViewLoader from './TabViewLoader';
 import XYZ from 'ol/source/XYZ';
 import {transformExtent} from 'ol/proj';
@@ -85,18 +86,24 @@ export default {
 
         // this.footprintRastersLayer = new LayerGroup();
 
+        const measureControls = new olMeasure.Controls({
+            onToolSelected: () => { this.measuring = true; },
+            onToolDelesected: () => { this.measuring = false; }
+        });
         this.map = new Map({
             target: this.$refs['map-container'],
             layers: [
                 this.basemapLayer,
                 this.rasterLayer,
                 // this.footprintRastersLayer,
+                measureControls.getLayer()
             ],
             view: new View({
                 center: [0, 0],
                 zoom: 2
             })
         });
+        this.map.addControl(measureControls);
 
         setTimeout(() => this.map.updateSize(), 1);
 
