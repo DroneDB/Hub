@@ -10,6 +10,7 @@
                     {{ v.label }}
                 </option>
             </select>
+            <olMeasure />
         </div>
     </div>
 </template>
@@ -35,6 +36,8 @@ import { fromExtent } from 'ol/geom/Polygon';
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
+import { MeasureControls } from '../libs/olMeasure';
+import olMeasure from './olMeasure';
 import XYZ from 'ol/source/XYZ';
 import Toolbar from './Toolbar.vue';
 import Keyboard from '../libs/keyboard';
@@ -48,7 +51,7 @@ import {Circle as CircleStyle, Fill, Stroke, Style, Text, Icon} from 'ol/style';
 
 export default {
   components: {
-      Map, Toolbar
+      Map, Toolbar, olMeasure
   },
   props: {
       files: {
@@ -402,6 +405,8 @@ export default {
                 zoom: 2
             })
         });
+
+        this.map.addControl(new MeasureControls());
 
         const doSelectSingle = e => {
             let first = true;
