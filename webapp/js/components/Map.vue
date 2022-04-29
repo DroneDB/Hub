@@ -10,7 +10,7 @@
                     {{ v.label }}
                 </option>
             </select>
-            <olMeasure />
+            <olMeasure ref="measure" />
         </div>
     </div>
 </template>
@@ -36,7 +36,6 @@ import { fromExtent } from 'ol/geom/Polygon';
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
-import { MeasureControls } from '../libs/olMeasure';
 import olMeasure from './olMeasure';
 import XYZ from 'ol/source/XYZ';
 import Toolbar from './Toolbar.vue';
@@ -390,6 +389,10 @@ export default {
             })
         });
 
+        const measureControls = new olMeasure.Controls({
+            onToolSelected: () => { this.measuring = true; },
+            onToolDelesected: () => { this.measuring = false; }
+        });
         this.map = new Map({
             target: this.$refs['map-container'],
             layers: [
@@ -399,6 +402,7 @@ export default {
                 this.extentLayer,
                 this.outlineLayer,
                 this.topLayers,
+                measureControls.getLayer()
             ],
             view: new View({
                 center: [0, 0],
@@ -406,7 +410,7 @@ export default {
             })
         });
 
-        this.map.addControl(new MeasureControls());
+        this.map.addControl(measureControls);
 
         const doSelectSingle = e => {
             let first = true;
@@ -443,6 +447,8 @@ export default {
         };
 
         this.map.on('click', e => {
+            if (this.measuring) return;
+
             // Single selection
             if (this.selectSingle){
                 doSelectSingle(e);
