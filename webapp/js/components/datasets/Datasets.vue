@@ -228,7 +228,7 @@ export default {
                     if (ret) {
                         this.datasets.unshift({
                             slug: newds.slug,
-                            creationDate: new Date(),                    
+                            creationDate: new Date(),
                             public: newds.isPublic,
                             entries: 0,
                             size: 0,
@@ -271,7 +271,7 @@ export default {
 
                             let ren = await dsobj.rename(newds.slug);
                             if (ren) {
-                                dsitem.slug = newds.slug;
+                                dsitem.slug = ren.slug;
                             } else {
                                 this.error = `Failed to rename dataset \"${ds.slug}\" to \"${newds.slug}\"`;
                                 console.error(ren);
