@@ -124,8 +124,10 @@ export default {
             this.datasets.sort((a, b) => new Date(a.creationDate).getTime() < new Date(b.creationDate).getTime() ? 1 : -1);
 
         } catch(e) {
-            if (e.message === "Unauthorized"){
+            if (e.status === 401){
                 this.$router.push({name: "Login"}).catch(()=>{});
+            }else if (e.status === 404){
+                this.$router.push({name: "Organizations"}).catch(()=>{});
             } else {
                 this.error = e.message;
             }

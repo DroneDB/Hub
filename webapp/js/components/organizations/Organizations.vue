@@ -117,8 +117,7 @@ export default {
                 this.$router.push({name: "Upload"}).catch(()=>{});
             }
         } catch(e) {
-
-            if (e.message === "Unauthorized")
+            if (e.status === 401)
                 this.$router.push({name: "Login"}).catch(()=>{});
             else
                 this.error = e.message;

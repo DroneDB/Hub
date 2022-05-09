@@ -162,7 +162,7 @@ export default {
 
           // TODO: we need to show this to users that
           // have write access, not everyone
-          this.showSettings = reg.isLoggedIn();
+          this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
           this.params = params;
       }
