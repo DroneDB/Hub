@@ -77,12 +77,22 @@ window.addEventListener('load', function () {
     });
 
     // Refresh auth tokens
-    if (reg.isLoggedIn()) {
-        reg.refreshToken();
-        reg.setAutoRefreshToken();
-    } else {
-        reg.clearCredentials();
-    }
+    (async () => {
+        if (reg.isLoggedIn()) {
+            try{
+                await reg.refreshToken();
+                reg.setAutoRefreshToken();
+            }catch(e){
+                console.log(e.message);
+                if (e.status === 401){
+                    reg.clearCredentials();
+                    router.push({ name: "Login" }).catch(() => { });
+                }
+            }
+        } else {
+            reg.clearCredentials();
+        }
+    })();
 
     new Vue({
         router

@@ -84,7 +84,7 @@ export default {
             deleteDialogOpen: false,
             currentDsSlug: null,
             messageDialogOpen: false,
-            currentMessage: null,            
+            currentMessage: null,
 
             dsDialogModel: null,
             dsDialogMode: null,

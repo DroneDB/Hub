@@ -147,13 +147,13 @@ export default {
           return HubOptions.appLogo;
       },
       appIcon: function(){
-          return HubOptions.appIcon === "dronedb" ? 
+          return (HubOptions.appIcon === "dronedb" || HubOptions.appIcon === undefined) ? 
                 "icon-dronedb" :
                 `icon ${HubOptions.appIcon}`;
       },
       appName: function(){
-          return HubOptions.appName;
-      }      
+          return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+      }
   },
   mounted: function(){
       mouse.on('click', this.hideMenu);
@@ -194,13 +194,16 @@ export default {
       mouse.off('click', this.hideMenu);
   },
   methods: {
-
-    handleStorageInfoDialogClose: function () {
-        this.storageInfoDialogOpen = false;
-    },
+      handleStorageInfoDialogClose: function () {
+          this.storageInfoDialogOpen = false;
+      },
 
       refreshStorageInfo: async function() {
-          this.storageInfo = await reg.getStorageInfo();
+          try{
+            this.storageInfo = await reg.getStorageInfo();
+          }catch(e){
+              console.log(e.message);
+          }
       },
       uploadFiles: function(){
           this.$router.push({name: "Upload"});
