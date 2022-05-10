@@ -32,7 +32,7 @@
                                     :disabled="ds.editing || ds.deleting">
                                     <i class="ui icon pencil"></i>
                         </button>                        
-                        <button @click.stop="handleDelete(ds)" class="ui button icon small negative" 
+                        <button v-if="canDelete" @click.stop="handleDelete(ds)" class="ui button icon small negative" 
                                 :class="{loading: ds.deleting}"                                
                                 :disabled="ds.deleting || ds.editing"><i class="ui icon trash"></i>
                         </button>
@@ -137,7 +137,10 @@ export default {
     computed: {
         forbiddenSlugs: function(){
             return this.datasets.map(ds => ds.slug);
-        }    
+        },
+        canDelete: function(){
+            return !HubOptions.disableDatasetCreation;
+        }
     },
     methods: {
         bytesToSize,
