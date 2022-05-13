@@ -79,7 +79,6 @@ export default {
 
         // Redirect to previous path, unless it's the same as the current login path
         // in which case redirect to home
-        console.log(redirectTo);
         if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()){
             this.$router.push({name: "Organizations"});
             //this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});

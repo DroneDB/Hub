@@ -255,8 +255,11 @@ export default {
                 });
 
             } catch (e) {
-                console.log(e)
-                this.showError(e, "Dataset");
+                if (e.status === 401){
+                    this.$router.push({ name: "Login" }).catch(() => { });
+                }else{
+                    this.showError(e, "Dataset");
+                }
                 return [];
             }
         },

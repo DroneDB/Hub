@@ -199,10 +199,12 @@ export default {
       },
 
       refreshStorageInfo: async function() {
-          try{
-            this.storageInfo = await reg.getStorageInfo();
-          }catch(e){
-              console.log(e.message);
+          if (!HubOptions.disableStorageInfo){
+            try{
+                this.storageInfo = await reg.getStorageInfo();
+            }catch(e){
+                console.log(e.message);
+            }
           }
       },
       uploadFiles: function(){

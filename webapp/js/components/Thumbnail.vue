@@ -68,7 +68,25 @@ export default {
           return this.$el.getBoundingClientRect();
       },
       handleImageError: function(e){
-          this.showError(new Error("Cannot load thumbnail"));
+        // Retry
+        if (!this.retryNumber) this.retryNumber = 0;
+
+        if (this.retryNumber < 1000 && this.thumbnail.startsWith("/orgs")){
+            if (this.loadTimeout){
+                clearTimeout(this.loadTimeout);
+                this.loadTimeout = null;
+            }
+            this.loadTimeout = setTimeout(() => {
+                if (this.retryNumber > 0 && this.thumbnail.endsWith(`&retry=${this.retryNumber}`)){
+                    this.thumbnail = this.thumbnail.replace(new RegExp("&retry="+ this.retryNumber) + "$", `&retry=${this.retryNumber + 1}`);
+                }else{
+                    this.thumbnail += "&retry=1";
+                }
+                this.retryNumber += 1;
+            }, 5000);
+        }else{
+            this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
+        }
       },
       showError: function(e){
         console.warn(e);
