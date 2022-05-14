@@ -17,7 +17,7 @@
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment" @click="viewDataset(ds)">
                 <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col"><i class="large database icon"></i>{{ds.name ? ds.name : ds.slug}}</div>
+                    <div class="flex-item column left aligned main-col ds-name"><i class="large database icon"></i>{{ds.name ? ds.name : ds.slug}}</div>
                     <div class="flex-item column left aligned">
                         <span v-if="ds.entries == 0">0 files</span>
                         <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div> <div>{{bytesToSize(ds.size)}}</div></div>
@@ -323,6 +323,11 @@ export default {
     margin: 12px;
     
     .datasets {
+
+        .ds-name{
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
 
         .segment {
             &:hover {
