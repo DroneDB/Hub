@@ -10,21 +10,21 @@
             <div class="column">
                 <h1>{{ orgName }}</h1>
             </div>
-            <div class="column right aligned" v-if="isOwner">
+            <div class="column right aligned">
                 <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
             </div>
         </div>
         <div v-for="ds in datasets" class="ui segments datasets">
             <div class="ui segment" @click="viewDataset(ds)">
                 <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col ds-name"><i class="large database icon"></i>{{ds.name ? ds.name : ds.slug}}</div>
+                    <div class="flex-item column left aligned main-col ds-name"><i class="database icon"></i>{{ds.name ? ds.name : ds.slug}}</div>
                     <div class="flex-item column left aligned">
                         <span v-if="ds.entries == 0">0 files</span>
                         <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div> <div>{{bytesToSize(ds.size)}}</div></div>
                     </div>
                     <div class="flex-item column left aligned">
-                        <div v-if="ds.public"><i class="large globe icon"></i>Public</div>
-                        <div v-else><i class="large lock icon"></i>Private</div>
+                        <div v-if="ds.public"><i class="unlock icon"></i>Public</div>
+                        <div v-else><i class="lock icon"></i>Private</div>
                     </div>
                     <div class="flex-item column actions right aligned">
                         <button @click.stop="handleEdit(ds)" class="ui button icon small grey"
@@ -90,8 +90,7 @@ export default {
             dsDialogMode: null,
             dsDialogOpen: false,
 
-            orgName: "",
-            isOwner: false
+            orgName: ""
         }
     },
     mounted: async function(){
@@ -100,18 +99,16 @@ export default {
             
             this.org = reg.Organization(this.$route.params.org);
             const orgInfo = await this.org.info();
-
+            console.log(orgInfo);
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
             setTitle(this.orgName);
         
-            this.isOwner = reg.getUsername() === this.$route.params.org;
-            
             const tmp = await this.org.datasets();
 
             this.datasets = tmp.map(ds => {
                 return {
                     slug: ds.slug,
-                    creationDate: Date.parse(ds.creationDate),                    
+                    creationDate: Date.parse(ds.creationDate),
                     public: ds.properties.public,
                     entries: ds.properties.entries,
                     size: ds.size,
