@@ -56,7 +56,7 @@ export default {
   },
   beforeMount: function(){
       if (reg.isLoggedIn()){
-          this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
+        this.$router.push({name: "Organizations", params: {org: HubOptions.singleOrganization !== undefined ? HubOptions.singleOrganization : reg.getUsername()}});
       }else if (xAuthAvailable()){
           // Try to log-in using the xAuthToken
           this.xAuthInProgress = true;
@@ -75,17 +75,16 @@ export default {
   },
   methods: {
       redirectToPrevRoute: function(){
-            let redirectTo = this.$router.history.current.meta.prev.path;
+        let redirectTo = this.$router.history.current.meta.prev.path;
 
-            // Redirect to previous path, unless it's the same as the current login path
-            // in which case redirect to home
-            console.log(redirectTo);
-            if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()){
-                this.$router.push({name: "Organizations"});
-                //this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
-            }else{
-                this.$router.push({path: redirectTo});
-            }
+        // Redirect to previous path, unless it's the same as the current login path
+        // in which case redirect to home
+        if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()){
+            this.$router.push({name: "Organizations"});
+            //this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
+        }else{
+            this.$router.push({path: redirectTo});
+        }
       },
       login: async function(e){
         e.preventDefault();

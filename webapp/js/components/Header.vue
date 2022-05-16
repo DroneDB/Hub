@@ -1,6 +1,12 @@
 <template>
 <div id="header">
-    <a :href="homeUrl" class="logo"><img src="/images/banner.svg"></a>
+    <a :href="homeUrl" class="logo">
+    <img v-if="appLogo" :src="appLogo">
+    <template v-else>
+        <i class="app-icon" :class="appIcon" />
+        <div class="app-name">{{ appName }}</div>
+    </template>
+    </a>
     
     <div class="right">
 
@@ -35,7 +41,7 @@
             <div class="menu" ref="menu">
                 <div class="header">{{ username }} <span v-if="isAdmin && username != 'admin'"> — <i>admin</i></span></div>
                 <div class="divider"></div>
-                <div class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
+                <div v-if="fileUploads" class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
                 <div class="item" @click="myOrganizations"><i class="icon users"></i> My Organizations</div>
                 <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
                 <div class="divider only" v-if="storageInfo"></div>
@@ -89,13 +95,13 @@ export default {
   },
   computed: {
       homeUrl: function(){
-          if (this.loggedIn){
-              return `/r/${this.username}`;
-          } else return "/";
-      },
+          const org = HubOptions.singleOrganization !== undefined ? 
+                      HubOptions.singleOrganization : 
+                      this.username;
 
-      datasetsUrl: function() {
-        return this.loggedIn ? "/r/" + reg.getUsername() : "/";      
+          if (this.loggedIn){
+              return `/r/${org}`;
+          } else return "/";
       },
 
       downloadUrl: function(){
@@ -133,7 +139,21 @@ export default {
           else return this.selectedFiles.length == 0;
       },
 
+      fileUploads: function(){
+          return !HubOptions.disableDatasetCreation;
+      },
 
+      appLogo: function(){
+          return HubOptions.appLogo;
+      },
+      appIcon: function(){
+          return (HubOptions.appIcon === "dronedb" || HubOptions.appIcon === undefined) ? 
+                "icon-dronedb" :
+                `icon ${HubOptions.appIcon}`;
+      },
+      appName: function(){
+          return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+      }
   },
   mounted: function(){
       mouse.on('click', this.hideMenu);
@@ -162,7 +182,7 @@ export default {
 
           // TODO: we need to show this to users that
           // have write access, not everyone
-          this.showSettings = reg.isLoggedIn();
+          this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
           this.params = params;
       }
@@ -174,19 +194,24 @@ export default {
       mouse.off('click', this.hideMenu);
   },
   methods: {
-
-    handleStorageInfoDialogClose: function () {
-        this.storageInfoDialogOpen = false;
-    },
+      handleStorageInfoDialogClose: function () {
+          this.storageInfoDialogOpen = false;
+      },
 
       refreshStorageInfo: async function() {
-          this.storageInfo = await reg.getStorageInfo();
+          if (!HubOptions.disableStorageInfo){
+            try{
+                this.storageInfo = await reg.getStorageInfo();
+            }catch(e){
+                console.log(e.message);
+            }
+          }
       },
       uploadFiles: function(){
           this.$router.push({name: "Upload"});
       },
       myDatasets: function(){
-          this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
+          this.$router.push({name: "Datasets", params: {org: HubOptions.singleOrganization !== undefined ? HubOptions.singleOrganization : reg.getUsername()}});
       },
       myOrganizations: function(){
           this.$router.push({name: "Organizations"});
@@ -267,7 +292,7 @@ export default {
     .logo{
         margin-top: 6px;
         & > img{
-            width: 140px;
+            height: 22px;
         }
 
         @media only screen and (max-width: 767px) {
@@ -275,6 +300,19 @@ export default {
                 width: 160px;
                 margin-top: 2px;
             }
+        }
+
+        .app-icon{
+            font-size: 22px;
+        }
+        .app-name{
+            font-size: 22px;
+            color: #030a03;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .icon-dronedb{
+            padding-right: 8px;
         }
     }
     .right{

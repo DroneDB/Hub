@@ -6,7 +6,7 @@
         <div class="column">
             <h1>Organizations</h1>
         </div>
-        <div class="column right aligned">
+        <div class="column right aligned" v-if="!readyOnly">
             <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Create Organization</button>
         </div>
     </div>
@@ -19,24 +19,18 @@
                 <div class="ui grid middle aligned flex-container">
                     <div class="flex-item column left aligned main-col"><i class="large users icon"></i>{{org.name ? org.name : org.slug}}</div>
                     <div class="flex-item column left aligned">
-                        <div v-if="org.isPublic"><i class="large globe icon"></i>Public</div>
-                        <div v-else><i class="large lock icon"></i>Private</div>
+                        <div v-if="org.isPublic"><i class="unlock icon"></i>Public</div>
+                        <div v-else><i class="lock icon"></i>Private</div>
                     </div>
                     <div class="flex-item column actions right aligned">
-                        <button v-if="org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleEdit(org)" class="ui button icon small grey"
+                        <button v-if="!readyOnly &&org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleEdit(org)" class="ui button icon small grey"
                                     :class="{loading: org.editing}"
                                     :disabled="org.editing || org.deleting">
                                     <i class="ui icon pencil"></i>
                         </button>
-                        <button v-if="org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleDelete(org)" class="ui button icon small negative" 
-                                :class="{loading: org.deleting}"                                
+                        <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleDelete(org)" class="ui button icon small negative" 
+                                :class="{loading: org.deleting}"
                                 :disabled="org.deleting || org.editing"><i class="ui icon trash"></i>
-                        </button>
-                        <button v-else-if="org.slug == 'public'" @click.stop="showMessage('This is the public organization. It cannot be deleted or edited.')" class="ui button icon small info"
-                                :disabled="org.deleting"><i class="ui icon info"></i>
-                        </button>
-                        <button v-else-if="org.slug == org.owner" @click.stop="showMessage('This is the user organization. It cannot be deleted or edited.')" class="ui button icon small info"
-                                :disabled="org.deleting"><i class="ui icon info"></i>
                         </button>
                     </div>
                 </div>
@@ -117,8 +111,7 @@ export default {
                 this.$router.push({name: "Upload"}).catch(()=>{});
             }
         } catch(e) {
-
-            if (e.message === "Unauthorized")
+            if (e.status === 401)
                 this.$router.push({name: "Login"}).catch(()=>{});
             else
                 this.error = e.message;
@@ -263,6 +256,12 @@ export default {
 
         upload: function(){
             this.$router.push({name: "Upload"});
+        }
+    },
+
+    computed: {
+        readyOnly: function(){
+            return HubOptions.readOnlyOrgs;
         }
     }
 }
