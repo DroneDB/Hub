@@ -21,6 +21,9 @@ import Nexus from './components/Nexus.vue';
 import Panorama from './components/Panorama.vue';
 import Markdown from './components/Markdown.vue';
 import Upload from './components/Upload.vue';
+import Users from './components/users/Users.vue';
+import Account from './components/account/Account.vue';
+
 import reg from './libs/sharedRegistry';
 import { setTitle, queryParams, inIframe } from './libs/utils';
 
@@ -63,7 +66,8 @@ window.addEventListener('load', function () {
         { path: '/r/:org', name: "Datasets", components: {content: Datasets, header: hdr}, meta: { title: "Datasets"}},
         { path: '/r', name: "Organizations", components: {content: Organizations, header: hdr}, meta: { title: "Organizations"}},
         { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
-        // TODO: add an actual home page
+        { path: '/admin/users', name: "Users", components: {content: Users, header: hdr}, meta: { title: "Users"}},
+        { path: '/account', name: "Account", components: {content: Account, header: hdr}, meta: { title: "Account"}},
         { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" }},
         { path: '*', name: "NotFound", components: {content: NotFound, header: hdr}, meta: { title: "Not Found"}}
     ];

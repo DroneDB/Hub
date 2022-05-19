@@ -17,7 +17,7 @@
         <div v-for="org in organizations" class="ui segments organization">            
             <div class="ui segment" @click="viewOrganization(org)">
                 <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col"><i class="large users icon"></i>{{org.name ? org.name : org.slug}}</div>
+                    <div class="flex-item column left aligned main-col"><i class="sitemap icon"></i>{{org.name ? org.name : org.slug}}</div>
                     <div class="flex-item column left aligned">
                         <div v-if="org.isPublic"><i class="unlock icon"></i>Public</div>
                         <div v-else><i class="lock icon"></i>Private</div>

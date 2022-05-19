@@ -42,11 +42,14 @@
                 <div class="header">{{ username }} <span v-if="isAdmin && username != 'admin'"> — <i>admin</i></span></div>
                 <div class="divider"></div>
                 <div v-if="fileUploads" class="item" @click="uploadFiles" ><i class="icon cloud upload"></i> Upload Files</div>
-                <div class="item" @click="myOrganizations"><i class="icon users"></i> My Organizations</div>
+                <div class="item" @click="myOrganizations"><i class="icon sitemap"></i> My Organizations</div>
                 <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
                 <div class="divider only" v-if="storageInfo"></div>
                 <div class="item only" @click="storageInfoDialogOpen = true" v-if="storageInfo && storageInfo.total != null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.usedPercentage | percent(2) }}</div>
                 <div class="item only" v-if="storageInfo && storageInfo.total == null"><i class="icon hdd outline"></i>&nbsp;{{storageInfo.used | bytes }}</div>
+                <div v-if="(accountManagement && loggedIn) || (usersManagement && isAdmin)" class="divider"></div>
+                <div v-if="accountManagement && loggedIn" class="item only" @click="manageAccount"><i class="icon user"></i> My Account</div>
+                <div v-if="usersManagement && isAdmin" class="item only" @click="manageUsers"><i class="icon users"></i> Manage Users</div>
                 <div class="divider"></div>
                 <div class="item" @click="logout" ><i class="icon sign-out"></i> Logout</div>
             </div>
@@ -81,7 +84,8 @@ export default {
           showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
           selectedFiles: [],
           storageInfo: null,
-          storageInfoDialogOpen: false
+          storageInfoDialogOpen: false,
+          usersManagement: !!HubOptions.enableUsersManagement
       }
   },
   filters: {
@@ -153,6 +157,9 @@ export default {
       },
       appName: function(){
           return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+      },
+      accountManagement: function(){
+          return !!HubOptions.enableAccountManagement;
       }
   },
   mounted: function(){
@@ -201,7 +208,7 @@ export default {
       refreshStorageInfo: async function() {
           if (!HubOptions.disableStorageInfo){
             try{
-                this.storageInfo = await reg.getStorageInfo();
+                this.storageInfo = await reg.storageInfo();
             }catch(e){
                 console.log(e.message);
             }
@@ -215,6 +222,12 @@ export default {
       },
       myOrganizations: function(){
           this.$router.push({name: "Organizations"});
+      },
+      manageUsers: function(){
+          this.$router.push({name: "Users"});
+      },
+      manageAccount: function(){
+          this.$router.push({name: "Account"});
       },
       handleDownload: async function(e){
           if (this.downloadUrl === "javascript:void(0)"){

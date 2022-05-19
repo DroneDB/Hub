@@ -99,7 +99,6 @@ export default {
             
             this.org = reg.Organization(this.$route.params.org);
             const orgInfo = await this.org.info();
-            console.log(orgInfo);
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
             setTitle(this.orgName);
         
