@@ -11,7 +11,7 @@
                 <h1>Users</h1>
             </div>
             <div class="column right aligned">
-                <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;New User</button>
+                <button @click.stop="showAddUserDialog = true" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;New User</button>
             </div>
         </div>
         <div v-for="u in users" class="ui segments users">
@@ -20,14 +20,9 @@
                     <div class="two column row">
                         <div class="thirteen wide column main"><i class="user icon"></i>{{u.username}}</div>
                         <div class="three wide column right aligned">
-                            <button @click.stop="handleEdit(u)" class="ui button icon small grey"
-                                        :class="{loading: u.editing}"
-                                        :disabled="u.editing || u.deleting">
-                                        <i class="ui icon pencil"></i>
-                            </button>                        
                             <button @click.stop="handleDelete(u)" class="ui button icon small negative" 
                                     :class="{loading: u.deleting}"
-                                    :disabled="u.deleting || u.editing"><i class="ui icon trash"></i>
+                                    :disabled="u.deleting || u.username === 'admin'"><i class="ui icon trash"></i>
                             </button>
                         </div>
                     </div>
@@ -39,20 +34,15 @@
             <p>Are you logged in?</p>
         </div>
     </div>
-    <!--
-    <DeleteDatasetDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :dsSlug="currentDsSlug"></DeleteDatasetDialog>
-    <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
-    <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs" @onClose="handleDatasetClose"></DatasetDialog>
--->
+
+    <AddUserDialog v-if="showAddUserDialog" @onClose="handleCloseAddUser" />
 </div>
 </template>
 
 <script>
 import Message from '../Message.vue';
 import ddb from 'ddb';
-// import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
-// import DatasetDialog from './DatasetDialog.vue';
-// import MessageDialog from '../common/MessageDialog.vue'
+import AddUserDialog from './AddUserDialog.vue'
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -60,17 +50,14 @@ const reg = new Registry(window.location.origin);
 export default {
     components: {
         Message,
-        // DeleteDatasetDialog,
-        // MessageDialog,
-        // DatasetDialog
+        AddUserDialog
     },
     data: function () {
         return {
             error: "",
             users: [],
             loading: true,
-            
-            // deleteDialogOpen: false,
+            showAddUserDialog: false,
         }
     },
     mounted: async function(){
@@ -86,19 +73,24 @@ export default {
         this.loading = false;
     },
     methods: {
-        handleDelete(u) {
-            // this.deleteDialogOpen = true;
+        handleCloseAddUser: function(user){
+            this.showAddUserDialog = false;
+            if (user) this.users.push(user);
         },
 
-        handleEdit(u) {
-            // this.editDataset(ds);
-        },
+        handleDelete: async function(u){
+            const { username } = u;
 
-        
-        handleNew() {
-            // this.dsDialogMode = "new";
-            // this.dsDialogOpen = true;
-            
+            if (window.confirm(`Are you sure you want to delete "${username}"?`)){
+                try{
+                    u.deleting = true;
+                    await reg.deleteUser(username);
+                    this.users = this.users.filter(u => u.username !== username);
+                }catch(e){
+                    this.error = e.message;
+                    u.deleting = false;
+                }
+            }
         }
     }
 }
@@ -114,12 +106,14 @@ export default {
     }
 
     .users {
+/*
         .segment {
             &:hover {
                 background-color: #f5f5f5;
                 cursor: pointer;
             }
         }
+*/
         .column{
             font-size: large;
             .main {
