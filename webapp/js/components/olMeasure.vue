@@ -2,6 +2,7 @@
 </template>
 
 <script>
+import { rootPath } from '../dynamic/pathutils';
 import {Control} from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
@@ -20,11 +21,11 @@ class MeasureControls extends Control {
         const options = opt_options || {};
 
         const btnLength = document.createElement('button');
-        btnLength.innerHTML = '<img title="Measure Length" src="/images/measure-length.svg"/>';
+        btnLength.innerHTML = '<img title="Measure Length" src="' + rootPath("/images/measure-length.svg") + '"/>';
         const btnArea = document.createElement('button');
-        btnArea.innerHTML = '<img title="Measure Area" src="/images/measure-area.svg"/>';
+        btnArea.innerHTML = '<img title="Measure Area" src="' + rootPath("/images/measure-area.svg") + '"/>';
         const btnErase = document.createElement('button');
-        btnErase.innerHTML = '<img title="Erase Measurement" src="/images/measure-erase.svg"/>';
+        btnErase.innerHTML = '<img title="Erase Measurement" src="' + rootPath("/images/measure-erase.svg") + '"/>';
 
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable ol-control';
@@ -76,6 +77,10 @@ class MeasureControls extends Control {
     
     handleErase() {
         this.onSelect('erase');
+    }
+
+    deselectCurrent(){
+        if (this.selectedTool) this.onSelect(this.selectedTool);
     }
 
     getLayer(){

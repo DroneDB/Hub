@@ -389,7 +389,7 @@ export default {
             })
         });
 
-        const measureControls = new olMeasure.Controls({
+        this.measureControls = new olMeasure.Controls({
             onToolSelected: () => { this.measuring = true; },
             onToolDelesected: () => { this.measuring = false; }
         });
@@ -402,7 +402,7 @@ export default {
                 this.extentLayer,
                 this.outlineLayer,
                 this.topLayers,
-                measureControls.getLayer()
+                this.measureControls.getLayer()
             ],
             view: new View({
                 center: [0, 0],
@@ -414,7 +414,7 @@ export default {
             this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
         });
 
-        this.map.addControl(measureControls);
+        this.map.addControl(this.measureControls);
 
         const doSelectSingle = e => {
             let first = true;
@@ -729,6 +729,7 @@ export default {
         if (e.keyCode === 27){
             this.$refs.toolbar.selectTool('clear-selection');
             this.$refs.toolbar.deselectAll();
+            this.measureControls.deselectCurrent();
         }
 
         if (!Keyboard.isCtrlPressed() && this.mouseInside){
