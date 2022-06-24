@@ -409,6 +409,10 @@ export default {
                 zoom: 2
             })
         });
+        
+        this.map.once("postrender", () => {
+            this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
+        });
 
         this.map.addControl(measureControls);
 
