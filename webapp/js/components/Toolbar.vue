@@ -121,6 +121,7 @@ export default {
 .toolbar{
     user-select: none;
     -webkit-user-select: none;
+    z-index: 0;
 
     display: flex;
     background-image: linear-gradient(#fefefe, #f3f3f3);
