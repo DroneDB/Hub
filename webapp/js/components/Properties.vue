@@ -1,5 +1,5 @@
 <template>
-    <Window title="Properties" id="properties" @onClose="$emit('onClose', $event, arguments[1])">
+    <Window height="80%" width="40%" title="Properties" id="properties" @onClose="$emit('onClose', $event, arguments[1])">
     <div v-if="files.length === 1">
         <table class="ui compact celled definition unstackable table">
             <tbody>
