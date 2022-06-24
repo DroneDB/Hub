@@ -93,7 +93,9 @@ export default {
       },
 
       deselectAll: function(){
-          this.dataTools.forEach(t => this.deselectTool(t.id));
+          this.dataTools.forEach(t => {
+              if (t.selected) this.deselectTool(t.id);
+          });
       },
 
       toggleTool: function(toolId){
