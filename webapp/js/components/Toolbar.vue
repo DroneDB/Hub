@@ -14,7 +14,7 @@
 
 <script>
 //<div class="button selected" title="Select Features by Area (SHIFT)"><i class="icon square outline"></i></div>
-        
+
 export default {
   props: ["tools", "className"],
   data: function(){
@@ -109,7 +109,7 @@ export default {
 
   watch: {
       tools: function(newVal, oldVal){
-          if (newVal.length !== oldVal.length){
+          if (JSON.stringify(newVal) !== JSON.stringify(oldVal)){
             this.refreshTools();
           }
       }
@@ -122,7 +122,7 @@ export default {
     user-select: none;
     -webkit-user-select: none;
     z-index: 0;
-
+    
     display: flex;
     background-image: linear-gradient(#fefefe, #f3f3f3);
     &.plain{
