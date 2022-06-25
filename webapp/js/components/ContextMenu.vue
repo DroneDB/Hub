@@ -3,7 +3,7 @@
     <div class="menu">
         <template v-for="item in visibleItems">
             <div v-if="item.type === 'separator'" class="divider" />
-            <div v-else class="item" @click="handleClick(item)">
+            <div v-else class="item" :class="{'disabled': item.isEnabled !== undefined ? !item.isEnabled() : false }" @click="handleClick(item)">
                 <i v-if="item.icon != null" style="margin-right: 0.5rem" class="icon" v-bind:class="item.icon"></i>
                 {{ item.label }}
             </div>
@@ -113,5 +113,3 @@ export default {
     display: block;
 }
 </style>
-
-    
