@@ -44,6 +44,12 @@ export default {
 
         this.$nextTick(() => {
             this.$refs.renameInput.focus();
+            
+            this.$refs.renameInput.select();
+            const dotIdx = this.renameText.indexOf(".");
+            if (dotIdx !== -1){
+                this.$refs.renameInput.selectionEnd = dotIdx;
+            }
         });
     },
     methods: {
