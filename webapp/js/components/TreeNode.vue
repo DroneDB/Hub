@@ -290,6 +290,7 @@ export default {
     }
     .circle.notch{
         margin-left: -5px;
+        margin-top: 2px;
     }
     .children{
         margin-left: 16px;
