@@ -400,7 +400,9 @@ export default {
                     file.selected = false;
                 }
                 file.selected = !file.selected;
-                this.rangeStartThumb = thumb;
+                
+                // Keep rangeStart from the first selected file
+                if (this.selectedFiles.length === 1) this.rangeStartThumb = thumb;
             }
         },
 
