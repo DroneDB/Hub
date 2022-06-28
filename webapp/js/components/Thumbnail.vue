@@ -70,7 +70,6 @@ export default {
       handleImageError: function(e){
         // Retry
         if (!this.retryNumber) this.retryNumber = 0;
-
         if (this.retryNumber < 1000 && this.thumbnail.startsWith("/orgs")){
             if (this.loadTimeout){
                 clearTimeout(this.loadTimeout);
@@ -174,12 +173,17 @@ export default {
     }
     .icon.badge{
         font-size: 11px;
+    }
 
+    i.icon{
+        margin: 0;
     }
 
     i.loading{
         position: absolute;
-        top: 50%;
+        top: 63%;
+        left: 50%;
+        margin-left: -10px;
     }
 }
 </style>
