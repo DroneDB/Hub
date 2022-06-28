@@ -378,6 +378,7 @@ export default {
             const file = thumb.file;
 
             if (entry.isDirectory(file.entry)) {
+                thumb.loading = true; // Show loading spinner
                 this.$root.$emit("folderOpened", pathutils.getTree(file.entry.path));
             } else {
                 this.$emit('openItem', file);
