@@ -4,6 +4,7 @@ let metaPressed = false;
 
 let keyDownListeners = [];
 let keyUpListeners = [];
+let shortcutListeners = [];
 
 const api = {
     onKeyDown: function(listener){
@@ -12,6 +13,14 @@ const api = {
 
     onKeyUp: function(listener){
         keyUpListeners.push(listener);
+    },
+
+    onShortcut: function(listener){
+        shortcutListeners.push(listener);
+    },
+
+    offShortcut: function(listener){
+        shortcutListeners = shortcutListeners.filter(l => l !== listener);
     },
 
     offKeyDown: function(listener){
@@ -49,6 +58,12 @@ const api = {
     }
 };
 
+const fireShortcutEvent = (accelerator) => {
+    for (let i = 0; i < shortcutListeners.length; i++){
+        if (shortcutListeners[i](accelerator)) break;
+    }
+};
+
 window.addEventListener("keydown", e => {
     const state = {
         ctrlKey: e.ctrlKey,
@@ -61,6 +76,16 @@ window.addEventListener("keydown", e => {
     if (e.key === "Shift") state.shiftKey = true;
     
     api.updateState(state);
+
+    // Shortcuts
+    if (e.key.length === 1 && (state.ctrlKey || state.metaKey)){
+        fireShortcutEvent("CmdOrCtrl+" + e.key.toUpperCase());
+    }else if (e.key.length === 2 && e.key[0] === 'F'){
+        fireShortcutEvent(e.key);
+    }else if (e.key.length === 6){
+        // Delete
+        fireShortcutEvent(e.key);
+    }
 
     keyDownListeners.forEach(l => l(e));
 });
