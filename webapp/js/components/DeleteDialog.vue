@@ -18,6 +18,7 @@
 </template>
 
 <script>
+import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
 
 export default {
@@ -31,10 +32,18 @@ export default {
       return {};
   },
   mounted: function(){
+    Keyboard.onKeyDown(this.handleKeyDown);
+  },
+  beforeDestroy: function(){
+    Keyboard.offKeyDown(this.handleKeyDown);
   },
   methods: {
       close: function(buttonId){
           this.$emit('onClose', buttonId);
+      },
+
+      handleKeyDown: function(e){
+          if (e.key === 'Enter') this.close('remove');
       }
   }
 }
