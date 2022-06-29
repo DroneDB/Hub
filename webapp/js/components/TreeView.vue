@@ -1,5 +1,5 @@
 <template>
-    <div class="tree-view">
+    <div class="tree-view" ref="treeView">
         <TreeNode v-for="node in nodes" 
                     :node="node" 
                     :key="node.path"
@@ -64,7 +64,7 @@ export default {
             this.selectedNodes.forEach(n => n.selected = false);
             this.selectedNodes = [];
 
-            this.selectRange(this.rangeStartNode, node, this.$refs.treeNodes);
+            this.selectRange(this.rangeStartNode, node,  this.$refs.treeView.__vue__.$children);
         } else {
             // Single selection
             this.selectedNodes.forEach(n => n.selected = false);

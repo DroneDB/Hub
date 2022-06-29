@@ -392,7 +392,7 @@ export default {
             if (Keyboard.isShiftPressed() && this.selectedFiles.length > 0 && this.rangeStartThumb) {
                 // Range selection
                 this.selectedFiles.forEach(f => f.selected = false);
-                this.selectRange(this.rangeStartThumb, thumb, this.$refs.thumbs);
+                this.selectRange(this.rangeStartThumb, thumb);
             } else {
 
                 // Single selection
@@ -407,9 +407,7 @@ export default {
             }
         },
 
-        selectRange: function (low, high, thumbs) {
-            if (!thumbs) return;
-
+        selectRange: function (low, high) {
             let idxLow = parseInt(low.$el.getAttribute('data-idx')),
                 idxHigh = parseInt(high.$el.getAttribute('data-idx'));
 
@@ -420,14 +418,14 @@ export default {
 
             let $n = low.$el;
             while ($n != high.$el && $n !== null) {
-                const f = thumbs[parseInt($n.getAttribute('data-idx'))].file;
+                const f = $n.__vue__.file;
                 f.selected = true;
                 $n = $n.parentElement.nextSibling.children[0];
             }
 
             if ($n !== null) {
                 // Select last
-                const f = thumbs[parseInt($n.getAttribute('data-idx'))].file;
+                const f = $n.__vue__.file;
                 f.selected = true;
             }
         },
