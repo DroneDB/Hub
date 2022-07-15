@@ -1,5 +1,6 @@
 export default {
     rootPath: function(path){
-        return "/" + path;
+        if (path.indexOf("/") === 0) return path;
+        else return "/" + path;
     }
 }
