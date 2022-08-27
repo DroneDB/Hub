@@ -20,18 +20,33 @@ class MeasureControls extends Control {
     constructor(opt_options) {
         const options = opt_options || {};
 
+        const unitPref = localStorage.getItem("measureUnitPref") || "metric";
+
         const btnLength = document.createElement('button');
         btnLength.innerHTML = '<img title="Measure Length" src="' + rootPath("/images/measure-length.svg") + '"/>';
         const btnArea = document.createElement('button');
         btnArea.innerHTML = '<img title="Measure Area" src="' + rootPath("/images/measure-area.svg") + '"/>';
         const btnErase = document.createElement('button');
         btnErase.innerHTML = '<img title="Erase Measurement" src="' + rootPath("/images/measure-erase.svg") + '"/>';
-
+        const btnUnits = document.createElement('button');
+        btnUnits.innerHTML = '<img title="Change Units" src="' + rootPath("/images/measure-units.svg") + '"/>';
+        
+        const unitDiv = document.createElement('div');
+        unitDiv.style.display = 'none';
+        unitDiv.style.float = 'right';
+        const unitSelect = document.createElement('select');
+        unitSelect.style.marginRight = '2px';
+        unitSelect.innerHTML = '<option value="metric" ' + (unitPref === 'metric' ? 'selected' : '') + '>Metric</option>' + 
+                               '<option value="imperial" ' + (unitPref === 'imperial' ? 'selected' : '') + '>Imperial</option>';
+        unitDiv.appendChild(unitSelect);
+        
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable ol-control';
         element.appendChild(btnLength);
         element.appendChild(btnArea);
         element.appendChild(btnErase);
+        element.appendChild(unitDiv);
+        element.appendChild(btnUnits);
         
         super({
             element: element,
@@ -41,6 +56,8 @@ class MeasureControls extends Control {
         btnLength.addEventListener('click', this.handleMeasureLength.bind(this), false);
         btnArea.addEventListener('click', this.handleMeasureArea.bind(this), false);
         btnErase.addEventListener('click', this.handleErase.bind(this), false);
+        btnUnits.addEventListener('click', this.handleToggleUnits.bind(this), false);
+        unitSelect.addEventListener('change', this.handleChangeUnits.bind(this), false);
 
         this.selectedTool = null;
         this.onToolSelected = options.onToolSelected || (() => {});
@@ -65,6 +82,10 @@ class MeasureControls extends Control {
               }),
             }),
           });
+
+        this.unitDiv = unitDiv;
+        this.unitSelect = unitSelect;
+        this.unitPref = unitPref;
     }
   
     handleMeasureLength() {
@@ -77,6 +98,15 @@ class MeasureControls extends Control {
     
     handleErase() {
         this.onSelect('erase');
+    }
+
+    handleChangeUnits(){
+        localStorage.setItem("measureUnitPref", this.unitSelect.value);
+        this.unitPref = this.unitSelect.value;
+    }
+
+    handleToggleUnits(){
+        this.unitDiv.style.display = this.unitDiv.style.display === 'none' ? 'inline-block' : 'none';
     }
 
     deselectCurrent(){
@@ -131,10 +161,15 @@ class MeasureControls extends Control {
             const formatArea = function (polygon) {
                 const area = getArea(polygon);
                 let output;
-                if (area > 10000) {
-                  output = Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
-                } else {
-                  output = Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
+                if (this.unitPref === 'metric'){
+                    if (area > 10000) {
+                        output = Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
+                    } else {
+                        output = Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
+                    }
+                }else{
+                    const f = 4046.86; // m2 to acres
+                    output = Math.round((area / f) * 100) / 100 + ' acres';
                 }
                 return output;
             };
@@ -142,10 +177,15 @@ class MeasureControls extends Control {
             const formatLength = function (line) {
                 const length = getLength(line);
                 let output;
-                if (length > 100) {
-                  output = Math.round((length / 1000) * 100) / 100 + ' ' + 'km';
-                } else {
-                  output = Math.round(length * 100) / 100 + ' ' + 'm';
+                if (this.unitPref === 'metric'){
+                    if (length > 100) {
+                        output = Math.round((length / 1000) * 100) / 100 + ' ' + 'km';
+                    } else {
+                        output = Math.round(length * 100) / 100 + ' ' + 'm';
+                    }
+                }else{
+                    const f = 3.28084; // meters to feet
+                    output = Math.round((length * f) * 100) / 100 + ' ft';
                 }
                 return output;
             };
@@ -205,10 +245,10 @@ class MeasureControls extends Control {
                         const geom = evt.target;
                         let output;
                         if (geom instanceof Polygon) {
-                        output = formatArea(geom);
+                        output = formatArea.call(self, geom);
                         tooltipCoord = geom.getInteriorPoint().getCoordinates();
                         } else if (geom instanceof LineString) {
-                        output = formatLength(geom);
+                        output = formatLength.call(self,geom);
                         tooltipCoord = geom.getLastCoordinate();
                         }
                         self.measureTooltipElement.innerHTML = output;
