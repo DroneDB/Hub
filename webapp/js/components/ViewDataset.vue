@@ -41,7 +41,7 @@
                     @moveSelectedItems="openRenameItemsDialog"
                     @moveItem="handleMoveItem"
                     @openProperties="handleExplorerOpenProperties"
-                    @importInQGIS="handleImportInQGIS" />
+                    @shareEmbed="handleShareEmbed" />
             </template>
         </TabSwitcher>
     </Panel>
@@ -56,7 +56,7 @@
     </Alert>
     <Loader v-if="isBusy"></Loader>
     <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{flash}}</Flash>
-    <ImportInQGIS v-if="qgisFile" @onClose="handleCloseImportInQGIS" :file="qgisFile" />
+    <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
 </div>
 </template>
 
@@ -78,7 +78,7 @@ import Markdown from './Markdown.vue';
 import Alert from './Alert.vue';
 import Loader from './Loader.vue';
 import Flash from './Flash.vue';
-import ImportInQGIS from './ImportInQGIS.vue';
+import ShareEmbed from './ShareEmbed.vue';
 
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
@@ -92,14 +92,7 @@ import { b64encode } from '../libs/base64';
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
 
-const OpenItemDefaults = {
-    [ddb.entry.type.MARKDOWN]: 'markdown',
-    [ddb.entry.type.GEORASTER]: 'map',
-    [ddb.entry.type.POINTCLOUD]: 'pointcloud',
-    [ddb.entry.type.MODEL]: 'model',
-    [ddb.entry.type.PANORAMA]: 'panorama',
-    [ddb.entry.type.GEOPANORAMA]: 'panorama'    
-}
+import { OpenItemDefaults } from '../libs/openItemDefaults';
 
 export default {
     components: {
@@ -119,7 +112,7 @@ export default {
         Alert,
         Loader,
         Flash,
-        ImportInQGIS
+        ShareEmbed
     },
     data: function () {
         const mobile = isMobile();
@@ -169,7 +162,7 @@ export default {
             errorMessageTitle: null,
             showSettings: false,
             filesToUpload: null,
-            qgisFile: null,
+            shareFile: null,
             flash: ""       
         };
     },
@@ -276,12 +269,12 @@ export default {
             }
         },
 
-        handleImportInQGIS: function(file){
-            this.qgisFile = file;
+        handleShareEmbed: function(file){
+            this.shareFile = file;
         },
 
-        handleCloseImportInQGIS: function(){
-            this.qgisFile = null;
+        handleCloseShareEmbed: function(){
+            this.shareFile = null;
         },
 
         handleMoveItem: async function(node, path){
@@ -670,6 +663,15 @@ export default {
                     let addedOpen = false;
 
                     if (this.selectedFiles.length === 1){
+                        this.explorerTools.push({
+                            id: 'share-embed',
+                            title: "Share/Embed",
+                            icon: "share alternate",
+                            onClick: () => {
+                                this.handleShareEmbed(this.selectedFiles[0]);
+                            }
+                        });
+
                         if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1){
                             this.explorerTools.push({
                                 id: 'open-map',
@@ -677,14 +679,6 @@ export default {
                                 icon: "map",
                                 onClick: () => {
                                     this.handleOpenItem(this.selectedFiles[0], 'map');
-                                }
-                            });
-                            this.explorerTools.push({
-                                id: 'import-qgis',
-                                title: "Import in QGIS",
-                                icon: "cloud upload",
-                                onClick: () => {
-                                    this.handleImportInQGIS(this.selectedFiles[0]);
                                 }
                             });
                             addedOpen = true;

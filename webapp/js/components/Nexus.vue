@@ -9,9 +9,6 @@
         </div>
 
         <div class="container">
-            <button v-if="!loading" class="ui inverted basic button" id="back-button" @click="handleGoToDataset()">
-                <i class="icon arrow left" />&nbsp;Back
-            </button>
             <canvas ref="canvas"></canvas>
         </div>
     </div>
@@ -169,13 +166,6 @@ export default {
             height: 20px;
             width: 22px;
         }
-    }
-
-    #back-button {
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        z-index: 999999999999;
     }
 }
 </style>

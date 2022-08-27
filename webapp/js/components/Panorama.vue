@@ -5,9 +5,6 @@
         <Message bindTo="error" noDismiss />
 
         <div class="viewer" ref="viewer">
-            <button v-if="!loading" class="ui inverted basic button" id="back-button" @click="handleHistoryBack()">
-                <i class="icon arrow left" />&nbsp;Back
-            </button>
         </div>
     </div>
 </template>
@@ -124,13 +121,6 @@ export default {
         .psv-loader{
             color: #fefefe;
         }
-    }
-
-    #back-button {
-        position: absolute;
-        top: 8px;
-        left: 8px;
-        z-index: 999999999999;
     }
 
     .psv-download-button{
