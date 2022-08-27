@@ -168,8 +168,8 @@ class MeasureControls extends Control {
                         output = Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
                     }
                 }else{
-                    const f = 4046.86; // m2 to acres
-                    output = Math.round((area / f) * 100) / 100 + ' acres';
+                    const f = 0.00024710538146717; // m2 to acres
+                    output = Math.round((area * f) * 100) / 100 + ' acres';
                 }
                 return output;
             };
