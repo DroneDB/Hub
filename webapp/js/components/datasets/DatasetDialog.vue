@@ -13,8 +13,12 @@
                     <input ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" type="text" v-model="ds.name" placeholder="Name" />
                 </div>
                 <div class="inline field">
-                    <label>Public</label>
-                    <input type="checkbox" v-model="ds.isPublic" />
+                    <label>Visibility</label>
+                    <select v-model="ds.visibility">
+                        <option :value="0">Private</option>
+                        <option :value="1">Unlisted</option>
+                        <option :value="2">Public</option>
+                    </select>
                 </div>
             </form>  
             <div class="buttons">
@@ -63,7 +67,7 @@ export default {
             ds: {
                 slug: null,
                 name: null,
-                isPublic: false
+                visibility: 0
             },
             title: null
         };
@@ -77,14 +81,14 @@ export default {
 
             this.ds.slug = this.model.slug;
             this.ds.name = this.model.name;
-            this.ds.isPublic = this.model.isPublic;
+            this.ds.visibility = this.model.visibility;
         } else {
 
             this.title = "Create new dataset";
 
             this.ds.slug = null;
             this.ds.name = null;
-            this.ds.isPublic = false;
+            this.ds.visibility = 0;
         }
 
     },
@@ -92,7 +96,7 @@ export default {
         close: function(buttonId){
             this.$emit('onClose', buttonId, {
                 name: this.ds.name,
-                isPublic: this.ds.isPublic,
+                visibility: this.ds.visibility,
                 slug: slugFromName(this.ds.name)
             });
         },

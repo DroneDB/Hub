@@ -23,7 +23,8 @@
                         <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div> <div>{{bytesToSize(ds.size)}}</div></div>
                     </div>
                     <div class="flex-item column left aligned">
-                        <div v-if="ds.public"><i class="unlock icon"></i>Public</div>
+                        <div v-if="ds.visibility === 2"><i class="unlock icon"></i>Public</div>
+                        <div v-else-if="ds.visibility === 1"><i class="unlock icon"></i>Unlisted</div>
                         <div v-else><i class="lock icon"></i>Private</div>
                     </div>
                     <div class="flex-item column actions right aligned">
@@ -108,7 +109,7 @@ export default {
                 return {
                     slug: ds.slug,
                     creationDate: Date.parse(ds.creationDate),
-                    public: ds.properties.public,
+                    visibility: ds.properties?.meta?.visibility?.data,
                     entries: ds.properties.entries,
                     size: ds.size,
                     editing: false,
@@ -195,7 +196,7 @@ export default {
             this.dsDialogModel = {
                 slug: ds.slug,
                 name: ds.name,    
-                isPublic: ds.public
+                visibility: ds.visibility
             };
             this.dsDialogMode = "edit";
             this.dsDialogOpen = true;
@@ -225,12 +226,12 @@ export default {
                 this.loading = true;
 
                 try {
-                    let ret = await this.org.createDataset(newds.slug, newds.name, newds.isPublic);
+                    let ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility);
                     if (ret) {
                         this.datasets.unshift({
                             slug: newds.slug,
                             creationDate: new Date(),
-                            public: newds.isPublic,
+                            visibility: newds.visibility,
                             entries: 0,
                             size: 0,
                             editing: false,
@@ -259,13 +260,13 @@ export default {
                 try {
 
                     let dsobj = this.org.Dataset(ds.slug);
-                    let ret = await dsobj.update(newds.name, newds.isPublic);
+                    let ret = await dsobj.update(newds.name, newds.visibility);
 
                     if (ret) {
                         
                         dsitem.slug = ds.slug;
                         dsitem.name = newds.name;
-                        dsitem.public = newds.isPublic;
+                        dsitem.visibility = newds.visibility;
 
                         // Rename
                         if (newds.slug !== dsitem.slug) {

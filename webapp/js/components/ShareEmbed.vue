@@ -56,7 +56,7 @@
             <div v-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'">
                 <div v-if="needsAuth">
                     <a href="javascript:void(0);"
-                        @click="handleSetPublic"
+                        @click="handleSetUnlisted"
                         class="ui button primary icon">
                             <i class="icon unlock"></i> Allow access to anyone with the link
                     </a>
@@ -132,7 +132,7 @@ export default {
   mounted: async function(){
       try{
           const [ dataset, _ ] = ddb.utils.datasetPathFromUri(this.file.path);
-          this.needsAuth = !(await dataset.isPublic());
+          this.needsAuth = (await dataset.getVisibility()) === ddb.Visibility.PRIVATE;
           const entry = dataset.Entry(this.file.entry);
 
           if (entry.type === ddb.entry.type.POINTCLOUD) this.buildUrl = await entry.getEpt();
@@ -154,10 +154,10 @@ export default {
               this.copyTextTimeout = null;
           }, 2000);
       },
-      handleSetPublic: async function(){
+      handleSetUnlisted: async function(){
         try{
             this.loading = true;
-            await this.dataset.setPublic(true);
+            await this.dataset.setVisibility(ddb.Visibility.UNLISTED);
             this.needsAuth = false;
         }catch(e){
             this.error = e.message;
