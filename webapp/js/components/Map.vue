@@ -46,6 +46,11 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { isMobile } from '../libs/responsive';
 import { Basemaps } from '../libs/basemaps';
 
+import MVT from 'ol/format/MVT';
+import VectorTileLayer from 'ol/layer/VectorTile';
+import VectorTileSource from 'ol/source/VectorTile';
+import GeometryType from 'ol/geom/GeometryType';
+
 import {Circle as CircleStyle, Fill, Stroke, Style, Text, Icon} from 'ol/style';
 
 export default {
@@ -315,6 +320,7 @@ export default {
             }
         });
         this.rasterLayer = new LayerGroup();
+        this.vectorLayer = new LayerGroup();
 
         this.extentsFeatures = new VectorSource();
         this.extentLayer = new VectorLayer({
@@ -399,6 +405,7 @@ export default {
                 this.basemapLayer,
                 this.rasterLayer,
                 this.footprintRastersLayer,
+                this.vectorLayer,
                 this.extentLayer,
                 this.outlineLayer,
                 this.topLayers,
@@ -624,9 +631,39 @@ export default {
         this.flightPathFeatures.clear();
         this.markerFeatures.clear();
         this.clearLayerGroup(this.rasterLayer);
+        this.clearLayerGroup(this.vectorLayer);
 
         const features = [];
         const rasters = this.rasterLayer.getLayers();
+
+
+        // TODO: REMOVE
+
+        
+
+        const vectors = this.vectorLayer.getLayers();
+        const mvtLayer = new VectorTileLayer({
+            declutter: true,
+            source: new VectorTileSource({
+                format: new MVT(),
+                //projection: 'EPSG:3857',
+                url: '/contours/{z}/{x}/{y}.pbf',
+            }),
+            maxZoom: 20,
+            minZoom: 16,
+            style: new Style({
+                stroke: new Stroke({
+                    color: 'rgba(253, 226, 147, 1)',
+                    width: 4
+                }),
+                fill: new Fill({
+                    color: 'rgba(252, 252, 255, 1)'
+                })
+            }),
+        });
+        vectors.push(mvtLayer);
+
+        // END TODO REMOVE
 
         let flightPath = [];
 
