@@ -148,7 +148,7 @@ export default {
                     this.license = document;
                     break;
                 case "README.md":
-                    entry = await this.dataset.writeObj(document, "# Readme\n");
+                    entry = await this.dataset.writeObj(document, "\n");
                     this.readme = document;
                     break;
                 default:
