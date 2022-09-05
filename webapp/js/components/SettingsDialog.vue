@@ -14,41 +14,27 @@
         <h4 class="ui header">
         <i class="icon" :class="{unlock: noAuthRequired, lock: !noAuthRequired}"></i>
         <div class="content">
-            Visibility:
-            <div class="ui inline dropdown" @click.stop="toggleVisibilityMenu">
-            
-            <div class="text" v-if="isPublic">public</div>
-            <div class="text" v-if="isUnlisted">unlisted</div>
-            <div class="text" v-if="isPrivate">private</div>
-            
-            <i class="dropdown icon"></i>
-            <div class="menu" ref="visibilityMenu">
-                <div class="item" :class="{active: isPublic}" @click="setVisibility(2)">public</div>
-                <div class="item" :class="{active: isUnlisted}" @click="setVisibility(1)">unlisted</div>
-                <div class="item" :class="{active: isPrivate}" @click="setVisibility(0)">private</div>
-            </div>
-            </div>
+            Visibility: <select v-model="visibility" @change="setVisibility">
+                <option v-for="(v, k) in Visibilities" :value="k">{{ v.label }}</option>
+            </select>
         </div>
         </h4>
 
-        <div class="description" v-if="isPublic">
-        This dataset will be discoverable. Anybody with the <a :href="currentUrl">link</a> to this page can also see and download the data 
-        </div>
-        <div class="description" v-if="isUnlisted">
-        Anybody with the <a :href="currentUrl">link</a> to this page can see and download the data, but it will not be discoverable.
-        </div>
-        <div class="description" v-if="isPrivate">
-        Only you and people in your organization can see and download the data. 
+        <div class="description" v-html="description">
         </div>
 
+        <h4 class="ui header">
+        <i class="icon balance scale"></i>
+        <div class="content">
+            License: <select style="text-overflow: ellipsis" :title="Licenses[license].name" class="license-dropdown" v-model="license" @change="setLicense">
+                <option v-for="(v, k) in Licenses" :value="k">{{ v.name }}</option>
+            </select>
+        </div>
+        </h4>
+        
         <div class="extra" v-if="readme == null">
             <button @click="addDocument('README.md')" class="ui button basic icon">
                 <i class="icon book"/> Add Readme
-            </button>
-        </div>
-        <div class="extra" v-if="license == null">
-            <button @click="addDocument('LICENSE.md')" class="ui button basic icon">
-                <i class="icon balance scale" /> Add License
             </button>
         </div>
     </div>
@@ -59,6 +45,7 @@
 import Message from './Message.vue';
 import mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
+import { Licenses } from '../libs/licenses';
 import Window from './Window.vue';
 import ddb from 'ddb';
 
@@ -78,20 +65,26 @@ export default {
             properties: null,
             loading: true,
             readme: null,
-            license: null
+            license: "proprietary",
+            Licenses,
+            Visibilities: {
+                [ddb.Visibility.PUBLIC]: { label: "Public" },
+                [ddb.Visibility.UNLISTED]: { label: "Unlisted" },
+                [ddb.Visibility.PRIVATE]: { label: "Private" }
+            },
+            visibility: ddb.Visibility.PRIVATE
         }
     },
     mounted: async function(){
-        mouse.on("click", this.hideVisibilityMenu);
-
-
         try{
             const info = await this.dataset.info();
             this.properties = info[0].properties;
         
             this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
-            this.license = (typeof this.properties.license !== 'undefined') ? this.properties.license : null;
+            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
+            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
 
+            console.log(this.Visibilities);
         }catch(e){
             this.error = e.message;
         }
@@ -99,39 +92,38 @@ export default {
         this.loading = false;
     },
     beforeDestroy: function(){
-        mouse.off("click", this.hideVisibilityMenu);
     },
     computed: {
         currentUrl: function(){
             return window.location.href;
         },
         noAuthRequired: function(){
-            return this.isPublic || this.isUnlisted;
+            return [ddb.Visibility.PUBLIC, ddb.Visibility.UNLISTED].indexOf(this.visibility) !== -1;
         },
-        isPublic: function(){
-            return this.properties?.meta?.visibility?.data === ddb.Visibility.PUBLIC;
-        },
-        isUnlisted: function(){
-            return this.properties?.meta?.visibility?.data === ddb.Visibility.UNLISTED;
-        },
-        isPrivate: function(){
-            return this.properties?.meta?.visibility?.data === ddb.Visibility.PRIVATE || !(this.properties?.meta?.visibility?.data);
+        description: function(){
+            if (parseInt(this.visibility) === ddb.Visibility.PUBLIC){
+                return `This dataset will be discoverable. Anybody with the <a href="${this.currentUrl}">link</a> to this page can also see and download the data`;
+            }else if (parseInt(this.visibility) === ddb.Visibility.UNLISTED){
+                return `Anybody with the <a href="${this.currentUrl}">link</a> to this page can see and download the data, but it will not be discoverable.`;
+            }else{
+                return `Only you and people in your organization can see and download the data.`;
+            }
         }
     },
     methods: {
         close: function(buttonId){
           this.$emit('onClose', buttonId);
         },
-        toggleVisibilityMenu: function(){
-            if (this.$refs.visibilityMenu) this.$refs.visibilityMenu.style.display = this.$refs.visibilityMenu.style.display === 'block' ? 
-                                                        'none' : 'block';
-        },
-        hideVisibilityMenu: function(){
-            if (this.$refs.visibilityMenu) this.$refs.visibilityMenu.style.display = 'none';
-        },
-        setVisibility: async function(v){
+        setVisibility: async function(){
             try{
-                this.properties.meta.visibility = await this.dataset.setVisibility(v);
+                this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);
+            }catch(e){
+                this.error = e.message;
+            }
+        },
+        setLicense: async function(){
+            try{
+                this.properties.meta.license = await this.dataset.metaSet("license", this.license);
             }catch(e){
                 this.error = e.message;
             }
@@ -143,10 +135,10 @@ export default {
             var entry = null;
 
             switch(document) {
-                case "LICENSE.md":
-                    entry = await this.dataset.writeObj(document, "# License\n");
-                    this.license = document;
-                    break;
+                // case "LICENSE.md":
+                //     entry = await this.dataset.writeObj(document, "# License\n");
+                //     this.license = document;
+                //     break;
                 case "README.md":
                     entry = await this.dataset.writeObj(document, "# Readme\n");
                     this.readme = document;
@@ -158,7 +150,7 @@ export default {
             this.$emit('addMarkdown', document, entry);
 
             this.loading = false;
-        }     
+        }
     }
 }
 </script>
@@ -195,6 +187,10 @@ export default {
         .button{
             color: #030A03 !important;
         }
+    }
+
+    .license-dropdown{
+        max-width: 250px;
     }
 }
 </style>
