@@ -27,6 +27,7 @@
                         <div @click="login" :class="{loading: loggingIn}" class="ui fluid large primary submit button">Login</div>
                     </div>
                 </form>
+                <div style="margin-top:1rem">If you don't have an account, you can register for free on <a target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
             </div>
             <Message bindTo="error" />
         </div>
