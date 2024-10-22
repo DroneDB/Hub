@@ -1,55 +1,63 @@
 <template>
-<div id="organizations">
-    <Message bindTo="error" />
+    <div id="organizations">
+        <Message bindTo="error"/>
 
-    <div class="top-banner ui equal width grid middle aligned">
-        <div class="column">
-            <h1>Organizations</h1>
+        <div class="top-banner ui equal width grid middle aligned">
+            <div class="column">
+                <h1>Organizations</h1>
+            </div>
+            <div class="column right aligned" v-if="!readyOnly">
+                <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Create
+                    Organization
+                </button>
+            </div>
         </div>
-        <div class="column right aligned" v-if="!readyOnly">
-            <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Create Organization</button>
+        <div v-if="loading" class="loading">
+            <i class="icon circle notch spin"/>
         </div>
-    </div>
-    <div v-if="loading" class="loading">
-        <i class="icon circle notch spin" />
-    </div>
-    <div v-else>
-        <div v-for="org in organizations" class="ui segments organization">            
-            <div class="ui segment" @click="viewOrganization(org)">
-                <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col"><i class="sitemap icon"></i>{{org.name ? org.name : org.slug}}</div>
-                    <div class="flex-item column left aligned">
-                        <div v-if="org.isPublic"><i class="unlock icon"></i>Public</div>
-                        <div v-else><i class="lock icon"></i>Private</div>
-                    </div>
-                    <div class="flex-item column actions right aligned">
-                        <button v-if="!readyOnly &&org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleEdit(org)" class="ui button icon small grey"
+        <div v-else>
+            <div v-for="org in organizations" class="ui segments organization">
+                <div class="ui segment" @click="viewOrganization(org)">
+                    <div class="ui grid middle aligned flex-container">
+                        <div class="flex-item column left aligned main-col"><i
+                            class="sitemap icon"></i>{{ org.name ? org.name : org.slug }}
+                        </div>
+                        <div class="flex-item column left aligned">
+                            <div v-if="org.isPublic"><i class="unlock icon"></i>Public</div>
+                            <div v-else><i class="lock icon"></i>Private</div>
+                        </div>
+                        <div class="flex-item column actions right aligned">
+                            <button v-if="!readyOnly &&org.slug !== 'public' && org.slug !== org.owner"
+                                    @click.stop="handleEdit(org)" class="ui button icon small grey"
                                     :class="{loading: org.editing}"
                                     :disabled="org.editing || org.deleting">
-                                    <i class="ui icon pencil"></i>
-                        </button>
-                        <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner" @click.stop="handleDelete(org)" class="ui button icon small negative" 
-                                :class="{loading: org.deleting}"
-                                :disabled="org.deleting || org.editing"><i class="ui icon trash"></i>
-                        </button>
+                                <i class="ui icon pencil"></i>
+                            </button>
+                            <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                    @click.stop="handleDelete(org)" class="ui button icon small negative"
+                                    :class="{loading: org.deleting}"
+                                    :disabled="org.deleting || org.editing"><i class="ui icon trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-if="organizations.length == 0" class="ui segment">
+                <div class="ui grid middle aligned">
+                    <div class="column">
+                        <h3>No organizations found</h3>
+                        <p>You can create a new organization by clicking the create organization button.</p>
                     </div>
                 </div>
             </div>
         </div>
-        <div v-if="organizations.length == 0" class="ui segment">
-            <div class="ui grid middle aligned">
-                <div class="column">
-                    <h3>No organizations found</h3>
-                    <p>You can create a new organization by clicking the create organization button.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug"></DeleteOrganizationDialog>
-    <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
-    <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel" @onClose="handleOrganizationClose"></OrganizationDialog>
+        <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose"
+                                  :orgSlug="currentOrgSlug"></DeleteOrganizationDialog>
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
+        <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
+                            @onClose="handleOrganizationClose"></OrganizationDialog>
 
-</div>
+    </div>
 </template>
 
 <script>
@@ -58,9 +66,9 @@ import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import OrganizationDialog from './OrganizationDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue'
 import ddb from 'ddb';
-import { setTitle } from '../../libs/utils';
+import {setTitle} from '../../libs/utils';
 
-const { Registry } = ddb;
+const {Registry} = ddb;
 const reg = new Registry(window.location.origin);
 
 export default {
@@ -70,7 +78,7 @@ export default {
         MessageDialog,
         OrganizationDialog
     },
-    
+
     data: function () {
         return {
             error: "",
@@ -87,12 +95,12 @@ export default {
             orgDialogOpen: false,
         }
     },
-    mounted: async function(){
+    mounted: async function () {
         setTitle("Organizations");
-        
+
         try {
             let tmp = await reg.getOrganizations()
-            
+
             this.organizations = tmp.map(item => {
                 let org = item.org;
                 return {
@@ -108,18 +116,25 @@ export default {
             });
 
             if (this.organizations.length === 0) {
-                this.$router.push({name: "Upload"}).catch(()=>{});
+                this.$router.push({name: "Upload"}).catch(() => {
+                });
             }
-        } catch(e) {
-            if (e.status === 401)
-                this.$router.push({name: "Login"}).catch(()=>{});
-            else
+        } catch (e) {
+            if (e.status === 401) {
+                if (e.noRetry) {
+                    reg.logout(); // Clear JWT token and related data
+                    this.$router.push({ name: "Login" }).catch(() => {});
+                } else {
+                    this.error = "Temporary authentication issue. Please try again.";
+                }
+            } else {
                 this.error = e.message;
-            
+            }
+
         }
         this.loading = false;
     },
-    methods: {       
+    methods: {
 
         handleDelete(org) {
             this.currentOrgSlug = org.slug;
@@ -138,7 +153,7 @@ export default {
             org.deleting = true;
 
             try {
-                
+
                 let ret = await reg.deleteOrganization(this.currentOrgSlug);
 
                 if (ret) {
@@ -148,7 +163,7 @@ export default {
                     console.error(ret);
                     org.deleting = false;
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
                 this.error = "Failed to delete organization: " + e.message;
                 org.deleting = false;
@@ -166,7 +181,7 @@ export default {
             this.orgDialogMode = "edit";
             this.orgDialogOpen = true;
         },
-        
+
         newOrganization() {
             this.orgDialogMode = "new";
             this.orgDialogOpen = true;
@@ -202,7 +217,7 @@ export default {
                         this.error = "Failed to create organization \"" + neworg.slug + "\"";
                         console.error(ret);
                     }
-                } catch(e) {
+                } catch (e) {
                     console.error(e);
                     this.error = "Failed to create organization: " + e.message;
                 }
@@ -226,7 +241,7 @@ export default {
                         this.error = "Failed to update organization \"" + org.slug + "\"";
                         console.error(ret);
                     }
-                } catch(e) {
+                } catch (e) {
                     console.error(e);
                     this.error = "Failed to update organization: " + e.message;
                 }
@@ -237,7 +252,7 @@ export default {
         showMessage(msg) {
             this.currentMessage = msg;
             this.messageDialogOpen = true;
-        },        
+        },
 
         handleMessageClose() {
             this.messageDialogOpen = false;
@@ -248,19 +263,21 @@ export default {
             this.editOrganization(org);
         },
 
-        viewOrganization(org){
-            this.$router.push({name: "Datasets", params: {
-                org: org.slug
-            }});
+        viewOrganization(org) {
+            this.$router.push({
+                name: "Datasets", params: {
+                    org: org.slug
+                }
+            });
         },
 
-        upload: function(){
+        upload: function () {
             this.$router.push({name: "Upload"});
         }
     },
 
     computed: {
-        readyOnly: function(){
+        readyOnly: function () {
             return HubOptions.readOnlyOrgs;
         }
     }
@@ -284,23 +301,27 @@ export default {
                 cursor: pointer;
             }
         }
-       
+
         .column {
             font-size: large;
         }
+
         i.icon {
-                margin-right: 5px;
+            margin-right: 5px;
         }
+
         .main-col {
             font-weight: bold;
+
             i.icon {
                 margin-right: 20px;
             }
         }
+
         .item {
             display: flex;
             justify-content: space-between;
-            align-items: center;            
+            align-items: center;
         }
 
     }
@@ -352,10 +373,10 @@ export default {
         flex: 0.5 1 auto;
         align-self: auto;
 
-        
+
         @media screen and (max-width: 768px) {
             text-align: center;
-            
+
             i.icon {
                 margin-right: 0;
             }
