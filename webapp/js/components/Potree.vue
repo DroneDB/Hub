@@ -91,9 +91,9 @@ export default {
                     renderArea.style.right = '300px';
                 }
         };
-        viewer.setEDLEnabled(true);
+        viewer.setEDLEnabled(false);
         viewer.setFOV(60);
-        viewer.setPointBudget(1*1000*1000);
+        viewer.setPointBudget(10*1000*1000);
         viewer.loadGUI(() => {
             viewer.setLanguage('en');
             $("#menu_tools").next().show();
