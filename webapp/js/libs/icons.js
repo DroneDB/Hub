@@ -13,7 +13,8 @@ const typeIconMap = {
     [entry.type.GEOVIDEO]: "film",
     [entry.type.MODEL]: "cube",
     [entry.type.PANORAMA]: "globe",
-    [entry.type.GEOPANORAMA]: "globe"    
+    [entry.type.GEOPANORAMA]: "globe",
+    [entry.type.VECTOR]: "vector square",    
 };
 
 export default {
