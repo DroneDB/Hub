@@ -5,12 +5,17 @@ JS Client Application for Registry
 
 ## Build
 
+Prima di buildare, assicurati di utilizzare Node.js versione 14.x, che è richiesta per questo progetto:
+
 ```
 # git clone https://github.com/DroneDB/Hub --recurse-submodules && cd Hub
+# nvm use 14        # Il file .nvmrc è già configurato con la versione 14.17.0
 # npm install -g webpack@4
 # npm install
-# webpack
+# npx webpack
 ```
+
+Nota: Il progetto utilizza Vue.js 2.6.11 ed è configurato per essere buildato con webpack 4, che funziona meglio con Node.js 14.x.
 
 ## Run
 
