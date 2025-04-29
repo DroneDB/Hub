@@ -10,20 +10,20 @@
                 <tbody>
                     <tr v-for="(val, key) in tObj" :key="key">
                         <td style="white-space: nowrap;">
-                            {{beautify(key)}}</span>
+                            {{ beautify(key) }}
                         </td>
                         <td>
-                            <div v-if="key=='captureTime'">
-                                {{new Date(val)}}
+                            <div v-if="key == 'captureTime'">
+                                {{ new Date(val) }}
                             </div>
-                            <div v-else-if="key=='bands'">
+                            <div v-else-if="key == 'bands'">
                                 {{val.map(b => b.colorInterp).join(", ")}}
                             </div>
-                            <div v-else-if="key=='dimensions'">
-                                {{val.join(", ")}}
+                            <div v-else-if="key == 'dimensions'">
+                                {{ val.join(", ") }}
                             </div>
                             <div v-else-if="typeof val === 'string'" class="wrap">
-                                {{val}}
+                                {{ val }}
                             </div>
                             <ObjTable v-else :obj="val"></ObjTable>
                         </td>
@@ -32,10 +32,10 @@
             </table>
         </div>
         <div v-else-if="typeof tObj === 'number'">
-            {{obj.toLocaleString()}}
+            {{ obj.toLocaleString() }}
         </div>
         <div v-else>
-            {{obj}}
+            {{ obj }}
         </div>
     </div>
 </template>
@@ -48,31 +48,31 @@ export default {
     },
     props: ["obj"],
 
-    data: function(){
+    data: function () {
         let tObj = clone(this.obj);
-        
-        if (typeof tObj === 'object'){
+
+        if (typeof tObj === 'object') {
             // GeoImage adjustments
-            if (Array.isArray(tObj.geotransform)){
+            if (Array.isArray(tObj.geotransform)) {
                 tObj.resolution = (tObj.geotransform[1]).toFixed(2) + ' meters';
-                delete(tObj.geotransform);
+                delete (tObj.geotransform);
             }
 
             // Image / GeoImage Adjustments
-            if (tObj.width !== undefined && tObj.height !== undefined){
+            if (tObj.width !== undefined && tObj.height !== undefined) {
                 tObj["Image Dimensions"] = `${tObj.width} x ${tObj.height}`;
-                delete(tObj.width);
-                delete(tObj.height);
+                delete (tObj.width);
+                delete (tObj.height);
             }
-            
-            // Point cloud / GeoImage adjustments
-            delete(tObj.projection);
-            
-            // GeoImage adjustments
-            delete(tObj.focalLength35);
-            delete(tObj.orientation);
 
-            if (tObj.sensor){
+            // Point cloud / GeoImage adjustments
+            delete (tObj.projection);
+
+            // GeoImage adjustments
+            delete (tObj.focalLength35);
+            delete (tObj.orientation);
+
+            if (tObj.sensor) {
                 tObj.sensor = tObj.sensor.toUpperCase();
             }
 
@@ -83,10 +83,10 @@ export default {
             tObj
         };
     },
-    beforeMount: function(){
+    beforeMount: function () {
     },
     methods: {
-        beautify: function(name) {
+        beautify: function (name) {
             if (typeof name !== 'string') return name;
             return name[0].toUpperCase() + name.substring(1).replace(/([a-z])([A-Z0-9])/g, '$1 $2');
         }
@@ -95,13 +95,14 @@ export default {
 </script>
 
 <style scoped>
-ul{
+ul {
     margin: 0;
     padding-left: 1rem;
 }
-.wrap { 
-   word-wrap: break-word;
-   word-break: break-all;
-   white-space: normal;
+
+.wrap {
+    word-wrap: break-word;
+    word-break: break-all;
+    white-space: normal;
 }
 </style>

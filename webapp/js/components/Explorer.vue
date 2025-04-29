@@ -1,35 +1,28 @@
 <template>
-<div id="explorer-container" >
-    <ContextMenu :items="contextMenu" />
-    <Toolbar :tools="tools" v-if="tools" />
-    <div v-if="currentPath">
-        <div class="ui large breadcrumb" style="margin-top: 1rem; margin-left: 1rem">      
-            <span v-for="(b, idx) in breadcrumbs" :key="'B,' + b.name">
-                <a v-if="idx != breadcrumbs.length - 1" class="section" :class="{home: idx === 0}" v-on:click="goTo(b)">{{b.name}}</a>
-                <div v-if="idx == breadcrumbs.length - 1" class="section active">{{b.name}}</div>
-                <span v-if="idx != breadcrumbs.length - 1" class="divider">/</span>
-            </span>            
+    <div id="explorer-container">
+        <ContextMenu :items="contextMenu" />
+        <Toolbar :tools="tools" v-if="tools" />
+        <div v-if="currentPath">
+            <div class="ui large breadcrumb" style="margin-top: 1rem; margin-left: 1rem">
+                <span v-for="(b, idx) in breadcrumbs" :key="'B,' + b.name">
+                    <a v-if="idx != breadcrumbs.length - 1" class="section" :class="{ home: idx === 0 }"
+                        v-on:click="goTo(b)">{{ b.name }}</a>
+                    <div v-if="idx == breadcrumbs.length - 1" class="section active">{{ b.name }}</div>
+                    <span v-if="idx != breadcrumbs.length - 1" class="divider">/</span>
+                </span>
+            </div>
+            <div class="ui divider"></div>
         </div>
-        <div class="ui divider"></div>
+        <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
+            @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
+            @dragenter="explorerDragEnter($event)" @dragover.prevent>
+            <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable @dragstart="startDrag($event, f)"
+                @drop="onDrop($event, f)" @dragenter.prevent @dragover.prevent>
+                <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
+                    :lazyLoad="true" />
+            </div>
+        </div>
     </div>
-    <div ref="explorer" id="explorer" @click="onClick" :class="{loading, dropping}" @scroll="onScroll" @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)" @dragenter="explorerDragEnter($event)" @dragover.prevent>
-        <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable
-                    @dragstart="startDrag($event, f)"
-                    @drop="onDrop($event, f)"
-                    @dragenter.prevent
-                    @dragover.prevent
-                    >
-            <Thumbnail 
-            :file="f"         
-            :data-idx="idx" 
-            ref="thumbs" 
-            @clicked="handleSelection" 
-            @open="handleOpen"
-            :lazyLoad="true"                
-                />    
-        </div>    
-    </div>    
-</div>
 </template>
 
 <script>
@@ -56,145 +49,145 @@ export default {
     data: function () {
         let contextMenu = [];
 
-        if (env.isElectron()){
+        if (env.isElectron()) {
             contextMenu = contextMenu.concat([{
-                        label: "Open Item Location",
-                        icon: 'open folder outline', 
-                        isVisible: () => { return this.selectedFiles.length > 0; },
-                        click: () => {
-                            if (this.selectedFiles.length > 0) shell.showItemInFolder(this.selectedFiles[0].path);
-                        },
-                        accelerator: "Alt+CmdOrCtrl+R",
-                    },{
-                        type: 'separator'
-                    },{
-                        label: "Share",
-                        icon: 'share alternate',
-                        accelerator: "CmdOrCtrl+S",
-                        isVisible: () => { return this.selectedFiles.length > 0; },
-                        click: () => {
-                            if (this.selectedFiles.length > 0) dispatchEvent(new Event("btnShare_Click"));
-                        }
-                    },{
-                        type: 'separator'
-                    }]);
+                label: "Open Item Location",
+                icon: 'open folder outline',
+                isVisible: () => { return this.selectedFiles.length > 0; },
+                click: () => {
+                    if (this.selectedFiles.length > 0) shell.showItemInFolder(this.selectedFiles[0].path);
+                },
+                accelerator: "Alt+CmdOrCtrl+R",
+            }, {
+                type: 'separator'
+            }, {
+                label: "Share",
+                icon: 'share alternate',
+                accelerator: "CmdOrCtrl+S",
+                isVisible: () => { return this.selectedFiles.length > 0; },
+                click: () => {
+                    if (this.selectedFiles.length > 0) dispatchEvent(new Event("btnShare_Click"));
+                }
+            }, {
+                type: 'separator'
+            }]);
         }
 
         contextMenu = contextMenu.concat([{
-                    label: 'Open',
-                    icon: 'folder open outline',
-                    isVisible: () => { return this.selectedFiles.length > 0; },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('openItem', f);
-                        });
-                    }
-                },{
-                    label: 'Open Map',
-                    icon: 'map',
-                    isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('openItem', f, 'map');
-                        });
-                    }
-                },{
-                    label: 'Open Point Cloud',
-                    icon: 'cube',
-                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('openItem', f, 'pointcloud');
-                        });
-                    }
-                },{
-                    label: 'Open 3D Model',
-                    icon: 'cube',
-                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('openItem', f, 'model');
-                        });
-                    }
-                },{
-                    label: 'Open Panorama',
-                    icon: 'globe',
-                    isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1; },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('openItem', f, 'panorama');
-                        });
-                    }
-                },{
-                    label: 'Open Markdown',
-                    icon: 'book',
-                    isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('openItem', f, 'markdown');
-                        });
-                    }
-                },{
-                    label: 'Share/Embed',
-                    icon: 'share alternate',
-                    isVisible: () => { return this.selectedFiles.length === 1 },
-                    click: () => {
-                        this.selectedFiles.forEach(f => {
-                            this.$emit('shareEmbed', f);
-                        });
-                    }
-                },{
-                    label: "Create Folder",
-                    icon: 'folder',
-                    accelerator: "CmdOrCtrl+N",
-                    click: () => {
-                        this.$emit("createFolder");
-                    }
-                },{
-                    label: "Select All/None",
-                    icon: 'list',
-                    accelerator: "CmdOrCtrl+A",
-                    click: () => {
-                        if (!this.$refs.thumbs) return;
-                        if (this.selectedFiles.length === this.$refs.thumbs.length) {
-                            this.deselectAll();
-                        } else {
-                            this.selectAll();
-                        }
-                    }
-                },
-                {
-                    label: "Properties",
-                    isVisible: () => { return this.selectedFiles.length > 0; },
-                    icon: 'info circle',
-                    accelerator: "CmdOrCtrl+P",
-                    click: () => {
-                        this.$emit("openProperties");
-                    }
-                },
-                {
-                    label: "Rename",
-                    icon: 'pencil alternate',
-                    isVisible: () => { return this.selectedFiles.length == 1; },
-                    accelerator: "CmdOrCtrl+M",
-                    click: () => {
-                        this.$emit("moveSelectedItems");
-                    }
-                },
-                {
-                    isVisible: () => { return this.selectedFiles.length > 0  && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
-                    type: 'separator'
-                },
-                {
-                    label: "Delete",
-                    icon: 'trash alternate outline',
-                    isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
-                    accelerator: "CmdOrCtrl+D",
-                    click: () => {
-                        this.$emit("deleteSelecteditems");
-                    }
+            label: 'Open',
+            icon: 'folder open outline',
+            isVisible: () => { return this.selectedFiles.length > 0; },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('openItem', f);
+                });
+            }
+        }, {
+            label: 'Open Map',
+            icon: 'map',
+            isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('openItem', f, 'map');
+                });
+            }
+        }, {
+            label: 'Open Point Cloud',
+            icon: 'cube',
+            isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('openItem', f, 'pointcloud');
+                });
+            }
+        }, {
+            label: 'Open 3D Model',
+            icon: 'cube',
+            isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('openItem', f, 'model');
+                });
+            }
+        }, {
+            label: 'Open Panorama',
+            icon: 'globe',
+            isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1; },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('openItem', f, 'panorama');
+                });
+            }
+        }, {
+            label: 'Open Markdown',
+            icon: 'book',
+            isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('openItem', f, 'markdown');
+                });
+            }
+        }, {
+            label: 'Share/Embed',
+            icon: 'share alternate',
+            isVisible: () => { return this.selectedFiles.length === 1 },
+            click: () => {
+                this.selectedFiles.forEach(f => {
+                    this.$emit('shareEmbed', f);
+                });
+            }
+        }, {
+            label: "Create Folder",
+            icon: 'folder',
+            accelerator: "CmdOrCtrl+N",
+            click: () => {
+                this.$emit("createFolder");
+            }
+        }, {
+            label: "Select All/None",
+            icon: 'list',
+            accelerator: "CmdOrCtrl+A",
+            click: () => {
+                if (!this.$refs.thumbs) return;
+                if (this.selectedFiles.length === this.$refs.thumbs.length) {
+                    this.deselectAll();
+                } else {
+                    this.selectAll();
                 }
-                ]);
+            }
+        },
+        {
+            label: "Properties",
+            isVisible: () => { return this.selectedFiles.length > 0; },
+            icon: 'info circle',
+            accelerator: "CmdOrCtrl+P",
+            click: () => {
+                this.$emit("openProperties");
+            }
+        },
+        {
+            label: "Rename",
+            icon: 'pencil alternate',
+            isVisible: () => { return this.selectedFiles.length == 1; },
+            accelerator: "CmdOrCtrl+M",
+            click: () => {
+                this.$emit("moveSelectedItems");
+            }
+        },
+        {
+            isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+            type: 'separator'
+        },
+        {
+            label: "Delete",
+            icon: 'trash alternate outline',
+            isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+            accelerator: "CmdOrCtrl+D",
+            click: () => {
+                this.$emit("deleteSelecteditems");
+            }
+        }
+        ]);
 
         return {
             loading: false,
@@ -206,14 +199,14 @@ export default {
         selectedFiles: function () {
             return this.files.filter(f => f.selected);
         },
-        breadcrumbs: function() {
+        breadcrumbs: function () {
             if (this.currentPath == null || this.currentPath.length == 0) return null;
 
             var folders = this.currentPath.split('/');
             var cur = "";
             var bc = [];
 
-            for(var el of folders) {
+            for (var el of folders) {
                 cur += '/' + el;
 
                 bc.push({
@@ -222,7 +215,7 @@ export default {
                 });
             }
 
-            if (bc.length > 0){
+            if (bc.length > 0) {
                 bc.unshift({
                     path: "/",
                     name: "~"
@@ -235,25 +228,25 @@ export default {
     mounted: function () {
         this.rangeStartThumb = null;
     },
-    updated: function(){
+    updated: function () {
         this.lazyLoadThumbs();
     },
     methods: {
 
-        explorerDragEnter: function(evt) {
+        explorerDragEnter: function (evt) {
             //evt.preventDefault();
             console.log("Enter", evt);
             this.dropping = true;
         },
 
-        explorerDragLeave: function(evt) {
+        explorerDragLeave: function (evt) {
             //evt.preventDefault();
             console.log("Leave");
             this.dropping = false;
 
         },
 
-        getFiles: function(ev) {
+        getFiles: function (ev) {
             var files = [];
 
             if (ev.dataTransfer.items) {
@@ -272,7 +265,7 @@ export default {
             return files;
         },
 
-        explorerDropHandler: function(ev) {
+        explorerDropHandler: function (ev) {
             ev.preventDefault();
 
             this.dropping = false;
@@ -280,26 +273,26 @@ export default {
             var files = this.getFiles(ev);
             if (files.length == 0) return;
 
-            this.$root.$emit('uploadItems', { files: files, path: this.currentPath});
-            
+            this.$root.$emit('uploadItems', { files: files, path: this.currentPath });
+
         },
 
-        goTo: function(itm) {
+        goTo: function (itm) {
             this.$root.$emit("folderOpened", pathutils.getTree(itm.path));
         },
 
         startDrag: (evt, item) => {
             evt.dataTransfer.dropEffect = 'move';
             evt.dataTransfer.effectAllowed = 'move';
-            
+
             evt.dataTransfer.setData('item', JSON.stringify(clone(item)));
         },
 
-        onDrop (evt, item) {
-                            
+        onDrop(evt, item) {
+
             this.dropping = false;
 
-            if (entry.isDirectory(item.entry)) {   
+            if (entry.isDirectory(item.entry)) {
                 const destFolder = item.entry.path;
                 const sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
                 this.drop(sourceItem, destFolder);
@@ -311,53 +304,53 @@ export default {
             }
         },
 
-        drop (sourceItem, destFolder) {
-            
+        drop(sourceItem, destFolder) {
+
             if (entry.isDirectory(sourceItem.entry) && (destFolder + '/').startsWith(sourceItem.entry.path + '/')) {
                 this.$log.info("Cannot copy a folder on itself or one of its descendants");
                 return;
             }
-            
+
             const destPath = pathutils.join(destFolder, pathutils.basename(sourceItem.entry.path));
 
             this.$emit('moveItem', sourceItem, destPath);
         },
 
-        onTabActivated: function(){
+        onTabActivated: function () {
             this.$nextTick(() => {
                 this.lazyLoadThumbs();
             });
         },
 
-        onPanelResized: function(){
+        onPanelResized: function () {
             this.$nextTick(() => {
                 this.lazyLoadThumbs();
             });
         },
 
         onClick: function (e) {
-            
+
             // Clicked an empty area
             if (e.target.id === 'explorer') {
                 this.clearSelection();
             }
         },
-        lazyLoadThumbs: function(){
+        lazyLoadThumbs: function () {
             if (!this.$refs.thumbs) return;
 
             const parentBcr = this.$el.getBoundingClientRect();
             this.$refs.thumbs.forEach(t => {
                 const thumbBcr = t.getBoundingRect();
-                if (thumbBcr.bottom - parentBcr.top  > 0 &&
+                if (thumbBcr.bottom - parentBcr.top > 0 &&
                     parentBcr.bottom - thumbBcr.top > 0 &&
                     thumbBcr.right - parentBcr.left > 0 &&
-                    parentBcr.right - thumbBcr.left > 0){
+                    parentBcr.right - thumbBcr.left > 0) {
                     t.loadThumbnail();
                 }
             });
         },
-        onScroll: function(){
-            if (this.scrollTimeout){
+        onScroll: function () {
+            if (this.scrollTimeout) {
                 clearTimeout(this.scrollTimeout);
                 this.scrollTimeout = null;
             }
@@ -371,7 +364,7 @@ export default {
         deselectAll: function () {
             this.files.forEach(f => f.selected = false);
         },
-        clearSelection: function() {
+        clearSelection: function () {
             this.files.forEach(f => f.selected = false);
         },
         handleOpen: async function (thumb) {
@@ -401,7 +394,7 @@ export default {
                     file.selected = false;
                 }
                 file.selected = !file.selected;
-                
+
                 // Keep rangeStart from the first selected file
                 if (this.selectedFiles.length === 1) this.rangeStartThumb = thumb;
             }
@@ -430,9 +423,9 @@ export default {
             }
         },
 
-        scrollTo: function(file){
+        scrollTo: function (file) {
             const thumb = this.$refs.thumbs.find(t => t.file === file);
-            if (thumb){
+            if (thumb) {
                 this.$refs.explorer.scrollTo(0, thumb.$el.offsetTop - this.$el.offsetTop - 12);
             }
         }
@@ -457,7 +450,7 @@ export default {
         opacity: 0.5;
         pointer-events: none;
     }
-    
+
     &.dropping {
         background-color: #EFEFEF;
         box-shadow: inset 0em 0em 5px 2px grey;
@@ -470,10 +463,12 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-    .breadcrumb{
+
+    .breadcrumb {
         word-break: break-all;
         overflow: hidden;
-        .section.home{
+
+        .section.home {
             font-family: monospace;
         }
     }

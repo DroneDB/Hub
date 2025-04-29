@@ -1,16 +1,16 @@
 const loadedUrls = {};
 
-export async function loadResources(urls){
+export async function loadResources(urls) {
     if (typeof urls === "string") urls = [urls];
-    
-    const loadResource = async function(url){
+
+    const loadResource = async function (url) {
         return new Promise((resolve, reject) => {
-            if (loadedUrls[url]){
+            if (loadedUrls[url]) {
                 resolve(url);
                 return;
             }
 
-            if (url.endsWith(".js")){
+            if (url.endsWith(".js")) {
                 const scriptTag = document.createElement('script');
                 scriptTag.src = url;
                 scriptTag.onload = () => {
@@ -19,10 +19,10 @@ export async function loadResources(urls){
                 };
                 scriptTag.onerror = reject;
                 document.body.appendChild(scriptTag);
-            }else if (url.endsWith(".css")){
-                const head  = document.getElementsByTagName('head')[0];
-                const link  = document.createElement('link');
-                link.rel  = 'stylesheet';
+            } else if (url.endsWith(".css")) {
+                const head = document.getElementsByTagName('head')[0];
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
                 link.type = 'text/css';
                 link.href = url;
                 link.media = 'all';

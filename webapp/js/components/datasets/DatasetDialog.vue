@@ -1,16 +1,14 @@
 <template>
-    <Window v-bind:title="title" id="datasetDialog" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
+    <Window v-bind:title="title" id="datasetDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="ds-dialog">
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !isValid()}">
-                <div class="ui error message" v-if="isDuplicateSlug()">                
+            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !isValid() }">
+                <div class="ui error message" v-if="isDuplicateSlug()">
                     <p>This name is already in use.</p>
                 </div>
                 <div class="field">
                     <label>Name</label>
-                    <input ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" type="text" v-model="ds.name" placeholder="Name" />
+                    <input ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')"
+                        type="text" v-model="ds.name" placeholder="Name" />
                 </div>
                 <div class="inline field">
                     <label>Visibility</label>
@@ -20,7 +18,7 @@
                         <option :value="2">Public</option>
                     </select>
                 </div>
-            </form>  
+            </form>
             <div class="buttons">
                 <button @click="close('close')" class="ui button">
                     Close
@@ -49,7 +47,7 @@ export default {
     props: {
         mode: {
             type: String,
-            default: 'new'        
+            default: 'new'
         },
         model: {
             type: Object,
@@ -61,8 +59,8 @@ export default {
             required: false
         }
     },
-  
-    data: function(){
+
+    data: function () {
         return {
             ds: {
                 slug: null,
@@ -72,7 +70,7 @@ export default {
             title: null
         };
     },
-    mounted: function() {
+    mounted: function () {
         this.$nextTick(() => this.$refs.name.focus());
 
         if (this.mode == 'edit') {
@@ -93,14 +91,14 @@ export default {
 
     },
     methods: {
-        close: function(buttonId){
+        close: function (buttonId) {
             this.$emit('onClose', buttonId, {
                 name: this.ds.name,
                 visibility: this.ds.visibility,
                 slug: slugFromName(this.ds.name)
             });
         },
-        isValid: function() {
+        isValid: function () {
             const slug = slugFromName(this.ds.name);
             if (slug == null || slug.length == 0 || !re.test(slug)) {
                 return false;
@@ -118,7 +116,7 @@ export default {
 
             return true;
         },
-        isDuplicateSlug: function(){
+        isDuplicateSlug: function () {
             const slug = slugFromName(this.ds.name);
             return this.forbiddenSlugs.includes(slug);
         }
@@ -127,14 +125,16 @@ export default {
 </script>
 
 <style scoped>
-.ds-dialog{
+.ds-dialog {
     min-width: 320px;
     padding: 4px;
 }
-.buttons{
+
+.buttons {
     margin-top: 16px;
     text-align: right;
 }
+
 .form {
     margin-bottom: 20px;
 }

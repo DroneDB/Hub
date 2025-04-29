@@ -1,61 +1,68 @@
 <template>
-<div id="datasets">
-    <Message bindTo="error" />
+    <div id="datasets">
+        <Message bindTo="error" />
 
-    <div v-if="loading" class="loading">
-        <i class="icon circle notch spin" />
-    </div>
-    <div v-else>
-        <div class="top-banner ui equal width grid middle aligned">
-            <div class="column">
-                <h1>{{ orgName }}</h1>
-            </div>
-            <div class="column right aligned">
-                <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i>&nbsp;Create Dataset</button>
-            </div>
+        <div v-if="loading" class="loading">
+            <i class="icon circle notch spin" />
         </div>
-        <div v-for="ds in datasets" class="ui segments datasets">
-            <div class="ui segment" @click="viewDataset(ds)">
-                <div class="ui grid middle aligned flex-container">
-                    <div class="flex-item column left aligned main-col ds-name"><i class="database icon"></i>{{ds.name ? ds.name : ds.slug}}</div>
-                    <div class="flex-item column left aligned">
-                        <span v-if="ds.entries == 0">0 files</span>
-                        <div v-else><div style="margin-bottom: 5px">{{ds.entries}} <span v-if="ds.entries > 1">files</span><span v-else>file</span></div> <div>{{bytesToSize(ds.size)}}</div></div>
-                    </div>
-                    <div class="flex-item column left aligned">
-                        <div v-if="ds.visibility === 2"><i class="unlock icon"></i>Public</div>
-                        <div v-else-if="ds.visibility === 1"><i class="unlock icon"></i>Unlisted</div>
-                        <div v-else><i class="lock icon"></i>Private</div>
-                    </div>
-                    <div class="flex-item column actions right aligned">
-                        <button @click.stop="handleEdit(ds)" class="ui button icon small grey"
-                                    :class="{loading: ds.editing}"
-                                    :disabled="ds.editing || ds.deleting">
-                                    <i class="ui icon pencil"></i>
-                        </button>                        
-                        <button v-if="canDelete" @click.stop="handleDelete(ds)" class="ui button icon small negative" 
-                                :class="{loading: ds.deleting}"                                
-                                :disabled="ds.deleting || ds.editing"><i class="ui icon trash"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div v-if="datasets.length == 0" class="ui segment">
-            <div class="ui grid middle aligned">
+        <div v-else>
+            <div class="top-banner ui equal width grid middle aligned">
                 <div class="column">
-                    <h3>No datasets found</h3>
-                    <p>You can create a new dataset by clicking the create dataset button.</p>
+                    <h1>{{ orgName }}</h1>
+                </div>
+                <div class="column right aligned">
+                    <button @click.stop="handleNew()" class="ui primary button icon"><i
+                            class="ui icon add"></i>&nbsp;Create Dataset</button>
+                </div>
+            </div>
+            <div v-for="ds in datasets" class="ui segments datasets">
+                <div class="ui segment" @click="viewDataset(ds)">
+                    <div class="ui grid middle aligned flex-container">
+                        <div class="flex-item column left aligned main-col ds-name"><i
+                                class="database icon"></i>{{ ds.name ? ds.name : ds.slug }}</div>
+                        <div class="flex-item column left aligned">
+                            <span v-if="ds.entries == 0">0 files</span>
+                            <div v-else>
+                                <div style="margin-bottom: 5px">{{ ds.entries }} <span
+                                        v-if="ds.entries > 1">files</span><span v-else>file</span></div>
+                                <div>{{ bytesToSize(ds.size) }}</div>
+                            </div>
+                        </div>
+                        <div class="flex-item column left aligned">
+                            <div v-if="ds.visibility === 2"><i class="unlock icon"></i>Public</div>
+                            <div v-else-if="ds.visibility === 1"><i class="unlock icon"></i>Unlisted</div>
+                            <div v-else><i class="lock icon"></i>Private</div>
+                        </div>
+                        <div class="flex-item column actions right aligned">
+                            <button @click.stop="handleEdit(ds)" class="ui button icon small grey"
+                                :class="{ loading: ds.editing }" :disabled="ds.editing || ds.deleting">
+                                <i class="ui icon pencil"></i>
+                            </button>
+                            <button v-if="canDelete" @click.stop="handleDelete(ds)"
+                                class="ui button icon small negative" :class="{ loading: ds.deleting }"
+                                :disabled="ds.deleting || ds.editing"><i class="ui icon trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div v-if="datasets.length == 0" class="ui segment">
+                <div class="ui grid middle aligned">
+                    <div class="column">
+                        <h3>No datasets found</h3>
+                        <p>You can create a new dataset by clicking the create dataset button.</p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-        
-    <DeleteDatasetDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :dsSlug="currentDsSlug"></DeleteDatasetDialog>
-    <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
-    <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs" @onClose="handleDatasetClose"></DatasetDialog>
 
-</div>
+        <DeleteDatasetDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :dsSlug="currentDsSlug">
+        </DeleteDatasetDialog>
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
+        <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs"
+            @onClose="handleDatasetClose"></DatasetDialog>
+
+    </div>
 </template>
 
 <script>
@@ -94,15 +101,15 @@ export default {
             orgName: ""
         }
     },
-    mounted: async function(){
-        
+    mounted: async function () {
+
         try {
-            
+
             this.org = reg.Organization(this.$route.params.org);
             const orgInfo = await this.org.info();
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
             setTitle(this.orgName);
-        
+
             const tmp = await this.org.datasets();
 
             this.datasets = tmp.map(ds => {
@@ -120,11 +127,11 @@ export default {
 
             this.datasets.sort((a, b) => new Date(a.creationDate).getTime() < new Date(b.creationDate).getTime() ? 1 : -1);
 
-        } catch(e) {
-            if (e.status === 401){
-                this.$router.push({name: "Login"}).catch(()=>{});
-            }else if (e.status === 404){
-                this.$router.push({name: "Organizations"}).catch(()=>{});
+        } catch (e) {
+            if (e.status === 401) {
+                this.$router.push({ name: "Login" }).catch(() => { });
+            } else if (e.status === 404) {
+                this.$router.push({ name: "Organizations" }).catch(() => { });
             } else {
                 this.error = e.message;
             }
@@ -132,10 +139,10 @@ export default {
         this.loading = false;
     },
     computed: {
-        forbiddenSlugs: function(){
+        forbiddenSlugs: function () {
             return this.datasets.map(ds => ds.slug);
         },
-        canDelete: function(){
+        canDelete: function () {
             return !HubOptions.disableDatasetCreation;
         }
     },
@@ -160,7 +167,7 @@ export default {
             ds.deleting = true;
 
             try {
-                
+
                 let ret = await this.org.Dataset(this.currentDsSlug).delete()
 
                 if (ret) {
@@ -170,7 +177,7 @@ export default {
                     console.error(ret);
                     ds.deleting = false;
                 }
-            } catch(e) {
+            } catch (e) {
                 console.error(e);
                 this.error = "Failed to delete dataset: " + e.message;
                 ds.deleting = false;
@@ -181,7 +188,7 @@ export default {
         showMessage(msg) {
             this.currentMessage = msg;
             this.messageDialogOpen = true;
-        },        
+        },
 
         handleMessageClose() {
             this.messageDialogOpen = false;
@@ -195,13 +202,13 @@ export default {
         editDataset(ds) {
             this.dsDialogModel = {
                 slug: ds.slug,
-                name: ds.name,    
+                name: ds.name,
                 visibility: ds.visibility
             };
             this.dsDialogMode = "edit";
             this.dsDialogOpen = true;
         },
-        
+
         newDataset() {
             this.dsDialogMode = "new";
             this.dsDialogOpen = true;
@@ -210,7 +217,7 @@ export default {
         handleNew() {
             this.newDataset();
         },
-    
+
         async handleDatasetClose(res, newds) {
 
             this.dsDialogOpen = false;
@@ -242,7 +249,7 @@ export default {
                         this.error = "Failed to create dataset \"" + newds.slug + "\"";
                         console.error(ret);
                     }
-                } catch(e) {
+                } catch (e) {
                     console.error(e);
                     this.error = "Failed to create dataset: " + e.message;
                 }
@@ -263,7 +270,7 @@ export default {
                     let ret = await dsobj.update(newds.name, newds.visibility);
 
                     if (ret) {
-                        
+
                         dsitem.slug = ds.slug;
                         dsitem.name = newds.name;
                         dsitem.visibility = newds.visibility;
@@ -284,27 +291,29 @@ export default {
                         this.error = `Failed to update dataset \"${ds.slug}\"`;
                         console.error(ret);
                     }
-                } catch(e) {
+                } catch (e) {
                     console.error(e);
                     this.error = "Failed to update dataset: " + e.message;
                 }
                 this.loading = false;
                 this.$set(dsitem, 'editing', false);
             }
-        },        
+        },
 
-        viewDataset(ds){
+        viewDataset(ds) {
 
             if (ds.editing || ds.deleting) return;
 
-            this.$router.push({name: "ViewDataset", params: {
-                org: this.$route.params.org,
-                ds: ds.slug 
-            }});
+            this.$router.push({
+                name: "ViewDataset", params: {
+                    org: this.$route.params.org,
+                    ds: ds.slug
+                }
+            });
         },
 
-        upload: function(){
-            this.$router.push({name: "Upload"});
+        upload: function () {
+            this.$router.push({ name: "Upload" });
         }
     }
 }
@@ -318,10 +327,10 @@ export default {
     }
 
     margin: 12px;
-    
+
     .datasets {
 
-        .ds-name{
+        .ds-name {
             text-overflow: ellipsis;
             overflow: hidden;
         }
@@ -332,23 +341,27 @@ export default {
                 cursor: pointer;
             }
         }
-       
+
         .column {
             font-size: large;
         }
+
         i.icon {
-                margin-right: 5px;
+            margin-right: 5px;
         }
+
         .main-col {
             font-weight: bold;
+
             i.icon {
                 margin-right: 20px;
             }
         }
+
         .item {
             display: flex;
             justify-content: space-between;
-            align-items: center;            
+            align-items: center;
         }
 
     }
@@ -400,10 +413,10 @@ export default {
         flex: 0.5 1 auto;
         align-self: auto;
 
-        
+
         @media screen and (max-width: 768px) {
             text-align: center;
-            
+
             i.icon {
                 margin-right: 0;
             }

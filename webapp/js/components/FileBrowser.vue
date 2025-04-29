@@ -1,19 +1,22 @@
 <template>
-<div class="file-browser">
-    <ContextMenu :items="contextMenu" />
-    <div id="search-box">
-        <div class="box">
-            <div id="cancel" :style="{visibility: filterRaw != null && filterRaw.length > 0 ? 'visible' : 'hidden'}" v-on:click="clearSearch()">
-                <i class="icon cancel"></i></div>
-            <input type="text" v-model="filterRaw" v-on:keyup.enter="search()">            
+    <div class="file-browser">
+        <ContextMenu :items="contextMenu" />
+        <div id="search-box">
+            <div class="box">
+                <div id="cancel" :style="{ visibility: filterRaw != null && filterRaw.length > 0 ? 'visible' : 'hidden' }"
+                    v-on:click="clearSearch()">
+                    <i class="icon cancel"></i>
+                </div>
+                <input type="text" v-model="filterRaw" v-on:keyup.enter="search()">
+            </div>
+            <div id="src" v-on:click="search()"><i class="icon search"></i></div>
         </div>
-        <div id="src" v-on:click="search()"><i class="icon search"></i></div> 
+        <TreeView :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
+            :getChildren="getChildren" />
+        <div v-if="loading" class="loading">
+            <i class="icon circle notch spin" />
+        </div>
     </div>
-    <TreeView :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen" :getChildren="getChildren" />
-    <div v-if="loading" class="loading">
-        <i class="icon circle notch spin" />
-    </div>
-</div>
 </template>
 
 <script>
@@ -40,69 +43,69 @@ export default {
     data: function () {
         let contextMenu = [];
 
-        if (env.isElectron()){
+        if (env.isElectron()) {
             contextMenu = contextMenu.concat([{
-                    label: "Open Item Location",
-                    icon: 'open folder outline', 
-                    isVisible: () => {
-                        return this.lastSelectedNode !== null;
-                    },
-                    click: () => {
-                        if (this.lastSelectedNode !== null) shell.showItemInFolder(this.lastSelectedNode.node.path);
-                    }
-                }, {
-                    type: 'separator'
+                label: "Open Item Location",
+                icon: 'open folder outline',
+                isVisible: () => {
+                    return this.lastSelectedNode !== null;
+                },
+                click: () => {
+                    if (this.lastSelectedNode !== null) shell.showItemInFolder(this.lastSelectedNode.node.path);
                 }
+            }, {
+                type: 'separator'
+            }
             ]);
         }
 
         contextMenu = contextMenu.concat([{
-                label: 'Open Item',
-                icon: 'folder open outline',
-                isVisible: () => { return this.lastSelectedNode !== null; },
-                click: () => {
-                    if (this.lastSelectedNode !== null) this.$emit('openItem', this.lastSelectedNode.node);
+            label: 'Open Item',
+            icon: 'folder open outline',
+            isVisible: () => { return this.lastSelectedNode !== null; },
+            click: () => {
+                if (this.lastSelectedNode !== null) this.$emit('openItem', this.lastSelectedNode.node);
+            }
+        },
+        {
+            label: 'Properties',
+            icon: 'info circle',
+            isVisible: () => { return this.lastSelectedNode !== null; },
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                    this.$emit("openProperties");
                 }
-            },
-            {
-                label: 'Properties',
-                icon: 'info circle',
-                isVisible: () => { return this.lastSelectedNode !== null; },
-                click: () => {
-                    if (this.lastSelectedNode !== null) {
-                        this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                        this.$emit("openProperties");
-                    }
+            }
+        },
+        {
+            label: "Rename",
+            icon: 'pencil alternate',
+            isVisible: () => { return this.lastSelectedNode !== null; },
+            accelerator: "CmdOrCtrl+M",
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                    this.$emit("moveSelectedItems");
                 }
-            },
-            {
-                label: "Rename",
-                icon: 'pencil alternate',
-                isVisible: () => { return this.lastSelectedNode !== null; },
-                accelerator: "CmdOrCtrl+M",
-                click: () => {
-                    if (this.lastSelectedNode !== null) {
-                        this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                        this.$emit("moveSelectedItems");
-                    }
+            }
+        },
+        {
+            type: 'separator',
+            isVisible: () => { return this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
+        },
+        {
+            label: "Delete",
+            icon: 'trash alternate outline',
+            accelerator: "CmdOrCtrl+D",
+            isVisible: () => { return this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                    this.$emit("deleteSelecteditems");
                 }
-            },
-            {
-                type: 'separator',
-                isVisible: () => { return this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
-            },
-            {
-                label: "Delete",
-                icon: 'trash alternate outline',
-                accelerator: "CmdOrCtrl+D",
-                isVisible: () => { return this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
-                click: () => {
-                    if (this.lastSelectedNode !== null) {
-                        this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                        this.$emit("deleteSelecteditems");
-                    }
-                }
-            },
+            }
+        },
         ]);
 
         return {
@@ -116,10 +119,10 @@ export default {
         };
     },
     watch: {
-      filterRaw: debounce(function (newVal) {
-        this.filter = newVal;
-        this.search();
-      }, 500)
+        filterRaw: debounce(function (newVal) {
+            this.filter = newVal;
+            this.search();
+        }, 500)
     },
     mounted: async function () {
         await this.refreshNodes();
@@ -128,14 +131,14 @@ export default {
     },
     methods: {
 
-        clearSearch: async function() {
+        clearSearch: async function () {
             this.filter = null;
             this.searchStaticPaths = null;
             this.filterRaw = null;
             await this.refreshNodes();
         },
 
-        search: async function() {
+        search: async function () {
 
             if (this.filter == null || this.filter.length == 0) {
                 await this.clearSearch();
@@ -147,15 +150,15 @@ export default {
                 var rootPath = this.nodes[0].path;
 
                 var query = this.filter;
-                
+
                 if (!query.includes('*') && !query.includes('*'))
                     query = "*" + query + "*";
-                
+
                 const entries = await ddb.searchEntries(rootPath, query);
 
                 var res = entries.filter(entry => {
-                        return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
-                    })
+                    return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
+                })
                     .sort((a, b) => {
                         // Folders first
                         let aDir = ddb.entry.isDirectory(a);
@@ -182,30 +185,30 @@ export default {
 
                 this.searchStaticPaths = {};
                 this.searchStaticPaths[rootPath] = res;
-                
+
                 await this.refreshNodes();
-                
+
             } catch (e) {
                 this.$log.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized"){
+                if (e.message == "Unauthorized") {
                     this.$emit('error', "You are not allowed to perform this action", "Load entries");
                 } else {
                     this.$emit('error', e, "Load entries");
                 }
-                
+
                 this.nodes = [];
 
             }
         },
 
-        getChildren: async function(path) {
+        getChildren: async function (path) {
 
             if (this.searchStaticPaths != null && (typeof this.searchStaticPaths[path] !== 'undefined')) {
                 this.$log.info("using static path");
                 return this.searchStaticPaths[path];
             }
-            
+
             try {
                 const entries = await ddb.fetchEntries(path, {
                     withHash: false,
@@ -215,8 +218,8 @@ export default {
                 });
 
                 var res = entries.filter(entry => {
-                        return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
-                    })
+                    return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
+                })
                     .sort((a, b) => {
                         // Folders first
                         let aDir = ddb.entry.isDirectory(a);
@@ -245,7 +248,7 @@ export default {
             } catch (e) {
                 this.$log.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized"){
+                if (e.message == "Unauthorized") {
                     this.$emit('error', "You are not allowed to perform this action", "Load entries");
                 } else {
                     this.$emit('error', e, "Load entries");
@@ -255,7 +258,7 @@ export default {
 
         },
 
-        refreshNodes: async function() {
+        refreshNodes: async function () {
 
             this.nodes = [];
             this.loading = true;
@@ -264,7 +267,7 @@ export default {
 
             for (let i = 0; i < rootNodes.length; i++) {
                 const n = rootNodes[i];
-                
+
                 try {
                     const entry = n.entry || (await ddb.fetchEntries(n.path, {
                         withHash: false
@@ -279,8 +282,8 @@ export default {
                         root: true,
                         entry
                     });
-                } catch(e) {
-                    if (e.message == "Unauthorized"){
+                } catch (e) {
+                    if (e.message == "Unauthorized") {
                         this.$emit('error', "You are not allowed to perform this action", "Load entries");
                     } else {
                         this.$emit('error', e, "Load entries");
@@ -295,17 +298,17 @@ export default {
 
             // Keep track of nodes for "Open Item Location"
             this.lastSelectedNode = selectedNodes.length > 0 ? selectedNodes[selectedNodes.length - 1] : null;
-            
+
             // If a folder is expanded and we select it, 
             // we select it's children instead.
             if (selectedNodes.length === 1) {
                 const n = selectedNodes[0];
 
                 if (n.isExpandable || n.expanded) {
-                    
+
                     if (!n.loadedChildren) {
                         // Let's expand it
-                        await n.expand(); 
+                        await n.expand();
                     }
 
                     n.children.forEach(c => c.selected = false);
@@ -317,9 +320,9 @@ export default {
             }
 
             this.$emit('selectionChanged', selectedNodes.map(n => n.node));
-            if (selectedNodes.length > 0){
+            if (selectedNodes.length > 0) {
                 this.$emit('currentUriChanged', pathutils.getParentFolder(selectedNodes[0].node.path));
-            }else{
+            } else {
                 this.$emit('currentUriChanged', null);
             }
 
@@ -348,6 +351,7 @@ export default {
     .loading {
         margin-left: 2px;
     }
+
     user-select: none;
     -webkit-user-select: none;
 
@@ -374,7 +378,7 @@ export default {
 
     #cancel {
         cursor: pointer;
-        visibility: hidden; 
+        visibility: hidden;
         position: absolute;
         right: 0px;
         top: 0;

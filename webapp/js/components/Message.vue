@@ -7,41 +7,40 @@
 
 <script>
 export default {
-  props: {
-      bindTo: {
-          type: String,
-          default: "message"
-      },
-      className: {
-          type: String,
-          default: "warning"
-      },
-      noDismiss: {
-          type: Boolean,
-          default: false
-      }
-  },
-  data: function(){
-      return {
-          parentRef: {}
-      }
-  },
-  beforeMount: function(){
-    // Traverse the Vue component tree until we find 
-    // a component with the bind property we need
-    let p = this.$parent;
-    while(p !== undefined && p[this.bindTo] === undefined){
-        p = p.$parent;
+    props: {
+        bindTo: {
+            type: String,
+            default: "message"
+        },
+        className: {
+            type: String,
+            default: "warning"
+        },
+        noDismiss: {
+            type: Boolean,
+            default: false
+        }
+    },
+    data: function () {
+        return {
+            parentRef: {}
+        }
+    },
+    beforeMount: function () {
+        // Traverse the Vue component tree until we find 
+        // a component with the bind property we need
+        let p = this.$parent;
+        while (p !== undefined && p[this.bindTo] === undefined) {
+            p = p.$parent;
+        }
+        this.parentRef = p;
+    },
+    methods: {
+        dismiss: function () {
+            this.parentRef[this.bindTo] = "";
+        }
     }
-    this.parentRef = p;
-  },
-  methods: {
-      dismiss: function(){
-          this.parentRef[this.bindTo] = "";
-      }
-  }
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

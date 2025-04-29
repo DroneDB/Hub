@@ -1,11 +1,7 @@
 <template>
-    <Window title="Confirm delete" id="remove" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
-
-        Are you sure you want to delete <span v-if="files.length === 1">"{{ files[0].label }}"</span><span v-else>{{ files.length }} entries</span>?<br />
-
+    <Window title="Confirm delete" id="remove" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+        Are you sure you want to delete <span v-if="files.length === 1">"{{ files[0].label }}"</span><span v-else>{{
+            files.length }} entries</span>?<br />
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
@@ -22,35 +18,35 @@ import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
 
 export default {
-  components: {
-      Window
-  },
+    components: {
+        Window
+    },
 
-  props: ["files"],
-  
-  data: function(){
-      return {};
-  },
-  mounted: function(){
-    Keyboard.onKeyDown(this.handleKeyDown);
-  },
-  beforeDestroy: function(){
-    Keyboard.offKeyDown(this.handleKeyDown);
-  },
-  methods: {
-      close: function(buttonId){
-          this.$emit('onClose', buttonId);
-      },
+    props: ["files"],
 
-      handleKeyDown: function(e){
-          if (e.key === 'Enter') this.close('remove');
-      }
-  }
+    data: function () {
+        return {};
+    },
+    mounted: function () {
+        Keyboard.onKeyDown(this.handleKeyDown);
+    },
+    beforeDestroy: function () {
+        Keyboard.offKeyDown(this.handleKeyDown);
+    },
+    methods: {
+        close: function (buttonId) {
+            this.$emit('onClose', buttonId);
+        },
+
+        handleKeyDown: function (e) {
+            if (e.key === 'Enter') this.close('remove');
+        }
+    }
 }
 </script>
 
 <style scoped>
-.buttons{
+.buttons {
     margin-top: 16px;
     text-align: right;
 }

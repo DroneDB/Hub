@@ -70,7 +70,7 @@
                     </div>
                     <template v-else>
                         <template v-if="shareMode === 'embed'">
-                            <textarea readonly v-html="url" @click="copyToClipboard">
+                            <textarea readonly :value="url" @click="copyToClipboard">
                             </textarea>
                         </template>
                         <template v-else>

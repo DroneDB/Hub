@@ -12,7 +12,8 @@
                 <button @click="save" class="ui basic button secondary icon save"><i class="icon save" /></button>
             </div>
             <template v-else>
-                <button v-if="editable" @click="edit" class="ui basic button secondary icon edit"><i class="icon edit" /></button>
+                <button v-if="editable" @click="edit" class="ui basic button secondary icon edit"><i
+                        class="icon edit" /></button>
                 <div v-html="content" class="content" />
             </template>
         </div>
@@ -26,80 +27,80 @@ import ddb from 'ddb';
 import MarkdownIt from 'markdown-it';
 
 export default {
-  components: {
-      TabViewLoader, Message
-  },
-  props: {
-      uri: { // DDB uri
-          type: String,
-          required: false
-      },
-      editable: {
-          type: Boolean,
-          required: false,
-          default: true
-      }
-  },
-  data: function(){
-      return {
-          loading: true,
-          error: "",
-          content: "",
-          rawContent: "",
-          editing: false,
-      }
-  },
-
-  methods: {
-      handleLoad: async function(){
-        // Quick type check
-        if (this.entry.type !== ddb.entry.type.MARKDOWN) throw new Error(`${this.entry.path} cannot be opened as markdown`);
-
-        const [dataset, path] = ddb.utils.datasetPathFromUri(this.ddbURI);
-        this.dataset = dataset;
-        this.path = path;
-
-        try{
-            this.rawContent = await dataset.getFileContents(path);
-            this.updateMarkdown();
-        }catch(e){
-            this.error = `Cannot fetch ${this.ddbURI}: ${e}`;
+    components: {
+        TabViewLoader, Message
+    },
+    props: {
+        uri: { // DDB uri
+            type: String,
+            required: false
+        },
+        editable: {
+            type: Boolean,
+            required: false,
+            default: true
         }
-        this.loading = false;
-      },
-      updateMarkdown: function(){
-        const md = new MarkdownIt();
-        this.content = md.render(this.rawContent);
-      },
+    },
+    data: function () {
+        return {
+            loading: true,
+            error: "",
+            content: "",
+            rawContent: "",
+            editing: false,
+        }
+    },
 
-      edit: function(){
-          this.editing = true;
-          this.$nextTick(() => {
-              this.$refs.editTextarea.focus();
-              this.$refs.editTextarea.scrollTo(0, 0);
-          });
-      },
+    methods: {
+        handleLoad: async function () {
+            // Quick type check
+            if (this.entry.type !== ddb.entry.type.MARKDOWN) throw new Error(`${this.entry.path} cannot be opened as markdown`);
 
-      save: async function(){
-          this.loading = true;
-          try{
-            await this.dataset.writeObj(this.path, this.rawContent);
-            this.updateMarkdown();
-            this.editing = false;
-          }catch(e){
-              this.error = e.message;
-          }finally{
-              this.loading = false;
-          }
-      }
-      
-  }
+            const [dataset, path] = ddb.utils.datasetPathFromUri(this.ddbURI);
+            this.dataset = dataset;
+            this.path = path;
+
+            try {
+                this.rawContent = await dataset.getFileContents(path);
+                this.updateMarkdown();
+            } catch (e) {
+                this.error = `Cannot fetch ${this.ddbURI}: ${e}`;
+            }
+            this.loading = false;
+        },
+        updateMarkdown: function () {
+            const md = new MarkdownIt();
+            this.content = md.render(this.rawContent);
+        },
+
+        edit: function () {
+            this.editing = true;
+            this.$nextTick(() => {
+                this.$refs.editTextarea.focus();
+                this.$refs.editTextarea.scrollTo(0, 0);
+            });
+        },
+
+        save: async function () {
+            this.loading = true;
+            try {
+                await this.dataset.writeObj(this.path, this.rawContent);
+                this.updateMarkdown();
+                this.editing = false;
+            } catch (e) {
+                this.error = e.message;
+            } finally {
+                this.loading = false;
+            }
+        }
+
+    }
 }
 </script>
 
 <style>
-.markdown{
-    .loading{
+.markdown {
+    .loading {
         margin-top: 12px;
         text-align: center;
     }
@@ -110,27 +111,27 @@ export default {
     width: 100%;
     height: 100%;
 
-    .md-container{
+    .md-container {
         height: 100%;
 
-        .edit-container{
+        .edit-container {
             position: relative;
             height: 100%;
             display: flex;
         }
-        
-        button.edit{
+
+        button.edit {
             float: right;
             margin: 10px;
         }
 
-        button.save{
+        button.save {
             position: absolute;
             top: 10px;
             right: 7px;
         }
 
-        textarea{
+        textarea {
             padding: 12px;
             width: 100%;
             flex-grow: 1;
@@ -140,9 +141,11 @@ export default {
             outline: none;
         }
     }
-    .content{
+
+    .content {
         padding: 12px;
-        img{
+
+        img {
             max-width: 100%;
         }
     }
