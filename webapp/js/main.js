@@ -1,6 +1,7 @@
 
 import 'regenerator-runtime';
 import '../css/app.scss';
+import '../css/ol-controls.css';  // Importazione stili OpenLayers
 import './libs/keyboard';
 import './libs/mouse';
 import './dynamic/web';
