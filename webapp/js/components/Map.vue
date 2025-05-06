@@ -33,6 +33,7 @@ import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
 import Polygon from 'ol/geom/Polygon';
 import { fromExtent } from 'ol/geom/Polygon';
+import GeoJSON from 'ol/format/GeoJSON';
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
@@ -45,17 +46,23 @@ import { rootPath } from '../dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '../libs/utils';
 import { isMobile } from '../libs/responsive';
 import { Basemaps } from '../libs/basemaps';
+import * as flatgeobuf from 'flatgeobuf';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
+// Import additional OpenLayers utilities for extent handling
+import { buffer as extentBuffer, getCenter as getExtentCenter } from 'ol/extent';
 
 export default {
     components: {
         Map, Toolbar, olMeasure
-    },
-    props: {
+    }, props: {
         files: {
             type: Array,
             required: true
+        },
+        dataset: {
+            type: Object,
+            default: null
         },
         lazyload: {
             type: Boolean,
@@ -117,12 +124,11 @@ export default {
                     }
                 }
             });
-        }
-
-        return {
+        } return {
             tools,
             selectSingle: false,
             selectArea: false,
+            vectorLayers: [],
 
             selectedBasemap: "satellite",
             basemaps: Basemaps
@@ -130,10 +136,17 @@ export default {
     },
     mounted: function () {
         if (!this.lazyload) this.loadMap();
-    },
-    beforeDestroy: function () {
+    }, beforeDestroy: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
+
+        // Clean up vector layers
+        if (this.vectorLayers && this.map) {
+            this.vectorLayers.forEach(layer => {
+                this.map.removeLayer(layer);
+            });
+            this.vectorLayers = [];
+        }
     },
     watch: {
         files: {
@@ -169,6 +182,7 @@ export default {
 
             this.loaded = true;
             this._updateMap = null;
+            this.vectorLayers = [];
 
             const genShotStyle = (fill, stroke, size) => {
                 let text = null;
@@ -288,14 +302,43 @@ export default {
                         anchorYUnits: 'fraction',
                         src: rootPath('images/pano.svg')
                     })
-                }),
-
-                panoSelected: new Style({
+                }), panoSelected: new Style({
                     image: new Icon({
                         anchor: [0.5, 0.5],
                         anchorXUnits: 'fraction',
                         anchorYUnits: 'fraction',
                         src: rootPath('images/pano-selected.svg')
+                    })
+                }),
+
+                // Vector file styles
+                vectorPoint: new Style({
+                    image: new CircleStyle({
+                        radius: 5,
+                        fill: new Fill({
+                            color: 'rgba(30, 144, 255, 0.8)'
+                        }),
+                        stroke: new Stroke({
+                            color: 'rgba(0, 0, 139, 1)',
+                            width: 1.5
+                        })
+                    })
+                }),
+
+                vectorLine: new Style({
+                    stroke: new Stroke({
+                        color: 'rgba(30, 144, 255, 0.8)',
+                        width: 3
+                    })
+                }),
+
+                vectorPolygon: new Style({
+                    fill: new Fill({
+                        color: 'rgba(30, 144, 255, 0.2)'
+                    }),
+                    stroke: new Stroke({
+                        color: 'rgba(30, 144, 255, 0.8)',
+                        width: 2
                     })
                 })
             };
@@ -345,17 +388,36 @@ export default {
                 this.markerLayer
             ]));
 
-            this.dragBox = new DragBox({ minArea: 0 });
-            this.dragBox.on('boxend', () => {
+            this.dragBox = new DragBox({ minArea: 0 }); this.dragBox.on('boxend', () => {
                 let extent = this.dragBox.getGeometry().getExtent();
 
                 // Select (default) or deselect (if all features are previously selected)
                 const intersect = [];
 
+                // Check standard features (fileFeatures and extentsFeatures)
                 [this.fileFeatures, this.extentsFeatures].forEach(layer => {
                     layer.forEachFeatureIntersectingExtent(extent, feat => {
                         intersect.push(feat);
                     });
+                });
+
+                // Check vector layers - using a different approach for streamed features
+                const vectorFeatureFiles = [];
+                this.vectorLayers.forEach(vectorLayer => {
+                    // For streamed features, we need to check the layer's current features
+                    let hasIntersection = false;
+
+                    // Use forEachFeatureInExtent on the vector source
+                    // This will only check currently loaded features due to streaming
+                    if (vectorLayer.getSource().forEachFeatureInExtent) {
+                        vectorLayer.getSource().forEachFeatureInExtent(extent, feature => {
+                            hasIntersection = true;
+                        });
+                    }
+
+                    if (hasIntersection && vectorLayer.file) {
+                        vectorFeatureFiles.push(vectorLayer.file);
+                    }
                 });
 
                 let deselect = false;
@@ -364,13 +426,24 @@ export default {
                 if (!Keyboard.isShiftPressed()) {
                     this.clearSelection();
                 } else {
-                    deselect = intersect.length > 0 && intersect.filter(feat => feat.file.selected).length === intersect.length;
+                    // Check if all standard features and vector files are already selected
+                    const allFeaturesSelected = intersect.length > 0 &&
+                        intersect.filter(feat => feat.file.selected).length === intersect.length;
+                    const allVectorFilesSelected = vectorFeatureFiles.length > 0 &&
+                        vectorFeatureFiles.filter(file => file.selected).length === vectorFeatureFiles.length;
+
+                    deselect = (intersect.length > 0 || vectorFeatureFiles.length > 0) &&
+                        (allFeaturesSelected && (vectorFeatureFiles.length === 0 || allVectorFilesSelected));
                 }
 
                 if (deselect) {
+                    // Deselect all features
                     intersect.forEach(feat => feat.file.selected = false);
+                    vectorFeatureFiles.forEach(file => file.selected = false);
                 } else {
                     let scrolled = false;
+
+                    // Select standard features
                     intersect.forEach(feat => {
                         feat.file.selected = true;
 
@@ -379,7 +452,20 @@ export default {
                             scrolled = true;
                         }
                     });
+
+                    // Select vector files
+                    vectorFeatureFiles.forEach(file => {
+                        file.selected = true;
+
+                        if (!scrolled) {
+                            this.$emit("scrollTo", file);
+                            scrolled = true;
+                        }
+                    });
                 }
+
+                // Update styles on vector layers to reflect selection changes
+                this.updateRastersOpacity();
             });
 
             this.basemapLayer = new TileLayer({
@@ -414,40 +500,73 @@ export default {
                 this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
             });
 
-            this.map.addControl(this.measureControls);
-
-            const doSelectSingle = e => {
+            this.map.addControl(this.measureControls); const doSelectSingle = e => {
                 let first = true;
+                let vectorLayerClicked = false;
 
-                this.map.forEachFeatureAtPixel(e.pixel, feat => {
-                    // Only select the first entry
-                    if (!first) return;
-                    first = false;
+                // First check vector features, since they might be on top
+                // Loop through all vector layers
+                for (let i = 0; i < this.vectorLayers.length; i++) {
+                    const vectorLayer = this.vectorLayers[i];
 
-                    const feats = feat.get('features');
-                    if (feats) {
-                        // Geoimage point cluster
-                        let selected = false;
-                        for (let i = 0; i < feats.length; i++) {
-                            if (feats[i].file && feats[i].file.selected) {
-                                selected = true;
-                                break;
+                    // Use OpenLayers' built-in feature detection at pixel
+                    // This works well with the streamed features
+                    let foundFeature = false;
+
+                    this.map.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
+                        if (layer === vectorLayer && !foundFeature) {
+                            foundFeature = true;
+                            vectorLayerClicked = true;
+
+                            if (vectorLayer.file) {
+                                vectorLayer.file.selected = !vectorLayer.file.selected;
+
+                                // Inform other components we should scroll to this file
+                                if (vectorLayer.file.selected) {
+                                    this.$emit("scrollTo", vectorLayer.file);
+                                }
+
+                                // Update the vector layer's style to reflect selection
+                                this.updateRastersOpacity();
                             }
                         }
+                    });
 
-                        for (let i = 0; i < feats.length; i++) {
-                            if (feats[i].file) feats[i].file.selected = !selected;
-                        }
+                    if (vectorLayerClicked) break;
+                }
 
-                        // Inform other components we should scroll to this file
-                        if (!selected && feats.length && feats[0].file) {
-                            this.$emit("scrollTo", feats[0].file);
+                // If no vector feature was clicked, check other features
+                if (!vectorLayerClicked) {
+                    this.map.forEachFeatureAtPixel(e.pixel, feat => {
+                        // Only select the first entry
+                        if (!first) return;
+                        first = false;
+
+                        const feats = feat.get('features');
+                        if (feats) {
+                            // Geoimage point cluster
+                            let selected = false;
+                            for (let i = 0; i < feats.length; i++) {
+                                if (feats[i].file && feats[i].file.selected) {
+                                    selected = true;
+                                    break;
+                                }
+                            }
+
+                            for (let i = 0; i < feats.length; i++) {
+                                if (feats[i].file) feats[i].file.selected = !selected;
+                            }
+
+                            // Inform other components we should scroll to this file
+                            if (!selected && feats.length && feats[0].file) {
+                                this.$emit("scrollTo", feats[0].file);
+                            }
+                        } else {
+                            // Extents selection
+                            if (feat.file) feat.file.selected = !feat.file.selected;
                         }
-                    } else {
-                        // Extents selection
-                        if (feat.file) feat.file.selected = !feat.file.selected;
-                    }
-                });
+                    });
+                }
             };
 
             this.map.on('click', e => {
@@ -594,8 +713,7 @@ export default {
                     });
                 }, 10);
             }
-        },
-        getSelectedFilesExtent: function () {
+        }, getSelectedFilesExtent: function () {
             const ext = createEmptyExtent();
             if (this.fileFeatures.getFeatures().length) {
                 extendExtent(ext, this.fileFeatures.getExtent());
@@ -603,6 +721,18 @@ export default {
             this.rasterLayer.getLayers().forEach(layer => {
                 extendExtent(ext, layer.getExtent());
             });
+
+            // Include vector layers' extent
+            this.vectorLayers.forEach(layer => {
+                const source = layer.getSource();
+                if (source && source.getExtent) {
+                    const vectorExtent = source.getExtent();
+                    if (!isEmptyExtent(vectorExtent)) {
+                        extendExtent(ext, vectorExtent);
+                    }
+                }
+            });
+
             return ext;
         },
         clearLayerGroup: function (layerGroup) {
@@ -627,6 +757,15 @@ export default {
 
             const features = [];
             const rasters = this.rasterLayer.getLayers();
+
+            // Clear any existing vector layers
+            const vectorLayers = this.vectorLayers || [];
+            vectorLayers.forEach(layer => {
+                if (this.map) {
+                    this.map.removeLayer(layer);
+                }
+            });
+            this.vectorLayers = [];
 
             let flightPath = [];
 
@@ -678,8 +817,94 @@ export default {
                     const feat = new Feature(point);
                     feat.style = 'pano';
                     feat.file = f;
-                    feat.getGeometry().transform('EPSG:4326', 'EPSG:3857');
-                    features.push(feat);
+                    feat.getGeometry().transform('EPSG:4326', 'EPSG:3857'); features.push(feat);
+                } else if (f.entry.type === ddb.entry.type.VECTOR) {
+                    // Handle vector files using streaming approach
+                    const loadVectorFile = async () => {
+                        try {
+                            // Create a proper Entry object using the dataset
+                            let vectorUrl = '';
+
+                            if (this.dataset) {
+                                // Create the Entry object using the dataset
+                                const entry = this.dataset.Entry(f.entry);
+                                // Get the vector URL using getVector method
+                                vectorUrl = await entry.getVector();
+                            } else {
+                                console.warn('Dataset not available, using fallback URL construction');
+                                // Fallback in case dataset is not available
+                                const hashMatch = f.path.match(/\/r\/([^\/]+)\/([^\/]+)\/([^\/]+)/);
+
+                                if (hashMatch && hashMatch.length >= 4) {
+                                    // Use the same URL pattern that getVector() would use
+                                    const hash = hashMatch[3];
+                                    const baseApi = f.path.split('/r/')[0];
+                                    vectorUrl = `${baseApi}/build/${hash}/vec/vector.fgb`;
+                                } else {
+                                    // Fallback in case the path structure is different
+                                    vectorUrl = `${f.path}/vector.fgb`;
+                                }
+                            }
+
+                            // Create a vector source that will stream features based on the current view
+                            const vectorSource = new VectorSource();
+
+                            // Create the vector layer with styling based on geometry type
+                            const vectorLayer = new VectorLayer({
+                                source: vectorSource,
+                                style: (feature) => {
+                                    const geometry = feature.getGeometry();
+                                    const geometryType = geometry.getType();
+
+                                    if (geometryType.includes('Point')) {
+                                        return this.styles.vectorPoint;
+                                    } else if (geometryType.includes('LineString')) {
+                                        return this.styles.vectorLine;
+                                    } else if (geometryType.includes('Polygon')) {
+                                        return this.styles.vectorPolygon;
+                                    }
+
+                                    // Default style
+                                    return this.styles.vectorPoint;
+                                }
+                            });                            // Create a buffered extent strategy for efficient loading
+                            const createBufferedExtent = (coord) => {
+                                const extent = createEmptyExtent();
+                                extendExtent(extent, [coord[0], coord[1], coord[0], coord[1]]);
+                                return extentBuffer(extent, 1000); // Buffer by 1000 units
+                            };
+                              // Define strategy function that creates a buffered extent around the center of view
+                            const strategy = (extent) => [createBufferedExtent(getExtentCenter(extent))];
+                            
+                            // Use FlatGeobuf's createLoader to stream features as needed
+                            // This creates a loader function that will load features when the view changes
+                            const loader = flatgeobuf.ol.createLoader(
+                                vectorSource,
+                                vectorUrl,
+                                'EPSG:4326',  // Source projection - FlatGeobuf uses WGS84
+                                strategy,     // Use our buffered extent strategy
+                                true          // Clear existing features when loading new ones
+                            );
+
+                            // Set the loader on the vector source
+                            vectorSource.setLoader(loader);
+
+                            // Add file reference to layer for selection handling
+                            vectorLayer.file = f;
+
+                            // Add layer to the map
+                            this.map.addLayer(vectorLayer);
+
+                            // Store vector layer for later reference
+                            this.vectorLayers.push(vectorLayer);
+
+                        } catch (error) {
+                            console.error('Error loading vector file:', error);
+                        }
+                    };
+
+                    // Start loading the vector file asynchronously
+                    loadVectorFile();
                 }
             });
 
@@ -741,11 +966,68 @@ export default {
         },
         clearSelection: function () {
             this.files.forEach(f => f.selected = false);
-        },
-        updateRastersOpacity: function () {
+        }, updateRastersOpacity: function () {
             this.rasterLayer.getLayers().forEach(layer => {
                 if (layer.file.selected) layer.setOpacity(0.8);
                 else layer.setOpacity(1.0);
+            });
+
+            // Update vector layer styles based on selection
+            this.vectorLayers.forEach(layer => {
+                const isSelected = layer.file && layer.file.selected;
+
+                // Update vector layer style based on selection
+                layer.setStyle(feature => {
+                    const geometry = feature.getGeometry();
+                    const geometryType = geometry.getType();
+
+                    // Create a style based on the original but with different colors for selected state
+                    if (isSelected) {
+                        if (geometryType.includes('Point')) {
+                            return new Style({
+                                image: new CircleStyle({
+                                    radius: 5,
+                                    fill: new Fill({
+                                        color: 'rgba(255, 158, 103, 0.8)'
+                                    }),
+                                    stroke: new Stroke({
+                                        color: 'rgba(252, 252, 255, 1)',
+                                        width: 2
+                                    })
+                                })
+                            });
+                        } else if (geometryType.includes('LineString')) {
+                            return new Style({
+                                stroke: new Stroke({
+                                    color: 'rgba(255, 158, 103, 0.8)',
+                                    width: 4
+                                })
+                            });
+                        } else if (geometryType.includes('Polygon')) {
+                            return new Style({
+                                fill: new Fill({
+                                    color: 'rgba(255, 158, 103, 0.2)'
+                                }),
+                                stroke: new Stroke({
+                                    color: 'rgba(255, 158, 103, 0.8)',
+                                    width: 3
+                                })
+                            });
+                        }
+                    } else {
+                        // Non-selected state - use the original styles
+                        if (geometryType.includes('Point')) {
+                            return this.styles.vectorPoint;
+                        } else if (geometryType.includes('LineString')) {
+                            return this.styles.vectorLine;
+                        } else if (geometryType.includes('Polygon')) {
+                            return this.styles.vectorPolygon;
+                        }
+                    }
+
+                    // Default style
+                    return this.styles.vectorPoint;
+                });
             });
         },
         updateBasemap: function () {

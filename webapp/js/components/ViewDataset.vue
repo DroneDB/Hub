@@ -18,9 +18,9 @@
                         @openProperties="handleFileBrowserOpenProperties"
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                         @moveSelectedItems="openRenameItemsDialogFromFileBrowser" @error="handleError" />
-                </template>
-                <template v-slot:map>
-                    <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" @openItem="handleOpenItem" />
+                </template> <template v-slot:map>
+                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" @scrollTo="handleScrollTo"
+                        @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
                     <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
