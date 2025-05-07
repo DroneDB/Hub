@@ -14,7 +14,7 @@ const typeIconMap = {
     [entry.type.MODEL]: "cube",
     [entry.type.PANORAMA]: "globe",
     [entry.type.GEOPANORAMA]: "globe",
-    [entry.type.VECTOR]: "vector square",
+    [entry.type.VECTOR]: "object ungroup outline",
 };
 
 export default {
