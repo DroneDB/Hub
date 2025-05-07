@@ -23,7 +23,7 @@ import { Vector as VectorSource, Cluster } from 'ol/source';
 import { defaults as defaultControls, Control } from 'ol/control';
 import Collection from 'ol/Collection';
 import { DragBox } from 'ol/interaction';
-import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
+import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent, getCenter as getExtentCenter, buffer as extentBuffer } from 'ol/extent';
 import { transformExtent } from 'ol/proj';
 
 import Feature from 'ol/Feature';
@@ -34,6 +34,7 @@ import LineString from 'ol/geom/LineString';
 import Polygon from 'ol/geom/Polygon';
 import { fromExtent } from 'ol/geom/Polygon';
 import GeoJSON from 'ol/format/GeoJSON';
+import Overlay from 'ol/Overlay'; // Add overlay for tooltips
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
@@ -47,14 +48,16 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { isMobile } from '../libs/responsive';
 import { Basemaps } from '../libs/basemaps';
 import * as flatgeobuf from 'flatgeobuf';
+import Vue from 'vue';
+import FeatureInfoDialog from './FeatureInfoDialog.vue';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 // Import additional OpenLayers utilities for extent handling
-import { buffer as extentBuffer, getCenter as getExtentCenter } from 'ol/extent';
+
 
 export default {
     components: {
-        Map, Toolbar, olMeasure
+        Map, Toolbar, olMeasure, FeatureInfoDialog
     }, props: {
         files: {
             type: Array,
@@ -124,12 +127,16 @@ export default {
                     }
                 }
             });
-        } return {
+        }
+
+        return {
             tools,
             selectSingle: false,
             selectArea: false,
             vectorLayers: [],
-
+            vectorLayerColors: {}, // Store colors for vector layers
+            tooltipElement: null,  // Element for vector feature tooltips
+            tooltipOverlay: null,  // Overlay for tooltips
             selectedBasemap: "satellite",
             basemaps: Basemaps
         };
@@ -139,6 +146,13 @@ export default {
     }, beforeDestroy: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
+
+        // Clean up the tooltip overlay
+        if (this.tooltipOverlay && this.map) {
+            this.map.removeOverlay(this.tooltipOverlay);
+            this.tooltipOverlay = null;
+            this.tooltipElement = null;
+        }
 
         // Clean up vector layers
         if (this.vectorLayers && this.map) {
@@ -176,7 +190,199 @@ export default {
             }
         }
     },
-    methods: {
+    methods: {        // Generate a unique color based on the file name or index
+        getVectorFileColor: function (file, index) {
+            // If we already have a color for this file, return it
+            if (this.vectorLayerColors[file.entry.path]) {
+                return this.vectorLayerColors[file.entry.path];
+            }
+
+            // Color palette for vector layers - bright, distinct colors with good contrast
+            const colorPalette = [
+                'rgba(66, 133, 244, 0.8)',    // Blue 
+                'rgba(219, 68, 55, 0.8)',     // Red
+                'rgba(15, 157, 88, 0.8)',     // Green
+                'rgba(244, 160, 0, 0.8)',     // Yellow
+                'rgba(171, 71, 188, 0.8)',    // Purple
+                'rgba(255, 87, 34, 0.8)',     // Deep Orange
+                'rgba(3, 169, 244, 0.8)',     // Light Blue
+                'rgba(0, 150, 136, 0.8)',     // Teal
+                'rgba(124, 77, 255, 0.8)',    // Deep Purple
+                'rgba(229, 57, 53, 0.8)',     // Red
+                'rgba(0, 200, 83, 0.8)',      // Green
+                'rgba(253, 216, 53, 0.8)'     // Yellow
+            ];
+
+            // Use the index to select a color or generate a hash-based color for more files
+            let color;
+            if (index < colorPalette.length) {
+                color = colorPalette[index];
+            } else {
+                // Generate a more sophisticated hash-based color
+                // This uses HSL to ensure good saturation and lightness
+                const hash = this.stringToHashCode(file.entry.path);
+
+                // Get hue from 0-360 based on hash
+                const hue = hash % 360;
+                // Fixed high saturation for visibility
+                const saturation = 80;
+                // Medium lightness for good contrast
+                const lightness = 45;
+
+                color = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`;
+            }
+
+            // Store the color for future reference
+            this.vectorLayerColors[file.entry.path] = color;
+            return color;
+        },
+
+        // Helper to generate a numeric hash from a string
+        stringToHashCode: function (str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = ((hash << 5) - hash) + str.charCodeAt(i);
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return Math.abs(hash);
+        },
+        // Setup tooltip overlay for vector features
+        setupTooltipOverlay: function () {
+            // Create tooltip element
+            this.tooltipElement = document.createElement('div');
+            this.tooltipElement.className = 'vector-tooltip';
+            this.tooltipElement.style.cssText =
+                'position: absolute; ' +
+                'background-color: rgba(255, 255, 255, 0.9); ' +
+                'color: #333; ' +
+                'padding: 6px 10px; ' +
+                'border-radius: 4px; ' +
+                'border: 1px solid rgba(0, 0, 0, 0.2); ' +
+                'font-size: 13px; ' +
+                'font-weight: bold; ' +
+                'box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); ' +
+                'pointer-events: none; ' +
+                'z-index: 1000; ' +
+                'max-width: 300px; ' +
+                'white-space: nowrap; ' +
+                'overflow: hidden; ' +
+                'text-overflow: ellipsis; ' +
+                'display: none;';
+
+            // Create and add the overlay to the map
+            this.tooltipOverlay = new Overlay({
+                element: this.tooltipElement,
+                offset: [12, 0],
+                positioning: 'center-left'
+            });
+        },
+        // Display tooltip with feature info
+        showFeatureTooltip: function (feature, pixel) {
+            if (!this.tooltipElement || !this.tooltipOverlay) return;
+
+            // Get feature info
+            let content = '';
+
+            // Try to get feature name from properties
+            const properties = feature.getProperties();
+
+            // Check for a name or label property (in current language if available)
+            // This covers requirement #3 - first try label in current language
+            const userLang = navigator.language || navigator.userLanguage;
+            const langPrefix = userLang.split('-')[0].toLowerCase();
+
+            // First priority: localized name (name:en, name:it, etc.)
+            if (properties[`name:${langPrefix}`]) {
+                content = properties[`name:${langPrefix}`];
+            }
+            // Second priority: generic name, label, title properties
+            else if (properties.name) {
+                content = properties.name;
+            } else if (properties.label) {
+                content = properties.label;
+            } else if (properties.title) {
+                content = properties.title;
+            } else if (properties.id) {
+                content = `ID: ${properties.id}`;
+            }
+            // Fallback to file name if no label is found (requirement #2)
+            else {
+                const layer = this.findVectorLayerForFeature(feature);
+                if (layer && layer.file) {
+                    content = layer.file.name || layer.file.entry.name || 'Unknown layer';
+                } else {
+                    content = 'Unknown feature';
+                }
+            }
+
+            // Set content and show tooltip
+            this.tooltipElement.innerHTML = content;
+            this.tooltipElement.style.display = 'block';
+            this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
+        },
+
+        // Hide tooltip
+        hideFeatureTooltip: function () {
+            if (this.tooltipElement) {
+                this.tooltipElement.style.display = 'none';
+            }
+        },
+
+        // Find the vector layer that contains a feature
+        findVectorLayerForFeature: function (feature) {
+            for (let i = 0; i < this.vectorLayers.length; i++) {
+                const layer = this.vectorLayers[i];
+                const source = layer.getSource();
+
+                // Check if this source contains the feature
+                if (source.getFeatures().some(f => f === feature)) {
+                    return layer;
+                }
+            }
+
+            return null;
+        },        // Show dialog with feature properties
+        showFeaturePropertiesDialog: function (feature) {
+            // Get feature properties
+            const properties = { ...feature.getProperties() };
+            delete properties.geometry; // Remove geometry from properties
+
+            // Try to get a good title for the dialog
+            let title = 'Feature Properties';
+
+            // Find the layer that contains this feature
+            const layer = this.findVectorLayerForFeature(feature);
+
+            // Get file name for the dialog title
+            if (layer && layer.file) {
+                const fileName = layer.file.name || layer.file.entry.name || '';
+                if (fileName) {
+                    title = `${fileName} - Feature Properties`;
+                }
+
+                // If there's a name property, include it in the title
+                if (properties.name) {
+                    title = `${fileName} - ${properties.name}`;
+                }
+            }            // Use the FeatureInfoDialog component
+            const DialogComponent = Vue.extend(FeatureInfoDialog);
+            const dialogInstance = new DialogComponent({
+                propsData: {
+                    title: title,
+                    properties: properties
+                }
+            });
+
+            dialogInstance.$mount();
+            document.body.appendChild(dialogInstance.$el);
+
+            // Handle close event
+            dialogInstance.$on('onClose', () => {
+                document.body.removeChild(dialogInstance.$el);
+                dialogInstance.$destroy();
+            });
+        },
+
         loadMap: function () {
             if (this.loaded) return;
 
@@ -478,8 +684,7 @@ export default {
             this.measureControls = new olMeasure.Controls({
                 onToolSelected: () => { this.measuring = true; },
                 onToolDelesected: () => { this.measuring = false; }
-            });
-            this.map = new Map({
+            }); this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
                     this.basemapLayer,
@@ -496,8 +701,75 @@ export default {
                 })
             });
 
-            this.map.once("postrender", () => {
+            // Setup tooltip overlay for vector features
+            this.setupTooltipOverlay();
+            this.map.addOverlay(this.tooltipOverlay); this.map.once("postrender", () => {
                 this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
+            });
+            // Add pointer move handler for tooltips
+            this.map.on('pointermove', (e) => {
+                if (e.dragging || this.measuring) {
+                    this.hideFeatureTooltip();
+                    return;
+                }
+
+                // Check if we're hovering over a vector feature
+                const hit = this.map.hasFeatureAtPixel(e.pixel, {
+                    layerFilter: layer => this.vectorLayers.includes(layer)
+                });
+
+                // Update cursor style based on whether we're hovering over a feature
+                this.map.getTargetElement().style.cursor = hit ? 'pointer' : 'inherit';
+
+                if (hit) {
+                    let hoveredFeature = null;
+
+                    // Find the first vector feature at this pixel
+                    this.map.forEachFeatureAtPixel(e.pixel,
+                        (feature, layer) => {
+                            if (this.vectorLayers.includes(layer) && !hoveredFeature) {
+                                hoveredFeature = feature;
+                                return true; // Stop looking after finding the first feature
+                            }
+                            return false;
+                        }, {
+                        layerFilter: layer => this.vectorLayers.includes(layer)
+                    });
+
+                    if (hoveredFeature) {
+                        // Show tooltip for this feature
+                        this.showFeatureTooltip(hoveredFeature, e.pixel);
+                    } else {
+                        this.hideFeatureTooltip();
+                    }
+                } else {
+                    this.hideFeatureTooltip();
+                }
+            });
+            // Add double-click handler for showing feature properties
+            this.map.on('dblclick', (e) => {
+                if (this.measuring) return;
+
+                // Check if we clicked on a vector feature
+                let dblClickedFeature = null;
+
+                // First try to find a vector feature at this pixel
+                this.map.forEachFeatureAtPixel(e.pixel,
+                    (feature, layer) => {
+                        if (this.vectorLayers.includes(layer) && !dblClickedFeature) {
+                            dblClickedFeature = feature;
+                            // Prevent further processing
+                            e.stopPropagation();
+                            return true; // Stop looking for more features
+                        }
+                        return false;
+                    }, {
+                    layerFilter: layer => this.vectorLayers.includes(layer)
+                });
+
+                if (dblClickedFeature) {
+                    this.showFeaturePropertiesDialog(dblClickedFeature);
+                }
             });
 
             this.map.addControl(this.measureControls); const doSelectSingle = e => {
@@ -700,8 +972,7 @@ export default {
                     if (this.map) this.map.updateSize();
                 });
             }
-        },
-        zoomToFilesExtent: function () {
+        }, zoomToFilesExtent: function () {
             const ext = this.getSelectedFilesExtent();
             if (!isEmptyExtent(ext)) {
                 // Zoom to it
@@ -709,9 +980,21 @@ export default {
                     this.map.getView().fit(ext, {
                         padding: [40, 40, 40, 40],
                         duration: 500,
-                        minResolution: 0.5
+                        minResolution: 0.5,
+                        maxZoom: 22  // Prevent zooming in too much on single points
                     });
                 }, 10);
+            } else {
+                // If we have no content to zoom to, check if we'll get vector data later
+                // In this case, an event listener in reloadFileLayers will handle zooming
+                // when vector features are loaded
+
+                // If no vector layers expected and no extent, set a default view
+                if (this.vectorLayers.length === 0 && this.files.length === 0) {
+                    // Reset to default view
+                    this.map.getView().setCenter([0, 0]);
+                    this.map.getView().setZoom(2);
+                }
             }
         }, getSelectedFilesExtent: function () {
             const ext = createEmptyExtent();
@@ -849,33 +1132,163 @@ export default {
                             // Create a vector source that will stream features based on the current view
                             const vectorSource = new VectorSource();
 
+                            // Get a unique color for this vector file
+                            const vectorFileIndex = this.vectorLayers.length;
+                            const vectorColor = this.getVectorFileColor(f, vectorFileIndex);
+                            const vectorSelectedColor = 'rgba(255, 158, 103, 0.8)'; // Orange for selected state
+                            // Create a vector style based on the unique color
+                            const vectorStyles = {
+                                point: new Style({
+                                    image: new CircleStyle({
+                                        radius: 5,
+                                        fill: new Fill({
+                                            color: vectorColor
+                                        }),
+                                        stroke: new Stroke({
+                                            color: 'rgba(255, 255, 255, 0.8)',
+                                            width: 1.5
+                                        })
+                                    })
+                                }),
+
+                                line: new Style({
+                                    stroke: new Stroke({
+                                        color: vectorColor,
+                                        width: 3
+                                    })
+                                }),
+
+                                polygon: new Style({
+                                    fill: new Fill({
+                                        color: vectorColor.replace('0.8', '0.3') // More transparent for fill
+                                    }),
+                                    stroke: new Stroke({
+                                        color: vectorColor,
+                                        width: 2
+                                    })
+                                }),
+
+                                // Selected styles
+                                pointSelected: new Style({
+                                    image: new CircleStyle({
+                                        radius: 6, // Slightly larger when selected
+                                        fill: new Fill({
+                                            color: vectorSelectedColor
+                                        }),
+                                        stroke: new Stroke({
+                                            color: 'rgba(255, 255, 255, 0.8)',
+                                            width: 2
+                                        })
+                                    })
+                                }),
+
+                                lineSelected: new Style({
+                                    stroke: new Stroke({
+                                        color: vectorSelectedColor,
+                                        width: 4 // Slightly thicker when selected
+                                    })
+                                }),
+
+                                polygonSelected: new Style({
+                                    fill: new Fill({
+                                        color: vectorSelectedColor.replace('0.8', '0.3') // More transparent for fill
+                                    }),
+                                    stroke: new Stroke({
+                                        color: vectorSelectedColor,
+                                        width: 3 // Slightly thicker when selected
+                                    })
+                                })
+                            };
+
                             // Create the vector layer with styling based on geometry type
                             const vectorLayer = new VectorLayer({
                                 source: vectorSource,
                                 style: (feature) => {
                                     const geometry = feature.getGeometry();
                                     const geometryType = geometry.getType();
+                                    const isSelected = f.selected;
+                                    const properties = feature.getProperties();
 
-                                    if (geometryType.includes('Point')) {
-                                        return this.styles.vectorPoint;
-                                    } else if (geometryType.includes('LineString')) {
-                                        return this.styles.vectorLine;
-                                    } else if (geometryType.includes('Polygon')) {
-                                        return this.styles.vectorPolygon;
+                                    // Get appropriate base style based on geometry and selection
+                                    let style;
+                                    if (isSelected) {
+                                        if (geometryType.includes('Point')) {
+                                            style = vectorStyles.pointSelected.clone();
+                                        } else if (geometryType.includes('LineString')) {
+                                            style = vectorStyles.lineSelected.clone();
+                                        } else if (geometryType.includes('Polygon')) {
+                                            style = vectorStyles.polygonSelected.clone();
+                                        } else {
+                                            style = vectorStyles.pointSelected.clone();
+                                        }
+                                    } else {
+                                        if (geometryType.includes('Point')) {
+                                            style = vectorStyles.point.clone();
+                                        } else if (geometryType.includes('LineString')) {
+                                            style = vectorStyles.line.clone();
+                                        } else if (geometryType.includes('Polygon')) {
+                                            style = vectorStyles.polygon.clone();
+                                        } else {
+                                            style = vectorStyles.point.clone();
+                                        }
                                     }
 
-                                    // Default style
-                                    return this.styles.vectorPoint;
+                                    // Add label for features when zoomed in close enough
+                                    // Only add labels at higher zoom levels to prevent clutter
+                                    const zoom = this.map ? this.map.getView().getZoom() : 0;
+
+                                    if (zoom >= 16) { // Only show labels when zoomed in
+                                        // Try to find a good label property
+                                        const userLang = navigator.language || navigator.userLanguage;
+                                        const langPrefix = userLang.split('-')[0].toLowerCase();
+
+                                        let label = null;
+                                        // Check multilingual name first
+                                        if (properties[`name:${langPrefix}`]) {
+                                            label = properties[`name:${langPrefix}`];
+                                        }
+                                        // Then check common name properties
+                                        else if (properties.name) {
+                                            label = properties.name;
+                                        } else if (properties.label) {
+                                            label = properties.label;
+                                        } else if (properties.title) {
+                                            label = properties.title;
+                                        }
+
+                                        if (label) {
+                                            // Define text style for the label
+                                            const textStyle = new Text({
+                                                text: label,
+                                                font: 'bold 12px Arial, Helvetica, sans-serif',
+                                                fill: new Fill({
+                                                    color: '#000'
+                                                }),
+                                                stroke: new Stroke({
+                                                    color: '#fff',
+                                                    width: 3
+                                                }),
+                                                offsetY: -15, // For points, place above the point
+                                                textAlign: 'center',
+                                                overflow: true,
+                                                maxAngle: 45  // Maximum angle for curved labels (e.g. on lines)
+                                            });
+
+                                            style.setText(textStyle);
+                                        }
+                                    }
+
+                                    return style;
                                 }
-                            });                            // Create a buffered extent strategy for efficient loading
+                            });// Create a buffered extent strategy for efficient loading
                             const createBufferedExtent = (coord) => {
                                 const extent = createEmptyExtent();
                                 extendExtent(extent, [coord[0], coord[1], coord[0], coord[1]]);
                                 return extentBuffer(extent, 1000); // Buffer by 1000 units
                             };
-                              // Define strategy function that creates a buffered extent around the center of view
+                            // Define strategy function that creates a buffered extent around the center of view
                             const strategy = (extent) => [createBufferedExtent(getExtentCenter(extent))];
-                            
+
                             // Use FlatGeobuf's createLoader to stream features as needed
                             // This creates a loader function that will load features when the view changes
                             const loader = flatgeobuf.ol.createLoader(
@@ -897,6 +1310,16 @@ export default {
 
                             // Store vector layer for later reference
                             this.vectorLayers.push(vectorLayer);
+
+                            // Add event listener to zoom to all features when source changes
+                            // This helps with requirement #5 - calculate initial map position
+                            vectorSource.on('change', () => {
+                                // Only trigger if we have features and loading is done
+                                if (vectorSource.getFeatures().length > 0 && vectorSource.getState() === 'ready') {
+                                    // Trigger a map extent update to include these features
+                                    this.zoomToFilesExtent();
+                                }
+                            });
 
                         } catch (error) {
                             console.error('Error loading vector file:', error);
@@ -972,62 +1395,13 @@ export default {
                 else layer.setOpacity(1.0);
             });
 
-            // Update vector layer styles based on selection
+            // For vector layers, no need to update the style manually
+            // since we're using a style function that checks the selection state
+            // Just trigger a redraw of the layer
             this.vectorLayers.forEach(layer => {
-                const isSelected = layer.file && layer.file.selected;
-
-                // Update vector layer style based on selection
-                layer.setStyle(feature => {
-                    const geometry = feature.getGeometry();
-                    const geometryType = geometry.getType();
-
-                    // Create a style based on the original but with different colors for selected state
-                    if (isSelected) {
-                        if (geometryType.includes('Point')) {
-                            return new Style({
-                                image: new CircleStyle({
-                                    radius: 5,
-                                    fill: new Fill({
-                                        color: 'rgba(255, 158, 103, 0.8)'
-                                    }),
-                                    stroke: new Stroke({
-                                        color: 'rgba(252, 252, 255, 1)',
-                                        width: 2
-                                    })
-                                })
-                            });
-                        } else if (geometryType.includes('LineString')) {
-                            return new Style({
-                                stroke: new Stroke({
-                                    color: 'rgba(255, 158, 103, 0.8)',
-                                    width: 4
-                                })
-                            });
-                        } else if (geometryType.includes('Polygon')) {
-                            return new Style({
-                                fill: new Fill({
-                                    color: 'rgba(255, 158, 103, 0.2)'
-                                }),
-                                stroke: new Stroke({
-                                    color: 'rgba(255, 158, 103, 0.8)',
-                                    width: 3
-                                })
-                            });
-                        }
-                    } else {
-                        // Non-selected state - use the original styles
-                        if (geometryType.includes('Point')) {
-                            return this.styles.vectorPoint;
-                        } else if (geometryType.includes('LineString')) {
-                            return this.styles.vectorLine;
-                        } else if (geometryType.includes('Polygon')) {
-                            return this.styles.vectorPolygon;
-                        }
-                    }
-
-                    // Default style
-                    return this.styles.vectorPoint;
-                });
+                if (layer.getSource()) {
+                    layer.getSource().changed();
+                }
             });
         },
         updateBasemap: function () {
