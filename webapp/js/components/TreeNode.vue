@@ -10,9 +10,8 @@
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
-        </div>
-        <div class="children" v-show="expanded">
-            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path" :node="node" ref="nodes"
+        </div>        <div class="children" v-show="expanded">
+            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" :node="node" ref="nodes"
                 :getChildren="getChildren" @selected="$emit('selected', $event, arguments[1])"
                 @opened="$emit('opened', $event, arguments[1])" />
         </div>

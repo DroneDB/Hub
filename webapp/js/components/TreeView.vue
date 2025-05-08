@@ -1,6 +1,5 @@
-<template>
-    <div class="tree-view" ref="treeView">
-        <TreeNode v-for="node in nodes" :node="node" :key="node.path" ref="treeNodes" @selected="handleSelection"
+<template>    <div class="tree-view" ref="treeView">
+        <TreeNode v-for="(node, index) in nodes" :node="node" :key="node.path + ',' + index" ref="treeNodes" @selected="handleSelection"
             @opened="handleOpen" :getChildren="getChildren" />
     </div>
 </template>
