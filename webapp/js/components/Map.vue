@@ -50,9 +50,9 @@ import { Basemaps } from '../libs/basemaps';
 import * as flatgeobuf from 'flatgeobuf';
 import Vue from 'vue';
 import FeatureInfoDialog from './FeatureInfoDialog.vue';
+import { extractFeatureDisplayName } from '../libs/propertiesUtils';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
-// Import additional OpenLayers utilities for extent handling
 
 
 export default {
@@ -286,32 +286,14 @@ export default {
             // Try to get feature name from properties
             const properties = feature.getProperties();
 
-            // Check for a name or label property (in current language if available)
-            // This covers requirement #3 - first try label in current language
-            const userLang = navigator.language || navigator.userLanguage;
-            const langPrefix = userLang.split('-')[0].toLowerCase();
-
-            // First priority: localized name (name:en, name:it, etc.)
-            if (properties[`name:${langPrefix}`]) {
-                content = properties[`name:${langPrefix}`];
-            }
-            // Second priority: generic name, label, title properties
-            else if (properties.name) {
-                content = properties.name;
-            } else if (properties.label) {
-                content = properties.label;
-            } else if (properties.title) {
-                content = properties.title;
-            } else if (properties.id) {
-                content = `ID: ${properties.id}`;
-            }
-            // Fallback to file name if no label is found (requirement #2)
-            else {
+            // Extract display name from properties
+            content = extractFeatureDisplayName(properties);
+            
+            // Fallback to file name if no label is found
+            if (content === 'Unknown feature') {
                 const layer = this.findVectorLayerForFeature(feature);
                 if (layer && layer.file) {
                     content = layer.file.name || layer.file.entry.name || 'Unknown layer';
-                } else {
-                    content = 'Unknown feature';
                 }
             }
 
@@ -1239,24 +1221,9 @@ export default {
 
                                     if (zoom >= 16) { // Only show labels when zoomed in
                                         // Try to find a good label property
-                                        const userLang = navigator.language || navigator.userLanguage;
-                                        const langPrefix = userLang.split('-')[0].toLowerCase();
-
-                                        let label = null;
-                                        // Check multilingual name first
-                                        if (properties[`name:${langPrefix}`]) {
-                                            label = properties[`name:${langPrefix}`];
-                                        }
-                                        // Then check common name properties
-                                        else if (properties.name) {
-                                            label = properties.name;
-                                        } else if (properties.label) {
-                                            label = properties.label;
-                                        } else if (properties.title) {
-                                            label = properties.title;
-                                        }
-
-                                        if (label) {
+                                        let label = extractFeatureDisplayName(properties, null);
+                                        
+                                        if (label && label !== 'Unknown feature') {
                                             // Define text style for the label
                                             const textStyle = new Text({
                                                 text: label,
