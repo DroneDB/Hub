@@ -1,23 +1,46 @@
 <template>
     <Window v-bind:title="title" id="datasetDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="ds-dialog">
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !isValid() }">
+            <form v-on:submit.prevent class="ui form" style="margin-right: 10px" v-bind:class="{ error: !isValid() }">
                 <div class="ui error message" v-if="isDuplicateSlug()">
-                    <p>This name is already in use.</p>
+                    <p>This dataset name is already in use. It will generate a duplicate slug.</p>
                 </div>
-                <div class="field">
-                    <label>Name</label>
-                    <input ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')"
-                        type="text" v-model="ds.name" placeholder="Name" />
+
+                <div class="ui grid two column">
+                    <div class="column">
+                        <div class="field">
+                            <label>Dataset Name</label>
+                            <input ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')"
+                                type="text" v-model="ds.name" placeholder="Dataset Name" />
+                        </div>
+                    </div>
+                    <div class="column">
+                        <div class="field">
+                            <label>Visibility</label>
+                            <div class="ui selection dropdown" ref="visibilityDropdown">
+                                <input type="hidden" name="visibility" v-model="ds.visibility">
+                                <i class="dropdown icon"></i>
+                                <div class="text">{{ getVisibilityText(ds.visibility) }}</div>
+                                <div class="menu">
+                                    <div class="item" data-value="0"><i class="lock icon"></i>Private</div>
+                                    <div class="item" data-value="1"><i class="unlock icon"></i>Unlisted</div>
+                                    <div class="item" data-value="2"><i class="unlock icon"></i>Public</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="inline field">
-                    <label>Visibility</label>
-                    <select v-model="ds.visibility">
-                        <option :value="0">Private</option>
-                        <option :value="1">Unlisted</option>
-                        <option :value="2">Public</option>
-                    </select>
+                <div class="ui grid one column">
+                    <div class="column">
+                        <div class="field">
+                            <label>Dataset Slug</label>
+                            <div class="ui message">
+                                <small>{{ ds.name ? slugFromName(ds.name) : "" }}</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
+
             </form>
             <div class="buttons">
                 <button @click="close('close')" class="ui button">
@@ -69,33 +92,48 @@ export default {
             },
             title: null
         };
-    },
-    mounted: function () {
-        this.$nextTick(() => this.$refs.name.focus());
+    }, mounted: function () {
+        this.$nextTick(() => {
+            this.$refs.name.focus();
+
+            // Initialize the visibility dropdown with Semantic UI
+            $(this.$refs.visibilityDropdown).dropdown({
+                onChange: (value) => {
+                    this.ds.visibility = parseInt(value);
+                }
+            });
+        });
 
         if (this.mode == 'edit') {
-
             this.title = "Edit dataset " + this.model.slug;
 
             this.ds.slug = this.model.slug;
             this.ds.name = this.model.name;
-            this.ds.visibility = this.model.visibility;
-        } else {
+            this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : 0;
 
+            // Set the dropdown value after initialization
+            this.$nextTick(() => {
+                $(this.$refs.visibilityDropdown).dropdown('set selected', this.ds.visibility.toString());
+            });
+        } else {
             this.title = "Create new dataset";
 
             this.ds.slug = null;
             this.ds.name = null;
             this.ds.visibility = 0;
-        }
 
-    },
-    methods: {
+            // Set the dropdown value after initialization
+            this.$nextTick(() => {
+                $(this.$refs.visibilityDropdown).dropdown('set selected', '0');
+            });
+        }
+    }, methods: {
+        slugFromName,
         close: function (buttonId) {
             this.$emit('onClose', buttonId, {
                 name: this.ds.name,
                 visibility: this.ds.visibility,
-                slug: slugFromName(this.ds.name)
+                slug: this.mode === 'edit' ? this.model.slug : slugFromName(this.ds.name)
             });
         },
         isValid: function () {
@@ -115,10 +153,15 @@ export default {
             }
 
             return true;
-        },
-        isDuplicateSlug: function () {
+        }, isDuplicateSlug: function () {
             const slug = slugFromName(this.ds.name);
             return this.forbiddenSlugs.includes(slug);
+        },
+
+        getVisibilityText: function (visibility) {
+            if (visibility === 2) return 'Public';
+            if (visibility === 1) return 'Unlisted';
+            return 'Private';
         }
     }
 }

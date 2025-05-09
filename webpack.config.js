@@ -67,14 +67,14 @@ module.exports = {
                                 '@babel/plugin-transform-optional-chaining',
                                 '@babel/plugin-transform-class-properties',
                                 '@babel/plugin-transform-private-methods',
-                                '@babel/plugin-transform-private-property-in-object'
-                            ]
+                                '@babel/plugin-transform-private-property-in-object']
                         }
                     }
                 ],
-            },
+            },            // Handle application CSS/SCSS files
             {
-                test: /\.s?css$/,
+                test: /\.s[ac]ss$/i,
+                exclude: /node_modules/,
                 use: [
                     {
                         loader: "vue-style-loader" // creates style nodes from JS strings
@@ -90,6 +90,14 @@ module.exports = {
                     }
                 ]
             },
+            // Handle regular CSS files
+            {
+                test: /\.css$/i,
+                use: [
+                    'vue-style-loader',
+                    'css-loader'
+                ]
+            },
             {
                 test: /\.(png|woff|woff2|eot|ttf|svg|jpg|gif)$/,
                 use: {
@@ -100,10 +108,14 @@ module.exports = {
                 }
             }
         ]
-    },
-    plugins: [
+    }, plugins: [
         new VueLoaderPlugin(),
         new LiveReloadPlugin(),
+        new webpack.ProvidePlugin({
+            $: 'jquery',
+            jQuery: 'jquery',
+            'window.jQuery': 'jquery'
+        }),
         new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
             resource.request = resource.request.replace(/polyfills\/node\//, `polyfills\/web\/`);
         }),

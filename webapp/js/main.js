@@ -2,6 +2,16 @@
 import 'regenerator-runtime';
 import '../css/app.scss';
 import '../css/ol-controls.css';  // Importazione stili OpenLayers
+
+// Import jQuery first and make it global BEFORE importing any jQuery-dependent libraries
+import $ from 'jquery';
+window.$ = window.jQuery = $;
+
+// Then import Semantic UI CSS and components (jQuery is already provided by webpack.ProvidePlugin)
+import 'semantic-ui-css/semantic.min.css';  // Semantic UI CSS from npm package
+import 'semantic-ui-css/components/dropdown.min';
+import 'semantic-ui-css/components/transition.min';
+
 import './libs/keyboard';
 import './libs/mouse';
 import './dynamic/web';
