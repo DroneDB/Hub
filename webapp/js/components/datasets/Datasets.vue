@@ -17,7 +17,7 @@
             </div>
 
             <!-- Dataset Controls -->
-            <div class="ui segment filter-controls">
+            <div class="">
                 <div class="ui stackable grid">
                     <div class="six wide column">
                         <div class="ui icon input fluid">
@@ -145,7 +145,7 @@
                                 <div class="column right aligned middle aligned">
                                     <div class="ui right floated">
                                         Items per page
-                                        <select v-model="itemsPerPage" class="ui dropdown compact">
+                                        <select v-model="itemsPerPage" style="margin-left: 5px" class="ui dropdown compact">
                                             <option value="5">5</option>
                                             <option value="10">10</option>
                                             <option value="25">25</option>
