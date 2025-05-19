@@ -1,5 +1,5 @@
 export default {
-    isElectron: function(){
+    isElectron: function () {
         return false;
     }
 }

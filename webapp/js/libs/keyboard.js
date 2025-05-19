@@ -7,51 +7,51 @@ let keyUpListeners = [];
 let shortcutListeners = [];
 
 const api = {
-    onKeyDown: function(listener){
+    onKeyDown: function (listener) {
         keyDownListeners.push(listener);
     },
 
-    onKeyUp: function(listener){
+    onKeyUp: function (listener) {
         keyUpListeners.push(listener);
     },
 
-    onShortcut: function(listener){
+    onShortcut: function (listener) {
         shortcutListeners.push(listener);
     },
 
-    offShortcut: function(listener){
+    offShortcut: function (listener) {
         shortcutListeners = shortcutListeners.filter(l => l !== listener);
     },
 
-    offKeyDown: function(listener){
+    offKeyDown: function (listener) {
         keyDownListeners = keyDownListeners.filter(l => l !== listener);
     },
 
-    offKeyUp: function(listener){
+    offKeyUp: function (listener) {
         keyUpListeners = keyUpListeners.filter(l => l !== listener);
     },
 
-    isShiftPressed: function(){
+    isShiftPressed: function () {
         return shiftPressed;
     },
 
-    isCtrlPressed: function(){
+    isCtrlPressed: function () {
         return ctrlPressed;
     },
 
-    isMetaPressed: function(){
+    isMetaPressed: function () {
         return metaPressed;
     },
 
-    isModifierPressed: function(){
+    isModifierPressed: function () {
         return shiftPressed || ctrlPressed || metaPressed;
     },
 
-    resetModifiers: function(){
+    resetModifiers: function () {
         shiftPressed = ctrlPressed = metaPressed = false;
     },
 
-    updateState: function(e){
+    updateState: function (e) {
         shiftPressed = e.shiftKey;
         ctrlPressed = e.ctrlKey;
         metaPressed = e.metaKey;
@@ -59,7 +59,7 @@ const api = {
 };
 
 const fireShortcutEvent = (accelerator) => {
-    for (let i = 0; i < shortcutListeners.length; i++){
+    for (let i = 0; i < shortcutListeners.length; i++) {
         if (shortcutListeners[i](accelerator)) break;
     }
 };
@@ -74,15 +74,15 @@ window.addEventListener("keydown", e => {
     if (e.key === "Control") state.ctrlKey = true;
     if (e.key === "Meta") state.metaKey = true;
     if (e.key === "Shift") state.shiftKey = true;
-    
+
     api.updateState(state);
 
     // Shortcuts
-    if (e.key.length === 1 && (state.ctrlKey || state.metaKey)){
+    if (e.key.length === 1 && (state.ctrlKey || state.metaKey)) {
         fireShortcutEvent("CmdOrCtrl+" + e.key.toUpperCase());
-    }else if (e.key.length === 2 && e.key[0] === 'F'){
+    } else if (e.key.length === 2 && e.key[0] === 'F') {
         fireShortcutEvent(e.key);
-    }else if (e.key.length === 6){
+    } else if (e.key.length === 6) {
         // Delete
         fireShortcutEvent(e.key);
     }
@@ -90,7 +90,7 @@ window.addEventListener("keydown", e => {
     keyDownListeners.forEach(l => l(e));
 });
 
-window.addEventListener("keyup",  e => {
+window.addEventListener("keyup", e => {
     const state = {
         ctrlKey: e.ctrlKey,
         metaKey: e.metaKey,
@@ -102,14 +102,14 @@ window.addEventListener("keyup",  e => {
     if (e.key === "Shift") state.shiftKey = false;
 
     api.updateState(state);
-    
+
     keyUpListeners.forEach(l => l(e));
 });
 
 window.addEventListener("contextmenuopened", api.resetModifiers, false);
 
 // iOS fix, when keyboard is open it pushes the viewport out
-document.addEventListener('focusout', function(e) {
+document.addEventListener('focusout', function (e) {
     if (window.scrollY > 0) window.scrollTo(0, 0);
 });
 

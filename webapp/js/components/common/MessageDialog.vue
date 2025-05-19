@@ -1,17 +1,14 @@
 <template>
-    <Window title="Information" id="info" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
+    <Window title="Information" id="info" @onClose="close('close')" modal maxWidth="70%" fixedSize>
 
-        {{message}}
-        
+        {{ message }}
+
         <br />
 
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
-            </button>            
+            </button>
         </div>
     </Window>
 </template>
@@ -20,27 +17,27 @@
 import Window from '../Window.vue';
 
 export default {
-  components: {
-      Window
-  },
+    components: {
+        Window
+    },
 
-  props: ["message"],
-  
-  data: function(){
-      return {};
-  },
-  mounted: function(){
-  },
-  methods: {
-      close: function(buttonId){
-          this.$emit('onClose', buttonId);
-      }
-  }
+    props: ["message"],
+
+    data: function () {
+        return {};
+    },
+    mounted: function () {
+    },
+    methods: {
+        close: function (buttonId) {
+            this.$emit('onClose', buttonId);
+        }
+    }
 }
 </script>
 
 <style scoped>
-.buttons{
+.buttons {
     margin-top: 16px;
     text-align: right;
 }

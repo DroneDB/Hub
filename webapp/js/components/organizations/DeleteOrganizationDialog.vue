@@ -1,10 +1,7 @@
 <template>
-    <Window title="Confirm delete" id="remove" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
+    <Window title="Confirm delete" id="remove" @onClose="close('close')" modal maxWidth="70%" fixedSize>
 
-        Are you sure you want to delete the organization '{{orgSlug}}'?<br />
+        Are you sure you want to delete the organization '{{ orgSlug }}'?<br />
 
         <div class="ui negative message">
             <div class="header">
@@ -28,27 +25,27 @@
 import Window from '../Window.vue';
 
 export default {
-  components: {
-      Window
-  },
+    components: {
+        Window
+    },
 
-  props: ["orgSlug"],
-  
-  data: function(){
-      return {};
-  },
-  mounted: function(){
-  },
-  methods: {
-      close: function(buttonId){
-          this.$emit('onClose', buttonId);
-      }
-  }
+    props: ["orgSlug"],
+
+    data: function () {
+        return {};
+    },
+    mounted: function () {
+    },
+    methods: {
+        close: function (buttonId) {
+            this.$emit('onClose', buttonId);
+        }
+    }
 }
 </script>
 
 <style scoped>
-.buttons{
+.buttons {
     margin-top: 16px;
     text-align: right;
 }

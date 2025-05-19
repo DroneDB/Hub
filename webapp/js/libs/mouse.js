@@ -3,15 +3,15 @@ export default {
     //     return position;
     // },
 
-    on: function(eventName, handler){
+    on: function (eventName, handler) {
         window.addEventListener(eventName, handler);
     },
 
-    off: function(eventName, handler){
+    off: function (eventName, handler) {
         window.removeEventListener(eventName, handler);
     },
 
-    intersects: function(mouseEvent, domElement){
+    intersects: function (mouseEvent, domElement) {
         const rect = domElement.getBoundingClientRect(),
             scrollLeft = window.pageXOffset || document.documentElement.scrollLeft,
             scrollTop = window.pageYOffset || document.documentElement.scrollTop,
@@ -20,18 +20,18 @@ export default {
             bottom = top + domElement.clientHeight,
             right = left + domElement.clientWidth;
 
-        return (mouseEvent.clientX >= left && 
-                mouseEvent.clientX <= right &&
-                mouseEvent.clientY >= top &&
-                mouseEvent.clientY <= bottom);
+        return (mouseEvent.clientX >= left &&
+            mouseEvent.clientX <= right &&
+            mouseEvent.clientY >= top &&
+            mouseEvent.clientY <= bottom);
     },
 
-    setCursor: function(cursor = "auto"){
+    setCursor: function (cursor = "auto") {
         window.document.body.style.cursor = cursor;
     },
 
-    clearCursor: function(prevCursor = "auto"){
-        if (window.document.body.style.cursor === prevCursor){
+    clearCursor: function (prevCursor = "auto") {
+        if (window.document.body.style.cursor === prevCursor) {
             window.document.body.style.cursor = "auto";
         }
     },

@@ -6,18 +6,18 @@ const path = require('path');
 
 module.exports = {
     mode: 'development',
-    
+
     entry: {
         main: path.join(__dirname, './webapp/js/main.js')
     },
-    
+
     output: {
         path: path.join(__dirname, './build'),
         filename: "[name].js",
         sourceMapFilename: "[name].js.map"
         // publicPath: "/build/"
     },
-    
+
     devtool: "source-map",
 
     module: {
@@ -35,21 +35,46 @@ module.exports = {
                         ]
                     }
                 }
-            },
-            {
+            }, {
                 test: /\.js$/,
-                exclude: /(node_modules|bower_components)/,
+                include: [
+                    path.resolve(__dirname, 'webapp'),
+                    path.resolve(__dirname, 'node_modules/ol'),
+                    path.resolve(__dirname, 'node_modules/color-parse'),
+                    path.resolve(__dirname, 'node_modules/color-rgba'),
+                    path.resolve(__dirname, 'node_modules'),
+                    path.resolve(__dirname, 'vendor')
+                ],
                 use: [
                     {
                         loader: 'babel-loader',
-                        query: {
-                            presets: ['@babel/env']
+                        options: {
+                            presets: [
+                                ['@babel/preset-env', {
+                                    targets: {
+                                        browsers: [
+                                            'last 2 Chrome versions',
+                                            'last 2 Firefox versions',
+                                            'last 2 Safari versions',
+                                            'last 2 Edge versions',
+                                            'last 2 iOS versions',
+                                            'last 2 Android versions'
+                                        ]
+                                    }
+                                }]
+                            ], plugins: [
+                                '@babel/plugin-transform-nullish-coalescing-operator',
+                                '@babel/plugin-transform-optional-chaining',
+                                '@babel/plugin-transform-class-properties',
+                                '@babel/plugin-transform-private-methods',
+                                '@babel/plugin-transform-private-property-in-object']
                         }
                     }
                 ],
-            },
+            },            // Handle application CSS/SCSS files
             {
-                test: /\.s?css$/,
+                test: /\.s[ac]ss$/i,
+                exclude: /node_modules/,
                 use: [
                     {
                         loader: "vue-style-loader" // creates style nodes from JS strings
@@ -65,27 +90,39 @@ module.exports = {
                     }
                 ]
             },
+            // Handle regular CSS files
             {
-                test: /\.(png|woff|woff2|eot|ttf|svg|jpg|gif)$/, 
+                test: /\.css$/i,
+                use: [
+                    'vue-style-loader',
+                    'css-loader'
+                ]
+            },
+            {
+                test: /\.(png|woff|woff2|eot|ttf|svg|jpg|gif)$/,
                 use: {
                     loader: 'url-loader',
                     options: {
                         limit: 131072
                     }
-                } 
+                }
             }
         ]
-    },
-    plugins: [
+    }, plugins: [
         new VueLoaderPlugin(),
         new LiveReloadPlugin(),
-        new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function(resource) {
+        new webpack.ProvidePlugin({
+            $: 'jquery',
+            jQuery: 'jquery',
+            'window.jQuery': 'jquery'
+        }),
+        new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
             resource.request = resource.request.replace(/polyfills\/node\//, `polyfills\/web\/`);
         }),
         new CopyPlugin({
-          patterns: [
-            { from: 'webapp/public', to: '' }
-          ]
+            patterns: [
+                { from: 'webapp/public', to: '' }
+            ]
         })
     ],
 

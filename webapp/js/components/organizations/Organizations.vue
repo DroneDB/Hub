@@ -1,6 +1,6 @@
 <template>
     <div id="organizations">
-        <Message bindTo="error"/>
+        <Message bindTo="error" />
 
         <div class="top-banner ui equal width grid middle aligned">
             <div class="column">
@@ -13,30 +13,29 @@
             </div>
         </div>
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin"/>
+            <i class="icon circle notch spin" />
         </div>
         <div v-else>
             <div v-for="org in organizations" class="ui segments organization">
                 <div class="ui segment" @click="viewOrganization(org)">
                     <div class="ui grid middle aligned flex-container">
-                        <div class="flex-item column left aligned main-col"><i
-                            class="sitemap icon"></i>{{ org.name ? org.name : org.slug }}
+                        <div class="flex-item column left aligned main-col"><i class="sitemap icon"></i>{{ org.name ?
+                            org.name : org.slug }}
                         </div>
                         <div class="flex-item column left aligned">
                             <div v-if="org.isPublic"><i class="unlock icon"></i>Public</div>
                             <div v-else><i class="lock icon"></i>Private</div>
                         </div>
                         <div class="flex-item column actions right aligned">
-                            <button v-if="!readyOnly &&org.slug !== 'public' && org.slug !== org.owner"
-                                    @click.stop="handleEdit(org)" class="ui button icon small grey"
-                                    :class="{loading: org.editing}"
-                                    :disabled="org.editing || org.deleting">
+                            <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                @click.stop="handleEdit(org)" class="ui button icon small grey"
+                                :class="{ loading: org.editing }" :disabled="org.editing || org.deleting">
                                 <i class="ui icon pencil"></i>
                             </button>
                             <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
-                                    @click.stop="handleDelete(org)" class="ui button icon small negative"
-                                    :class="{loading: org.deleting}"
-                                    :disabled="org.deleting || org.editing"><i class="ui icon trash"></i>
+                                @click.stop="handleDelete(org)" class="ui button icon small negative"
+                                :class="{ loading: org.deleting }" :disabled="org.deleting || org.editing"><i
+                                    class="ui icon trash"></i>
                             </button>
                         </div>
                     </div>
@@ -51,11 +50,11 @@
                 </div>
             </div>
         </div>
-        <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose"
-                                  :orgSlug="currentOrgSlug"></DeleteOrganizationDialog>
+        <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug">
+        </DeleteOrganizationDialog>
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
-                            @onClose="handleOrganizationClose"></OrganizationDialog>
+            @onClose="handleOrganizationClose"></OrganizationDialog>
 
     </div>
 </template>
@@ -66,9 +65,9 @@ import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import OrganizationDialog from './OrganizationDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue'
 import ddb from 'ddb';
-import {setTitle} from '../../libs/utils';
+import { setTitle } from '../../libs/utils';
 
-const {Registry} = ddb;
+const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
 
 export default {
@@ -116,14 +115,14 @@ export default {
             });
 
             if (this.organizations.length === 0) {
-                this.$router.push({name: "Upload"}).catch(() => {
+                this.$router.push({ name: "Upload" }).catch(() => {
                 });
             }
         } catch (e) {
             if (e.status === 401) {
                 if (e.noRetry) {
                     reg.logout(); // Clear JWT token and related data
-                    this.$router.push({ name: "Login" }).catch(() => {});
+                    this.$router.push({ name: "Login" }).catch(() => { });
                 } else {
                     this.error = "Temporary authentication issue. Please try again.";
                 }
@@ -272,7 +271,7 @@ export default {
         },
 
         upload: function () {
-            this.$router.push({name: "Upload"});
+            this.$router.push({ name: "Upload" });
         }
     },
 

@@ -1,35 +1,35 @@
-export function setTitle(title){
+export function setTitle(title) {
     document.title = `${title} - ${HubOptions.appName || "DroneDB"}`;
 }
 
-export function getCookie(key){
+export function getCookie(key) {
     const cobj = document.cookie
-      .split(';')
-      .map(v => v.split('='))
-      .reduce((acc, v) => {
-        acc[decodeURIComponent(v[0].trim())] = decodeURIComponent(v[1].trim());
-        return acc;
-      }, {});
+        .split(';')
+        .map(v => v.split('='))
+        .reduce((acc, v) => {
+            acc[decodeURIComponent(v[0].trim())] = decodeURIComponent(v[1].trim());
+            return acc;
+        }, {});
     return cobj[key];
 }
 
-export function clearCookie(key){
+export function clearCookie(key) {
     document.cookie = `${key}=;-1;path=/`;
 }
 
-export function queryParams(location){
+export function queryParams(location) {
     let params = {};
     let paramsRaw = (location.search.replace("?", "").match(/([^&=]+)=?([^&]*)/g) || []);
-    for (let i in paramsRaw){
-      let parts = paramsRaw[i].split("=");
-      if (parts[1] !== undefined){
-          params[parts[0]] = parts[1];
-      }
+    for (let i in paramsRaw) {
+        let parts = paramsRaw[i].split("=");
+        if (parts[1] !== undefined) {
+            params[parts[0]] = parts[1];
+        }
     }
     return params;
 };
 
-export function inIframe(){
+export function inIframe() {
     try {
         return window.self !== window.top;
     } catch (e) {
@@ -37,19 +37,19 @@ export function inIframe(){
     }
 }
 
-export function clone(obj){
+export function clone(obj) {
     if (typeof obj === 'undefined') return undefined;
     try {
         return JSON.parse(JSON.stringify(obj));
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         debugger;
         return undefined;
     }
 }
 
-export function bytesToSize(bytes, decimals = 2){
-    if(bytes == 0) return '0 byte';
+export function bytesToSize(bytes, decimals = 2) {
+    if (bytes == 0) return '0 byte';
     var k = 1000; // or 1024 for binary
     var dm = decimals || 3;
     var sizes = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
@@ -60,16 +60,16 @@ export function bytesToSize(bytes, decimals = 2){
 
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {
-	var fse = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
-	
-	// If no element is in full-screen
-	if(fse === null)
-		return false;
-	else
-		return true;
+    var fse = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
+
+    // If no element is in full-screen
+    if (fse === null)
+        return false;
+    else
+        return true;
 }
 
-export function supportsFullScreen(){
+export function supportsFullScreen() {
     return !!(document.body.requestFullScreen || document.body.webkitRequestFullScreen || document.body.mozRequestFullScreen || document.body.msRequestFullScreen);
 }
 
@@ -107,22 +107,22 @@ export function exitFullScreen() {
 }
 
 // https://stackoverflow.com/a/53486112
-export function debounce (fn, delay) {
+export function debounce(fn, delay) {
     var timeoutID = null;
     return function () {
         clearTimeout(timeoutID);
         var args = arguments;
         var that = this;
         timeoutID = setTimeout(function () {
-        fn.apply(that, args);
+            fn.apply(that, args);
         }, delay);
     };
 }
 
-export function sortObjectKeys(unorderedObj){
+export function sortObjectKeys(unorderedObj) {
     return Object.keys(unorderedObj).sort().reduce(
-        (obj, key) => { 
-            obj[key] = unorderedObj[key]; 
+        (obj, key) => {
+            obj[key] = unorderedObj[key];
             return obj;
         }, {});
 }

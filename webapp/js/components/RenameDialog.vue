@@ -1,16 +1,8 @@
 <template>
-    <Window title="Rename" id="rename" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
+    <Window title="Rename" id="rename" @onClose="close('close')" modal maxWidth="70%" fixedSize>
 
-        <input class="renameInput" 
-                ref="renameInput" 
-                v-on:keyup.enter="rename"
-                v-on:keyup.esc="close"
-                
-                v-model="renameText" 
-                :error="renameText == null || renameText.length == 0" />
+        <input class="renameInput" ref="renameInput" v-on:keyup.enter="rename" v-on:keyup.esc="close"
+            v-model="renameText" :error="renameText == null || renameText.length == 0" />
 
         <div class="buttons">
             <button @click="close('close')" class="ui button">
@@ -34,41 +26,41 @@ export default {
 
     props: ["file"],
 
-    data: function() {
+    data: function () {
         return {
             renameText: null
         };
     },
-    mounted: function() {
+    mounted: function () {
         this.renameText = this.file.label;
 
         this.$nextTick(() => {
             this.$refs.renameInput.focus();
-            
+
             this.$refs.renameInput.select();
             const dotIdx = this.renameText.indexOf(".");
-            if (dotIdx !== -1){
+            if (dotIdx !== -1) {
                 this.$refs.renameInput.selectionEnd = dotIdx;
             }
         });
     },
     methods: {
-        close: function(buttonId) {
+        close: function (buttonId) {
             this.$emit('onClose', buttonId);
         },
-        rename: function(){
+        rename: function () {
             if (this.renameText) {
-                if (this.file.entry.type === ddb.entry.type.DRONEDB){
+                if (this.file.entry.type === ddb.entry.type.DRONEDB) {
                     this.$emit('onClose', "renameddb", this.renameText, this.entry);
-                }else{
+                } else {
                     let basePath = this.file.entry.path.substring(0, this.file.entry.path.lastIndexOf('/'));
 
                     // Check that renameText does not contain any invalid characters
-                    if (this.renameText.indexOf('/') != -1 || 
-                        this.renameText.indexOf('\\') != -1 || 
-                        this.renameText.indexOf('..') != -1 || 
+                    if (this.renameText.indexOf('/') != -1 ||
+                        this.renameText.indexOf('\\') != -1 ||
+                        this.renameText.indexOf('..') != -1 ||
                         this.renameText.indexOf('.') == 0) {
-                        
+
                         this.$refs.renameInput.setCustomValidity("Invalid characters in path");
                         return;
                     }
@@ -82,11 +74,12 @@ export default {
 </script>
 
 <style scoped>
-.renameInput{
+.renameInput {
     margin-top: 8px;
     width: 100%;
 }
-.buttons{
+
+.buttons {
     margin-top: 16px;
     text-align: right;
 }

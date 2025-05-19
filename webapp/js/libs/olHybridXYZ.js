@@ -6,17 +6,17 @@ import ddb from 'ddb';
 // from internet and file:// URLs via
 // DDB tiling
 
-function genTileFSLoadFunction(filePath, minZoom){
+function genTileFSLoadFunction(filePath, minZoom) {
     return (tile, src) => {
         tile.setState(TileState.LOADING);
         const { tileCoord } = tile;
-        let [ tz, tx, ty ] = tileCoord;
-    
-        if (minZoom !== undefined && tz < minZoom){
+        let [tz, tx, ty] = tileCoord;
+
+        if (minZoom !== undefined && tz < minZoom) {
             // Do not load this one
             tile.setState(TileState.EMPTY);
-        }else{
-            ddb.tile.getFromUserCache(filePath.replace(/^file:\/\//, ""), tz, tx, ty, { size: 256, tms: true}).then((tilePath) => {
+        } else {
+            ddb.tile.getFromUserCache(filePath.replace(/^file:\/\//, ""), tz, tx, ty, { size: 256, tms: true }).then((tilePath) => {
                 tile.getImage().src = "file://" + tilePath;
                 tile.setState(TileState.LOADED);
             }).catch(e => {
@@ -27,18 +27,18 @@ function genTileFSLoadFunction(filePath, minZoom){
     };
 }
 
-function genTileDDBLoadFunction(ddbUri, minZoom){
+function genTileDDBLoadFunction(ddbUri, minZoom) {
     const [dataset, path] = ddb.utils.datasetPathFromUri(ddbUri);
-            
+
     return (tile, src) => {
         tile.setState(TileState.LOADING);
         const { tileCoord } = tile;
-        let [ tz, tx, ty ] = tileCoord;
+        let [tz, tx, ty] = tileCoord;
 
-        if (minZoom !== undefined && tz < minZoom){
+        if (minZoom !== undefined && tz < minZoom) {
             // Do not load this one
             tile.setState(TileState.EMPTY);
-        }else{
+        } else {
             tile.getImage().onload = () => {
                 tile.setState(TileState.LOADED);
             };
@@ -51,26 +51,26 @@ function genTileDDBLoadFunction(ddbUri, minZoom){
     };
 }
 
-class HybridXYZ extends XYZ{
-    constructor(opt_options){
+class HybridXYZ extends XYZ {
+    constructor(opt_options) {
         const isFS = opt_options.url && opt_options.url.startsWith("file://");
         const isDDB = opt_options.url && ddb.utils.isDDBUri(opt_options.url);
 
         let minZoom = opt_options.minZoom;
-        if (isFS && isDDB){
+        if (isFS && isDDB) {
             // minZoom freezes OL. Bho... so we remove it
-            delete(opt_options.minZoom);
+            delete (opt_options.minZoom);
         }
         const url = opt_options.url;
-        
+
         // Override opt_options.url to a dummy URL
         // so that we can send parallel tile requests
         opt_options.url = "https://{z}/{x}/{y}";
         super(opt_options);
 
-        if (isFS){
+        if (isFS) {
             this.tileLoadFunction = genTileFSLoadFunction(url, minZoom).bind(this);
-        }else if (isDDB){
+        } else if (isDDB) {
             this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom).bind(this);
         }
     }

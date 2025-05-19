@@ -1,14 +1,13 @@
 <template>
-    <Window v-bind:title="title" id="organizationDialog" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
+    <Window v-bind:title="title" id="organizationDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="org-dialog">
             <form v-on:submit.prevent class="ui form">
                 <div class="fields">
                     <div class="field">
                         <label>Name</label>
-                        <input type="text" ref="name" v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name" placeholder="Name" />
+                        <input type="text" ref="name"
+                            v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name"
+                            placeholder="Name" />
                     </div>
                 </div>
                 <div class="field">
@@ -19,7 +18,7 @@
                     <label>Public</label>
                     <input type="checkbox" v-model="org.isPublic" />
                 </div>
-            </form>        
+            </form>
             <div class="buttons">
                 <button @click="close('close')" class="ui button">
                     Close
@@ -47,8 +46,8 @@ export default {
     },
 
     props: ["mode", "model"],
-  
-    data: function(){
+
+    data: function () {
         return {
             org: {
                 name: null,
@@ -58,7 +57,7 @@ export default {
             title: null
         };
     },
-    mounted: function() { 
+    mounted: function () {
         this.$nextTick(() => this.$refs.name.focus());
 
         if (this.mode == 'edit') {
@@ -91,7 +90,7 @@ export default {
                 e.preventDefault();
             }
         },
-        close: function(buttonId, obj){
+        close: function (buttonId, obj) {
             this.$emit('onClose', buttonId, {
                 name: this.org.name,
                 description: typeof this.org.description === "string" ? this.org.description : "",
@@ -99,7 +98,7 @@ export default {
                 slug: slugFromName(this.org.name)
             });
         },
-        isValid: function(){
+        isValid: function () {
             // organization slug can contain only letters, numbers, dashes and underscores
             const slug = slugFromName(this.org.name);
             return slug && re.test(slug) && this.org.name;
@@ -109,19 +108,21 @@ export default {
 </script>
 
 <style scoped>
-.org-dialog{
+.org-dialog {
     min-width: 320px;
     padding: 4px;
 }
-.buttons{
+
+.buttons {
     margin-top: 16px;
     text-align: right;
 }
+
 .form {
     margin-bottom: 20px;
 }
 
-.field{
+.field {
     width: 100%;
 }
 

@@ -13,11 +13,12 @@ const typeIconMap = {
     [entry.type.GEOVIDEO]: "film",
     [entry.type.MODEL]: "cube",
     [entry.type.PANORAMA]: "globe",
-    [entry.type.GEOPANORAMA]: "globe"    
+    [entry.type.GEOPANORAMA]: "globe",
+    [entry.type.VECTOR]: "object ungroup outline",
 };
 
 export default {
-    getForType: function(entryType){
+    getForType: function (entryType) {
         return typeIconMap[entryType] || "question";
     }
 }

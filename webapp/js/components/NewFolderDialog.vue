@@ -1,16 +1,9 @@
 <template>
-    <Window title="Create folder" id="newFolder" @onClose="close('close')" 
-            modal
-            maxWidth="70%"
-            fixedSize>
+    <Window title="Create folder" id="newFolder" @onClose="close('close')" modal maxWidth="70%" fixedSize>
 
-        <input class="newFolderInput" 
-                ref="newFolderInput" 
-                v-on:keyup.enter="createFolder"
-                v-on:keyup.esc="close"
-                v-model="newFolderPath" 
-                :error="!newFolderPath" />
-        
+        <input class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close"
+            v-model="newFolderPath" :error="!newFolderPath" />
+
         <div class="buttons">
             <button @click="close('close')" class="ui button">
                 Close
@@ -26,45 +19,47 @@
 import Window from './Window.vue';
 
 export default {
-  components: {
-      Window
-  },
+    components: {
+        Window
+    },
 
-  props: [],
-  
-  data: function(){
-      return {
-          newFolderPath: null
-      };
-  },
-  mounted: function(){
-      this.$nextTick(() => {
-        this.$refs.newFolderInput.focus();
-      });
-  },
-  methods: {
-      close: function(buttonId){
-          this.$emit('onClose', buttonId);
-      },
-      createFolder: function(){
-          if (this.newFolderPath){
-            this.$emit('onClose', "createFolder", this.newFolderPath);
-          }
-      }
-  }
+    props: [],
+
+    data: function () {
+        return {
+            newFolderPath: null
+        };
+    },
+    mounted: function () {
+        this.$nextTick(() => {
+            this.$refs.newFolderInput.focus();
+        });
+    },
+    methods: {
+        close: function (buttonId) {
+            this.$emit('onClose', buttonId);
+        },
+        createFolder: function () {
+            if (this.newFolderPath) {
+                this.$emit('onClose', "createFolder", this.newFolderPath);
+            }
+        }
+    }
 }
 </script>
 
 <style scoped>
-.newFolderInput{
+.newFolderInput {
     width: 100%;
     margin-top: 8px;
     padding: 4px;
 }
-.buttons{
+
+.buttons {
     margin-top: 16px;
     text-align: right;
-    button{
+
+    button {
         margin: 0;
     }
 }

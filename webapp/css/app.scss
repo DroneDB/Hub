@@ -1,18 +1,20 @@
-@import './semantic.min.css';
+// Import Semantic UI from npm package
+// Semantic UI is now imported in main.js directly
 
-html{
+html {
     overflow: hidden;
 }
-body{
+
+body {
     color: #030A03;
     background: #fefefe;
 }
 
-*{
+* {
     user-select: none;
 }
 
-.hidden{
+.hidden {
     display: none !important;
 }
 
@@ -20,26 +22,26 @@ body{
     animation: rotation 2s infinite linear;
 }
 
-.circle.notch{
+.circle.notch {
     height: 17px;
     line-height: 17px;
     width: 22px;
 }
 
-.cui.select.icon{
+.cui.select.icon {
     position: relative;
 
-    select{
+    select {
         text-indent: 24px;
     }
 
-    i{
+    i {
         position: absolute;
         left: 13px;
         z-index: 1;
         top: 10px;
         opacity: 0.5;
-        color: rgba(0,0,0,0.87);
+        color: rgba(0, 0, 0, 0.87);
     }
 }
 
@@ -74,22 +76,25 @@ body{
         height: 100%;
     }
 }
- 
+
 @keyframes rotation {
     from {
         transform: rotate(0deg);
     }
+
     to {
         transform: rotate(360deg);
     }
 }
 
-#app{
+#app {
     display: flex;
     flex-direction: column;
-    &.fullpage{
+
+    &.fullpage {
         height: 100%;
-        & > div#views{
+
+        &>div#views {
             height: 100%;
         }
     }
@@ -106,123 +111,142 @@ body:fullscreen {
 /* Mobile */
 
 @media only screen and (max-width: 767px) {
+
     [class*="mobile hide"],
     [class*="tablet only"]:not(.mobile),
     [class*="computer only"]:not(.mobile),
     [class*="large monitor only"]:not(.mobile),
     [class*="widescreen monitor only"]:not(.mobile),
     [class*="or lower hide"] {
-      display: none !important;
+        display: none !important;
     }
 
-    body,button, input, optgroup, select, textarea{
+    body,
+    button,
+    input,
+    optgroup,
+    select,
+    textarea {
         font-size: 120%;
     }
-    .ui.button, .ui.buttons .button, .ui.buttons .or,
+
+    .ui.button,
+    .ui.buttons .button,
+    .ui.buttons .or,
     .ui.dropdown .menu,
     .ui.dropdown .menu>.item,
-    i.icon, i.icons{
+    i.icon,
+    i.icons {
         font-size: 1.2rem;
     }
-  }
-  
-  
-  /* Tablet / iPad Portrait */
-  
-  @media only screen and (min-width: 768px) and (max-width: 991px) {
+}
+
+
+/* Tablet / iPad Portrait */
+
+@media only screen and (min-width: 768px) and (max-width: 991px) {
+
     [class*="mobile only"]:not(.tablet),
     [class*="tablet hide"],
     [class*="computer only"]:not(.tablet),
     [class*="large monitor only"]:not(.tablet),
     [class*="widescreen monitor only"]:not(.tablet),
     [class*="or lower hide"]:not(.mobile) {
-      display: none !important;
+        display: none !important;
     }
-  }
+}
 
-  /* Computer / Desktop / iPad Landscape */
-  
-  @media only screen and (min-width: 992px) and (max-width: 1199px) {
+/* Computer / Desktop / iPad Landscape */
+
+@media only screen and (min-width: 992px) and (max-width: 1199px) {
+
     [class*="mobile only"]:not(.computer),
     [class*="tablet only"]:not(.computer),
     [class*="computer hide"],
     [class*="large monitor only"]:not(.computer),
     [class*="widescreen monitor only"]:not(.computer),
     [class*="or lower hide"]:not(.tablet):not(.mobile) {
-      display: none !important;
+        display: none !important;
     }
-  }
-  
-  
-  /* Large Monitor */
-  
-  @media only screen and (min-width: 1200px) and (max-width: 1919px) {
+}
+
+
+/* Large Monitor */
+
+@media only screen and (min-width: 1200px) and (max-width: 1919px) {
+
     [class*="mobile only"]:not([class*="large monitor"]),
     [class*="tablet only"]:not([class*="large monitor"]),
     [class*="computer only"]:not([class*="large monitor"]),
     [class*="large monitor hide"],
     [class*="widescreen monitor only"]:not([class*="large monitor"]),
     [class*="or lower hide"]:not(.computer):not(.tablet):not(.mobile) {
-      display: none !important;
+        display: none !important;
     }
-  }
-  
-  
-  /* Widescreen Monitor */
-  
-  @media only screen and (min-width: 1920px) {
+}
+
+
+/* Widescreen Monitor */
+
+@media only screen and (min-width: 1920px) {
+
     [class*="mobile only"]:not([class*="widescreen monitor"]),
     [class*="tablet only"]:not([class*="widescreen monitor"]),
     [class*="computer only"]:not([class*="widescreen monitor"]),
     [class*="large monitor only"]:not([class*="widescreen monitor"]),
     [class*="widescreen monitor hide"],
     [class*="widescreen monitor or lower hide"] {
-      display: none !important;
+        display: none !important;
     }
-  }
-  
+}
+
 
 @font-face {
-  font-family: 'dronedb';
-  src: url('../fonts/dronedb.woff2?91670630') format('woff2'),
-       url('../fonts/dronedb.woff?91670630') format('woff');
-  font-weight: normal;
-  font-style: normal;
+    font-family: 'dronedb';
+    src: url('../fonts/dronedb.woff2?91670630') format('woff2'),
+        url('../fonts/dronedb.woff?91670630') format('woff');
+    font-weight: normal;
+    font-style: normal;
 }
 
-[class^="icon-dronedb"]:before, [class*=" icon-dronedb"]:before {
-  font-family: "dronedb";
-  font-style: normal;
-  font-weight: normal;
-  speak: never;
+[class^="icon-dronedb"]:before,
+[class*=" icon-dronedb"]:before {
+    font-family: "dronedb";
+    font-style: normal;
+    font-weight: normal;
+    speak: never;
 
-  display: inline-block;
-  text-decoration: inherit;
-  width: 1em;
-  margin-right: .2em;
-  text-align: center;
-  /* opacity: .8; */
+    display: inline-block;
+    text-decoration: inherit;
+    width: 1em;
+    margin-right: .2em;
+    text-align: center;
+    /* opacity: .8; */
 
-  /* For safety - reset parent styles, that can break glyph codes*/
-  font-variant: normal;
-  text-transform: none;
+    /* For safety - reset parent styles, that can break glyph codes*/
+    font-variant: normal;
+    text-transform: none;
 
-  /* fix buttons height, for twitter bootstrap */
-  line-height: 1em;
+    /* fix buttons height, for twitter bootstrap */
+    line-height: 1em;
 
-  /* Animation center compensation - margins should be symmetric */
-  /* remove if not needed */
-  margin-left: .2em;
+    /* Animation center compensation - margins should be symmetric */
+    /* remove if not needed */
+    margin-left: .2em;
 
-  /* you can be more comfortable with increased icons size */
-  /* font-size: 120%; */
+    /* you can be more comfortable with increased icons size */
+    /* font-size: 120%; */
 
-  /* Font smoothing. That was taken from TWBS */
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    /* Font smoothing. That was taken from TWBS */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 
-  /* Uncomment for 3D effect */
-  /* text-shadow: 1px 1px 1px rgba(127, 127, 127, 0.3); */
+    /* Uncomment for 3D effect */
+    /* text-shadow: 1px 1px 1px rgba(127, 127, 127, 0.3); */
 }
 
-.icon-dronedb:before { content: '\e800'; } /* '' */
+.icon-dronedb:before {
+    content: '\e800';
+}
+
+/* '' */

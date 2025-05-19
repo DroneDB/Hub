@@ -1,32 +1,19 @@
 <template>
     <div class="tree-node">
-        <div class="entry" draggable
-                @dragstart="startDrag($event, node)"
-                @drop="onDrop($event, node)"
-                @dragover.prevent
-                @dragenter.prevent
-            @click="onClick" 
-            @dblclick="handleOpenDblClick" 
-            @contextmenu="onRightClick"
-            :class="{selected: selected}">
+        <div class="entry" draggable @dragstart="startDrag($event, node)" @drop="onDrop($event, node)" @dragover.prevent
+            @dragenter.prevent @click="onClick" @dblclick="handleOpenDblClick" @contextmenu="onRightClick"
+            :class="{ selected: selected }">
             <i class="icon circle notch spin" v-if="loading" />
-            <i class="icon" @click="handleOpenCaret"
-                            :class="expanded ? 'caret down' : 'caret right'" 
-                            v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
+            <i class="icon" @click="handleOpenCaret" :class="expanded ? 'caret down' : 'caret right'"
+                v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
             <i class="icon nonexistant" v-if="!isExpandable || (empty && loadedChildren)" />
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
-        </div>
-        <div class="children" v-show="expanded">                 
-            <TreeNode v-for="(node, index) in children" 
-                :key="'N,' + node.path"
-                :node="node"                    
-                ref="nodes"
-                :getChildren="getChildren" 
-                @selected="$emit('selected', $event, arguments[1])"
-                @opened="$emit('opened', $event, arguments[1])"
-                    />                        
+        </div>        <div class="children" v-show="expanded">
+            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" :node="node" ref="nodes"
+                :getChildren="getChildren" @selected="$emit('selected', $event, arguments[1])"
+                @opened="$emit('opened', $event, arguments[1])" />
         </div>
     </div>
 </template>
@@ -37,7 +24,6 @@ import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import ddb from 'ddb';
 const { pathutils } = ddb;
-import icons from '../libs/icons';
 
 export default {
     props: {
@@ -50,7 +36,7 @@ export default {
         }
     },
     components: { TreeNode: () => import('./TreeNode.vue') },
-    data: function(){
+    data: function () {
         return {
             children: [],
             loading: false,
@@ -60,25 +46,25 @@ export default {
         }
     },
     computed: {
-        isExpandable: function() {
+        isExpandable: function () {
             return ddb.entry.isDirectory(this.node.entry);
         },
-        empty: function() {
+        empty: function () {
             return this.children.length === 0;
         }
 
     },
-    mounted: async function(){
-        if (this.node.expanded){
+    mounted: async function () {
+        if (this.node.expanded) {
             await this.handleOpenDblClick(new CustomEvent('click'));
         }
 
         this.$root.$on('deleteEntries', async (deleted) => {
-            
+
             var els = this.children.filter(item => deleted.includes(item.entry.path));
 
             // It's not our business
-            if (els.length == 0) 
+            if (els.length == 0)
                 return;
 
             this.children = this.children.filter(item => !deleted.includes(item.entry.path));
@@ -95,20 +81,20 @@ export default {
             if (tree.includes(ourPath))
                 await this.expand();
 
-            if (tree[tree.length-1] === ourPath ||
-                (tree[tree.length-1] === "/" && this.node.root))
-                this.$emit('opened', this, "explorer");  
-            
+            if (tree[tree.length - 1] === ourPath ||
+                (tree[tree.length - 1] === "/" && this.node.root))
+                this.$emit('opened', this, "explorer");
+
         });
 
         this.$root.$on('addItems', async (items) => {
-            
-            if (items.length == 0) 
+
+            if (items.length == 0)
                 return;
-            
-            if (!this.isExpandable) 
+
+            if (!this.isExpandable)
                 return;
-            
+
             var parentPath = pathutils.getParentFolder(items[0].entry.path);
 
             if (parentPath == null) {
@@ -120,12 +106,12 @@ export default {
                     return;
                 }
             }
-            
+
             // Let's remove first the duplicates
             this.children = this.children.filter(ch => items.find(i => i.entry.path !== ch.entry.path));
-            
+
             // Add new items
-            for(var item of items){
+            for (var item of items) {
                 this.children.push(item);
             }
 
@@ -133,7 +119,7 @@ export default {
                 await this.expand();
                 this.$emit('opened', this, "addItems");
             }
-            
+
             this.sortChildren();
 
         });
@@ -145,28 +131,28 @@ export default {
                 this.$root.$emit('moveItem', this.node, destItem);
             }
         });
-       
+
     },
     methods: {
-        onClick: function(e){
+        onClick: function (e) {
             Keyboard.updateState(e);
             this.$emit('selected', this, Mouse.LEFT);
         },
-        onRightClick: function(e){
+        onRightClick: function (e) {
             Keyboard.updateState(e);
             this.$emit('selected', this, Mouse.RIGHT);
         },
-        handleOpenDblClick: async function(e){
+        handleOpenDblClick: async function (e) {
             return this._handleOpen(e, "dblclick");
         },
-        handleOpenCaret: async function(e){
+        handleOpenCaret: async function (e) {
             return this._handleOpen(e, "caret");
         },
 
-        startDrag (evt, item) {
+        startDrag(evt, item) {
 
             evt.stopPropagation();
-            
+
             evt.dataTransfer.dropEffect = 'move';
             evt.dataTransfer.effectAllowed = 'move';
             var data = JSON.stringify(clone(item));
@@ -176,19 +162,19 @@ export default {
             this.$log.info(`drag start '${item.entry.path}'`);
         },
 
-        onDrop (evt, item) {              
+        onDrop(evt, item) {
             const sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
             this.$log.info(`dropping '${sourceItem.entry.path}' onto '${item.entry.path}'`);
-            
+
             this.$root.$emit('moveItemInit', item);
         },
 
-        sortChildren: function() {
+        sortChildren: function () {
             this.children = this.children.sort((n1, n2) => {
 
                 var a = n1.entry;
                 var b = n2.entry;
-                
+
                 // Folders first
                 let aDir = ddb.entry.isDirectory(a);
                 let bDir = ddb.entry.isDirectory(b);
@@ -196,7 +182,7 @@ export default {
                 if (aDir && !bDir) return -1;
                 else if (!aDir && bDir) return 1;
                 else {
-                  
+
                     // then filename ascending
                     return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
 
@@ -204,41 +190,41 @@ export default {
             });
         },
 
-        loadChildren: async function() {
+        loadChildren: async function () {
 
             this.loading = true;
-            
+
             this.children = await this.getChildren(this.node.path);
             this.loadedChildren = true;
 
             this.loading = false;
         },
 
-        expand: async function() {
-            
+        expand: async function () {
+
             if (!this.isExpandable) {
                 this.$log.info("Only folders can be expanded");
                 return;
             }
 
-            if (!this.loadedChildren) 
+            if (!this.loadedChildren)
                 await this.loadChildren();
 
             this.expanded = true;
 
         },
 
-        _handleOpen: async function(e, sender){
+        _handleOpen: async function (e, sender) {
 
             e.stopPropagation();
             if (Keyboard.isModifierPressed()) return; // We are selecting
 
             if (sender == "caret") {
                 if (!this.expanded) {
-                    await this.expand();   
+                    await this.expand();
                     this.$emit('opened', this, sender);
                 } else {
-                    this.expanded = false; 
+                    this.expanded = false;
                 }
             } else {
                 await this.expand(sender);
@@ -247,52 +233,58 @@ export default {
 
 
         }
-  }
+    }
 }
 </script>
 
 <style scoped>
-.tree-node{
-    .entry{
+.tree-node {
+    .entry {
         padding: 2px 4px 2px 4px;
         display: inline-block;
         white-space: nowrap;
         min-width: 100%;
 
-        &:hover{
+        &:hover {
             background: #eee;
             cursor: pointer;
         }
-        &:focus,&:active{
+
+        &:focus,
+        &:active {
             background: #dadada;
         }
-        &.selected{
+
+        &.selected {
             background: #ddd;
         }
     }
 
-    @media only screen and (max-width: 767px){
-        .entry{
+    @media only screen and (max-width: 767px) {
+        .entry {
             padding: 4px;
         }
     }
 
-    i{
+    i {
         display: inline-block;
         margin-top: 1px;
         margin-right: 0px;
     }
-    .text{
+
+    .text {
         display: inline-block;
         margin-left: 2px;
         white-space: nowrap;
         word-break: keep-all;
     }
-    .circle.notch{
+
+    .circle.notch {
         margin-left: -5px;
         margin-top: 2px;
     }
-    .children{
+
+    .children {
         margin-left: 16px;
     }
 }

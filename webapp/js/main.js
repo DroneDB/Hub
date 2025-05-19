@@ -1,6 +1,17 @@
 
 import 'regenerator-runtime';
 import '../css/app.scss';
+import '../css/ol-controls.css';  // Importazione stili OpenLayers
+
+// Import jQuery first and make it global BEFORE importing any jQuery-dependent libraries
+import $ from 'jquery';
+window.$ = window.jQuery = $;
+
+// Then import Semantic UI CSS and components (jQuery is already provided by webpack.ProvidePlugin)
+import 'semantic-ui-css/semantic.min.css';  // Semantic UI CSS from npm package
+import 'semantic-ui-css/components/dropdown.min';
+import 'semantic-ui-css/components/transition.min';
+
 import './libs/keyboard';
 import './libs/mouse';
 import './dynamic/web';
@@ -56,20 +67,20 @@ window.addEventListener('load', function () {
     Vue.use(VueRouter);
 
     const routes = [
-        { path: '/r/:org/:ds', name: "ViewDataset", components: {content: ViewDataset, header: hdr}, meta: { title: "View Dataset"}},
-        { path: '/r/:org/:ds/view/:encodedPath/map', name: "SingleMap", components: {content: SingleMap, header: hdr}, meta: { title: "Map"}},
-        { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: "PointCloud", components: {content: Potree, header: hdr}, meta: { title: "Point Cloud"}},
-        { path: '/r/:org/:ds/view/:encodedPath/markdown', name: "Markdown", components: {content: Markdown, header: hdr}, meta: { title: "Markdown"}},
-        { path: '/r/:org/:ds/view/:encodedPath/model', name: "Model", components: {content: Nexus, header: hdr}, meta: { title: "Model"}},
-        { path: '/r/:org/:ds/view/:encodedPath/panorama', name: "Panorama", components: {content: Panorama, header: hdr}, meta: { title: "Panorama"}},
-        { path: '/login', name: "Login", components: {content: Login, header: hdr}, meta: { title: "Login" }},
-        { path: '/r/:org', name: "Datasets", components: {content: Datasets, header: hdr}, meta: { title: "Datasets"}},
-        { path: '/r', name: "Organizations", components: {content: Organizations, header: hdr}, meta: { title: "Organizations"}},
-        { path: '/upload', name: "Upload", components: {content: Upload, header: hdr}, meta: { title: "Upload" }},
-        { path: '/admin/users', name: "Users", components: {content: Users, header: hdr}, meta: { title: "Users"}},
-        { path: '/account', name: "Account", components: {content: Account, header: hdr}, meta: { title: "Account"}},
-        { path: '/', name: "LoginHome", components: {content: Login, header: hdr}, meta: { title: "Login" }},
-        { path: '*', name: "NotFound", components: {content: NotFound, header: hdr}, meta: { title: "Not Found"}}
+        { path: '/r/:org/:ds', name: "ViewDataset", components: { content: ViewDataset, header: hdr }, meta: { title: "View Dataset" } },
+        { path: '/r/:org/:ds/view/:encodedPath/map', name: "SingleMap", components: { content: SingleMap, header: hdr }, meta: { title: "Map" } },
+        { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: "PointCloud", components: { content: Potree, header: hdr }, meta: { title: "Point Cloud" } },
+        { path: '/r/:org/:ds/view/:encodedPath/markdown', name: "Markdown", components: { content: Markdown, header: hdr }, meta: { title: "Markdown" } },
+        { path: '/r/:org/:ds/view/:encodedPath/model', name: "Model", components: { content: Nexus, header: hdr }, meta: { title: "Model" } },
+        { path: '/r/:org/:ds/view/:encodedPath/panorama', name: "Panorama", components: { content: Panorama, header: hdr }, meta: { title: "Panorama" } },
+        { path: '/login', name: "Login", components: { content: Login, header: hdr }, meta: { title: "Login" } },
+        { path: '/r/:org', name: "Datasets", components: { content: Datasets, header: hdr }, meta: { title: "Datasets" } },
+        { path: '/r', name: "Organizations", components: { content: Organizations, header: hdr }, meta: { title: "Organizations" } },
+        { path: '/upload', name: "Upload", components: { content: Upload, header: hdr }, meta: { title: "Upload" } },
+        { path: '/admin/users', name: "Users", components: { content: Users, header: hdr }, meta: { title: "Users" } },
+        { path: '/account', name: "Account", components: { content: Account, header: hdr }, meta: { title: "Account" } },
+        { path: '/', name: "LoginHome", components: { content: Login, header: hdr }, meta: { title: "Login" } },
+        { path: '*', name: "NotFound", components: { content: NotFound, header: hdr }, meta: { title: "Not Found" } }
     ];
     const router = new VueRouter({ mode: "history", routes });
 
@@ -83,12 +94,12 @@ window.addEventListener('load', function () {
     // Refresh auth tokens
     (async () => {
         if (reg.isLoggedIn()) {
-            try{
+            try {
                 await reg.refreshToken();
                 reg.setAutoRefreshToken();
-            }catch(e){
+            } catch (e) {
                 console.log(e.message);
-                if (e.status === 401){
+                if (e.status === 401) {
                     reg.clearCredentials();
                     router.push({ name: "Login" }).catch(() => { });
                 }

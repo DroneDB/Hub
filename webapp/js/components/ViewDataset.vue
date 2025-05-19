@@ -1,63 +1,52 @@
 <template>
-<div id="browser" class="cui app">
-    <Message bindTo="error" />
-    <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%" mobileCollapsed>
-        <div class="sidebar" >
-            <FileBrowser v-show="!isMobile" :rootNodes="rootNodes"
-                @openItem="handleOpenItem"
-                @selectionChanged="handleFileSelectionChanged"
-                @currentUriChanged="handleCurrentUriChanged"
-                @openProperties="handleFileBrowserOpenProperties"
-                @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
-                @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
-                @error="handleError" />
-        </div>
-        <TabSwitcher :tabs="mainTabs" :selectedTab="startTab"
-                position="top"
-                buttonWidth="auto"
-                :hideSingle="false"
-                ref="mainTabSwitcher" >
-            <template v-if="isMobile" v-slot:filebrowser>
-                <FileBrowser :rootNodes="rootNodes"
-                    @openItem="handleOpenItem"
-                    @selectionChanged="handleFileSelectionChanged"
-                    @currentUriChanged="handleCurrentUriChanged"
+    <div id="browser" class="cui app">
+        <Message bindTo="error" />
+        <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
+            mobileCollapsed>
+            <div class="sidebar">
+                <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" @openItem="handleOpenItem"
+                    @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
-                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
-                    @error="handleError" />
-            </template>
-            <template v-slot:map>
-                <Map lazyload :files="fileBrowserFiles" @scrollTo="handleScrollTo" @openItem="handleOpenItem" />
-            </template>
-            <template v-slot:explorer>
-                <Explorer ref="explorer" 
-                    :files="fileBrowserFiles"
-                    :tools="explorerTools"
-                    :currentPath="currentPath"
-                    @openItem="handleOpenItem"
-                    @createFolder="handleCreateFolder"
-                    @deleteSelecteditems="openDeleteItemsDialog"
-                    @moveSelectedItems="openRenameItemsDialog"
-                    @moveItem="handleMoveItem"
-                    @openProperties="handleExplorerOpenProperties"
-                    @shareEmbed="handleShareEmbed" />
-            </template>
-        </TabSwitcher>
-    </Panel>
-    <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
-    <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose" @addMarkdown="handleAddMarkdown" />
-    <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true"></AddToDatasetDialog>
-    <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
-    <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
-    <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
-    <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
-        {{errorMessage}}
-    </Alert>
-    <Loader v-if="isBusy"></Loader>
-    <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{flash}}</Flash>
-    <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
-</div>
+                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser" @error="handleError" />
+            </div>
+            <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
+                ref="mainTabSwitcher">
+                <template v-if="isMobile" v-slot:filebrowser>
+                    <FileBrowser :rootNodes="rootNodes" @openItem="handleOpenItem"
+                        @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
+                        @openProperties="handleFileBrowserOpenProperties"
+                        @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
+                        @moveSelectedItems="openRenameItemsDialogFromFileBrowser" @error="handleError" />
+                </template> <template v-slot:map>
+                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" @scrollTo="handleScrollTo"
+                        @openItem="handleOpenItem" />
+                </template>
+                <template v-slot:explorer>
+                    <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
+                        @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
+                        @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                        @shareEmbed="handleShareEmbed" />
+                </template>
+            </TabSwitcher>
+        </Panel>
+        <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
+        <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose"
+            @addMarkdown="handleAddMarkdown" />
+        <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath"
+            :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true">
+        </AddToDatasetDialog>
+        <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
+        <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
+        <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
+        <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
+            {{ errorMessage }}
+        </Alert>
+        <Loader v-if="isBusy"></Loader>
+        <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{ flash }}</Flash>
+        <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
+    </div>
 </template>
 
 <script>
@@ -74,7 +63,6 @@ import Explorer from './Explorer.vue';
 import Properties from './Properties.vue';
 import TabSwitcher from './TabSwitcher.vue';
 import Panel from './Panel.vue';
-import Markdown from './Markdown.vue';
 import Alert from './Alert.vue';
 import Loader from './Loader.vue';
 import Flash from './Flash.vue';
@@ -119,7 +107,7 @@ export default {
 
         var mainTabs = [];
 
-        if (mobile){
+        if (mobile) {
             mainTabs.unshift({
                 label: 'Browser',
                 icon: 'sitemap',
@@ -149,7 +137,7 @@ export default {
             selectedUsingFileBrowserList: false,
             explorerTools: [],
             dataset: reg.Organization(this.$route.params.org)
-                               .Dataset(this.$route.params.ds),
+                .Dataset(this.$route.params.ds),
             uploadDialogOpen: false,
             deleteDialogOpen: false,
             renameDialogOpen: false,
@@ -163,10 +151,10 @@ export default {
             showSettings: false,
             filesToUpload: null,
             shareFile: null,
-            flash: ""       
+            flash: ""
         };
     },
-    mounted: function(){
+    mounted: function () {
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
 
@@ -180,7 +168,7 @@ export default {
         });
 
         this.$root.$on('moveItem', async (sourceItem, destItem) => {
-            
+
             if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
                 this.$log.info("Cannot move root");
                 return;
@@ -191,9 +179,9 @@ export default {
 
             // Folder magics: if dest is file let's use its parent.
             if (ddb.entry.isDirectory(destItem.entry))
-                destPath = destItem.entry.type == ddb.entry.type.DRONEDB ? sourceItemName : pathutils.join(destItem.entry.path, sourceItemName) ;
+                destPath = destItem.entry.type == ddb.entry.type.DRONEDB ? sourceItemName : pathutils.join(destItem.entry.path, sourceItemName);
             else {
-                var destParentFolder = pathutils.getParentFolder(destItem.entry.path);            
+                var destParentFolder = pathutils.getParentFolder(destItem.entry.path);
                 destPath = destParentFolder == null ? sourceItemName : pathutils.join(destParentFolder, sourceItemName);
             }
 
@@ -201,26 +189,26 @@ export default {
                 this.$log.info("Cannot move a file onto itself");
                 return;
             }
-            
+
             this.$log.info(`Moving ${sourceItem.entry.path} -> ${destPath}`);
 
             this.isBusy = true;
             await this.renameFile(sourceItem, destPath);
-            this.isBusy = false;            
+            this.isBusy = false;
 
         });
     },
-    beforeDestroy: function(){
+    beforeDestroy: function () {
         document.getElementById("app").classList.remove("fullpage");
     },
     computed: {
         selectedFiles: function () {
             return this.fileBrowserFiles.filter(f => f.selected);
         },
-        contextMenuFiles: function(){
-            if (this.selectedUsingFileBrowserList){
+        contextMenuFiles: function () {
+            if (this.selectedUsingFileBrowserList) {
                 return this.fileBrowserFiles;
-            }else{
+            } else {
                 return this.selectedFiles;
             }
         }
@@ -233,11 +221,12 @@ export default {
                 const entries = await this.dataset.info();
 
                 // Set title
-                if (entries.length > 0 && entries[0]?.properties?.meta?.name){
+                if (entries.length > 0 && entries[0]?.properties?.meta?.name) {
                     setTitle(entries[0]?.properties?.meta?.name.data);
                 }
 
-                return entries.map(e => { return {
+                return entries.map(e => {
+                    return {
                         icon: icons.getForType(e.type),
                         label: utils.entryLabel(e),
                         path: e.path,
@@ -248,43 +237,43 @@ export default {
                 });
 
             } catch (e) {
-                if (e.status === 401){
+                if (e.status === 401) {
                     this.$router.push({ name: "Login" }).catch(() => { });
-                }else{
+                } else {
                     this.showError(e, "Dataset");
                 }
                 return [];
             }
         },
-        
-        handleOpenItem: function(node, view){
+
+        handleOpenItem: function (node, view) {
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
-            if (view){
+            if (view) {
                 const [_, path] = ddb.utils.datasetPathFromUri(node.path);
                 const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
                 window.open(url, `${path}-${view}`);
-            }else{
+            } else {
                 shell.openItem(node.path);
             }
         },
 
-        handleShareEmbed: function(file){
+        handleShareEmbed: function (file) {
             this.shareFile = file;
         },
 
-        handleCloseShareEmbed: function(){
+        handleCloseShareEmbed: function () {
             this.shareFile = null;
         },
 
-        handleMoveItem: async function(node, path){
+        handleMoveItem: async function (node, path) {
             await this.renameFile(node, path);
         },
-        handleCreateFolder: function(){ 
+        handleCreateFolder: function () {
             this.createFolderDialogOpen = true;
         },
-        addComponentTab: function(uri, label, icon, component, view){
-            if (!this.$refs.mainTabSwitcher.hasTab(label)){
+        addComponentTab: function (uri, label, icon, component, view) {
+            if (!this.$refs.mainTabSwitcher.hasTab(label)) {
                 this.$refs.mainTabSwitcher.addTab({
                     label,
                     icon,
@@ -296,61 +285,63 @@ export default {
                         uri
                     }
                 }, { activate: true });
-            }else{
+            } else {
                 this.$refs.mainTabSwitcher.activateTab(label);
             }
         },
 
-        sortFiles: function() {
+        sortFiles: function () {
             this.$log.info("ViewDataset.sortFiles");
             this.fileBrowserFiles = this.fileBrowserFiles.sort((n1, n2) => {
-                    var a = n1.entry;
-                    var b = n2.entry;
+                var a = n1.entry;
+                var b = n2.entry;
 
-                    // Folders first
-                    let aDir = ddb.entry.isDirectory(a);
-                    let bDir = ddb.entry.isDirectory(b);
+                // Folders first
+                let aDir = ddb.entry.isDirectory(a);
+                let bDir = ddb.entry.isDirectory(b);
 
-                    if (aDir && !bDir) return -1;
-                    else if (!aDir && bDir) return 1;
-                    else {
-                        // then filename ascending
-                        return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                    }
-                });
+                if (aDir && !bDir) return -1;
+                else if (!aDir && bDir) return 1;
+                else {
+                    // then filename ascending
+                    return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
+                }
+            });
         },
-        showError: function(text, title) {
+        showError: function (text, title) {
             this.errorMessage = text;
             this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
             this.errorDialogOpen = true;
         },
-        handleSettingsClose: function(){
+        handleSettingsClose: function () {
             this.showSettings = false;
         },
-        handleRenameClose: async function(id, newPath, entry) {
+        handleRenameClose: async function (id, newPath, entry) {
             if (id == "rename") {
                 if (newPath == null || newPath.length == 0) return;
                 await this.renameSelectedFile(newPath);
-            }else if (id == "renameddb"){
+            } else if (id == "renameddb") {
                 if (newPath == null || newPath.length == 0) return;
                 this.isBusy = true;
-                try{
+                try {
                     const newDs = await renameDataset(this.$route.params.org, this.$route.params.ds, newPath);
-                    this.$router.push({name: "ViewDataset", params: {
-                        org: this.$route.params.org,
-                        ds: newDs.slug
-                    }});
+                    this.$router.push({
+                        name: "ViewDataset", params: {
+                            org: this.$route.params.org,
+                            ds: newDs.slug
+                        }
+                    });
                     location.reload(true);
-                }catch(e){
+                } catch (e) {
                     this.showError(e, "Rename");
                 }
                 this.isBusy = false;
-                
+
             }
 
             this.renameDialogOpen = false;
         },
-        handleDeleteClose: async function(id) {
+        handleDeleteClose: async function (id) {
             if (id == "remove") {
                 await this.deleteSelectedFiles();
             }
@@ -358,7 +349,7 @@ export default {
             this.deleteDialogOpen = false;
         },
 
-        openDeleteItemsDialog: function() {
+        openDeleteItemsDialog: function () {
 
             if (this.selectedFiles.length == 0) return;
 
@@ -366,14 +357,14 @@ export default {
             this.deleteDialogOpen = true;
         },
 
-        openDeleteItemsDialogFromFileBrowser: function() {
-            
+        openDeleteItemsDialogFromFileBrowser: function () {
+
             this.selectedUsingFileBrowserList = true;
             this.deleteDialogOpen = true;
         },
 
-        openRenameItemsDialog: function() {
-            
+        openRenameItemsDialog: function () {
+
             if (this.selectedFiles.length != 1) return;
 
             this.selectedUsingFileBrowserList = false;
@@ -381,54 +372,54 @@ export default {
             this.renameDialogOpen = true;
         },
 
-        openRenameItemsDialogFromFileBrowser: function() {
+        openRenameItemsDialogFromFileBrowser: function () {
 
             this.renameDialogOpen = true;
             this.fileToRename = this.fileBrowserFiles[0];
             this.selectedUsingFileBrowserList = true;
         },
 
-        deleteSelectedFiles: async function() {
+        deleteSelectedFiles: async function () {
 
             this.isBusy = true;
 
             try {
                 var deleted = [];
 
-                for(var file of this.contextMenuFiles) {
+                for (var file of this.contextMenuFiles) {
                     await this.dataset.deleteObj(file.entry.path);
                     deleted.push(file.entry.path);
                 }
-                
+
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
 
                 this.$root.$emit('deleteEntries', deleted);
-           
-            } catch(e) {
+
+            } catch (e) {
                 this.showError(e, "Delete");
             }
 
             this.isBusy = false;
-           
+
         },
-        renameFile: async function(file, newPath) {
+        renameFile: async function (file, newPath) {
 
             try {
                 var oldPath = file.entry.path;
                 await this.dataset.moveObj(oldPath, newPath);
-                            
+
                 // Let's remove both the new file path and the old one because it could be a replace
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
                 var newItem = clone(file);
                 newItem.path = this.dataset.remoteUri(newPath),
-                newItem.label = pathutils.basename(newPath);
+                    newItem.label = pathutils.basename(newPath);
                 newItem.entry.path = newPath;
 
                 // Let's add it to our explorer (we are in the same folder)
-                if (pathutils.getParentFolder(newPath) == (this.currentPath || null)){
+                if (pathutils.getParentFolder(newPath) == (this.currentPath || null)) {
                     this.fileBrowserFiles.push(newItem);
-                } 
+                }
 
                 // Tell filebrowser to remove the file in the old location and add to the new location
                 this.$root.$emit('deleteEntries', [oldPath]);
@@ -436,13 +427,13 @@ export default {
 
                 this.sortFiles();
 
-            } catch(e) {
+            } catch (e) {
                 this.showError(e, "Rename file");
             }
 
         },
 
-        renameSelectedFile: async function(newPath) {
+        renameSelectedFile: async function (newPath) {
 
             var source;
 
@@ -461,14 +452,14 @@ export default {
             this.isBusy = true;
 
             await this.renameFile(source, newPath);
-            
+
             this.isBusy = false;
         },
 
-        createFolder: async function(newPath) {
-            
+        createFolder: async function (newPath) {
+
             this.isBusy = true;
-            
+
             newPath = this.currentPath ? this.currentPath + "/" + newPath : newPath;
 
             try {
@@ -491,14 +482,14 @@ export default {
                     isExpandable: ddb.entry.isDirectory(entry)
                 };
 
-                this.fileBrowserFiles.push(folderItem);            
+                this.fileBrowserFiles.push(folderItem);
 
                 this.sortFiles();
 
                 // Tell filebrowser to add items
                 this.$root.$emit('addItems', [folderItem]);
 
-            } catch(e) {
+            } catch (e) {
                 this.showError(e, "Create folder");
             }
 
@@ -510,7 +501,7 @@ export default {
             this.fileBrowserFiles = fileBrowserFiles;
         },
 
-        handleCurrentUriChanged: function(currentUri){
+        handleCurrentUriChanged: function (currentUri) {
             this.currentPath = currentUri != null ? utils.pathFromUri(currentUri).replace(/^\//, "") : null;
         },
 
@@ -532,7 +523,7 @@ export default {
         handleCloseProperties: function () {
             this.showProperties = false;
         },
-        handleNewFolderClose: async function(id, newFolderPath) {
+        handleNewFolderClose: async function (id, newFolderPath) {
 
             if (id == "createFolder") {
                 if (newFolderPath == null || newFolderPath.length == 0) return;
@@ -541,21 +532,21 @@ export default {
 
             this.createFolderDialogOpen = false;
         },
-        handleAddClose: function(uploaded, uploadSuccess) {
-            
+        handleAddClose: function (uploaded, uploadSuccess) {
+
             this.uploadDialogOpen = false;
             this.filesToUpload = null;
-            
+
             if (uploaded.length == 0) return;
 
             var items = [];
 
-            for(var entry of uploaded) {
+            for (var entry of uploaded) {
 
                 // Don't add the same file twice
                 if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)
                     continue;
-                
+
                 const base = pathutils.basename(entry.path);
 
                 var item = {
@@ -583,7 +574,7 @@ export default {
             if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} file${uploaded.length > 1 ? "s" : ""}`;
         },
 
-        handleAddMarkdown: function(document, entry) {
+        handleAddMarkdown: function (document, entry) {
             this.handleAddClose([entry]);
             this.handleOpenItem({
                 label: document,
@@ -593,15 +584,15 @@ export default {
             this.showSettings = false;
         },
 
-        handleScrollTo: function(file){
+        handleScrollTo: function (file) {
             this.$refs.explorer.scrollTo(file);
         },
 
-        handleError: function(e){
+        handleError: function (e) {
             this.showError(e, "Error");
         },
 
-        closeFlash: function(){
+        closeFlash: function () {
             this.flash = "";
         }
     },
@@ -616,7 +607,7 @@ export default {
         },
 
         selectedFiles: {
-            handler: function(){
+            handler: function () {
                 this.explorerTools = [{
                     id: 'upload',
                     title: "Upload",
@@ -650,8 +641,8 @@ export default {
                         id: 'remove',
                         title: "Remove",
                         icon: "trash alternate",
-                        onClick: () => {                 
-                            this.selectedUsingFileBrowserList = false;        
+                        onClick: () => {
+                            this.selectedUsingFileBrowserList = false;
                             this.deleteDialogOpen = true;
                         }
                     });
@@ -662,7 +653,7 @@ export default {
 
                     let addedOpen = false;
 
-                    if (this.selectedFiles.length === 1){
+                    if (this.selectedFiles.length === 1) {
                         this.explorerTools.push({
                             id: 'share-embed',
                             title: "Share/Embed",
@@ -672,7 +663,7 @@ export default {
                             }
                         });
 
-                        if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                        if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1) {
                             this.explorerTools.push({
                                 id: 'open-map',
                                 title: "Open Map",
@@ -683,7 +674,7 @@ export default {
                             });
                             addedOpen = true;
                         }
-                        if ([ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                        if ([ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1) {
                             this.explorerTools.push({
                                 id: 'open-pointcloud',
                                 title: "Open Point Cloud",
@@ -694,7 +685,7 @@ export default {
                             });
                             addedOpen = true;
                         }
-                        if ([ddb.entry.type.MODEL].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                        if ([ddb.entry.type.MODEL].indexOf(this.selectedFiles[0].entry.type) !== -1) {
                             this.explorerTools.push({
                                 id: 'open-3dmodel',
                                 title: "Open 3D Model",
@@ -705,7 +696,7 @@ export default {
                             });
                             addedOpen = true;
                         }
-                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1){
+                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1) {
                             this.explorerTools.push({
                                 id: 'open-panorama',
                                 title: "Open Panorama",
@@ -715,10 +706,10 @@ export default {
                                 }
                             });
                             addedOpen = true;
-                        }           
+                        }
                     }
 
-                    if (!addedOpen){
+                    if (!addedOpen) {
                         this.explorerTools.push({
                             id: 'open',
                             title: "Open",
@@ -735,5 +726,4 @@ export default {
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

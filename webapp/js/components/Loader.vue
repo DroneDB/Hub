@@ -1,8 +1,7 @@
-
 <template>
   <div>
     <div id="loader-backdrop"></div>
-    <div id="loader-container">      
+    <div id="loader-container">
       <div class="loader">Loading...</div>
     </div>
   </div>
@@ -13,24 +12,23 @@
 export default {
   components: {
 
-    },
+  },
   props: {
-      
+
   },
-  
-  data: function(){
-      return {};
+
+  data: function () {
+    return {};
   },
-  mounted: function(){
+  mounted: function () {
   },
   methods: {
-      
+
   }
 }
 </script>
 
 <style scoped>
-
 #loader-container {
   position: absolute;
   display: flex;
@@ -46,11 +44,11 @@ export default {
 #loader-backdrop {
   background: rgba(100, 100, 100, 0.2);
   position: absolute;
-  right:0;
-  top:0;
-  bottom:0;
+  right: 0;
+  top: 0;
+  bottom: 0;
   left: 0;
-    z-index: 999;
+  z-index: 999;
 }
 
 .loader,
@@ -59,6 +57,7 @@ export default {
   width: 10em;
   height: 10em;
 }
+
 .loader {
   margin: 60px auto;
   font-size: 10px;
@@ -74,26 +73,28 @@ export default {
   -webkit-animation: load8 1.1s infinite linear;
   animation: load8 1.1s infinite linear;
 }
+
 @-webkit-keyframes load8 {
   0% {
     -webkit-transform: rotate(0deg);
     transform: rotate(0deg);
   }
+
   100% {
     -webkit-transform: rotate(360deg);
     transform: rotate(360deg);
   }
 }
+
 @keyframes load8 {
   0% {
     -webkit-transform: rotate(0deg);
     transform: rotate(0deg);
   }
+
   100% {
     -webkit-transform: rotate(360deg);
     transform: rotate(360deg);
   }
 }
 </style>
-
-
