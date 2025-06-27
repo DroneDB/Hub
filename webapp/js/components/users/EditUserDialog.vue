@@ -1,5 +1,5 @@
 <template>
-    <Window title="Add User" id="addUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window title="Edit User" id="editUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
 
         <div v-if="loading" class="loading">
             <i class="icon circle notch spin" />
@@ -8,31 +8,25 @@
         <div v-else class="dialog">
             <Message bindTo="error" />
             <div class="ui message positive" v-if="success">
-                <p><strong>User added successfully!</strong></p>
+                <p><strong>User updated successfully!</strong></p>
             </div>
 
             <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
                 <div class="field">
                     <label>Username</label>
-                    <input ref="txtUsername" v-on:keydown="clearError()" v-on:keyup.enter="confirmAddUser()" type="text"
-                        v-model="username" placeholder="" />
+                    <input type="text" v-model="editUser.userName" disabled />
                 </div>
-                <div class="field" :class="{ error: email && !isEmailValid() }">
+                <div class="field" :class="{ error: editUser.email && !isEmailValid() }">
                     <label>Email</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="confirmAddUser()" type="email"
-                        v-model="email" placeholder="user@example.com" />
-                    <div v-if="email && !isEmailValid()" class="ui pointing red basic label">
+                    <input v-on:keydown="clearError()" v-on:keyup.enter="confirmUpdate()" type="email"
+                           v-model="editUser.email" placeholder="user@example.com" />
+                    <div v-if="editUser.email && !isEmailValid()" class="ui pointing red basic label">
                         Please enter a valid email address
                     </div>
                 </div>
                 <div class="field">
-                    <label>Password</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="confirmAddUser()" type="password"
-                        v-model="password" placeholder="" />
-                </div>
-                <div class="field">
                     <label>Roles</label>
-                    <select multiple="multiple" v-model="roles" class="ui dropdown" ref="rolesDropdown">
+                    <select multiple="multiple" v-model="editUser.roles" class="ui dropdown" ref="rolesDropdown">
                         <option v-for="role in availableRoles" :key="role" :value="role">
                             {{ role }}
                         </option>
@@ -41,12 +35,12 @@
                 </div>
             </form>
             <div class="buttons">
-                <button @click="close()" class="ui button" :disabled="adding">
-                    Close
+                <button @click="close()" class="ui button" :disabled="updating">
+                    Cancel
                 </button>
-                <button @click="confirmAddUser()" :disabled="adding || !isFilled()" :class="{ loading: adding }"
+                <button @click="confirmUpdate()" :disabled="updating || !isValid()" :class="{ loading: updating }"
                     class="ui button primary">
-                    Add User
+                    Update User
                 </button>
             </div>
         </div>
@@ -63,6 +57,10 @@ export default {
         Window, Message
     },
     props: {
+        user: {
+            type: Object,
+            required: true
+        },
         availableRoles: {
             type: Array,
             required: true
@@ -71,28 +69,30 @@ export default {
 
     data: function () {
         return {
-            adding: false,
+            updating: false,
             success: false,
             loading: false,
             error: "",
-            username: "",
-            email: "",
-            password: "",
-            roles: []
+            editUser: {
+                userName: this.user.userName,
+                email: this.user.email || '',
+                roles: [...(this.user.roles || [])]
+            }
         };
     },
     mounted: function () {
+        // Initialize Semantic UI dropdown
         this.$nextTick(() => {
-            this.$refs.txtUsername.focus();
-
-            // Initialize Semantic UI dropdown
             if (this.$refs.rolesDropdown) {
                 $(this.$refs.rolesDropdown).dropdown({
                     allowAdditions: false,
                     onChange: (value, text, $selectedItem) => {
-                        this.roles = value ? value.split(',') : [];
+                        this.editUser.roles = value ? value.split(',') : [];
                     }
                 });
+
+                // Set initial values
+                $(this.$refs.rolesDropdown).dropdown('set exactly', this.editUser.roles);
             }
         });
     },
@@ -103,17 +103,17 @@ export default {
         clearError: function () {
             this.error = "";
         },
-        isFilled: function () {
-            return this.username !== "" && this.password !== "" && this.isEmailValid();
-        },
         isEmailValid: function () {
-            if (!this.email || this.email.trim() === "") return true; // Email is optional
+            if (!this.editUser.email || this.editUser.email.trim() === "") return true; // Email is optional
 
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            return emailRegex.test(this.email.trim());
+            return emailRegex.test(this.editUser.email.trim());
         },
-        confirmAddUser: async function () {
-            if (!this.isFilled()) {
+        isValid: function () {
+            return this.isEmailValid();
+        },
+        confirmUpdate: async function () {
+            if (!this.isValid()) {
                 if (!this.isEmailValid()) {
                     this.error = "Please enter a valid email address";
                     return;
@@ -121,17 +121,19 @@ export default {
                 return;
             }
 
-            this.adding = true;
+            this.updating = true;
             try {
-                const user = await extendedRegistry.addUser(this.username, this.password, this.roles, this.email);
+                // Update user with both email and roles
+                await extendedRegistry.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
+
                 this.success = true;
                 setTimeout(() => {
-                    this.adding = false;
-                    this.$emit('onClose', user);
-                }, 2500);
+                    this.updating = false;
+                    this.$emit('onClose', 'updated');
+                }, 1500);
             } catch (e) {
                 this.error = e.message;
-                this.adding = false;
+                this.updating = false;
             }
         }
     }
