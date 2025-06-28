@@ -39,7 +39,8 @@ export default {
         handleLoad: async function () {
             try {
                 // Quick type check
-                if (this.entry.type !== ddb.entry.type.MODEL) throw new Error(`${this.entry.path} cannot be opened as a model`);
+                if (this.entry.type !== ddb.entry.type.MODEL) 
+                  throw new Error(`${this.entry.path} cannot be opened as a model`);
 
                 this.loading = true;
 
@@ -58,6 +59,14 @@ export default {
         },
         loadNexus: async function () {
             this.error = "";
+
+            // Verifica che le librerie siano caricate
+            if (typeof THREE === 'undefined') {
+                throw new Error('THREE.js library not loaded');
+            }
+            if (typeof NexusObject === 'undefined') {
+                throw new Error('Nexus library not loaded');
+            }
 
             const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
             camera.position.z = 4.0;
@@ -78,6 +87,11 @@ export default {
             const renderer = new THREE.WebGLRenderer({ canvas: this.$refs.canvas, antialias: false });
             renderer.setClearColor(scene.fog.color);
             renderer.setPixelRatio(window.devicePixelRatio);
+
+            // Definisci il material prima di utilizzarlo
+            let material = false;
+            /* Material customizations examples: */
+            //material = new THREE.MeshLambertMaterial( { color: 0xff0000, vertexColors: THREE.VertexColors } );
 
             let nexusObj = null;
 
@@ -108,11 +122,6 @@ export default {
             nexusObj = new NexusObject(model, onNexusLoad, () => { }, renderer, material);
             scene.add(nexusObj);
 
-            /* An appropriate material can be used as optional fifth arg for the NexusObject constructor */
-            let material = false;
-            /* Material customizations examples: */
-            //let material = new THREE.MeshLambertMaterial( { color: 0xff0000, vertexColors: THREE.VertexColors } );
-
             const controls = new THREE.ArcballControls(camera, renderer.domElement, scene);
             controls.setGizmosVisible(false);
 
@@ -135,16 +144,16 @@ export default {
 
 <style>
 #nexus {
-    .ui.message {
-        margin: 8px;
-    }
-
     background: #030A03;
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+
+    .ui.message {
+        margin: 8px;
+    }
 
     .container {
         display: flex;
