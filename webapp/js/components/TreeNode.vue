@@ -108,7 +108,7 @@ export default {
             }
 
             // Let's remove first the duplicates
-            this.children = this.children.filter(ch => items.find(i => i.entry.path !== ch.entry.path));
+            this.children = this.children.filter(ch => !items.find(i => i.entry.path === ch.entry.path));
 
             // Add new items
             for (var item of items) {
