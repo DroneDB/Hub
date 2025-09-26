@@ -19,7 +19,7 @@
             <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable @dragstart="startDrag($event, f)"
                 @drop="onDrop($event, f)" @dragenter.prevent @dragover.prevent>
                 <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
-                    :lazyLoad="true" />
+                    :lazyLoad="true" :dataset="dataset" />
             </div>
         </div>
     </div>
@@ -32,6 +32,7 @@ import Keyboard from '../libs/keyboard';
 import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import Window from './Window.vue';
+import BuildManager from '../libs/buildManager';
 
 import ddb from 'ddb';
 const { pathutils } = ddb;
@@ -45,7 +46,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window
     },
-    props: ['files', 'currentPath', 'tools'],
+    props: ['files', 'currentPath', 'tools', 'dataset'],
     data: function () {
         let contextMenu = [];
 
@@ -135,6 +136,17 @@ export default {
                 this.selectedFiles.forEach(f => {
                     this.$emit('shareEmbed', f);
                 });
+            }
+        }, {
+            label: 'Build',
+            icon: 'cog',
+            isVisible: () => {
+                return this.selectedFiles.length === 1 &&
+                       this.isBuildableFile(this.selectedFiles[0]) &&
+                       !this.hasActiveBuild(this.selectedFiles[0]);
+            },
+            click: () => {
+                this.buildSelectedFile();
             }
         }, {
             label: "Create Folder",
@@ -427,6 +439,32 @@ export default {
             const thumb = this.$refs.thumbs.find(t => t.file === file);
             if (thumb) {
                 this.$refs.explorer.scrollTo(0, thumb.$el.offsetTop - this.$el.offsetTop - 12);
+            }
+        },
+
+        // Build management methods
+        isBuildableFile: function(file) {
+            if (!this.dataset) return false;
+            return BuildManager.isBuildableType(file.entry.type);
+        },
+
+        hasActiveBuild: function(file) {
+            if (!this.dataset) return false;
+            return BuildManager.hasActiveBuild(this.dataset, file.entry.path);
+        },
+
+        buildSelectedFile: async function() {
+            if (this.selectedFiles.length !== 1) return;
+
+            const file = this.selectedFiles[0];
+
+            try {
+                await BuildManager.startBuild(this.dataset, file.entry.path);
+                // Emit event to notify parent
+                this.$emit('buildStarted', file);
+            } catch (error) {
+                // Emit error event
+                this.$emit('buildError', { file, error: error.message });
             }
         }
     }

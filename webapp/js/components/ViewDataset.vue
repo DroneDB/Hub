@@ -24,10 +24,13 @@
                 </template>
                 <template v-slot:explorer>
                     <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        :dataset="dataset" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                        @shareEmbed="handleShareEmbed" />
+                        @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
+                </template>
+                <template v-slot:buildhistory>
+                    <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
                 </template>
             </TabSwitcher>
         </Panel>
@@ -67,6 +70,7 @@ import Alert from './Alert.vue';
 import Loader from './Loader.vue';
 import Flash from './Flash.vue';
 import ShareEmbed from './ShareEmbed.vue';
+import BuildHistory from './BuildHistory.vue';
 
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
@@ -76,6 +80,7 @@ import shell from '../dynamic/shell';
 import { isMobile } from '../libs/responsive';
 import { renameDataset, entryLabel } from '../libs/registryUtils';
 import { b64encode } from '../libs/base64';
+import BuildManager from '../libs/buildManager';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -100,7 +105,8 @@ export default {
         Alert,
         Loader,
         Flash,
-        ShareEmbed
+        ShareEmbed,
+        BuildHistory
     },
     data: function () {
         const mobile = isMobile();
@@ -125,6 +131,10 @@ export default {
             label: 'Map',
             icon: 'map',
             key: 'map'
+        }, {
+            label: 'Build History',
+            icon: 'history',
+            key: 'buildhistory'
         }]);
 
         return {
@@ -157,6 +167,17 @@ export default {
     mounted: function () {
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
+
+        // Initialize BuildManager
+        BuildManager.registerDataset(this.dataset);
+        BuildManager.loadBuilds(this.dataset).catch(error => {
+            console.warn('Error loading builds:', error);
+        });
+
+        // Listen to build state change events
+        BuildManager.on('buildStateChanged', this.handleBuildStateNotification);
+        BuildManager.on('buildStarted', this.handleBuildStartedNotification);
+        BuildManager.on('buildError', this.handleBuildErrorNotification);
 
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
@@ -200,6 +221,14 @@ export default {
     },
     beforeDestroy: function () {
         document.getElementById("app").classList.remove("fullpage");
+
+        // Cleanup BuildManager listeners
+        BuildManager.off('buildStateChanged', this.handleBuildStateNotification);
+        BuildManager.off('buildStarted', this.handleBuildStartedNotification);
+        BuildManager.off('buildError', this.handleBuildErrorNotification);
+
+        // Cleanup BuildManager
+        BuildManager.cleanup();
     },
     computed: {
         selectedFiles: function () {
@@ -408,7 +437,7 @@ export default {
                 var oldPath = file.entry.path;
                 await this.dataset.moveObj(oldPath, newPath);
 
-                // Let's remove both the new file path and the old one because it could be a replace
+                // Remove both the new file path and the old one because it could be a replace
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
                 var newItem = clone(file);
@@ -416,7 +445,7 @@ export default {
                     newItem.label = pathutils.basename(newPath);
                 newItem.entry.path = newPath;
 
-                // Let's add it to our explorer (we are in the same folder)
+                // Add it to our explorer (we are in the same folder)
                 if (pathutils.getParentFolder(newPath) == (this.currentPath || null)) {
                     this.fileBrowserFiles.push(newItem);
                 }
@@ -594,6 +623,51 @@ export default {
 
         closeFlash: function () {
             this.flash = "";
+        },
+
+        // Build event handlers
+        handleBuildStarted: function(file) {
+            this.flash = `Build started for ${file.label}`;
+        },
+
+        handleBuildError: function(data) {
+            this.showError(data.error, "Build Error");
+        },
+
+
+
+        handleBuildRetried: function(build) {
+            this.flash = `Build restarted for ${build.path}`;
+        },
+
+        handleBuildRetryError: function(data) {
+            this.showError(data.error, "Build Retry Error");
+        },
+
+        // Build notification handlers
+        handleBuildStateNotification: function(data) {
+            const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
+
+            switch (data.newState) {
+                case 'Succeeded':
+                    this.flash = `Build completed for ${fileName}`;
+                    break;
+                case 'Failed':
+                    this.flash = `❌ Build failed for ${fileName}`;
+                    break;
+                case 'Processing':
+                    this.flash = `⚙️ Building ${fileName}...`;
+                    break;
+            }
+        },
+
+        handleBuildStartedNotification: function(data) {
+            const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
+            this.flash = `🚀 Build started for ${fileName}`;
+        },
+
+        handleBuildErrorNotification: function(data) {
+            this.showError(data.error, "Build Error");
         }
     },
     watch: {
