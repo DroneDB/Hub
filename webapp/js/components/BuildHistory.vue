@@ -2,7 +2,7 @@
     <div id="build-history" class="build-history-page">
         <div class="filters">
             <div class="ui form">
-                <div class="fields">
+                <div class="fields" style="margin: 0">
                     <div class="field">
                         <select v-model="selectedState" class="ui dropdown" @change="applyFilters">
                             <option value="">All States</option>
@@ -34,16 +34,17 @@
             <table v-else class="ui celled striped table">
                 <thead>
                     <tr>
-                        <th class="sortable" @click="sort('path')" style="width: 35%;">
-                            File Path
-                            <i v-if="sortBy === 'path'" class="icon"
-                               :class="sortDesc ? 'sort down' : 'sort up'"></i>
-                        </th>
                         <th class="sortable" @click="sort('currentState')" style="width: 15%;">
                             State
                             <i v-if="sortBy === 'currentState'" class="icon"
                                :class="sortDesc ? 'sort down' : 'sort up'"></i>
                         </th>
+                        <th class="sortable" @click="sort('path')" style="width: 35%;">
+                            File Path
+                            <i v-if="sortBy === 'path'" class="icon"
+                               :class="sortDesc ? 'sort down' : 'sort up'"></i>
+                        </th>
+
                         <th class="sortable" @click="sort('createdAt')" style="width: 20%;">
                             Started
                             <i v-if="sortBy === 'createdAt'" class="icon"
@@ -56,13 +57,6 @@
                 <tbody>
                     <tr v-for="build in paginatedBuilds" :key="build.jobId">
                         <td>
-                            <div class="build-path" :title="build.path">
-                                <strong>{{ getFileName(build.path) }}</strong>
-                                <br>
-                                <small class="path-details">{{ getFilePath(build.path) }}</small>
-                            </div>
-                        </td>
-                        <td>
                             <div class="ui label" :class="getStateClass(build.currentState)">
                                 <i class="icon" :class="getStateIcon(build.currentState)"></i>
                                 {{ build.currentState }}
@@ -74,6 +68,14 @@
                                 </button>
                             </div>
                         </td>
+                        <td>
+                            <div class="build-path" :title="build.path">
+                                <strong>{{ getFileName(build.path) }}</strong>
+                                <br>
+                                <small class="path-details">{{ getFilePath(build.path) }}</small>
+                            </div>
+                        </td>
+
                         <td>
                             <div class="date-time">
                                 <div>{{ formatDateTime(build.createdAt) }}</div>
@@ -94,7 +96,7 @@
                         <td>
                             <div class="job-details">
                                 <small>
-                                    <strong>Job ID:</strong><br>
+                                    <strong>Job ID: </strong>
                                     <code style="font-size: 10px;">{{ build.jobId }}</code>
                                 </small>
                                 <div v-if="build.processingAt" style="margin-top: 3px;">
@@ -419,14 +421,11 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-    padding: 20px;
 }
 
 .filters {
-    margin-bottom: 20px;
     padding: 15px;
     background: #f8f8f9;
-    border-radius: 4px;
     flex-shrink: 0;
 }
 

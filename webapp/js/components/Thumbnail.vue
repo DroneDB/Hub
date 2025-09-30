@@ -2,13 +2,22 @@
     <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
         :style="{ 'maxWidth': size + 'px' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
-            <img v-if="!icon" :class="{ hide: thumbnail !== null && (loading || buildLoading) }" @load="imageLoaded"
-                @error="handleImageError" :src="thumbnail" />
-            <i v-if="icon && !loading && !buildLoading" class="icon icon-file " :class="icon" :style="iconStyle" />
+            <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
+            <img v-if="thumbnail && !loading && !buildLoading"
+                @error="handleImageError" :src="thumbnail"
+                style="padding-right: 8px; padding-left: 8px; max-width: 100%; max-height: 100%;" />
 
-            <!-- Priority: Build loading > Thumbnail loading > Build status badges -->
+            <!-- Show icon if we have an icon and not loading -->
+            <i v-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
+
+            <!-- Build loading spinner (highest priority) -->
             <i class="icon circle notch spin loading" v-if="buildLoading" />
-            <i class="icon circle notch spin loading" v-else-if="loading || (thumbnail === null && icon === null)" />
+
+            <!-- Regular loading spinner (when loading thumbnails) -->
+            <i class="icon circle notch spin loading" v-else-if="loading" />
+
+            <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
+            <i class="icon circle notch spin loading" v-else-if="!thumbnail && !icon" />
 
             <!-- Build Status Badges - Only show errors -->
             <div v-if="!buildLoading && !loading && buildState && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
@@ -108,31 +117,24 @@ export default {
     mounted: async function () {
         if (!this.lazyLoad) await this.loadThumbnail();
 
-        // Initialize build state if dataset is available
+        // Setup build listeners if dataset is available
         if (this.dataset) {
-            this.updateBuildState();
             this.setupBuildListeners();
-
-            // Trigger automatic polling monitoring for this file if it's buildable
-            if (BuildManager.isBuildableType(this.file.entry.type)) {
-                BuildManager.onFilesAdded(this.dataset, [this.file.entry]);
-            }
         }
     },
     beforeDestroy() {
         this.cleanupBuildListeners();
     },
     methods: {
-        imageLoaded: function () {
-            this.loading = false;
-        },
         getBoundingRect: function () {
             return this.$el.getBoundingClientRect();
         },
         handleImageError: function (e) {
+            console.log('Image error for:', this.file.entry.path, 'URL:', this.thumbnail, 'Error:', e);
             // Retry
             if (!this.retryNumber) this.retryNumber = 0;
             if (this.retryNumber < 1000 && this.thumbnail.startsWith("/orgs")) {
+                console.log('Retrying thumbnail load, attempt:', this.retryNumber + 1);
                 if (this.loadTimeout) {
                     clearTimeout(this.loadTimeout);
                     this.loadTimeout = null;
@@ -146,6 +148,7 @@ export default {
                     this.retryNumber += 1;
                 }, 5000);
             } else {
+                console.log('Retry limit exceeded for:', this.file.entry.path);
                 this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
             }
         },
@@ -156,34 +159,112 @@ export default {
             this.loading = false;
         },
         loadThumbnail: async function (force = false) {
-            if (this.loadingThumbnail) return; // Already loading
-            if (!force && this.thumbnail && !this.error) return; // Already loaded (unless forced)
-            if (!force && this.error) return; // Skip if error (unless forced)
+            console.log('loadThumbnail called for:', this.file.entry.path, 'force:', force);
 
-            // Check build state before generating thumbnail
+            // Use single loading flag to prevent multiple calls
+            if (this.loading) {
+                console.log('Already loading, skipping');
+                return; // Already loading
+            }
+            if (!force && this.thumbnail && !this.error) {
+                console.log('Already loaded, skipping');
+                return; // Already loaded (unless forced)
+            }
+            if (!force && this.error) {
+                console.log('Has error, skipping');
+                return; // Skip if error (unless forced)
+            }
+
+            // For buildable files, check if there's an active build or if it needs building
             if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
-                const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
+                try {
+                    // Check BuildManager cache first (more reliable)
+                    const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
 
-                // If there's an active build that hasn't succeeded, don't generate thumbnail
-                if (buildState && buildState.currentState !== 'Succeeded') {
-                    this.icon = this.file.icon;
-                    return;
+                    if (buildState) {
+                        const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
+
+                        if (activeStates.includes(buildState.currentState)) {
+                            console.log('Active build found for', this.file.entry.path, '- state:', buildState.currentState);
+                            this.buildLoading = true;
+                            this.buildState = buildState;
+                            this.icon = this.file.icon;
+                            return;
+                        }
+
+                        // If build failed or succeeded, continue with thumbnail load
+                        this.buildState = buildState;
+                    } else {
+                        // No build state found - might be a new file that needs building
+                        // Direct API call to check current builds - no cache
+                        const builds = await this.dataset.getBuilds(1, 200);
+                        const activeBuild = builds.find(build =>
+                            build.path === this.file.entry.path &&
+                            (build.currentState === 'Processing' ||
+                             build.currentState === 'Enqueued' ||
+                             build.currentState === 'Scheduled' ||
+                             build.currentState === 'Awaiting' ||
+                             build.currentState === 'Created')
+                        );
+
+                        if (activeBuild) {
+                            console.log('Active build found via API for', this.file.entry.path, '- showing build loading');
+                            this.buildLoading = true;
+                            this.buildState = activeBuild;
+                            this.icon = this.file.icon;
+                            return;
+                        }
+
+                        // For buildable types without a successful build, show build loading initially
+                        // This covers newly uploaded files that need processing
+                        const hasSuccessfulBuild = builds.find(build =>
+                            build.path === this.file.entry.path &&
+                            build.currentState === 'Succeeded'
+                        );
+
+                        if (!hasSuccessfulBuild) {
+                            console.log('Buildable file without successful build - showing build loading initially');
+                            this.buildLoading = true;
+                            this.icon = this.file.icon;
+                            // Don't return here - let it fall through to try thumbnail generation
+                        }
+                    }
+                } catch (e) {
+                    console.log('Error checking builds, proceeding with thumbnail:', e);
+                    // If build check fails, continue with thumbnail load
                 }
             }
 
-            this.loadingThumbnail = true;
+            this.loading = true;
+            console.log('Starting thumbnail load');
 
             try {
                 if (thumbs.supportedForType(this.file.entry.type)) {
-                    this.loading = true;
+                    console.log('Type supported, fetching thumbnail for:', this.file.path);
                     this.thumbnail = await thumbs.fetch(this.file.path);
+                    console.log('Thumbnail fetch completed:', this.thumbnail);
+
+                    this.loading = false;
+                    this.buildLoading = false; // Clear build loading when thumbnail succeeds
                 } else {
+                    console.log('Type not supported, using icon');
                     this.icon = this.file.icon;
+                    this.loading = false;
+                    this.buildLoading = false; // Clear build loading when using icon
                 }
-                this.loadingThumbnail = false;
             } catch (e) {
-                this.loadingThumbnail = false;
-                this.showError(e);
+                console.log('Thumbnail fetch error:', e);
+                this.loading = false; // Reset loading state on error
+
+                // For buildable files that fail thumbnail generation, keep showing build loading
+                if (this.dataset && BuildManager.isBuildableType(this.file.entry.type) && !this.buildState) {
+                    console.log('Thumbnail failed for buildable file - keeping build loading state');
+                    this.buildLoading = true;
+                    this.icon = this.file.icon;
+                } else {
+                    this.buildLoading = false;
+                    this.showError(e);
+                }
             }
         },
         onClick: function (e) {
@@ -199,43 +280,34 @@ export default {
         },
 
         // Build management methods
-        updateBuildState() {
-            if (!this.dataset) return;
-
-            this.buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
-        },
 
         setupBuildListeners() {
             if (!this.dataset) return;
 
-            // Listen to build state changes
+            // Listen to build events (only for UI feedback)
             BuildManager.on('buildStateChanged', this.onBuildStateChanged);
             BuildManager.on('buildStarted', this.onBuildStarted);
-            BuildManager.on('newBuildableFilesDetected', this.onNewBuildableFilesDetected);
         },
 
         cleanupBuildListeners() {
             BuildManager.off('buildStateChanged', this.onBuildStateChanged);
             BuildManager.off('buildStarted', this.onBuildStarted);
-            BuildManager.off('newBuildableFilesDetected', this.onNewBuildableFilesDetected);
         },
 
         onBuildStateChanged(data) {
             if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                console.log('Build state changed for', this.file.entry.path, ':', data.newState);
                 this.buildState = data.buildInfo;
                 this.buildLoading = false;
 
                 // If build succeeded, refresh the thumbnail
                 if (data.newState === 'Succeeded') {
-                    console.log('Build succeeded for', this.file.entry.path, '- refreshing thumbnail');
-
-                    // Clear existing thumbnail and error state to force refresh
+                    console.log('Build succeeded - refreshing thumbnail');
+                    // Clear existing state and reload
                     this.thumbnail = null;
                     this.error = null;
                     this.icon = null;
-                    this.loadingThumbnail = false;
-
-                    // Force load fresh thumbnail
+                    this.loading = false;
                     this.loadThumbnail(true);
                 }
             }
@@ -243,23 +315,16 @@ export default {
 
         onBuildStarted(data) {
             if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                console.log('Build started for', this.file.entry.path);
                 this.buildLoading = true;
+                this.loading = false;
+                this.error = null;
+                this.thumbnail = null;
+                this.icon = this.file.icon;
             }
         },
 
-        onNewBuildableFilesDetected(data) {
-            if (data.dataset === this.dataset && data.filePaths.includes(this.file.entry.path)) {
-                console.log('This file is now being monitored for build changes:', this.file.entry.path);
 
-                // Update build state immediately
-                this.updateBuildState();
-
-                // If we don't have a thumbnail and the file might be building, show loading
-                if (!this.thumbnail && !this.error && !this.icon) {
-                    this.buildLoading = true;
-                }
-            }
-        }
     }
 }
 </script>

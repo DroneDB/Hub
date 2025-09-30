@@ -178,6 +178,7 @@ export default {
         BuildManager.on('buildStateChanged', this.handleBuildStateNotification);
         BuildManager.on('buildStarted', this.handleBuildStartedNotification);
         BuildManager.on('buildError', this.handleBuildErrorNotification);
+        BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
@@ -226,6 +227,7 @@ export default {
         BuildManager.off('buildStateChanged', this.handleBuildStateNotification);
         BuildManager.off('buildStarted', this.handleBuildStartedNotification);
         BuildManager.off('buildError', this.handleBuildErrorNotification);
+        BuildManager.off('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
         // Cleanup BuildManager
         BuildManager.cleanup();
@@ -597,6 +599,10 @@ export default {
             // Only if any add is necessary, send addItems message to filebrowser
             if (items.length > 0) {
                 this.$root.$emit('addItems', items);
+
+                // Notify BuildManager about new files for build monitoring
+                const newEntries = items.map(item => item.entry);
+                BuildManager.onFilesAdded(this.dataset, newEntries);
             }
 
             // Show flash
@@ -634,8 +640,6 @@ export default {
             this.showError(data.error, "Build Error");
         },
 
-
-
         handleBuildRetried: function(build) {
             this.flash = `Build restarted for ${build.path}`;
         },
@@ -668,6 +672,15 @@ export default {
 
         handleBuildErrorNotification: function(data) {
             this.showError(data.error, "Build Error");
+        },
+
+        handleNewBuildableFilesNotification: function(data) {
+            console.log('New buildable files detected notification:', data);
+            if (data.dataset === this.dataset) {
+                // Show info flash
+                const fileCount = data.filePaths.length;
+                this.flash = `${fileCount} buildable file${fileCount > 1 ? 's' : ''} detected - processing in background`;
+            }
         }
     },
     watch: {
