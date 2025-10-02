@@ -36,7 +36,8 @@
                         <i class="dropdown icon"></i>
                         <div class="default text">Select dataset...</div>
                         <div class="menu">
-                            <div class="item" v-for="ds in datasets" :key="ds.slug" :data-value="ds.slug">
+                            <div class="item" v-for="ds in datasets" :key="ds.slug" :data-value="ds.slug"
+                                :class="{ disabled: isCurrentDataset(ds.slug) }">
                                 <i class="database icon"></i>{{ ds.name || ds.slug }}
                             </div>
                         </div>
@@ -184,6 +185,11 @@ export default {
     },
 
     methods: {
+        isCurrentDataset(dsSlug) {
+            // Disable the current dataset if we're in the same organization
+            return this.destOrg === this.sourceOrg && dsSlug === this.sourceDs;
+        },
+
         async loadDatasets(orgSlug) {
             try {
                 const org = reg.Organization(orgSlug);
@@ -294,5 +300,12 @@ export default {
 
 .buttons button {
     margin-left: 8px;
+}
+
+.ui.dropdown .menu > .item.disabled {
+    color: #ccc !important;
+    cursor: default !important;
+    pointer-events: none !important;
+    opacity: 0.5 !important;
 }
 </style>
