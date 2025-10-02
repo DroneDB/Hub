@@ -248,6 +248,11 @@ export default {
     },
     mounted: function () {
         this.rangeStartThumb = null;
+
+        // Load thumbnails immediately after mount
+        this.$nextTick(() => {
+            this.lazyLoadThumbs();
+        });
     },
     updated: function () {
         this.lazyLoadThumbs();

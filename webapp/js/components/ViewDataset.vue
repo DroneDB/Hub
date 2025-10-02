@@ -25,12 +25,42 @@
                         @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
-                    <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
+                    <!-- View mode toggle -->
+                    <div class="view-mode-toggle" style="padding: 0.5rem 1rem; border-bottom: 1px solid #d4d4d5; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                        <button class="ui icon button" :class="{ active: viewMode === 'grid' }" @click="switchViewMode('grid')" title="Grid View">
+                            <i class="th icon"></i>
+                        </button>
+                        <button class="ui icon button" :class="{ active: viewMode === 'table' }" @click="switchViewMode('table')" title="Table View">
+                            <i class="list icon"></i>
+                        </button>
+                    </div>
+
+                    <!-- Grid View (Explorer) -->
+                    <Explorer v-if="viewMode === 'grid'" ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
                         :dataset="dataset" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
+
+                    <!-- Table View with Detail Panel -->
+                    <Panel v-else split="vertical" amount="70%" mobileAmount="100%" tabletAmount="60%" :mobileCollapsed="true">
+                        <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
+                            :dataset="dataset" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                            @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
+                            @transferSelectedItems="openTransferItemsDialog"
+                            @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                            @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                            @selectionChanged="handleTableSelectionChanged" />
+
+                        <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                            @close="handleDetailPanelClose"
+                            @open="handleDetailPanelOpen"
+                            @properties="handleDetailPanelProperties"
+                            @share="handleDetailPanelShare"
+                            @buildStarted="handleBuildStarted"
+                            @buildError="handleBuildError" />
+                    </Panel>
                 </template>
                 <template v-slot:buildhistory>
                     <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
@@ -69,6 +99,8 @@ import Message from './Message.vue';
 import FileBrowser from './FileBrowser.vue';
 import Map from './Map.vue';
 import Explorer from './Explorer.vue';
+import TableView from './TableView.vue';
+import DetailPanel from './DetailPanel.vue';
 import Properties from './Properties.vue';
 import TabSwitcher from './TabSwitcher.vue';
 import Panel from './Panel.vue';
@@ -93,13 +125,21 @@ const { pathutils, utils } = ddb;
 
 import { OpenItemDefaults } from '../libs/openItemDefaults';
 
+// Import mixins
+import dialogManager from '../mixins/dialogManager';
+import fileOperations from '../mixins/fileOperations';
+import buildEvents from '../mixins/buildEvents';
+
 export default {
+    mixins: [dialogManager, fileOperations, buildEvents],
     components: {
         Header,
         Message,
         FileBrowser,
         Map,
         Explorer,
+        TableView,
+        DetailPanel,
         Properties,
         TabSwitcher,
         SettingsDialog,
@@ -144,32 +184,29 @@ export default {
             key: 'buildhistory'
         }]);
 
+        // Load view mode preference from localStorage
+        const savedViewMode = localStorage.getItem('fileViewMode') || 'grid';
+
         return {
             startTab: mainTabs[0].key,
             error: "",
             isMobile: mobile,
             mainTabs: mainTabs,
             fileBrowserFiles: [],
-            showProperties: false,
             selectedUsingFileBrowserList: false,
             explorerTools: [],
             dataset: reg.Organization(this.$route.params.org)
                 .Dataset(this.$route.params.ds),
-            uploadDialogOpen: false,
-            deleteDialogOpen: false,
-            renameDialogOpen: false,
-            createFolderDialogOpen: false,
-            transferDialogOpen: false,
-            fileToRename: null,
-            isBusy: false,
             currentPath: null,
-            errorDialogOpen: false,
-            errorMessage: null,
-            errorMessageTitle: null,
-            showSettings: false,
-            filesToUpload: null,
-            shareFile: null,
-            flash: ""
+            viewMode: savedViewMode, // 'grid' or 'table'
+            selectedDetailFile: null, // For DetailPanel in table view
+
+            // Helper references for mixins
+            icons: icons,
+            pathutils: pathutils,
+            ddb: ddb,
+            BuildManager: BuildManager,
+            renameDataset: renameDataset
         };
     },
     mounted: function () {
@@ -253,6 +290,44 @@ export default {
         }
     },
     methods: {
+        // View mode switching
+        switchViewMode(mode) {
+            this.viewMode = mode;
+            localStorage.setItem('fileViewMode', mode);
+
+            // Clear selection when switching views
+            if (mode === 'table') {
+                this.selectedDetailFile = null;
+            }
+        },
+
+        toggleViewMode() {
+            this.switchViewMode(this.viewMode === 'grid' ? 'table' : 'grid');
+        },
+
+        handleTableSelectionChanged(file) {
+            // Update selected file for DetailPanel
+            const selectedFiles = this.fileBrowserFiles.filter(f => f.selected);
+            this.selectedDetailFile = selectedFiles.length === 1 ? selectedFiles[0] : null;
+        },
+
+        handleDetailPanelClose() {
+            this.selectedDetailFile = null;
+        },
+
+        handleDetailPanelOpen(file) {
+            this.handleOpenItem(file);
+        },
+
+        handleDetailPanelProperties(file) {
+            this.selectedUsingFileBrowserList = false;
+            this.showProperties = true;
+        },
+
+        handleDetailPanelShare(file) {
+            this.handleShareEmbed(file);
+        },
+
         rootNodes: async function () {
 
             try {
@@ -297,20 +372,7 @@ export default {
             }
         },
 
-        handleShareEmbed: function (file) {
-            this.shareFile = file;
-        },
 
-        handleCloseShareEmbed: function () {
-            this.shareFile = null;
-        },
-
-        handleMoveItem: async function (node, path) {
-            await this.renameFile(node, path);
-        },
-        handleCreateFolder: function () {
-            this.createFolderDialogOpen = true;
-        },
         addComponentTab: function (uri, label, icon, component, view) {
             if (!this.$refs.mainTabSwitcher.hasTab(label)) {
                 this.$refs.mainTabSwitcher.addTab({
@@ -329,243 +391,7 @@ export default {
             }
         },
 
-        sortFiles: function () {
-            this.$log.info("ViewDataset.sortFiles");
-            this.fileBrowserFiles = this.fileBrowserFiles.sort((n1, n2) => {
-                var a = n1.entry;
-                var b = n2.entry;
 
-                // Folders first
-                let aDir = ddb.entry.isDirectory(a);
-                let bDir = ddb.entry.isDirectory(b);
-
-                if (aDir && !bDir) return -1;
-                else if (!aDir && bDir) return 1;
-                else {
-                    // then filename ascending
-                    return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                }
-            });
-        },
-        showError: function (text, title) {
-            this.errorMessage = text;
-            this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
-            this.errorDialogOpen = true;
-        },
-        handleSettingsClose: function () {
-            this.showSettings = false;
-        },
-        handleRenameClose: async function (id, newPath, entry) {
-            if (id == "rename") {
-                if (newPath == null || newPath.length == 0) return;
-                await this.renameSelectedFile(newPath);
-            } else if (id == "renameddb") {
-                if (newPath == null || newPath.length == 0) return;
-                this.isBusy = true;
-                try {
-                    const newDs = await renameDataset(this.$route.params.org, this.$route.params.ds, newPath);
-                    this.$router.push({
-                        name: "ViewDataset", params: {
-                            org: this.$route.params.org,
-                            ds: newDs.slug
-                        }
-                    });
-                    location.reload(true);
-                } catch (e) {
-                    this.showError(e, "Rename");
-                }
-                this.isBusy = false;
-
-            }
-
-            this.renameDialogOpen = false;
-        },
-        handleDeleteClose: async function (id) {
-            if (id == "remove") {
-                await this.deleteSelectedFiles();
-            }
-
-            this.deleteDialogOpen = false;
-        },
-
-        handleTransferClose: async function (id, transferredFiles) {
-            this.transferDialogOpen = false;
-
-            if (id === "transferred" && transferredFiles && transferredFiles.length > 0) {
-                // Remove transferred files from the current view
-                const transferredPaths = transferredFiles.map(f => f.entry.path);
-                this.fileBrowserFiles = this.fileBrowserFiles.filter(
-                    item => !transferredPaths.includes(item.entry.path)
-                );
-
-                // Notify other components
-                this.$root.$emit('deleteEntries', transferredPaths);
-
-                // Show success message
-                this.flash = `${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`;
-            }
-        },
-
-        openDeleteItemsDialog: function () {
-
-            if (this.selectedFiles.length == 0) return;
-
-            this.selectedUsingFileBrowserList = false;
-            this.deleteDialogOpen = true;
-        },
-
-        openDeleteItemsDialogFromFileBrowser: function () {
-
-            this.selectedUsingFileBrowserList = true;
-            this.deleteDialogOpen = true;
-        },
-
-        openRenameItemsDialog: function () {
-
-            if (this.selectedFiles.length != 1) return;
-
-            this.selectedUsingFileBrowserList = false;
-            this.fileToRename = this.selectedFiles[0];
-            this.renameDialogOpen = true;
-        },
-
-        openRenameItemsDialogFromFileBrowser: function () {
-
-            this.renameDialogOpen = true;
-            this.fileToRename = this.fileBrowserFiles[0];
-            this.selectedUsingFileBrowserList = true;
-        },
-
-        openTransferItemsDialog: function () {
-            if (this.selectedFiles.length === 0) return;
-
-            this.selectedUsingFileBrowserList = false;
-            this.transferDialogOpen = true;
-        },
-
-        openTransferItemsDialogFromFileBrowser: function () {
-            if (this.fileBrowserFiles.length === 0) return;
-
-            this.selectedUsingFileBrowserList = true;
-            this.transferDialogOpen = true;
-        },
-
-        deleteSelectedFiles: async function () {
-
-            this.isBusy = true;
-
-            try {
-                var deleted = [];
-
-                for (var file of this.contextMenuFiles) {
-                    await this.dataset.deleteObj(file.entry.path);
-                    deleted.push(file.entry.path);
-                }
-
-                this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
-
-                this.$root.$emit('deleteEntries', deleted);
-
-            } catch (e) {
-                this.showError(e, "Delete");
-            }
-
-            this.isBusy = false;
-
-        },
-        renameFile: async function (file, newPath) {
-
-            try {
-                var oldPath = file.entry.path;
-                await this.dataset.moveObj(oldPath, newPath);
-
-                // Remove both the new file path and the old one because it could be a replace
-                this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
-
-                var newItem = clone(file);
-                newItem.path = this.dataset.remoteUri(newPath),
-                    newItem.label = pathutils.basename(newPath);
-                newItem.entry.path = newPath;
-
-                // Add it to our explorer (we are in the same folder)
-                if (pathutils.getParentFolder(newPath) == (this.currentPath || null)) {
-                    this.fileBrowserFiles.push(newItem);
-                }
-
-                // Tell filebrowser to remove the file in the old location and add to the new location
-                this.$root.$emit('deleteEntries', [oldPath]);
-                this.$root.$emit('addItems', [newItem]);
-
-                this.sortFiles();
-
-            } catch (e) {
-                this.showError(e, "Rename file");
-            }
-
-        },
-
-        renameSelectedFile: async function (newPath) {
-
-            var source;
-
-            if (this.selectedUsingFileBrowserList) {
-
-                if (this.fileBrowserFiles.length == 0) return;
-
-                source = this.fileBrowserFiles[0];
-
-            } else {
-                if (this.selectedFiles.length == 0) return;
-
-                source = this.selectedFiles[0];
-            }
-
-            this.isBusy = true;
-
-            await this.renameFile(source, newPath);
-
-            this.isBusy = false;
-        },
-
-        createFolder: async function (newPath) {
-
-            this.isBusy = true;
-
-            newPath = this.currentPath ? this.currentPath + "/" + newPath : newPath;
-
-            try {
-
-                var entry = await this.dataset.createFolder(newPath);
-
-                const base = pathutils.basename(entry.path);
-
-                var remoteUri = this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base);
-
-                this.$log.info("Remote uri", remoteUri);
-
-                var folderItem = {
-                    icon: icons.getForType(entry.type),
-                    label: base,
-                    path: remoteUri,
-                    selected: false,
-                    entry,
-                    empty: true,
-                    isExpandable: ddb.entry.isDirectory(entry)
-                };
-
-                this.fileBrowserFiles.push(folderItem);
-
-                this.sortFiles();
-
-                // Tell filebrowser to add items
-                this.$root.$emit('addItems', [folderItem]);
-
-            } catch (e) {
-                this.showError(e, "Create folder");
-            }
-
-            this.isBusy = false;
-        },
 
         handleFileSelectionChanged: function (fileBrowserFiles) {
             this.fileBrowserFiles.forEach(f => f.selected = false);
@@ -576,88 +402,7 @@ export default {
             this.currentPath = currentUri != null ? utils.pathFromUri(currentUri).replace(/^\//, "") : null;
         },
 
-        handleExplorerOpenProperties: function () {
 
-            if (this.selectedFiles.length == 0) return;
-
-            this.showProperties = true;
-            this.selectedUsingFileBrowserList = false;
-        },
-        handleFileBrowserOpenProperties: function () {
-
-            this.showProperties = true;
-            this.selectedUsingFileBrowserList = true;
-        },
-        handleErrorDialogClose: function () {
-            this.errorDialogOpen = false;
-        },
-        handleCloseProperties: function () {
-            this.showProperties = false;
-        },
-        handleNewFolderClose: async function (id, newFolderPath) {
-
-            if (id == "createFolder") {
-                if (newFolderPath == null || newFolderPath.length == 0) return;
-                await this.createFolder(newFolderPath);
-            }
-
-            this.createFolderDialogOpen = false;
-        },
-        handleAddClose: function (uploaded, uploadSuccess) {
-
-            this.uploadDialogOpen = false;
-            this.filesToUpload = null;
-
-            if (uploaded.length == 0) return;
-
-            var items = [];
-
-            for (var entry of uploaded) {
-
-                // Don't add the same file twice
-                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)
-                    continue;
-
-                const base = pathutils.basename(entry.path);
-
-                var item = {
-                    icon: icons.getForType(entry.type),
-                    label: base,
-                    path: this.dataset.remoteUri((this.currentPath != null && this.currentPath.length > 0) ? pathutils.join(this.currentPath, base) : base),
-                    entry,
-                    isExpandable: ddb.entry.isDirectory(entry),
-                    selected: false
-                };
-
-                // Add the file to the explorer
-                this.fileBrowserFiles.push(item);
-                items.push(item);
-            }
-
-            this.sortFiles();
-
-            // Only if any add is necessary, send addItems message to filebrowser
-            if (items.length > 0) {
-                this.$root.$emit('addItems', items);
-
-                // Notify BuildManager about new files for build monitoring
-                const newEntries = items.map(item => item.entry);
-                BuildManager.onFilesAdded(this.dataset, newEntries);
-            }
-
-            // Show flash
-            if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} file${uploaded.length > 1 ? "s" : ""}`;
-        },
-
-        handleAddMarkdown: function (document, entry) {
-            this.handleAddClose([entry]);
-            this.handleOpenItem({
-                label: document,
-                entry,
-                path: this.dataset.remoteUri(document)
-            });
-            this.showSettings = false;
-        },
 
         handleScrollTo: function (file) {
             this.$refs.explorer.scrollTo(file);
@@ -665,65 +410,20 @@ export default {
 
         handleError: function (e) {
             this.showError(e, "Error");
-        },
-
-        closeFlash: function () {
-            this.flash = "";
-        },
-
-        // Build event handlers
-        handleBuildStarted: function(file) {
-            this.flash = `Build started for ${file.label}`;
-        },
-
-        handleBuildError: function(data) {
-            this.showError(data.error, "Build Error");
-        },
-
-        handleBuildRetried: function(build) {
-            this.flash = `Build restarted for ${build.path}`;
-        },
-
-        handleBuildRetryError: function(data) {
-            this.showError(data.error, "Build Retry Error");
-        },
-
-        // Build notification handlers
-        handleBuildStateNotification: function(data) {
-            const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
-
-            switch (data.newState) {
-                case 'Succeeded':
-                    this.flash = `Build completed for ${fileName}`;
-                    break;
-                case 'Failed':
-                    this.flash = `❌ Build failed for ${fileName}`;
-                    break;
-                case 'Processing':
-                    this.flash = `⚙️ Building ${fileName}...`;
-                    break;
-            }
-        },
-
-        handleBuildStartedNotification: function(data) {
-            const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
-            this.flash = `🚀 Build started for ${fileName}`;
-        },
-
-        handleBuildErrorNotification: function(data) {
-            this.showError(data.error, "Build Error");
-        },
-
-        handleNewBuildableFilesNotification: function(data) {
-            console.log('New buildable files detected notification:', data);
-            if (data.dataset === this.dataset) {
-                // Show info flash
-                const fileCount = data.filePaths.length;
-                this.flash = `${fileCount} buildable file${fileCount > 1 ? 's' : ''} detected - processing in background`;
-            }
         }
     },
     watch: {
+        viewMode: function(newMode) {
+            // When switching to grid view, trigger thumbnail loading
+            if (newMode === 'grid') {
+                this.$nextTick(() => {
+                    if (this.$refs.explorer) {
+                        this.$refs.explorer.lazyLoadThumbs();
+                    }
+                });
+            }
+        },
+
         fileBrowserFiles: {
             deep: true,
             handler: function (newVal, oldVal) {
@@ -853,4 +553,13 @@ export default {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.view-mode-toggle .ui.button.active {
+    background-color: #2185d0;
+    color: white;
+}
+
+.view-mode-toggle .ui.button.active:hover {
+    background-color: #1678c2;
+}
+</style>

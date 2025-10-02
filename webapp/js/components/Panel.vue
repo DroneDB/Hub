@@ -192,5 +192,8 @@ export default {
 </script>
 
 <style scoped>
-.panel {}
+.panel {
+    display: flex;
+    flex-direction: row;
+}
 </style>
