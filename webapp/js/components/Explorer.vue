@@ -187,6 +187,15 @@ export default {
             }
         },
         {
+            label: "Transfer to Dataset...",
+            icon: 'exchange',
+            isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+            accelerator: "CmdOrCtrl+T",
+            click: () => {
+                this.$emit("transferSelectedItems");
+            }
+        },
+        {
             isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             type: 'separator'
         },

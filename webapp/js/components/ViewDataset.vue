@@ -8,7 +8,8 @@
                     @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
-                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser" @error="handleError" />
+                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
+                    @transferSelectedItems="openTransferItemsDialogFromFileBrowser" @error="handleError" />
             </div>
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
                 ref="mainTabSwitcher">
@@ -17,7 +18,8 @@
                         @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                         @openProperties="handleFileBrowserOpenProperties"
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
-                        @moveSelectedItems="openRenameItemsDialogFromFileBrowser" @error="handleError" />
+                        @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
+                        @transferSelectedItems="openTransferItemsDialogFromFileBrowser" @error="handleError" />
                 </template> <template v-slot:map>
                     <Map lazyload :files="fileBrowserFiles" :dataset="dataset" @scrollTo="handleScrollTo"
                         @openItem="handleOpenItem" />
@@ -26,6 +28,7 @@
                     <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
                         :dataset="dataset" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
+                        @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
                 </template>
@@ -43,6 +46,8 @@
         <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
+        <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
+            :sourceOrg="dataset.org" :sourceDs="dataset.ds"></TransferDialog>
         <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
             {{ errorMessage }}
         </Alert>
@@ -59,6 +64,7 @@ import AddToDatasetDialog from './AddToDatasetDialog.vue';
 import DeleteDialog from './DeleteDialog.vue';
 import RenameDialog from './RenameDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
+import TransferDialog from './TransferDialog.vue';
 import Message from './Message.vue';
 import FileBrowser from './FileBrowser.vue';
 import Map from './Map.vue';
@@ -102,6 +108,7 @@ export default {
         DeleteDialog,
         RenameDialog,
         NewFolderDialog,
+        TransferDialog,
         Alert,
         Loader,
         Flash,
@@ -152,6 +159,7 @@ export default {
             deleteDialogOpen: false,
             renameDialogOpen: false,
             createFolderDialogOpen: false,
+            transferDialogOpen: false,
             fileToRename: null,
             isBusy: false,
             currentPath: null,
@@ -380,6 +388,24 @@ export default {
             this.deleteDialogOpen = false;
         },
 
+        handleTransferClose: async function (id, transferredFiles) {
+            this.transferDialogOpen = false;
+
+            if (id === "transferred" && transferredFiles && transferredFiles.length > 0) {
+                // Remove transferred files from the current view
+                const transferredPaths = transferredFiles.map(f => f.entry.path);
+                this.fileBrowserFiles = this.fileBrowserFiles.filter(
+                    item => !transferredPaths.includes(item.entry.path)
+                );
+
+                // Notify other components
+                this.$root.$emit('deleteEntries', transferredPaths);
+
+                // Show success message
+                this.flash = `${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`;
+            }
+        },
+
         openDeleteItemsDialog: function () {
 
             if (this.selectedFiles.length == 0) return;
@@ -408,6 +434,20 @@ export default {
             this.renameDialogOpen = true;
             this.fileToRename = this.fileBrowserFiles[0];
             this.selectedUsingFileBrowserList = true;
+        },
+
+        openTransferItemsDialog: function () {
+            if (this.selectedFiles.length === 0) return;
+
+            this.selectedUsingFileBrowserList = false;
+            this.transferDialogOpen = true;
+        },
+
+        openTransferItemsDialogFromFileBrowser: function () {
+            if (this.fileBrowserFiles.length === 0) return;
+
+            this.selectedUsingFileBrowserList = true;
+            this.transferDialogOpen = true;
         },
 
         deleteSelectedFiles: async function () {

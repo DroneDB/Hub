@@ -7,8 +7,8 @@
                 @error="handleImageError" :src="thumbnail"
                 style="padding-right: 8px; padding-left: 8px; max-width: 100%; max-height: 100%;" />
 
-            <!-- Show icon if we have an icon and not loading -->
-            <i v-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
+            <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
+            <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
 
             <!-- Build loading spinner (highest priority) -->
             <i class="icon circle notch spin loading" v-if="buildLoading" />

@@ -91,6 +91,18 @@ export default {
             }
         },
         {
+            label: "Transfer to Dataset...",
+            icon: 'exchange',
+            isVisible: () => { return this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
+            accelerator: "CmdOrCtrl+T",
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                    this.$emit("transferSelectedItems");
+                }
+            }
+        },
+        {
             type: 'separator',
             isVisible: () => { return this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
         },
@@ -299,7 +311,7 @@ export default {
             // Keep track of nodes for "Open Item Location"
             this.lastSelectedNode = selectedNodes.length > 0 ? selectedNodes[selectedNodes.length - 1] : null;
 
-            // If a folder is expanded and we select it, 
+            // If a folder is expanded and we select it,
             // we select it's children instead.
             if (selectedNodes.length === 1) {
                 const n = selectedNodes[0];
