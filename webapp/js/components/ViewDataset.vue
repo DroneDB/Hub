@@ -25,28 +25,18 @@
                         @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
-                    <!-- View mode toggle -->
-                    <div class="view-mode-toggle" style="padding: 0.5rem 1rem; border-bottom: 1px solid #d4d4d5; display: flex; justify-content: flex-end; gap: 0.5rem;">
-                        <button class="ui icon button" :class="{ active: viewMode === 'grid' }" @click="switchViewMode('grid')" title="Grid View">
-                            <i class="th icon"></i>
-                        </button>
-                        <button class="ui icon button" :class="{ active: viewMode === 'table' }" @click="switchViewMode('table')" title="Table View">
-                            <i class="list icon"></i>
-                        </button>
-                    </div>
-
                     <!-- Grid View (Explorer) -->
                     <Explorer v-if="viewMode === 'grid'" ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
 
                     <!-- Table View with Detail Panel -->
-                    <Panel v-else split="vertical" amount="70%" mobileAmount="100%" tabletAmount="60%" :mobileCollapsed="true">
+                    <Panel v-else-if="selectedDetailFile" split="vertical" amount="70%" mobileAmount="100%" tabletAmount="60%" :mobileCollapsed="true">
                         <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                            :dataset="dataset" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                            :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                             @transferSelectedItems="openTransferItemsDialog"
                             @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
@@ -61,6 +51,15 @@
                             @buildStarted="handleBuildStarted"
                             @buildError="handleBuildError" />
                     </Panel>
+
+                    <!-- Table View without Detail Panel -->
+                    <TableView v-else ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
+                        :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
+                        @transferSelectedItems="openTransferItemsDialog"
+                        @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                        @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                        @selectionChanged="handleTableSelectionChanged" />
                 </template>
                 <template v-slot:buildhistory>
                     <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
@@ -410,6 +409,148 @@ export default {
 
         handleError: function (e) {
             this.showError(e, "Error");
+        },
+
+        updateExplorerTools: function() {
+            // Rebuild explorer tools based on current selection and view mode
+            this.explorerTools = [{
+                id: 'upload',
+                title: "Upload",
+                icon: "plus",
+                onClick: () => {
+                    this.uploadDialogOpen = true;
+                }
+            }, {
+                id: 'newfolder',
+                title: "Create folder",
+                icon: "folder",
+                onClick: () => {
+                    this.createFolderDialogOpen = true;
+                }
+            }];
+
+            if (this.selectedFiles.length == 1) {
+                this.explorerTools.push({
+                    id: 'rename',
+                    title: "Rename",
+                    icon: "edit",
+                    onClick: () => {
+                        this.fileToRename = this.selectedFiles[0];
+                        this.renameDialogOpen = true;
+                    }
+                });
+            }
+
+            if (this.selectedFiles.length > 0) {
+                this.explorerTools.push({
+                    id: 'remove',
+                    title: "Remove",
+                    icon: "trash alternate",
+                    onClick: () => {
+                        this.selectedUsingFileBrowserList = false;
+                        this.deleteDialogOpen = true;
+                    }
+                });
+
+                this.explorerTools.push({
+                    id: 'separator'
+                });
+
+                let addedOpen = false;
+
+                if (this.selectedFiles.length === 1) {
+                    this.explorerTools.push({
+                        id: 'share-embed',
+                        title: "Share/Embed",
+                        icon: "share alternate",
+                        onClick: () => {
+                            this.handleShareEmbed(this.selectedFiles[0]);
+                        }
+                    });
+
+                    if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1) {
+                        this.explorerTools.push({
+                            id: 'open-map',
+                            title: "Open Map",
+                            icon: "map",
+                            onClick: () => {
+                                this.handleOpenItem(this.selectedFiles[0], 'map');
+                            }
+                        });
+                        addedOpen = true;
+                    }
+                    if ([ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1) {
+                        this.explorerTools.push({
+                            id: 'open-pointcloud',
+                            title: "Open Point Cloud",
+                            icon: "cube",
+                            onClick: () => {
+                                this.handleOpenItem(this.selectedFiles[0], 'pointcloud');
+                            }
+                        });
+                        addedOpen = true;
+                    }
+                    if ([ddb.entry.type.MODEL].indexOf(this.selectedFiles[0].entry.type) !== -1) {
+                        this.explorerTools.push({
+                            id: 'open-3dmodel',
+                            title: "Open 3D Model",
+                            icon: "cube",
+                            onClick: () => {
+                                this.handleOpenItem(this.selectedFiles[0], 'model');
+                            }
+                        });
+                        addedOpen = true;
+                    }
+                    if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1) {
+                        this.explorerTools.push({
+                            id: 'open-panorama',
+                            title: "Open Panorama",
+                            icon: "globe",
+                            onClick: () => {
+                                this.handleOpenItem(this.selectedFiles[0], 'panorama');
+                            }
+                        });
+                        addedOpen = true;
+                    }
+                }
+
+                if (!addedOpen) {
+                    this.explorerTools.push({
+                        id: 'open',
+                        title: "Open",
+                        icon: "folder open outline",
+                        onClick: () => {
+                            this.handleOpenItem(this.selectedFiles[0]);
+                        }
+                    });
+                }
+            }
+
+            // Add spacer and view mode toggle button
+            this.explorerTools.push({
+                id: 'spacer'
+            });
+
+            // Show only the button to switch to the opposite view
+            if (this.viewMode === 'grid') {
+                this.explorerTools.push({
+                    id: 'view-toggle',
+                    title: "Table View",
+                    icon: "list",
+                    onClick: () => {
+                        this.toggleViewMode();
+                    }
+                });
+            } else {
+                this.explorerTools.push({
+                    id: 'view-toggle',
+                    title: "Grid View",
+                    icon: "th",
+                    onClick: () => {
+                        this.toggleViewMode();
+                    }
+                });
+            }
         }
     },
     watch: {
@@ -435,131 +576,17 @@ export default {
 
         selectedFiles: {
             handler: function () {
-                this.explorerTools = [{
-                    id: 'upload',
-                    title: "Upload",
-                    icon: "plus",
-                    onClick: () => {
-                        this.uploadDialogOpen = true;
-                    }
-                }, {
-                    id: 'newfolder',
-                    title: "Create folder",
-                    icon: "folder",
-                    onClick: () => {
-                        this.createFolderDialogOpen = true;
-                    }
-                }];
-
-                if (this.selectedFiles.length == 1) {
-                    this.explorerTools.push({
-                        id: 'rename',
-                        title: "Rename",
-                        icon: "edit",
-                        onClick: () => {
-                            this.fileToRename = this.selectedFiles[0];
-                            this.renameDialogOpen = true;
-                        }
-                    });
-                }
-
-                if (this.selectedFiles.length > 0) {
-                    this.explorerTools.push({
-                        id: 'remove',
-                        title: "Remove",
-                        icon: "trash alternate",
-                        onClick: () => {
-                            this.selectedUsingFileBrowserList = false;
-                            this.deleteDialogOpen = true;
-                        }
-                    });
-
-                    this.explorerTools.push({
-                        id: 'separator'
-                    });
-
-                    let addedOpen = false;
-
-                    if (this.selectedFiles.length === 1) {
-                        this.explorerTools.push({
-                            id: 'share-embed',
-                            title: "Share/Embed",
-                            icon: "share alternate",
-                            onClick: () => {
-                                this.handleShareEmbed(this.selectedFiles[0]);
-                            }
-                        });
-
-                        if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1) {
-                            this.explorerTools.push({
-                                id: 'open-map',
-                                title: "Open Map",
-                                icon: "map",
-                                onClick: () => {
-                                    this.handleOpenItem(this.selectedFiles[0], 'map');
-                                }
-                            });
-                            addedOpen = true;
-                        }
-                        if ([ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1) {
-                            this.explorerTools.push({
-                                id: 'open-pointcloud',
-                                title: "Open Point Cloud",
-                                icon: "cube",
-                                onClick: () => {
-                                    this.handleOpenItem(this.selectedFiles[0], 'pointcloud');
-                                }
-                            });
-                            addedOpen = true;
-                        }
-                        if ([ddb.entry.type.MODEL].indexOf(this.selectedFiles[0].entry.type) !== -1) {
-                            this.explorerTools.push({
-                                id: 'open-3dmodel',
-                                title: "Open 3D Model",
-                                icon: "cube",
-                                onClick: () => {
-                                    this.handleOpenItem(this.selectedFiles[0], 'model');
-                                }
-                            });
-                            addedOpen = true;
-                        }
-                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1) {
-                            this.explorerTools.push({
-                                id: 'open-panorama',
-                                title: "Open Panorama",
-                                icon: "globe",
-                                onClick: () => {
-                                    this.handleOpenItem(this.selectedFiles[0], 'panorama');
-                                }
-                            });
-                            addedOpen = true;
-                        }
-                    }
-
-                    if (!addedOpen) {
-                        this.explorerTools.push({
-                            id: 'open',
-                            title: "Open",
-                            icon: "folder open outline",
-                            onClick: () => {
-                                this.handleOpenItem(this.selectedFiles[0]);
-                            }
-                        });
-                    }
-                }
+                this.updateExplorerTools();
             }
+        },
+
+        viewMode: function(newMode) {
+            // When viewMode changes, rebuild explorerTools to show the correct icon
+            this.updateExplorerTools();
         }
     }
 }
 </script>
 
 <style scoped>
-.view-mode-toggle .ui.button.active {
-    background-color: #2185d0;
-    color: white;
-}
-
-.view-mode-toggle .ui.button.active:hover {
-    background-color: #1678c2;
-}
 </style>

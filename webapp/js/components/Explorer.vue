@@ -46,7 +46,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window
     },
-    props: ['files', 'currentPath', 'tools', 'dataset'],
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode'],
     data: function () {
         let contextMenu = [];
 

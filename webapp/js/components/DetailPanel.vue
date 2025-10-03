@@ -426,11 +426,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #f9fafb;
-    border: 1px solid #d4d4d5;
-    border-radius: 4px;
     position: relative;
-    padding: 1rem;
 }
 
 .detail-thumbnail {

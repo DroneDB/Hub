@@ -100,7 +100,7 @@ export default {
     components: {
         Toolbar, ContextMenu
     },
-    props: ['files', 'currentPath', 'tools', 'dataset'],
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode'],
     data: function () {
         let contextMenu = this.buildContextMenu();
 
