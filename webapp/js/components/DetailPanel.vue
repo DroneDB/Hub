@@ -340,7 +340,7 @@ export default {
             if (!this.dataset || !this.file) return;
 
             try {
-                await BuildManager.startBuild(this.dataset, this.file.entry.path);
+                await BuildManager.startBuild(this.dataset, this.file.entry.path, true);
                 this.buildLoading = true;
                 this.$emit('buildStarted', this.file);
             } catch (error) {
@@ -449,7 +449,6 @@ export default {
     color: white;
     font-weight: bold;
     display: flex;
-    align-items: center;
     gap: 0.5rem;
 }
 

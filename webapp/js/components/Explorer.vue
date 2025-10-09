@@ -473,7 +473,7 @@ export default {
             const file = this.selectedFiles[0];
 
             try {
-                await BuildManager.startBuild(this.dataset, file.entry.path);
+                await BuildManager.startBuild(this.dataset, file.entry.path, true);
                 // Emit event to notify parent
                 this.$emit('buildStarted', file);
             } catch (error) {
