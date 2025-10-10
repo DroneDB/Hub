@@ -19,6 +19,11 @@
                             <i class="icon refresh"></i> Refresh
                         </button>
                     </div>
+                    <div class="field">
+                        <button class="ui button negative" @click="showClearDialog" :disabled="completedBuildsCount === 0">
+                            <i class="icon trash"></i> Clear Completed
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -130,13 +135,29 @@
                 </a>
             </div>
         </div>
+
+        <ConfirmDialog v-if="clearDialogOpen"
+            title="Clear Completed Builds"
+            :message="`Are you sure you want to delete all completed and failed builds?<br/><strong>${completedBuildsCount} build(s)</strong> will be removed from the history.`"
+            confirmText="Clear"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            warningTitle="Warning"
+            warningMessage="This action cannot be undone."
+            @onClose="handleClearDialogClose">
+        </ConfirmDialog>
     </div>
 </template>
 
 <script>
 import BuildManager from '../libs/buildManager';
+import ConfirmDialog from './ConfirmDialog.vue';
 
 export default {
+    components: {
+        ConfirmDialog
+    },
+
     props: {
         dataset: {
             type: Object,
@@ -154,7 +175,8 @@ export default {
             sortDesc: true,
             currentPage: 1,
             pageSize: 20,
-            retryingBuilds: {}
+            retryingBuilds: {},
+            clearDialogOpen: false
         };
     },
 
@@ -182,6 +204,12 @@ export default {
                 pages.push(i);
             }
             return pages;
+        },
+
+        completedBuildsCount() {
+            return this.builds.filter(build =>
+                build.currentState === 'Succeeded' || build.currentState === 'Failed'
+            ).length;
         }
     },
 
@@ -410,6 +438,32 @@ export default {
 
                 // Refresh the build list to show new builds
                 this.refreshData();
+            }
+        },
+
+        showClearDialog() {
+            this.clearDialogOpen = true;
+        },
+
+        async handleClearDialogClose(buttonId) {
+            this.clearDialogOpen = false;
+
+            if (buttonId === 'confirm') {
+                try {
+                    this.loading = true;
+                    const result = await this.dataset.clearCompletedBuilds();
+                    console.log('Cleared completed builds:', result);
+
+                    // Reload the build list
+                    await this.loadBuilds();
+
+                    this.$emit('buildsCleared', result);
+                } catch (error) {
+                    console.error('Error clearing completed builds:', error);
+                    this.$emit('clearBuildsError', { error: error.message });
+                } finally {
+                    this.loading = false;
+                }
             }
         }
     }
