@@ -21,7 +21,7 @@
                     </div>
                     <div class="field">
                         <button class="ui button negative" @click="showClearDialog" :disabled="completedBuildsCount === 0">
-                            <i class="icon trash"></i> Clear Completed
+                            <i class="icon trash"></i> Clear Concluded
                         </button>
                     </div>
                 </div>
@@ -137,7 +137,7 @@
         </div>
 
         <ConfirmDialog v-if="clearDialogOpen"
-            title="Clear Completed Builds"
+            title="Clear Concluded Builds"
             :message="`Are you sure you want to delete all completed and failed builds?<br/><strong>${completedBuildsCount} build(s)</strong> will be removed from the history.`"
             confirmText="Clear"
             cancelText="Cancel"
@@ -300,8 +300,6 @@ export default {
             return parts.slice(0, -1).join('/');
         },
 
-
-
         getStateClass(state) {
             switch (state) {
                 case 'Succeeded':
@@ -330,6 +328,7 @@ export default {
                 case 'Enqueued':
                 case 'Scheduled':
                 case 'Awaiting':
+                case 'Created':
                     return 'clock outline';
                 default:
                     return 'question';
