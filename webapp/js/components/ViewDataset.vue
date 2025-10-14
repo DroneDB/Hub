@@ -33,8 +33,8 @@
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
 
-                    <!-- Table View with Detail Panel -->
-                    <Panel v-else-if="selectedDetailFile" split="vertical" amount="70%" mobileAmount="100%" tabletAmount="60%" :mobileCollapsed="true">
+                    <!-- Table View with Detail Panel (Desktop/Tablet only) -->
+                    <Panel v-else-if="selectedDetailFile && !isMobile" split="vertical" amount="70%" tabletAmount="60%">
                         <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
                             :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
