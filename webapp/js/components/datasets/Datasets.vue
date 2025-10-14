@@ -175,6 +175,7 @@ import Message from '../Message.vue';
 import ddb from 'ddb';
 import { setTitle, bytesToSize } from '../../libs/utils';
 import { renameDataset, datasetName } from '../../libs/registryUtils';
+import { getDatasetTablePreferences, saveDatasetTablePreferences } from '../../libs/storageUtils';
 import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
 import DatasetDialog from './DatasetDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue'
@@ -190,6 +191,9 @@ export default {
         DatasetDialog
     },
     data: function () {
+        // Load preferences from Local Storage
+        const prefs = getDatasetTablePreferences();
+
         return {
             error: "",
             datasets: [],
@@ -205,13 +209,13 @@ export default {
 
             orgName: "",
 
-            // Sorting
-            sortColumn: "name",
-            sortDirection: "asc",
+            // Sorting - use saved preferences or defaults
+            sortColumn: prefs?.sortColumn || "name",
+            sortDirection: prefs?.sortDirection || "asc",
 
-            // Pagination
+            // Pagination - use saved preferences or defaults
             currentPage: 1,
-            itemsPerPage: 10,
+            itemsPerPage: prefs?.itemsPerPage || 10,
 
             // Filtering
             searchQuery: "",
@@ -352,10 +356,23 @@ export default {
         }
     },
     watch: {
-        itemsPerPage: function () {
+        itemsPerPage: function (newValue) {
             this.currentPage = 1; // Reset to first page when items per page changes
+            this.savePreferences();
+        },
+        sortColumn: function () {
+            this.savePreferences();
+        },
+        sortDirection: function () {
+            this.savePreferences();
         }
     }, methods: {
+        /**
+         * Save table preferences to Local Storage
+         */
+        savePreferences: function () {
+            saveDatasetTablePreferences(this.sortColumn, this.sortDirection, this.itemsPerPage);
+        },
         bytesToSize,
         datasetName,
 

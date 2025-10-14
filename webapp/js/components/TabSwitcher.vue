@@ -53,7 +53,7 @@ export default {
     mounted: function () {
         // Trigger first onTabActivated
         const node = this.getNodeFor(this.activeTab);
-        if (node.onTabActivated) node.onTabActivated();
+        if (node && node.onTabActivated) node.onTabActivated();
 
         this.tabMap = {};
     },

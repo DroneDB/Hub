@@ -1,9 +1,10 @@
 <template>
     <div class="toolbar" :class="className">
-        <template v-for="tool in dataTools">
-            <div class="separator" v-if="tool.id === 'separator'"></div>
+        <template v-for="(tool, index) in dataTools">
+            <div class="separator" v-if="tool.id === 'separator'" :key="'sep-' + index"></div>
+            <div class="spacer" v-else-if="tool.id === 'spacer'" :key="'spacer-' + index"></div>
             <div v-else class="button" :class="{ selected: tool.selected, disabled: tool.disabled }" :title="tool.title"
-                @click="toggleTool(tool.id)">
+                @click="toggleTool(tool.id)" :key="tool.id">
                 <i :class="'icon ' + tool.icon"></i>
             </div>
         </template>
@@ -215,6 +216,10 @@ export default {
         margin-bottom: 3px;
         margin-left: 6px;
         margin-right: 6px;
+    }
+
+    .spacer {
+        flex-grow: 1;
     }
 }
 </style>

@@ -1,0 +1,218 @@
+/**
+ * Dialog Manager Mixin
+ * Manages the state and handlers for various dialogs in ViewDataset
+ */
+export default {
+    data() {
+        return {
+            // Dialog states
+            uploadDialogOpen: false,
+            deleteDialogOpen: false,
+            renameDialogOpen: false,
+            createFolderDialogOpen: false,
+            transferDialogOpen: false,
+            showSettings: false,
+            showProperties: false,
+            errorDialogOpen: false,
+
+            // Dialog data
+            fileToRename: null,
+            filesToUpload: null,
+            errorMessage: null,
+            errorMessageTitle: null,
+            shareFile: null
+        };
+    },
+
+    methods: {
+        // Settings Dialog
+        openSettingsDialog() {
+            this.showSettings = true;
+        },
+
+        handleSettingsClose() {
+            this.showSettings = false;
+        },
+
+        // Upload Dialog
+        openUploadDialog(files = null) {
+            this.filesToUpload = files;
+            this.uploadDialogOpen = true;
+        },
+
+        handleAddClose(uploaded, uploadSuccess) {
+            this.uploadDialogOpen = false;
+            this.filesToUpload = null;
+
+            if (uploaded.length == 0) return;
+
+            var items = [];
+
+            for (var entry of uploaded) {
+                // Don't add the same file twice
+                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)
+                    continue;
+
+                const base = this.pathutils.basename(entry.path);
+
+                var item = {
+                    icon: this.icons.getForType(entry.type),
+                    label: base,
+                    path: this.dataset.remoteUri((this.currentPath != null && this.currentPath.length > 0) ? this.pathutils.join(this.currentPath, base) : base),
+                    entry,
+                    isExpandable: this.ddb.entry.isDirectory(entry),
+                    selected: false
+                };
+
+                this.fileBrowserFiles.push(item);
+                items.push(item);
+            }
+
+            this.sortFiles();
+
+            if (items.length > 0) {
+                this.$root.$emit('addItems', items);
+
+                // Notify BuildManager about new files
+                const newEntries = items.map(item => item.entry);
+                this.BuildManager.onFilesAdded(this.dataset, newEntries);
+            }
+
+            if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} file${uploaded.length > 1 ? "s" : ""}`;
+        },
+
+        // Delete Dialog
+        openDeleteItemsDialog() {
+            if (this.selectedFiles.length == 0) return;
+            this.selectedUsingFileBrowserList = false;
+            this.deleteDialogOpen = true;
+        },
+
+        openDeleteItemsDialogFromFileBrowser() {
+            this.selectedUsingFileBrowserList = true;
+            this.deleteDialogOpen = true;
+        },
+
+        async handleDeleteClose(id) {
+            if (id == "remove") {
+                await this.deleteSelectedFiles();
+            }
+            this.deleteDialogOpen = false;
+        },
+
+        // Rename Dialog
+        openRenameItemsDialog() {
+            if (this.selectedFiles.length != 1) return;
+            this.selectedUsingFileBrowserList = false;
+            this.fileToRename = this.selectedFiles[0];
+            this.renameDialogOpen = true;
+        },
+
+        openRenameItemsDialogFromFileBrowser() {
+            this.renameDialogOpen = true;
+            this.fileToRename = this.fileBrowserFiles[0];
+            this.selectedUsingFileBrowserList = true;
+        },
+
+        async handleRenameClose(id, newPath, entry) {
+            if (id == "rename") {
+                if (newPath == null || newPath.length == 0) return;
+                await this.renameSelectedFile(newPath);
+            } else if (id == "renameddb") {
+                if (newPath == null || newPath.length == 0) return;
+                this.isBusy = true;
+                try {
+                    const newDs = await this.renameDataset(this.$route.params.org, this.$route.params.ds, newPath);
+                    this.$router.push({
+                        name: "ViewDataset", params: {
+                            org: this.$route.params.org,
+                            ds: newDs.slug
+                        }
+                    });
+                    location.reload(true);
+                } catch (e) {
+                    this.showError(e, "Rename");
+                }
+                this.isBusy = false;
+            }
+            this.renameDialogOpen = false;
+        },
+
+        // New Folder Dialog
+        handleCreateFolder() {
+            this.createFolderDialogOpen = true;
+        },
+
+        async handleNewFolderClose(id, newFolderPath) {
+            if (id == "createFolder") {
+                if (newFolderPath == null || newFolderPath.length == 0) return;
+                await this.createFolder(newFolderPath);
+            }
+            this.createFolderDialogOpen = false;
+        },
+
+        // Transfer Dialog
+        openTransferItemsDialog() {
+            if (this.selectedFiles.length === 0) return;
+            this.selectedUsingFileBrowserList = false;
+            this.transferDialogOpen = true;
+        },
+
+        openTransferItemsDialogFromFileBrowser() {
+            if (this.fileBrowserFiles.length === 0) return;
+            this.selectedUsingFileBrowserList = true;
+            this.transferDialogOpen = true;
+        },
+
+        async handleTransferClose(id, transferredFiles) {
+            this.transferDialogOpen = false;
+
+            if (id === "transferred" && transferredFiles && transferredFiles.length > 0) {
+                const transferredPaths = transferredFiles.map(f => f.entry.path);
+                this.fileBrowserFiles = this.fileBrowserFiles.filter(
+                    item => !transferredPaths.includes(item.entry.path)
+                );
+
+                this.$root.$emit('deleteEntries', transferredPaths);
+
+                this.flash = `${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`;
+            }
+        },
+
+        // Properties Dialog
+        handleExplorerOpenProperties() {
+            if (this.selectedFiles.length == 0) return;
+            this.showProperties = true;
+            this.selectedUsingFileBrowserList = false;
+        },
+
+        handleFileBrowserOpenProperties() {
+            this.showProperties = true;
+            this.selectedUsingFileBrowserList = true;
+        },
+
+        handleCloseProperties() {
+            this.showProperties = false;
+        },
+
+        // Share/Embed Dialog
+        handleShareEmbed(file) {
+            this.shareFile = file;
+        },
+
+        handleCloseShareEmbed() {
+            this.shareFile = null;
+        },
+
+        // Error Dialog
+        showError(text, title) {
+            this.errorMessage = text;
+            this.errorMessageTitle = (typeof title === 'undefined' || title == null) ? "Error" : title;
+            this.errorDialogOpen = true;
+        },
+
+        handleErrorDialogClose() {
+            this.errorDialogOpen = false;
+        }
+    }
+};
