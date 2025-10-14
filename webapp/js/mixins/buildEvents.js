@@ -30,17 +30,17 @@ export default {
                     this.flash = `Build completed for ${fileName}`;
                     break;
                 case 'Failed':
-                    this.flash = `❌ Build failed for ${fileName}`;
+                    this.flash = `Build failed for ${fileName}`;
                     break;
                 case 'Processing':
-                    this.flash = `⚙️ Building ${fileName}...`;
+                    this.flash = `Building ${fileName}...`;
                     break;
             }
         },
 
         handleBuildStartedNotification(data) {
             const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
-            this.flash = `🚀 Build started for ${fileName}`;
+            this.flash = `Build started for ${fileName}`;
         },
 
         handleBuildErrorNotification(data) {
