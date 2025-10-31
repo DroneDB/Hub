@@ -9,6 +9,47 @@
         </div>
 
         <div class="potree-container" :class="{ loading }">
+            <!-- Toolbar for measurements -->
+            <div v-if="loaded" class="measurements-toolbar">
+                <button
+                    @click="saveMeasurements"
+                    :disabled="savingMeasurements"
+                    class="btn-measurement"
+                    title="Save measurements">
+                    <i class="save icon"></i>
+                    Save Measurements
+                </button>
+
+                <button
+                    @click="clearAllMeasurements"
+                    class="btn-measurement btn-danger"
+                    title="Clear all measurements from scene">
+                    <i class="eraser icon"></i>
+                    Clear All
+                </button>
+
+                <button
+                    @click="exportMeasurementsToFile"
+                    class="btn-measurement"
+                    title="Export measurements as GeoJSON file">
+                    <i class="download icon"></i>
+                    Export
+                </button>
+
+                <button
+                    v-if="hasSavedMeasurements"
+                    @click="deleteSavedMeasurements"
+                    class="btn-measurement btn-danger"
+                    title="Delete saved measurements file">
+                    <i class="trash icon"></i>
+                    Delete Saved
+                </button>
+
+                <span v-if="hasSavedMeasurements" class="measurement-badge">
+                    <i class="check circle icon"></i> Measurements saved
+                </span>
+            </div>
+
             <div id="potree_sidebar_container" ref="sidebar"> </div>
             <div id="potree_render_area" ref="container"></div>
         </div>
@@ -20,6 +61,8 @@ import ddb from 'ddb';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
 import { loadResources } from '../libs/lazy';
+import { MeasurementStorage } from '../libs/measurementStorage';
+import { exportMeasurements, importMeasurements } from '../libs/potreeMeasurementConverter';
 
 export default {
     components: {
@@ -30,7 +73,11 @@ export default {
         return {
             error: "",
             loading: false,
-            loaded: false
+            loaded: false,
+            measurementStorage: null,
+            coordinateSystem: null,
+            hasSavedMeasurements: false,
+            savingMeasurements: false
         };
     },
     mounted: function () {
@@ -112,6 +159,10 @@ export default {
 
             await this.addPointCloud(this.dataset.Entry(this.entry));
             this.viewer.fitToScreen();
+
+            // Load saved measurements automatically
+            await this.loadMeasurements();
+
             window.viewer = viewer;
             // if (pointCloudFiles.length === 0) this.error = "No point cloud files selected. Select one or more point cloud files to display them.";
         },
@@ -121,6 +172,10 @@ export default {
                 try {
                     const eptUrl = await entry.getEpt();
                     const basename = ddb.pathutils.basename(entry.path);
+
+                    // Load coordinate system
+                    this.coordinateSystem = await this.getCoordinateSystem(eptUrl);
+                    console.log('Coordinate system:', this.coordinateSystem);
 
                     Potree.loadPointCloud(eptUrl, basename, e => {
                         if (e.type == "loading_failed") {
@@ -138,6 +193,160 @@ export default {
                 }
             });
         },
+
+        /**
+         * Load the coordinate system from EPT
+         */
+        getCoordinateSystem: async function(eptUrl) {
+            try {
+                const response = await fetch(eptUrl);
+                const eptJson = await response.json();
+
+                return {
+                    srs: eptJson.srs || eptJson.srs?.wkt || null,
+                    scale: eptJson.scale || [1, 1, 1],
+                    offset: eptJson.offset || [0, 0, 0],
+                    bounds: eptJson.bounds || eptJson.boundsConforming
+                };
+            } catch (e) {
+                console.warn('Could not load coordinate system:', e);
+                // Fallback
+                return {
+                    srs: null,
+                    scale: [1, 1, 1],
+                    offset: [0, 0, 0],
+                    bounds: null
+                };
+            }
+        },
+
+        /**
+         * Load saved measurements
+         */
+        loadMeasurements: async function() {
+            if (!this.measurementStorage) {
+                this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
+            }
+
+            try {
+                // Check if saved measurements exist
+                const geojson = await this.measurementStorage.load();
+
+                if (geojson && geojson.features && geojson.features.length > 0) {
+                    // Import measurements into viewer
+                    importMeasurements(geojson, this.viewer, this.coordinateSystem);
+
+                    this.hasSavedMeasurements = true;
+                    console.log(`Loaded ${geojson.features.length} measurements`);
+
+                    // Optional: show message to user
+                    this.$emit('info', `${geojson.features.length} measurements loaded`);
+                }
+            } catch (e) {
+                console.error('Error loading measurements:', e);
+                this.error = `Could not load measurements: ${e.message}`;
+            }
+        },
+
+        /**
+         * Save current measurements
+         */
+        saveMeasurements: async function() {
+            if (!this.viewer || !this.viewer.scene) {
+                this.error = 'Viewer not ready';
+                return;
+            }
+
+            this.savingMeasurements = true;
+            this.error = '';
+
+            try {
+                // Export measurements in GeoJSON format
+                const geojson = exportMeasurements(
+                    this.viewer,
+                    this.entry.path,
+                    this.coordinateSystem
+                );
+
+                if (!geojson.features || geojson.features.length === 0) {
+                    this.error = 'No measurements to save';
+                    this.savingMeasurements = false;
+                    return;
+                }
+
+                // Save the file
+                if (!this.measurementStorage) {
+                    this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
+                }
+
+                await this.measurementStorage.save(geojson);
+
+                this.hasSavedMeasurements = true;
+
+                // Show success message
+                this.$emit('success', `${geojson.features.length} measurements saved`);
+
+                console.log('Measurements saved successfully');
+            } catch (e) {
+                console.error('Error saving measurements:', e);
+                this.error = `Failed to save measurements: ${e.message}`;
+            } finally {
+                this.savingMeasurements = false;
+            }
+        },
+
+        /**
+         * Delete saved measurements
+         */
+        deleteSavedMeasurements: async function() {
+            if (!this.measurementStorage) {
+                return;
+            }
+
+            try {
+                await this.measurementStorage.delete();
+                this.hasSavedMeasurements = false;
+                this.$emit('success', 'Saved measurements deleted');
+            } catch (e) {
+                console.error('Error deleting measurements:', e);
+                this.error = `Failed to delete measurements: ${e.message}`;
+            }
+        },
+
+        /**
+         * Clear all measurements from the scene
+         */
+        clearAllMeasurements: function() {
+            if (!this.viewer || !this.viewer.scene) return;
+
+            const measurements = [...this.viewer.scene.measurements];
+            measurements.forEach(m => {
+                this.viewer.scene.removeMeasurement(m);
+            });
+
+            console.log('All measurements cleared from scene');
+        },
+
+        /**
+         * Export measurements as file for download
+         */
+        exportMeasurementsToFile: function() {
+            if (!this.viewer || !this.viewer.scene) return;
+
+            const geojson = exportMeasurements(
+                this.viewer,
+                this.entry.path,
+                this.coordinateSystem
+            );
+
+            if (!geojson.features || geojson.features.length === 0) {
+                this.error = 'No measurements to export';
+                return;
+            }
+
+            this.measurementStorage.exportToFile(geojson);
+        },
+
         handleHistoryBack: function () {
             this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
         },
@@ -319,6 +528,62 @@ export default {
 
     #profile_window {
         z-index: 999999999999 !important;
+    }
+
+    /* Toolbar for measurements */
+    .measurements-toolbar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 5px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .btn-measurement {
+        background: #4a90e2;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 14px;
+        transition: background 0.3s;
+    }
+
+    .btn-measurement:hover {
+        background: #357abd;
+    }
+
+    .btn-measurement:disabled {
+        background: #666;
+        cursor: not-allowed;
+    }
+
+    .btn-measurement.btn-danger {
+        background: #e74c3c;
+    }
+
+    .btn-measurement.btn-danger:hover {
+        background: #c0392b;
+    }
+
+    .measurement-badge {
+        background: rgba(46, 204, 113, 0.9);
+        color: white;
+        padding: 6px 12px;
+        border-radius: 4px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
 }
 </style>

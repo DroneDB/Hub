@@ -114,10 +114,41 @@ export default {
             this.selectedUsingFileBrowserList = true;
         },
 
-        async handleRenameClose(id, newPath, entry) {
+        async handleRenameClose(id, newPath, entry, measurementsInfo) {
             if (id == "rename") {
                 if (newPath == null || newPath.length == 0) return;
-                await this.renameSelectedFile(newPath);
+
+                // Handle measurements rename if requested
+                if (measurementsInfo && measurementsInfo.renameMeasurements) {
+                    this.isBusy = true;
+                    try {
+                        // First rename the point cloud
+                        await this.renameSelectedFile(newPath);
+
+                        // Then rename the measurements file
+                        console.log('Renaming measurements file...');
+                        await this.dataset.moveObj(
+                            measurementsInfo.oldMeasurementsPath,
+                            measurementsInfo.newMeasurementsPath
+                        );
+
+                        console.log('Both files renamed successfully');
+                        this.flash = 'Point cloud and measurements file renamed successfully';
+                    } catch (e) {
+                        // If measurements rename fails, show warning but not critical error
+                        if (e.message && e.message.includes('measurements')) {
+                            this.flash = 'Point cloud renamed, but measurements file could not be renamed';
+                            console.warn('Measurements rename failed:', e);
+                        } else {
+                            this.showError(e, "Rename");
+                        }
+                    } finally {
+                        this.isBusy = false;
+                    }
+                } else {
+                    // Normal rename without measurements
+                    await this.renameSelectedFile(newPath);
+                }
             } else if (id == "renameddb") {
                 if (newPath == null || newPath.length == 0) return;
                 this.isBusy = true;
