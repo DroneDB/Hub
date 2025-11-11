@@ -179,7 +179,7 @@ export default {
 
                     Potree.loadPointCloud(eptUrl, basename, e => {
                         if (e.type == "loading_failed") {
-                            reject(new Error(`Cannot load ${entry.path}, we're still building it. Try again in a few minutes.`));
+                            reject(new Error(`Unable to load ${entry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
                             return;
                         }
 
@@ -189,7 +189,7 @@ export default {
                         resolve();
                     });
                 } catch (e) {
-                    reject(new Error(`${entry.path} is being built. Try to refresh the page in a few minutes!`));
+                    reject(new Error(`${entry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`));
                 }
             });
         },

@@ -353,6 +353,103 @@ class BuildManager {
     }
 
     /**
+     * Checks if a file is ready for visualization
+     * Considers build state and output file availability
+     * @param {Object} dataset - DDB Dataset
+     * @param {Object} entry - File entry
+     * @param {string} viewType - Viewer type
+     * @returns {Promise<boolean>}
+     */
+    async isFileReadyForViewing(dataset, entry, viewType) {
+        // Non-buildable files are always ready
+        if (!this.isBuildableType(entry.type)) {
+            return true;
+        }
+
+        // Check build state
+        const buildState = this.getBuildState(dataset, entry.path);
+
+        if (buildState) {
+            return buildState.currentState === BUILD_STATES.SUCCEEDED;
+        }
+
+        // If no build state, check the API
+        try {
+            const builds = await dataset.getBuilds(1, 100);
+            const currentBuild = builds.find(b => b.path === entry.path);
+
+            if (currentBuild) {
+                return currentBuild.currentState === BUILD_STATES.SUCCEEDED;
+            }
+        } catch (error) {
+            console.error('Error checking build state:', error);
+        }
+
+        return false;
+    }
+
+    /**
+     * Waits for build completion with polling
+     * @param {Object} dataset - DDB Dataset
+     * @param {string} filePath - File path
+     * @param {number} maxWaitMs - Maximum timeout in milliseconds (default 5 minutes)
+     * @returns {Promise<Object>} Promise that resolves with build state when complete
+     */
+    async waitForBuildCompletion(dataset, filePath, maxWaitMs = 300000) {
+        const startTime = Date.now();
+        const pollInterval = 3000; // 3 seconds
+
+        return new Promise((resolve, reject) => {
+            const checkBuild = async () => {
+                try {
+                    // Check timeout
+                    if (Date.now() - startTime > maxWaitMs) {
+                        reject(new Error('Timeout waiting for build completion'));
+                        return;
+                    }
+
+                    // Reload builds
+                    await this.loadBuilds(dataset);
+
+                    // Check state
+                    const buildState = this.getBuildState(dataset, filePath);
+
+                    if (!buildState) {
+                        // No build found, retry
+                        setTimeout(checkBuild, pollInterval);
+                        return;
+                    }
+
+                    if (buildState.currentState === BUILD_STATES.SUCCEEDED) {
+                        resolve(buildState);
+                        return;
+                    }
+
+                    if (buildState.currentState === BUILD_STATES.FAILED) {
+                        reject(new Error(`Build failed for ${filePath}`));
+                        return;
+                    }
+
+                    // Build still in progress, retry
+                    if (ACTIVE_STATES.includes(buildState.currentState)) {
+                        setTimeout(checkBuild, pollInterval);
+                        return;
+                    }
+
+                    // Unexpected state
+                    reject(new Error(`Unexpected build state: ${buildState.currentState}`));
+
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            // Start first check
+            checkBuild();
+        });
+    }
+
+    /**
      * Cleans up everything (call when leaving the dataset)
      */
     cleanup() {

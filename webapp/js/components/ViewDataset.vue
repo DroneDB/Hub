@@ -83,6 +83,23 @@
         <Loader v-if="isBusy"></Loader>
         <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{ flash }}</Flash>
         <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
+        <FileAvailabilityDialog
+            v-if="showAvailabilityDialog"
+            :show="showAvailabilityDialog"
+            :title="availabilityDialogData.title"
+            :message="availabilityDialogData.message"
+            :status="availabilityDialogData.status"
+            :actions="availabilityDialogData.actions"
+            :buildState="availabilityDialogData.buildState"
+            :dataset="dataset"
+            :entry="availabilityDialogData.entry"
+            @close="handleAvailabilityDialogClose"
+            @build-started="handleBuildStarted"
+            @build-completed="handleBuildCompleted"
+            @build-failed="handleBuildFailed"
+            @timeout="handleBuildTimeout"
+            @error="handleError"
+        />
     </div>
 </template>
 
@@ -108,6 +125,7 @@ import Loader from './Loader.vue';
 import Flash from './Flash.vue';
 import ShareEmbed from './ShareEmbed.vue';
 import BuildHistory from './BuildHistory.vue';
+import FileAvailabilityDialog from './FileAvailabilityDialog.vue';
 
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
@@ -118,6 +136,7 @@ import { isMobile } from '../libs/responsive';
 import { renameDataset, entryLabel } from '../libs/registryUtils';
 import { b64encode } from '../libs/base64';
 import BuildManager from '../libs/buildManager';
+import FileAvailabilityChecker from '../libs/fileAvailabilityChecker';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -152,7 +171,8 @@ export default {
         Loader,
         Flash,
         ShareEmbed,
-        BuildHistory
+        BuildHistory,
+        FileAvailabilityDialog
     },
     data: function () {
         const mobile = isMobile();
@@ -199,6 +219,17 @@ export default {
             currentPath: null,
             viewMode: savedViewMode, // 'grid' or 'table'
             selectedDetailFile: null, // For DetailPanel in table view
+
+            // File availability dialog
+            showAvailabilityDialog: false,
+            availabilityDialogData: {
+                title: '',
+                message: '',
+                status: '',
+                actions: [],
+                buildState: null,
+                entry: null
+            },
 
             // Helper references for mixins
             icons: icons,
@@ -359,16 +390,76 @@ export default {
             }
         },
 
-        handleOpenItem: function (node, view) {
+        handleOpenItem: async function (node, view) {
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
+
             if (view) {
-                const [_, path] = ddb.utils.datasetPathFromUri(node.path);
-                const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
-                window.open(url, `${path}-${view}`);
+                // Pre-opening check of file availability
+                try {
+                    const availability = await FileAvailabilityChecker.check(
+                        this.dataset,
+                        node.entry,
+                        view
+                    );
+
+                    if (!availability.available) {
+                        // File not available - show dialog
+                        this.showFileNotAvailableDialog(availability, node);
+                        return;
+                    }
+
+                    // File available - proceed with opening
+                    const [_, path] = ddb.utils.datasetPathFromUri(node.path);
+                    const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
+                    window.open(url, `${path}-${view}`);
+
+                } catch (error) {
+                    this.showError(error.message, "Error");
+                }
             } else {
                 shell.openItem(node.path);
             }
+        },
+
+        showFileNotAvailableDialog: function(availability, node) {
+            this.availabilityDialogData = {
+                title: availability.title,
+                message: availability.message,
+                status: availability.status,
+                actions: availability.actions,
+                buildState: availability.buildState,
+                entry: node.entry
+            };
+            this.showAvailabilityDialog = true;
+        },
+
+        handleAvailabilityDialogClose: function() {
+            this.showAvailabilityDialog = false;
+        },
+
+        handleBuildCompleted: function(entry) {
+            this.showAvailabilityDialog = false;
+            this.flash = `Build completed for ${entry.path}. Opening viewer...`;
+
+            // Automatically open the viewer
+            setTimeout(() => {
+                const view = OpenItemDefaults[entry.type];
+                if (view) {
+                    const [_, path] = ddb.utils.datasetPathFromUri(entry.path);
+                    const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
+                    window.open(url, `${path}-${view}`);
+                }
+            }, 500);
+        },
+
+        handleBuildFailed: function(buildState) {
+            this.showError(`Build failed for ${buildState.path}`, "Build Error");
+        },
+
+        handleBuildTimeout: function() {
+            this.showError("Timeout while waiting for build completion. Please try again later.", "Timeout");
+            this.showAvailabilityDialog = false;
         },
 
 

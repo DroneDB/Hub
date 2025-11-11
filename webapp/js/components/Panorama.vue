@@ -35,7 +35,8 @@ export default {
         handleLoad: async function () {
             try {
                 // Quick type check
-                if (this.entry.type !== ddb.entry.type.PANORAMA && this.entry.type !== ddb.entry.type.GEOPANORAMA) throw new Error(`${this.entry.path} cannot be opened as a panorama`);
+                if (this.entry.type !== ddb.entry.type.PANORAMA && this.entry.type !== ddb.entry.type.GEOPANORAMA)
+                    throw new Error(`${this.entry.path} cannot be opened as a panorama`);
 
                 this.loading = true;
 
