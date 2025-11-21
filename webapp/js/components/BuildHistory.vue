@@ -289,7 +289,7 @@ export default {
         },
 
         getFileName(path) {
-            if (!path) return 'Unknown';
+            if (!path) return 'Dataset';
             return path.split('/').pop() || path;
         },
 
