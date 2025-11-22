@@ -3,6 +3,7 @@
         <TabViewLoader @loaded="handleLoad" titleSuffix="Point Cloud" />
 
         <Message bindTo="error" noDismiss />
+        <Message bindTo="success" className="positive" />
         <div v-if="loading" class="loading">
             <p>Loading point cloud...</p>
             <i class="icon circle notch spin" />
@@ -21,22 +22,6 @@
                 </button>
 
                 <button
-                    @click="clearAllMeasurements"
-                    class="btn-measurement btn-danger"
-                    title="Clear all measurements from scene">
-                    <i class="eraser icon"></i>
-                    Clear All
-                </button>
-
-                <button
-                    @click="exportMeasurementsToFile"
-                    class="btn-measurement"
-                    title="Export measurements as GeoJSON file">
-                    <i class="download icon"></i>
-                    Export
-                </button>
-
-                <button
                     v-if="hasSavedMeasurements"
                     @click="deleteSavedMeasurements"
                     class="btn-measurement btn-danger"
@@ -44,10 +29,6 @@
                     <i class="trash icon"></i>
                     Delete Saved
                 </button>
-
-                <span v-if="hasSavedMeasurements" class="measurement-badge">
-                    <i class="check circle icon"></i> Measurements saved
-                </span>
             </div>
 
             <div id="potree_sidebar_container" ref="sidebar"> </div>
@@ -72,6 +53,7 @@ export default {
     data: function () {
         return {
             error: "",
+            success: "",
             loading: false,
             loaded: false,
             measurementStorage: null,
@@ -239,8 +221,8 @@ export default {
                     this.hasSavedMeasurements = true;
                     console.log(`Loaded ${geojson.features.length} measurements`);
 
-                    // Optional: show message to user
-                    this.$emit('info', `${geojson.features.length} measurements loaded`);
+                    // Show info message to user
+                    this.success = `${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`;
                 }
             } catch (e) {
                 console.error('Error loading measurements:', e);
@@ -259,6 +241,7 @@ export default {
 
             this.savingMeasurements = true;
             this.error = '';
+            this.success = '';
 
             try {
                 // Export measurements in GeoJSON format
@@ -284,7 +267,7 @@ export default {
                 this.hasSavedMeasurements = true;
 
                 // Show success message
-                this.$emit('success', `${geojson.features.length} measurements saved`);
+                this.success = `${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`;
 
                 console.log('Measurements saved successfully');
             } catch (e) {
@@ -303,48 +286,19 @@ export default {
                 return;
             }
 
+            // Ask for confirmation
+            if (!confirm('Are you sure you want to delete all saved measurements? This action cannot be undone.')) {
+                return;
+            }
+
             try {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
-                this.$emit('success', 'Saved measurements deleted');
+                this.success = 'Saved measurements deleted successfully';
             } catch (e) {
                 console.error('Error deleting measurements:', e);
                 this.error = `Failed to delete measurements: ${e.message}`;
             }
-        },
-
-        /**
-         * Clear all measurements from the scene
-         */
-        clearAllMeasurements: function() {
-            if (!this.viewer || !this.viewer.scene) return;
-
-            const measurements = [...this.viewer.scene.measurements];
-            measurements.forEach(m => {
-                this.viewer.scene.removeMeasurement(m);
-            });
-
-            console.log('All measurements cleared from scene');
-        },
-
-        /**
-         * Export measurements as file for download
-         */
-        exportMeasurementsToFile: function() {
-            if (!this.viewer || !this.viewer.scene) return;
-
-            const geojson = exportMeasurements(
-                this.viewer,
-                this.entry.path,
-                this.coordinateSystem
-            );
-
-            if (!geojson.features || geojson.features.length === 0) {
-                this.error = 'No measurements to export';
-                return;
-            }
-
-            this.measurementStorage.exportToFile(geojson);
         },
 
         handleHistoryBack: function () {
@@ -573,17 +527,6 @@ export default {
 
     .btn-measurement.btn-danger:hover {
         background: #c0392b;
-    }
-
-    .measurement-badge {
-        background: rgba(46, 204, 113, 0.9);
-        color: white;
-        padding: 6px 12px;
-        border-radius: 4px;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 5px;
     }
 }
 </style>

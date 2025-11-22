@@ -100,6 +100,24 @@ class BuildManager {
     }
 
     /**
+     * Updates the build state for a file in the cache
+     */
+    updateBuildState(dataset, buildState) {
+        if (!buildState || !buildState.path) {
+            console.warn('Invalid build state:', buildState);
+            return;
+        }
+
+        const key = this.getDatasetKey(dataset);
+        const cache = this.buildCache.get(key) || new Map();
+
+        cache.set(buildState.path, buildState);
+        this.buildCache.set(key, cache);
+
+        console.log('Build state updated for', buildState.path, ':', buildState.currentState);
+    }
+
+    /**
      * Starts a build for a file
      */
     async startBuild(dataset, filePath, force = false) {

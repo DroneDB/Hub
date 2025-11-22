@@ -38,6 +38,7 @@ import * as flatgeobuf from 'flatgeobuf';
 import Vue from 'vue';
 import FeatureInfoDialog from './FeatureInfoDialog.vue';
 import { extractFeatureDisplayName } from '../libs/propertiesUtils';
+import { MeasurementStorage } from '../libs/measurementStorage';
 
 export default {
     components: {
@@ -56,6 +57,10 @@ export default {
             vectorLayerColors: {}, // Store colors for vector layers
             tooltipElement: null,  // Element for vector feature tooltips
             tooltipOverlay: null,  // Overlay for tooltips
+            measuring: false,
+            measurementStorage: null,
+            hasSavedMeasurements: false,
+            measureControls: null
         };
     },
     mounted: async function () {
@@ -87,7 +92,7 @@ export default {
 
             // Color palette for vector layers - bright, distinct colors with good contrast
             const colorPalette = [
-                'rgba(66, 133, 244, 0.8)',    // Blue 
+                'rgba(66, 133, 244, 0.8)',    // Blue
                 'rgba(219, 68, 55, 0.8)',     // Red
                 'rgba(15, 157, 88, 0.8)',     // Green
                 'rgba(244, 160, 0, 0.8)',     // Yellow
@@ -178,7 +183,7 @@ export default {
 
             // Extract display name from properties
             content = extractFeatureDisplayName(properties);
-            
+
             // Fallback to file name if no label is found
             if (content === 'Unknown feature') {
                 const layer = this.findVectorLayerForFeature(feature);
@@ -297,23 +302,27 @@ export default {
                 this.vectorLayers = [];
             }
 
-            const measureControls = new olMeasure.Controls({
+            this.measureControls = new olMeasure.Controls({
                 onToolSelected: () => { this.measuring = true; },
-                onToolDelesected: () => { this.measuring = false; }
+                onToolDelesected: () => { this.measuring = false; },
+                onSave: () => { this.saveMeasurements(); },
+                onClearAll: () => { this.onClearAllMeasurements(); },
+                onExport: () => { this.exportMeasurementsToFile(); },
+                onDeleteSaved: () => { this.deleteSavedMeasurements(); }
             });
             this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
                     this.basemapLayer,
                     this.rasterLayer,
-                    measureControls.getLayer()
+                    this.measureControls.getLayer()
                 ],
                 view: new View({
                     center: [0, 0],
                     zoom: 2
                 })
             });
-            this.map.addControl(measureControls);
+            this.map.addControl(this.measureControls);
 
             // Setup tooltip overlay for vector features
             this.setupTooltipOverlay();
@@ -391,6 +400,11 @@ export default {
             // Handle vector files
             if (entry.type === ddb.entry.type.VECTOR) {
                 this.loadVectorLayer(entry);
+            }
+
+            // Load measurements for orthophotos if available
+            if (entry.type === ddb.entry.type.GEORASTER) {
+                this.loadMeasurementsForOrthophoto();
             }
 
             if (!isEmptyExtent(ext)) {
@@ -477,7 +491,7 @@ export default {
                         if (zoom >= 16) { // Only show labels when zoomed in
                             // Try to find a good label property
                             let label = extractFeatureDisplayName(properties, null);
-                            
+
                             if (label && label !== 'Unknown feature') {
                                 // Define text style for the label
                                 const textStyle = new Text({
@@ -570,6 +584,163 @@ export default {
             const source = this.basemapLayer.getSource();
             source.setUrl(basemap.url);
             source.setAttributions(basemap.attributions);
+        },
+
+        /**
+         * Load measurements for orthophoto files
+         */
+        loadMeasurementsForOrthophoto: async function() {
+            if (!this.dataset || !this.measureControls || !this.entry) {
+                console.log('Cannot load measurements: dataset, measureControls or entry not available');
+                return;
+            }
+
+            // Only load measurements for georaster files
+            if (this.entry.type !== ddb.entry.type.GEORASTER) {
+                console.log('Not a georaster file, skipping measurements');
+                return;
+            }
+
+            // Initialize measurement storage
+            this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
+            console.log('Measurement storage initialized for:', this.entry.path);
+
+            try {
+                const geojson = await this.measurementStorage.load();
+
+                if (geojson && geojson.features && geojson.features.length > 0) {
+                    // Import measurements
+                    this.measureControls.importFromGeoJSON(geojson);
+                    this.hasSavedMeasurements = true;
+
+                    // Update button visibility
+                    this.measureControls.updateButtonsVisibility(true, true);
+
+                    console.log(`Loaded ${geojson.features.length} measurements for orthophoto`);
+                } else {
+                    console.log('No saved measurements found for this orthophoto');
+                    this.hasSavedMeasurements = false;
+                }
+            } catch (e) {
+                console.error('Error loading measurements:', e);
+                this.hasSavedMeasurements = false;
+            }
+        },
+
+        /**
+         * Save measurements
+         */
+        saveMeasurements: async function() {
+            if (!this.measureControls) {
+                console.error('Cannot save: measureControls not initialized');
+                alert('Cannot save: measurement controls not initialized');
+                return;
+            }
+
+            if (!this.measureControls.hasMeasurements()) {
+                alert('No measurements to save');
+                return;
+            }
+
+            // Try to initialize measurement storage if not already done
+            if (!this.measurementStorage) {
+                console.log('Measurement storage not initialized, trying to initialize now...');
+                await this.loadMeasurementsForOrthophoto();
+
+                // Check again after initialization attempt
+                if (!this.measurementStorage) {
+                    console.error('Cannot save: no georaster file found');
+                    alert('Cannot save: no orthophoto/georaster file found. Measurements can only be saved for orthophoto files.');
+                    return;
+                }
+            }
+
+            if (!this.entry) {
+                console.error('Cannot save: entry not set');
+                alert('Cannot save: no entry found');
+                return;
+            }
+
+            try {
+                const geojson = this.measureControls.exportToGeoJSON(this.entry.path);
+
+                if (!geojson.features || geojson.features.length === 0) {
+                    alert('No measurements to save');
+                    return;
+                }
+
+                await this.measurementStorage.save(geojson);
+                this.hasSavedMeasurements = true;
+
+                // Update button visibility
+                this.measureControls.updateButtonsVisibility(true, true);
+
+                console.log(`Saved ${geojson.features.length} measurements`);
+                alert(`Saved ${geojson.features.length} measurement(s)`);
+            } catch (e) {
+                console.error('Error saving measurements:', e);
+                alert(`Failed to save measurements: ${e.message}`);
+            }
+        },
+
+        /**
+         * Handle clear all measurements
+         */
+        onClearAllMeasurements: function() {
+            // Update button visibility after clear
+            this.measureControls.updateButtonsVisibility(false, this.hasSavedMeasurements);
+        },
+
+        /**
+         * Export measurements to file
+         */
+        exportMeasurementsToFile: function() {
+            if (!this.measureControls || !this.entry) {
+                return;
+            }
+
+            if (!this.measureControls.hasMeasurements()) {
+                alert('No measurements to export');
+                return;
+            }
+
+            const geojson = this.measureControls.exportToGeoJSON(this.entry.path);
+
+            if (!geojson.features || geojson.features.length === 0) {
+                alert('No measurements to export');
+                return;
+            }
+
+            // Use MeasurementStorage's export method
+            if (this.measurementStorage) {
+                this.measurementStorage.exportToFile(geojson);
+            }
+        },
+
+        /**
+         * Delete saved measurements
+         */
+        deleteSavedMeasurements: async function() {
+            if (!this.measurementStorage) {
+                return;
+            }
+
+            try {
+                await this.measurementStorage.delete();
+                this.hasSavedMeasurements = false;
+
+                // Update button visibility
+                this.measureControls.updateButtonsVisibility(
+                    this.measureControls.hasMeasurements(),
+                    false
+                );
+
+                console.log('Saved measurements deleted');
+                alert('Saved measurements deleted');
+            } catch (e) {
+                console.error('Error deleting measurements:', e);
+                alert(`Failed to delete measurements: ${e.message}`);
+            }
         }
     }
 }
