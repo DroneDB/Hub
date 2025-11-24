@@ -421,6 +421,17 @@ class MeasureControls extends Control {
                     return;
                 }
 
+                // Check if pointer is over UI controls
+                const pixel = evt.pixel;
+                const element = document.elementFromPoint(pixel[0], pixel[1]);
+                if (element && (
+                    element.closest('.ol-measure-control') ||
+                    element.closest('.ol-zoom')
+                )) {
+                    this.helpTooltipElement.classList.add('hidden');
+                    return;
+                }
+
                 let helpMsg = 'Click to start drawing. Press ESC to cancel';
                 if (tool === 'erase') helpMsg = 'Click a measurement to remove it. Press ESC to exit';
                 else if (sketch) {
