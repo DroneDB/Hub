@@ -21,7 +21,7 @@
                         @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                         @transferSelectedItems="openTransferItemsDialogFromFileBrowser" @error="handleError" />
                 </template> <template v-slot:map>
-                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" @scrollTo="handleScrollTo"
+                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" @scrollTo="handleScrollTo"
                         @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
@@ -317,6 +317,27 @@ export default {
             } else {
                 return this.selectedFiles;
             }
+        },
+        // Dataset permissions from backend
+        datasetPermissions: function () {
+            // Get permissions from the root entry properties
+            if (this.fileBrowserFiles.length > 0 &&
+                this.fileBrowserFiles[0].entry &&
+                this.fileBrowserFiles[0].entry.properties &&
+                this.fileBrowserFiles[0].entry.properties.permissions) {
+                return this.fileBrowserFiles[0].entry.properties.permissions;
+            }
+            // Default to no permissions if not available
+            return { canRead: false, canWrite: false, canDelete: false };
+        },
+        canRead: function () {
+            return this.datasetPermissions.canRead;
+        },
+        canWrite: function () {
+            return this.datasetPermissions.canWrite;
+        },
+        canDelete: function () {
+            return this.datasetPermissions.canDelete;
         }
     },
     methods: {
@@ -504,23 +525,29 @@ export default {
 
         updateExplorerTools: function() {
             // Rebuild explorer tools based on current selection and view mode
-            this.explorerTools = [{
-                id: 'upload',
-                title: "Upload",
-                icon: "plus",
-                onClick: () => {
-                    this.uploadDialogOpen = true;
-                }
-            }, {
-                id: 'newfolder',
-                title: "Create folder",
-                icon: "folder",
-                onClick: () => {
-                    this.createFolderDialogOpen = true;
-                }
-            }];
+            this.explorerTools = [];
 
-            if (this.selectedFiles.length == 1) {
+            // Upload and create folder only if user has write permissions
+            if (this.canWrite) {
+                this.explorerTools.push({
+                    id: 'upload',
+                    title: "Upload",
+                    icon: "plus",
+                    onClick: () => {
+                        this.uploadDialogOpen = true;
+                    }
+                }, {
+                    id: 'newfolder',
+                    title: "Create folder",
+                    icon: "folder",
+                    onClick: () => {
+                        this.createFolderDialogOpen = true;
+                    }
+                });
+            }
+
+            // Rename and delete only if user has write permissions and files are selected
+            if (this.canWrite && this.selectedFiles.length == 1) {
                 this.explorerTools.push({
                     id: 'rename',
                     title: "Rename",
@@ -532,7 +559,7 @@ export default {
                 });
             }
 
-            if (this.selectedFiles.length > 0) {
+            if (this.canWrite && this.selectedFiles.length > 0) {
                 this.explorerTools.push({
                     id: 'remove',
                     title: "Remove",

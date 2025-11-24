@@ -12,6 +12,26 @@
             </select>
             <olMeasure ref="measure" />
         </div>
+        <Alert :title="alertTitle" v-if="alertDialogOpen" @onClose="handleAlertDialogClose">
+            {{ alertMessage }}
+        </Alert>
+        <ConfirmDialog v-if="clearMeasurementsDialogOpen"
+            title="Clear All Measurements"
+            message="Are you sure you want to clear all measurements?"
+            confirmText="Clear"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            @onClose="handleClearMeasurementsDialogClose">
+        </ConfirmDialog>
+        <ConfirmDialog v-if="deleteSavedMeasurementsDialogOpen"
+            title="Delete Saved Measurements"
+            message="Are you sure you want to delete saved measurements?"
+            confirmText="Delete"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            @onClose="handleDeleteSavedMeasurementsDialogClose">
+        </ConfirmDialog>
+        <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
     </div>
 </template>
 
@@ -52,13 +72,16 @@ import Vue from 'vue';
 import FeatureInfoDialog from './FeatureInfoDialog.vue';
 import { extractFeatureDisplayName } from '../libs/propertiesUtils';
 import { MeasurementStorage } from '../libs/measurementStorage';
+import Alert from './Alert.vue';
+import ConfirmDialog from './ConfirmDialog.vue';
+import Flash from './Flash.vue';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, FeatureInfoDialog
+        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, Flash
     }, props: {
         files: {
             type: Array,
@@ -71,6 +94,10 @@ export default {
         lazyload: {
             type: Boolean,
             default: false
+        },
+        canWrite: {
+            type: Boolean,
+            default: true
         }
     },
     data: function () {
@@ -143,7 +170,21 @@ export default {
             measuring: false,
             measurementStorage: null,
             hasSavedMeasurements: false,
-            currentOrthophotoEntry: null
+            currentOrthophotoEntry: null,
+
+            // Alert dialog
+            alertDialogOpen: false,
+            alertTitle: '',
+            alertMessage: '',
+
+            // Confirm dialogs
+            clearMeasurementsDialogOpen: false,
+            deleteSavedMeasurementsDialogOpen: false,
+
+            // Flash message
+            flashMessage: null,
+            flashIcon: 'check circle outline',
+            flashColor: 'positive'
         };
     },
     mounted: function () {
@@ -298,7 +339,7 @@ export default {
             if (content === 'Unknown feature') {
                 const layer = this.findVectorLayerForFeature(feature);
                 if (layer && layer.file) {
-                    content = layer.file.name || layer.file.entry.name || 'Unknown layer';
+                    content = layer.file.name || 'Unknown layer';
                 }
             }
 
@@ -674,7 +715,9 @@ export default {
                 onSave: () => { this.saveMeasurements(); },
                 onClearAll: () => { this.onClearAllMeasurements(); },
                 onExport: () => { this.exportMeasurementsToFile(); },
-                onDeleteSaved: () => { this.deleteSavedMeasurements(); }
+                onDeleteSaved: () => { this.deleteSavedMeasurements(); },
+                onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
+                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; }
             }); this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
@@ -1443,14 +1486,20 @@ export default {
          * Save measurements
          */
         saveMeasurements: async function() {
+            // Check write permissions first
+            if (!this.canWrite) {
+                this.showAlert('Permission Denied', 'You do not have permission to save measurements in this dataset');
+                return;
+            }
+
             if (!this.measureControls) {
                 console.error('Cannot save: measureControls not initialized');
-                alert('Cannot save: measurement controls not initialized');
+                this.showAlert('Error', 'Cannot save: measurement controls not initialized');
                 return;
             }
 
             if (!this.measureControls.hasMeasurements()) {
-                alert('No measurements to save');
+                this.showAlert('Warning', 'No measurements to save');
                 return;
             }
 
@@ -1462,14 +1511,14 @@ export default {
                 // Check again after initialization attempt
                 if (!this.measurementStorage) {
                     console.error('Cannot save: no georaster file found');
-                    alert('Cannot save: no orthophoto/georaster file found. Measurements can only be saved for orthophoto files.');
+                    this.showAlert('Error', 'Cannot save: no orthophoto/georaster file found. Measurements can only be saved for orthophoto files.');
                     return;
                 }
             }
 
             if (!this.currentOrthophotoEntry) {
                 console.error('Cannot save: currentOrthophotoEntry not set');
-                alert('Cannot save: no orthophoto entry found');
+                this.showAlert('Error', 'Cannot save: no orthophoto entry found');
                 return;
             }
 
@@ -1477,7 +1526,7 @@ export default {
                 const geojson = this.measureControls.exportToGeoJSON(this.currentOrthophotoEntry.path);
 
                 if (!geojson.features || geojson.features.length === 0) {
-                    alert('No measurements to save');
+                    this.showAlert('Warning', 'No measurements to save');
                     return;
                 }
 
@@ -1488,10 +1537,10 @@ export default {
                 this.measureControls.updateButtonsVisibility(true, true);
 
                 console.log(`Saved ${geojson.features.length} measurements`);
-                alert(`Saved ${geojson.features.length} measurement(s)`);
+                this.showFlash(`Saved ${geojson.features.length} measurement(s)`, 'positive', 'check circle outline');
             } catch (e) {
                 console.error('Error saving measurements:', e);
-                alert(`Failed to save measurements: ${e.message}`);
+                this.showAlert('Error', `Failed to save measurements: ${e.message}`);
             }
         },
 
@@ -1512,14 +1561,14 @@ export default {
             }
 
             if (!this.measureControls.hasMeasurements()) {
-                alert('No measurements to export');
+                this.showAlert('Warning', 'No measurements to export');
                 return;
             }
 
             const geojson = this.measureControls.exportToGeoJSON(this.currentOrthophotoEntry.path);
 
             if (!geojson.features || geojson.features.length === 0) {
-                alert('No measurements to export');
+                this.showAlert('Warning', 'No measurements to export');
                 return;
             }
 
@@ -1548,11 +1597,63 @@ export default {
                 );
 
                 console.log('Saved measurements deleted');
-                alert('Saved measurements deleted');
+                this.showFlash('Saved measurements deleted', 'positive', 'check circle outline');
             } catch (e) {
                 console.error('Error deleting measurements:', e);
-                alert(`Failed to delete measurements: ${e.message}`);
+                this.showAlert('Error', `Failed to delete measurements: ${e.message}`);
             }
+        },
+
+        /**
+         * Show alert dialog
+         */
+        showAlert: function(title, message) {
+            this.alertTitle = title;
+            this.alertMessage = message;
+            this.alertDialogOpen = true;
+        },
+
+        /**
+         * Handle alert dialog close
+         */
+        handleAlertDialogClose: function() {
+            this.alertDialogOpen = false;
+        },
+
+        /**
+         * Handle clear measurements dialog close
+         */
+        handleClearMeasurementsDialogClose: function(result) {
+            this.clearMeasurementsDialogOpen = false;
+            if (result === 'confirm' && this.measureControls) {
+                this.measureControls.confirmClearAll();
+            }
+        },
+
+        /**
+         * Handle delete saved measurements dialog close
+         */
+        handleDeleteSavedMeasurementsDialogClose: function(result) {
+            this.deleteSavedMeasurementsDialogOpen = false;
+            if (result === 'confirm') {
+                this.measureControls.confirmDeleteSaved();
+            }
+        },
+
+        /**
+         * Show flash message
+         */
+        showFlash: function(message, color = 'positive', icon = 'check circle outline') {
+            this.flashMessage = message;
+            this.flashColor = color;
+            this.flashIcon = icon;
+        },
+
+        /**
+         * Close flash message
+         */
+        closeFlash: function() {
+            this.flashMessage = null;
         }
     }
 }

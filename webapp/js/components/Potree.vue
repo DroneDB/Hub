@@ -34,6 +34,16 @@
             <div id="potree_sidebar_container" ref="sidebar"> </div>
             <div id="potree_render_area" ref="container"></div>
         </div>
+        <ConfirmDialog v-if="deleteMeasurementsDialogOpen"
+            title="Delete Saved Measurements"
+            message="Are you sure you want to delete all saved measurements?"
+            confirmText="Delete"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            warningTitle="Warning"
+            warningMessage="This action cannot be undone."
+            @onClose="handleDeleteMeasurementsDialogClose">
+        </ConfirmDialog>
     </div>
 </template>
 
@@ -41,13 +51,14 @@
 import ddb from 'ddb';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
+import ConfirmDialog from './ConfirmDialog.vue';
 import { loadResources } from '../libs/lazy';
 import { MeasurementStorage } from '../libs/measurementStorage';
 import { exportMeasurements, importMeasurements } from '../libs/potreeMeasurementConverter';
 
 export default {
     components: {
-        Message, TabViewLoader
+        Message, TabViewLoader, ConfirmDialog
     },
     props: ['uri'],
     data: function () {
@@ -59,10 +70,36 @@ export default {
             measurementStorage: null,
             coordinateSystem: null,
             hasSavedMeasurements: false,
-            savingMeasurements: false
+            savingMeasurements: false,
+
+            // Confirm dialog
+            deleteMeasurementsDialogOpen: false
         };
     },
     mounted: function () {
+    },
+
+    computed: {
+        // Dataset permissions from entry properties
+        datasetPermissions: function () {
+            // Get permissions from the entry properties
+            if (this.entry &&
+                this.entry.properties &&
+                this.entry.properties.permissions) {
+                return this.entry.properties.permissions;
+            }
+            // Default to no permissions if not available
+            return { canRead: false, canWrite: false, canDelete: false };
+        },
+        canRead: function () {
+            return this.datasetPermissions.canRead;
+        },
+        canWrite: function () {
+            return this.datasetPermissions.canWrite;
+        },
+        canDelete: function () {
+            return this.datasetPermissions.canDelete;
+        }
     },
 
     methods: {
@@ -234,6 +271,12 @@ export default {
          * Save current measurements
          */
         saveMeasurements: async function() {
+            // Check write permissions first
+            if (!this.canWrite) {
+                this.error = 'You do not have permission to save measurements in this dataset';
+                return;
+            }
+
             if (!this.viewer || !this.viewer.scene) {
                 this.error = 'Viewer not ready';
                 return;
@@ -281,13 +324,22 @@ export default {
         /**
          * Delete saved measurements
          */
-        deleteSavedMeasurements: async function() {
+        deleteSavedMeasurements: function() {
             if (!this.measurementStorage) {
                 return;
             }
 
-            // Ask for confirmation
-            if (!confirm('Are you sure you want to delete all saved measurements? This action cannot be undone.')) {
+            // Open confirmation dialog
+            this.deleteMeasurementsDialogOpen = true;
+        },
+
+        /**
+         * Handle delete measurements dialog close
+         */
+        handleDeleteMeasurementsDialogClose: async function(result) {
+            this.deleteMeasurementsDialogOpen = false;
+
+            if (result !== 'confirm') {
                 return;
             }
 

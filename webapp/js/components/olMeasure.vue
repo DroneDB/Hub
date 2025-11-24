@@ -70,15 +70,6 @@ class MeasureControls extends Control {
         btnDelete.innerHTML = '<img title="Delete Saved Measurements" src="' + rootPath("/images/trash.svg") + '"/>';
         btnDelete.style.display = 'none';
 
-        const savedBadge = document.createElement('span');
-        savedBadge.className = 'ol-measure-saved-badge';
-        savedBadge.innerHTML = '<span style="color: #2ecc71;">✓</span> Saved';
-        savedBadge.style.display = 'none';
-        savedBadge.style.fontSize = '11px';
-        savedBadge.style.color = 'rgba(255, 255, 255, 0.8)';
-        savedBadge.style.padding = '0 6px';
-        savedBadge.style.verticalAlign = 'middle';
-
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable ol-control';
         element.appendChild(btnLength);
@@ -92,7 +83,6 @@ class MeasureControls extends Control {
         element.appendChild(btnClear);
         element.appendChild(btnExport);
         element.appendChild(btnDelete);
-        element.appendChild(savedBadge);
 
         super({
             element: element,
@@ -117,6 +107,8 @@ class MeasureControls extends Control {
         this.onClearAll = options.onClearAll || (() => { });
         this.onExport = options.onExport || (() => { });
         this.onDeleteSaved = options.onDeleteSaved || (() => { });
+        this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
+        this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
 
         this.source = new VectorSource();
         this.vector = new VectorLayer({
@@ -148,7 +140,6 @@ class MeasureControls extends Control {
         this.btnClear = btnClear;
         this.btnExport = btnExport;
         this.btnDelete = btnDelete;
-        this.savedBadge = savedBadge;
         this.separator = separator;
 
         // Store keyboard listener reference
@@ -204,11 +195,7 @@ class MeasureControls extends Control {
     }
 
     handleClearAll() {
-        if (confirm('Are you sure you want to clear all measurements?')) {
-            this.clearAllMeasurements();
-            this.updateButtonsVisibility(false, false);
-            this.onClearAll();
-        }
+        this.onRequestClearConfirm();
     }
 
     handleExport() {
@@ -216,9 +203,7 @@ class MeasureControls extends Control {
     }
 
     handleDeleteSaved() {
-        if (confirm('Are you sure you want to delete saved measurements?')) {
-            this.onDeleteSaved();
-        }
+        this.onRequestDeleteConfirm();
     }
 
     /**
@@ -232,7 +217,6 @@ class MeasureControls extends Control {
         this.btnClear.style.display = display;
         this.btnExport.style.display = display;
         this.btnDelete.style.display = hasSavedMeasurements ? 'block' : 'none';
-        this.savedBadge.style.display = hasSavedMeasurements ? 'block' : 'none';
         console.log('Buttons visibility updated. Save button display:', this.btnSave.style.display);
     }
 

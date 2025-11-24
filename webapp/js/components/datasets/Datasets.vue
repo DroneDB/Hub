@@ -89,11 +89,11 @@
                             <div v-else><i class="lock icon"></i>{{ getVisibilityText(ds.visibility) }}</div>
                         </td>
                         <td class="center aligned">
-                            <button @click.stop="handleEdit(ds)" class="ui button icon small grey"
+                            <button v-if="ds.permissions && ds.permissions.canWrite" @click.stop="handleEdit(ds)" class="ui button icon small grey"
                                 :class="{ loading: ds.editing }" :disabled="ds.editing || ds.deleting">
                                 <i class="ui icon pencil"></i>
                             </button>
-                            <button v-if="canDelete" @click.stop="handleDelete(ds)"
+                            <button v-if="ds.permissions && ds.permissions.canDelete && canDeleteGlobal" @click.stop="handleDelete(ds)"
                                 class="ui button icon small negative" :class="{ loading: ds.deleting }"
                                 :disabled="ds.deleting || ds.editing">
                                 <i class="ui icon trash"></i>
@@ -238,7 +238,8 @@ export default {
                     size: ds.size,
                     editing: false,
                     deleting: false,
-                    name: ds.properties?.meta?.name?.data
+                    name: ds.properties?.meta?.name?.data,
+                    permissions: ds.permissions
                 };
             });            // Initialize dropdown for visibility filter
             this.$nextTick(() => {
@@ -270,7 +271,7 @@ export default {
         forbiddenSlugs: function () {
             return this.datasets.map(ds => ds.slug);
         },
-        canDelete: function () {
+        canDeleteGlobal: function () {
             return !HubOptions.disableDatasetCreation;
         },
         // Filtering
@@ -493,6 +494,7 @@ export default {
                         editing: false,
                         deleting: false,
                         name: newds.name,
+                        permissions: { canRead: true, canWrite: true, canDelete: true },
                         ...loadingIndicator
                     });
 
@@ -510,7 +512,8 @@ export default {
                                 size: 0,
                                 editing: false,
                                 deleting: false,
-                                name: newds.name
+                                name: newds.name,
+                                permissions: { canRead: true, canWrite: true, canDelete: true }
                             });
                         }
                     } else {
