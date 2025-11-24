@@ -1136,6 +1136,12 @@ export default {
                     feat.file = f;
                     feat.getGeometry().transform('EPSG:4326', 'EPSG:3857'); features.push(feat);
                 } else if (f.entry.type === ddb.entry.type.VECTOR) {
+                    // Skip measurement files (they are loaded separately as measurements)
+                    if (f.entry.path.endsWith('_measurements.geojson')) {
+                        console.log(`Skipping vector layer for measurement file: ${f.entry.path}`);
+                        return;
+                    }
+
                     // Handle vector files using streaming approach
                     const loadVectorFile = async () => {
                         try {
