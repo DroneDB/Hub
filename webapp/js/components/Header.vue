@@ -90,7 +90,7 @@ export default {
             selectedFiles: [],
             storageInfo: null,
             storageInfoDialogOpen: false,
-            usersManagement: !!HubOptions.enableUsersManagement
+            usersManagement: false // Will be set dynamically based on server configuration
         }
     },
     filters: {
@@ -182,12 +182,13 @@ export default {
         });
 
         this.refreshStorageInfo();
+        this.checkUserManagement();
     },
     watch: {
         $route: function (to, from) {
             const { params } = to;
 
-            // TODO: we might need have more complex 
+            // TODO: we might need have more complex
             // logic in the future to see who has access
             // to download files?
             this.showDownload = !!params.ds;
@@ -287,6 +288,17 @@ export default {
 
         hideMenu: function () {
             if (this.$refs.menu) this.$refs.menu.style.display = 'none';
+        },
+
+        async checkUserManagement() {
+            try {
+                // Import the extended registry to check user management status
+                const { default: extendedRegistry } = await import('../libs/userManagementRegistry');
+                this.usersManagement = await extendedRegistry.isUserManagementEnabled();
+            } catch (e) {
+                console.log('Failed to check user management status:', e.message);
+                this.usersManagement = false;
+            }
         }
     }
 }
