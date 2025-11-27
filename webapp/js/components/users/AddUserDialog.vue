@@ -56,7 +56,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -123,7 +123,7 @@ export default {
 
             this.adding = true;
             try {
-                const user = await extendedRegistry.addUser(this.username, this.password, this.roles, this.email);
+                const user = await reg.addUser(this.username, this.password, this.roles, this.email);
                 this.success = true;
                 setTimeout(() => {
                     this.adding = false;

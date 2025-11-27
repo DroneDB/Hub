@@ -103,7 +103,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -166,7 +166,7 @@ export default {
 
             this.addingRole = true;
             try {
-                await extendedRegistry.createRole(this.newRoleName.trim());
+                await reg.createRole(this.newRoleName.trim());
 
                 this.currentRoles.push(this.newRoleName.trim());
                 this.success = true;
@@ -195,7 +195,7 @@ export default {
 
             this.deletingRole = this.roleToDelete;
             try {
-                const result = await extendedRegistry.deleteRole(this.roleToDelete);
+                const result = await reg.deleteRole(this.roleToDelete);
                 // Note: DELETE role endpoint returns 204 No Content (empty response)
                 // This is normal and indicates success
 
@@ -229,8 +229,6 @@ export default {
 .dialog-buttons {
     margin-top: 16px;
     text-align: right;
-    border-top: 1px solid #d4d4d5;
-    padding-top: 1rem;
 }
 
 .ui.tab.segment {

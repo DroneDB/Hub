@@ -50,7 +50,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -87,7 +87,12 @@ export default {
                 $(this.$refs.rolesDropdown).dropdown({
                     allowAdditions: false,
                     onChange: (value, text, $selectedItem) => {
-                        this.editUser.roles = value ? value.split(',') : [];
+                        // Handle both array and string values from Semantic UI dropdown
+                        if (Array.isArray(value)) {
+                            this.editUser.roles = value;
+                        } else {
+                            this.editUser.roles = value ? value.split(',') : [];
+                        }
                     }
                 });
 
@@ -124,7 +129,7 @@ export default {
             this.updating = true;
             try {
                 // Update user with both email and roles
-                await extendedRegistry.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
+                await reg.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
 
                 this.success = true;
                 setTimeout(() => {

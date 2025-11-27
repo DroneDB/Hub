@@ -46,7 +46,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -117,7 +117,7 @@ export default {
             this.error = "";
 
             try {
-                await extendedRegistry.createOrganization({
+                await reg.createOrganization({
                     name: this.organizationName.trim(),
                     slug: slug,
                     description: this.organizationDescription.trim() || undefined
@@ -148,8 +148,6 @@ export default {
 .dialog-buttons {
     margin-top: 16px;
     text-align: right;
-    border-top: 1px solid #d4d4d5;
-    padding-top: 1rem;
 }
 
 .form {

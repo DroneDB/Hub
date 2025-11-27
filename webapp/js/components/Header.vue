@@ -292,9 +292,8 @@ export default {
 
         async checkUserManagement() {
             try {
-                // Import the extended registry to check user management status
-                const { default: extendedRegistry } = await import('../libs/userManagementRegistry');
-                this.usersManagement = await extendedRegistry.isUserManagementEnabled();
+                // Check user management status using the shared registry
+                this.usersManagement = await reg.isUserManagementEnabled();
             } catch (e) {
                 console.log('Failed to check user management status:', e.message);
                 this.usersManagement = false;

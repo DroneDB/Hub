@@ -20,23 +20,10 @@
             <!-- User Controls -->
             <div class="">
                 <div class="ui stackable grid">
-                    <div class="four wide column">
+                    <div class="eight wide column">
                         <div class="ui icon input fluid">
                             <input v-model="searchQuery" type="text" placeholder="Search users...">
                             <i class="search icon"></i>
-                        </div>
-                    </div>
-                    <div class="four wide column">
-                        <div class="ui selection dropdown" ref="roleFilter">
-                            <input type="hidden" name="role" v-model="roleFilter">
-                            <i class="dropdown icon"></i>
-                            <div class="default text">All Roles</div>
-                            <div class="menu">
-                                <div class="item" data-value="all"><i class="filter icon"></i>All</div>
-                                <div v-for="role in availableRoles" :key="role" class="item" :data-value="role">
-                                    <i class="users icon"></i>{{ role }}
-                                </div>
-                            </div>
                         </div>
                     </div>
                     <div class="eight wide column">
@@ -106,12 +93,11 @@
                             <span v-else class="text-muted">No roles</span>
                         </td>
                         <td>
-                            <button v-if="user.organizationCount > 0" @click="showUserOrganizations(user)"
+                            <button @click="showUserOrganizations(user)"
                                     class="ui mini button icon" title="Manage Organizations">
                                 <i class="sitemap icon"></i>
                                 {{ user.organizationCount }}
                             </button>
-                            <span v-else>0</span>
                         </td>
                         <td>{{ user.datasetCount }}</td>
                         <td>
@@ -254,7 +240,7 @@ import ChangePasswordDialog from './ChangePasswordDialog.vue';
 import OrganizationsDialog from './OrganizationsDialog.vue';
 import RoleManagementDialog from './RoleManagementDialog.vue';
 import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 import { bytesToSize } from '../../libs/utils';
 
 export default {
@@ -292,25 +278,11 @@ export default {
             itemsPerPage: 10,
 
             // Filtering
-            searchQuery: "",
-            roleFilter: "all"
+            searchQuery: ""
         }
     },
     mounted: async function () {
         await this.loadData();
-
-        // Initialize dropdown for role filter
-        this.$nextTick(() => {
-            if (this.$refs.roleFilter) {
-                $(this.$refs.roleFilter).dropdown({
-                    onChange: (value) => {
-                        this.roleFilter = value;
-                        this.currentPage = 1;
-                    }
-                });
-                $(this.$refs.roleFilter).dropdown('set selected', this.roleFilter);
-            }
-        });
     },
     computed: {
         // Filtering
@@ -325,13 +297,6 @@ export default {
                     const email = (user.email || '').toLowerCase();
                     return userName.includes(query) || email.includes(query);
                 });
-            }
-
-            // Filter by role
-            if (this.roleFilter !== "all") {
-                filtered = filtered.filter(user =>
-                    user.roles && user.roles.some(role => role === this.roleFilter)
-                );
             }
 
             // Apply sorting
@@ -403,8 +368,8 @@ export default {
             try {
                 this.loading = true;
                 const [usersData, rolesData] = await Promise.all([
-                    extendedRegistry.usersDetailed(),
-                    extendedRegistry.userRoles()
+                    reg.usersDetailed(),
+                    reg.userRoles()
                 ]);
 
                 this.users = usersData.map(user => ({
@@ -425,7 +390,7 @@ export default {
 
         async refreshRoles() {
             try {
-                this.availableRoles = await extendedRegistry.userRoles();
+                this.availableRoles = await reg.userRoles();
             } catch (e) {
                 this.error = e.message;
             }
@@ -483,7 +448,7 @@ export default {
                 this.userToDelete.deleting = true;
 
                 // Perform the delete operation
-                const result = await extendedRegistry.deleteUser(this.userToDelete.userName);
+                const result = await reg.deleteUser(this.userToDelete.userName);
 
                 // Remove user from list
                 this.users = this.users.filter(u => u.userName !== this.userToDelete.userName);

@@ -133,7 +133,7 @@ module.exports = {
     resolve: {
         alias: {
             'vue$': 'vue/dist/vue.esm.js',
-            'ddb': path.resolve(__dirname, 'vendor/ddb_js')
+            'ddb': path.resolve(__dirname, 'webapp/js/libs/ddb')
         },
         extensions: ['*', '.js', '.vue', '.json']
     },

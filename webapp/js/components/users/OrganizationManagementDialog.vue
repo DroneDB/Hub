@@ -105,9 +105,6 @@
                                 :class="{ loading: creating }" class="ui primary button">
                             <i class="plus icon"></i>Create Organization
                         </button>
-                        <button @click="resetCreateForm()" class="ui button" :disabled="creating">
-                            Reset Form
-                        </button>
                     </div>
                 </form>
             </div>
@@ -151,7 +148,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -222,7 +219,9 @@ export default {
         async loadOrganizations() {
             try {
                 this.loading = true;
-                this.organizations = await extendedRegistry.getOrganizations();
+                const orgInstances = await reg.getOrganizations();
+                // Extract org data from Organization instances
+                this.organizations = orgInstances.map(instance => instance.org);
             } catch (e) {
                 this.error = e.message;
             }
@@ -248,7 +247,7 @@ export default {
             try {
                 this.deleting = this.orgToDelete.slug;
 
-                await extendedRegistry.deleteOrganization(this.orgToDelete.slug);
+                await reg.deleteOrganization(this.orgToDelete.slug);
 
                 // Remove organization from list
                 this.organizations = this.organizations.filter(org => org.slug !== this.orgToDelete.slug);
@@ -286,7 +285,7 @@ export default {
             this.createError = "";
 
             try {
-                const newOrg = await extendedRegistry.createOrganization({
+                const newOrg = await reg.createOrganization({
                     name: this.newOrgName.trim(),
                     slug: slug,
                     description: this.newOrgDescription.trim() || undefined
@@ -338,8 +337,6 @@ export default {
 .dialog-buttons {
     margin-top: 16px;
     text-align: right;
-    border-top: 1px solid #d4d4d5;
-    padding-top: 1rem;
 }
 
 .text-red {

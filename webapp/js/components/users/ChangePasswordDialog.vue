@@ -49,7 +49,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -97,7 +97,7 @@ export default {
 
             this.changing = true;
             try {
-                await extendedRegistry.changeUserPassword(
+                await reg.changeUserPassword(
                     this.user.userName,
                     this.currentPassword || null, // Pass null instead of empty string for admin override
                     this.newPassword

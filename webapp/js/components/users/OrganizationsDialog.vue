@@ -53,7 +53,7 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
-import extendedRegistry from '../../libs/userManagementRegistry';
+import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
@@ -86,7 +86,12 @@ export default {
                 $(this.$refs.orgsDropdown).dropdown({
                     allowAdditions: false,
                     onChange: (value, text, $selectedItem) => {
-                        this.selectedOrganizations = value ? value.split(',') : [];
+                        // Handle both string and array values from Semantic UI dropdown
+                        if (Array.isArray(value)) {
+                            this.selectedOrganizations = value;
+                        } else {
+                            this.selectedOrganizations = value ? value.split(',') : [];
+                        }
                     }
                 });
 
@@ -99,10 +104,13 @@ export default {
         async loadData() {
             try {
                 this.loading = true;
-                const [userOrgs, allOrgs] = await Promise.all([
-                    extendedRegistry.getUserOrganizations(this.user.userName),
-                    extendedRegistry.getOrganizations()
+                const [userOrgs, allOrgsInstances] = await Promise.all([
+                    reg.getUserOrganizations(this.user.userName),
+                    reg.getOrganizations()
                 ]);
+
+                // Extract org data from Organization instances
+                const allOrgs = allOrgsInstances.map(instance => instance.org);
 
                 // Filter out "Public" organization from both lists
                 this.currentOrganizations = userOrgs
@@ -131,7 +139,7 @@ export default {
             this.updating = true;
             this.error = ""; // Clear any previous errors
             try {
-                const result = await extendedRegistry.setUserOrganizations(this.user.userName, this.selectedOrganizations);
+                const result = await reg.setUserOrganizations(this.user.userName, this.selectedOrganizations);
 
                 // Success - show success message and close
                 this.success = true;

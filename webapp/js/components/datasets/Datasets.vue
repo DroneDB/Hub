@@ -19,26 +19,11 @@
             <!-- Dataset Controls -->
             <div class="">
                 <div class="ui stackable grid">
-                    <div class="six wide column">
+                    <div class="sixteen wide column">
                         <div class="ui icon input fluid">
                             <input v-model="searchQuery" type="text" placeholder="Search datasets...">
                             <i class="search icon"></i>
                         </div>
-                    </div>
-                    <div class="four wide column">
-                        <div class="ui selection dropdown" ref="visibilityFilter">
-                            <input type="hidden" name="visibility" v-model="visibilityFilter">
-                            <i class="dropdown icon"></i>
-                            <div class="default text">All Visibilities</div>
-                            <div class="menu">
-                                <div class="item" data-value="all"><i class="filter icon"></i>All</div>
-                                <div class="item" data-value="0"><i class="lock icon"></i>Private</div>
-                                <div class="item" data-value="1"><i class="unlock icon"></i>Unlisted</div>
-                                <div class="item" data-value="2"><i class="unlock icon"></i>Public</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="six wide column">
                     </div>
                 </div>
             </div>
@@ -218,8 +203,7 @@ export default {
             itemsPerPage: prefs?.itemsPerPage || 10,
 
             // Filtering
-            searchQuery: "",
-            visibilityFilter: "all"
+            searchQuery: ""
         }
     },
     mounted: async function () {
@@ -241,19 +225,6 @@ export default {
                     name: ds.properties?.meta?.name?.data,
                     permissions: ds.permissions
                 };
-            });            // Initialize dropdown for visibility filter
-            this.$nextTick(() => {
-                if (this.$refs.visibilityFilter) {
-                    $(this.$refs.visibilityFilter).dropdown({
-                        onChange: (value) => {
-                            this.visibilityFilter = value;
-                            this.currentPage = 1; // Reset to first page when filter changes
-                        }
-                    });
-
-                    // Set the dropdown value after initialization
-                    $(this.$refs.visibilityFilter).dropdown('set selected', this.visibilityFilter);
-                }
             });
 
         } catch (e) {
@@ -286,12 +257,6 @@ export default {
                     const slug = ds.slug.toLowerCase();
                     return name.includes(query) || slug.includes(query);
                 });
-            }
-
-            // Filter by visibility
-            if (this.visibilityFilter !== "all") {
-                const visibilityValue = parseInt(this.visibilityFilter);
-                filtered = filtered.filter(ds => ds.visibility === visibilityValue);
             }
 
             // Apply sorting
