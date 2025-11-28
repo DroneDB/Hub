@@ -85,13 +85,13 @@ module.exports = class Registry {
 
     // Login
     async login(username, password, xAuthToken = null) {
-        const body = {};
-        if (username) body.username = username;
-        if (password) body.password = password;
-        if (xAuthToken) body.token = xAuthToken;
+        const formData = new FormData();
+        if (username) formData.append('username', username);
+        if (password) formData.append('password', password);
+        if (xAuthToken) formData.append('token', xAuthToken);
 
         try {
-            const res = await this.postRequest('/users/authenticate', body);
+            const res = await this.postFormData('/users/authenticate', formData);
 
             if (res && res.token) {
                 this.setCredentials(res.username, res.token, res.expires);
@@ -157,9 +157,10 @@ module.exports = class Registry {
     }
 
     async changePwd(oldPassword, newPassword) {
-        const res = await this.postRequest('/users/changePwd', {
-            oldPassword, newPassword
-        });
+        const formData = new FormData();
+        formData.append('oldPassword', oldPassword);
+        formData.append('newPassword', newPassword);
+        const res = await this.postFormData('/users/changePwd', formData);
         if (res.token) {
             this.setCredentials(this.getUsername(), res.token, res.expires);
         } else {
@@ -293,36 +294,36 @@ module.exports = class Registry {
         if (!this.isLoggedIn())
             throw new Error("not logged in");
 
+        const formData = new FormData();
+
         // Support both old signature (slug, name, desc, isPublic) and new signature (object)
         if (typeof slugOrData === 'object') {
             // New signature: createOrganization({slug, name, description, isPublic})
-            const formData = new FormData();
             if (slugOrData.slug) formData.append('slug', slugOrData.slug);
             if (slugOrData.name) formData.append('name', slugOrData.name);
             if (slugOrData.description) formData.append('description', slugOrData.description);
             if (slugOrData.isPublic !== undefined) formData.append('isPublic', slugOrData.isPublic);
-            return await this.postFormData('/orgs', formData);
         } else {
             // Old signature: createOrganization(slug, name, description, isPublic)
-            return await this.postRequest(`/orgs`, {
-                slug: slugOrData,
-                name,
-                description,
-                isPublic
-            });
+            if (slugOrData) formData.append('slug', slugOrData);
+            if (name) formData.append('name', name);
+            if (description) formData.append('description', description);
+            if (isPublic !== undefined) formData.append('isPublic', isPublic);
         }
+
+        return await this.postFormData('/orgs', formData);
     }
 
     async updateOrganization(slug, name, description, isPublic) {
         if (!this.isLoggedIn())
             throw new Error("not logged in");
 
-        return await this.putRequest(`/orgs/${slug}`, {
-            slug: slug,
-            name,
-            description,
-            isPublic
-        });
+        const formData = new FormData();
+        formData.append('slug', slug);
+        if (name !== undefined) formData.append('name', name);
+        if (description !== undefined) formData.append('description', description);
+        if (isPublic !== undefined) formData.append('isPublic', isPublic);
+        return await this.putFormData(`/orgs/${slug}`, formData);
     }
 
     async getOrganizations() {
@@ -644,6 +645,12 @@ module.exports = class Registry {
         if (!(formData instanceof FormData))
             throw new Error('Expected FormData instance');
         return this.makeRequest(endpoint, "PATCH", formData);
+    }
+
+    async deleteFormData(endpoint, formData) {
+        if (!(formData instanceof FormData))
+            throw new Error('Expected FormData instance');
+        return this.makeRequest(endpoint, "DELETE", formData);
     }
 
     Organization(name) {

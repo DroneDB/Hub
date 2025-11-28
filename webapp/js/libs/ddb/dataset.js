@@ -63,7 +63,9 @@ module.exports = class Dataset {
     }
 
     async download(paths) {
-        return this.registry.postRequest(`${this.baseApi}/download`, { path: paths });
+        const formData = new FormData();
+        if (paths !== undefined && paths !== null) formData.append('path', paths);
+        return this.registry.postFormData(`${this.baseApi}/download`, formData);
     }
 
     async getFileContents(path) {
@@ -76,13 +78,16 @@ module.exports = class Dataset {
     }
 
     async update(name, visibility) {
-        return this.registry.putRequest(`${this.baseApi}`, {
-            name, visibility
-        });
+        const formData = new FormData();
+        if (name !== undefined) formData.append('name', name);
+        if (visibility !== undefined) formData.append('visibility', visibility);
+        return this.registry.putFormData(`${this.baseApi}`, formData);
     }
 
     async list(path) {
-        return this.registry.postRequest(`${this.baseApi}/list`, { path });
+        const formData = new FormData();
+        if (path !== undefined && path !== null) formData.append('path', path);
+        return this.registry.postFormData(`${this.baseApi}/list`, formData);
     }
 
     async listOne(path){
@@ -97,7 +102,9 @@ module.exports = class Dataset {
     }
 
     async search(query){
-        return this.registry.postRequest(`${this.baseApi}/search`, { query });
+        const formData = new FormData();
+        if (query !== undefined && query !== null) formData.append('query', query);
+        return this.registry.postFormData(`${this.baseApi}/search`, formData);
     }
 
     async delete() {
@@ -105,11 +112,16 @@ module.exports = class Dataset {
     }
 
     async deleteObj(path) {
-        return this.registry.deleteRequest(`${this.baseApi}/obj`, { path });
+        const formData = new FormData();
+        formData.append('path', path);
+        return this.registry.deleteFormData(`${this.baseApi}/obj`, formData);
     }
 
     async moveObj(source, dest) {
-        return this.registry.putRequest(`${this.baseApi}/obj`, { source, dest });
+        const formData = new FormData();
+        formData.append('source', source);
+        formData.append('dest', dest);
+        return this.registry.putFormData(`${this.baseApi}/obj`, formData);
     }
 
     async transferObj(sourcePath, destOrgSlug, destDsSlug, destPath = "", overwrite = false) {
@@ -117,35 +129,44 @@ module.exports = class Dataset {
         if (!destOrgSlug) throw new Error("Invalid destination organization");
         if (!destDsSlug) throw new Error("Invalid destination dataset");
 
-        return this.registry.postRequest(`${this.baseApi}/transfer`, {
-            sourcePath,
-            destOrgSlug,
-            destDsSlug,
-            destPath,
-            overwrite
-        });
+        const formData = new FormData();
+        formData.append('sourcePath', sourcePath);
+        formData.append('destOrgSlug', destOrgSlug);
+        formData.append('destDsSlug', destDsSlug);
+        formData.append('destPath', destPath);
+        formData.append('overwrite', overwrite);
+        return this.registry.postFormData(`${this.baseApi}/transfer`, formData);
     }
 
     async writeObj(path, content) {
-        return this.registry.postRequest(`${this.baseApi}/obj`, { path, file: new Blob([content]) });
+        const formData = new FormData();
+        formData.append('path', path);
+        formData.append('file', new Blob([content]));
+        return this.registry.postFormData(`${this.baseApi}/obj`, formData);
     }
 
     async createFolder(path) {
-        return this.registry.postRequest(`${this.baseApi}/obj`, { path });
+        const formData = new FormData();
+        formData.append('path', path);
+        return this.registry.postFormData(`${this.baseApi}/obj`, formData);
     }
 
     async rename(slug) {
         if (typeof slug !== "string") throw new Error(`Invalid slug ${slug}`);
-        return this.registry.postRequest(`${this.baseApi}/rename`, { slug });
+        const formData = new FormData();
+        formData.append('slug', slug);
+        return this.registry.postFormData(`${this.baseApi}/rename`, formData);
     }
 
     async metaSet(key, data, path = "") {
         if (!key) throw new Error(`Invalid key ${key}`);
         if (data === undefined) throw new Error(`Invalid data`);
         if (typeof data === "string") data = JSON.stringify(data);
-        return this.registry.postRequest(`${this.baseApi}/meta/set`, {
-            key, data, path
-        });
+        const formData = new FormData();
+        formData.append('key', key);
+        formData.append('data', data);
+        formData.append('path', path);
+        return this.registry.postFormData(`${this.baseApi}/meta/set`, formData);
     }
 
     async setVisibility(visibility) {
@@ -163,10 +184,10 @@ module.exports = class Dataset {
     async build(path, force = false) {
         if (!path) throw new Error(`Invalid path ${path}`);
 
-        const response = await this.registry.postRequest(`${this.baseApi}/build`, {
-            path: path,
-            force: force
-        });
+        const formData = new FormData();
+        formData.append('path', path);
+        formData.append('force', force);
+        const response = await this.registry.postFormData(`${this.baseApi}/build`, formData);
 
         return response === true ? { success: true } : response;
     }
