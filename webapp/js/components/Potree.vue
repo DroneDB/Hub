@@ -11,8 +11,9 @@
 
         <div class="potree-container" :class="{ loading }">
             <!-- Toolbar for measurements -->
-            <div v-if="loaded" class="measurements-toolbar">
+            <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
                 <button
+                    v-if="hasMeasurements"
                     @click="saveMeasurements"
                     :disabled="savingMeasurements"
                     class="btn-measurement"
@@ -73,36 +74,59 @@ export default {
             savingMeasurements: false,
 
             // Confirm dialog
-            deleteMeasurementsDialogOpen: false
+            deleteMeasurementsDialogOpen: false,
+
+            // Dataset permissions (set by TabViewLoader)
+            canRead: false,
+            canWrite: false,
+            canDelete: false,
+
+            // Track measurement count for reactivity
+            measurementCount: 0
         };
     },
     mounted: function () {
     },
 
     computed: {
-        // Dataset permissions from entry properties
-        datasetPermissions: function () {
-            // Get permissions from the entry properties
-            if (this.entry &&
-                this.entry.properties &&
-                this.entry.properties.permissions) {
-                return this.entry.properties.permissions;
-            }
-            // Default to no permissions if not available
-            return { canRead: false, canWrite: false, canDelete: false };
-        },
-        canRead: function () {
-            return this.datasetPermissions.canRead;
-        },
-        canWrite: function () {
-            return this.datasetPermissions.canWrite;
-        },
-        canDelete: function () {
-            return this.datasetPermissions.canDelete;
+        /**
+         * Check if there are any measurements in the viewer
+         */
+        hasMeasurements: function() {
+            return this.measurementCount > 0;
         }
     },
 
     methods: {
+
+        /**
+         * Setup listeners to track measurement additions/removals
+         */
+        setupMeasurementListeners: function() {
+            if (!this.viewer || !this.viewer.scene) return;
+
+            const scene = this.viewer.scene;
+            const self = this;
+
+            // Helper to update measurement count
+            const updateCount = () => {
+                const measurements = (scene.measurements ? scene.measurements.length : 0);
+                const profiles = (scene.profiles ? scene.profiles.length : 0);
+                const volumes = (scene.volumes ? scene.volumes.length : 0);
+                self.measurementCount = measurements + profiles + volumes;
+            };
+
+            // Listen to measurement events
+            scene.addEventListener('measurement_added', updateCount);
+            scene.addEventListener('measurement_removed', updateCount);
+            scene.addEventListener('profile_added', updateCount);
+            scene.addEventListener('profile_removed', updateCount);
+            scene.addEventListener('volume_added', updateCount);
+            scene.addEventListener('volume_removed', updateCount);
+
+            // Initial count
+            updateCount();
+        },
 
         handleLoad: async function () {
             try {
@@ -175,6 +199,9 @@ export default {
 
             this.loaded = true;
             this.viewer = viewer;
+
+            // Setup measurement tracking listeners
+            this.setupMeasurementListeners();
 
             await this.addPointCloud(this.dataset.Entry(this.entry));
             this.viewer.fitToScreen();
