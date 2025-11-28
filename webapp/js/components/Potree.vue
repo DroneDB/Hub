@@ -3,7 +3,6 @@
         <TabViewLoader @loaded="handleLoad" titleSuffix="Point Cloud" />
 
         <Message bindTo="error" noDismiss />
-        <Message bindTo="success" className="positive" />
         <div v-if="loading" class="loading">
             <p>Loading point cloud...</p>
             <i class="icon circle notch spin" />
@@ -45,6 +44,7 @@
             warningMessage="This action cannot be undone."
             @onClose="handleDeleteMeasurementsDialogClose">
         </ConfirmDialog>
+        <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
     </div>
 </template>
 
@@ -53,19 +53,19 @@ import ddb from 'ddb';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
 import ConfirmDialog from './ConfirmDialog.vue';
+import Flash from './Flash.vue';
 import { loadResources } from '../libs/lazy';
 import { MeasurementStorage } from '../libs/measurementStorage';
 import { exportMeasurements, importMeasurements } from '../libs/potreeMeasurementConverter';
 
 export default {
     components: {
-        Message, TabViewLoader, ConfirmDialog
+        Message, TabViewLoader, ConfirmDialog, Flash
     },
     props: ['uri'],
     data: function () {
         return {
             error: "",
-            success: "",
             loading: false,
             loaded: false,
             measurementStorage: null,
@@ -82,7 +82,12 @@ export default {
             canDelete: false,
 
             // Track measurement count for reactivity
-            measurementCount: 0
+            measurementCount: 0,
+
+            // Flash message
+            flashMessage: null,
+            flashIcon: 'check circle outline',
+            flashColor: 'positive'
         };
     },
     mounted: function () {
@@ -286,7 +291,7 @@ export default {
                     console.log(`Loaded ${geojson.features.length} measurements`);
 
                     // Show info message to user
-                    this.success = `${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`;
+                    this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`, 'positive', 'check circle outline');
                 }
             } catch (e) {
                 console.error('Error loading measurements:', e);
@@ -311,7 +316,6 @@ export default {
 
             this.savingMeasurements = true;
             this.error = '';
-            this.success = '';
 
             try {
                 // Export measurements in GeoJSON format
@@ -337,7 +341,7 @@ export default {
                 this.hasSavedMeasurements = true;
 
                 // Show success message
-                this.success = `${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`;
+                this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`, 'positive', 'check circle outline');
 
                 console.log('Measurements saved successfully');
             } catch (e) {
@@ -373,11 +377,27 @@ export default {
             try {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
-                this.success = 'Saved measurements deleted successfully';
+                this.showFlash('Saved measurements deleted successfully', 'positive', 'check circle outline');
             } catch (e) {
                 console.error('Error deleting measurements:', e);
                 this.error = `Failed to delete measurements: ${e.message}`;
             }
+        },
+
+        /**
+         * Show flash message
+         */
+        showFlash: function(message, color = 'positive', icon = 'check circle outline') {
+            this.flashMessage = message;
+            this.flashColor = color;
+            this.flashIcon = icon;
+        },
+
+        /**
+         * Close flash message
+         */
+        closeFlash: function() {
+            this.flashMessage = null;
         },
 
         handleHistoryBack: function () {
