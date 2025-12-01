@@ -90,7 +90,8 @@ export default {
             selectedFiles: [],
             storageInfo: null,
             storageInfoDialogOpen: false,
-            usersManagement: false // Will be set dynamically based on server configuration
+            usersManagement: false, // Will be set dynamically based on server configuration
+            accountManagement: false // Will be set dynamically based on server configuration and disableAccountManagement option
         }
     },
     filters: {
@@ -162,9 +163,6 @@ export default {
         },
         appName: function () {
             return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
-        },
-        accountManagement: function () {
-            return !!HubOptions.enableAccountManagement;
         }
     },
     mounted: function () {
@@ -292,11 +290,20 @@ export default {
 
         async checkUserManagement() {
             try {
-                // Check user management status using the shared registry
-                this.usersManagement = await reg.isUserManagementEnabled();
+                // Check if user management is enabled on server (i.e., local auth, not external)
+                const isLocalAuth = await reg.isUserManagementEnabled();
+
+                // Users management (admin panel) is only available with local auth
+                this.usersManagement = isLocalAuth;
+
+                // Account management is enabled when:
+                // 1. Authentication is local (not external provider)
+                // 2. AND disableAccountManagement is not explicitly set to true
+                this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
             } catch (e) {
                 console.log('Failed to check user management status:', e.message);
                 this.usersManagement = false;
+                this.accountManagement = false;
             }
         }
     }

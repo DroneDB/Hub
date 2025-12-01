@@ -93,11 +93,8 @@
                             <span v-else class="text-muted">No roles</span>
                         </td>
                         <td>
-                            <button @click="showUserOrganizations(user)"
-                                    class="ui mini button icon" title="Manage Organizations">
-                                <i class="sitemap icon"></i>
-                                {{ user.organizationCount }}
-                            </button>
+                            <button @click="showUserOrganizations(user)" class="ui mini button icon" title="Manage Organizations">
+                              <i class="sitemap icon" style="margin-right: 1rem"></i>&nbsp;{{ user.organizationCount }}</button>
                         </td>
                         <td>{{ user.datasetCount }}</td>
                         <td>

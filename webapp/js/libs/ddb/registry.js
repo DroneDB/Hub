@@ -226,6 +226,8 @@ module.exports = class Registry {
             clearTimeout(refreshTimers[this.url]);
             delete refreshTimers[this.url];
         }
+        // Clear cached user management status
+        delete this._userManagementEnabledCache;
         this.clearCredentials();
         this.emit("logout");
     }
@@ -679,9 +681,17 @@ module.exports = class Registry {
 
     // ========== Extended User Management Methods ==========
 
-    // Check if user management is enabled
+    // Check if user management is enabled (cached to avoid repeated API calls)
     async isUserManagementEnabled() {
-        return await this.getRequest('/users/management-enabled');
+        // Return cached value if available
+        if (this._userManagementEnabledCache !== undefined) {
+            return this._userManagementEnabledCache;
+        }
+
+        // Fetch from server and cache the result
+        const result = await this.getRequest('/users/management-enabled');
+        this._userManagementEnabledCache = result;
+        return result;
     }
 
     // Get detailed user information
