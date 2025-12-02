@@ -747,6 +747,18 @@ export default {
                     return;
                 }
 
+                // Check if pointer is over UI controls - hide tooltip if so
+                const domElement = document.elementFromPoint(e.pixel[0], e.pixel[1]);
+                if (domElement && (
+                    domElement.closest('.toolbar') ||
+                    domElement.closest('.ol-measure-control') ||
+                    domElement.closest('.ol-zoom') ||
+                    domElement.closest('#basemap-selector')
+                )) {
+                    this.hideFeatureTooltip();
+                    return;
+                }
+
                 // Check if we're hovering over a vector feature
                 const hit = this.map.hasFeatureAtPixel(e.pixel, {
                     layerFilter: layer => this.vectorLayers.includes(layer)
