@@ -189,9 +189,7 @@ class MeasureControls extends Control {
     }
 
     handleSave() {
-        console.log('handleSave called, onSave type:', typeof this.onSave);
         this.onSave();
-        console.log('onSave callback executed');
     }
 
     handleClearAll() {
@@ -210,14 +208,12 @@ class MeasureControls extends Control {
      * Show or hide the management buttons
      */
     updateButtonsVisibility(hasMeasurements, hasSavedMeasurements) {
-        console.log('updateButtonsVisibility called:', 'hasMeasurements=', hasMeasurements, 'hasSavedMeasurements=', hasSavedMeasurements);
         const display = hasMeasurements ? 'block' : 'none';
         this.separator.style.display = display;
         this.btnSave.style.display = display;
         this.btnClear.style.display = display;
         this.btnExport.style.display = display;
         this.btnDelete.style.display = hasSavedMeasurements ? 'block' : 'none';
-        console.log('Buttons visibility updated. Save button display:', this.btnSave.style.display);
     }
 
     /**
@@ -247,8 +243,6 @@ class MeasureControls extends Control {
 
         // Update button visibility
         this.updateButtonsVisibility(false, false);
-
-        console.log('All measurements cleared');
     }
 
     /**
@@ -517,7 +511,6 @@ class MeasureControls extends Control {
                     // Update button visibility after a short delay to allow OpenLayers to add the feature to the source
                     setTimeout(() => {
                         const hasMeasurements = self.hasMeasurements();
-                        console.log('Measurement completed. Total measurements:', self.source.getFeatures().length, 'hasMeasurements:', hasMeasurements);
                         self.updateButtonsVisibility(hasMeasurements, false);
                     }, 10);
                 }
