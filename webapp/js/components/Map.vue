@@ -1452,7 +1452,7 @@ export default {
         },
 
         /**
-         * Load measurements for orthophoto files
+         * Load measurements for orthophoto and point cloud files
          */
         loadMeasurementsForOrthophotos: async function() {
             if (!this.dataset || !this.measureControls) {
@@ -1460,13 +1460,13 @@ export default {
                 return;
             }
 
-            // Find the first orthophoto/georaster file
+            // Find the first orthophoto/georaster or point cloud file
             const orthophotoFile = this.files.find(f =>
-                f.entry && (f.entry.type === ddb.entry.type.GEORASTER)
+                f.entry && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.POINTCLOUD)
             );
 
             if (!orthophotoFile) {
-                console.log('No orthophoto/georaster files found');
+                console.log('No orthophoto/georaster or point cloud files found');
                 // Reset measurement storage if no georaster files
                 this.currentOrthophotoEntry = null;
                 this.measurementStorage = null;
@@ -1528,8 +1528,8 @@ export default {
 
                 // Check again after initialization attempt
                 if (!this.measurementStorage) {
-                    console.error('Cannot save: no georaster file found');
-                    this.showAlert('Error', 'Cannot save: no orthophoto/georaster file found. Measurements can only be saved for orthophoto files.');
+                    console.error('Cannot save: no georaster or point cloud file found');
+                    this.showAlert('Error', 'Cannot save: no orthophoto/georaster or point cloud file found. Measurements can only be saved for orthophoto or point cloud files.');
                     return;
                 }
             }

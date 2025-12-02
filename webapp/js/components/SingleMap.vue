@@ -455,8 +455,8 @@ export default {
                 this.loadVectorLayer(entry);
             }
 
-            // Load measurements for orthophotos if available
-            if (entry.type === ddb.entry.type.GEORASTER) {
+            // Load measurements for orthophotos and point clouds if available
+            if (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.POINTCLOUD) {
                 this.loadMeasurementsForOrthophoto();
             }
 
@@ -640,7 +640,7 @@ export default {
         },
 
         /**
-         * Load measurements for orthophoto files
+         * Load measurements for orthophoto and point cloud files
          */
         loadMeasurementsForOrthophoto: async function() {
             if (!this.dataset || !this.measureControls || !this.entry) {
@@ -648,9 +648,9 @@ export default {
                 return;
             }
 
-            // Only load measurements for georaster files
-            if (this.entry.type !== ddb.entry.type.GEORASTER) {
-                console.log('Not a georaster file, skipping measurements');
+            // Only load measurements for georaster and point cloud files
+            if (this.entry.type !== ddb.entry.type.GEORASTER && this.entry.type !== ddb.entry.type.POINTCLOUD) {
+                console.log('Not a georaster or point cloud file, skipping measurements');
                 return;
             }
 
@@ -708,8 +708,8 @@ export default {
 
                 // Check again after initialization attempt
                 if (!this.measurementStorage) {
-                    console.error('Cannot save: no georaster file found');
-                    this.showAlert('Error', 'Cannot save: no orthophoto/georaster file found. Measurements can only be saved for orthophoto files.');
+                    console.error('Cannot save: no georaster or point cloud file found');
+                    this.showAlert('Error', 'Cannot save: no orthophoto/georaster or point cloud file found. Measurements can only be saved for orthophoto or point cloud files.');
                     return;
                 }
             }
