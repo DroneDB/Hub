@@ -219,6 +219,7 @@ export default {
             currentPath: null,
             viewMode: savedViewMode, // 'grid' or 'table'
             selectedDetailFile: null, // For DetailPanel in table view
+            rootDatasetEntry: null, // Root dataset entry with permissions
 
             // File availability dialog
             showAvailabilityDialog: false,
@@ -320,12 +321,11 @@ export default {
         },
         // Dataset permissions from backend
         datasetPermissions: function () {
-            // Get permissions from the root entry properties
-            if (this.fileBrowserFiles.length > 0 &&
-                this.fileBrowserFiles[0].entry &&
-                this.fileBrowserFiles[0].entry.properties &&
-                this.fileBrowserFiles[0].entry.properties.permissions) {
-                return this.fileBrowserFiles[0].entry.properties.permissions;
+            // Get permissions from the root dataset entry
+            if (this.rootDatasetEntry &&
+                this.rootDatasetEntry.properties &&
+                this.rootDatasetEntry.properties.permissions) {
+                return this.rootDatasetEntry.properties.permissions;
             }
             // Default to no permissions if not available
             return { canRead: false, canWrite: false, canDelete: false };
@@ -384,6 +384,11 @@ export default {
             try {
 
                 const entries = await this.dataset.info();
+
+                // Save the root dataset entry (contains permissions)
+                if (entries.length > 0) {
+                    this.rootDatasetEntry = entries[0];
+                }
 
                 // Set title
                 if (entries.length > 0 && entries[0]?.properties?.meta?.name) {
