@@ -9,9 +9,42 @@
         </div>
 
         <div class="potree-container" :class="{ loading }">
+            <!-- Toolbar for measurements -->
+            <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
+                <button
+                    v-if="hasMeasurements"
+                    @click="saveMeasurements"
+                    :disabled="savingMeasurements"
+                    class="btn-measurement"
+                    title="Save measurements">
+                    <i class="save icon"></i>
+                    Save Measurements
+                </button>
+
+                <button
+                    v-if="hasSavedMeasurements"
+                    @click="deleteSavedMeasurements"
+                    class="btn-measurement btn-danger"
+                    title="Delete saved measurements file">
+                    <i class="trash icon"></i>
+                    Delete Saved
+                </button>
+            </div>
+
             <div id="potree_sidebar_container" ref="sidebar"> </div>
             <div id="potree_render_area" ref="container"></div>
         </div>
+        <ConfirmDialog v-if="deleteMeasurementsDialogOpen"
+            title="Delete Saved Measurements"
+            message="Are you sure you want to delete all saved measurements?"
+            confirmText="Delete"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            warningTitle="Warning"
+            warningMessage="This action cannot be undone."
+            @onClose="handleDeleteMeasurementsDialogClose">
+        </ConfirmDialog>
+        <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
     </div>
 </template>
 
@@ -19,24 +52,86 @@
 import ddb from 'ddb';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
+import ConfirmDialog from './ConfirmDialog.vue';
+import Flash from './Flash.vue';
 import { loadResources } from '../libs/lazy';
+import { MeasurementStorage } from '../libs/measurementStorage';
+import { exportMeasurements, importMeasurements } from '../libs/potreeMeasurementConverter';
 
 export default {
     components: {
-        Message, TabViewLoader
+        Message, TabViewLoader, ConfirmDialog, Flash
     },
     props: ['uri'],
     data: function () {
         return {
             error: "",
             loading: false,
-            loaded: false
+            loaded: false,
+            measurementStorage: null,
+            coordinateSystem: null,
+            hasSavedMeasurements: false,
+            savingMeasurements: false,
+
+            // Confirm dialog
+            deleteMeasurementsDialogOpen: false,
+
+            // Dataset permissions (set by TabViewLoader)
+            canRead: false,
+            canWrite: false,
+            canDelete: false,
+
+            // Track measurement count for reactivity
+            measurementCount: 0,
+
+            // Flash message
+            flashMessage: null,
+            flashIcon: 'check circle outline',
+            flashColor: 'positive'
         };
     },
     mounted: function () {
     },
 
+    computed: {
+        /**
+         * Check if there are any measurements in the viewer
+         */
+        hasMeasurements: function() {
+            return this.measurementCount > 0;
+        }
+    },
+
     methods: {
+
+        /**
+         * Setup listeners to track measurement additions/removals
+         */
+        setupMeasurementListeners: function() {
+            if (!this.viewer || !this.viewer.scene) return;
+
+            const scene = this.viewer.scene;
+            const self = this;
+
+            // Helper to update measurement count
+            const updateCount = () => {
+                const measurements = (scene.measurements ? scene.measurements.length : 0);
+                const profiles = (scene.profiles ? scene.profiles.length : 0);
+                const volumes = (scene.volumes ? scene.volumes.length : 0);
+                self.measurementCount = measurements + profiles + volumes;
+            };
+
+            // Listen to measurement events
+            scene.addEventListener('measurement_added', updateCount);
+            scene.addEventListener('measurement_removed', updateCount);
+            scene.addEventListener('profile_added', updateCount);
+            scene.addEventListener('profile_removed', updateCount);
+            scene.addEventListener('volume_added', updateCount);
+            scene.addEventListener('volume_removed', updateCount);
+
+            // Initial count
+            updateCount();
+        },
 
         handleLoad: async function () {
             try {
@@ -110,8 +205,15 @@ export default {
             this.loaded = true;
             this.viewer = viewer;
 
+            // Setup measurement tracking listeners
+            this.setupMeasurementListeners();
+
             await this.addPointCloud(this.dataset.Entry(this.entry));
             this.viewer.fitToScreen();
+
+            // Load saved measurements automatically
+            await this.loadMeasurements();
+
             window.viewer = viewer;
             // if (pointCloudFiles.length === 0) this.error = "No point cloud files selected. Select one or more point cloud files to display them.";
         },
@@ -122,9 +224,13 @@ export default {
                     const eptUrl = await entry.getEpt();
                     const basename = ddb.pathutils.basename(entry.path);
 
+                    // Load coordinate system
+                    this.coordinateSystem = await this.getCoordinateSystem(eptUrl);
+                    console.log('Coordinate system:', this.coordinateSystem);
+
                     Potree.loadPointCloud(eptUrl, basename, e => {
                         if (e.type == "loading_failed") {
-                            reject(new Error(`Cannot load ${entry.path}, we're still building it. Try again in a few minutes.`));
+                            reject(new Error(`Unable to load ${entry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
                             return;
                         }
 
@@ -134,10 +240,166 @@ export default {
                         resolve();
                     });
                 } catch (e) {
-                    reject(new Error(`${entry.path} is being built. Try to refresh the page in a few minutes!`));
+                    reject(new Error(`${entry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`));
                 }
             });
         },
+
+        /**
+         * Load the coordinate system from EPT
+         */
+        getCoordinateSystem: async function(eptUrl) {
+            try {
+                const response = await fetch(eptUrl);
+                const eptJson = await response.json();
+
+                return {
+                    srs: eptJson.srs || eptJson.srs?.wkt || null,
+                    scale: eptJson.scale || [1, 1, 1],
+                    offset: eptJson.offset || [0, 0, 0],
+                    bounds: eptJson.bounds || eptJson.boundsConforming
+                };
+            } catch (e) {
+                console.warn('Could not load coordinate system:', e);
+                // Fallback
+                return {
+                    srs: null,
+                    scale: [1, 1, 1],
+                    offset: [0, 0, 0],
+                    bounds: null
+                };
+            }
+        },
+
+        /**
+         * Load saved measurements
+         */
+        loadMeasurements: async function() {
+            if (!this.measurementStorage) {
+                this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
+            }
+
+            try {
+                // Check if saved measurements exist
+                const geojson = await this.measurementStorage.load();
+
+                if (geojson && geojson.features && geojson.features.length > 0) {
+                    // Import measurements into viewer
+                    importMeasurements(geojson, this.viewer, this.coordinateSystem);
+
+                    this.hasSavedMeasurements = true;
+                    console.log(`Loaded ${geojson.features.length} measurements`);
+
+                    // Show info message to user
+                    this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`, 'positive', 'check circle outline');
+                }
+            } catch (e) {
+                console.error('Error loading measurements:', e);
+                this.error = `Could not load measurements: ${e.message}`;
+            }
+        },
+
+        /**
+         * Save current measurements
+         */
+        saveMeasurements: async function() {
+            // Check write permissions first
+            if (!this.canWrite) {
+                this.error = 'You do not have permission to save measurements in this dataset';
+                return;
+            }
+
+            if (!this.viewer || !this.viewer.scene) {
+                this.error = 'Viewer not ready';
+                return;
+            }
+
+            this.savingMeasurements = true;
+            this.error = '';
+
+            try {
+                // Export measurements in GeoJSON format
+                const geojson = exportMeasurements(
+                    this.viewer,
+                    this.entry.path,
+                    this.coordinateSystem
+                );
+
+                if (!geojson.features || geojson.features.length === 0) {
+                    this.error = 'No measurements to save';
+                    this.savingMeasurements = false;
+                    return;
+                }
+
+                // Save the file
+                if (!this.measurementStorage) {
+                    this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
+                }
+
+                await this.measurementStorage.save(geojson);
+
+                this.hasSavedMeasurements = true;
+
+                // Show success message
+                this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`, 'positive', 'check circle outline');
+
+                console.log('Measurements saved successfully');
+            } catch (e) {
+                console.error('Error saving measurements:', e);
+                this.error = `Failed to save measurements: ${e.message}`;
+            } finally {
+                this.savingMeasurements = false;
+            }
+        },
+
+        /**
+         * Delete saved measurements
+         */
+        deleteSavedMeasurements: function() {
+            if (!this.measurementStorage) {
+                return;
+            }
+
+            // Open confirmation dialog
+            this.deleteMeasurementsDialogOpen = true;
+        },
+
+        /**
+         * Handle delete measurements dialog close
+         */
+        handleDeleteMeasurementsDialogClose: async function(result) {
+            this.deleteMeasurementsDialogOpen = false;
+
+            if (result !== 'confirm') {
+                return;
+            }
+
+            try {
+                await this.measurementStorage.delete();
+                this.hasSavedMeasurements = false;
+                this.showFlash('Saved measurements deleted successfully', 'positive', 'check circle outline');
+            } catch (e) {
+                console.error('Error deleting measurements:', e);
+                this.error = `Failed to delete measurements: ${e.message}`;
+            }
+        },
+
+        /**
+         * Show flash message
+         */
+        showFlash: function(message, color = 'positive', icon = 'check circle outline') {
+            this.flashMessage = message;
+            this.flashColor = color;
+            this.flashIcon = icon;
+        },
+
+        /**
+         * Close flash message
+         */
+        closeFlash: function() {
+            this.flashMessage = null;
+        },
+
         handleHistoryBack: function () {
             this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
         },
@@ -319,6 +581,51 @@ export default {
 
     #profile_window {
         z-index: 999999999999 !important;
+    }
+
+    /* Toolbar for measurements */
+    .measurements-toolbar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 5px;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .btn-measurement {
+        background: #4a90e2;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 14px;
+        transition: background 0.3s;
+    }
+
+    .btn-measurement:hover {
+        background: #357abd;
+    }
+
+    .btn-measurement:disabled {
+        background: #666;
+        cursor: not-allowed;
+    }
+
+    .btn-measurement.btn-danger {
+        background: #e74c3c;
+    }
+
+    .btn-measurement.btn-danger:hover {
+        background: #c0392b;
     }
 }
 </style>

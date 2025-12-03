@@ -12,6 +12,7 @@ import { Vector as VectorLayer } from 'ol/layer';
 import { unByKey } from 'ol/Observable';
 import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
+import { exportMeasurements, importMeasurements } from '../libs/olMeasurementConverter';
 
 class MeasureControls extends Control {
     /**
@@ -28,6 +29,9 @@ class MeasureControls extends Control {
         btnArea.innerHTML = '<img title="Measure Area" src="' + rootPath("/images/measure-area.svg") + '"/>';
         const btnErase = document.createElement('button');
         btnErase.innerHTML = '<img title="Erase Measurement" src="' + rootPath("/images/measure-erase.svg") + '"/>';
+        const btnStop = document.createElement('button');
+        btnStop.innerHTML = '<img title="Stop Measuring (ESC)" src="' + rootPath("/images/measure-stop.svg") + '"/>';
+        btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
         const btnUnits = document.createElement('button');
         btnUnits.innerHTML = '<img title="Change Units" src="' + rootPath("/images/measure-units.svg") + '"/>';
 
@@ -40,13 +44,45 @@ class MeasureControls extends Control {
             '<option value="imperial" ' + (unitPref === 'imperial' ? 'selected' : '') + '>Imperial</option>';
         unitDiv.appendChild(unitSelect);
 
+        // Separator
+        const separator = document.createElement('div');
+        separator.style.display = 'inline-block';
+        separator.style.width = '1px';
+        separator.style.height = '26px';
+        separator.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+        separator.style.margin = '0 4px';
+        separator.style.verticalAlign = 'middle';
+
+        // Save/Load/Clear buttons
+        const btnSave = document.createElement('button');
+        btnSave.innerHTML = '<img title="Save Measurements" src="' + rootPath("/images/save.svg") + '"/>';
+        btnSave.style.display = 'none';
+
+        const btnClear = document.createElement('button');
+        btnClear.innerHTML = '<img title="Clear All Measurements" src="' + rootPath("/images/eraser.svg") + '"/>';
+        btnClear.style.display = 'none';
+
+        const btnExport = document.createElement('button');
+        btnExport.innerHTML = '<img title="Export Measurements" src="' + rootPath("/images/download.svg") + '"/>';
+        btnExport.style.display = 'none';
+
+        const btnDelete = document.createElement('button');
+        btnDelete.innerHTML = '<img title="Delete Saved Measurements" src="' + rootPath("/images/trash.svg") + '"/>';
+        btnDelete.style.display = 'none';
+
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable ol-control';
         element.appendChild(btnLength);
         element.appendChild(btnArea);
         element.appendChild(btnErase);
+        element.appendChild(btnStop);
         element.appendChild(unitDiv);
         element.appendChild(btnUnits);
+        element.appendChild(separator);
+        element.appendChild(btnSave);
+        element.appendChild(btnClear);
+        element.appendChild(btnExport);
+        element.appendChild(btnDelete);
 
         super({
             element: element,
@@ -56,12 +92,23 @@ class MeasureControls extends Control {
         btnLength.addEventListener('click', this.handleMeasureLength.bind(this), false);
         btnArea.addEventListener('click', this.handleMeasureArea.bind(this), false);
         btnErase.addEventListener('click', this.handleErase.bind(this), false);
+        btnStop.addEventListener('click', this.handleStop.bind(this), false);
         btnUnits.addEventListener('click', this.handleToggleUnits.bind(this), false);
         unitSelect.addEventListener('change', this.handleChangeUnits.bind(this), false);
+        btnSave.addEventListener('click', this.handleSave.bind(this), false);
+        btnClear.addEventListener('click', this.handleClearAll.bind(this), false);
+        btnExport.addEventListener('click', this.handleExport.bind(this), false);
+        btnDelete.addEventListener('click', this.handleDeleteSaved.bind(this), false);
 
         this.selectedTool = null;
         this.onToolSelected = options.onToolSelected || (() => { });
-        this.onToolDelesected = options.onToolDelesected || (() => { });
+        this.onToolDeselected = options.onToolDeselected || (() => { });
+        this.onSave = options.onSave || (() => { });
+        this.onClearAll = options.onClearAll || (() => { });
+        this.onExport = options.onExport || (() => { });
+        this.onDeleteSaved = options.onDeleteSaved || (() => { });
+        this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
+        this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
 
         this.source = new VectorSource();
         this.vector = new VectorLayer({
@@ -86,6 +133,29 @@ class MeasureControls extends Control {
         this.unitDiv = unitDiv;
         this.unitSelect = unitSelect;
         this.unitPref = unitPref;
+
+        // Store button references
+        this.btnStop = btnStop;
+        this.btnSave = btnSave;
+        this.btnClear = btnClear;
+        this.btnExport = btnExport;
+        this.btnDelete = btnDelete;
+        this.separator = separator;
+
+        // Store keyboard listener reference
+        this.keyboardListener = null;
+    }
+
+    /**
+     * Override setMap to initialize button visibility when control is added
+     */
+    setMap(map) {
+        super.setMap(map);
+
+        // Initialize button visibility when control is added to map
+        if (map) {
+            this.updateButtonsVisibility(this.hasMeasurements(), false);
+        }
     }
 
     handleMeasureLength() {
@@ -100,6 +170,15 @@ class MeasureControls extends Control {
         this.onSelect('erase');
     }
 
+    handleStop() {
+        // Finish current drawing if in progress
+        if (this.draw) {
+            this.draw.finishDrawing();
+        }
+        // Deselect current tool
+        this.deselectCurrent();
+    }
+
     handleChangeUnits() {
         localStorage.setItem("measureUnitPref", this.unitSelect.value);
         this.unitPref = this.unitSelect.value;
@@ -107,6 +186,124 @@ class MeasureControls extends Control {
 
     handleToggleUnits() {
         this.unitDiv.style.display = this.unitDiv.style.display === 'none' ? 'inline-block' : 'none';
+    }
+
+    handleSave() {
+        this.onSave();
+    }
+
+    handleClearAll() {
+        this.onRequestClearConfirm();
+    }
+
+    handleExport() {
+        this.onExport();
+    }
+
+    handleDeleteSaved() {
+        this.onRequestDeleteConfirm();
+    }
+
+    /**
+     * Show or hide the management buttons
+     */
+    updateButtonsVisibility(hasMeasurements, hasSavedMeasurements) {
+        const display = hasMeasurements ? 'block' : 'none';
+        this.separator.style.display = display;
+        this.btnSave.style.display = display;
+        this.btnClear.style.display = display;
+        this.btnExport.style.display = display;
+        this.btnDelete.style.display = hasSavedMeasurements ? 'block' : 'none';
+    }
+
+    /**
+     * Set the saved state (shows/hides the saved badge and delete button)
+     */
+    setSavedState(isSaved) {
+        const hasMeasurements = this.hasMeasurements();
+        this.updateButtonsVisibility(hasMeasurements, isSaved);
+    }
+
+    /**
+     * Clear all measurements from the map
+     */
+    clearAllMeasurements() {
+        const features = this.source.getFeatures();
+
+        // Remove tooltip overlays
+        features.forEach(feature => {
+            const tooltipElement = feature.get('measureTooltipElement');
+            if (tooltipElement && tooltipElement.parentNode) {
+                tooltipElement.parentNode.removeChild(tooltipElement);
+            }
+        });
+
+        // Clear all features
+        this.source.clear();
+
+        // Update button visibility
+        this.updateButtonsVisibility(false, false);
+    }
+
+    /**
+     * Export measurements to GeoJSON
+     */
+    exportToGeoJSON(orthophotoPath) {
+        return exportMeasurements(this.source, orthophotoPath, this.unitPref);
+    }
+
+    /**
+     * Import measurements from GeoJSON
+     */
+    importFromGeoJSON(geojson) {
+        const map = this.getMap();
+
+        // Create format functions bound to current instance
+        const formatArea = (polygon) => {
+            const area = getArea(polygon);
+            let output;
+            if (this.unitPref === 'metric') {
+                if (area > 10000) {
+                    output = Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
+                } else {
+                    output = Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
+                }
+            } else {
+                const f = 0.00024710538146717;
+                output = Math.round((area * f) * 100) / 100 + ' acres';
+            }
+            return output;
+        };
+
+        const formatLength = (line) => {
+            const length = getLength(line);
+            let output;
+            if (this.unitPref === 'metric') {
+                if (length > 100) {
+                    output = Math.round((length / 1000) * 100) / 100 + ' ' + 'km';
+                } else {
+                    output = Math.round(length * 100) / 100 + ' ' + 'm';
+                }
+            } else {
+                const f = 3.28084;
+                output = Math.round((length * f) * 100) / 100 + ' ft';
+            }
+            return output;
+        };
+
+        const result = importMeasurements(geojson, this.source, formatArea, formatLength, map);
+
+        // Update button visibility after import
+        this.updateButtonsVisibility(this.hasMeasurements(), true);
+
+        return result;
+    }
+
+    /**
+     * Check if there are any measurements
+     */
+    hasMeasurements() {
+        return this.source.getFeatures().length > 0;
     }
 
     deselectCurrent() {
@@ -125,9 +322,16 @@ class MeasureControls extends Control {
             this.helpTooltipElement.classList.add('hidden');
             map.removeInteraction(this.draw);
             unByKey(this.pointerMoveListener);
-        };
 
-        if (!this.selectedTool || this.selectedTool !== tool) {
+            // Remove keyboard listener
+            if (this.keyboardListener) {
+                document.removeEventListener('keydown', this.keyboardListener);
+                this.keyboardListener = null;
+            }
+
+            // Hide stop button
+            this.btnStop.style.display = 'none';
+        };        if (!this.selectedTool || this.selectedTool !== tool) {
             if (this.selectedTool !== tool) removeHandlers();
 
             const types = {
@@ -195,14 +399,25 @@ class MeasureControls extends Control {
                     return;
                 }
 
-                let helpMsg = 'Click to start drawing';
-                if (tool === 'erase') helpMsg = 'Click a measurement to remove it';
+                // Check if pointer is over UI controls
+                const pixel = evt.pixel;
+                const element = document.elementFromPoint(pixel[0], pixel[1]);
+                if (element && (
+                    element.closest('.ol-measure-control') ||
+                    element.closest('.ol-zoom')
+                )) {
+                    this.helpTooltipElement.classList.add('hidden');
+                    return;
+                }
+
+                let helpMsg = 'Click to start drawing. Press ESC to cancel';
+                if (tool === 'erase') helpMsg = 'Click a measurement to remove it. Press ESC to exit';
                 else if (sketch) {
                     const geom = sketch.getGeometry();
                     if (geom instanceof Polygon) {
-                        helpMsg = 'Click to continue drawing the polygon';
+                        helpMsg = 'Click to continue drawing the polygon. Double-click to finish. Press ESC to cancel';
                     } else if (geom instanceof LineString) {
-                        helpMsg = 'Click to continue drawing the line';
+                        helpMsg = 'Click to continue drawing the line. Double-click to finish. Press ESC to cancel';
                     }
                 }
 
@@ -265,22 +480,39 @@ class MeasureControls extends Control {
                             layerFilter: l => l === self.source,
                             hitTolerance: 4
                         }), f => {
-                            if (f.measureTooltipElement !== undefined) {
-                                f.measureTooltipElement.parentNode.removeChild(f.measureTooltipElement);
-                                f.measureTooltipElement = null;
+                            if (f.get('measureTooltipElement') !== undefined) {
+                                const tooltipElem = f.get('measureTooltipElement');
+                                if (tooltipElem && tooltipElem.parentNode) {
+                                    tooltipElem.parentNode.removeChild(tooltipElem);
+                                }
                                 self.source.removeFeature(f);
                             }
                         });
 
                         self.source.removeFeature(feat);
+
+                        // Update button visibility after erase
+                        self.updateButtonsVisibility(self.hasMeasurements(), false);
                     }, 100);
                 } else {
-                    // Create new meaasurement tooltip, save ref to existing one
+                    // Save tooltip text and timestamp to feature
+                    feat.set('tooltipText', self.measureTooltipElement.innerHTML);
+                    feat.set('createdAt', new Date().toISOString());
+                    feat.set('measurementType', tool);
+
+                    // Create new measurement tooltip, save ref to existing one
                     self.measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
                     self.measureTooltip.setOffset([0, -7]);
-                    feat.measureTooltipElement = self.measureTooltipElement;
+                    feat.set('measureTooltipElement', self.measureTooltipElement);
+                    feat.set('measureTooltip', self.measureTooltip);
                     self.measureTooltipElement = null;
                     self.createMeasureTooltipElement(map);
+
+                    // Update button visibility after a short delay to allow OpenLayers to add the feature to the source
+                    setTimeout(() => {
+                        const hasMeasurements = self.hasMeasurements();
+                        self.updateButtonsVisibility(hasMeasurements, false);
+                    }, 10);
                 }
 
                 sketch = null;
@@ -289,11 +521,28 @@ class MeasureControls extends Control {
 
             map.addInteraction(this.draw);
             this.pointerMoveListener = map.on('pointermove', this.pointerMoveHandler.bind(this));
+
+            // Show stop button when a tool is active
+            this.btnStop.style.display = 'inline-block';
+
+            // Add ESC key listener to cancel drawing
+            this.keyboardListener = (e) => {
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    // Finish current drawing if in progress
+                    if (this.draw) {
+                        this.draw.finishDrawing();
+                    }
+                    // Deselect tool and go back to normal mode
+                    this.deselectCurrent();
+                }
+            };
+            document.addEventListener('keydown', this.keyboardListener);
+
             this.onToolSelected(tool);
         } else {
             removeHandlers();
             this.selectedTool = null;
-            this.onToolDelesected();
+            this.onToolDeselected();
         }
     }
 

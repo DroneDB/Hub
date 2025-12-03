@@ -47,6 +47,31 @@ export default {
             const entry = await ds.listOne(path);
             this.$parent.entry = entry;
             this.$parent.dataset = ds;
+
+            // Get dataset permissions from dataset info (root entry)
+            // Permissions are always at dataset level, not per file
+            try {
+                const rootEntry = await ds.info();
+                if (rootEntry && rootEntry.length > 0 &&
+                    rootEntry[0].properties &&
+                    rootEntry[0].properties.permissions) {
+                    this.$parent.canWrite = rootEntry[0].properties.permissions.canWrite || false;
+                    this.$parent.canDelete = rootEntry[0].properties.permissions.canDelete || false;
+                    this.$parent.canRead = rootEntry[0].properties.permissions.canRead || false;
+                } else {
+                    // Default to no permissions if not available
+                    this.$parent.canWrite = false;
+                    this.$parent.canDelete = false;
+                    this.$parent.canRead = false;
+                }
+            } catch (permError) {
+                console.warn('Could not load dataset permissions:', permError);
+                // Default to no permissions if there's an error
+                this.$parent.canWrite = false;
+                this.$parent.canDelete = false;
+                this.$parent.canRead = false;
+            }
+
             if (this.$route.params.encodedPath) {
                 const $header = this.$parent.$parent.$children[0];
                 $header.selectedFiles = [{ path: this.$parent.ddbURI }];

@@ -204,7 +204,12 @@ export default {
                 this.loading = true;
 
                 try {
-                    let ret = await reg.createOrganization(neworg.slug, neworg.name, neworg.description, neworg.isPublic);
+                    let ret = await reg.createOrganization({
+                        slug: neworg.slug,
+                        name: neworg.name,
+                        description: neworg.description,
+                        isPublic: neworg.isPublic
+                    });
                     if (ret) {
                         this.organizations.push({
                             slug: neworg.slug,

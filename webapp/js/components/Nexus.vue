@@ -39,8 +39,8 @@ export default {
         handleLoad: async function () {
             try {
                 // Quick type check
-                if (this.entry.type !== ddb.entry.type.MODEL) 
-                  throw new Error(`${this.entry.path} cannot be opened as a model`);
+                if (this.entry.type !== ddb.entry.type.MODEL)
+                  throw new Error(`${this.entry.path} cannot be opened as a 3D model`);
 
                 this.loading = true;
 
@@ -60,12 +60,12 @@ export default {
         loadNexus: async function () {
             this.error = "";
 
-            // Verifica che le librerie siano caricate
+            // Check that libraries are loaded
             if (typeof THREE === 'undefined') {
-                throw new Error('THREE.js library not loaded');
+                throw new Error('Error loading THREE.js library');
             }
             if (typeof NexusObject === 'undefined') {
-                throw new Error('Nexus library not loaded');
+                throw new Error('Error loading Nexus library');
             }
 
             const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
@@ -88,7 +88,7 @@ export default {
             renderer.setClearColor(scene.fog.color);
             renderer.setPixelRatio(window.devicePixelRatio);
 
-            // Definisci il material prima di utilizzarlo
+            // Define the material before using it
             let material = false;
             /* Material customizations examples: */
             //material = new THREE.MeshLambertMaterial( { color: 0xff0000, vertexColors: THREE.VertexColors } );

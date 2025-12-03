@@ -16,24 +16,24 @@ export function extractFeatureDisplayName(properties, defaultValue = 'Unknown fe
     const userLang = navigator.language || navigator.userLanguage;
     const langPrefix = userLang.split('-')[0].toLowerCase();
 
-    // First priority: localized name (name:en, name:it, etc.)
+    // 1. Localized name (name:en, name:it, etc.)
     if (properties[`name:${langPrefix}`]) {
         return properties[`name:${langPrefix}`];
     }
-    // Second priority: generic name, label, title properties with case variations
-    else if (properties.name) {
-        return properties.name;
-    } else if (properties.Name) {
-        return properties.Name;
-    } else if (properties.label) {
-        return properties.label;
-    } else if (properties.Label) {
-        return properties.Label;
-    } else if (properties.title) {
-        return properties.title;
-    } else if (properties.id) {
-        return `ID: ${properties.id}`;
-    }
+
+    // 2. Generic name/label/title
+    if (properties.name) return properties.name;
+    if (properties.Name) return properties.Name;
+    if (properties.label) return properties.label;
+    if (properties.Label) return properties.Label;
+    if (properties.title) return properties.title;
+
+    // 3. Special display or tooltip properties
+    if (properties.displayValue) return properties.displayValue;
+    if (properties.tooltipText) return properties.tooltipText;
+
+    // 4. ID as a last resort
+    if (properties.id) return `ID: ${properties.id}`;
 
     // Fallback to default
     return defaultValue;

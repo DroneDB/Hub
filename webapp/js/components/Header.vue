@@ -90,7 +90,8 @@ export default {
             selectedFiles: [],
             storageInfo: null,
             storageInfoDialogOpen: false,
-            usersManagement: !!HubOptions.enableUsersManagement
+            usersManagement: false, // Will be set dynamically based on server configuration
+            accountManagement: false // Will be set dynamically based on server configuration and disableAccountManagement option
         }
     },
     filters: {
@@ -162,9 +163,6 @@ export default {
         },
         appName: function () {
             return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
-        },
-        accountManagement: function () {
-            return !!HubOptions.enableAccountManagement;
         }
     },
     mounted: function () {
@@ -182,12 +180,13 @@ export default {
         });
 
         this.refreshStorageInfo();
+        this.checkUserManagement();
     },
     watch: {
         $route: function (to, from) {
             const { params } = to;
 
-            // TODO: we might need have more complex 
+            // TODO: we might need have more complex
             // logic in the future to see who has access
             // to download files?
             this.showDownload = !!params.ds;
@@ -287,6 +286,25 @@ export default {
 
         hideMenu: function () {
             if (this.$refs.menu) this.$refs.menu.style.display = 'none';
+        },
+
+        async checkUserManagement() {
+            try {
+                // Check if user management is enabled on server (i.e., local auth, not external)
+                const isLocalAuth = await reg.isUserManagementEnabled();
+
+                // Users management (admin panel) is only available with local auth
+                this.usersManagement = isLocalAuth;
+
+                // Account management is enabled when:
+                // 1. Authentication is local (not external provider)
+                // 2. AND disableAccountManagement is not explicitly set to true
+                this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
+            } catch (e) {
+                console.log('Failed to check user management status:', e.message);
+                this.usersManagement = false;
+                this.accountManagement = false;
+            }
         }
     }
 }
