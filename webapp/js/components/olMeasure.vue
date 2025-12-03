@@ -205,6 +205,21 @@ class MeasureControls extends Control {
     }
 
     /**
+     * Confirm and execute clear all measurements (called after user confirmation)
+     */
+    confirmClearAll() {
+        this.clearAllMeasurements();
+        this.onClearAll();
+    }
+
+    /**
+     * Confirm and execute delete saved measurements (called after user confirmation)
+     */
+    confirmDeleteSaved() {
+        this.onDeleteSaved();
+    }
+
+    /**
      * Show or hide the management buttons
      */
     updateButtonsVisibility(hasMeasurements, hasSavedMeasurements) {
@@ -228,10 +243,16 @@ class MeasureControls extends Control {
      * Clear all measurements from the map
      */
     clearAllMeasurements() {
+        const map = this.getMap();
         const features = this.source.getFeatures();
 
-        // Remove tooltip overlays
+        // Remove tooltip overlays from map
         features.forEach(feature => {
+            const tooltipOverlay = feature.get('measureTooltip');
+            if (tooltipOverlay && map) {
+                map.removeOverlay(tooltipOverlay);
+            }
+            // Also remove the DOM element if still attached
             const tooltipElement = feature.get('measureTooltipElement');
             if (tooltipElement && tooltipElement.parentNode) {
                 tooltipElement.parentNode.removeChild(tooltipElement);

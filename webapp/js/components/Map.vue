@@ -1608,6 +1608,9 @@ export default {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
 
+                // Clear measurements from the map
+                this.measureControls.clearAllMeasurements();
+
                 // Update button visibility
                 this.measureControls.updateButtonsVisibility(
                     this.measureControls.hasMeasurements(),
