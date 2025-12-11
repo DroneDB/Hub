@@ -425,7 +425,10 @@ export default {
 }
 
 .build-badge i.icon {
-    margin: 0;
+    margin: 0 !important;
     font-size: 10px;
+    width: auto;
+    height: auto;
+    line-height: 1;
 }
 </style>
