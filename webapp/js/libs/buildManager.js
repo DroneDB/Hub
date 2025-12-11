@@ -168,9 +168,19 @@ class BuildManager {
             const key = this.getDatasetKey(dataset);
             const cache = this.buildCache.get(key) || new Map();
 
-            // Update cache with existing builds
+            // Track which paths we've already processed
+            // Since builds are ordered by createdAt DESC (newest first),
+            // we only want to keep the most recent build for each path
+            const processedPaths = new Set();
+
+            // Update cache with existing builds - only the most recent for each path
             builds.forEach(build => {
                 if (build.path) {
+                    // Skip if we've already processed a newer build for this path
+                    if (processedPaths.has(build.path)) {
+                        return;
+                    }
+                    processedPaths.add(build.path);
                     cache.set(build.path, build);
                 }
             });
@@ -217,9 +227,20 @@ class BuildManager {
                     previousStates.set(path, build.currentState);
                 });
 
-                // Update cache
+                // Track which paths we've already processed in this poll cycle
+                // Since builds are ordered by createdAt DESC (newest first),
+                // we only want to keep the most recent build for each path
+                const processedPaths = new Set();
+
+                // Update cache - only consider the most recent build for each path
                 builds.forEach(build => {
                     if (build.path) {
+                        // Skip if we've already processed a newer build for this path
+                        if (processedPaths.has(build.path)) {
+                            return;
+                        }
+                        processedPaths.add(build.path);
+
                         const previousState = previousStates.get(build.path);
                         cache.set(build.path, build);
 
