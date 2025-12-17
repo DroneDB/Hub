@@ -28,6 +28,11 @@
     background-color: #003c88cc !important;
 }
 
+.ol-control button.active {
+    background-color: #00a86b !important;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
 .ol-measure-control {
     top: 4.5em;
     left: 0.5em;
@@ -66,4 +71,16 @@
     font-size: 12px;
     cursor: default;
     user-select: none;
+}
+
+.ol-tooltip-name {
+    font-weight: bold;
+    font-size: 11px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+    padding-bottom: 2px;
+}
+
+.ol-tooltip-value {
+    font-size: 12px;
 }
