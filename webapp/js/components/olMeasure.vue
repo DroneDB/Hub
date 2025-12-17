@@ -8,6 +8,8 @@ import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Translate from 'ol/interaction/Translate';
+import { defaults as defaultInteractions } from 'ol/interaction';
+import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
 import { Vector as VectorLayer } from 'ol/layer';
@@ -148,6 +150,12 @@ class MeasureControls extends Control {
         // Dialog instance reference
         this.propertiesDialog = null;
         this.dblClickListener = null;
+        this.changeFeatureListener = null;
+        this.doubleClickZoomInteraction = null;
+
+        // Undo stack for geometry modifications
+        this.undoStack = [];
+        this.maxUndoSteps = 50;
     }
 
     /**
@@ -438,9 +446,23 @@ class MeasureControls extends Control {
         map.addInteraction(this.modifyInteraction);
         map.addInteraction(this.translateInteraction);
 
-        // Update tooltip positions when geometry changes
+        // Save original geometry before modification starts (for undo)
+        this.modifyInteraction.on('modifystart', (evt) => {
+            evt.features.forEach(feature => {
+                this.saveToUndoStack(feature);
+            });
+        });
+
+        this.translateInteraction.on('translatestart', (evt) => {
+            evt.features.forEach(feature => {
+                this.saveToUndoStack(feature);
+            });
+        });
+
+        // Update tooltip in real-time during modification
         this.modifyInteraction.on('modifyend', (evt) => {
             evt.features.forEach(feature => {
+                this.updateMeasurementValue(feature);
                 this.updateTooltipPosition(feature);
             });
         });
@@ -451,8 +473,24 @@ class MeasureControls extends Control {
             });
         });
 
-        // Add double-click handler for opening properties dialog
-        this.dblClickListener = (evt) => {
+        // Real-time update during vertex dragging
+        this.changeFeatureListener = (evt) => {
+            if (this.isEditMode && evt.feature) {
+                this.updateMeasurementValueRealtime(evt.feature);
+            }
+        };
+        this.source.on('changefeature', this.changeFeatureListener);
+
+        // Disable DoubleClickZoom interaction to allow double-click on features
+        map.getInteractions().forEach((interaction) => {
+            if (interaction instanceof DoubleClickZoom) {
+                this.doubleClickZoomInteraction = interaction;
+                interaction.setActive(false);
+            }
+        });
+
+        // Add double-click handler for opening properties dialog using OpenLayers event
+        this.dblClickListener = map.on('dblclick', (evt) => {
             // Check if we hit a measurement feature
             const feature = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
                 if (layer === this.vector) return f;
@@ -463,21 +501,23 @@ class MeasureControls extends Control {
                 evt.stopPropagation();
                 evt.preventDefault();
                 this.openPropertiesDialog(feature);
+                return true; // Stop event propagation in OpenLayers
             }
-        };
-
-        map.getViewport().addEventListener('dblclick', this.dblClickListener);
+        });
 
         // Show help tooltip
         if (this.helpTooltipElement) {
-            this.helpTooltipElement.innerHTML = 'Drag vertices to edit. Shift+drag to move. Double-click for properties. Press ESC to exit.';
+            this.helpTooltipElement.innerHTML = 'Drag vertices to edit. Shift+drag to move. Double-click for properties. Ctrl+Z to undo. ESC to exit.';
             this.helpTooltipElement.classList.remove('hidden');
         }
 
-        // Add ESC key listener to exit edit mode
+        // Add keyboard listener for ESC to exit and Ctrl+Z for undo
         this.keyboardListener = (e) => {
             if (e.key === 'Escape' || e.keyCode === 27) {
                 this.disableEditMode();
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                this.undo();
             }
         };
         document.addEventListener('keydown', this.keyboardListener);
@@ -502,14 +542,26 @@ class MeasureControls extends Control {
             this.translateInteraction = null;
         }
 
-        if (this.dblClickListener && map) {
-            map.getViewport().removeEventListener('dblclick', this.dblClickListener);
+        // Remove OpenLayers dblclick listener
+        if (this.dblClickListener) {
+            unByKey(this.dblClickListener);
             this.dblClickListener = null;
+        }
+
+        // Re-enable DoubleClickZoom interaction
+        if (this.doubleClickZoomInteraction) {
+            this.doubleClickZoomInteraction.setActive(true);
+            this.doubleClickZoomInteraction = null;
         }
 
         if (this.keyboardListener) {
             document.removeEventListener('keydown', this.keyboardListener);
             this.keyboardListener = null;
+        }
+
+        if (this.changeFeatureListener) {
+            this.source.un('changefeature', this.changeFeatureListener);
+            this.changeFeatureListener = null;
         }
 
         if (this.helpTooltipElement) {
@@ -518,6 +570,123 @@ class MeasureControls extends Control {
 
         // Close any open dialog
         this.closePropertiesDialog();
+
+        // Clear undo stack when exiting edit mode
+        this.undoStack = [];
+    }
+
+    /**
+     * Save feature state to undo stack
+     */
+    saveToUndoStack(feature) {
+        const geometry = feature.getGeometry();
+        if (!geometry) return;
+
+        // Clone geometry and save with feature reference
+        const state = {
+            feature: feature,
+            geometry: geometry.clone(),
+            tooltipText: feature.get('tooltipText')
+        };
+
+        this.undoStack.push(state);
+
+        // Limit stack size
+        if (this.undoStack.length > this.maxUndoSteps) {
+            this.undoStack.shift();
+        }
+    }
+
+    /**
+     * Undo last geometry modification
+     */
+    undo() {
+        if (this.undoStack.length === 0) return;
+
+        const state = this.undoStack.pop();
+        const feature = state.feature;
+
+        // Check if feature still exists in source
+        if (!this.source.getFeatures().includes(feature)) return;
+
+        // Restore geometry
+        feature.setGeometry(state.geometry);
+
+        // Restore tooltip text
+        if (state.tooltipText) {
+            feature.set('tooltipText', state.tooltipText);
+        }
+
+        // Update tooltip display and position
+        this.updateMeasurementValue(feature);
+        this.updateTooltipPosition(feature);
+    }
+
+    /**
+     * Update measurement value and tooltip text after geometry change
+     */
+    updateMeasurementValue(feature) {
+        const geometry = feature.getGeometry();
+        const measurementType = feature.get('measurementType');
+
+        if (!geometry || !measurementType) return;
+
+        let output;
+        if (geometry instanceof Polygon && measurementType === 'area') {
+            const area = getArea(geometry);
+            if (this.unitPref === 'metric') {
+                if (area > 10000) {
+                    output = Math.round((area / 1000000) * 100) / 100 + ' km<sup>2</sup>';
+                } else {
+                    output = Math.round(area * 100) / 100 + ' m<sup>2</sup>';
+                }
+            } else {
+                const f = 0.00024710538146717;
+                output = Math.round((area * f) * 100) / 100 + ' acres';
+            }
+        } else if (geometry instanceof LineString && measurementType === 'length') {
+            const length = getLength(geometry);
+            if (this.unitPref === 'metric') {
+                if (length > 100) {
+                    output = Math.round((length / 1000) * 100) / 100 + ' km';
+                } else {
+                    output = Math.round(length * 100) / 100 + ' m';
+                }
+            } else {
+                const f = 3.28084;
+                output = Math.round((length * f) * 100) / 100 + ' ft';
+            }
+        }
+
+        if (output) {
+            feature.set('tooltipText', output);
+
+            // Update tooltip element
+            const tooltipElement = feature.get('measureTooltipElement');
+            if (tooltipElement) {
+                const name = feature.get('name');
+                let tooltipContent = '';
+                if (name) {
+                    tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
+                }
+                tooltipContent += `<div class="ol-tooltip-value">${output}</div>`;
+                tooltipElement.innerHTML = tooltipContent;
+            }
+        }
+    }
+
+    /**
+     * Real-time update of measurement value during vertex dragging (throttled)
+     */
+    updateMeasurementValueRealtime(feature) {
+        // Throttle updates to avoid performance issues
+        if (this._updateTimeout) return;
+
+        this._updateTimeout = setTimeout(() => {
+            this.updateMeasurementValue(feature);
+            this.updateTooltipPosition(feature);
+            this._updateTimeout = null;
+        }, 50); // Update every 50ms max
     }
 
     /**
