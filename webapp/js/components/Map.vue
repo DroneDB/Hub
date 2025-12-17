@@ -31,6 +31,11 @@
             confirmButtonClass="negative"
             @onClose="handleDeleteSavedMeasurementsDialogClose">
         </ConfirmDialog>
+        <ChangeUnitsDialog v-if="changeUnitsDialogOpen"
+            :targetUnit="changeUnitsTargetUnit"
+            :measurementsCount="changeUnitsMeasurementsCount"
+            @onClose="handleChangeUnitsDialogClose">
+        </ChangeUnitsDialog>
         <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
     </div>
 </template>
@@ -74,6 +79,7 @@ import { extractFeatureDisplayName } from '../libs/propertiesUtils';
 import { MeasurementStorage } from '../libs/measurementStorage';
 import Alert from './Alert.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
+import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import Flash from './Flash.vue';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
@@ -81,7 +87,7 @@ import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, Flash
+        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, ChangeUnitsDialog, Flash
     }, props: {
         files: {
             type: Array,
@@ -180,6 +186,10 @@ export default {
             // Confirm dialogs
             clearMeasurementsDialogOpen: false,
             deleteSavedMeasurementsDialogOpen: false,
+            changeUnitsDialogOpen: false,
+            changeUnitsTargetUnit: 'metric',
+            changeUnitsPreviousUnit: 'metric',
+            changeUnitsMeasurementsCount: 0,
 
             // Flash message
             flashMessage: null,
@@ -717,7 +727,8 @@ export default {
                 onExport: () => { this.exportMeasurementsToFile(); },
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
-                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; }
+                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
+                onUnitsChangeRequested: (newUnit, oldUnit) => { this.onUnitsChangeRequested(newUnit, oldUnit); }
             }); this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
@@ -1658,6 +1669,32 @@ export default {
             this.deleteSavedMeasurementsDialogOpen = false;
             if (result === 'confirm') {
                 this.measureControls.confirmDeleteSaved();
+            }
+        },
+
+        /**
+         * Handle units change request - show confirmation dialog
+         */
+        onUnitsChangeRequested: function(newUnit, oldUnit) {
+            this.changeUnitsTargetUnit = newUnit;
+            this.changeUnitsPreviousUnit = oldUnit;
+            this.changeUnitsMeasurementsCount = this.measureControls.getMeasurementsCount();
+            this.changeUnitsDialogOpen = true;
+        },
+
+        /**
+         * Handle change units dialog close
+         */
+        handleChangeUnitsDialogClose: async function(result) {
+            this.changeUnitsDialogOpen = false;
+            if (result === 'confirm') {
+                // Apply the unit change
+                this.measureControls.applyUnitsChange(this.changeUnitsTargetUnit);
+                // Save measurements with new units
+                await this.saveMeasurements();
+            } else {
+                // Rollback the select to previous value
+                this.measureControls.rollbackUnitSelect(this.changeUnitsPreviousUnit);
             }
         },
 

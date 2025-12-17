@@ -119,6 +119,7 @@ class MeasureControls extends Control {
         this.onDeleteSaved = options.onDeleteSaved || (() => { });
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
+        this.onUnitsChangeRequested = options.onUnitsChangeRequested || null;
 
         this.source = new VectorSource();
         this.vector = new VectorLayer({
@@ -196,8 +197,53 @@ class MeasureControls extends Control {
     }
 
     handleChangeUnits() {
-        localStorage.setItem("measureUnitPref", this.unitSelect.value);
-        this.unitPref = this.unitSelect.value;
+        const newUnit = this.unitSelect.value;
+        const oldUnit = this.unitPref;
+
+        // If unit didn't change, do nothing
+        if (newUnit === oldUnit) {
+            return;
+        }
+
+        // If there are measurements and a callback is provided, request confirmation
+        if (this.hasMeasurements() && this.onUnitsChangeRequested) {
+            this.onUnitsChangeRequested(newUnit, oldUnit);
+        } else {
+            // No measurements or no callback, apply directly
+            this.applyUnitsChange(newUnit);
+        }
+    }
+
+    /**
+     * Apply units change - update preference and recalculate all measurement tooltips
+     * @param {string} newUnit - The new unit preference ('metric' or 'imperial')
+     */
+    applyUnitsChange(newUnit) {
+        localStorage.setItem("measureUnitPref", newUnit);
+        this.unitPref = newUnit;
+        this.unitSelect.value = newUnit;
+
+        // Recalculate all existing measurement tooltips
+        const features = this.source.getFeatures();
+        features.forEach(feature => {
+            this.updateMeasurementValue(feature);
+        });
+    }
+
+    /**
+     * Rollback unit select to previous value (called when user cancels the dialog)
+     * @param {string} previousUnit - The previous unit preference
+     */
+    rollbackUnitSelect(previousUnit) {
+        this.unitSelect.value = previousUnit;
+    }
+
+    /**
+     * Get the count of measurements
+     * @returns {number} Number of measurements
+     */
+    getMeasurementsCount() {
+        return this.source.getFeatures().length;
     }
 
     handleToggleUnits() {
