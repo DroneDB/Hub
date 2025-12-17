@@ -10,15 +10,15 @@
 
 .ol-control button {
     background-color: #003c8880 !important;
-    margin: 1px !important;
+    margin: 0.25rem !important;
     padding: 0 !important;
     color: #fff !important;
     font-weight: bold !important;
     text-decoration: none !important;
     font-size: inherit !important;
     text-align: center !important;
-    height: 1.375em !important;
-    width: 1.375em !important;
+    height: 2rem !important;
+    width: 2rem !important;
     line-height: .4em !important;
     border: none !important;
     cursor: pointer !important;
@@ -34,7 +34,7 @@
 }
 
 .ol-measure-control {
-    top: 4.5em;
+    top: 6.5em;
     left: 0.5em;
 }
 
