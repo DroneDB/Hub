@@ -50,10 +50,12 @@
 
 <script>
 import ddb from 'ddb';
+import Vue from 'vue';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
 import ConfirmDialog from './ConfirmDialog.vue';
 import Flash from './Flash.vue';
+import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import { loadResources } from '../libs/lazy';
 import { MeasurementStorage } from '../libs/measurementStorage';
 import { exportMeasurements, importMeasurements } from '../libs/potreeMeasurementConverter';
@@ -87,7 +89,10 @@ export default {
             // Flash message
             flashMessage: null,
             flashIcon: 'check circle outline',
-            flashColor: 'positive'
+            flashColor: 'positive',
+
+            // Properties dialog for editing measurements
+            propertiesDialog: null
         };
     },
     mounted: function () {
@@ -113,12 +118,20 @@ export default {
             const scene = this.viewer.scene;
             const self = this;
 
+            // Helper to count annotations recursively
+            const countAnnotations = (annotations) => {
+                let count = 0;
+                annotations.traverse(() => { count++; });
+                return count;
+            };
+
             // Helper to update measurement count
             const updateCount = () => {
                 const measurements = (scene.measurements ? scene.measurements.length : 0);
                 const profiles = (scene.profiles ? scene.profiles.length : 0);
                 const volumes = (scene.volumes ? scene.volumes.length : 0);
-                self.measurementCount = measurements + profiles + volumes;
+                const annotations = countAnnotations(scene.annotations);
+                self.measurementCount = measurements + profiles + volumes + annotations;
             };
 
             // Listen to measurement events
@@ -129,8 +142,270 @@ export default {
             scene.addEventListener('volume_added', updateCount);
             scene.addEventListener('volume_removed', updateCount);
 
+            // Listen to annotation events
+            scene.annotations.addEventListener('annotation_added', updateCount);
+
             // Initial count
             updateCount();
+        },
+
+        /**
+         * Setup double-click listeners for editing measurements and annotations
+         */
+        setupMeasurementEditListeners: function() {
+            if (!this.viewer || !this.viewer.scene) return;
+
+            const self = this;
+            const renderer = this.viewer.renderer;
+            const scene = this.viewer.scene;
+
+            // Listen for double-click on the render area for measurements
+            renderer.domElement.addEventListener('dblclick', (event) => {
+                // Find if we clicked on a measurement sphere
+                const measure = self.findMeasurementAtPoint(event);
+                if (measure) {
+                    self.openPropertiesDialog(measure);
+                }
+            });
+
+            // Setup listeners for annotations (they have HTML domElements)
+            this.setupAnnotationEditListeners();
+
+            // Listen for new annotations being added
+            scene.annotations.addEventListener('annotation_added', (e) => {
+                // Delay to let the annotation fully initialize
+                setTimeout(() => {
+                    self.addAnnotationEditListener(e.annotation);
+                }, 100);
+            });
+        },
+
+        /**
+         * Setup double-click listeners for existing annotations
+         */
+        setupAnnotationEditListeners: function() {
+            const self = this;
+            const annotations = this.viewer.scene.annotations;
+
+            // Traverse all annotations and add listeners
+            annotations.traverse(annotation => {
+                self.addAnnotationEditListener(annotation);
+            });
+        },
+
+        /**
+         * Add double-click listener to a single annotation
+         */
+        addAnnotationEditListener: function(annotation) {
+            const self = this;
+
+            // Verify annotation is valid
+            if (!annotation || !annotation.position) {
+                console.warn('Invalid annotation, skipping edit listener');
+                return;
+            }
+
+            // Find the title element within the annotation's domElement
+            // Potree annotations have a structure with a title span
+            const domElement = annotation.domElement;
+            if (!domElement) return;
+
+            // Look for the title element (usually has class 'annotation-titlebar' or similar)
+            const titleElement = domElement.querySelector('.annotation-titlebar') ||
+                                 domElement.querySelector('[id$="-titlebar"]') ||
+                                 domElement;
+
+            // Remove existing listener to avoid duplicates
+            if (annotation._editHandler) {
+                titleElement.removeEventListener('dblclick', annotation._editHandler);
+            }
+
+            // Create and store handler
+            annotation._editHandler = (event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                self.openAnnotationPropertiesDialog(annotation);
+            };
+
+            titleElement.addEventListener('dblclick', annotation._editHandler);
+        },
+
+        /**
+         * Open properties dialog for an annotation
+         */
+        openAnnotationPropertiesDialog: function(annotation) {
+            // Close any existing dialog
+            this.closePropertiesDialog();
+
+            // Create a wrapper object that mimics OpenLayers Feature interface
+            const featureWrapper = {
+                get: (prop) => {
+                    switch(prop) {
+                        case 'name': return annotation.title || '';
+                        case 'description': return annotation.description || '';
+                        case 'stroke': return '#ffcc33';
+                        case 'stroke-width': return 2;
+                        case 'stroke-opacity': return 1;
+                        case 'fill': return '#ffcc33';
+                        case 'fill-opacity': return 0.2;
+                        default: return null;
+                    }
+                }
+            };
+
+            // Create Vue component instance
+            const DialogComponent = Vue.extend(MeasurementPropertiesDialog);
+            this.propertiesDialog = new DialogComponent({
+                propsData: {
+                    feature: featureWrapper,
+                    geometryType: 'Point' // Annotations are points
+                }
+            });
+
+            this.propertiesDialog.$mount();
+            document.body.appendChild(this.propertiesDialog.$el);
+
+            const self = this;
+
+            // Handle save
+            this.propertiesDialog.$on('onSave', (properties) => {
+                // Update annotation properties
+                if (properties.name !== undefined) {
+                    annotation.title = properties.name;
+                }
+                if (properties.description !== undefined) {
+                    annotation.description = properties.description;
+                }
+
+                // Auto-save measurements/annotations
+                self.saveMeasurements();
+            });
+
+            // Handle close
+            this.propertiesDialog.$on('onClose', () => {
+                self.closePropertiesDialog();
+            });
+        },
+
+        /**
+         * Find measurement at click point using raycasting
+         */
+        findMeasurementAtPoint: function(event) {
+            const renderer = this.viewer.renderer;
+            const camera = this.viewer.scene.getActiveCamera();
+            const measurements = this.viewer.scene.measurements || [];
+
+            // Get mouse position in normalized device coordinates
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+
+            // Create raycaster
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.params.Points = { threshold: 5 };
+
+            // Check each measurement's spheres
+            for (const measure of measurements) {
+                if (measure.spheres && measure.spheres.length > 0) {
+                    const intersects = raycaster.intersectObjects(measure.spheres, true);
+                    if (intersects.length > 0) {
+                        return measure;
+                    }
+                }
+            }
+
+            return null;
+        },
+
+        /**
+         * Open properties dialog for a measurement
+         */
+        openPropertiesDialog: function(measure) {
+            // Close any existing dialog
+            this.closePropertiesDialog();
+
+            // Determine geometry type based on measurement
+            const geometryType = (measure.showArea && measure.closed) ? 'Polygon' : 'LineString';
+
+            // Create a wrapper object that mimics OpenLayers Feature interface
+            const featureWrapper = {
+                get: (prop) => {
+                    switch(prop) {
+                        case 'name': return measure.name || '';
+                        case 'description': return measure.description || '';
+                        case 'stroke': return '#' + (measure.color ? measure.color.getHexString() : 'ffcc33');
+                        case 'stroke-width': return 2;
+                        case 'stroke-opacity': return 1;
+                        case 'fill': return '#' + (measure.color ? measure.color.getHexString() : 'ffcc33');
+                        case 'fill-opacity': return 0.2;
+                        default: return null;
+                    }
+                }
+            };
+
+            // Create Vue component instance
+            const DialogComponent = Vue.extend(MeasurementPropertiesDialog);
+            this.propertiesDialog = new DialogComponent({
+                propsData: {
+                    feature: featureWrapper,
+                    geometryType: geometryType
+                }
+            });
+
+            this.propertiesDialog.$mount();
+            document.body.appendChild(this.propertiesDialog.$el);
+
+            const self = this;
+
+            // Handle save
+            this.propertiesDialog.$on('onSave', (properties) => {
+                // Update measurement properties
+                if (properties.name !== undefined) {
+                    measure.name = properties.name;
+                }
+                if (properties.description !== undefined) {
+                    measure.description = properties.description;
+                }
+                if (properties.stroke) {
+                    measure.color = new THREE.Color(properties.stroke);
+                }
+
+                // Update the label in the viewer if exists
+                if (measure.sphereLabels && measure.sphereLabels.length > 0) {
+                    // Potree uses edgeLabels for distances, update color
+                    if (measure.edgeLabels) {
+                        measure.edgeLabels.forEach(label => {
+                            if (label.element) {
+                                label.element.style.color = properties.stroke;
+                            }
+                        });
+                    }
+                }
+
+                // Auto-save measurements
+                self.saveMeasurements();
+            });
+
+            // Handle close
+            this.propertiesDialog.$on('onClose', () => {
+                self.closePropertiesDialog();
+            });
+        },
+
+        /**
+         * Close properties dialog
+         */
+        closePropertiesDialog: function() {
+            if (this.propertiesDialog) {
+                if (this.propertiesDialog.$el && this.propertiesDialog.$el.parentNode) {
+                    this.propertiesDialog.$el.parentNode.removeChild(this.propertiesDialog.$el);
+                }
+                this.propertiesDialog.$destroy();
+                this.propertiesDialog = null;
+            }
         },
 
         handleLoad: async function () {
@@ -207,6 +482,9 @@ export default {
 
             // Setup measurement tracking listeners
             this.setupMeasurementListeners();
+
+            // Setup double-click listeners for editing measurements
+            this.setupMeasurementEditListeners();
 
             await this.addPointCloud(this.dataset.Entry(this.entry));
             this.viewer.fitToScreen();
