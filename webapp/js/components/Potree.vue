@@ -9,6 +9,31 @@
         </div>
 
         <div class="potree-container" :class="{ loading }">
+            <!-- Undo/Redo toolbar -->
+            <div v-if="loaded" class="undo-redo-toolbar">
+                <button
+                    @click="undo"
+                    :disabled="undoStack.length === 0"
+                    class="btn-undo-redo"
+                    title="Undo (Ctrl+Z)">
+                    <i class="undo icon"></i>
+                </button>
+                <button
+                    @click="redo"
+                    :disabled="redoStack.length === 0"
+                    class="btn-undo-redo"
+                    title="Redo (Ctrl+Y)">
+                    <i class="redo icon"></i>
+                </button>
+                <button
+                    @click="toggleDeleteTool"
+                    :class="{ active: deleteToolActive }"
+                    class="btn-undo-redo btn-delete-tool"
+                    title="Delete measurement tool (click on measurement to delete)">
+                    <i class="trash alternate icon"></i>
+                </button>
+            </div>
+
             <!-- Toolbar for measurements -->
             <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
                 <button
@@ -92,7 +117,16 @@ export default {
             flashColor: 'positive',
 
             // Properties dialog for editing measurements
-            propertiesDialog: null
+            propertiesDialog: null,
+
+            // Undo/Redo stacks for measurements
+            undoStack: [],
+            redoStack: [],
+
+            // Delete tool state
+            deleteToolActive: false,
+            deleteClickHandler: null,
+            deleteToolIcon: null
         };
     },
     mounted: function () {
@@ -464,10 +498,37 @@ export default {
             viewer.setEDLEnabled(false);
             viewer.setFOV(60);
             viewer.setPointBudget(10 * 1000 * 1000);
+
+            const self = this;
             viewer.loadGUI(() => {
                 viewer.setLanguage('en');
                 $("#menu_tools").next().show();
                 // viewer.toggleSidebar();
+
+                // Add delete measurement tool to the Potree toolbar
+                const elToolbar = $('#tools');
+                if (elToolbar.length > 0) {
+                    const deleteIcon = $(`
+                        <img src="${Potree.resourcePath}/icons/remove.svg"
+                            style="width: 32px; height: 32px"
+                            class="button-icon"
+                            title="Delete measurement (click to remove)" />
+                    `);
+                    deleteIcon.click(() => {
+                        self.toggleDeleteTool();
+                        // Update visual feedback on the icon
+                        if (self.deleteToolActive) {
+                            deleteIcon.css('background-color', 'rgba(231, 76, 60, 0.5)');
+                            deleteIcon.css('border-radius', '4px');
+                        } else {
+                            deleteIcon.css('background-color', '');
+                        }
+                    });
+                    elToolbar.append(deleteIcon);
+
+                    // Store reference to update icon state from deactivateDeleteTool
+                    self.deleteToolIcon = deleteIcon;
+                }
             });
 
             viewer.scene.scene.add(new THREE.AmbientLight(0x404040, 2.0)); // soft white light );
@@ -485,6 +546,9 @@ export default {
 
             // Setup double-click listeners for editing measurements
             this.setupMeasurementEditListeners();
+
+            // Setup undo/redo keyboard shortcuts
+            this.setupUndoRedoKeyboardShortcuts();
 
             await this.addPointCloud(this.dataset.Entry(this.entry));
             this.viewer.fitToScreen();
@@ -678,6 +742,260 @@ export default {
             this.flashMessage = null;
         },
 
+        // ============================================================================
+        // Undo/Redo System
+        // ============================================================================
+
+        /**
+         * Push a measurement to the undo stack (for deletion operations)
+         * Stores the measurement data needed to recreate it
+         */
+        pushToUndoStack: function(measure, actionType = 'delete') {
+            const measureData = {
+                actionType: actionType,
+                name: measure.name,
+                color: measure.color ? '#' + measure.color.getHexString() : '#ffcc33',
+                showDistances: measure.showDistances,
+                showCoordinates: measure.showCoordinates,
+                showArea: measure.showArea,
+                showAngles: measure.showAngles,
+                showCircle: measure.showCircle,
+                showHeight: measure.showHeight,
+                showEdges: measure.showEdges,
+                closed: measure.closed,
+                points: measure.points.map(p => ({
+                    x: p.position.x,
+                    y: p.position.y,
+                    z: p.position.z
+                }))
+            };
+
+            this.undoStack.push(measureData);
+
+            // Clear redo stack when new action is performed
+            this.redoStack = [];
+
+            // Limit stack size to prevent memory issues
+            if (this.undoStack.length > 50) {
+                this.undoStack.shift();
+            }
+        },
+
+        /**
+         * Recreate a measurement from stored data
+         */
+        recreateMeasurement: function(measureData) {
+            if (!this.viewer || !this.viewer.scene) return null;
+
+            const measure = new Potree.Measure();
+            measure.name = measureData.name || 'Measure';
+            measure.showDistances = measureData.showDistances !== undefined ? measureData.showDistances : true;
+            measure.showCoordinates = measureData.showCoordinates || false;
+            measure.showArea = measureData.showArea || false;
+            measure.showAngles = measureData.showAngles || false;
+            measure.showCircle = measureData.showCircle || false;
+            measure.showHeight = measureData.showHeight || false;
+            measure.showEdges = measureData.showEdges !== undefined ? measureData.showEdges : true;
+            measure.closed = measureData.closed !== undefined ? measureData.closed : true;
+
+            if (measureData.color) {
+                measure.color = new THREE.Color(measureData.color);
+            }
+
+            // Add points
+            measureData.points.forEach(p => {
+                const position = new THREE.Vector3(p.x, p.y, p.z);
+                measure.addMarker({ position: position });
+            });
+
+            return measure;
+        },
+
+        /**
+         * Undo last action
+         */
+        undo: function() {
+            if (this.undoStack.length === 0) return;
+
+            const measureData = this.undoStack.pop();
+
+            if (measureData.actionType === 'delete') {
+                // Recreate the deleted measurement
+                const measure = this.recreateMeasurement(measureData);
+                if (measure) {
+                    this.viewer.scene.addMeasurement(measure);
+                    this.showFlash('Measurement restored', 'positive', 'undo icon');
+                }
+            }
+
+            // Push to redo stack
+            this.redoStack.push(measureData);
+
+            // Limit redo stack size
+            if (this.redoStack.length > 50) {
+                this.redoStack.shift();
+            }
+        },
+
+        /**
+         * Redo last undone action
+         */
+        redo: function() {
+            if (this.redoStack.length === 0) return;
+
+            const measureData = this.redoStack.pop();
+
+            if (measureData.actionType === 'delete') {
+                // Find and delete the measurement again
+                const measurements = this.viewer.scene.measurements || [];
+
+                // Find measurement by matching points (since UUID changes on recreate)
+                for (const measure of measurements) {
+                    if (this.measurementsMatch(measure, measureData)) {
+                        this.viewer.scene.removeMeasurement(measure);
+                        this.showFlash('Measurement deleted', 'positive', 'redo icon');
+                        break;
+                    }
+                }
+            }
+
+            // Push back to undo stack
+            this.undoStack.push(measureData);
+        },
+
+        /**
+         * Check if a measurement matches stored data (by comparing points)
+         */
+        measurementsMatch: function(measure, measureData) {
+            if (!measure.points || measure.points.length !== measureData.points.length) {
+                return false;
+            }
+
+            for (let i = 0; i < measure.points.length; i++) {
+                const p1 = measure.points[i].position;
+                const p2 = measureData.points[i];
+                const epsilon = 0.001;
+
+                if (Math.abs(p1.x - p2.x) > epsilon ||
+                    Math.abs(p1.y - p2.y) > epsilon ||
+                    Math.abs(p1.z - p2.z) > epsilon) {
+                    return false;
+                }
+            }
+
+            return true;
+        },
+
+        // ============================================================================
+        // Delete Tool
+        // ============================================================================
+
+        /**
+         * Toggle the delete measurement tool
+         */
+        toggleDeleteTool: function() {
+            if (this.deleteToolActive) {
+                this.deactivateDeleteTool();
+            } else {
+                this.activateDeleteTool();
+            }
+        },
+
+        /**
+         * Activate the delete measurement tool
+         */
+        activateDeleteTool: function() {
+            if (!this.viewer || !this.viewer.renderer) return;
+
+            this.deleteToolActive = true;
+            const renderer = this.viewer.renderer;
+
+            // Change cursor to indicate delete mode
+            renderer.domElement.style.cursor = 'crosshair';
+
+            // Create click handler
+            const self = this;
+            this.deleteClickHandler = (event) => {
+                // Prevent if right-click
+                if (event.button !== 0) return;
+
+                const measure = self.findMeasurementAtPoint(event);
+                if (measure) {
+                    // Save to undo stack before deleting
+                    self.pushToUndoStack(measure, 'delete');
+
+                    // Remove the measurement
+                    self.viewer.scene.removeMeasurement(measure);
+                    self.showFlash('Measurement deleted (Ctrl+Z to undo)', 'warning', 'trash icon');
+                }
+                // Tool stays active for multiple deletions
+            };
+
+            renderer.domElement.addEventListener('click', this.deleteClickHandler);
+
+            // ESC key to deactivate
+            this.deleteKeyHandler = (event) => {
+                if (event.key === 'Escape') {
+                    self.deactivateDeleteTool();
+                }
+            };
+            document.addEventListener('keydown', this.deleteKeyHandler);
+
+            this.showFlash('Delete tool active - Click on measurements to delete. Press ESC to exit.', 'info', 'trash icon');
+        },
+
+        /**
+         * Deactivate the delete measurement tool
+         */
+        deactivateDeleteTool: function() {
+            if (!this.viewer || !this.viewer.renderer) return;
+
+            this.deleteToolActive = false;
+            const renderer = this.viewer.renderer;
+
+            // Reset cursor
+            renderer.domElement.style.cursor = '';
+
+            // Remove click handler
+            if (this.deleteClickHandler) {
+                renderer.domElement.removeEventListener('click', this.deleteClickHandler);
+                this.deleteClickHandler = null;
+            }
+
+            // Remove ESC key handler
+            if (this.deleteKeyHandler) {
+                document.removeEventListener('keydown', this.deleteKeyHandler);
+                this.deleteKeyHandler = null;
+            }
+
+            // Reset Potree toolbar icon state
+            if (this.deleteToolIcon) {
+                this.deleteToolIcon.css('background-color', '');
+            }
+        },
+
+        /**
+         * Setup keyboard shortcuts for undo/redo
+         */
+        setupUndoRedoKeyboardShortcuts: function() {
+            const self = this;
+
+            this.undoRedoKeyHandler = (event) => {
+                // Check if Ctrl (or Cmd on Mac) is pressed
+                if (event.ctrlKey || event.metaKey) {
+                    if (event.key === 'z' || event.key === 'Z') {
+                        event.preventDefault();
+                        self.undo();
+                    } else if (event.key === 'y' || event.key === 'Y') {
+                        event.preventDefault();
+                        self.redo();
+                    }
+                }
+            };
+
+            document.addEventListener('keydown', this.undoRedoKeyHandler);
+        },
+
         handleHistoryBack: function () {
             this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
         },
@@ -861,10 +1179,64 @@ export default {
         z-index: 999999999999 !important;
     }
 
+    /* Undo/Redo toolbar */
+    .undo-redo-toolbar {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1001;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 6px;
+        border-radius: 5px;
+        display: flex;
+        gap: 4px;
+        align-items: center;
+    }
+
+    .btn-undo-redo {
+        background: #555;
+        color: white;
+        border: none;
+        padding: 8px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        transition: background 0.2s;
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    .btn-undo-redo:hover:not(:disabled) {
+        background: #777;
+    }
+
+    .btn-undo-redo:disabled {
+        background: #333;
+        color: #666;
+        cursor: not-allowed;
+    }
+
+    .btn-undo-redo.btn-delete-tool {
+        background: #666;
+        margin-left: 8px;
+    }
+
+    .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
+        background: #e74c3c;
+    }
+
+    .btn-undo-redo.btn-delete-tool.active {
+        background: #e74c3c;
+        box-shadow: 0 0 8px rgba(231, 76, 60, 0.8);
+    }
+
     /* Toolbar for measurements */
     .measurements-toolbar {
         position: absolute;
-        top: 10px;
+        top: 60px;
         left: 10px;
         z-index: 1000;
         background: rgba(0, 0, 0, 0.7);
