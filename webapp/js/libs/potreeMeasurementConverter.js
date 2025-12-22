@@ -195,7 +195,10 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
     });
 
     annotations.forEach(annotation => {
-        features.push(annotationToGeoJSON(annotation, coordinateSystem));
+        const feature = annotationToGeoJSON(annotation, coordinateSystem);
+        if (feature) {
+            features.push(feature);
+        }
     });
 
     const geojson = {
@@ -224,9 +227,15 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
  * Convert an annotation to GeoJSON Feature
  * @param {Potree.Annotation} annotation - Potree annotation
  * @param {Object} coordinateSystem - Coordinate system
- * @returns {Object} GeoJSON Feature
+ * @returns {Object|null} GeoJSON Feature or null if annotation is invalid
  */
 function annotationToGeoJSON(annotation, coordinateSystem) {
+    // Skip annotations without valid position
+    if (!annotation || !annotation.position) {
+        console.warn('Skipping annotation without valid position:', annotation?.title);
+        return null;
+    }
+
     const coords = localToGeographic(annotation.position, coordinateSystem);
 
     return {

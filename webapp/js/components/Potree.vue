@@ -152,10 +152,15 @@ export default {
             const scene = this.viewer.scene;
             const self = this;
 
-            // Helper to count annotations recursively
+            // Helper to count annotations recursively (only valid ones with position)
             const countAnnotations = (annotations) => {
                 let count = 0;
-                annotations.traverse(() => { count++; });
+                annotations.traverse((annotation) => {
+                    // Only count if annotation has a valid position
+                    if (annotation && annotation.position) {
+                        count++;
+                    }
+                });
                 return count;
             };
 
