@@ -142,6 +142,14 @@ export default {
                 onClick: () => {
                     this.clearSelection();
                 }
+            },
+            {
+                id: 'reset-view',
+                title: "Reset View (H)",
+                icon: "home",
+                onClick: () => {
+                    this.resetToInitialView();
+                }
             }
         ];
 
@@ -167,6 +175,7 @@ export default {
             tools,
             selectSingle: false,
             selectArea: false,
+            initialExtent: null,
             vectorLayers: [],
             vectorLayerColors: {}, // Store colors for vector layers
             tooltipElement: null,  // Element for vector feature tooltips
@@ -1032,6 +1041,10 @@ export default {
         }, zoomToFilesExtent: function () {
             const ext = this.getSelectedFilesExtent();
             if (!isEmptyExtent(ext)) {
+                // Save initial extent on first zoom
+                if (!this.initialExtent) {
+                    this.initialExtent = ext.slice(); // Clone the extent array
+                }
                 // Zoom to it
                 setTimeout(() => {
                     this.map.getView().fit(ext, {
@@ -1053,7 +1066,21 @@ export default {
                     this.map.getView().setZoom(2);
                 }
             }
-        }, getSelectedFilesExtent: function () {
+        },
+        resetToInitialView: function () {
+            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) {
+                this.map.getView().fit(this.initialExtent, {
+                    padding: [40, 40, 40, 40],
+                    duration: 500,
+                    minResolution: 0.5,
+                    maxZoom: 22
+                });
+            } else {
+                // Fallback to recalculating extent
+                this.zoomToFilesExtent();
+            }
+        },
+        getSelectedFilesExtent: function () {
             const ext = createEmptyExtent();
             if (this.fileFeatures.getFeatures().length) {
                 extendExtent(ext, this.fileFeatures.getExtent());
@@ -1413,7 +1440,7 @@ export default {
             // Load measurements for orthophotos if available
             this.loadMeasurementsForOrthophotos();
         },
-        handleKeyDown: function () {
+        handleKeyDown: function (e) {
             if (Keyboard.isCtrlPressed() && this.mouseInside) {
                 if (Keyboard.isShiftPressed()) {
                     this.selectFeaturesByAreaKeyPressed = true;
@@ -1421,6 +1448,10 @@ export default {
                 } else {
                     this.$refs.toolbar.selectTool('select-features');
                 }
+            }
+            // H key for reset view
+            if (e.keyCode === 72 && this.mouseInside) {
+                this.resetToInitialView();
             }
         },
         handleKeyUp: function (e) {
