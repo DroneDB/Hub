@@ -513,12 +513,13 @@ export default {
                 // Add delete measurement tool to the Potree toolbar
                 const elToolbar = $('#tools');
                 if (elToolbar.length > 0) {
-                    const deleteIcon = $(`
+                    /*const deleteIcon = $(`
                         <img src="${Potree.resourcePath}/icons/remove.svg"
                             style="width: 32px; height: 32px"
                             class="button-icon"
                             title="Delete measurement (click to remove)" />
-                    `);
+                    `);*/
+                    const deleteIcon = $('<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="trash icon" style="font-size: x-large; margin: 0"></i></div>');
                     deleteIcon.click(() => {
                         self.toggleDeleteTool();
                         // Update visual feedback on the icon
