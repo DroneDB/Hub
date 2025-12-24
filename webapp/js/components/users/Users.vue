@@ -26,7 +26,8 @@
                             <i class="search icon"></i>
                         </div>
                     </div>
-                    <div class="eight wide column">
+                    <!-- align right -->
+                    <div class="eight wide column right aligned">
                         <button @click="showRoleManagement = true" class="ui button">
                             <i class="ui icon cogs"></i> Manage Roles
                         </button>

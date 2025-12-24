@@ -21,7 +21,13 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
     const clonedFeature = new Feature(geometry.clone());
 
     // Only copy safe properties (not circular references)
-    const safeProperties = ['tooltipText', 'createdAt', 'measurementType'];
+    // Includes GeoJSON styling conventions: stroke, stroke-width, stroke-opacity, fill, fill-opacity
+    const safeProperties = [
+        'tooltipText', 'createdAt', 'measurementType',
+        'name', 'description',
+        'stroke', 'stroke-width', 'stroke-opacity',
+        'fill', 'fill-opacity'
+    ];
     safeProperties.forEach(prop => {
         const value = feature.get(prop);
         if (value !== undefined) {
@@ -57,10 +63,26 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         measurementType: measurementType,
         unitPreference: unitPref,
         ...calculatedValues,
+        // Store name and description if available
+        name: feature.get('name') || null,
+        description: feature.get('description') || null,
         // Store the tooltip text if available
         tooltipText: feature.get('tooltipText') || null,
-        createdAt: feature.get('createdAt') || new Date().toISOString()
+        createdAt: feature.get('createdAt') || new Date().toISOString(),
+        // GeoJSON styling properties
+        stroke: feature.get('stroke') || null,
+        'stroke-width': feature.get('stroke-width') || null,
+        'stroke-opacity': feature.get('stroke-opacity') || null,
+        fill: feature.get('fill') || null,
+        'fill-opacity': feature.get('fill-opacity') || null
     };
+
+    // Remove null properties for cleaner GeoJSON
+    Object.keys(properties).forEach(key => {
+        if (properties[key] === null) {
+            delete properties[key];
+        }
+    });
 
     geoJsonFeature.properties = properties;
 
@@ -89,6 +111,17 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     feature.set('unitPreference', props.unitPreference);
     feature.set('createdAt', props.createdAt);
 
+    // Restore name and description
+    if (props.name) feature.set('name', props.name);
+    if (props.description) feature.set('description', props.description);
+
+    // Restore GeoJSON styling properties
+    if (props.stroke) feature.set('stroke', props.stroke);
+    if (props['stroke-width']) feature.set('stroke-width', props['stroke-width']);
+    if (props['stroke-opacity']) feature.set('stroke-opacity', props['stroke-opacity']);
+    if (props.fill) feature.set('fill', props.fill);
+    if (props['fill-opacity']) feature.set('fill-opacity', props['fill-opacity']);
+
     // Calculate and format the tooltip text
     let tooltipText = props.tooltipText;
 
@@ -103,6 +136,27 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     feature.set('tooltipText', tooltipText);
 
     return feature;
+}
+
+/**
+ * Update the tooltip content for a feature (e.g., after editing properties)
+ * @param {ol.Feature} feature - Feature to update tooltip for
+ */
+export function updateFeatureTooltip(feature) {
+    const tooltipElement = feature.get('measureTooltipElement');
+    if (!tooltipElement) return;
+
+    const name = feature.get('name');
+    const tooltipText = feature.get('tooltipText');
+
+    let tooltipContent = '';
+    if (name) {
+        tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
+    }
+    if (tooltipText) {
+        tooltipContent += `<div class="ol-tooltip-value">${tooltipText}</div>`;
+    }
+    tooltipElement.innerHTML = tooltipContent;
 }
 
 /**
@@ -191,11 +245,19 @@ export function importMeasurements(geojson, source, formatArea, formatLength, ma
  */
 function createStaticTooltip(feature, text, map) {
     const geometry = feature.getGeometry();
+    const name = feature.get('name');
 
     // Create tooltip element
     const measureTooltipElement = document.createElement('div');
     measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
-    measureTooltipElement.innerHTML = text;
+
+    // Build tooltip content with optional name
+    let tooltipContent = '';
+    if (name) {
+        tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
+    }
+    tooltipContent += `<div class="ol-tooltip-value">${text}</div>`;
+    measureTooltipElement.innerHTML = tooltipContent;
 
     // Determine tooltip position based on geometry type
     let position;

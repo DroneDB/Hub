@@ -67,6 +67,7 @@ export function measureToGeoJSON(measure, coordinateSystem) {
     const properties = {
         measurementType: measurementType,
         name: measure.name,
+        description: measure.description || '',
         color: '#' + measure.color.getHexString(),
         showDistances: measure.showDistances,
         showCoordinates: measure.showCoordinates,
@@ -128,6 +129,7 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
 
     // Restore base properties
     measure.name = props.name || 'Measure';
+    measure.description = props.description || '';
     measure.showDistances = props.showDistances !== undefined ? props.showDistances : true;
     measure.showCoordinates = props.showCoordinates || false;
     measure.showArea = props.showArea || false;
@@ -183,6 +185,22 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
 export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
     const measurements = viewer.scene.measurements || [];
 
+    // Collect all features from measurements
+    const features = measurements.map(m => measureToGeoJSON(m, coordinateSystem));
+
+    // Also export annotations
+    const annotations = [];
+    viewer.scene.annotations.traverse(annotation => {
+        annotations.push(annotation);
+    });
+
+    annotations.forEach(annotation => {
+        const feature = annotationToGeoJSON(annotation, coordinateSystem);
+        if (feature) {
+            features.push(feature);
+        }
+    });
+
     const geojson = {
         type: 'FeatureCollection',
         crs: {
@@ -199,10 +217,68 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
             application: 'Registry-Potree',
             coordinateSystem: coordinateSystem // Save original system for reference
         },
-        features: measurements.map(m => measureToGeoJSON(m, coordinateSystem))
+        features: features
     };
 
     return geojson;
+}
+
+/**
+ * Convert an annotation to GeoJSON Feature
+ * @param {Potree.Annotation} annotation - Potree annotation
+ * @param {Object} coordinateSystem - Coordinate system
+ * @returns {Object|null} GeoJSON Feature or null if annotation is invalid
+ */
+function annotationToGeoJSON(annotation, coordinateSystem) {
+    // Skip annotations without valid position
+    if (!annotation || !annotation.position) {
+        console.warn('Skipping annotation without valid position:', annotation?.title);
+        return null;
+    }
+
+    const coords = localToGeographic(annotation.position, coordinateSystem);
+
+    return {
+        type: 'Feature',
+        id: annotation.uuid || annotation.title,
+        geometry: {
+            type: 'Point',
+            coordinates: coords
+        },
+        properties: {
+            measurementType: 'annotation',
+            name: annotation.title || 'Annotation',
+            description: annotation.description || '',
+            localCoordinates: [annotation.position.x, annotation.position.y, annotation.position.z]
+        }
+    };
+}
+
+/**
+ * Convert a GeoJSON Feature to an annotation
+ * @param {Object} feature - GeoJSON Feature
+ * @param {Potree.Viewer} viewer - Potree viewer
+ * @param {Object} coordinateSystem - Coordinate system
+ * @returns {Potree.Annotation} Potree annotation
+ */
+function geoJSONToAnnotation(feature, viewer, coordinateSystem) {
+    const props = feature.properties;
+
+    // Get position from local coordinates if available, otherwise convert from geographic
+    let position;
+    if (props.localCoordinates && props.localCoordinates.length >= 3) {
+        position = props.localCoordinates;
+    } else {
+        position = geographicToLocal(feature.geometry.coordinates, coordinateSystem);
+    }
+
+    const annotation = new Potree.Annotation({
+        position: position,
+        title: props.name || 'Annotation',
+        description: props.description || ''
+    });
+
+    return annotation;
 }
 
 /**
@@ -221,15 +297,25 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
 
     geojson.features.forEach(feature => {
         try {
-            const measure = geoJSONToMeasure(feature, viewer, coordinateSystem);
-            viewer.scene.addMeasurement(measure);
-            imported.push(measure);
+            const props = feature.properties;
+
+            if (props.measurementType === 'annotation') {
+                // Import as annotation
+                const annotation = geoJSONToAnnotation(feature, viewer, coordinateSystem);
+                viewer.scene.annotations.add(annotation);
+                imported.push(annotation);
+            } else {
+                // Import as measurement
+                const measure = geoJSONToMeasure(feature, viewer, coordinateSystem);
+                viewer.scene.addMeasurement(measure);
+                imported.push(measure);
+            }
         } catch (e) {
             console.error('Error importing measurement:', e, feature);
         }
     });
 
-    console.log(`Imported ${imported.length} measurements`);
+    console.log(`Imported ${imported.length} measurements/annotations`);
     return imported;
 }
 
