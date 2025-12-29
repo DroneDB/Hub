@@ -203,7 +203,7 @@
 
         <!-- Delete User Confirmation Dialog -->
         <div v-if="showDeleteDialog" class="ui dimmer modals page transition visible active" style="display: flex !important; align-items: center; justify-content: center;">
-            <div class="ui small modal transition visible active" style="position: relative; top: auto; left: auto; margin: 0;">
+            <div class="ui modal transition visible active" style="position: relative; top: auto; left: auto; margin: 0;">
                 <i class="close icon" @click="showDeleteDialog = false"></i>
                 <div class="header">
                     <i class="trash icon"></i>
@@ -211,9 +211,55 @@
                 </div>
                 <div class="content">
                     <p>Are you sure you want to delete user <strong>{{ userToDelete && userToDelete.userName }}</strong>?</p>
-                    <p class="ui warning message">
+
+                    <div class="ui segment">
+                        <div class="ui form">
+                            <div class="field">
+                                <label>Transfer data to successor (optional)</label>
+                                <select v-model="deleteSuccessor" class="ui dropdown">
+                                    <option :value="null">-- Delete all data --</option>
+                                    <option v-for="user in users.filter(u => u.userName !== (userToDelete && userToDelete.userName))"
+                                            :key="user.userName"
+                                            :value="user.userName">
+                                        {{ user.userName }} ({{ user.email || 'no email' }})
+                                    </option>
+                                </select>
+                                <small class="text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
+                            </div>
+
+                            <div v-if="deleteSuccessor" class="field">
+                                <label>Conflict Resolution Strategy</label>
+                                <div class="grouped fields">
+                                    <div class="field">
+                                        <div class="ui radio checkbox">
+                                            <input type="radio" v-model="deleteConflictResolution" value="Rename" id="conflict-rename">
+                                            <label for="conflict-rename">Rename conflicting datasets</label>
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <div class="ui radio checkbox">
+                                            <input type="radio" v-model="deleteConflictResolution" value="Overwrite" id="conflict-overwrite">
+                                            <label for="conflict-overwrite">Overwrite existing datasets</label>
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <div class="ui radio checkbox">
+                                            <input type="radio" v-model="deleteConflictResolution" value="HaltOnConflict" id="conflict-halt">
+                                            <label for="conflict-halt">Stop if conflict detected</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p v-if="!deleteSuccessor" class="ui warning message">
                         <i class="warning icon"></i>
-                        This action cannot be undone. All user data and access will be permanently removed.
+                        <strong>Warning:</strong> All user data (organizations, datasets, files) will be permanently deleted.
+                    </p>
+                    <p v-else class="ui info message">
+                        <i class="info icon"></i>
+                        Organizations and datasets will be transferred to <strong>{{ deleteSuccessor }}</strong>.
                     </p>
                 </div>
                 <div class="actions">
@@ -222,7 +268,55 @@
                     </button>
                     <button class="ui red button" @click="confirmDelete" :class="{ loading: userToDelete && userToDelete.deleting }">
                         <i class="trash icon"></i>
-                        Delete User
+                        {{ deleteSuccessor ? 'Delete & Transfer' : 'Delete User' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete Result Dialog -->
+        <div v-if="showDeleteResultDialog" class="ui dimmer modals page transition visible active" style="display: flex !important; align-items: center; justify-content: center;">
+            <div class="ui small modal transition visible active" style="position: relative; top: auto; left: auto; margin: 0;">
+                <div class="header">
+                    <i class="check circle icon green"></i>
+                    User Deleted Successfully
+                </div>
+                <div class="content">
+                    <p>User <strong>{{ deleteResult && deleteResult.userName }}</strong> has been deleted.</p>
+
+                    <div v-if="deleteResult" class="ui segment">
+                        <div class="ui list">
+                            <div v-if="deleteResult.successor" class="item">
+                                <i class="user icon"></i>
+                                <div class="content">Data transferred to: <strong>{{ deleteResult.successor }}</strong></div>
+                            </div>
+                            <div class="item">
+                                <i class="building icon"></i>
+                                <div class="content">Organizations transferred: <strong>{{ deleteResult.organizationsTransferred || 0 }}</strong></div>
+                            </div>
+                            <div class="item">
+                                <i class="trash icon"></i>
+                                <div class="content">Organizations deleted: <strong>{{ deleteResult.organizationsDeleted || 0 }}</strong></div>
+                            </div>
+                            <div class="item">
+                                <i class="database icon"></i>
+                                <div class="content">Datasets transferred: <strong>{{ deleteResult.datasetsTransferred || 0 }}</strong></div>
+                            </div>
+                            <div class="item">
+                                <i class="trash alternate icon"></i>
+                                <div class="content">Datasets deleted: <strong>{{ deleteResult.datasetsDeleted || 0 }}</strong></div>
+                            </div>
+                            <div class="item">
+                                <i class="clock icon"></i>
+                                <div class="content">Batches deleted: <strong>{{ deleteResult.batchesDeleted || 0 }}</strong></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="ui primary button" @click="closeDeleteResultDialog">
+                        <i class="check icon"></i>
+                        OK
                     </button>
                 </div>
             </div>
@@ -264,8 +358,14 @@ export default {
             showRoleManagement: false,
             showOrganizationManagement: false,
             showDeleteDialog: false,
+            showDeleteResultDialog: false,
             userToDelete: null,
             currentUser: null,
+
+            // Delete options
+            deleteSuccessor: null,
+            deleteConflictResolution: 'Rename',
+            deleteResult: null,
 
             // Sorting
             sortColumn: "userName",
@@ -436,6 +536,9 @@ export default {
 
         async handleDelete(user) {
             this.userToDelete = user;
+            this.deleteSuccessor = null;
+            this.deleteConflictResolution = 'Rename';
+            this.deleteResult = null;
             this.showDeleteDialog = true;
         },
 
@@ -445,17 +548,24 @@ export default {
             try {
                 this.userToDelete.deleting = true;
 
-                // Perform the delete operation
-                const result = await reg.deleteUser(this.userToDelete.userName);
+                // Perform the delete operation with optional successor
+                const result = await reg.deleteUser(
+                    this.userToDelete.userName,
+                    this.deleteSuccessor,
+                    this.deleteConflictResolution
+                );
+
+                // Store result for display
+                this.deleteResult = result;
 
                 // Remove user from list
                 this.users = this.users.filter(u => u.userName !== this.userToDelete.userName);
 
-                // Close dialog and reset state on successful deletion
+                // Close delete dialog and show result dialog
                 this.showDeleteDialog = false;
-                this.userToDelete = null;
+                this.showDeleteResultDialog = true;
 
-                console.log('User deleted successfully');
+                console.log('User deleted successfully', result);
 
             } catch (e) {
                 console.error('Error deleting user:', e);
@@ -464,6 +574,16 @@ export default {
                     this.userToDelete.deleting = false;
                 }
                 // Don't close dialog on error so user can see the error message
+            }
+        },
+
+        closeDeleteResultDialog() {
+            this.showDeleteResultDialog = false;
+            this.deleteResult = null;
+            this.userToDelete = null;
+            // Reload to refresh data if successor was used
+            if (this.deleteSuccessor) {
+                this.loadData();
             }
         },
 

@@ -152,8 +152,30 @@ module.exports = class Registry {
         });
     }
 
-    async deleteUser(username) {
-        return await this.deleteRequest(`/users/${encodeURIComponent(username)}`);
+    /**
+     * Deletes a user and optionally transfers their data to a successor.
+     * @param {string} username - The username of the user to delete.
+     * @param {string|null} successor - The username of the successor to transfer data to. If null, all data is deleted.
+     * @param {string} conflictResolution - How to handle conflicts: 'HaltOnConflict' (0), 'Overwrite' (1), or 'Rename' (2). Default is 'Rename'.
+     * @returns {Promise<Object>} Result object with deletion details.
+     */
+    async deleteUser(username, successor = null, conflictResolution = 'Rename') {
+        let url = `/users/${encodeURIComponent(username)}`;
+        const params = new URLSearchParams();
+
+        if (successor) {
+            params.append('successor', successor);
+        }
+        if (conflictResolution) {
+            params.append('conflictResolution', conflictResolution);
+        }
+
+        const queryString = params.toString();
+        if (queryString) {
+            url += `?${queryString}`;
+        }
+
+        return await this.deleteRequest(url);
     }
 
     async changePwd(oldPassword, newPassword) {
