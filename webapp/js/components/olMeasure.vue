@@ -6,13 +6,19 @@ import { rootPath } from '../dynamic/pathutils';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
+import Modify from 'ol/interaction/Modify';
+import Translate from 'ol/interaction/Translate';
+import { defaults as defaultInteractions } from 'ol/interaction';
+import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
 import { Vector as VectorLayer } from 'ol/layer';
 import { unByKey } from 'ol/Observable';
 import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
-import { exportMeasurements, importMeasurements } from '../libs/olMeasurementConverter';
+import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '../libs/olMeasurementConverter';
+import Vue from 'vue';
+import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 
 class MeasureControls extends Control {
     /**
@@ -29,6 +35,8 @@ class MeasureControls extends Control {
         btnArea.innerHTML = '<img title="Measure Area" src="' + rootPath("/images/measure-area.svg") + '"/>';
         const btnErase = document.createElement('button');
         btnErase.innerHTML = '<img title="Erase Measurement" src="' + rootPath("/images/measure-erase.svg") + '"/>';
+        const btnEdit = document.createElement('button');
+        btnEdit.innerHTML = '<img title="Edit/Move Measurements" src="' + rootPath("/images/edit.svg") + '"/>';
         const btnStop = document.createElement('button');
         btnStop.innerHTML = '<img title="Stop Measuring (ESC)" src="' + rootPath("/images/measure-stop.svg") + '"/>';
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
@@ -75,6 +83,7 @@ class MeasureControls extends Control {
         element.appendChild(btnLength);
         element.appendChild(btnArea);
         element.appendChild(btnErase);
+        element.appendChild(btnEdit);
         element.appendChild(btnStop);
         element.appendChild(unitDiv);
         element.appendChild(btnUnits);
@@ -92,6 +101,7 @@ class MeasureControls extends Control {
         btnLength.addEventListener('click', this.handleMeasureLength.bind(this), false);
         btnArea.addEventListener('click', this.handleMeasureArea.bind(this), false);
         btnErase.addEventListener('click', this.handleErase.bind(this), false);
+        btnEdit.addEventListener('click', this.handleEdit.bind(this), false);
         btnStop.addEventListener('click', this.handleStop.bind(this), false);
         btnUnits.addEventListener('click', this.handleToggleUnits.bind(this), false);
         unitSelect.addEventListener('change', this.handleChangeUnits.bind(this), false);
@@ -109,25 +119,12 @@ class MeasureControls extends Control {
         this.onDeleteSaved = options.onDeleteSaved || (() => { });
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
+        this.onUnitsChangeRequested = options.onUnitsChangeRequested || null;
 
         this.source = new VectorSource();
         this.vector = new VectorLayer({
             source: this.source,
-            style: new Style({
-                fill: new Fill({
-                    color: 'rgba(255, 255, 255, 0.2)',
-                }),
-                stroke: new Stroke({
-                    color: '#ffcc33',
-                    width: 2,
-                }),
-                image: new CircleStyle({
-                    radius: 7,
-                    fill: new Fill({
-                        color: '#ffcc33',
-                    }),
-                }),
-            }),
+            style: (feature) => this.createFeatureStyle(feature),
         });
 
         this.unitDiv = unitDiv;
@@ -136,6 +133,7 @@ class MeasureControls extends Control {
 
         // Store button references
         this.btnStop = btnStop;
+        this.btnEdit = btnEdit;
         this.btnSave = btnSave;
         this.btnClear = btnClear;
         this.btnExport = btnExport;
@@ -144,6 +142,21 @@ class MeasureControls extends Control {
 
         // Store keyboard listener reference
         this.keyboardListener = null;
+
+        // Edit mode interactions
+        this.modifyInteraction = null;
+        this.translateInteraction = null;
+        this.isEditMode = false;
+
+        // Dialog instance reference
+        this.propertiesDialog = null;
+        this.dblClickListener = null;
+        this.changeFeatureListener = null;
+        this.doubleClickZoomInteraction = null;
+
+        // Undo stack for geometry modifications
+        this.undoStack = [];
+        this.maxUndoSteps = 50;
     }
 
     /**
@@ -170,6 +183,10 @@ class MeasureControls extends Control {
         this.onSelect('erase');
     }
 
+    handleEdit() {
+        this.toggleEditMode();
+    }
+
     handleStop() {
         // Finish current drawing if in progress
         if (this.draw) {
@@ -180,8 +197,53 @@ class MeasureControls extends Control {
     }
 
     handleChangeUnits() {
-        localStorage.setItem("measureUnitPref", this.unitSelect.value);
-        this.unitPref = this.unitSelect.value;
+        const newUnit = this.unitSelect.value;
+        const oldUnit = this.unitPref;
+
+        // If unit didn't change, do nothing
+        if (newUnit === oldUnit) {
+            return;
+        }
+
+        // If there are measurements and a callback is provided, request confirmation
+        if (this.hasMeasurements() && this.onUnitsChangeRequested) {
+            this.onUnitsChangeRequested(newUnit, oldUnit);
+        } else {
+            // No measurements or no callback, apply directly
+            this.applyUnitsChange(newUnit);
+        }
+    }
+
+    /**
+     * Apply units change - update preference and recalculate all measurement tooltips
+     * @param {string} newUnit - The new unit preference ('metric' or 'imperial')
+     */
+    applyUnitsChange(newUnit) {
+        localStorage.setItem("measureUnitPref", newUnit);
+        this.unitPref = newUnit;
+        this.unitSelect.value = newUnit;
+
+        // Recalculate all existing measurement tooltips
+        const features = this.source.getFeatures();
+        features.forEach(feature => {
+            this.updateMeasurementValue(feature);
+        });
+    }
+
+    /**
+     * Rollback unit select to previous value (called when user cancels the dialog)
+     * @param {string} previousUnit - The previous unit preference
+     */
+    rollbackUnitSelect(previousUnit) {
+        this.unitSelect.value = previousUnit;
+    }
+
+    /**
+     * Get the count of measurements
+     * @returns {number} Number of measurements
+     */
+    getMeasurementsCount() {
+        return this.source.getFeatures().length;
     }
 
     handleToggleUnits() {
@@ -205,6 +267,21 @@ class MeasureControls extends Control {
     }
 
     /**
+     * Confirm and execute clear all measurements (called after user confirmation)
+     */
+    confirmClearAll() {
+        this.clearAllMeasurements();
+        this.onClearAll();
+    }
+
+    /**
+     * Confirm and execute delete saved measurements (called after user confirmation)
+     */
+    confirmDeleteSaved() {
+        this.onDeleteSaved();
+    }
+
+    /**
      * Show or hide the management buttons
      */
     updateButtonsVisibility(hasMeasurements, hasSavedMeasurements) {
@@ -225,13 +302,69 @@ class MeasureControls extends Control {
     }
 
     /**
+     * Create a style for a feature based on its properties (GeoJSON styling conventions)
+     * @param {ol.Feature} feature - The feature to style
+     * @returns {ol.style.Style} The style for the feature
+     */
+    createFeatureStyle(feature) {
+        // Default colors
+        const defaultStroke = '#ffcc33';
+        const defaultFill = 'rgba(255, 255, 255, 0.2)';
+        const defaultStrokeWidth = 2;
+
+        // Read GeoJSON style properties from feature
+        const strokeColor = feature.get('stroke') || defaultStroke;
+        const strokeWidth = feature.get('stroke-width') || defaultStrokeWidth;
+        const strokeOpacity = feature.get('stroke-opacity') !== undefined ? feature.get('stroke-opacity') : 1;
+        const fillColor = feature.get('fill') || defaultStroke;
+        const fillOpacity = feature.get('fill-opacity') !== undefined ? feature.get('fill-opacity') : 0.2;
+
+        // Convert hex color to rgba if needed
+        const hexToRgba = (hex, opacity) => {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            if (result) {
+                const r = parseInt(result[1], 16);
+                const g = parseInt(result[2], 16);
+                const b = parseInt(result[3], 16);
+                return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+            }
+            return hex;
+        };
+
+        const strokeRgba = hexToRgba(strokeColor, strokeOpacity);
+        const fillRgba = hexToRgba(fillColor, fillOpacity);
+
+        return new Style({
+            fill: new Fill({
+                color: fillRgba,
+            }),
+            stroke: new Stroke({
+                color: strokeRgba,
+                width: strokeWidth,
+            }),
+            image: new CircleStyle({
+                radius: 7,
+                fill: new Fill({
+                    color: strokeColor,
+                }),
+            }),
+        });
+    }
+
+    /**
      * Clear all measurements from the map
      */
     clearAllMeasurements() {
+        const map = this.getMap();
         const features = this.source.getFeatures();
 
-        // Remove tooltip overlays
+        // Remove tooltip overlays from map
         features.forEach(feature => {
+            const tooltipOverlay = feature.get('measureTooltip');
+            if (tooltipOverlay && map) {
+                map.removeOverlay(tooltipOverlay);
+            }
+            // Also remove the DOM element if still attached
             const tooltipElement = feature.get('measureTooltipElement');
             if (tooltipElement && tooltipElement.parentNode) {
                 tooltipElement.parentNode.removeChild(tooltipElement);
@@ -306,6 +439,378 @@ class MeasureControls extends Control {
         return this.source.getFeatures().length > 0;
     }
 
+    /**
+     * Toggle edit mode (Modify + Translate interactions)
+     */
+    toggleEditMode() {
+        const map = this.getMap();
+
+        if (this.isEditMode) {
+            // Disable edit mode
+            this.disableEditMode();
+        } else {
+            // First deselect any active drawing tool
+            if (this.selectedTool) {
+                this.deselectCurrent();
+            }
+
+            // Enable edit mode
+            this.enableEditMode(map);
+        }
+    }
+
+    /**
+     * Enable edit mode with Modify and Translate interactions
+     */
+    enableEditMode(map) {
+        if (!map) return;
+
+        this.isEditMode = true;
+        this.btnEdit.classList.add('active');
+
+        // Create Modify interaction for vertex editing
+        this.modifyInteraction = new Modify({
+            source: this.source,
+            style: new Style({
+                image: new CircleStyle({
+                    radius: 6,
+                    fill: new Fill({ color: '#ffcc33' }),
+                    stroke: new Stroke({ color: '#fff', width: 2 })
+                })
+            })
+        });
+
+        // Create Translate interaction for moving entire features (Shift+drag)
+        this.translateInteraction = new Translate({
+            layers: [this.vector],
+            condition: (event) => {
+                // Only translate when Shift key is pressed
+                return event.originalEvent.shiftKey;
+            }
+        });
+
+        map.addInteraction(this.modifyInteraction);
+        map.addInteraction(this.translateInteraction);
+
+        // Save original geometry before modification starts (for undo)
+        this.modifyInteraction.on('modifystart', (evt) => {
+            evt.features.forEach(feature => {
+                this.saveToUndoStack(feature);
+            });
+        });
+
+        this.translateInteraction.on('translatestart', (evt) => {
+            evt.features.forEach(feature => {
+                this.saveToUndoStack(feature);
+            });
+        });
+
+        // Update tooltip in real-time during modification
+        this.modifyInteraction.on('modifyend', (evt) => {
+            evt.features.forEach(feature => {
+                this.updateMeasurementValue(feature);
+                this.updateTooltipPosition(feature);
+            });
+        });
+
+        this.translateInteraction.on('translateend', (evt) => {
+            evt.features.forEach(feature => {
+                this.updateTooltipPosition(feature);
+            });
+        });
+
+        // Real-time update during vertex dragging
+        this.changeFeatureListener = (evt) => {
+            if (this.isEditMode && evt.feature) {
+                this.updateMeasurementValueRealtime(evt.feature);
+            }
+        };
+        this.source.on('changefeature', this.changeFeatureListener);
+
+        // Disable DoubleClickZoom interaction to allow double-click on features
+        map.getInteractions().forEach((interaction) => {
+            if (interaction instanceof DoubleClickZoom) {
+                this.doubleClickZoomInteraction = interaction;
+                interaction.setActive(false);
+            }
+        });
+
+        // Add double-click handler for opening properties dialog using OpenLayers event
+        this.dblClickListener = map.on('dblclick', (evt) => {
+            // Check if we hit a measurement feature
+            const feature = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
+                if (layer === this.vector) return f;
+                return null;
+            }, { hitTolerance: 5 });
+
+            if (feature && feature.get('measurementType')) {
+                evt.stopPropagation();
+                evt.preventDefault();
+                this.openPropertiesDialog(feature);
+                return true; // Stop event propagation in OpenLayers
+            }
+        });
+
+        // Show help tooltip
+        if (this.helpTooltipElement) {
+            this.helpTooltipElement.innerHTML = 'Drag vertices to edit. Shift+drag to move. Double-click for properties. Ctrl+Z to undo. ESC to exit.';
+            this.helpTooltipElement.classList.remove('hidden');
+        }
+
+        // Add keyboard listener for ESC to exit and Ctrl+Z for undo
+        this.keyboardListener = (e) => {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                this.disableEditMode();
+            } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                this.undo();
+            }
+        };
+        document.addEventListener('keydown', this.keyboardListener);
+    }
+
+    /**
+     * Disable edit mode
+     */
+    disableEditMode() {
+        const map = this.getMap();
+
+        this.isEditMode = false;
+        this.btnEdit.classList.remove('active');
+
+        if (this.modifyInteraction && map) {
+            map.removeInteraction(this.modifyInteraction);
+            this.modifyInteraction = null;
+        }
+
+        if (this.translateInteraction && map) {
+            map.removeInteraction(this.translateInteraction);
+            this.translateInteraction = null;
+        }
+
+        // Remove OpenLayers dblclick listener
+        if (this.dblClickListener) {
+            unByKey(this.dblClickListener);
+            this.dblClickListener = null;
+        }
+
+        // Re-enable DoubleClickZoom interaction
+        if (this.doubleClickZoomInteraction) {
+            this.doubleClickZoomInteraction.setActive(true);
+            this.doubleClickZoomInteraction = null;
+        }
+
+        if (this.keyboardListener) {
+            document.removeEventListener('keydown', this.keyboardListener);
+            this.keyboardListener = null;
+        }
+
+        if (this.changeFeatureListener) {
+            this.source.un('changefeature', this.changeFeatureListener);
+            this.changeFeatureListener = null;
+        }
+
+        if (this.helpTooltipElement) {
+            this.helpTooltipElement.classList.add('hidden');
+        }
+
+        // Close any open dialog
+        this.closePropertiesDialog();
+
+        // Clear undo stack when exiting edit mode
+        this.undoStack = [];
+    }
+
+    /**
+     * Save feature state to undo stack
+     */
+    saveToUndoStack(feature) {
+        const geometry = feature.getGeometry();
+        if (!geometry) return;
+
+        // Clone geometry and save with feature reference
+        const state = {
+            feature: feature,
+            geometry: geometry.clone(),
+            tooltipText: feature.get('tooltipText')
+        };
+
+        this.undoStack.push(state);
+
+        // Limit stack size
+        if (this.undoStack.length > this.maxUndoSteps) {
+            this.undoStack.shift();
+        }
+    }
+
+    /**
+     * Undo last geometry modification
+     */
+    undo() {
+        if (this.undoStack.length === 0) return;
+
+        const state = this.undoStack.pop();
+        const feature = state.feature;
+
+        // Check if feature still exists in source
+        if (!this.source.getFeatures().includes(feature)) return;
+
+        // Restore geometry
+        feature.setGeometry(state.geometry);
+
+        // Restore tooltip text
+        if (state.tooltipText) {
+            feature.set('tooltipText', state.tooltipText);
+        }
+
+        // Update tooltip display and position
+        this.updateMeasurementValue(feature);
+        this.updateTooltipPosition(feature);
+    }
+
+    /**
+     * Update measurement value and tooltip text after geometry change
+     */
+    updateMeasurementValue(feature) {
+        const geometry = feature.getGeometry();
+        const measurementType = feature.get('measurementType');
+
+        if (!geometry || !measurementType) return;
+
+        let output;
+        if (geometry instanceof Polygon && measurementType === 'area') {
+            const area = getArea(geometry);
+            if (this.unitPref === 'metric') {
+                if (area > 10000) {
+                    output = Math.round((area / 1000000) * 100) / 100 + ' km<sup>2</sup>';
+                } else {
+                    output = Math.round(area * 100) / 100 + ' m<sup>2</sup>';
+                }
+            } else {
+                const f = 0.00024710538146717;
+                output = Math.round((area * f) * 100) / 100 + ' acres';
+            }
+        } else if (geometry instanceof LineString && measurementType === 'length') {
+            const length = getLength(geometry);
+            if (this.unitPref === 'metric') {
+                if (length > 100) {
+                    output = Math.round((length / 1000) * 100) / 100 + ' km';
+                } else {
+                    output = Math.round(length * 100) / 100 + ' m';
+                }
+            } else {
+                const f = 3.28084;
+                output = Math.round((length * f) * 100) / 100 + ' ft';
+            }
+        }
+
+        if (output) {
+            feature.set('tooltipText', output);
+
+            // Update tooltip element
+            const tooltipElement = feature.get('measureTooltipElement');
+            if (tooltipElement) {
+                const name = feature.get('name');
+                let tooltipContent = '';
+                if (name) {
+                    tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
+                }
+                tooltipContent += `<div class="ol-tooltip-value">${output}</div>`;
+                tooltipElement.innerHTML = tooltipContent;
+            }
+        }
+    }
+
+    /**
+     * Real-time update of measurement value during vertex dragging (throttled)
+     */
+    updateMeasurementValueRealtime(feature) {
+        // Throttle updates to avoid performance issues
+        if (this._updateTimeout) return;
+
+        this._updateTimeout = setTimeout(() => {
+            this.updateMeasurementValue(feature);
+            this.updateTooltipPosition(feature);
+            this._updateTimeout = null;
+        }, 50); // Update every 50ms max
+    }
+
+    /**
+     * Update tooltip position after geometry modification
+     */
+    updateTooltipPosition(feature) {
+        const geometry = feature.getGeometry();
+        const tooltip = feature.get('measureTooltip');
+
+        if (!tooltip || !geometry) return;
+
+        let position;
+        if (geometry instanceof Polygon) {
+            position = geometry.getInteriorPoint().getCoordinates();
+        } else if (geometry instanceof LineString) {
+            position = geometry.getLastCoordinate();
+        }
+
+        if (position) {
+            tooltip.setPosition(position);
+        }
+    }
+
+    /**
+     * Open properties dialog for a feature
+     */
+    openPropertiesDialog(feature) {
+        // Close any existing dialog
+        this.closePropertiesDialog();
+
+        const geometry = feature.getGeometry();
+        const geometryType = geometry ? geometry.getType() : 'LineString';
+
+        // Create Vue component instance
+        const DialogComponent = Vue.extend(MeasurementPropertiesDialog);
+        this.propertiesDialog = new DialogComponent({
+            propsData: {
+                feature: feature,
+                geometryType: geometryType
+            }
+        });
+
+        this.propertiesDialog.$mount();
+        document.body.appendChild(this.propertiesDialog.$el);
+
+        // Handle save
+        this.propertiesDialog.$on('onSave', (properties) => {
+            // Update feature properties
+            Object.keys(properties).forEach(key => {
+                feature.set(key, properties[key]);
+            });
+
+            // Update tooltip with new name
+            updateFeatureTooltip(feature);
+
+            // Trigger re-render for style changes
+            feature.changed();
+        });
+
+        // Handle close
+        this.propertiesDialog.$on('onClose', () => {
+            this.closePropertiesDialog();
+        });
+    }
+
+    /**
+     * Close properties dialog
+     */
+    closePropertiesDialog() {
+        if (this.propertiesDialog) {
+            if (this.propertiesDialog.$el && this.propertiesDialog.$el.parentNode) {
+                this.propertiesDialog.$el.parentNode.removeChild(this.propertiesDialog.$el);
+            }
+            this.propertiesDialog.$destroy();
+            this.propertiesDialog = null;
+        }
+    }
+
     deselectCurrent() {
         if (this.selectedTool) this.onSelect(this.selectedTool);
     }
@@ -316,6 +821,12 @@ class MeasureControls extends Control {
 
     onSelect(tool) {
         const map = this.getMap();
+
+        // Disable edit mode if active when selecting a drawing tool
+        if (this.isEditMode) {
+            this.disableEditMode();
+        }
+
         const removeHandlers = () => {
             if (!this.loaded) return;
 

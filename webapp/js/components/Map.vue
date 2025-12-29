@@ -31,6 +31,11 @@
             confirmButtonClass="negative"
             @onClose="handleDeleteSavedMeasurementsDialogClose">
         </ConfirmDialog>
+        <ChangeUnitsDialog v-if="changeUnitsDialogOpen"
+            :targetUnit="changeUnitsTargetUnit"
+            :measurementsCount="changeUnitsMeasurementsCount"
+            @onClose="handleChangeUnitsDialogClose">
+        </ChangeUnitsDialog>
         <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
     </div>
 </template>
@@ -74,6 +79,7 @@ import { extractFeatureDisplayName } from '../libs/propertiesUtils';
 import { MeasurementStorage } from '../libs/measurementStorage';
 import Alert from './Alert.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
+import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import Flash from './Flash.vue';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
@@ -81,7 +87,7 @@ import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, Flash
+        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, ChangeUnitsDialog, Flash
     }, props: {
         files: {
             type: Array,
@@ -136,6 +142,14 @@ export default {
                 onClick: () => {
                     this.clearSelection();
                 }
+            },
+            {
+                id: 'reset-view',
+                title: "Reset View (H)",
+                icon: "home",
+                onClick: () => {
+                    this.resetToInitialView();
+                }
             }
         ];
 
@@ -161,6 +175,7 @@ export default {
             tools,
             selectSingle: false,
             selectArea: false,
+            initialExtent: null,
             vectorLayers: [],
             vectorLayerColors: {}, // Store colors for vector layers
             tooltipElement: null,  // Element for vector feature tooltips
@@ -180,6 +195,10 @@ export default {
             // Confirm dialogs
             clearMeasurementsDialogOpen: false,
             deleteSavedMeasurementsDialogOpen: false,
+            changeUnitsDialogOpen: false,
+            changeUnitsTargetUnit: 'metric',
+            changeUnitsPreviousUnit: 'metric',
+            changeUnitsMeasurementsCount: 0,
 
             // Flash message
             flashMessage: null,
@@ -717,7 +736,8 @@ export default {
                 onExport: () => { this.exportMeasurementsToFile(); },
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
-                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; }
+                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
+                onUnitsChangeRequested: (newUnit, oldUnit) => { this.onUnitsChangeRequested(newUnit, oldUnit); }
             }); this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
@@ -1021,6 +1041,10 @@ export default {
         }, zoomToFilesExtent: function () {
             const ext = this.getSelectedFilesExtent();
             if (!isEmptyExtent(ext)) {
+                // Save initial extent on first zoom
+                if (!this.initialExtent) {
+                    this.initialExtent = ext.slice(); // Clone the extent array
+                }
                 // Zoom to it
                 setTimeout(() => {
                     this.map.getView().fit(ext, {
@@ -1042,7 +1066,21 @@ export default {
                     this.map.getView().setZoom(2);
                 }
             }
-        }, getSelectedFilesExtent: function () {
+        },
+        resetToInitialView: function () {
+            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) {
+                this.map.getView().fit(this.initialExtent, {
+                    padding: [40, 40, 40, 40],
+                    duration: 500,
+                    minResolution: 0.5,
+                    maxZoom: 22
+                });
+            } else {
+                // Fallback to recalculating extent
+                this.zoomToFilesExtent();
+            }
+        },
+        getSelectedFilesExtent: function () {
             const ext = createEmptyExtent();
             if (this.fileFeatures.getFeatures().length) {
                 extendExtent(ext, this.fileFeatures.getExtent());
@@ -1402,7 +1440,7 @@ export default {
             // Load measurements for orthophotos if available
             this.loadMeasurementsForOrthophotos();
         },
-        handleKeyDown: function () {
+        handleKeyDown: function (e) {
             if (Keyboard.isCtrlPressed() && this.mouseInside) {
                 if (Keyboard.isShiftPressed()) {
                     this.selectFeaturesByAreaKeyPressed = true;
@@ -1410,6 +1448,10 @@ export default {
                 } else {
                     this.$refs.toolbar.selectTool('select-features');
                 }
+            }
+            // H key for reset view
+            if (e.keyCode === 72 && this.mouseInside) {
+                this.resetToInitialView();
             }
         },
         handleKeyUp: function (e) {
@@ -1608,6 +1650,9 @@ export default {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
 
+                // Clear measurements from the map
+                this.measureControls.clearAllMeasurements();
+
                 // Update button visibility
                 this.measureControls.updateButtonsVisibility(
                     this.measureControls.hasMeasurements(),
@@ -1655,6 +1700,32 @@ export default {
             this.deleteSavedMeasurementsDialogOpen = false;
             if (result === 'confirm') {
                 this.measureControls.confirmDeleteSaved();
+            }
+        },
+
+        /**
+         * Handle units change request - show confirmation dialog
+         */
+        onUnitsChangeRequested: function(newUnit, oldUnit) {
+            this.changeUnitsTargetUnit = newUnit;
+            this.changeUnitsPreviousUnit = oldUnit;
+            this.changeUnitsMeasurementsCount = this.measureControls.getMeasurementsCount();
+            this.changeUnitsDialogOpen = true;
+        },
+
+        /**
+         * Handle change units dialog close
+         */
+        handleChangeUnitsDialogClose: async function(result) {
+            this.changeUnitsDialogOpen = false;
+            if (result === 'confirm') {
+                // Apply the unit change
+                this.measureControls.applyUnitsChange(this.changeUnitsTargetUnit);
+                // Save measurements with new units
+                await this.saveMeasurements();
+            } else {
+                // Rollback the select to previous value
+                this.measureControls.rollbackUnitSelect(this.changeUnitsPreviousUnit);
             }
         },
 

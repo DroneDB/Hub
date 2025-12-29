@@ -9,7 +9,8 @@
                     @openProperties="handleFileBrowserOpenProperties"
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                     @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
-                    @transferSelectedItems="openTransferItemsDialogFromFileBrowser" @error="handleError" />
+                    @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
+                    @openAsText="handleOpenAsText" @error="handleError" />
             </div>
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
                 ref="mainTabSwitcher">
@@ -19,7 +20,8 @@
                         @openProperties="handleFileBrowserOpenProperties"
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                         @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
-                        @transferSelectedItems="openTransferItemsDialogFromFileBrowser" @error="handleError" />
+                        @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
+                        @openAsText="handleOpenAsText" @error="handleError" />
                 </template> <template v-slot:map>
                     <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" @scrollTo="handleScrollTo"
                         @openItem="handleOpenItem" />
@@ -100,6 +102,14 @@
             @timeout="handleBuildTimeout"
             @error="handleError"
         />
+        <TextEditorDialog
+            v-if="textEditorDialogOpen"
+            :dataset="dataset"
+            :entry="textEditorEntry"
+            :readonly="textEditorReadonly"
+            @onClose="handleTextEditorClose"
+            @saved="handleTextEditorSaved"
+        />
     </div>
 </template>
 
@@ -126,6 +136,7 @@ import Flash from './Flash.vue';
 import ShareEmbed from './ShareEmbed.vue';
 import BuildHistory from './BuildHistory.vue';
 import FileAvailabilityDialog from './FileAvailabilityDialog.vue';
+import TextEditorDialog from './TextEditorDialog.vue';
 
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
@@ -137,6 +148,7 @@ import { renameDataset, entryLabel } from '../libs/registryUtils';
 import { b64encode } from '../libs/base64';
 import BuildManager from '../libs/buildManager';
 import FileAvailabilityChecker from '../libs/fileAvailabilityChecker';
+import { shouldOpenAsText, canOpenAsText } from '../libs/textFileUtils';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -172,7 +184,8 @@ export default {
         Flash,
         ShareEmbed,
         BuildHistory,
-        FileAvailabilityDialog
+        FileAvailabilityDialog,
+        TextEditorDialog
     },
     data: function () {
         const mobile = isMobile();
@@ -231,6 +244,11 @@ export default {
                 buildState: null,
                 entry: null
             },
+
+            // Text editor dialog
+            textEditorDialogOpen: false,
+            textEditorEntry: null,
+            textEditorReadonly: false,
 
             // Helper references for mixins
             icons: icons,
@@ -420,6 +438,12 @@ export default {
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
 
+            // Check if file should open as text
+            if (!view && shouldOpenAsText(node.entry)) {
+                this.openTextEditor(node.entry, false);
+                return;
+            }
+
             if (view) {
                 // Pre-opening check of file availability
                 try {
@@ -446,6 +470,25 @@ export default {
             } else {
                 shell.openItem(node.path);
             }
+        },
+
+        openTextEditor: function(entry, readonly = false) {
+            this.textEditorEntry = entry;
+            this.textEditorReadonly = readonly || !this.canWrite;
+            this.textEditorDialogOpen = true;
+        },
+
+        handleOpenAsText: function(node) {
+            this.openTextEditor(node.entry, false);
+        },
+
+        handleTextEditorClose: function() {
+            this.textEditorDialogOpen = false;
+            this.textEditorEntry = null;
+        },
+
+        handleTextEditorSaved: function(path) {
+            this.flash = `File saved: ${path}`;
         },
 
         showFileNotAvailableDialog: function(availability, node) {

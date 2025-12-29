@@ -27,6 +27,7 @@ import env from '../dynamic/env';
 import ddb from 'ddb';
 import icons from '../libs/icons';
 import { clone, debounce } from '../libs/utils';
+import { canOpenAsText, shouldOpenAsText } from '../libs/textFileUtils';
 
 const { pathutils } = ddb;
 
@@ -65,6 +66,24 @@ export default {
             isVisible: () => { return this.lastSelectedNode !== null; },
             click: () => {
                 if (this.lastSelectedNode !== null) this.$emit('openItem', this.lastSelectedNode.node);
+            }
+        },
+        {
+            label: 'Open as Text',
+            icon: 'file alternate outline',
+            isVisible: () => {
+                if (this.lastSelectedNode === null) return false;
+                const entry = this.lastSelectedNode.node.entry;
+                // Show only for non-directory files that can be opened as text
+                // but are not already default text files (those open automatically)
+                return !ddb.entry.isDirectory(entry) &&
+                       canOpenAsText(entry) &&
+                       !shouldOpenAsText(entry);
+            },
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('openAsText', this.lastSelectedNode.node);
+                }
             }
         },
         {

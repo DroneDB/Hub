@@ -1,6 +1,7 @@
 <template>
-    <div class="singleMap">
+    <div class="singleMap" @mouseover="setMouseInside(true)" @mouseleave="setMouseInside(false)">
         <TabViewLoader @loaded="loadMap" titleSuffix="Map" />
+        <Toolbar :tools="tools" ref="toolbar" />
 
         <div ref="map-container" class="map-container">
             <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
@@ -62,14 +63,49 @@ import { MeasurementStorage } from '../libs/measurementStorage';
 import Alert from './Alert.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import Flash from './Flash.vue';
+import Toolbar from './Toolbar.vue';
+import Keyboard from '../libs/keyboard';
+import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '../libs/utils';
 
 export default {
     components: {
-        Map, TabViewLoader, FeatureInfoDialog, Alert, ConfirmDialog, Flash
+        Map, TabViewLoader, FeatureInfoDialog, Alert, ConfirmDialog, Flash, Toolbar
     },
     props: ["uri"],
     data: function () {
+        const tools = [
+            {
+                id: 'reset-view',
+                title: "Reset View (H)",
+                icon: "home",
+                onClick: () => {
+                    this.resetToInitialView();
+                }
+            }
+        ];
+
+        if (supportsFullScreen()) {
+            tools.push({
+                id: 'fullscreen',
+                title: "Fullscreen (F11)",
+                icon: "expand",
+                onClick: () => {
+                    if (isFullScreenCurrently()) {
+                        exitFullScreen();
+                    } else {
+                        requestFullScreen(this.$el);
+                        setTimeout(() => {
+                            this.map.updateSize();
+                        }, 500);
+                    }
+                }
+            });
+        }
+
         return {
+            tools,
+            initialExtent: null,
+            mouseInside: false,
             error: "",
             selectedBasemap: "satellite",
             basemaps: Basemaps,
@@ -107,6 +143,9 @@ export default {
 
     },
     beforeDestroy: function () {
+        // Clean up keyboard event handlers
+        Keyboard.offKeyDown(this.handleKeyDown);
+
         // Clean up the tooltip overlay
         if (this.tooltipOverlay && this.map) {
             this.map.removeOverlay(this.tooltipOverlay);
@@ -123,6 +162,24 @@ export default {
         }
     },
     methods: {
+        setMouseInside: function (flag) {
+            this.mouseInside = flag;
+        },
+        handleKeyDown: function (e) {
+            // H key for reset view
+            if (e.keyCode === 72 && this.mouseInside) {
+                this.resetToInitialView();
+            }
+        },
+        resetToInitialView: function () {
+            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) {
+                this.map.getView().fit(this.initialExtent, {
+                    padding: [40, 40, 40, 40],
+                    duration: 500,
+                    minResolution: 0.5
+                });
+            }
+        },
         // Generate a unique color based on the file name or index
         getVectorFileColor: function (entry, index) {
             // If we already have a color for this file, return it
@@ -461,6 +518,8 @@ export default {
             }
 
             if (!isEmptyExtent(ext)) {
+                // Save initial extent
+                this.initialExtent = ext.slice(); // Clone the extent array
                 setTimeout(() => {
                     this.map.getView().fit(ext, {
                         padding: [40, 40, 40, 40],
@@ -469,6 +528,9 @@ export default {
                     });
                 }, 10);
             }
+
+            // Register keyboard handler
+            Keyboard.onKeyDown(this.handleKeyDown);
         },
 
         // Load vector layer for the entry
@@ -609,6 +671,10 @@ export default {
                         // Zoom to the extent of the vector features
                         const vectorExtent = vectorSource.getExtent();
                         if (!isEmptyExtent(vectorExtent)) {
+                            // Save initial extent if not already set
+                            if (!this.initialExtent) {
+                                this.initialExtent = vectorExtent.slice(); // Clone the extent array
+                            }
                             this.map.getView().fit(vectorExtent, {
                                 padding: [40, 40, 40, 40],
                                 duration: 500,
@@ -787,6 +853,9 @@ export default {
             try {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
+
+                // Clear measurements from the map
+                this.measureControls.clearAllMeasurements();
 
                 // Update button visibility
                 this.measureControls.updateButtonsVisibility(
