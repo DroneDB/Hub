@@ -7,6 +7,10 @@ export async function renameDataset(orgSlug, dsSlug, name) {
     if (name.length > 128) name = name.slice(0, 128);
 
     let slug = slugFromName(name);
+
+    if (!slug)
+        throw new Error("Invalid name: cannot generate valid slug");
+
     await ds.metaSet("name", name);
     return await ds.rename(slug);
 };

@@ -132,6 +132,17 @@ export default {
     mounted: function () {
     },
 
+    beforeDestroy: function() {
+        // Clean up keyboard event listeners to prevent memory leaks
+        if (this.undoRedoKeyHandler) {
+            document.removeEventListener('keydown', this.undoRedoKeyHandler);
+        }
+        // Clean up measurement double-click listener
+        if (this.measurementDblClickHandler && this.viewer && this.viewer.renderer) {
+            this.viewer.renderer.domElement.removeEventListener('dblclick', this.measurementDblClickHandler);
+        }
+    },
+
     computed: {
         /**
          * Check if there are any measurements in the viewer
@@ -199,13 +210,14 @@ export default {
             const scene = this.viewer.scene;
 
             // Listen for double-click on the render area for measurements
-            renderer.domElement.addEventListener('dblclick', (event) => {
+            this.measurementDblClickHandler = (event) => {
                 // Find if we clicked on a measurement sphere
                 const measure = self.findMeasurementAtPoint(event);
                 if (measure) {
                     self.openPropertiesDialog(measure);
                 }
-            });
+            };
+            renderer.domElement.addEventListener('dblclick', this.measurementDblClickHandler);
 
             // Setup listeners for annotations (they have HTML domElements)
             this.setupAnnotationEditListeners();

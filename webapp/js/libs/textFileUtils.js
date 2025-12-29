@@ -18,7 +18,7 @@ const TEXT_EXTENSIONS = [
 
 // Binary extensions that should never be opened as text
 const BINARY_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'svg', 'tif', 'tiff',
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff',
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
     'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz',
     'exe', 'dll', 'so', 'dylib', 'bin',
@@ -110,8 +110,8 @@ function getLanguageMode(path) {
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
