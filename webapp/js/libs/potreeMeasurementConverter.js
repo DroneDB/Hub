@@ -69,6 +69,10 @@ export function measureToGeoJSON(measure, coordinateSystem) {
         name: measure.name,
         description: measure.description || '',
         color: '#' + measure.color.getHexString(),
+        'stroke-width': measure.strokeWidth || 2,
+        'stroke-opacity': measure.strokeOpacity ?? 1,
+        fill: '#' + (measure.fillColor ? measure.fillColor.getHexString() : measure.color.getHexString()),
+        'fill-opacity': measure.fillOpacity ?? 0.2,
         showDistances: measure.showDistances,
         showCoordinates: measure.showCoordinates,
         showArea: measure.showArea,
@@ -142,6 +146,14 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
     // Restore color
     if (props.color) {
         measure.color = new THREE.Color(props.color);
+    }
+
+    // Restore stroke and fill properties
+    measure.strokeWidth = props['stroke-width'] || 2;
+    measure.strokeOpacity = props['stroke-opacity'] ?? 1;
+    measure.fillOpacity = props['fill-opacity'] ?? 0.2;
+    if (props.fill) {
+        measure.fillColor = new THREE.Color(props.fill);
     }
 
     // Convert coordinates to points

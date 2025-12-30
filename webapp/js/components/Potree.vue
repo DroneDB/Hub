@@ -211,9 +211,19 @@ export default {
 
             // Listen for double-click on the render area for measurements
             this.measurementDblClickHandler = (event) => {
-                // Find if we clicked on a measurement sphere
+                // Check if there's an active measurement being drawn
+                // If so, let Potree handle the double-click to finish the measurement
+                const measuringTool = self.viewer.measuringTool;
+                if (measuringTool && measuringTool.activeMeasurement) {
+                    // A measurement is being drawn, don't open dialog
+                    // Let the event propagate to Potree to finish the measurement
+                    return;
+                }
+
+                // Find if we clicked on a completed measurement sphere
                 const measure = self.findMeasurementAtPoint(event);
                 if (measure) {
+                    // Only open dialog for completed measurements
                     self.openPropertiesDialog(measure);
                 }
             };
@@ -328,8 +338,8 @@ export default {
                     annotation.description = properties.description;
                 }
 
-                // Auto-save measurements/annotations
-                self.saveMeasurements();
+                // Update visual label for the annotation
+                self.updateAnnotationLabel(annotation);
             });
 
             // Handle close
@@ -388,10 +398,10 @@ export default {
                         case 'name': return measure.name || '';
                         case 'description': return measure.description || '';
                         case 'stroke': return '#' + (measure.color ? measure.color.getHexString() : 'ffcc33');
-                        case 'stroke-width': return 2;
-                        case 'stroke-opacity': return 1;
-                        case 'fill': return '#' + (measure.color ? measure.color.getHexString() : 'ffcc33');
-                        case 'fill-opacity': return 0.2;
+                        case 'stroke-width': return measure.strokeWidth || 2;
+                        case 'stroke-opacity': return measure.strokeOpacity ?? 1;
+                        case 'fill': return '#' + (measure.fillColor ? measure.fillColor.getHexString() : (measure.color ? measure.color.getHexString() : 'ffcc33'));
+                        case 'fill-opacity': return measure.fillOpacity ?? 0.2;
                         default: return null;
                     }
                 }
@@ -423,6 +433,21 @@ export default {
                 if (properties.stroke) {
                     measure.color = new THREE.Color(properties.stroke);
                 }
+                if (properties['stroke-width'] !== undefined) {
+                    measure.strokeWidth = properties['stroke-width'];
+                }
+                if (properties['stroke-opacity'] !== undefined) {
+                    measure.strokeOpacity = properties['stroke-opacity'];
+                }
+                if (properties['fill-opacity'] !== undefined) {
+                    measure.fillOpacity = properties['fill-opacity'];
+                }
+                if (properties.fill) {
+                    measure.fillColor = new THREE.Color(properties.fill);
+                }
+
+                // Apply fill color and opacity to area mesh (for polygon measurements)
+                self.applyAreaFillProperties(measure);
 
                 // Update the label in the viewer if exists
                 if (measure.sphereLabels && measure.sphereLabels.length > 0) {
@@ -436,8 +461,66 @@ export default {
                     }
                 }
 
-                // Auto-save measurements
-                self.saveMeasurements();
+                // Apply stroke-width to measurement lines
+                if (measure.edges && properties['stroke-width'] !== undefined) {
+                    measure.edges.forEach(edge => {
+                        if (edge.material && edge.material.linewidth !== undefined) {
+                            edge.material.linewidth = properties['stroke-width'];
+                            edge.material.needsUpdate = true;
+                        }
+                    });
+                }
+
+                // Apply color to spheres (for all measurement types including circle, angle, azimuth)
+                if (measure.spheres && properties.stroke) {
+                    const color = new THREE.Color(properties.stroke);
+                    measure.spheres.forEach(sphere => {
+                        if (sphere.material) {
+                            sphere.material.color = color;
+                            sphere.material.needsUpdate = true;
+                        }
+                    });
+                }
+
+                // Apply color and stroke-width to circle geometry (for circle measurements)
+                if (measure.circleGeometry && properties.stroke) {
+                    const color = new THREE.Color(properties.stroke);
+                    if (measure.circleLine && measure.circleLine.material) {
+                        measure.circleLine.material.color = color;
+                        if (properties['stroke-width'] !== undefined && measure.circleLine.material.linewidth !== undefined) {
+                            measure.circleLine.material.linewidth = properties['stroke-width'];
+                        }
+                        measure.circleLine.material.needsUpdate = true;
+                    }
+                }
+
+                // Apply color to angle/azimuth lines
+                if (measure.angleLine && properties.stroke) {
+                    const color = new THREE.Color(properties.stroke);
+                    if (measure.angleLine.material) {
+                        measure.angleLine.material.color = color;
+                        if (properties['stroke-width'] !== undefined && measure.angleLine.material.linewidth !== undefined) {
+                            measure.angleLine.material.linewidth = properties['stroke-width'];
+                        }
+                        measure.angleLine.material.needsUpdate = true;
+                    }
+                }
+
+                // Apply color to all child Line2 objects (generic approach for all measurement types)
+                measure.traverse((child) => {
+                    if (child.material && child.isLine2) {
+                        if (properties.stroke) {
+                            child.material.color = new THREE.Color(properties.stroke);
+                        }
+                        if (properties['stroke-width'] !== undefined && child.material.linewidth !== undefined) {
+                            child.material.linewidth = properties['stroke-width'];
+                        }
+                        child.material.needsUpdate = true;
+                    }
+                });
+
+                // Update visual name label for the measurement
+                self.updateMeasurementNameLabel(measure);
             });
 
             // Handle close
@@ -457,6 +540,317 @@ export default {
                 this.propertiesDialog.$destroy();
                 this.propertiesDialog = null;
             }
+        },
+
+        /**
+         * Create or update a name label for a measurement
+         * Position depends on type: line→beside center, area→centroid, point→above
+         */
+        updateMeasurementNameLabel: function(measure) {
+            const self = this;
+
+            // Remove existing label if present
+            if (measure._nameLabel) {
+                measure.remove(measure._nameLabel);
+                measure._nameLabel = null;
+            }
+            if (measure._nameLabelTooltip) {
+                document.body.removeChild(measure._nameLabelTooltip);
+                measure._nameLabelTooltip = null;
+            }
+            // Clean up update handler
+            if (measure._labelUpdateHandler && this.viewer) {
+                this.viewer.removeEventListener('update', measure._labelUpdateHandler);
+                measure._labelUpdateHandler = null;
+            }
+            // Clean up tooltip hover handler
+            if (measure._tooltipHoverHandler && this.viewer && this.viewer.renderer) {
+                this.viewer.renderer.domElement.removeEventListener('mousemove', measure._tooltipHoverHandler);
+                measure._tooltipHoverHandler = null;
+            }
+
+            // Only create label if name is set
+            if (!measure.name || measure.name.trim() === '') {
+                return;
+            }
+
+            // Calculate position based on measurement type
+            const points = measure.points;
+            if (!points || points.length === 0) return;
+
+            let labelPosition = new THREE.Vector3();
+            let offset = new THREE.Vector3(0, 0, 0);
+
+            if (measure.showArea && measure.closed && points.length >= 3) {
+                // Area: position at centroid (same height as average of points)
+                points.forEach(p => labelPosition.add(p.position));
+                labelPosition.divideScalar(points.length);
+            } else if (points.length === 1) {
+                // Single point: position slightly beside the point (not above)
+                labelPosition.copy(points[0].position);
+                offset.set(0.5, 0.5, 0); // Small lateral offset, no vertical
+            } else if (points.length >= 2) {
+                // Line: position beside the center point (same height)
+                if (points.length === 2) {
+                    // For 2 points, position at midpoint with small lateral offset
+                    labelPosition.copy(points[0].position).add(points[1].position).divideScalar(2);
+                    // Calculate perpendicular offset (small, in XY plane)
+                    const dir = new THREE.Vector3().subVectors(points[1].position, points[0].position).normalize();
+                    const up = new THREE.Vector3(0, 0, 1);
+                    const lateral = new THREE.Vector3().crossVectors(dir, up).normalize();
+                    offset.copy(lateral).multiplyScalar(0.3); // Small offset
+                } else {
+                    const midIndex = Math.floor(points.length / 2);
+                    labelPosition.copy(points[midIndex].position);
+                    offset.set(0.3, 0, 0); // Small lateral offset
+                }
+            }
+
+            labelPosition.add(offset);
+
+            // Create TextSprite for the name
+            const label = new Potree.TextSprite(measure.name);
+            label.setTextColor({ r: 255, g: 255, b: 255, a: 1.0 });
+            label.setBorderColor({ r: 0, g: 0, b: 0, a: 1.0 });
+            label.setBackgroundColor({ r: 0, g: 0, b: 0, a: 0.7 });
+            label.fontsize = 16;
+            label.material.depthTest = false;
+            label.material.opacity = 1;
+            label.position.copy(labelPosition);
+
+            // Store the base scale factor for constant screen size
+            label._baseScale = 0.30;
+
+            // Function to update scale based on camera distance for constant screen size
+            const updateLabelScale = () => {
+                if (!measure._nameLabel || !self.viewer) return;
+
+                const camera = self.viewer.scene.getActiveCamera();
+                const distance = camera.position.distanceTo(label.position);
+
+                // Scale proportionally to distance to maintain constant screen size
+                const scale = distance * label._baseScale * 0.02; // 0.02 is a tuning factor
+                label.scale.set(scale, scale, scale);
+            };
+
+            // Initial scale
+            updateLabelScale();
+
+            // Store update function for later cleanup
+            measure._labelScaleUpdater = updateLabelScale;
+
+            // Update scale on every frame
+            const updateHandler = () => {
+                if (measure._nameLabel) {
+                    updateLabelScale();
+                }
+            };
+            self.viewer.addEventListener('update', updateHandler);
+            measure._labelUpdateHandler = updateHandler;
+
+            measure._nameLabel = label;
+            measure.add(label);
+
+            // Create tooltip for description (popup on hover)
+            if (measure.description && measure.description.trim() !== '') {
+                const tooltip = document.createElement('div');
+                tooltip.className = 'potree-measurement-tooltip';
+                tooltip.innerHTML = `<strong>${measure.name}</strong><br>${measure.description}`;
+                tooltip.style.cssText = `
+                    position: fixed;
+                    background: rgba(0, 0, 0, 0.85);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    font-size: 13px;
+                    max-width: 300px;
+                    z-index: 10000;
+                    pointer-events: none;
+                    display: none;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                `;
+                document.body.appendChild(tooltip);
+                measure._nameLabelTooltip = tooltip;
+
+                // Update tooltip position on render
+                const updateTooltipPosition = () => {
+                    if (!measure._nameLabel || !measure._nameLabelTooltip) return;
+
+                    const camera = self.viewer.scene.getActiveCamera();
+                    const renderer = self.viewer.renderer;
+
+                    // Project label position to screen
+                    const screenPos = label.position.clone().project(camera);
+                    const rect = renderer.domElement.getBoundingClientRect();
+
+                    const x = ((screenPos.x + 1) / 2) * rect.width + rect.left;
+                    const y = ((-screenPos.y + 1) / 2) * rect.height + rect.top;
+
+                    tooltip.style.left = (x + 15) + 'px';
+                    tooltip.style.top = (y - 10) + 'px';
+                };
+
+                // Show tooltip on hover over label sprite
+                label.onMouseOver = () => {
+                    updateTooltipPosition();
+                    tooltip.style.display = 'block';
+                };
+                label.onMouseOut = () => {
+                    tooltip.style.display = 'none';
+                };
+
+                // Alternative: use mousemove on render area to detect hover
+                const domElement = this.viewer.renderer.domElement;
+                const hoverHandler = (event) => {
+                    if (!measure._nameLabel) return;
+
+                    const camera = self.viewer.scene.getActiveCamera();
+                    const rect = domElement.getBoundingClientRect();
+                    const mouse = new THREE.Vector2(
+                        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                        -((event.clientY - rect.top) / rect.height) * 2 + 1
+                    );
+
+                    const raycaster = new THREE.Raycaster();
+                    raycaster.setFromCamera(mouse, camera);
+
+                    // Check intersection with label
+                    const intersects = raycaster.intersectObject(measure._nameLabel, true);
+                    if (intersects.length > 0) {
+                        updateTooltipPosition();
+                        tooltip.style.display = 'block';
+                    } else if (tooltip.style.display !== 'none') {
+                        tooltip.style.display = 'none';
+                    }
+                };
+
+                domElement.addEventListener('mousemove', hoverHandler);
+                measure._tooltipHoverHandler = hoverHandler;
+            }
+        },
+
+        /**
+         * Update annotation label (annotations already show title, just handle description tooltip)
+         */
+        updateAnnotationLabel: function(annotation) {
+            // Remove existing tooltip
+            if (annotation._descriptionTooltip) {
+                document.body.removeChild(annotation._descriptionTooltip);
+                annotation._descriptionTooltip = null;
+            }
+
+            // Create description tooltip if description is set
+            if (annotation.description && annotation.description.trim() !== '') {
+                const domElement = annotation.domElement;
+                if (!domElement) return;
+
+                const tooltip = document.createElement('div');
+                tooltip.className = 'potree-annotation-tooltip';
+                tooltip.innerHTML = annotation.description;
+                tooltip.style.cssText = `
+                    position: fixed;
+                    background: rgba(0, 0, 0, 0.85);
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 4px;
+                    font-size: 13px;
+                    max-width: 300px;
+                    z-index: 10000;
+                    pointer-events: none;
+                    display: none;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                `;
+                document.body.appendChild(tooltip);
+                annotation._descriptionTooltip = tooltip;
+
+                // Show on hover
+                domElement.addEventListener('mouseenter', (e) => {
+                    tooltip.style.left = (e.clientX + 15) + 'px';
+                    tooltip.style.top = (e.clientY - 10) + 'px';
+                    tooltip.style.display = 'block';
+                });
+                domElement.addEventListener('mousemove', (e) => {
+                    tooltip.style.left = (e.clientX + 15) + 'px';
+                    tooltip.style.top = (e.clientY - 10) + 'px';
+                });
+                domElement.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
+            }
+        },
+
+        /**
+         * Apply visual properties to a loaded measurement (stroke-width, color, name label)
+         */
+        applyMeasurementVisualProperties: function(measure) {
+            // Apply stroke-width to edges
+            if (measure.edges && measure.strokeWidth) {
+                measure.edges.forEach(edge => {
+                    if (edge.material && edge.material.linewidth !== undefined) {
+                        edge.material.linewidth = measure.strokeWidth;
+                        edge.material.needsUpdate = true;
+                    }
+                });
+            }
+
+            // Apply color to spheres (for all measurement types)
+            if (measure.spheres && measure.color) {
+                measure.spheres.forEach(sphere => {
+                    if (sphere.material) {
+                        sphere.material.color = measure.color;
+                        sphere.material.needsUpdate = true;
+                    }
+                });
+            }
+
+            // Apply color and stroke-width to all child Line2 objects
+            if (measure.color || measure.strokeWidth) {
+                measure.traverse((child) => {
+                    if (child.material && child.isLine2) {
+                        if (measure.color) {
+                            child.material.color = measure.color;
+                        }
+                        if (measure.strokeWidth && child.material.linewidth !== undefined) {
+                            child.material.linewidth = measure.strokeWidth;
+                        }
+                        child.material.needsUpdate = true;
+                    }
+                });
+            }
+
+            // Create name label if name is set
+            if (measure.name && measure.name.trim() !== '') {
+                this.updateMeasurementNameLabel(measure);
+            }
+
+            // Apply fill properties to area measurements
+            this.applyAreaFillProperties(measure);
+        },
+
+        /**
+         * Apply fill color and opacity to area mesh (for polygon measurements)
+         */
+        applyAreaFillProperties: function(measure) {
+            // Only apply to area measurements
+            if (!measure.showArea || !measure.closed) {
+                return;
+            }
+
+            const fillColor = measure.fillColor || measure.color;
+            const fillOpacity = measure.fillOpacity ?? 0.2;
+
+            // Find and update the area mesh material
+            measure.traverse((child) => {
+                // Potree area measurements use a Mesh for the filled polygon
+                if (child.isMesh && child.material) {
+                    if (fillColor) {
+                        child.material.color = fillColor.clone();
+                    }
+                    child.material.opacity = fillOpacity;
+                    child.material.transparent = true;
+                    child.material.needsUpdate = true;
+                }
+            });
         },
 
         handleLoad: async function () {
@@ -645,7 +1039,24 @@ export default {
 
                 if (geojson && geojson.features && geojson.features.length > 0) {
                     // Import measurements into viewer
-                    importMeasurements(geojson, this.viewer, this.coordinateSystem);
+                    const imported = importMeasurements(geojson, this.viewer, this.coordinateSystem);
+
+                    // Apply visual properties (stroke-width, name labels) to loaded measurements
+                    // Need to wait a bit for Potree to fully initialize the measurement geometry
+                    const self = this;
+                    setTimeout(() => {
+                        if (imported && imported.length > 0) {
+                            imported.forEach(item => {
+                                // Check if it's a measurement (has edges) vs annotation
+                                if (item.edges) {
+                                    self.applyMeasurementVisualProperties(item);
+                                } else if (item.description) {
+                                    // It's an annotation with description
+                                    self.updateAnnotationLabel(item);
+                                }
+                            });
+                        }
+                    }, 500);
 
                     this.hasSavedMeasurements = true;
                     console.log(`Loaded ${geojson.features.length} measurements`);
