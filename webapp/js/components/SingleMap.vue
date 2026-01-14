@@ -47,6 +47,7 @@ import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
 import Polygon from 'ol/geom/Polygon';
 import Overlay from 'ol/Overlay';
+import { bbox as bboxStrategy } from 'ol/loadingstrategy';
 
 import ddb from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
@@ -581,74 +582,69 @@ export default {
                 };
 
                 // Create the vector layer with styling based on geometry type
-                const vectorLayer = new VectorLayer({
-                    source: vectorSource,
-                    style: (feature) => {
-                        const geometry = feature.getGeometry();
-                        const geometryType = geometry.getType();
-                        const properties = feature.getProperties();
+                // Style function compatible with RenderFeature (uses getType() instead of getGeometry().getType())
+                const vectorStyleFunction = (feature) => {
+                    // For RenderFeature, use getType() directly instead of getGeometry().getType()
+                    const geometryType = feature.getType ? feature.getType() : (feature.getGeometry ? feature.getGeometry().getType() : 'Point');
+                    const properties = feature.getProperties();
 
-                        // Get appropriate base style based on geometry
-                        let style;
-                        if (geometryType.includes('Point')) {
-                            style = vectorStyles.point.clone();
-                        } else if (geometryType.includes('LineString')) {
-                            style = vectorStyles.line.clone();
-                        } else if (geometryType.includes('Polygon')) {
-                            style = vectorStyles.polygon.clone();
-                        } else {
-                            style = vectorStyles.point.clone();
-                        }
-
-                        // Add label for features when zoomed in close enough
-                        const zoom = this.map ? this.map.getView().getZoom() : 0;
-
-                        if (zoom >= 16) { // Only show labels when zoomed in
-                            // Try to find a good label property
-                            let label = extractFeatureDisplayName(properties, null);
-
-                            if (label && label !== 'Unknown feature') {
-                                // Define text style for the label
-                                const textStyle = new Text({
-                                    text: label,
-                                    font: 'bold 12px Arial, Helvetica, sans-serif',
-                                    fill: new Fill({
-                                        color: '#000'
-                                    }),
-                                    stroke: new Stroke({
-                                        color: '#fff',
-                                        width: 3
-                                    }),
-                                    offsetY: -15, // For points, place above the point
-                                    textAlign: 'center',
-                                    overflow: true,
-                                    maxAngle: 45  // Maximum angle for curved labels (e.g. on lines)
-                                });
-
-                                style.setText(textStyle);
-                            }
-                        }
-
-                        return style;
+                    // Get appropriate base style based on geometry
+                    let style;
+                    if (geometryType.includes('Point')) {
+                        style = vectorStyles.point.clone();
+                    } else if (geometryType.includes('LineString')) {
+                        style = vectorStyles.line.clone();
+                    } else if (geometryType.includes('Polygon')) {
+                        style = vectorStyles.polygon.clone();
+                    } else {
+                        style = vectorStyles.point.clone();
                     }
-                });
 
-                // Create a buffered extent strategy for efficient loading
-                const createBufferedExtent = (coord) => {
-                    const extent = createEmptyExtent();
-                    extendExtent(extent, [coord[0], coord[1], coord[0], coord[1]]);
-                    return extentBuffer(extent, 1000); // Buffer by 1000 units
+                    // Add label for features when zoomed in close enough
+                    const zoom = this.map ? this.map.getView().getZoom() : 0;
+
+                    if (zoom >= 16) { // Only show labels when zoomed in
+                        // Try to find a good label property
+                        let label = extractFeatureDisplayName(properties, null);
+
+                        if (label && label !== 'Unknown feature') {
+                            // Define text style for the label
+                            const textStyle = new Text({
+                                text: label,
+                                font: 'bold 12px Arial, Helvetica, sans-serif',
+                                fill: new Fill({
+                                    color: '#000'
+                                }),
+                                stroke: new Stroke({
+                                    color: '#fff',
+                                    width: 3
+                                }),
+                                offsetY: -15, // For points, place above the point
+                                textAlign: 'center',
+                                overflow: true,
+                                maxAngle: 45  // Maximum angle for curved labels (e.g. on lines)
+                            });
+
+                            style.setText(textStyle);
+                        }
+                    }
+
+                    return style;
                 };
 
-                // Define strategy function that creates a buffered extent around the center of view
-                const strategy = (extent) => [createBufferedExtent(getExtentCenter(extent))];
+                // Create the vector layer with bbox loading strategy for efficient streaming
+                const vectorLayer = new VectorLayer({
+                    source: vectorSource,
+                    style: vectorStyleFunction
+                });
 
-                // Use FlatGeobuf's createLoader to stream features as needed
+                // Use FlatGeobuf's createLoader with bbox strategy for spatial queries
+                // This loads only features within the current view extent
                 const loader = flatgeobuf.ol.createLoader(
                     vectorSource,
                     vectorUrl,
                     'EPSG:4326',  // Source projection - FlatGeobuf uses WGS84
-                    strategy,     // Use our buffered extent strategy
+                    bboxStrategy, // Use bbox strategy for spatial queries (requires spatial index in FGB)
                     true          // Clear existing features when loading new ones
                 );
 
