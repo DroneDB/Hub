@@ -1489,6 +1489,10 @@ export default {
             width: 100% !important;
             height: 100% !important;
         }
+
+        i.icon {
+            margin: 0 !important;
+        }
     }
 
     .dg {
