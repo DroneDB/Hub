@@ -5,21 +5,28 @@ JS Client Application for Registry
 
 ## Build
 
-Before building, make sure you are using Node.js version 16.x, which is required for this project:
+The project is compatible with Node.js 18+ (recommended: 22.x LTS).
 
-```
-# git clone https://github.com/DroneDB/Hub --recurse-submodules && cd Hub
-# nvm use 16
-# npm install -g webpack@4
-# npm install
-# npx webpack
+```bash
+git clone https://github.com/DroneDB/Hub --recurse-submodules && cd Hub
+npm install
+npm run build
 ```
 
-Note: The project uses Vue.js 2.6.11 and is configured to be built with webpack 4, which works best with Node.js 16.x.
+### Alternative: Direct webpack command
+
+If you prefer to run webpack directly:
+
+```bash
+npm install
+node --openssl-legacy-provider ./node_modules/webpack/bin/webpack.js
+```
+
+> **Note**: The `--openssl-legacy-provider` flag is required for Node.js 17+ due to OpenSSL 3.0 changes. The `npm run build` script handles this automatically.
 
 ## Run
 
-```
+```bash
 cd build
 python -m http.server 8080
 ```

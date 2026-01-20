@@ -4,6 +4,8 @@
   "description": "JS Client Application for Registry",
   "main": "webpack.config.js",
   "scripts": {
+    "build": "node --openssl-legacy-provider ./node_modules/webpack/bin/webpack.js",
+    "build:watch": "node --openssl-legacy-provider ./node_modules/webpack/bin/webpack.js --watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
