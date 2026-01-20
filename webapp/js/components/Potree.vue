@@ -10,7 +10,7 @@
 
         <div class="potree-container" :class="{ loading }">
             <!-- Undo/Redo toolbar -->
-            <div v-if="loaded" class="undo-redo-toolbar">
+            <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="undo-redo-toolbar">
                 <button
                     @click="undo"
                     :disabled="undoStack.length === 0"
