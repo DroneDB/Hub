@@ -382,7 +382,7 @@ module.exports = class Registry {
         return loggedIn;
     }
 
-    async makeRequest(endpoint, method = "GET", body = null, contentType = null) {
+    async makeRequest(endpoint, method = "GET", body = null, contentType = null, responseType = null) {
         // Input validation
         if (typeof endpoint !== 'string' || !endpoint) {
             throw new Error('Invalid endpoint: must be a non-empty string');
@@ -443,7 +443,7 @@ module.exports = class Registry {
             }
 
             // Response handling errors are not caught here - they propagate as-is
-            return await this._handleResponse(response, method);
+            return await this._handleResponse(response, method, responseType);
 
         } catch (error) {
             // Re-throw errors that already have a status (our custom API errors)
@@ -455,7 +455,7 @@ module.exports = class Registry {
         }
     }
 
-    async _handleResponse(response, method) {
+    async _handleResponse(response, method, responseType = null) {
         const status = response.status;
 
         // Handle successful responses first
@@ -467,7 +467,7 @@ module.exports = class Registry {
             if (method.toUpperCase() === "HEAD") return true;
 
             // Try to parse response based on content type
-            return await this._parseResponseBody(response, status);
+            return await this._parseResponseBody(response, status, responseType);
         }
 
         // Handle specific error status codes
@@ -529,11 +529,19 @@ module.exports = class Registry {
      * Parses the response body based on content type.
      * Note: This method also checks for error fields in successful HTTP responses (2xx)
      * because some APIs return 200 OK with an error in the body.
+     * @param {Response} response - The fetch response object
+     * @param {number} status - HTTP status code
+     * @param {string|null} responseType - Force response type: 'text' to always return text, null for auto-detection
      */
-    async _parseResponseBody(response, status) {
+    async _parseResponseBody(response, status, responseType = null) {
         const contentType = response.headers.get("Content-Type");
 
         try {
+            // Force text response if explicitly requested (useful for downloading file contents)
+            if (responseType === 'text') {
+                return await response.text();
+            }
+
             // Handle JSON responses
             if (contentType && contentType.toLowerCase().includes("application/json")) {
                 const json = await response.json();
@@ -630,6 +638,16 @@ module.exports = class Registry {
 
     async getRequest(endpoint) {
         return this.makeRequest(endpoint, "GET");
+    }
+
+    /**
+     * Performs a GET request and returns the response as raw text.
+     * Useful for downloading file contents where automatic JSON parsing should be bypassed.
+     * @param {string} endpoint - API endpoint starting with '/'
+     * @returns {Promise<string>} Response body as text
+     */
+    async getRequestAsText(endpoint) {
+        return this.makeRequest(endpoint, "GET", null, null, 'text');
     }
 
     async postRequest(endpoint, body = {}) {

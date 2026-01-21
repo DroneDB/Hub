@@ -68,9 +68,15 @@ module.exports = class Dataset {
         return this.registry.postFormData(`${this.baseApi}/download`, formData);
     }
 
+    /**
+     * Gets the contents of a file as raw text.
+     * Uses getRequestAsText to bypass automatic JSON parsing for file downloads.
+     * @param {string} path - Path to the file within the dataset
+     * @returns {Promise<string>} File contents as text
+     */
     async getFileContents(path) {
         const url = this.downloadUrl(path, { inline: true });
-        return this.registry.getRequest(url);
+        return this.registry.getRequestAsText(url);
     }
 
     async info() {
