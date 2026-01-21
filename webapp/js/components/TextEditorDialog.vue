@@ -27,6 +27,11 @@
                             <span v-if="isModified" class="modified-indicator">*</span>
                         </div>
                         <div class="actions">
+                            <button v-if="!readonly && canFormatFile" @click="formatDocument" :disabled="saving"
+                                class="ui button small" title="Format document (Shift+Alt+F)">
+                                <i class="icon code" />
+                                Format
+                            </button>
                             <button v-if="!readonly && isModified" @click="save" :disabled="saving"
                                 class="ui button primary small">
                                 <i class="icon save" />
@@ -52,9 +57,11 @@
             v-if="showConfirmClose"
             title="Unsaved Changes"
             message="You have unsaved changes. Are you sure you want to close?"
-            confirmText="Close"
+            confirmText="Discard and Close"
             cancelText="Cancel"
             confirmButtonClass="negative"
+            secondaryText="Save and Close"
+            secondaryButtonClass="positive"
             @onClose="handleConfirmClose"
         />
     </div>
@@ -66,7 +73,7 @@ import Message from './Message.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import Keyboard from '../libs/keyboard';
 import icons from '../libs/icons';
-import { getLanguageMode, formatFileSize, MAX_TEXT_FILE_SIZE } from '../libs/textFileUtils';
+import { getLanguageMode, formatFileSize, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '../libs/textFileUtils';
 
 // CodeMirror imports
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
@@ -139,6 +146,10 @@ export default {
 
         formattedMaxSize() {
             return formatFileSize(MAX_TEXT_FILE_SIZE);
+        },
+
+        canFormatFile() {
+            return canFormat(this.entry?.path);
         }
     },
 
@@ -284,9 +295,15 @@ export default {
             this.$emit('onClose');
         },
 
-        handleConfirmClose(buttonId) {
+        async handleConfirmClose(buttonId) {
             this.showConfirmClose = false;
-            if (buttonId === 'confirm') {
+            if (buttonId === 'secondary') {
+                // Save and close
+                await this.save();
+                if (!this.error) {
+                    this.$emit('onClose');
+                }
+            } else if (buttonId === 'confirm') {
                 this.$emit('onClose');
             }
         },
@@ -298,9 +315,36 @@ export default {
                 this.save();
             }
 
+            // Shift + Alt + F to format
+            if (e.shiftKey && e.altKey && e.key === 'F') {
+                e.preventDefault();
+                this.formatDocument();
+            }
+
             // Escape to close
             if (e.key === 'Escape') {
                 this.close();
+            }
+        },
+
+        formatDocument() {
+            if (this.readonly || !this.canFormatFile || !this.editor) return;
+
+            const mode = getLanguageMode(this.entry.path);
+            const result = formatContent(this.currentContent, mode);
+
+            if (result.success) {
+                // Update editor content
+                this.editor.dispatch({
+                    changes: {
+                        from: 0,
+                        to: this.editor.state.doc.length,
+                        insert: result.content
+                    }
+                });
+                this.currentContent = result.content;
+            } else {
+                this.error = `Format failed: ${result.error}`;
             }
         }
     }

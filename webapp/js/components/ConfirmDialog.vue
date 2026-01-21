@@ -13,6 +13,9 @@
             <button @click="close('cancel')" class="ui button">
                 {{ cancelText }}
             </button>
+            <button v-if="secondaryText" @click="close('secondary')" class="ui button" :class="secondaryButtonClass">
+                {{ secondaryText }}
+            </button>
             <button @click="close('confirm')" class="ui button" :class="confirmButtonClass">
                 {{ confirmText }}
             </button>
@@ -47,6 +50,14 @@ export default {
             default: 'Cancel'
         },
         confirmButtonClass: {
+            type: String,
+            default: 'primary'
+        },
+        secondaryText: {
+            type: String,
+            default: null
+        },
+        secondaryButtonClass: {
             type: String,
             default: 'primary'
         },

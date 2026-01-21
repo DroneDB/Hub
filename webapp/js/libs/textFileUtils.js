@@ -115,6 +115,45 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+/**
+ * Check if file format supports auto-formatting
+ */
+function canFormat(path) {
+    const mode = getLanguageMode(path);
+    return mode === 'json';
+}
+
+/**
+ * Format content based on language mode
+ * @param {string} content - The content to format
+ * @param {string} mode - The language mode ('json', 'xml', etc.)
+ * @returns {{ success: boolean, content: string, error?: string }}
+ */
+function formatContent(content, mode) {
+    try {
+        switch (mode) {
+            case 'json':
+                const parsed = JSON.parse(content);
+                return {
+                    success: true,
+                    content: JSON.stringify(parsed, null, 2)
+                };
+            default:
+                return {
+                    success: false,
+                    content: content,
+                    error: 'Formatting not supported for this file type'
+                };
+        }
+    } catch (e) {
+        return {
+            success: false,
+            content: content,
+            error: e.message
+        };
+    }
+}
+
 export {
     TEXT_EXTENSIONS,
     BINARY_EXTENSIONS,
@@ -125,5 +164,7 @@ export {
     canOpenAsText,
     shouldOpenAsText,
     getLanguageMode,
-    formatFileSize
+    formatFileSize,
+    canFormat,
+    formatContent
 };
