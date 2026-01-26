@@ -1,9 +1,8 @@
 <template>
-    <Window title="Add to dataset" id="addToDataset" @onClose="close" modal fixedSize>
-        <div style="min-width: 320px">
-            <DatasetUpload :organization="organization" :dataset="dataset" :path="path" @onUpload="onUploaded"
-                @done="done" :open="open" :filesToUpload="filesToUpload"></DatasetUpload>
-        </div>
+    <Window title="Upload Progress" id="addToDataset" @onClose="close" modal :closable="closable" :fixedSize="true">
+        <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
+            @onUpload="onUploaded" @done="done" :filesToUpload="filesToUpload"
+            @update:closable="updateClosable" @onClose="close"></DatasetUpload>
     </Window>
 </template>
 
@@ -18,11 +17,12 @@ export default {
         DatasetUpload
     },
 
-    props: ['organization', 'dataset', 'path', 'open', 'filesToUpload'],
+    props: ['organization', 'dataset', 'path', 'filesToUpload'],
 
     data: function () {
         return {
-            uploaded: []
+            uploaded: [],
+            closable: false
         };
     },
     mounted: function () {
@@ -36,6 +36,9 @@ export default {
         },
         done: function () {
             this.close(true);
+        },
+        updateClosable: function (value) {
+            this.closable = value;
         }
     }
 }

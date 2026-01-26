@@ -4,7 +4,7 @@
             @mousedown="handleZ" @mouseup="handleWindowCloseClick">
             <div class="title" ref="title">
                 <div class="text">{{ title }}</div>
-                <div class="close" @mouseup="closeMouseUp">
+                <div v-if="closable" class="close" @mouseup="closeMouseUp">
                     <i class="icon close"></i>
                 </div>
             </div>
@@ -61,6 +61,10 @@ export default {
         closeModalOnClick: {
             type: Boolean,
             default: false
+        },
+        closable: {
+            type: Boolean,
+            default: true
         },
     },
     data: function () {
@@ -151,10 +155,10 @@ export default {
         },
 
         handleContainerCloseClick: function (e) {
-            if (this.closeModalOnClick) this.closeMouseUp(e);
+            if (this.closeModalOnClick && this.closable) this.closeMouseUp(e);
         },
         handleWindowCloseClick: function (e) {
-            // Events stopped here will not propagate to 
+            // Events stopped here will not propagate to
             // handleContainerCloseClick
             if (!this.closeModalOnClick) return;
             else e.stopPropagation();
@@ -206,7 +210,7 @@ export default {
             this.winStyle.cursor = "";
 
             // TODO: re-add window location preferences
-            //window.localStorage.setItem(`winStyle_${this.id}`, JSON.stringify(this.winStyle)); 
+            //window.localStorage.setItem(`winStyle_${this.id}`, JSON.stringify(this.winStyle));
         },
 
         mouseMove: function (e) {
@@ -273,7 +277,7 @@ export default {
 
         closeMouseUp: function (e) {
             e.stopPropagation();
-
+            if (!this.closable) return;
             this.$emit("onClose");
         }
     }

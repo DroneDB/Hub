@@ -19,6 +19,8 @@ import './dynamic/web';
 import Vue from 'vue';
 import VueRouter from 'vue-router';
 import VueLogger from 'vuejs-logger';
+import { RecycleScroller } from 'vue-virtual-scroller';
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 
 import Header from './components/Header.vue';
 import Login from './components/Login.vue';
@@ -65,6 +67,7 @@ window.addEventListener('load', function () {
 
     Vue.use(VueLogger, options);
     Vue.use(VueRouter);
+    Vue.component('RecycleScroller', RecycleScroller);
 
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: { content: ViewDataset, header: hdr }, meta: { title: "View Dataset" } },
