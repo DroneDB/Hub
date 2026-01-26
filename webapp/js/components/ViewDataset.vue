@@ -268,6 +268,9 @@ export default {
             console.warn('Error loading builds:', error);
         });
 
+        // Listen for Delete key to delete selected files
+        document.addEventListener('keydown', this.handleKeyDown);
+
         // Listen to build state change events
         BuildManager.on('buildStateChanged', this.handleBuildStateNotification);
         BuildManager.on('buildStarted', this.handleBuildStartedNotification);
@@ -317,6 +320,9 @@ export default {
     beforeDestroy: function () {
         document.getElementById("app").classList.remove("fullpage");
 
+        // Remove Delete key listener
+        document.removeEventListener('keydown', this.handleKeyDown);
+
         // Cleanup BuildManager listeners
         BuildManager.off('buildStateChanged', this.handleBuildStateNotification);
         BuildManager.off('buildStarted', this.handleBuildStartedNotification);
@@ -359,6 +365,28 @@ export default {
         }
     },
     methods: {
+        // Handle Delete key press to delete selected files
+        handleKeyDown(e) {
+            // Only handle Delete key
+            if (e.key !== 'Delete') return;
+
+            // Don't trigger if we're in an input field or dialog is open
+            const tagName = e.target.tagName.toLowerCase();
+            if (tagName === 'input' || tagName === 'textarea' || e.target.isContentEditable) return;
+
+            // Don't trigger if any dialog is already open
+            if (this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
+                this.createFolderDialogOpen || this.transferDialogOpen || this.showProperties ||
+                this.showSettings || this.textEditorDialogOpen) return;
+
+            // Check if we have selected files and can write
+            if (this.canWrite && this.selectedFiles.length > 0) {
+                e.preventDefault();
+                this.selectedUsingFileBrowserList = false;
+                this.deleteDialogOpen = true;
+            }
+        },
+
         // View mode switching
         switchViewMode(mode) {
             this.viewMode = mode;
