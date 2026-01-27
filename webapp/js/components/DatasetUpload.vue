@@ -36,7 +36,7 @@
                     <span class="filter-label">All</span>
                     <span class="filter-count">{{ counts.total }}</span>
                 </button>
-                <button class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'">
+                <button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'">
                     <i class="icon circle notch" :class="{ spin: counts.uploading > 0 }"></i>
                     <span class="filter-label">In Progress</span>
                     <span class="filter-count">{{ counts.uploading + counts.pending }}</span>
@@ -46,7 +46,7 @@
                     <span class="filter-label">Done</span>
                     <span class="filter-count">{{ counts.done }}</span>
                 </button>
-                <button class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'">
+                <button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'">
                     <i class="icon times"></i>
                     <span class="filter-label">Errors</span>
                     <span class="filter-count">{{ counts.error }}</span>
@@ -351,7 +351,8 @@ export default {
                 this.done = true;
                 this.uploadEndTime = new Date();
                 this.$emit('update:closable', true);
-                // Don't auto-close - always show the report
+                // Switch to appropriate tab based on results
+                this.activeFilter = this.counts.error > 0 ? 'error' : 'done';
             }
         })
         .on("reset", () => {
