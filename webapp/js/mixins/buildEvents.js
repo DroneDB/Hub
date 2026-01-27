@@ -28,12 +28,18 @@ export default {
             switch (data.newState) {
                 case 'Succeeded':
                     this.flash = `Build completed for ${fileName}`;
+                    this.flashColor = "positive";
+                    this.flashIcon = "check circle outline";
                     break;
                 case 'Failed':
                     this.flash = `Build failed for ${fileName}`;
+                    this.flashColor = "negative";
+                    this.flashIcon = "times circle outline";
                     break;
                 case 'Processing':
                     this.flash = `Building ${fileName}...`;
+                    this.flashColor = "primary";
+                    this.flashIcon = "sync";
                     break;
             }
         },

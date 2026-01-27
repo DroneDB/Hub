@@ -75,6 +75,11 @@
             :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true">
         </AddToDatasetDialog>
         <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
+        <DeleteResultDialog v-if="deleteResultDialogOpen"
+            :deleted="deleteResultData.deleted"
+            :failed="deleteResultData.failed"
+            @onClose="handleDeleteResultClose">
+        </DeleteResultDialog>
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
         <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
@@ -83,7 +88,7 @@
             {{ errorMessage }}
         </Alert>
         <Loader v-if="isBusy"></Loader>
-        <Flash v-if="flash" color="positive" icon="check circle outline" @onClose="closeFlash">{{ flash }}</Flash>
+        <Flash v-if="flash" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flash }}</Flash>
         <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
         <FileAvailabilityDialog
             v-if="showAvailabilityDialog"
@@ -118,6 +123,7 @@ import Header from './Header.vue';
 import SettingsDialog from './SettingsDialog.vue';
 import AddToDatasetDialog from './AddToDatasetDialog.vue';
 import DeleteDialog from './DeleteDialog.vue';
+import DeleteResultDialog from './DeleteResultDialog.vue';
 import RenameDialog from './RenameDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
 import TransferDialog from './TransferDialog.vue';
@@ -176,6 +182,7 @@ export default {
         Panel,
         AddToDatasetDialog,
         DeleteDialog,
+        DeleteResultDialog,
         RenameDialog,
         NewFolderDialog,
         TransferDialog,

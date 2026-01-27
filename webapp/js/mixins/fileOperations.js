@@ -12,7 +12,9 @@ export default {
     data() {
         return {
             isBusy: false,
-            flash: ""
+            flash: "",
+            flashColor: "positive",
+            flashIcon: "check circle outline"
         };
     },
 
@@ -40,16 +42,26 @@ export default {
             this.isBusy = true;
 
             try {
-                var deleted = [];
+                const paths = this.contextMenuFiles.map(file => file.entry.path);
 
-                for (var file of this.contextMenuFiles) {
-                    await this.dataset.deleteObj(file.entry.path);
-                    deleted.push(file.entry.path);
+                // Use batch delete endpoint
+                const response = await this.dataset.deleteObjs(paths);
+
+                // Update file browser with successfully deleted paths
+                if (response.deleted && response.deleted.length > 0) {
+                    this.fileBrowserFiles = this.fileBrowserFiles.filter(
+                        item => !response.deleted.includes(item.entry.path)
+                    );
+                    this.$root.$emit('deleteEntries', response.deleted);
                 }
 
-                this.fileBrowserFiles = this.fileBrowserFiles.filter(item => !deleted.includes(item.entry.path));
-
-                this.$root.$emit('deleteEntries', deleted);
+                // Show result dialog only if there are failures
+                if (response.failed && Object.keys(response.failed).length > 0) {
+                    this.showDeleteResults({
+                        deleted: response.deleted || [],
+                        failed: response.failed
+                    });
+                }
 
             } catch (e) {
                 this.showError(e, "Delete");
@@ -159,6 +171,8 @@ export default {
 
         closeFlash() {
             this.flash = "";
+            this.flashColor = "positive";
+            this.flashIcon = "check circle outline";
         }
     }
 };

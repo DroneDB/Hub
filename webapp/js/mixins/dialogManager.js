@@ -8,6 +8,7 @@ export default {
             // Dialog states
             uploadDialogOpen: false,
             deleteDialogOpen: false,
+            deleteResultDialogOpen: false,
             renameDialogOpen: false,
             createFolderDialogOpen: false,
             transferDialogOpen: false,
@@ -20,7 +21,8 @@ export default {
             filesToUpload: null,
             errorMessage: null,
             errorMessageTitle: null,
-            shareFile: null
+            shareFile: null,
+            deleteResultData: { deleted: [], failed: {} }
         };
     },
 
@@ -165,6 +167,17 @@ export default {
                 await this.deleteSelectedFiles();
             }
             this.deleteDialogOpen = false;
+        },
+
+        // Delete Result Dialog
+        showDeleteResults(result) {
+            this.deleteResultData = result;
+            this.deleteResultDialogOpen = true;
+        },
+
+        handleDeleteResultClose() {
+            this.deleteResultDialogOpen = false;
+            this.deleteResultData = { deleted: [], failed: {} };
         },
 
         // Rename Dialog

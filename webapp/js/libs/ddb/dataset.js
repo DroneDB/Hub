@@ -123,6 +123,12 @@ module.exports = class Dataset {
         return this.registry.deleteFormData(`${this.baseApi}/obj`, formData);
     }
 
+    async deleteObjs(paths) {
+        const formData = new FormData();
+        paths.forEach(path => formData.append('paths', path));
+        return this.registry.deleteFormData(`${this.baseApi}/obj/batch`, formData);
+    }
+
     async moveObj(source, dest) {
         const formData = new FormData();
         formData.append('source', source);
