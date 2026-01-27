@@ -272,31 +272,85 @@ export default {
 
         },
 
-        getFiles: function (ev) {
-            var files = [];
+        // Helper function to read all entries from a directory recursively
+        async readDirectoryEntries(directoryReader) {
+            const entries = [];
+            let batch;
+            do {
+                batch = await new Promise((resolve, reject) => {
+                    directoryReader.readEntries(resolve, reject);
+                });
+                entries.push(...batch);
+            } while (batch.length > 0);
+            return entries;
+        },
 
-            if (ev.dataTransfer.items) {
-                // Use DataTransferItemList interface to access the file(s)
-                for (var i = 0; i < ev.dataTransfer.items.length; i++) {
-                    // If dropped items aren't files, reject them
-                    if (ev.dataTransfer.items[i].kind === 'file') {
-                        var file = ev.dataTransfer.items[i].getAsFile();
-                        files.push(file);
-                    }
+        // Recursively traverse a FileSystemEntry and collect all files with their relative paths
+        async traverseFileSystemEntry(entry, basePath = '') {
+            const files = [];
+
+            if (entry.isFile) {
+                const file = await new Promise((resolve, reject) => {
+                    entry.file(resolve, reject);
+                });
+                // Set fullPath to preserve folder structure
+                const relativePath = basePath ? basePath + '/' + entry.name : entry.name;
+                file.fullPath = relativePath;
+                files.push(file);
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                const entries = await this.readDirectoryEntries(dirReader);
+                const newBasePath = basePath ? basePath + '/' + entry.name : entry.name;
+
+                for (const childEntry of entries) {
+                    const childFiles = await this.traverseFileSystemEntry(childEntry, newBasePath);
+                    files.push(...childFiles);
                 }
-            } else {
-                files = ev.dataTransfer.files;
             }
 
             return files;
         },
 
-        explorerDropHandler: function (ev) {
+        // Get files from drag event, supporting folders via webkitGetAsEntry
+        async getFilesFromDrop(ev) {
+            const files = [];
+            const entries = [];
+
+            if (ev.dataTransfer.items) {
+                // Collect all entries and files synchronously first.
+                // DataTransferItemList becomes invalid after async operations,
+                // so we must call webkitGetAsEntry() and getAsFile() before any await.
+                for (const item of Array.from(ev.dataTransfer.items)) {
+                    if (item.kind === 'file') {
+                        const entry = item.webkitGetAsEntry?.();
+                        if (entry) {
+                            entries.push(entry);
+                        } else {
+                            // Fallback to getAsFile for browsers without webkitGetAsEntry
+                            const file = item.getAsFile();
+                            if (file) files.push(file);
+                        }
+                    }
+                }
+
+                // Process all entries in parallel
+                const results = await Promise.all(
+                    entries.map(entry => this.traverseFileSystemEntry(entry))
+                );
+                files.push(...results.flat());
+            } else if (ev.dataTransfer.files) {
+                files.push(...Array.from(ev.dataTransfer.files));
+            }
+
+            return files;
+        },
+
+        async explorerDropHandler(ev) {
             ev.preventDefault();
 
             this.dropping = false;
 
-            var files = this.getFiles(ev);
+            const files = await this.getFilesFromDrop(ev);
             if (files.length == 0) return;
 
             this.$root.$emit('uploadItems', { files: files, path: this.currentPath });

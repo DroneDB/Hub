@@ -28,34 +28,28 @@
 
         <!-- Upload progress view -->
         <template v-else>
-            <!-- Header con contatori e filtri -->
+            <!-- Header con filtri -->
         <div class="upload-header">
-            <div class="upload-stats">
-                <span class="stat total">
-                    <i class="icon file"></i> {{ counts.total }} files
-                </span>
-                <span class="stat uploading" v-if="counts.uploading > 0">
-                    <i class="icon circle notch spin"></i> {{ counts.uploading }}
-                </span>
-                <span class="stat done" v-if="counts.done > 0">
-                    <i class="icon check"></i> {{ counts.done }}
-                </span>
-                <span class="stat errors" v-if="counts.error > 0">
-                    <i class="icon times"></i> {{ counts.error }}
-                </span>
-            </div>
             <div class="upload-filters">
-                <button class="filter-btn" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">
-                    All
+                <button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">
+                    <i class="icon file"></i>
+                    <span class="filter-label">All</span>
+                    <span class="filter-count">{{ counts.total }}</span>
                 </button>
-                <button class="filter-btn" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'">
-                    In Progress
+                <button class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'">
+                    <i class="icon circle notch" :class="{ spin: counts.uploading > 0 }"></i>
+                    <span class="filter-label">In Progress</span>
+                    <span class="filter-count">{{ counts.uploading + counts.pending }}</span>
                 </button>
-                <button class="filter-btn" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'">
-                    Done
+                <button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'">
+                    <i class="icon check"></i>
+                    <span class="filter-label">Done</span>
+                    <span class="filter-count">{{ counts.done }}</span>
                 </button>
-                <button class="filter-btn" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'">
-                    Errors <span v-if="counts.error > 0" class="error-badge">{{ counts.error }}</span>
+                <button class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'">
+                    <i class="icon times"></i>
+                    <span class="filter-label">Errors</span>
+                    <span class="filter-count">{{ counts.error }}</span>
                 </button>
             </div>
         </div>
@@ -158,7 +152,7 @@ export default {
             error: null,
             uploading: false,
             done: false,
-            activeFilter: 'all',
+            activeFilter: 'uploading',
             waitingForFiles: false,  // True when waiting for user to select files
 
             // File tracking
@@ -345,7 +339,9 @@ export default {
             setTimeout(() => this.dz.processQueue(), 100);
         })
         .on("sending", (file, xhr, formData) => {
-            formData.append("path", !this.path ? file.name : (this.path + "/" + file.name));
+            // Use fullPath to preserve folder structure, fallback to name
+            const filePath = file.fullPath || file.name;
+            formData.append("path", !this.path ? filePath : (this.path + "/" + filePath));
         })
         .on("queuecomplete", async () => {
             // Check if all files are done or error (no pending/uploading)
@@ -366,7 +362,13 @@ export default {
         if (this.filesToUpload != null && this.filesToUpload.length > 0) {
             this.waitingForFiles = false;
             // Convert to array if needed (FileList is not a real array)
-            const fileArray = Array.from(this.filesToUpload);
+            // and assign fullPath from webkitRelativePath for folder uploads
+            const fileArray = Array.from(this.filesToUpload).map(file => {
+                if (file.webkitRelativePath) {
+                    file.fullPath = file.webkitRelativePath;
+                }
+                return file;
+            });
             // handleFiles assigns upload.uuid and triggers addedfile event
             this.dz.handleFiles(fileArray);
             this.dz.processQueue();
@@ -469,8 +471,16 @@ export default {
                 return;
             }
 
-            // Convert FileList to array and process
-            const fileArray = Array.from(files);
+            // Convert FileList to array and assign fullPath from webkitRelativePath
+            const fileArray = Array.from(files).map(file => {
+                // webkitRelativePath contains the relative path including folder structure
+                // e.g. "folder/subfolder/file.jpg"
+                if (file.webkitRelativePath) {
+                    file.fullPath = file.webkitRelativePath;
+                }
+                return file;
+            });
+
             this.waitingForFiles = false;
             this.$emit('update:closable', false);
 
@@ -504,29 +514,16 @@ export default {
     background-color: #f9f9f9;
 }
 
-.upload-stats {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 8px;
-}
-
-.stat {
-    font-size: 13px;
-    display: flex;
-    gap: 4px;
-}
-
-.stat.uploading { color: #2185d0; }
-.stat.done { color: #21ba45; }
-.stat.errors { color: #db2828; }
-
 .upload-filters {
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
 .filter-btn {
-    padding: 4px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
     border: 1px solid #ddd;
     background: white;
     border-radius: 4px;
@@ -539,34 +536,88 @@ export default {
     background-color: #f0f0f0;
 }
 
-.filter-btn.active {
+.filter-btn .filter-count {
+    background-color: #e0e0e0;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+}
+
+/* All filter */
+.filter-btn.filter-all {
+    color: #666;
+}
+.filter-btn.filter-all.active {
+    background-color: #666;
+    color: white;
+    border-color: #666;
+}
+.filter-btn.filter-all.active .filter-count {
+    background-color: rgba(255,255,255,0.3);
+    color: white;
+}
+
+/* Uploading filter */
+.filter-btn.filter-uploading {
+    color: #2185d0;
+    border-color: #b3d4f0;
+}
+.filter-btn.filter-uploading .filter-count {
+    background-color: #d4e9f9;
+    color: #2185d0;
+}
+.filter-btn.filter-uploading.active {
     background-color: #2185d0;
     color: white;
     border-color: #2185d0;
 }
+.filter-btn.filter-uploading.active .filter-count {
+    background-color: rgba(255,255,255,0.3);
+    color: white;
+}
 
-.filter-btn.has-errors {
+/* Done filter */
+.filter-btn.filter-done {
+    color: #21ba45;
+    border-color: #b3e6c0;
+}
+.filter-btn.filter-done .filter-count {
+    background-color: #d4f5dc;
+    color: #21ba45;
+}
+.filter-btn.filter-done.active {
+    background-color: #21ba45;
+    color: white;
+    border-color: #21ba45;
+}
+.filter-btn.filter-done.active .filter-count {
+    background-color: rgba(255,255,255,0.3);
+    color: white;
+}
+
+/* Error filter */
+.filter-btn.filter-error {
+    color: #db2828;
+    border-color: #f0b3b3;
+}
+.filter-btn.filter-error .filter-count {
+    background-color: #fad4d4;
+    color: #db2828;
+}
+.filter-btn.filter-error.has-errors {
     border-color: #db2828;
-    color: #db2828;
 }
-
-.filter-btn.has-errors.active {
+.filter-btn.filter-error.active {
     background-color: #db2828;
     color: white;
+    border-color: #db2828;
 }
-
-.error-badge {
-    background-color: #db2828;
+.filter-btn.filter-error.active .filter-count {
+    background-color: rgba(255,255,255,0.3);
     color: white;
-    padding: 1px 6px;
-    border-radius: 10px;
-    font-size: 10px;
-    margin-left: 4px;
-}
-
-.filter-btn.active .error-badge {
-    background-color: white;
-    color: #db2828;
 }
 
 /* Body */

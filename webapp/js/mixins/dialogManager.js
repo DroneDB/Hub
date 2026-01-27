@@ -47,20 +47,87 @@ export default {
             if (uploaded.length == 0) return;
 
             var items = [];
+            var addedPaths = new Set(); // Track paths we've already added to avoid duplicates
+
+            // Normalize currentPath for comparison (null/undefined/"" all mean root)
+            const normalizedCurrentPath = (this.currentPath != null && this.currentPath.length > 0) ? this.currentPath : null;
 
             for (var entry of uploaded) {
-                // Don't add the same file twice
-                if (this.fileBrowserFiles.filter(file => file.entry.path == entry.path) != 0)
-                    continue;
+                // Get the parent folder of the uploaded entry
+                const entryParentPath = this.pathutils.getParentFolder(entry.path);
 
-                const base = this.pathutils.basename(entry.path);
+                // Determine what to show in the current view
+                let itemToAdd = null;
+                let itemPath = null;
+                let itemLabel = null;
+                let itemEntry = entry;
+                let isDirectory = false;
+
+                if (normalizedCurrentPath === null) {
+                    // We're at root level
+                    if (entryParentPath === null) {
+                        // Entry is directly in root - add it as-is
+                        itemPath = entry.path;
+                        itemLabel = this.pathutils.basename(entry.path);
+                        isDirectory = this.ddb.entry.isDirectory(entry);
+                    } else {
+                        // Entry is in a subfolder - add the top-level folder
+                        const pathParts = entry.path.split('/');
+                        itemPath = pathParts[0];
+                        itemLabel = pathParts[0];
+                        isDirectory = true;
+                        // Create a synthetic folder entry
+                        itemEntry = {
+                            path: itemPath,
+                            type: this.ddb.entry.type.DIRECTORY,
+                            size: 0,
+                            mtime: entry.mtime
+                        };
+                    }
+                } else {
+                    // We're in a subfolder
+                    if (entryParentPath === normalizedCurrentPath) {
+                        // Entry is directly in current folder - add it as-is
+                        itemPath = entry.path;
+                        itemLabel = this.pathutils.basename(entry.path);
+                        isDirectory = this.ddb.entry.isDirectory(entry);
+                    } else if (entryParentPath !== null && entryParentPath.startsWith(normalizedCurrentPath + '/')) {
+                        // Entry is in a subfolder of current folder - add the immediate subfolder
+                        const relativePath = entry.path.substring(normalizedCurrentPath.length + 1);
+                        const pathParts = relativePath.split('/');
+                        itemPath = normalizedCurrentPath + '/' + pathParts[0];
+                        itemLabel = pathParts[0];
+                        isDirectory = true;
+                        // Create a synthetic folder entry
+                        itemEntry = {
+                            path: itemPath,
+                            type: this.ddb.entry.type.DIRECTORY,
+                            size: 0,
+                            mtime: entry.mtime
+                        };
+                    } else {
+                        // Entry doesn't belong to current view - skip it
+                        continue;
+                    }
+                }
+
+                // Skip if we've already processed this path (for folders with multiple files)
+                if (addedPaths.has(itemPath)) {
+                    continue;
+                }
+                addedPaths.add(itemPath);
+
+                // Don't add if it already exists in the file browser
+                if (this.fileBrowserFiles.filter(file => file.entry.path === itemPath).length > 0) {
+                    continue;
+                }
 
                 var item = {
-                    icon: this.icons.getForType(entry.type),
-                    label: base,
-                    path: this.dataset.remoteUri((this.currentPath != null && this.currentPath.length > 0) ? this.pathutils.join(this.currentPath, base) : base),
-                    entry,
-                    isExpandable: this.ddb.entry.isDirectory(entry),
+                    icon: this.icons.getForType(itemEntry.type),
+                    label: itemLabel,
+                    path: this.dataset.remoteUri(itemPath),
+                    entry: itemEntry,
+                    isExpandable: isDirectory,
                     selected: false
                 };
 
@@ -73,8 +140,8 @@ export default {
             if (items.length > 0) {
                 this.$root.$emit('addItems', items);
 
-                // Notify BuildManager about new files
-                const newEntries = items.map(item => item.entry);
+                // Notify BuildManager about new files (use original entries, not synthetic ones)
+                const newEntries = uploaded;
                 this.BuildManager.onFilesAdded(this.dataset, newEntries);
             }
 
