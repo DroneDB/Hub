@@ -8,7 +8,7 @@
                     <i class="icon close"></i>
                 </div>
             </div>
-            <div class="content" ref="content">
+            <div class="content text-selectable" ref="content">
                 <slot />
             </div>
         </div>
@@ -350,7 +350,6 @@ export default {
     &>.content {
         overflow: auto;
         flex-grow: 1;
-        user-select: text;
         margin: 6px;
     }
 }

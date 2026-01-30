@@ -10,8 +10,32 @@ body {
     background: #fefefe;
 }
 
+/*
+ * GLOBAL USER-SELECT DISABLE
+ *
+ * This application is a geospatial data management platform with heavy
+ * interactive components (maps, 3D viewers, draggable windows, resizable panels).
+ *
+ * Disabling text selection globally prevents accidental text selection during:
+ * - Map panning/zooming (OpenLayers, Leaflet)
+ * - 3D model rotation/pan (Potree, Three.js)
+ * - Window dragging (Window.vue)
+ * - Panel resizing (Panel.vue)
+ * - File selection in browsers (FileBrowser.vue, Explorer.vue)
+ *
+ * Use .text-selectable class on elements where text should be selectable.
+ * Example: <div class="text-selectable">Copy me</div>
+ */
 * {
     user-select: none;
+}
+
+.text-selectable,
+.text-selectable * {
+    -webkit-user-select: text !important;
+    -moz-user-select: text !important;
+    user-select: text !important;
+    cursor: text;
 }
 
 .hidden {

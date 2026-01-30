@@ -36,7 +36,7 @@
             </div>
 
             <!-- Properties section -->
-            <div class="properties-section">
+            <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
 
                 <div class="ui relaxed divided list">
@@ -87,6 +87,12 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Extended Properties -->
+                <div v-if="extendedProperties && Object.keys(extendedProperties).length > 0" class="extended-properties">
+                    <h5 class="ui dividing header">Extended Properties</h5>
+                    <ObjTable :obj="extendedProperties" />
+                </div>
             </div>
 
             <!-- Actions section -->
@@ -96,10 +102,6 @@
                     <button class="ui button" @click="handleOpen">
                         <i class="folder open outline icon"></i>
                         Open
-                    </button>
-                    <button class="ui button" @click="handleProperties" v-if="!isDirectory">
-                        <i class="info circle icon"></i>
-                        Full Properties
                     </button>
                     <button class="ui button" @click="handleShare" v-if="!isDirectory">
                         <i class="share alternate icon"></i>
@@ -129,9 +131,10 @@
 import { thumbs } from 'ddb';
 import BuildManager from '../libs/buildManager';
 import ddb from 'ddb';
+import ObjTable from './ObjTable.vue';
 
 export default {
-    components: {},
+    components: { ObjTable },
     props: {
         file: {
             type: Object,
@@ -192,6 +195,19 @@ export default {
                 default:
                     return '';
             }
+        },
+        extendedProperties() {
+            if (!this.file || !this.file.entry || !this.file.entry.properties) return null;
+            const props = this.file.entry.properties;
+            // Exclude meta and permissions (already shown or internal)
+            const excluded = ['meta', 'permissions'];
+            const filtered = {};
+            for (const key in props) {
+                if (!excluded.includes(key)) {
+                    filtered[key] = props[key];
+                }
+            }
+            return Object.keys(filtered).length > 0 ? filtered : null;
         }
     },
     watch: {
@@ -326,10 +342,6 @@ export default {
 
         handleOpen() {
             this.$emit('open', this.file);
-        },
-
-        handleProperties() {
-            this.$emit('properties', this.file);
         },
 
         handleShare() {
@@ -511,5 +523,21 @@ export default {
 
 .detail-panel-empty .ui.message {
     text-align: center;
+}
+
+.extended-properties {
+    margin-top: 1rem;
+}
+
+.extended-properties h5.ui.header {
+    margin-bottom: 0.5rem;
+}
+
+.extended-properties :deep(.ui.table) {
+    font-size: 0.85em;
+}
+
+.extended-properties :deep(.ui.table td) {
+    padding: 0.4em 0.6em;
 }
 </style>

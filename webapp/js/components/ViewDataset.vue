@@ -48,7 +48,6 @@
                         <DetailPanel :file="selectedDetailFile" :dataset="dataset"
                             @close="handleDetailPanelClose"
                             @open="handleDetailPanelOpen"
-                            @properties="handleDetailPanelProperties"
                             @share="handleDetailPanelShare"
                             @buildStarted="handleBuildStarted"
                             @buildError="handleBuildError" />
@@ -421,11 +420,6 @@ export default {
 
         handleDetailPanelOpen(file) {
             this.handleOpenItem(file);
-        },
-
-        handleDetailPanelProperties(file) {
-            this.selectedUsingFileBrowserList = false;
-            this.showProperties = true;
         },
 
         handleDetailPanelShare(file) {
