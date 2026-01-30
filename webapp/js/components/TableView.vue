@@ -3,7 +3,7 @@
         <ContextMenu :items="contextMenu" />
         <Toolbar :tools="tools" v-if="tools" />
         <div v-if="currentPath">
-            <div class="ui large breadcrumb" style="margin-top: 1rem; margin-left: 1rem">
+            <div class="ui large breadcrumb" style="margin-top: 1rem; margin-bottom: 1rem; margin-left: 1rem">
                 <span v-for="(b, idx) in breadcrumbs" :key="'B,' + b.name">
                     <a v-if="idx != breadcrumbs.length - 1" class="section" :class="{ home: idx === 0 }"
                         v-on:click="goTo(b)">{{ b.name }}</a>
@@ -11,7 +11,7 @@
                     <span v-if="idx != breadcrumbs.length - 1" class="divider">/</span>
                 </span>
             </div>
-            <div class="ui divider"></div>
+            <!--<div class="ui divider"></div>-->
         </div>
         <div ref="tableview" id="table-view" :class="{ loading, dropping }"
             @drop="explorerDropHandler($event)"

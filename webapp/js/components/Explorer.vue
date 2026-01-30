@@ -11,7 +11,7 @@
                     <span v-if="idx != breadcrumbs.length - 1" class="divider">/</span>
                 </span>
             </div>
-            <div class="ui divider"></div>
+            <!--<div class="ui divider"></div>-->
         </div>
         <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
             @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"

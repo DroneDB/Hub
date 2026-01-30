@@ -195,5 +195,13 @@ export default {
 .panel {
     display: flex;
     flex-direction: row;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.panel > * {
+    min-height: 0;
+    overflow: hidden;
 }
 </style>
