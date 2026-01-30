@@ -49,3 +49,30 @@ export function clearDatasetTablePreferences() {
         console.error('Error clearing dataset table preferences from Local Storage:', e);
     }
 }
+
+const OPEN_AFTER_CREATE_KEY = 'open_dataset_after_create';
+
+/**
+ * Get the preference for opening a dataset after creation
+ * @returns {boolean} True if the user wants to open the dataset after creation, false otherwise
+ */
+export function getOpenAfterCreatePreference() {
+    try {
+        return localStorage.getItem(OPEN_AFTER_CREATE_KEY) === 'true';
+    } catch (e) {
+        console.error('Error reading open after create preference from Local Storage:', e);
+    }
+    return false;
+}
+
+/**
+ * Save the preference for opening a dataset after creation
+ * @param {boolean} value - True to open the dataset after creation, false otherwise
+ */
+export function saveOpenAfterCreatePreference(value) {
+    try {
+        localStorage.setItem(OPEN_AFTER_CREATE_KEY, value.toString());
+    } catch (e) {
+        console.error('Error saving open after create preference to Local Storage:', e);
+    }
+}

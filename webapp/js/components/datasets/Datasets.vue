@@ -481,6 +481,17 @@ export default {
                                 permissions: { canRead: true, canWrite: true, canDelete: true }
                             });
                         }
+
+                        // Navigate to the newly created dataset if the user has enabled the preference
+                        if (newds.openAfterCreate) {
+                            this.$router.push({
+                                name: "ViewDataset",
+                                params: {
+                                    org: this.$route.params.org,
+                                    ds: newds.slug
+                                }
+                            });
+                        }
                     } else {
                         // Remove the temporary dataset on error
                         this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));

@@ -42,6 +42,12 @@
                 </div>
 
             </form>
+            <div v-if="mode == 'new'" class="field" style="margin-bottom: 1em;">
+                <div class="ui checkbox">
+                    <input type="checkbox" id="openAfterCreate" v-model="openAfterCreate">
+                    <label for="openAfterCreate">Open dataset after creation</label>
+                </div>
+            </div>
             <div class="buttons">
                 <button @click="close('close')" class="ui button">
                     Close
@@ -60,6 +66,7 @@
 <script>
 import Window from '../Window.vue';
 import { slugFromName } from '../../libs/registryUtils';
+import { getOpenAfterCreatePreference, saveOpenAfterCreatePreference } from '../../libs/storageUtils';
 
 var re = /^[a-z0-9\-_]+$/;
 
@@ -90,7 +97,8 @@ export default {
                 name: null,
                 visibility: 0
             },
-            title: null
+            title: null,
+            openAfterCreate: getOpenAfterCreatePreference()
         };
     }, mounted: function () {
         this.$nextTick(() => {
@@ -130,10 +138,14 @@ export default {
     }, methods: {
         slugFromName,
         close: function (buttonId) {
+            if (buttonId === 'create') {
+                saveOpenAfterCreatePreference(this.openAfterCreate);
+            }
             this.$emit('onClose', buttonId, {
                 name: this.ds.name,
                 visibility: this.ds.visibility,
-                slug: this.mode === 'edit' ? this.model.slug : slugFromName(this.ds.name)
+                slug: this.mode === 'edit' ? this.model.slug : slugFromName(this.ds.name),
+                openAfterCreate: this.openAfterCreate
             });
         },
         isValid: function () {
