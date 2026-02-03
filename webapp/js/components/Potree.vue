@@ -9,29 +9,41 @@
         </div>
 
         <div class="potree-container" :class="{ loading }">
-            <!-- Undo/Redo toolbar -->
-            <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="undo-redo-toolbar">
-                <button
-                    @click="undo"
-                    :disabled="undoStack.length === 0"
-                    class="btn-undo-redo"
-                    title="Undo (Ctrl+Z)">
-                    <i class="undo icon"></i>
-                </button>
-                <button
-                    @click="redo"
-                    :disabled="redoStack.length === 0"
-                    class="btn-undo-redo"
-                    title="Redo (Ctrl+Y)">
-                    <i class="redo icon"></i>
-                </button>
-                <button
-                    @click="toggleDeleteTool"
-                    :class="{ active: deleteToolActive }"
-                    class="btn-undo-redo btn-delete-tool"
-                    title="Delete measurement tool (click on measurement to delete)">
-                    <i class="trash alternate icon"></i>
-                </button>
+            <!-- Top-left toolbar area -->
+            <div v-if="loaded" class="top-left-toolbar">
+                <!-- Undo/Redo toolbar -->
+                <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
+                    <button
+                        @click="undo"
+                        :disabled="undoStack.length === 0"
+                        class="btn-undo-redo"
+                        title="Undo (Ctrl+Z)">
+                        <i class="undo icon"></i>
+                    </button>
+                    <button
+                        @click="redo"
+                        :disabled="redoStack.length === 0"
+                        class="btn-undo-redo"
+                        title="Redo (Ctrl+Y)">
+                        <i class="redo icon"></i>
+                    </button>
+                    <button
+                        @click="toggleDeleteTool"
+                        :class="{ active: deleteToolActive }"
+                        class="btn-undo-redo btn-delete-tool"
+                        title="Delete measurement tool (click on measurement to delete)">
+                        <i class="trash alternate icon"></i>
+                    </button>
+                </div>
+
+                <!-- Unit selector toolbar -->
+                <div class="unit-selector-toolbar">
+                    <label for="potree-unit-select">Units:</label>
+                    <select id="potree-unit-select" v-model="unitPref" @change="handleUnitChange">
+                        <option value="metric">Metric (m)</option>
+                        <option value="imperial">Imperial (ft)</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Toolbar for measurements -->
@@ -84,6 +96,7 @@ import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import { loadResources } from '../libs/lazy';
 import { MeasurementStorage } from '../libs/measurementStorage';
 import { exportMeasurements, importMeasurements } from '../libs/potreeMeasurementConverter';
+import { isMobile } from '../libs/responsive';
 
 export default {
     components: {
@@ -126,7 +139,10 @@ export default {
             // Delete tool state
             deleteToolActive: false,
             deleteClickHandler: null,
-            deleteToolIcon: null
+            deleteToolIcon: null,
+
+            // Unit preference (shared with olMeasure via localStorage)
+            unitPref: localStorage.getItem("measureUnitPref") || "metric"
         };
     },
     mounted: function () {
@@ -153,6 +169,49 @@ export default {
     },
 
     methods: {
+
+        /**
+         * Handle unit preference change - updates viewer and all existing measurements
+         */
+        handleUnitChange: function() {
+            // Save preference to localStorage (shared with olMeasure)
+            localStorage.setItem("measureUnitPref", this.unitPref);
+
+            // Update Potree viewer unit
+            const unit = this.unitPref === 'metric' ? 'm' : 'ft';
+            this.viewer.setLengthUnit(unit);
+
+            // Propagate length units to scene so addMeasurement() uses correct units
+            this.viewer.scene.lengthUnit = this.viewer.lengthUnit;
+            this.viewer.scene.lengthUnitDisplay = this.viewer.lengthUnitDisplay;
+
+            // Update all existing measurements to reflect new unit
+            if (this.viewer.scene && this.viewer.scene.measurements) {
+                for (const measure of this.viewer.scene.measurements) {
+                    measure.lengthUnit = this.viewer.lengthUnit;
+                    measure.lengthUnitDisplay = this.viewer.lengthUnitDisplay;
+                    measure.update();
+                }
+            }
+
+            // Update profiles if any
+            if (this.viewer.scene && this.viewer.scene.profiles) {
+                for (const profile of this.viewer.scene.profiles) {
+                    if (profile.update) {
+                        profile.update();
+                    }
+                }
+            }
+
+            // Update volumes if any
+            if (this.viewer.scene && this.viewer.scene.volumes) {
+                for (const volume of this.viewer.scene.volumes) {
+                    if (volume.update) {
+                        volume.update();
+                    }
+                }
+            }
+        },
 
         /**
          * Setup listeners to track measurement additions/removals
@@ -269,7 +328,7 @@ export default {
             // Find the title element within the annotation's domElement
             // Potree annotations have a structure with a title span
             const domElement = annotation.domElement;
-            if (!domElement) return;
+            if (!domElement || !(domElement instanceof HTMLElement)) return;
 
             // Look for the title element (usually has class 'annotation-titlebar' or similar)
             const titleElement = domElement.querySelector('.annotation-titlebar') ||
@@ -742,7 +801,7 @@ export default {
             // Create description tooltip if description is set
             if (annotation.description && annotation.description.trim() !== '') {
                 const domElement = annotation.domElement;
-                if (!domElement) return;
+                if (!domElement || !(domElement instanceof HTMLElement)) return;
 
                 const tooltip = document.createElement('div');
                 tooltip.className = 'potree-annotation-tooltip';
@@ -910,6 +969,16 @@ export default {
             viewer.setFOV(60);
             viewer.setPointBudget(10 * 1000 * 1000);
 
+            // Apply unit preference from localStorage
+            viewer.setLengthUnit(this.unitPref === 'metric' ? 'm' : 'ft');
+
+            // Propagate length units to scene so addMeasurement() uses correct units
+            viewer.scene.lengthUnit = viewer.lengthUnit;
+            viewer.scene.lengthUnitDisplay = viewer.lengthUnitDisplay;
+
+            // Set Splat Quality based on device: HQ for desktop, Standard for mobile
+            viewer.useHQ = !isMobile();
+
             const self = this;
             viewer.loadGUI(() => {
                 viewer.setLanguage('en');
@@ -1047,8 +1116,12 @@ export default {
                     setTimeout(() => {
                         if (imported && imported.length > 0) {
                             imported.forEach(item => {
-                                // Check if it's a measurement (has edges) vs annotation
+                                // Ensure measurements have correct unit settings from viewer
                                 if (item.edges) {
+                                    // It's a measurement - apply units and visual properties
+                                    item.lengthUnit = self.viewer.lengthUnit;
+                                    item.lengthUnitDisplay = self.viewer.lengthUnitDisplay;
+                                    item.update();
                                     self.applyMeasurementVisualProperties(item);
                                 } else if (item.description) {
                                     // It's an annotation with description
@@ -1612,12 +1685,19 @@ export default {
         z-index: 999999999999 !important;
     }
 
-    /* Undo/Redo toolbar */
-    .undo-redo-toolbar {
+    /* Top-left toolbar container */
+    .top-left-toolbar {
         position: absolute;
         top: 10px;
         left: 10px;
         z-index: 1001;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    /* Undo/Redo toolbar */
+    .undo-redo-toolbar {
         background: rgba(0, 0, 0, 0.7);
         padding: 6px;
         border-radius: 5px;
@@ -1709,6 +1789,42 @@ export default {
 
     .btn-measurement.btn-danger:hover {
         background: #c0392b;
+    }
+
+    /* Unit selector toolbar */
+    .unit-selector-toolbar {
+        background: rgba(0, 0, 0, 0.7);
+        padding: 6px 12px;
+        border-radius: 5px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        color: white;
+        font-size: 14px;
+    }
+
+    .unit-selector-toolbar label {
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .unit-selector-toolbar select {
+        background: #555;
+        color: white;
+        border: 1px solid #777;
+        padding: 6px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .unit-selector-toolbar select:hover {
+        background: #666;
+    }
+
+    .unit-selector-toolbar select:focus {
+        border-color: #4a90e2;
     }
 }
 </style>
