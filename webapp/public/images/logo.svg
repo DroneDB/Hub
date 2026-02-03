@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" viewBox="0 0 71.34 51.97">
+  <defs>
+    <style>
+      .st0 {
+        fill: #0070e0;
+      }
+
+      .st1 {
+        fill: #0025e0;
+      }
+
+      .st2 {
+        fill: #00bbe0;
+      }
+    </style>
+  </defs>
+  <g id="svg2399" inkscape:export-filename="/home/piero/Desktop/ddb-logo-banner.png" inkscape:export-xdpi="65.437302" inkscape:version="1.0 (4035a4fb49, 2020-05-01)" sodipodi:docname="ddb-logo-banner.svg">
+    <sodipodi:namedview id="base" bordercolor="#666666" borderopacity="1.0" fit-margin-bottom="5" fit-margin-left="5" fit-margin-right="5" fit-margin-top="5" inkscape:current-layer="layer1" inkscape:cx="-1.036378" inkscape:cy="-48.856135" inkscape:document-rotation="0" inkscape:document-units="mm" inkscape:pageopacity="0.0" inkscape:pageshadow="2" inkscape:window-height="1005" inkscape:window-maximized="1" inkscape:window-width="1920" inkscape:window-x="0" inkscape:window-y="37" inkscape:zoom="0.89812355" pagecolor="#ffffff" showgrid="false" units="px"/>
+    <path id="rect1181" class="st1" d="M3.46,36.84c-1.92,0-3.46,1.54-3.46,3.46v8.22c0,1.92,1.54,3.46,3.46,3.46h64.42c1.92,0,3.46-1.54,3.46-3.46v-8.22c0-1.92-1.54-3.46-3.46-3.46H3.46ZM14,40.62c2.09,0,3.78,1.69,3.78,3.78,0,2.09-1.69,3.78-3.78,3.78-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0ZM36.14,40.62c2.09,0,3.78,1.69,3.78,3.78h0c0,2.09-1.69,3.78-3.78,3.78h0c-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0ZM57.34,40.62c2.09,0,3.78,1.69,3.78,3.78h0c0,2.09-1.69,3.78-3.78,3.78h0c-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0Z"/>
+    <g id="use1217">
+      <path id="rect1235" class="st0" d="M3.46,18.42C1.54,18.42,0,19.96,0,21.88v8.22C0,32.01,1.54,33.55,3.46,33.55h64.42c1.92,0,3.46-1.54,3.46-3.46v-8.22c0-1.92-1.54-3.46-3.46-3.46H3.46ZM14,22.2c2.09,0,3.78,1.69,3.78,3.78,0,2.09-1.69,3.78-3.78,3.78-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0ZM36.14,22.2c2.09,0,3.78,1.69,3.78,3.78h0c0,2.09-1.69,3.78-3.78,3.78h0c-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0ZM57.34,22.2c2.09,0,3.78,1.69,3.78,3.78h0c0,2.09-1.69,3.78-3.78,3.78h0c-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0Z"/>
+    </g>
+    <g id="use1219">
+      <path id="rect1223" class="st2" d="M3.46,0C1.54,0,0,1.54,0,3.46v8.22C0,13.59,1.54,15.13,3.46,15.13h64.42c1.92,0,3.46-1.54,3.46-3.46V3.46c0-1.92-1.54-3.46-3.46-3.46H3.46ZM14,3.78c2.09,0,3.78,1.69,3.78,3.78,0,2.09-1.69,3.78-3.78,3.78-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0ZM36.14,3.78c2.09,0,3.78,1.69,3.78,3.78h0c0,2.09-1.69,3.78-3.78,3.78h0c-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0ZM57.34,3.78c2.09,0,3.78,1.69,3.78,3.78h0c0,2.09-1.69,3.78-3.78,3.78h0c-2.09,0-3.78-1.69-3.78-3.78h0c0-2.09,1.69-3.78,3.78-3.78h0Z"/>
+    </g>
+  </g>
+</svg>

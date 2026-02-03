@@ -328,32 +328,35 @@ export default {
     z-index: 2;
 
     .logo {
-        margin-top: 6px;
+        margin-top: 0px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
 
         &>img {
-            height: 22px;
+            height: 33px;
         }
 
         @media only screen and (max-width: 767px) {
             &>img {
-                width: 160px;
-                margin-top: 2px;
+                /*width: 160px;
+                margin-top: 2px;*/
             }
         }
 
         .app-icon {
-            font-size: 22px;
+            font-size: 31px;
         }
 
         .app-name {
-            font-size: 22px;
+            font-size: 2rem;
             color: #030a03;
             font-weight: bold;
             display: inline-block;
         }
 
         .icon-dronedb {
-            padding-right: 8px;
+            margin-right: 20px;
         }
     }
 
