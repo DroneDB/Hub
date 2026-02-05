@@ -34,9 +34,9 @@
                                 </select>
                             </div>
                             <div class="five wide field">
-                                <label>Permission</label>
-                                <select v-model="newMember.permission">
-                                    <option v-for="perm in permissionOptions" :key="perm.value" :value="perm.value">
+                                <label>Permissions</label>
+                                <select v-model="newMember.permissions">
+                                    <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
                                         {{ perm.label }}
                                     </option>
                                 </select>
@@ -60,7 +60,7 @@
                         <tr>
                             <th>Username</th>
                             <th>Email</th>
-                            <th>Permission</th>
+                            <th>Permissions</th>
                             <th>Granted</th>
                             <th v-if="canManageMembers">Actions</th>
                         </tr>
@@ -71,9 +71,9 @@
                             <td>{{ member.email }}</td>
                             <td>
                                 <select v-if="canManageMembers"
-                                        v-model="member.permission"
+                                        v-model="member.permissions"
                                         @change="updatePermission(member)">
-                                    <option v-for="perm in permissionOptions" :key="perm.value" :value="perm.value">
+                                    <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
                                         {{ perm.label }}
                                     </option>
                                 </select>
@@ -136,9 +136,9 @@ export default {
             removingMember: null,
             newMember: {
                 userId: '',
-                permission: 1 // Default to ReadWrite
+                permissions: 1 // Default to ReadWrite
             },
-            permissionOptions: [
+            permissionsOptions: [
                 { value: 0, label: 'Read Only' },
                 { value: 1, label: 'Read/Write' },
                 { value: 2, label: 'Read/Write/Delete' },
@@ -199,7 +199,7 @@ export default {
                 await reg.addOrganizationMember(
                     this.orgSlug,
                     this.newMember.userId,
-                    this.newMember.permission
+                    this.newMember.permissions
                 );
 
                 // Refresh members list
@@ -207,7 +207,7 @@ export default {
 
                 // Reset form
                 this.newMember.userId = '';
-                this.newMember.permission = 1;
+                this.newMember.permissions = 1;
 
             } catch (e) {
                 this.error = e.message || 'Failed to add member';
@@ -218,13 +218,13 @@ export default {
 
         async updatePermission(member) {
             try {
-                await reg.updateMemberPermission(
+                await reg.updateMemberPermissions(
                     this.orgSlug,
                     member.userId,
-                    member.permission
+                    member.permissions
                 );
             } catch (e) {
-                this.error = e.message || 'Failed to update permission';
+                this.error = e.message || 'Failed to update permissions';
                 // Reload to get correct state
                 await this.loadData();
             }
