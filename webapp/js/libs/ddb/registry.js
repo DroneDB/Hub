@@ -394,49 +394,49 @@ module.exports = class Registry {
     /**
      * Adds a member to an organization
      * @param {string} orgSlug - The organization slug
-     * @param {string} userId - The user ID to add
-     * @param {number} permission - Permission level (0=ReadOnly, 1=ReadWrite, 2=ReadWriteDelete, 3=Admin)
+     * @param {string} userName - The username to add
+     * @param {number} permissions - Permission level (0=ReadOnly, 1=ReadWrite, 2=ReadWriteDelete, 3=Admin)
      * @returns {Promise<void>}
      */
-    async addOrganizationMember(orgSlug, userId, permission = 1) {
+    async addOrganizationMember(orgSlug, userName, permissions = 1) {
         if (!this.isLoggedIn())
             throw new Error("not logged in");
 
         return await this.postRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`, {
-            userId: userId,
-            permission: permission
+            userName: userName,
+            permissions: permissions
         });
     }
 
     /**
      * Updates a member's permission level
      * @param {string} orgSlug - The organization slug
-     * @param {string} userId - The user ID to update
-     * @param {number} permission - New permission level (0-3)
+     * @param {string} userName - The username to update
+     * @param {number} permissions - New permission level (0-3)
      * @returns {Promise<void>}
      */
-    async updateMemberPermission(orgSlug, userId, permission) {
+    async updateMemberPermissions(orgSlug, userName, permissions) {
         if (!this.isLoggedIn())
             throw new Error("not logged in");
 
         return await this.putRequest(
-            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userId)}`,
-            { permission: permission }
+            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userName)}`,
+            { permissions: permissions }
         );
     }
 
     /**
      * Removes a member from an organization
      * @param {string} orgSlug - The organization slug
-     * @param {string} userId - The user ID to remove
+     * @param {string} userName - The username to remove
      * @returns {Promise<void>}
      */
-    async removeOrganizationMember(orgSlug, userId) {
+    async removeOrganizationMember(orgSlug, userName) {
         if (!this.isLoggedIn())
             throw new Error("not logged in");
 
         return await this.deleteRequest(
-            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userId)}`
+            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userName)}`
         );
     }
 

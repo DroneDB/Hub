@@ -1,5 +1,5 @@
 <template>
-    <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal maxWidth="800px" fixedSize>
+    <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal width="700px" fixedSize >
         <div class="members-dialog">
             <!-- Loading state -->
             <div v-if="loading" class="ui active centered inline loader"></div>
@@ -12,13 +12,13 @@
             </div>
 
             <!-- Feature disabled message -->
-            <div v-if="!featureEnabled && !loading" class="ui info message">
+            <div v-if="!featureEnabled" class="ui info message">
                 <div class="header">Feature Disabled</div>
                 <p>Organization member management is disabled on this server.</p>
             </div>
 
             <!-- Members list -->
-            <div v-if="featureEnabled && !loading">
+            <div v-if="featureEnabled">
                 <!-- Add member section -->
                 <div class="add-member-section" v-if="canManageMembers">
                     <h4>Add Member</h4>
@@ -26,12 +26,17 @@
                         <div class="fields">
                             <div class="seven wide field">
                                 <label>User</label>
-                                <select v-model="newMember.userId">
-                                    <option value="">Select user...</option>
-                                    <option v-for="user in availableUsers" :key="user.id" :value="user.id">
-                                        {{ user.userName }} ({{ user.email }})
-                                    </option>
-                                </select>
+                                <div class="ui search selection dropdown" ref="userDropdown">
+                                    <input type="hidden" name="userName" v-model="newMember.userName">
+                                    <i class="dropdown icon"></i>
+                                    <input class="search" autocomplete="off" tabindex="0">
+                                    <div class="default text">Search user...</div>
+                                    <div class="menu">
+                                        <div class="item" v-for="user in availableUsers" :key="user.userName" :data-value="user.userName">
+                                            <i class="user icon"></i>{{ user.userName }} ({{ user.email }})
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="five wide field">
                                 <label>Permissions</label>
@@ -43,7 +48,7 @@
                             </div>
                             <div class="four wide field">
                                 <label>&nbsp;</label>
-                                <button class="ui primary button" @click="addMember" :disabled="!newMember.userId || addingMember">
+                                <button class="ui primary button" @click="addMember" :disabled="!newMember.userName || addingMember">
                                     <i class="plus icon"></i>&nbsp;Add
                                 </button>
                             </div>
@@ -66,7 +71,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="member in members" :key="member.userId">
+                        <tr v-for="member in members" :key="member.userName">
                             <td>{{ member.userName }}</td>
                             <td>{{ member.email }}</td>
                             <td>
@@ -87,7 +92,7 @@
                                 <span v-else>-</span>
                             </td>
                             <td v-if="canManageMembers">
-                                <button class="ui red mini button" @click="removeMember(member)" :disabled="removingMember === member.userId">
+                                <button class="ui red mini button" @click="removeMember(member)" :disabled="removingMember === member.userName">
                                     <i class="trash icon"></i> Remove
                                 </button>
                             </td>
@@ -105,18 +110,28 @@
                 <button @click="close" class="ui button">Close</button>
             </div>
         </div>
+
+        <ConfirmDialog v-if="removeMemberDialogOpen"
+            title="Remove Member"
+            :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
+            confirmText="Remove"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            @onClose="handleRemoveMemberDialogClose">
+        </ConfirmDialog>
     </Window>
 </template>
 
 <script>
 import Window from '../Window.vue';
+import ConfirmDialog from '../ConfirmDialog.vue';
 import ddb from 'ddb';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
 
 export default {
-    components: { Window },
+    components: { Window, ConfirmDialog },
 
     props: {
         orgSlug: { type: String, required: true },
@@ -135,9 +150,11 @@ export default {
             addingMember: false,
             removingMember: null,
             newMember: {
-                userId: '',
+                userName: '',
                 permissions: 1 // Default to ReadWrite
             },
+            removeMemberDialogOpen: false,
+            memberToRemove: null,
             permissionsOptions: [
                 { value: 0, label: 'Read Only' },
                 { value: 1, label: 'Read/Write' },
@@ -149,8 +166,8 @@ export default {
 
     computed: {
         availableUsers() {
-            const memberIds = this.members.map(m => m.userId);
-            return this.allUsers.filter(u => !memberIds.includes(u.id));
+            const memberUserNames = this.members.map(m => m.userName);
+            return this.allUsers.filter(u => !memberUserNames.includes(u.userName));
         }
     },
 
@@ -188,17 +205,32 @@ export default {
                 console.error('Failed to load organization members:', e);
             } finally {
                 this.loading = false;
+                this.$nextTick(() => {
+                    this.initUserDropdown();
+                });
             }
         },
 
+        initUserDropdown() {
+            if (!this.$refs.userDropdown) return;
+
+            $(this.$refs.userDropdown).dropdown({
+                fullTextSearch: true,
+                match: 'text',
+                onChange: (value) => {
+                    this.newMember.userName = value;
+                }
+            });
+        },
+
         async addMember() {
-            if (!this.newMember.userId) return;
+            if (!this.newMember.userName) return;
 
             this.addingMember = true;
             try {
                 await reg.addOrganizationMember(
                     this.orgSlug,
-                    this.newMember.userId,
+                    this.newMember.userName,
                     this.newMember.permissions
                 );
 
@@ -206,8 +238,15 @@ export default {
                 await this.loadData();
 
                 // Reset form
-                this.newMember.userId = '';
+                this.newMember.userName = '';
                 this.newMember.permissions = 1;
+
+                // Clear dropdown selection
+                this.$nextTick(() => {
+                    if (this.$refs.userDropdown) {
+                        $(this.$refs.userDropdown).dropdown('clear');
+                    }
+                });
 
             } catch (e) {
                 this.error = e.message || 'Failed to add member';
@@ -220,7 +259,7 @@ export default {
             try {
                 await reg.updateMemberPermissions(
                     this.orgSlug,
-                    member.userId,
+                    member.userName,
                     member.permissions
                 );
             } catch (e) {
@@ -230,19 +269,28 @@ export default {
             }
         },
 
-        async removeMember(member) {
-            if (!confirm(`Are you sure you want to remove ${member.userName} from this organization?`)) {
+        removeMember(member) {
+            this.memberToRemove = member;
+            this.removeMemberDialogOpen = true;
+        },
+
+        async handleRemoveMemberDialogClose(action) {
+            this.removeMemberDialogOpen = false;
+
+            if (action !== 'confirm' || !this.memberToRemove) {
+                this.memberToRemove = null;
                 return;
             }
 
-            this.removingMember = member.userId;
+            this.removingMember = this.memberToRemove.userName;
             try {
-                await reg.removeOrganizationMember(this.orgSlug, member.userId);
+                await reg.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
                 await this.loadData();
             } catch (e) {
                 this.error = e.message || 'Failed to remove member';
             } finally {
                 this.removingMember = null;
+                this.memberToRemove = null;
             }
         },
 
@@ -262,7 +310,10 @@ export default {
 <style scoped>
 .members-dialog {
     padding: 1em;
-    min-height: 300px;
+
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
 .add-member-section {
