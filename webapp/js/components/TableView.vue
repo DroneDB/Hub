@@ -100,7 +100,7 @@ export default {
     components: {
         Toolbar, ContextMenu
     },
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode'],
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite'],
     data: function () {
         let contextMenu = this.buildContextMenu();
 
@@ -411,6 +411,9 @@ export default {
 
             this.dropping = false;
 
+            // Check if user has write permission
+            if (!this.canWrite) return;
+
             const files = await this.getFilesFromDrop(ev);
             if (files.length == 0) return;
 
@@ -430,6 +433,9 @@ export default {
 
         onDrop(evt, item) {
             this.dropping = false;
+
+            // Check if user has write permission
+            if (!this.canWrite) return;
 
             if (entry.isDirectory(item.entry)) {
                 const destFolder = item.entry.path;

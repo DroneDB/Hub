@@ -105,6 +105,10 @@ export default {
         canWrite: {
             type: Boolean,
             default: true
+        },
+        canDelete: {
+            type: Boolean,
+            default: true
         }
     },
     data: function () {
@@ -738,7 +742,9 @@ export default {
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
-                onUnitsChangeRequested: (newUnit, oldUnit) => { this.onUnitsChangeRequested(newUnit, oldUnit); }
+                onUnitsChangeRequested: (newUnit, oldUnit) => { this.onUnitsChangeRequested(newUnit, oldUnit); },
+                canWrite: this.canWrite,
+                canDelete: this.canDelete
             }); this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [

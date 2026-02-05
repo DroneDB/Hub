@@ -874,12 +874,21 @@ module.exports = class Registry {
         return await this.getRequest(`/users/${encodeURIComponent(userName)}/orgs`);
     }
 
-    async setUserOrganizations(userName, orgSlugs) {
-        const formData = new FormData();
-        if (orgSlugs && orgSlugs.length > 0) {
-            orgSlugs.forEach(slug => formData.append('orgSlugs', slug));
-        }
-        return await this.putFormData(`/users/${encodeURIComponent(userName)}/orgs`, formData);
+    async addUserToOrganization(userName, orgSlug, permissions) {
+        return await this.postRequest(`/users/${encodeURIComponent(userName)}/orgs`, {
+            orgSlug,
+            permissions
+        });
+    }
+
+    async removeUserFromOrganization(userName, orgSlug) {
+        return await this.deleteRequest(`/users/${encodeURIComponent(userName)}/orgs/${encodeURIComponent(orgSlug)}`);
+    }
+
+    async updateUserOrganizationPermissions(userName, orgSlug, permissions) {
+        return await this.putRequest(`/users/${encodeURIComponent(userName)}/orgs/${encodeURIComponent(orgSlug)}`, {
+            permissions
+        });
     }
 
     // User storage info

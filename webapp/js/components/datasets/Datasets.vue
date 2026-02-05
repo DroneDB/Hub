@@ -10,7 +10,7 @@
                 <div class="column">
                     <h1>{{ orgName }}</h1>
                 </div>
-                <div class="column right aligned">
+                <div class="column right aligned" v-if="canCreateDataset">
                     <button @click.stop="handleNew()" class="ui primary button icon"><i
                             class="ui icon add"></i>&nbsp;Create Dataset</button>
                 </div>
@@ -57,7 +57,7 @@
                             <i v-if="sortColumn === 'visibility'"
                                 :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
                         </th>
-                        <th class="center aligned">Actions</th>
+                        <th v-if="showActionsColumn" class="center aligned">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -73,7 +73,7 @@
                                 getVisibilityText(ds.visibility) }}</div>
                             <div v-else><i class="lock icon"></i>{{ getVisibilityText(ds.visibility) }}</div>
                         </td>
-                        <td class="center aligned">
+                        <td v-if="showActionsColumn" class="center aligned">
                             <button v-if="ds.permissions && ds.permissions.canWrite" @click.stop="handleEdit(ds)" class="ui button icon small grey"
                                 :class="{ loading: ds.editing }" :disabled="ds.editing || ds.deleting">
                                 <i class="ui icon pencil"></i>
@@ -86,15 +86,15 @@
                         </td>
                     </tr>
                     <tr v-if="paginatedDatasets.length === 0">
-                        <td colspan="6" class="center aligned">
+                        <td :colspan="showActionsColumn ? 6 : 5" class="center aligned">
                             <h3>No datasets found</h3>
-                            <p>You can create a new dataset by clicking the create dataset button.</p>
+                            <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
                         </td>
                     </tr>
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th colspan="6">
+                        <th :colspan="showActionsColumn ? 6 : 5">
                             <div class="ui grid three column">
                                 <div class="column left aligned middle aligned">
                                     <div class="ui left floated">
@@ -244,6 +244,21 @@ export default {
         },
         canDeleteGlobal: function () {
             return !HubOptions.disableDatasetCreation;
+        },
+        // Check if user can create datasets in this organization
+        // User can create if: dataset creation is not disabled AND at least one dataset has canWrite permission
+        // OR if there are no datasets yet (server will validate permission)
+        canCreateDataset: function () {
+            if (HubOptions.disableDatasetCreation) return false;
+            if (this.datasets.length === 0) return true;
+            return this.datasets.some(ds => ds.permissions && ds.permissions.canWrite);
+        },
+        // Show Actions column only if at least one dataset has actions available
+        showActionsColumn: function () {
+            return this.datasets.some(ds =>
+                (ds.permissions && ds.permissions.canWrite) ||
+                (ds.permissions && ds.permissions.canDelete && this.canDeleteGlobal)
+            );
         },
         // Filtering
         filteredDatasets: function () {

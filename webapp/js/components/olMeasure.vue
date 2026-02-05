@@ -113,6 +113,8 @@ class MeasureControls extends Control {
         this.selectedTool = null;
         this.onToolSelected = options.onToolSelected || (() => { });
         this.onToolDeselected = options.onToolDeselected || (() => { });
+        this.canWrite = options.canWrite !== undefined ? options.canWrite : true;
+        this.canDelete = options.canDelete !== undefined ? options.canDelete : true;
         this.onSave = options.onSave || (() => { });
         this.onClearAll = options.onClearAll || (() => { });
         this.onExport = options.onExport || (() => { });
@@ -285,12 +287,16 @@ class MeasureControls extends Control {
      * Show or hide the management buttons
      */
     updateButtonsVisibility(hasMeasurements, hasSavedMeasurements) {
-        const display = hasMeasurements ? 'block' : 'none';
-        this.separator.style.display = display;
-        this.btnSave.style.display = display;
-        this.btnClear.style.display = display;
-        this.btnExport.style.display = display;
-        this.btnDelete.style.display = hasSavedMeasurements ? 'block' : 'none';
+        // Only show Save button if user has write permission
+        const canShowSave = this.canWrite;
+        // Only show Delete button if user has delete permission
+        const canShowDelete = this.canDelete;
+        const displaySave = (hasMeasurements && canShowSave) ? 'block' : 'none';
+        this.separator.style.display = hasMeasurements ? 'block' : 'none';
+        this.btnSave.style.display = displaySave;
+        this.btnClear.style.display = hasMeasurements ? 'block' : 'none';
+        this.btnExport.style.display = hasMeasurements ? 'block' : 'none';
+        this.btnDelete.style.display = (hasSavedMeasurements && canShowDelete) ? 'block' : 'none';
     }
 
     /**

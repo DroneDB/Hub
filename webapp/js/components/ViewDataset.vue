@@ -23,13 +23,13 @@
                         @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
                         @openAsText="handleOpenAsText" @error="handleError" />
                 </template> <template v-slot:map>
-                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" @scrollTo="handleScrollTo"
+                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
                         @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
                     <!-- Grid View (Explorer) -->
                     <Explorer v-if="viewMode === 'grid'" ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
@@ -38,7 +38,7 @@
                     <!-- Table View with Detail Panel (Desktop/Tablet only) -->
                     <Panel v-else-if="selectedDetailFile && !isMobile" split="vertical" amount="70%" tabletAmount="60%">
                         <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                            :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                            :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                             @transferSelectedItems="openTransferItemsDialog"
                             @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
@@ -55,7 +55,7 @@
 
                     <!-- Table View without Detail Panel -->
                     <TableView v-else ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" :viewMode="viewMode" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"

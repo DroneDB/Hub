@@ -49,7 +49,7 @@
             <!-- Toolbar for measurements -->
             <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
                 <button
-                    v-if="hasMeasurements"
+                    v-if="hasMeasurements && canWrite"
                     @click="saveMeasurements"
                     :disabled="savingMeasurements"
                     class="btn-measurement"
@@ -59,7 +59,7 @@
                 </button>
 
                 <button
-                    v-if="hasSavedMeasurements"
+                    v-if="hasSavedMeasurements && canDelete"
                     @click="deleteSavedMeasurements"
                     class="btn-measurement btn-danger"
                     title="Delete saved measurements file">

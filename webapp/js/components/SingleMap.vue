@@ -408,7 +408,9 @@ export default {
                 onExport: () => { this.exportMeasurementsToFile(); },
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
-                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; }
+                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
+                canWrite: this.canWrite,
+                canDelete: this.canDelete
             });
             this.map = new Map({
                 target: this.$refs['map-container'],
