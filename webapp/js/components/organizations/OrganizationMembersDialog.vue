@@ -24,27 +24,27 @@
                     <h4>Add Member</h4>
                     <div class="ui form">
                         <div class="fields">
-                            <div class="eight wide field">
+                            <div class="seven wide field">
                                 <label>User</label>
-                                <select v-model="newMember.userId" class="ui dropdown">
+                                <select v-model="newMember.userId">
                                     <option value="">Select user...</option>
                                     <option v-for="user in availableUsers" :key="user.id" :value="user.id">
                                         {{ user.userName }} ({{ user.email }})
                                     </option>
                                 </select>
                             </div>
-                            <div class="six wide field">
+                            <div class="five wide field">
                                 <label>Permission</label>
-                                <select v-model="newMember.permission" class="ui dropdown">
+                                <select v-model="newMember.permission">
                                     <option v-for="perm in permissionOptions" :key="perm.value" :value="perm.value">
                                         {{ perm.label }}
                                     </option>
                                 </select>
                             </div>
-                            <div class="two wide field">
+                            <div class="four wide field">
                                 <label>&nbsp;</label>
                                 <button class="ui primary button" @click="addMember" :disabled="!newMember.userId || addingMember">
-                                    <i class="plus icon"></i> Add
+                                    <i class="plus icon"></i>&nbsp;Add
                                 </button>
                             </div>
                         </div>
@@ -72,8 +72,7 @@
                             <td>
                                 <select v-if="canManageMembers"
                                         v-model="member.permission"
-                                        @change="updatePermission(member)"
-                                        class="ui dropdown">
+                                        @change="updatePermission(member)">
                                     <option v-for="perm in permissionOptions" :key="perm.value" :value="perm.value">
                                         {{ perm.label }}
                                     </option>
