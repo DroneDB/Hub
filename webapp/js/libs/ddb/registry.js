@@ -363,6 +363,110 @@ module.exports = class Registry {
         return await this.deleteRequest(`/orgs/${orgSlug}`);
     }
 
+    // ==================== Organization Member Management ====================
+
+    /**
+     * Checks if organization member management feature is enabled
+     * @returns {Promise<boolean>} Whether the feature is enabled
+     */
+    async isOrganizationMemberManagementEnabled() {
+        try {
+            const res = await this.getRequest('/orgs/features/member-management');
+            return res.enabled === true;
+        } catch (e) {
+            console.error('Failed to check member management status:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Gets all members of an organization
+     * @param {string} orgSlug - The organization slug
+     * @returns {Promise<Array>} List of organization members
+     */
+    async getOrganizationMembers(orgSlug) {
+        if (!this.isLoggedIn())
+            throw new Error("not logged in");
+
+        return await this.getRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`);
+    }
+
+    /**
+     * Adds a member to an organization
+     * @param {string} orgSlug - The organization slug
+     * @param {string} userId - The user ID to add
+     * @param {number} permission - Permission level (0=ReadOnly, 1=ReadWrite, 2=ReadWriteDelete, 3=Admin)
+     * @returns {Promise<void>}
+     */
+    async addOrganizationMember(orgSlug, userId, permission = 1) {
+        if (!this.isLoggedIn())
+            throw new Error("not logged in");
+
+        return await this.postRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`, {
+            userId: userId,
+            permission: permission
+        });
+    }
+
+    /**
+     * Updates a member's permission level
+     * @param {string} orgSlug - The organization slug
+     * @param {string} userId - The user ID to update
+     * @param {number} permission - New permission level (0-3)
+     * @returns {Promise<void>}
+     */
+    async updateMemberPermission(orgSlug, userId, permission) {
+        if (!this.isLoggedIn())
+            throw new Error("not logged in");
+
+        return await this.putRequest(
+            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userId)}`,
+            { permission: permission }
+        );
+    }
+
+    /**
+     * Removes a member from an organization
+     * @param {string} orgSlug - The organization slug
+     * @param {string} userId - The user ID to remove
+     * @returns {Promise<void>}
+     */
+    async removeOrganizationMember(orgSlug, userId) {
+        if (!this.isLoggedIn())
+            throw new Error("not logged in");
+
+        return await this.deleteRequest(
+            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userId)}`
+        );
+    }
+
+    /**
+     * Permission level constants for organization members
+     */
+    static get OrganizationPermissions() {
+        return {
+            ReadOnly: 0,
+            ReadWrite: 1,
+            ReadWriteDelete: 2,
+            Admin: 3
+        };
+    }
+
+    /**
+     * Gets the display name for a permission level
+     * @param {number} permission - Permission level (0-3)
+     * @returns {string} Human-readable permission name
+     */
+    static getPermissionName(permission) {
+        switch (permission) {
+            case 0: return 'Read Only';
+            case 1: return 'Read/Write';
+            case 2: return 'Read/Write/Delete';
+            case 3: return 'Admin';
+            default: return 'Unknown';
+        }
+    }
+
     clearCredentials() {
         storage.removeItem(`${this.url}_jwt_token`);
         storage.removeItem(`${this.url}_jwt_token_expires`);

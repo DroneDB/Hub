@@ -27,6 +27,11 @@
                             <div v-else><i class="lock icon"></i>Private</div>
                         </div>
                         <div class="flex-item column actions right aligned">
+                            <button v-if="!readyOnly && (org.owner === userName || isAdmin)"
+                                @click.stop="openMembersDialog(org)" class="ui button icon small blue"
+                                title="Manage Members">
+                                <i class="ui icon users"></i>
+                            </button>
                             <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
                                 @click.stop="handleEdit(org)" class="ui button icon small grey"
                                 :class="{ loading: org.editing }" :disabled="org.editing || org.deleting">
@@ -55,6 +60,12 @@
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
             @onClose="handleOrganizationClose"></OrganizationDialog>
+        <OrganizationMembersDialog v-if="membersDialogOpen"
+            :orgSlug="selectedOrgForMembers.slug"
+            :isOwner="selectedOrgForMembers.owner === userName"
+            :isAdmin="isAdmin"
+            @onClose="closeMembersDialog">
+        </OrganizationMembersDialog>
 
     </div>
 </template>
@@ -63,6 +74,7 @@
 import Message from '../Message.vue';
 import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import OrganizationDialog from './OrganizationDialog.vue';
+import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue'
 import ddb from 'ddb';
 import { setTitle } from '../../libs/utils';
@@ -75,7 +87,8 @@ export default {
         Message,
         DeleteOrganizationDialog,
         MessageDialog,
-        OrganizationDialog
+        OrganizationDialog,
+        OrganizationMembersDialog
     },
 
     data: function () {
@@ -88,16 +101,28 @@ export default {
             messageDialogOpen: false,
             currentMessage: null,
             userName: reg.getUsername(),
+            isAdmin: false,
 
             orgDialogModel: null,
             orgDialogMode: null,
             orgDialogOpen: false,
+
+            membersDialogOpen: false,
+            selectedOrgForMembers: null
         }
     },
     mounted: async function () {
         setTitle("Organizations");
 
         try {
+            // Check if current user is admin
+            try {
+                const userInfo = await reg.info();
+                this.isAdmin = userInfo?.roles?.includes('admin') || false;
+            } catch (e) {
+                this.isAdmin = false;
+            }
+
             let tmp = await reg.getOrganizations()
 
             this.organizations = tmp.map(item => {
@@ -273,6 +298,16 @@ export default {
                     org: org.slug
                 }
             });
+        },
+
+        openMembersDialog(org) {
+            this.selectedOrgForMembers = org;
+            this.membersDialogOpen = true;
+        },
+
+        closeMembersDialog() {
+            this.membersDialogOpen = false;
+            this.selectedOrgForMembers = null;
         },
 
         upload: function () {
