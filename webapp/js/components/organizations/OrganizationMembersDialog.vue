@@ -40,7 +40,7 @@
                             </div>
                             <div class="five wide field">
                                 <label>Permissions</label>
-                                <select v-model="newMember.permissions">
+                                <select v-model="newMember.permissions" ref="addPermDropdown" class="ui selection dropdown">
                                     <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
                                         {{ perm.label }}
                                     </option>
@@ -55,8 +55,6 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="ui divider" v-if="canManageMembers"></div>
 
                 <!-- Current members table -->
                 <h4>Current Members</h4>
@@ -77,7 +75,8 @@
                             <td>
                                 <select v-if="canManageMembers"
                                         v-model="member.permissions"
-                                        @change="updatePermission(member)">
+                                        @change="updatePermission(member)"
+                                        class="ui selection dropdown">
                                     <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
                                         {{ perm.label }}
                                     </option>
@@ -207,6 +206,7 @@ export default {
                 this.loading = false;
                 this.$nextTick(() => {
                     this.initUserDropdown();
+                    this.initPermDropdowns();
                 });
             }
         },
@@ -221,6 +221,10 @@ export default {
                     this.newMember.userName = value;
                 }
             });
+        },
+
+        initPermDropdowns() {
+            $(this.$el).find('select.ui.selection.dropdown').dropdown();
         },
 
         async addMember() {
@@ -245,6 +249,9 @@ export default {
                 this.$nextTick(() => {
                     if (this.$refs.userDropdown) {
                         $(this.$refs.userDropdown).dropdown('clear');
+                    }
+                    if (this.$refs.addPermDropdown) {
+                        $(this.$refs.addPermDropdown).dropdown('set selected', '1');
                     }
                 });
 
@@ -327,5 +334,13 @@ export default {
 
 table.ui.celled.table {
     margin-top: 0.5em;
+}
+
+>>> .ui.selection.dropdown {
+    cursor: pointer !important;
+}
+
+>>> .ui.selection.dropdown .menu > .item {
+    cursor: pointer !important;
 }
 </style>

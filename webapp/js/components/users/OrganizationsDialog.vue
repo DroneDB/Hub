@@ -36,7 +36,7 @@
                         </div>
                         <div class="five wide field">
                             <label>Permissions</label>
-                            <select v-model="newOrg.permissions" class="ui dropdown">
+                            <select v-model="newOrg.permissions" ref="addPermDropdown" class="ui selection dropdown">
                                 <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
                                     {{ perm.label }}
                                 </option>
@@ -75,7 +75,7 @@
                             <select v-if="!org.isOwner"
                                     v-model="org.permissions"
                                     @change="updatePermission(org)"
-                                    class="ui dropdown">
+                                    class="ui selection dropdown">
                                 <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
                                     {{ perm.label }}
                                 </option>
@@ -201,6 +201,7 @@ export default {
                 this.loading = false;
                 this.$nextTick(() => {
                     this.initOrgDropdown();
+                    this.initPermDropdowns();
                 });
             }
         },
@@ -215,6 +216,10 @@ export default {
                     this.newOrg.slug = value;
                 }
             });
+        },
+
+        initPermDropdowns() {
+            $(this.$el).find('select.ui.selection.dropdown').dropdown();
         },
 
         async addOrganization() {
@@ -241,6 +246,9 @@ export default {
                 this.$nextTick(() => {
                     if (this.$refs.orgDropdown) {
                         $(this.$refs.orgDropdown).dropdown('clear');
+                    }
+                    if (this.$refs.addPermDropdown) {
+                        $(this.$refs.addPermDropdown).dropdown('set selected', '1');
                     }
                 });
 
@@ -323,5 +331,13 @@ export default {
 
 table.ui.celled.table {
     margin-top: 0.5em;
+}
+
+>>> .ui.selection.dropdown {
+    cursor: pointer !important;
+}
+
+>>> .ui.selection.dropdown .menu > .item {
+    cursor: pointer !important;
 }
 </style>
