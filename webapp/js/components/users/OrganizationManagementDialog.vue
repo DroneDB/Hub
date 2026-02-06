@@ -98,8 +98,6 @@
                         </div>
                     </div>
 
-                    <div class="ui divider"></div>
-
                     <div class="field">
                         <button @click="createOrganization()" :disabled="creating || !newOrgName.trim()"
                                 :class="{ loading: creating }" class="ui primary button">
