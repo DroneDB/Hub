@@ -17,10 +17,28 @@
             </a>
 
             <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
-                <div>
-                    Used {{ storageInfo.used | bytes }} on {{ storageInfo.total | bytes }} total
-                    <span v-if="storageInfo.free > 0">, {{ storageInfo.free | bytes }} free</span>
-                    <span v-if="storageInfo.free <= 0"><br /><b>No storage left!</b></span>
+                <div class="storage-info-content">
+                    <div class="storage-progress-container">
+                        <div class="storage-progress-bar" :style="storageBarStyle"></div>
+                    </div>
+                    <div class="storage-percentage" :style="{ color: storageBarColor }">
+                        {{ storageInfo.usedPercentage | percent(1) }}
+                    </div>
+                    <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: #555;">
+                        <tr>
+                            <th><b>Total</b></th>
+                            <th><b>Used</b></th>
+                            <th v-if="storageInfo.free > 0"><b>Free</b></th>
+                        </tr>
+                        <tr>
+                            <td>{{ storageInfo.total | bytes }}</td>
+                            <td>{{ storageInfo.used | bytes }}</td>
+                            <td v-if="storageInfo.free > 0">{{ storageInfo.free | bytes }}</td>
+                        </tr>
+                    </table>
+                    <div v-if="storageInfo.free <= 0" class="storage-warning">
+                        <i class="icon warning sign"></i> No storage left!
+                    </div>
                 </div>
             </Alert>
 
@@ -104,6 +122,22 @@ export default {
         }
     },
     computed: {
+        storageBarColor: function () {
+            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return '#21ba45';
+            const pct = this.storageInfo.usedPercentage * 100;
+            if (pct >= 90) return '#db2828';
+            if (pct >= 70) return '#f2711c';
+            if (pct >= 50) return '#fbbd08';
+            return '#21ba45';
+        },
+        storageBarStyle: function () {
+            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return {};
+            const pct = Math.min(this.storageInfo.usedPercentage * 100, 100);
+            return {
+                width: pct + '%',
+                backgroundColor: this.storageBarColor
+            };
+        },
         homeUrl: function () {
             const org = HubOptions.singleOrganization !== undefined ?
                 HubOptions.singleOrganization :
@@ -383,6 +417,47 @@ export default {
         .button.download {
             min-width: 38px;
         }
+    }
+}
+
+.storage-info-content {
+    text-align: center;
+
+    .storage-progress-container {
+        width: 300px;
+        height: 18px;
+        background-color: #e8e8e8;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+        margin-top: 1rem;
+    }
+
+    .storage-progress-bar {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.4s ease, background-color 0.4s ease;
+        min-width: 2%;
+    }
+
+    .storage-percentage {
+        font-size: 1.6em;
+        font-weight: bold;
+        margin-bottom: 6px;
+    }
+
+    .storage-details {
+        display: flex;
+        justify-content: space-between;
+        color: #555;
+        font-size: 0.95em;
+    }
+
+    .storage-warning {
+        margin-top: 10px;
+        color: #db2828;
+        font-weight: bold;
+        font-size: 1em;
     }
 }
 </style>
