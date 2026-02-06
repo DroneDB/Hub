@@ -181,7 +181,7 @@ export default {
 
             try {
                 // Check if feature is enabled
-                this.featureEnabled = await reg.isOrganizationMemberManagementEnabled();
+                this.featureEnabled = reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
 
                 if (!this.featureEnabled) {
                     this.loading = false;
@@ -336,11 +336,11 @@ table.ui.celled.table {
     margin-top: 0.5em;
 }
 
->>> .ui.selection.dropdown {
+.ui.selection.dropdown {
     cursor: pointer !important;
 }
 
->>> .ui.selection.dropdown .menu > .item {
+.ui.selection.dropdown .menu > .item {
     cursor: pointer !important;
 }
 </style>

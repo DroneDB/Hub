@@ -248,8 +248,8 @@ module.exports = class Registry {
             clearTimeout(refreshTimers[this.url]);
             delete refreshTimers[this.url];
         }
-        // Clear cached user management status
-        delete this._userManagementEnabledCache;
+        // Clear cached features
+        delete this._features;
         this.clearCredentials();
         this.emit("logout");
     }
@@ -363,21 +363,35 @@ module.exports = class Registry {
         return await this.deleteRequest(`/orgs/${orgSlug}`);
     }
 
-    // ==================== Organization Member Management ====================
+    // ==================== Features ====================
 
     /**
-     * Checks if organization member management feature is enabled
-     * @returns {Promise<boolean>} Whether the feature is enabled
+     * Loads all platform feature flags from the server.
+     * Should be called once at app startup after authentication.
+     * @returns {Promise<Object>} The features object
      */
-    async isOrganizationMemberManagementEnabled() {
+    async loadFeatures() {
         try {
-            const res = await this.getRequest('/orgs/features/member-management');
-            return res.enabled === true;
+            this._features = await this.getRequest('/sys/features');
         } catch (e) {
-            console.error('Failed to check member management status:', e);
-            return false;
+            console.error('Failed to load features:', e);
+            this._features = {};
         }
+        return this._features;
     }
+
+    /**
+     * Gets the value of a specific feature flag.
+     * Features must be loaded first via loadFeatures().
+     * @param {string} name - The feature name (e.g. 'OrganizationMemberManagement')
+     * @returns {boolean} Whether the feature is enabled (defaults to false if not loaded)
+     */
+    getFeature(name) {
+        if (!this._features) return false;
+        return this._features[name] === true;
+    }
+
+    // ==================== Organization Member Management ==
 
     /**
      * Gets all members of an organization
@@ -825,18 +839,7 @@ module.exports = class Registry {
 
     // ========== Extended User Management Methods ==========
 
-    // Check if user management is enabled (cached to avoid repeated API calls)
-    async isUserManagementEnabled() {
-        // Return cached value if available
-        if (this._userManagementEnabledCache !== undefined) {
-            return this._userManagementEnabledCache;
-        }
 
-        // Fetch from server and cache the result
-        const result = await this.getRequest('/users/management-enabled');
-        this._userManagementEnabledCache = result;
-        return result;
-    }
 
     // Get detailed user information
     async usersDetailed() {

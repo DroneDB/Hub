@@ -85,6 +85,7 @@
 import { utils } from 'ddb';
 import mouse from '../libs/mouse';
 import reg from '../libs/sharedRegistry';
+import { Features } from '../libs/features';
 import Alert from './Alert';
 import { xAuthLogout } from '../libs/xauth';
 import { isMobile } from '../libs/responsive';
@@ -322,23 +323,16 @@ export default {
             if (this.$refs.menu) this.$refs.menu.style.display = 'none';
         },
 
-        async checkUserManagement() {
-            try {
-                // Check if user management is enabled on server (i.e., local auth, not external)
-                const isLocalAuth = await reg.isUserManagementEnabled();
+        checkUserManagement() {
+            const isLocalAuth = reg.getFeature(Features.USER_MANAGEMENT);
 
-                // Users management (admin panel) is only available with local auth
-                this.usersManagement = isLocalAuth;
+            // Users management (admin panel) is only available with local auth
+            this.usersManagement = isLocalAuth;
 
-                // Account management is enabled when:
-                // 1. Authentication is local (not external provider)
-                // 2. AND disableAccountManagement is not explicitly set to true
-                this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
-            } catch (e) {
-                console.log('Failed to check user management status:', e.message);
-                this.usersManagement = false;
-                this.accountManagement = false;
-            }
+            // Account management is enabled when:
+            // 1. Authentication is local (not external provider)
+            // 2. AND disableAccountManagement is not explicitly set to true
+            this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
         }
     }
 }

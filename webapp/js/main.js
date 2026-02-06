@@ -94,12 +94,13 @@ window.addEventListener('load', function () {
         next();
     });
 
-    // Refresh auth tokens
+    // Refresh auth tokens and load features
     (async () => {
         if (reg.isLoggedIn()) {
             try {
                 await reg.refreshToken();
                 reg.setAutoRefreshToken();
+                await reg.loadFeatures();
             } catch (e) {
                 console.log(e.message);
                 if (e.status === 401) {

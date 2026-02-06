@@ -74,6 +74,7 @@ export default {
         if (this.xAuthInProgress) {
             try {
                 let res = await reg.login(null, null, getXAuthToken());
+                await reg.loadFeatures();
                 this.redirectToPrevRoute();
             } catch (e) {
                 console.error(e);
@@ -101,6 +102,7 @@ export default {
 
             try {
                 await reg.login(this.username, this.password);
+                await reg.loadFeatures();
                 this.redirectToPrevRoute();
             } catch (e) {
                 this.error = e.message;

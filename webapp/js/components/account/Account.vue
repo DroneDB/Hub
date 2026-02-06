@@ -123,6 +123,7 @@
 import Message from '../Message.vue';
 import ChangePwdDialog from './ChangePwdDialog.vue';
 import reg from '../../libs/sharedRegistry';
+import { Features } from '../../libs/features';
 import { bytesToSize } from '../../libs/utils';
 import { xAuthLogout } from '../../libs/xauth';
 
@@ -181,13 +182,8 @@ export default {
                 this.isAdmin = reg.isAdmin();
 
                 // Check if account management is available
-                try {
-                    const isLocalAuth = await reg.isUserManagementEnabled();
-                    this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
-                } catch (e) {
-                    console.warn('Could not check account management:', e.message);
-                    this.accountManagement = false;
-                }
+                const isLocalAuth = reg.getFeature(Features.USER_MANAGEMENT);
+                this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
 
                 // Get user organizations
                 try {

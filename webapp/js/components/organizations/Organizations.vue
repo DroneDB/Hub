@@ -27,7 +27,7 @@
                             <div v-else><i class="lock icon"></i>Private</div>
                         </div>
                         <div class="flex-item column actions right aligned">
-                            <button v-if="!readyOnly && (org.owner === userName || isAdmin)"
+                            <button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
                                 @click.stop="openMembersDialog(org)" class="ui button icon small blue"
                                 title="Manage Members">
                                 <i class="ui icon users"></i>
@@ -78,6 +78,8 @@ import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue'
 import ddb from 'ddb';
 import { setTitle } from '../../libs/utils';
+import sharedReg from '../../libs/sharedRegistry';
+import { Features } from '../../libs/features';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -109,6 +111,11 @@ export default {
 
             membersDialogOpen: false,
             selectedOrgForMembers: null
+        }
+    },
+    computed: {
+        memberManagementEnabled() {
+            return sharedReg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         }
     },
     mounted: async function () {
