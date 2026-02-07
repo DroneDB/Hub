@@ -113,11 +113,6 @@ export default {
             selectedOrgForMembers: null
         }
     },
-    computed: {
-        memberManagementEnabled() {
-            return sharedReg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
-        }
-    },
     mounted: async function () {
         setTitle("Organizations");
 
@@ -325,6 +320,9 @@ export default {
     computed: {
         readyOnly: function () {
             return HubOptions.readOnlyOrgs;
+        },
+        memberManagementEnabled() {
+            return sharedReg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         }
     }
 }

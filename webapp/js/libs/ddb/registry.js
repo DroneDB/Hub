@@ -68,6 +68,7 @@ module.exports = class Registry {
         this.url = url;
         this.eventListeners = {};
         this._refreshingToken = false;
+        this._features = {};
     }
 
     get remote() {
@@ -249,7 +250,7 @@ module.exports = class Registry {
             delete refreshTimers[this.url];
         }
         // Clear cached features
-        delete this._features;
+        this._features = {};
         this.clearCredentials();
         this.emit("logout");
     }

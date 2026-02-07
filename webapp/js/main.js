@@ -94,8 +94,8 @@ window.addEventListener('load', function () {
         next();
     });
 
-    // Refresh auth tokens and load features
-    (async () => {
+    // Refresh auth tokens and load features before mounting Vue
+    async function boot() {
         if (reg.isLoggedIn()) {
             try {
                 await reg.refreshToken();
@@ -105,29 +105,29 @@ window.addEventListener('load', function () {
                 console.log(e.message);
                 if (e.status === 401) {
                     reg.clearCredentials();
-                    router.push({ name: "Login" }).catch(() => { });
                 }
             }
         } else {
             reg.clearCredentials();
         }
-    })();
 
-    new Vue({
-        router
-    }).$mount("#app");
+        const app = new Vue({
+            router
+        }).$mount("#app");
 
-    Vue.config.errorHandler = function (err, vm, info) {
-        // Catch unauthorized error globally
-        if (err.message === "Unauthorized") {
-            router.push({ name: "Login" }).catch(() => { });
-        } else {
-            throw err;
+        Vue.config.errorHandler = function (err, vm, info) {
+            // Catch unauthorized error globally
+            if (err.message === "Unauthorized") {
+                router.push({ name: "Login" }).catch(() => { });
+            } else {
+                throw err;
+            }
         }
+
+        document.getElementById("main-loading").style.display = 'none';
     }
 
-
-    document.getElementById("main-loading").style.display = 'none';
+    boot();
 
     // Live reload
     if (!isProduction) {
