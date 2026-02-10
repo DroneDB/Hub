@@ -245,6 +245,22 @@ export default {
                     });
                 }
             }, {
+                label: "Rename",
+                icon: 'pencil alternate',
+                isVisible: () => { return this.selectedFiles.length == 1; },
+                accelerator: "CmdOrCtrl+M",
+                click: () => {
+                    this.$emit("moveSelectedItems");
+                }
+            }, {
+                label: "Properties",
+                isVisible: () => { return this.selectedFiles.length > 0; },
+                icon: 'info circle',
+                accelerator: "CmdOrCtrl+P",
+                click: () => {
+                    this.$emit("openProperties");
+                }
+            }, {
                 label: 'Share/Embed',
                 icon: 'share alternate',
                 isVisible: () => { return this.selectedFiles.length === 1 },
@@ -265,12 +281,16 @@ export default {
                     this.buildSelectedFile();
                 }
             }, {
-                label: "Create Folder",
-                icon: 'folder',
-                accelerator: "CmdOrCtrl+N",
+                label: "Transfer to Dataset...",
+                icon: 'exchange',
+                isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+                accelerator: "CmdOrCtrl+T",
                 click: () => {
-                    this.$emit("createFolder");
+                    this.$emit("transferSelectedItems");
                 }
+            }, {
+                isVisible: () => { return this.selectedFiles.length > 0; },
+                type: 'separator'
             }, {
                 label: "Select All/None",
                 icon: 'list',
@@ -282,39 +302,17 @@ export default {
                         this.selectAll();
                     }
                 }
-            },
-            {
-                label: "Properties",
-                isVisible: () => { return this.selectedFiles.length > 0; },
-                icon: 'info circle',
-                accelerator: "CmdOrCtrl+P",
+            }, {
+                label: "Create Folder",
+                icon: 'folder',
+                accelerator: "CmdOrCtrl+N",
                 click: () => {
-                    this.$emit("openProperties");
+                    this.$emit("createFolder");
                 }
-            },
-            {
-                label: "Rename",
-                icon: 'pencil alternate',
-                isVisible: () => { return this.selectedFiles.length == 1; },
-                accelerator: "CmdOrCtrl+M",
-                click: () => {
-                    this.$emit("moveSelectedItems");
-                }
-            },
-            {
-                label: "Transfer to Dataset...",
-                icon: 'exchange',
-                isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
-                accelerator: "CmdOrCtrl+T",
-                click: () => {
-                    this.$emit("transferSelectedItems");
-                }
-            },
-            {
+            }, {
                 isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
                 type: 'separator'
-            },
-            {
+            }, {
                 label: "Delete",
                 icon: 'trash alternate outline',
                 isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },

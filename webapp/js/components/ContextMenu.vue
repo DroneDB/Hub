@@ -49,9 +49,15 @@ export default {
     },
 
     beforeDestroy: function () {
+        this.open = false;
         this.$parent.$el.removeEventListener('contextmenu', this.openContextMenu);
         Mouse.off("click", this.closeContextMenu);
         Keyboard.offKeyDown(this.handleKeyDown);
+
+        // Remove DOM element that was moved to document.body in mounted
+        if (this.$el.parentNode) {
+            this.$el.parentNode.removeChild(this.$el);
+        }
 
         contextMenus = contextMenus.filter(cm => cm !== this);
     },

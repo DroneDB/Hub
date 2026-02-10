@@ -395,6 +395,9 @@ export default {
 
         // View mode switching
         switchViewMode(mode) {
+            // Close any open context menu before switching views
+            window.dispatchEvent(new MouseEvent('click'));
+
             this.viewMode = mode;
             localStorage.setItem('fileViewMode', mode);
 
@@ -619,6 +622,28 @@ export default {
                     icon: "folder",
                     onClick: () => {
                         this.createFolderDialogOpen = true;
+                    }
+                });
+            }
+
+            // Select All button - always visible
+            this.explorerTools.push({
+                id: 'select-all',
+                title: "Select All",
+                icon: "check square outline",
+                onClick: () => {
+                    this.fileBrowserFiles.forEach(f => f.selected = true);
+                }
+            });
+
+            // Deselect All button - only visible when at least one file is selected
+            if (this.selectedFiles.length > 0) {
+                this.explorerTools.push({
+                    id: 'deselect-all',
+                    title: "Deselect All",
+                    icon: "square outline",
+                    onClick: () => {
+                        this.fileBrowserFiles.forEach(f => f.selected = false);
                     }
                 });
             }
