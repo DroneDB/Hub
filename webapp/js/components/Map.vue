@@ -37,6 +37,32 @@
             @onClose="handleChangeUnitsDialogClose">
         </ChangeUnitsDialog>
         <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
+        <div ref="imagePopup" class="image-popup" v-show="imagePopupVisible">
+            <div class="image-popup-header">
+                <span class="image-popup-title">{{ imagePopupFileName }}</span>
+                <div class="image-popup-actions">
+                    <a :href="imagePopupOpenUrl" target="_blank" class="image-popup-btn" title="Open in new tab">
+                        <i style="margin: 0; height: auto" class="icon external alternate"></i>
+                    </a>
+                    <a :href="imagePopupDownloadUrl" download class="image-popup-btn" title="Download">
+                        <i style="margin: 0; height: auto" class="icon download"></i>
+                    </a>
+                    <button class="image-popup-btn image-popup-close" @click="closeImagePopup" title="Close">
+                        <i style="margin: 0; height: auto" class="icon close"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="image-popup-body">
+                <div v-if="imagePopupLoading" class="image-popup-loading"><i class="icon spinner loading"></i></div>
+                <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail" :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded" @error="onImagePopupLoaded" />
+            </div>
+            <div class="image-popup-footer" v-if="imagePopupCoords">
+                <span class="image-popup-coords" :title="imagePopupCoords">{{ imagePopupCoords }}</span>
+                <button class="image-popup-btn image-popup-copy" @click="copyCoordinates" :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
+                    <i style="margin: 0" :class="imagePopupCoordsCopied ? 'icon check' : 'icon copy outline'"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -63,6 +89,7 @@ import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay'; // Add overlay for tooltips
 
 import ddb from 'ddb';
+import { thumbs } from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
 import olMeasure from './olMeasure';
 import XYZ from 'ol/source/XYZ';
@@ -208,6 +235,17 @@ export default {
             // Flash message
             flashMessage: null,
             flashIcon: 'check circle outline',
+
+            // Image popup
+            imagePopupVisible: false,
+            imagePopupLoading: true,
+            imagePopupFileName: '',
+            imagePopupThumbnail: null,
+            imagePopupOpenUrl: '',
+            imagePopupDownloadUrl: '',
+            imagePopupCoords: '',
+            imagePopupCoordsCopied: false,
+            imagePopupOverlay: null,
             flashColor: 'positive'
         };
     },
@@ -222,6 +260,12 @@ export default {
             this.map.removeOverlay(this.tooltipOverlay);
             this.tooltipOverlay = null;
             this.tooltipElement = null;
+        }
+
+        // Clean up image popup overlay
+        if (this.imagePopupOverlay && this.map) {
+            this.map.removeOverlay(this.imagePopupOverlay);
+            this.imagePopupOverlay = null;
         }
 
         // Clean up vector layers
@@ -393,7 +437,101 @@ export default {
             }
 
             return null;
-        },        // Show dialog with feature properties
+        },
+
+        // Show image popup overlay on the map
+        showImagePopup: function (file, coordinate) {
+            const pathUtils = ddb.pathutils || ddb.utils;
+            this.imagePopupFileName = pathUtils.basename ? pathUtils.basename(file.entry.path) : file.entry.path.split('/').pop();
+
+            // Reset loading state and thumbnail for new image
+            this.imagePopupLoading = true;
+            this.imagePopupThumbnail = null;
+
+            // Get thumbnail URL (set after nextTick so v-show hides the img while loading)
+            this.$nextTick(() => {
+                if (thumbs.supportedForType(file.entry.type)) {
+                    this.imagePopupThumbnail = thumbs.fetch(file.path, 512);
+                } else {
+                    this.imagePopupLoading = false;
+                }
+            });
+
+            // Build download and open URLs
+            const [dataset, path] = ddb.utils.datasetPathFromUri(file.path);
+            this.imagePopupDownloadUrl = dataset.downloadUrl(path);
+            this.imagePopupOpenUrl = dataset.downloadUrl(path, { inline: true });
+
+            // Extract WGS84 coordinates from entry
+            if (file.entry.point_geom) {
+                const coords = coordAll(file.entry.point_geom)[0];
+                if (coords && coords.length >= 2) {
+                    const lon = coords[0].toFixed(6);
+                    const lat = coords[1].toFixed(6);
+                    this.imagePopupCoords = `${lat}, ${lon}`;
+                } else {
+                    this.imagePopupCoords = '';
+                }
+            } else {
+                this.imagePopupCoords = '';
+            }
+            this.imagePopupCoordsCopied = false;
+
+            this.imagePopupVisible = true;
+
+            // Position the overlay on the map
+            this.$nextTick(() => {
+                if (!this.imagePopupOverlay) {
+                    this.imagePopupOverlay = new Overlay({
+                        element: this.$refs.imagePopup,
+                        autoPan: true,
+                        autoPanAnimation: { duration: 250 },
+                        offset: [10, -10],
+                        positioning: 'bottom-left'
+                    });
+                    this.map.addOverlay(this.imagePopupOverlay);
+                }
+                this.imagePopupOverlay.setPosition(coordinate);
+            });
+        },
+
+        // Called when popup image finishes loading (or errors)
+        onImagePopupLoaded: function () {
+            this.imagePopupLoading = false;
+        },
+
+        // Close image popup
+        closeImagePopup: function () {
+            this.imagePopupVisible = false;
+            this.imagePopupLoading = true;
+            this.imagePopupCoordsCopied = false;
+            if (this.imagePopupOverlay) {
+                this.imagePopupOverlay.setPosition(undefined);
+            }
+        },
+
+        // Copy coordinates to clipboard
+        copyCoordinates: function () {
+            if (!this.imagePopupCoords) return;
+            navigator.clipboard.writeText(this.imagePopupCoords).then(() => {
+                this.imagePopupCoordsCopied = true;
+                setTimeout(() => { this.imagePopupCoordsCopied = false; }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = this.imagePopupCoords;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                this.imagePopupCoordsCopied = true;
+                setTimeout(() => { this.imagePopupCoordsCopied = false; }, 2000);
+            });
+        },
+
+        // Show dialog with feature properties
         showFeaturePropertiesDialog: function (feature) {
             // Get feature properties
             const properties = { ...feature.getProperties() };
@@ -786,15 +924,19 @@ export default {
                     return;
                 }
 
-                // Check if we're hovering over a vector feature
-                const hit = this.map.hasFeatureAtPixel(e.pixel, {
+                // Check if we're hovering over a vector feature or image marker
+                const hitVector = this.map.hasFeatureAtPixel(e.pixel, {
                     layerFilter: layer => this.vectorLayers.includes(layer)
                 });
+                const hitImage = this.map.hasFeatureAtPixel(e.pixel, {
+                    layerFilter: layer => layer === this.fileLayer
+                });
+                const hit = hitVector || hitImage;
 
                 // Update cursor style based on whether we're hovering over a feature
                 this.map.getTargetElement().style.cursor = hit ? 'pointer' : 'inherit';
 
-                if (hit) {
+                if (hitVector) {
                     let hoveredFeature = null;
 
                     // Find the first vector feature at this pixel
@@ -812,6 +954,39 @@ export default {
                     if (hoveredFeature) {
                         // Show tooltip for this feature
                         this.showFeatureTooltip(hoveredFeature, e.pixel);
+                    } else {
+                        this.hideFeatureTooltip();
+                    }
+                } else if (hitImage) {
+                    // Show tooltip for image markers (GEOIMAGE cluster)
+                    let imageFeature = null;
+                    this.map.forEachFeatureAtPixel(e.pixel,
+                        (feature) => {
+                            if (!imageFeature) {
+                                imageFeature = feature;
+                                return true;
+                            }
+                            return false;
+                        }, {
+                        layerFilter: layer => layer === this.fileLayer
+                    });
+
+                    if (imageFeature) {
+                        const clusterFeatures = imageFeature.get('features');
+                        if (clusterFeatures && clusterFeatures.length > 0) {
+                            let label;
+                            if (clusterFeatures.length === 1) {
+                                const file = clusterFeatures[0].file;
+                                label = file.entry.path.split('/').pop();
+                            } else {
+                                label = `${clusterFeatures.length} images`;
+                            }
+                            this.tooltipElement.innerHTML = label;
+                            this.tooltipElement.style.display = 'block';
+                            this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(e.pixel));
+                        } else {
+                            this.hideFeatureTooltip();
+                        }
                     } else {
                         this.hideFeatureTooltip();
                     }
@@ -921,6 +1096,9 @@ export default {
                 if (this.selectSingle) {
                     doSelectSingle(e);
                 } else {
+                    // Close any open image popup
+                    this.closeImagePopup();
+
                     // Remove all
                     this.outlineFeatures.forEachFeature(outline => {
                         this.outlineFeatures.removeFeature(outline);
@@ -959,6 +1137,11 @@ export default {
                                     // Open panorama view
                                     this.$emit('openItem', file, 'panorama');
                                     return;
+                                }
+
+                                // Clicked on geoimage - show image popup
+                                if (file.entry.type === ddb.entry.type.GEOIMAGE) {
+                                    this.showImagePopup(file, e.coordinate);
                                 }
 
                                 // Nothing else to do
@@ -1780,5 +1963,118 @@ export default {
         top: 8px;
         z-index: 1;
     }
+}
+
+.image-popup {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    min-width: 260px;
+    max-width: 320px;
+    overflow: hidden;
+    z-index: 1001;
+    font-family: inherit;
+}
+
+.image-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    background: #f5f5f5;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.image-popup-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 160px;
+}
+
+.image-popup-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.image-popup-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    color: #555;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.image-popup-btn:hover {
+    background: #e0e0e0;
+    color: #222;
+}
+
+.image-popup-close:hover {
+    background: #ffcdd2;
+    color: #c62828;
+}
+
+.image-popup-body {
+    padding: 6px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100px;
+}
+
+.image-popup-img {
+    max-width: 100%;
+    max-height: 240px;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.image-popup-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100px;
+    font-size: 24px;
+    color: #999;
+}
+
+.image-popup-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 10px;
+    border-top: 1px solid #e0e0e0;
+    background: #fafafa;
+    border-radius: 0 0 6px 6px;
+}
+
+.image-popup-coords {
+    font-size: 12px;
+    font-family: monospace;
+    color: #555;
+    user-select: all;
+    cursor: text;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.image-popup-copy {
+    flex-shrink: 0;
+    margin-left: 6px;
+}
+
+.image-popup-copy .icon.check {
+    color: #2e7d32;
 }
 </style>

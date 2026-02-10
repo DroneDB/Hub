@@ -333,11 +333,11 @@ table.ui.celled.table {
     margin-top: 0.5em;
 }
 
->>> .ui.selection.dropdown {
+.ui.selection.dropdown {
     cursor: pointer !important;
 }
 
->>> .ui.selection.dropdown .menu > .item {
+.ui.selection.dropdown .menu > .item {
     cursor: pointer !important;
 }
 </style>
