@@ -3,7 +3,7 @@
         <Toolbar :tools="tools" ref="toolbar" />
         <div ref="map-container" class="map-container" :class="{
             'cursor-pointer': selectSingle,
-            'cursor-crosshair': selectArea
+            'cursor-crosshair': selectArea || selectPolygon
         }">
             <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
                 <option v-for="(v, k) in basemaps" :value="k">
@@ -92,6 +92,7 @@ import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
 import olMeasure from './olMeasure';
+import olPolygonSelection from './olPolygonSelection';
 import XYZ from 'ol/source/XYZ';
 import Toolbar from './Toolbar.vue';
 import Keyboard from '../libs/keyboard';
@@ -142,11 +143,12 @@ export default {
         const tools = [
             {
                 id: 'select-features',
-                title: "Select Features (CTRL)",
+                title: "Select Features — Hold CTRL and click on a feature to select/deselect it. Hold CTRL+click multiple features to multi-select.",
                 icon: "mouse pointer",
                 exclusiveGroup: "select",
                 onSelect: () => {
                     this.selectSingle = true;
+                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
                 },
                 onDeselect: () => {
                     this.selectSingle = false;
@@ -154,12 +156,13 @@ export default {
             },
             {
                 id: 'select-features-by-area',
-                title: "Select Features by Area (CTRL+SHIFT)",
+                title: "Select by Rectangle — Hold CTRL+SHIFT and drag to draw a rectangle. All features inside will be selected. Hold SHIFT while dragging to add/remove from selection.",
                 icon: "square outline",
                 exclusiveGroup: "select",
                 onSelect: () => {
                     this.selectArea = true;
                     this.map.addInteraction(this.dragBox);
+                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
                 },
                 onDeselect: () => {
                     this.selectArea = false;
@@ -169,15 +172,16 @@ export default {
             },
             {
                 id: 'clear-selection',
-                title: "Clear Selection (ESC)",
+                title: "Clear Selection — Deselect all selected features. Shortcut: ESC",
                 icon: "ban",
                 onClick: () => {
                     this.clearSelection();
+                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
                 }
             },
             {
                 id: 'reset-view',
-                title: "Reset View (H)",
+                title: "Reset View — Zoom to fit all features. Shortcut: H",
                 icon: "home",
                 onClick: () => {
                     this.resetToInitialView();
@@ -188,7 +192,7 @@ export default {
         if (supportsFullScreen()) {
             tools.push({
                 id: 'fullscreen',
-                title: "Fullscreen (F11)",
+                title: "Fullscreen — Toggle fullscreen mode. Shortcut: F11",
                 icon: "expand",
                 onClick: () => {
                     if (isFullScreenCurrently()) {
@@ -207,6 +211,7 @@ export default {
             tools,
             selectSingle: false,
             selectArea: false,
+            selectPolygon: false,
             initialExtent: null,
             vectorLayers: [],
             vectorLayerColors: {}, // Store colors for vector layers
@@ -871,8 +876,21 @@ export default {
                 })
             });
 
+            this.polygonSelectionControl = new olPolygonSelection.Control({
+                onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
+                onActivated: () => {
+                    this.$refs.toolbar.deselectAll();
+                    this.measureControls.deselectCurrent();
+                },
+                onDeactivated: () => {
+                    this.selectPolygon = false;
+                    this.clearSelection();
+                    this.updateRastersOpacity();
+                }
+            });
+
             this.measureControls = new olMeasure.Controls({
-                onToolSelected: () => { this.measuring = true; },
+                onToolSelected: () => { this.measuring = true; if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate(); },
                 onToolDelesected: () => { this.measuring = false; },
                 onSave: () => { this.saveMeasurements(); },
                 onClearAll: () => { this.onClearAllMeasurements(); },
@@ -917,6 +935,7 @@ export default {
                 if (domElement && (
                     domElement.closest('.toolbar') ||
                     domElement.closest('.ol-measure-control') ||
+                    domElement.closest('.ol-polygon-selection') ||
                     domElement.closest('.ol-zoom') ||
                     domElement.closest('#basemap-selector')
                 )) {
@@ -1020,6 +1039,7 @@ export default {
                 }
             });
 
+            this.map.addControl(this.polygonSelectionControl);
             this.map.addControl(this.measureControls); const doSelectSingle = e => {
                 let first = true;
                 let vectorLayerClicked = false;
@@ -1091,6 +1111,7 @@ export default {
 
             this.map.on('click', e => {
                 if (this.measuring) return;
+                if (this.selectPolygon || (this.polygonSelectionControl && this.polygonSelectionControl.isActive())) return;
 
                 // Single selection
                 if (this.selectSingle) {
@@ -1647,6 +1668,9 @@ export default {
                 this.$refs.toolbar.selectTool('clear-selection');
                 this.$refs.toolbar.deselectAll();
                 this.measureControls.deselectCurrent();
+                if (this.polygonSelectionControl) {
+                    this.polygonSelectionControl.deactivate();
+                }
             }
 
             if (!Keyboard.isCtrlPressed() && this.mouseInside) {
@@ -1655,6 +1679,73 @@ export default {
                 }
                 this.$refs.toolbar.deselectTool('select-features');
             }
+        },
+        handlePolygonSelection: function (polygon) {
+            this.selectPolygon = true;
+
+            // Clear previous selection
+            this.clearSelection();
+
+            let scrolled = false;
+
+            // Check geoimage/geopanorama point features
+            this.fileFeatures.getFeatures().forEach(feat => {
+                const geom = feat.getGeometry();
+                if (geom && polygon.intersectsCoordinate(geom.getCoordinates())) {
+                    if (feat.file) {
+                        feat.file.selected = true;
+                        if (!scrolled) {
+                            this.$emit('scrollTo', feat.file);
+                            scrolled = true;
+                        }
+                    }
+                }
+            });
+
+            // Check raster extent features (polygon geometries)
+            this.extentsFeatures.getFeatures().forEach(feat => {
+                const geom = feat.getGeometry();
+                if (geom && polygon.intersectsExtent(geom.getExtent())) {
+                    if (feat.file) {
+                        feat.file.selected = true;
+                        if (!scrolled) {
+                            this.$emit('scrollTo', feat.file);
+                            scrolled = true;
+                        }
+                    }
+                }
+            });
+
+            // Check vector layers
+            this.vectorLayers.forEach(vectorLayer => {
+                if (!vectorLayer.file) return;
+                const source = vectorLayer.getSource();
+                if (!source) return;
+
+                let hasIntersection = false;
+                const extent = polygon.getExtent();
+                if (source.forEachFeatureInExtent) {
+                    source.forEachFeatureInExtent(extent, feature => {
+                        const featureGeom = feature.getGeometry();
+                        if (featureGeom) {
+                            const featureExtent = featureGeom.getExtent();
+                            if (polygon.intersectsExtent(featureExtent)) {
+                                hasIntersection = true;
+                            }
+                        }
+                    });
+                }
+
+                if (hasIntersection) {
+                    vectorLayer.file.selected = true;
+                    if (!scrolled) {
+                        this.$emit('scrollTo', vectorLayer.file);
+                        scrolled = true;
+                    }
+                }
+            });
+
+            this.updateRastersOpacity();
         },
         clearSelection: function () {
             this.files.forEach(f => f.selected = false);
