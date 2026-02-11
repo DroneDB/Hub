@@ -114,6 +114,30 @@
             @onClose="handleTextEditorClose"
             @saved="handleTextEditorSaved"
         />
+        <FsLightbox
+            v-if="lightboxSources.length > 0"
+            :key="lightboxKey"
+            :toggler="lightboxToggler"
+            :slide="lightboxSlide"
+            :sources="lightboxSources"
+            :onOpen="handleLightboxOpen"
+            :onClose="handleLightboxClose"
+            :onShow="handleLightboxShow"
+        />
+        <div v-if="lightboxOpen" class="lightbox-toolbar-extra">
+            <div class="lightbox-open-fullsize" @click="openLightboxDirectLink" title="Open in new tab">
+                <i class="icon external alternate"></i>
+            </div>
+        </div>
+        <div v-if="lightboxOpen && lightboxCurrentEntry" class="lightbox-info-overlay">
+            <div class="lightbox-info-name">{{ lightboxCurrentEntry.name }}</div>
+            <div v-if="lightboxCurrentEntry.coords" class="lightbox-info-coords">
+                <i class="icon map marker alternate" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.coords }}
+            </div>
+            <div v-if="lightboxCurrentEntry.altitude !== null" class="lightbox-info-altitude">
+                <i class="icon arrows alternate vertical" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.altitude }} m
+            </div>
+        </div>
     </div>
 </template>
 
@@ -142,6 +166,7 @@ import ShareEmbed from './ShareEmbed.vue';
 import BuildHistory from './BuildHistory.vue';
 import FileAvailabilityDialog from './FileAvailabilityDialog.vue';
 import TextEditorDialog from './TextEditorDialog.vue';
+import FsLightbox from 'fslightbox-vue/v2';
 
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
@@ -156,6 +181,7 @@ import FileAvailabilityChecker from '../libs/fileAvailabilityChecker';
 import { shouldOpenAsText, canOpenAsText } from '../libs/textFileUtils';
 
 import ddb from 'ddb';
+import { coordAll } from '@turf/meta';
 const { pathutils, utils } = ddb;
 
 import { OpenItemDefaults } from '../libs/openItemDefaults';
@@ -191,7 +217,8 @@ export default {
         ShareEmbed,
         BuildHistory,
         FileAvailabilityDialog,
-        TextEditorDialog
+        TextEditorDialog,
+        FsLightbox
     },
     data: function () {
         const mobile = isMobile();
@@ -255,6 +282,15 @@ export default {
             textEditorDialogOpen: false,
             textEditorEntry: null,
             textEditorReadonly: false,
+
+            // Image lightbox
+            lightboxToggler: false,
+            lightboxSlide: 1,
+            lightboxSources: [],
+            lightboxEntries: [],
+            lightboxOpen: false,
+            lightboxCurrentSlide: 1,
+            lightboxKey: 0,
 
             // Helper references for mixins
             icons: icons,
@@ -368,6 +404,26 @@ export default {
         },
         canDelete: function () {
             return this.datasetPermissions.canDelete;
+        },
+        lightboxCurrentEntry: function () {
+            const idx = this.lightboxCurrentSlide - 1;
+            if (idx < 0 || idx >= this.lightboxEntries.length) return null;
+            const item = this.lightboxEntries[idx];
+            const name = pathutils.basename(item.path);
+            let coords = null;
+            let altitude = null;
+            if (item.entry && item.entry.point_geom) {
+                try {
+                    const c = coordAll(item.entry.point_geom)[0];
+                    if (c && c.length >= 2) {
+                        coords = `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`;
+                        if (c.length >= 3 && c[2] !== 0) {
+                            altitude = c[2].toFixed(1);
+                        }
+                    }
+                } catch (e) { /* no geo data */ }
+            }
+            return { name, coords, altitude };
         }
     },
     methods: {
@@ -500,7 +556,97 @@ export default {
                     this.showError(error.message, "Error");
                 }
             } else {
-                shell.openItem(node.path);
+                // Open images in lightbox
+                const entryType = node.entry.type;
+                if (entryType === ddb.entry.type.IMAGE || entryType === ddb.entry.type.GEOIMAGE) {
+                    this.openImageLightbox(node);
+                } else {
+                    shell.openItem(node.path);
+                }
+            }
+        },
+
+        getImageFiles: function () {
+            return this.fileBrowserFiles.filter(f => {
+                const t = f.entry.type;
+                return t === ddb.entry.type.IMAGE || t === ddb.entry.type.GEOIMAGE;
+            });
+        },
+
+        openImageLightbox: function (node) {
+            const imageFiles = this.getImageFiles();
+            if (imageFiles.length === 0) return;
+
+            const [_, nodePath] = ddb.utils.datasetPathFromUri(node.path);
+
+            this.lightboxSources = imageFiles.map(f => {
+                const [__, p] = ddb.utils.datasetPathFromUri(f.path);
+                return this.dataset.thumbUrl(p, 1024);
+            });
+
+            this.lightboxEntries = imageFiles.map(f => {
+                const [__, p] = ddb.utils.datasetPathFromUri(f.path);
+                return { path: p, entry: f.entry };
+            });
+
+            const idx = imageFiles.findIndex(f => {
+                const [__, p] = ddb.utils.datasetPathFromUri(f.path);
+                return p === nodePath;
+            });
+
+            this.lightboxSlide = (idx >= 0 ? idx : 0) + 1;
+            this.lightboxCurrentSlide = this.lightboxSlide;
+
+            // Force remount of FsLightbox with new sources, then toggle
+            this.lightboxKey++;
+            this.$nextTick(() => {
+                this.$nextTick(() => {
+                    this.lightboxToggler = !this.lightboxToggler;
+                });
+            });
+        },
+
+        handleLightboxOpen: function (instance) {
+            this.lightboxOpen = true;
+            if (instance && instance.stageIndexes) {
+                this.lightboxCurrentSlide = instance.stageIndexes.current + 1;
+            }
+            // Intercept slide number updates to track current slide
+            if (instance && typeof instance.sn === 'function') {
+                const origSn = instance.sn.bind(instance);
+                const self = this;
+                instance.sn = function (slideNumber) {
+                    origSn(slideNumber);
+                    self.lightboxCurrentSlide = slideNumber;
+                };
+            }
+        },
+
+        handleLightboxShow: function (instance) {
+            if (instance && instance.stageIndexes) {
+                this.lightboxCurrentSlide = instance.stageIndexes.current + 1;
+            }
+        },
+
+        handleLightboxClose: function () {
+            this.lightboxOpen = false;
+        },
+
+        openLightboxDirectLink: function () {
+            const idx = this.lightboxCurrentSlide - 1;
+            if (idx >= 0 && idx < this.lightboxEntries.length) {
+                const entry = this.lightboxEntries[idx];
+                const url = this.dataset.downloadUrl(entry.path, { inline: true });
+                window.open(url, '_blank');
+            }
+        },
+
+        openLightboxFullSize: function () {
+            const idx = this.lightboxCurrentSlide - 1;
+            if (idx >= 0 && idx < this.lightboxEntries.length) {
+                const entry = this.lightboxEntries[idx];
+                const url = this.dataset.downloadUrl(entry.path, { inline: true });
+                window.open(url, '_blank');
             }
         },
 
@@ -809,4 +955,69 @@ export default {
 </script>
 
 <style scoped>
+.lightbox-toolbar-extra {
+    position: fixed;
+    top: 7px;
+    right: 90px;
+    z-index: 1000000001;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.lightbox-direct-link,
+.lightbox-open-fullsize {
+    cursor: pointer;
+    color: #ddd;
+    font-size: 20px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: color 0.2s, background-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.lightbox-direct-link:hover,
+.lightbox-open-fullsize:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+.lightbox-info-overlay {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000000001;
+    background: rgba(0, 0, 0, 0.65);
+    color: #eee;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    white-space: nowrap;
+    backdrop-filter: blur(4px);
+    pointer-events: none;
+    user-select: none;
+    max-width: 90vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lightbox-info-name {
+    font-weight: 600;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.lightbox-info-coords,
+.lightbox-info-altitude {
+    display: flex;
+    align-items: center;
+    opacity: 0.9;
+}
 </style>

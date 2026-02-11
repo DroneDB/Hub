@@ -491,7 +491,7 @@ export default {
                         element: this.$refs.imagePopup,
                         autoPan: true,
                         autoPanAnimation: { duration: 250 },
-                        offset: [10, -10],
+                        offset: [150, -150],
                         positioning: 'bottom-left'
                     });
                     this.map.addOverlay(this.imagePopupOverlay);

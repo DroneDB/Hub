@@ -38,6 +38,7 @@
     "css-loader": "^1.0.0",
     "file-loader": "^4.0.0",
     "flatgeobuf": "^4.0.1",
+    "fslightbox-vue": "^3.0.3",
     "jquery": "^3.7.1",
     "markdown-it": "^12.0.4",
     "ol": "^10.5.0",
