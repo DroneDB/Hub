@@ -392,6 +392,17 @@ module.exports = class Registry {
         return this._features[name] === true;
     }
 
+    /**
+     * Gets the raw value of a feature (supports non-boolean features).
+     * Features must be loaded first via loadFeatures().
+     * @param {string} name - The feature name
+     * @returns {*} The feature value, or null if not loaded/not present
+     */
+    getFeatureValue(name) {
+        if (!this._features) return null;
+        return this._features[name] ?? null;
+    }
+
     // ==================== Organization Member Management ==
 
     /**

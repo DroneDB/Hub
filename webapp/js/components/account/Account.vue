@@ -234,11 +234,12 @@ export default {
             try {
                 reg.logout();
                 await xAuthLogout();
-                this.$router.push({ name: "Login" }).catch(() => { });
             } catch (e) {
-                this.error = e.message;
+                console.warn('Logout error:', e.message);
+            } finally {
+                this.loggingOut = false;
+                this.$router.push({ name: "Login" }).catch(() => { });
             }
-            this.loggingOut = false;
         }
     }
 }

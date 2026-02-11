@@ -52,6 +52,8 @@ import Message from '../Message.vue';
 import reg from '../../libs/sharedRegistry';
 
 export default {
+    // NOTE: This dialog is used by admins to change other users' passwords.
+    // Password policy validation is intentionally NOT applied here (admin override).
     components: {
         Window, Message
     },

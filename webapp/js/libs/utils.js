@@ -5,9 +5,10 @@ export function setTitle(title) {
 export function getCookie(key) {
     const cobj = document.cookie
         .split(';')
+        .filter(v => v.includes('='))
         .map(v => v.split('='))
         .reduce((acc, v) => {
-            acc[decodeURIComponent(v[0].trim())] = decodeURIComponent(v[1].trim());
+            acc[decodeURIComponent(v[0].trim())] = decodeURIComponent((v[1] || '').trim());
             return acc;
         }, {});
     return cobj[key];

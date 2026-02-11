@@ -25,10 +25,17 @@
                         Please enter a valid email address
                     </div>
                 </div>
-                <div class="field">
+                <div class="field" :class="{ error: password && !isPasswordValid() }">
                     <label>Password</label>
                     <input v-on:keydown="clearError()" v-on:keyup.enter="confirmAddUser()" type="password"
-                        v-model="password" placeholder="" />
+                        v-model="password" placeholder="" @input="onPasswordInput" />
+                    <div v-if="passwordPolicy && password" class="password-requirements">
+                        <small v-for="(req, idx) in passwordRequirements" :key="idx"
+                            :class="{ met: isRequirementMet(req) }">
+                            <i :class="isRequirementMet(req) ? 'icon check green' : 'icon close red'" />
+                            {{ req }}
+                        </small>
+                    </div>
                 </div>
                 <div class="field">
                     <label>Roles</label>
@@ -57,6 +64,8 @@
 import Window from '../Window.vue';
 import Message from '../Message.vue';
 import reg from '../../libs/sharedRegistry';
+import { Features } from '../../libs/features';
+import { validatePassword, getPasswordRequirements } from '../../libs/passwordValidator';
 
 export default {
     components: {
@@ -78,12 +87,19 @@ export default {
             username: "",
             email: "",
             password: "",
-            roles: []
+            roles: [],
+            passwordPolicy: null,
+            passwordRequirements: [],
+            passwordValidation: { isValid: true, errors: [] }
         };
     },
     mounted: function () {
         this.$nextTick(() => {
             this.$refs.txtUsername.focus();
+
+            // Load password policy from features
+            this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+            this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
 
             // Initialize Semantic UI dropdown
             if (this.$refs.rolesDropdown) {
@@ -104,7 +120,29 @@ export default {
             this.error = "";
         },
         isFilled: function () {
-            return this.username !== "" && this.password !== "" && this.isEmailValid();
+            return this.username !== "" && this.password !== "" && this.isEmailValid() && this.isPasswordValid();
+        },
+        isPasswordValid: function () {
+            if (!this.passwordPolicy || !this.password) return true;
+            return this.passwordValidation.isValid;
+        },
+        onPasswordInput: function () {
+            this.passwordValidation = validatePassword(this.password, this.passwordPolicy);
+        },
+        isRequirementMet: function (requirement) {
+            if (!this.password) return false;
+            const req = requirement.toLowerCase();
+            if (req.includes('character') && !req.includes('special'))
+                return this.password.length >= (this.passwordPolicy?.minLength || 0);
+            if (req.includes('digit'))
+                return /\d/.test(this.password);
+            if (req.includes('uppercase'))
+                return /[A-Z]/.test(this.password);
+            if (req.includes('lowercase'))
+                return /[a-z]/.test(this.password);
+            if (req.includes('special'))
+                return !/^[a-zA-Z0-9]*$/.test(this.password);
+            return false;
         },
         isEmailValid: function () {
             if (!this.email || this.email.trim() === "") return true; // Email is optional
@@ -151,5 +189,20 @@ export default {
 
 .form {
     margin-bottom: 20px;
+}
+
+.password-requirements {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.password-requirements small {
+    color: #db2828;
+}
+
+.password-requirements small.met {
+    color: #21ba45;
 }
 </style>

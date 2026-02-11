@@ -18,27 +18,39 @@
 
             <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
-                    <div class="storage-progress-container">
-                        <div class="storage-progress-bar" :style="storageBarStyle"></div>
-                    </div>
-                    <div class="storage-percentage" :style="{ color: storageBarColor }">
-                        {{ storageInfo.usedPercentage | percent(1) }}
-                    </div>
-                    <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: #555;">
-                        <tr>
-                            <th><b>Total</b></th>
-                            <th><b>Used</b></th>
-                            <th v-if="storageInfo.free > 0"><b>Free</b></th>
-                        </tr>
-                        <tr>
-                            <td>{{ storageInfo.total | bytes }}</td>
-                            <td>{{ storageInfo.used | bytes }}</td>
-                            <td v-if="storageInfo.free > 0">{{ storageInfo.free | bytes }}</td>
-                        </tr>
-                    </table>
-                    <div v-if="storageInfo.free <= 0" class="storage-warning">
-                        <i class="icon warning sign"></i> No storage left!
-                    </div>
+                    <template v-if="storageInfo.used > 0">
+                        <div class="storage-progress-container">
+                            <div class="storage-progress-bar" :style="storageBarStyle"></div>
+                        </div>
+                        <div class="storage-percentage" :style="{ color: storageBarColor }">
+                            {{ storageInfo.usedPercentage | percent(1) }}
+                        </div>
+                        <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: #555;">
+                            <tr>
+                                <th><b>Total</b></th>
+                                <th><b>Used</b></th>
+                                <th v-if="storageInfo.free > 0"><b>Free</b></th>
+                            </tr>
+                            <tr>
+                                <td>{{ storageInfo.total | bytes }}</td>
+                                <td>{{ storageInfo.used | bytes }}</td>
+                                <td v-if="storageInfo.free > 0">{{ storageInfo.free | bytes }}</td>
+                            </tr>
+                        </table>
+                        <div v-if="storageInfo.free <= 0" class="storage-warning">
+                            <i class="icon warning sign"></i> No storage left!
+                        </div>
+                    </template>
+                    <template v-else>
+                        <table style="width: 100%; margin-bottom: 0; color: #555;">
+                            <tr>
+                                <th><b>Total</b></th>
+                            </tr>
+                            <tr>
+                                <td>{{ storageInfo.total | bytes }}</td>
+                            </tr>
+                        </table>
+                    </template>
                 </div>
             </Alert>
 
@@ -62,8 +74,11 @@
                     <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
                     <div class="divider only" v-if="storageInfo"></div>
                     <div class="item only" @click="storageInfoDialogOpen = true"
-                        v-if="storageInfo && storageInfo.total != null"><i
+                        v-if="storageInfo && storageInfo.total != null && storageInfo.used > 0"><i
                             class="icon hdd outline"></i>&nbsp;{{ storageInfo.usedPercentage | percent(2) }}</div>
+                    <div class="item only"
+                        v-if="storageInfo && storageInfo.total != null && !storageInfo.used"><i
+                            class="icon hdd outline"></i>&nbsp;{{ storageInfo.total | bytes }}</div>
                     <div class="item only" v-if="storageInfo && storageInfo.total == null"><i
                             class="icon hdd outline"></i>&nbsp;{{ storageInfo.used | bytes }}</div>
                     <div v-if="(accountManagement && loggedIn) || (usersManagement && isAdmin)" class="divider"></div>
@@ -293,20 +308,36 @@ export default {
             this.$root.$emit("openSettings");
         },
 
-        onRegLogin: function (username) {
+        onRegLogin: async function (username) {
             this.username = username;
             this.loggedIn = true;
+            this.isAdmin = reg.isAdmin();
+            this.refreshStorageInfo();
+
+            // Features may not be loaded yet when login event fires,
+            // so we ensure they are loaded before checking user management
+            await reg.loadFeatures();
+            this.checkUserManagement();
         },
 
         onRegLogout: function () {
             this.username = "";
             this.loggedIn = false;
+            this.isAdmin = false;
+            this.storageInfo = null;
+            this.usersManagement = false;
+            this.accountManagement = false;
         },
 
         logout: async function () {
-            reg.logout();
-            await xAuthLogout();
-            this.login();
+            try {
+                reg.logout();
+                await xAuthLogout();
+            } catch (e) {
+                console.warn('Logout error:', e.message);
+            } finally {
+                this.login();
+            }
         },
 
         login: function () {
