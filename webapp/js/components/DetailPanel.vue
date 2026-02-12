@@ -76,6 +76,13 @@
                         </div>
                     </div>
 
+                    <div class="item" v-if="file.entry && file.entry.point_geom && file.entry.point_geom.geometry && file.entry.point_geom.geometry.coordinates">
+                        <div class="content">
+                            <div class="header">Coordinates</div>
+                            <div class="description hash-text"><div v-if="file.entry.point_geom.crs && file.entry.point_geom.crs.properties && file.entry.point_geom.crs.properties.name">{{ file.entry.point_geom.crs.properties.name }}</div>{{ file.entry.point_geom.geometry.coordinates[0] }}, {{ file.entry.point_geom.geometry.coordinates[1] }}<span v-if="file.entry.point_geom.geometry.coordinates[2] !== undefined">, {{ file.entry.point_geom.geometry.coordinates[2].toFixed(2) }}m</span></div>
+                        </div>
+                    </div>
+
                     <div class="item" v-if="file.entry.properties && file.entry.properties.meta">
                         <div class="content">
                             <div class="header">Metadata</div>
