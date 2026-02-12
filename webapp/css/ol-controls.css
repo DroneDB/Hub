@@ -33,13 +33,18 @@
     box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
-.ol-polygon-selection {
+.ol-rectangle-selection {
     top: 5.5em;
     left: 0.5em;
 }
 
+.ol-polygon-selection {
+    top: 7.5em;
+    left: 0.5em;
+}
+
 .ol-measure-control {
-    top: 8.5em;
+    top: 10.5em;
     left: 0.5em;
 }
 

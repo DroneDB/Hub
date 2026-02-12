@@ -93,6 +93,7 @@ import { thumbs } from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
 import olMeasure from './olMeasure';
 import olPolygonSelection from './olPolygonSelection';
+import olRectangleSelection from './olRectangleSelection';
 import XYZ from 'ol/source/XYZ';
 import Toolbar from './Toolbar.vue';
 import Keyboard from '../libs/keyboard';
@@ -149,6 +150,7 @@ export default {
                 onSelect: () => {
                     this.selectSingle = true;
                     if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
+                    if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate();
                 },
                 onDeselect: () => {
                     this.selectSingle = false;
@@ -163,6 +165,7 @@ export default {
                     this.selectArea = true;
                     this.map.addInteraction(this.dragBox);
                     if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
+                    if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate();
                 },
                 onDeselect: () => {
                     this.selectArea = false;
@@ -876,11 +879,26 @@ export default {
                 })
             });
 
+            this.rectangleSelectionControl = new olRectangleSelection.Control({
+                onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
+                onActivated: () => {
+                    this.$refs.toolbar.deselectAll();
+                    this.measureControls.deselectCurrent();
+                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
+                },
+                onDeactivated: () => {
+                    this.selectPolygon = false;
+                    this.clearSelection();
+                    this.updateRastersOpacity();
+                }
+            });
+
             this.polygonSelectionControl = new olPolygonSelection.Control({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
                 onActivated: () => {
                     this.$refs.toolbar.deselectAll();
                     this.measureControls.deselectCurrent();
+                    if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate();
                 },
                 onDeactivated: () => {
                     this.selectPolygon = false;
@@ -890,7 +908,7 @@ export default {
             });
 
             this.measureControls = new olMeasure.Controls({
-                onToolSelected: () => { this.measuring = true; if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate(); },
+                onToolSelected: () => { this.measuring = true; if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate(); if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate(); },
                 onToolDelesected: () => { this.measuring = false; },
                 onSave: () => { this.saveMeasurements(); },
                 onClearAll: () => { this.onClearAllMeasurements(); },
@@ -1039,6 +1057,7 @@ export default {
                 }
             });
 
+            this.map.addControl(this.rectangleSelectionControl);
             this.map.addControl(this.polygonSelectionControl);
             this.map.addControl(this.measureControls); const doSelectSingle = e => {
                 let first = true;

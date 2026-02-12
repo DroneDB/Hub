@@ -1017,7 +1017,6 @@ export default {
 .lightbox-info-coords,
 .lightbox-info-altitude {
     display: flex;
-    align-items: center;
     opacity: 0.9;
 }
 </style>
