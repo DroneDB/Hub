@@ -30,7 +30,7 @@
                             </div>
                         </div>
                     </form>
-                    <div style="margin-top:1rem">If you don't have an account, you can register for free on <a
+                    <div v-if="showRegistrationLink" style="margin-top:1rem">If you don't have an account, you can register for free on <a
                             target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
                 </div>
                 <Message bindTo="error" />
@@ -57,6 +57,11 @@ export default {
             xAuthInProgress: false,
             username: "",
             password: ""
+        }
+    },
+    computed: {
+        showRegistrationLink: function() {
+            return HubOptions.showRegistrationLink !== false;
         }
     },
     beforeMount: function () {

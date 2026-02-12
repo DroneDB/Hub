@@ -42,7 +42,9 @@
     </style>
     <script>
         window.HubOptions = {
-            appLogo: "/images/logo-banner.svg"
+            appLogo: "/images/logo-banner.svg",
+            // Set to false for self-hosted instances to hide the registration link
+            showRegistrationLink: true
             // #HUB OPTIONS#
         };
         if (Object.freeze) Object.freeze(window.HubOptions);
