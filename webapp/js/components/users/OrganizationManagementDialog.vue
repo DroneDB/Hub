@@ -356,4 +356,15 @@ code {
     border-radius: 3px;
     font-family: monospace;
 }
+
+.ui.top.attached.tabular.menu {
+    .item {
+        cursor: pointer;
+        &.active {
+            cursor: default;
+        }
+    }
+
+}
+
 </style>
