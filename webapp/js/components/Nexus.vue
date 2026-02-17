@@ -11,19 +11,22 @@
         <div class="container">
             <canvas ref="canvas"></canvas>
 
-            <!-- Lighting controls panel (only for models without texture) -->
-            <div v-if="loaded && !modelInfo.hasTexture" class="controls-panel">
-                <div class="controls-header">
-                    <span>Lighting</span>
-                </div>
+            <!-- Settings gear button (bottom-left) -->
+            <button v-if="loaded" class="btn-settings" @click="toggleSettings" title="Lighting settings">
+                <i class="icon cog" />
+            </button>
+        </div>
 
+        <!-- Lighting settings Window dialog -->
+        <Window v-if="showSettings" title="Lighting" id="nexus-lighting" @onClose="toggleSettings" fixedSize maxWidth="280px">
+            <div class="lighting-content">
                 <div class="form-group">
                     <label>Ambient: {{ ambientIntensity.toFixed(1) }}</label>
                     <input
                         type="range"
                         v-model.number="ambientIntensity"
                         min="0"
-                        max="2"
+                        max="3"
                         step="0.1"
                         @input="updateAmbient"
                     />
@@ -35,13 +38,13 @@
                         type="range"
                         v-model.number="directionalIntensity"
                         min="0"
-                        max="2"
+                        max="3"
                         step="0.1"
                         @input="updateDirectional"
                     />
                 </div>
 
-                <div class="form-group">
+                <div v-if="!modelInfo.hasTexture" class="form-group">
                     <label>Shininess: {{ shininess }}</label>
                     <input
                         type="range"
@@ -53,9 +56,9 @@
                     />
                 </div>
 
-                <button class="btn-reset" @click="resetDefaults">Reset</button>
+                <button class="ui mini fluid button" @click="resetDefaults">Reset</button>
             </div>
-        </div>
+        </Window>
     </div>
 </template>
 
@@ -63,26 +66,57 @@
 import ddb from 'ddb';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
+import Window from './Window.vue';
 import { loadResources } from '../libs/lazy';
+
+const STORAGE_KEY = 'nexus-lighting-settings';
+
+function loadSettings() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) return JSON.parse(raw);
+    } catch (e) {
+        // Ignore parse errors
+    }
+    return null;
+}
+
+function saveSettings(ambient, directional, shininess) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            ambientIntensity: ambient,
+            directionalIntensity: directional,
+            shininess: shininess
+        }));
+    } catch (e) {
+        // Ignore storage errors
+    }
+}
 
 export default {
     components: {
-        Message, TabViewLoader
+        Message, TabViewLoader, Window
     },
     props: ['uri'],
     data: function () {
+        const DEFAULT_AMBIENT = 0.4;
+        const DEFAULT_DIRECTIONAL = 0.7;
+        const DEFAULT_SHININESS = 25;
+        const saved = loadSettings();
+
         return {
             error: "",
             loading: false,
             loaded: false,
+            showSettings: false,
             // Default lighting values (MeshLab style)
-            DEFAULT_AMBIENT: 0.4,
-            DEFAULT_DIRECTIONAL: 0.8,
-            DEFAULT_SHININESS: 25,
-            // Reactive controls
-            ambientIntensity: 0.4,
-            directionalIntensity: 0.8,
-            shininess: 25,
+            DEFAULT_AMBIENT,
+            DEFAULT_DIRECTIONAL,
+            DEFAULT_SHININESS,
+            // Reactive controls (restored from localStorage if available)
+            ambientIntensity: saved ? saved.ambientIntensity : DEFAULT_AMBIENT,
+            directionalIntensity: saved ? saved.directionalIntensity : DEFAULT_DIRECTIONAL,
+            shininess: saved ? saved.shininess : DEFAULT_SHININESS,
             // Model info
             modelInfo: {
                 hasTexture: false,
@@ -91,6 +125,7 @@ export default {
             },
             // Three.js references (set in loadNexus)
             ambientLight: null,
+            hemisphereLight: null,
             light1: null,
             light2: null,
             material: null,
@@ -137,12 +172,16 @@ export default {
             camera.position.z = 4.0;
 
             const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x000000);
-            scene.fog = new THREE.Fog(0x050505, 2000, 3500);
+            scene.background = new THREE.Color(0x1a1a2e);
+            scene.fog = new THREE.Fog(0x1a1a2e, 2000, 3500);
 
-            // Lighting setup with MeshLab-style defaults
-            this.ambientLight = new THREE.AmbientLight(0x404040, this.ambientIntensity);
+            // Lighting setup
+            this.ambientLight = new THREE.AmbientLight(0xffffff, this.ambientIntensity);
             scene.add(this.ambientLight);
+
+            // Hemisphere light for natural sky/ground fill
+            this.hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
+            scene.add(this.hemisphereLight);
 
             this.light1 = new THREE.DirectionalLight(0xffffff, this.directionalIntensity);
             this.light1.position.set(1, 1, -1);
@@ -229,10 +268,19 @@ export default {
             this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
         },
 
+        toggleSettings: function () {
+            this.showSettings = !this.showSettings;
+        },
+
+        persistSettings: function () {
+            saveSettings(this.ambientIntensity, this.directionalIntensity, this.shininess);
+        },
+
         updateAmbient: function () {
             if (this.ambientLight) {
                 this.ambientLight.intensity = this.ambientIntensity;
             }
+            this.persistSettings();
         },
 
         updateDirectional: function () {
@@ -242,6 +290,7 @@ export default {
             if (this.light2) {
                 this.light2.intensity = this.directionalIntensity;
             }
+            this.persistSettings();
         },
 
         updateShininess: function () {
@@ -249,6 +298,7 @@ export default {
                 this.material.shininess = this.shininess;
                 this.material.needsUpdate = true;
             }
+            this.persistSettings();
         },
 
         resetDefaults: function () {
@@ -258,6 +308,7 @@ export default {
             this.updateAmbient();
             this.updateDirectional();
             this.updateShininess();
+            try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
         },
     }
 }
@@ -265,7 +316,7 @@ export default {
 
 <style scoped>
 #nexus {
-    background: #030A03;
+    background: #1a1a2e;
     width: 100%;
     height: 100%;
     display: flex;
@@ -302,83 +353,54 @@ export default {
     width: 22px;
 }
 
-#nexus .controls-panel {
+#nexus .btn-settings {
     position: absolute;
-    top: 10px;
-    right: 10px;
-    background: rgba(0, 0, 0, 0.75);
-    border-radius: 8px;
-    padding: 12px 16px;
+    bottom: 14px;
+    left: 14px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     color: #fefefe;
-    min-width: 180px;
-    font-size: 13px;
+    font-size: 16px;
+    cursor: pointer;
     z-index: 100;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-#nexus .controls-panel .controls-header {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 10px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-#nexus .controls-panel .form-group {
-    margin-bottom: 10px;
-}
-
-#nexus .controls-panel .form-group label {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.8);
-}
-
-#nexus .controls-panel .form-group input[type="range"] {
-    width: 100%;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(255, 255, 255, 0.2);
-    outline: none;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-}
-
-#nexus .controls-panel .form-group input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #4a9eff;
-    cursor: pointer;
-}
-
-#nexus .controls-panel .form-group input[type="range"]::-moz-range-thumb {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #4a9eff;
-    cursor: pointer;
-    border: none;
-}
-
-#nexus .controls-panel .btn-reset {
-    width: 100%;
-    padding: 6px 12px;
-    margin-top: 6px;
-    background: rgba(255, 255, 255, 0.15);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 4px;
-    color: #fefefe;
-    font-size: 12px;
-    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
     transition: background 0.2s, border-color 0.2s;
 }
 
-#nexus .controls-panel .btn-reset:hover {
-    background: rgba(255, 255, 255, 0.25);
+#nexus .btn-settings:hover {
+    background: rgba(0, 0, 0, 0.85);
     border-color: rgba(255, 255, 255, 0.5);
+}
+
+#nexus .btn-settings .icon.cog {
+    margin: 0;
+    width: auto;
+    height: auto;
+}
+
+#nexus .lighting-content {
+    padding: 4px 0;
+}
+
+#nexus .lighting-content .form-group {
+    margin-bottom: 12px;
+}
+
+#nexus .lighting-content .form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #555;
+}
+
+#nexus .lighting-content .form-group input[type="range"] {
+    width: 100%;
+    cursor: pointer;
 }
 </style>
