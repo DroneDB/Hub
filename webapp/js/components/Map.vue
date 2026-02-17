@@ -36,10 +36,12 @@
             :selectedBasemap="selectedBasemap"
             :unitPref="currentUnitPref"
             :showFlightPath="showFlightPath"
+            :customBasemapConfig="customBasemapConfig"
             @onClose="mapSettingsDialogOpen = false"
             @basemapChanged="handleBasemapChanged"
             @unitsChanged="handleUnitsChanged"
-            @flightPathChanged="handleFlightPathChanged">
+            @flightPathChanged="handleFlightPathChanged"
+            @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
         </MapSettingsDialog>
         <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
         <div ref="imagePopup" class="image-popup" v-show="imagePopupVisible">
@@ -99,13 +101,14 @@ import olMeasure from './olMeasure';
 import olSelection from './olSelection';
 import olSettings from './olSettings';
 import XYZ from 'ol/source/XYZ';
+import TileWMS from 'ol/source/TileWMS';
 import Toolbar from './Toolbar.vue';
 import Keyboard from '../libs/keyboard';
 import Mouse from '../libs/mouse';
 import { rootPath } from '../dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '../libs/utils';
 import { isMobile } from '../libs/responsive';
-import { Basemaps } from '../libs/basemaps';
+import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '../libs/basemaps';
 import * as flatgeobuf from 'flatgeobuf';
 import Vue from 'vue';
 import FeatureInfoDialog from './FeatureInfoDialog.vue';
@@ -199,6 +202,7 @@ export default {
             tooltipOverlay: null,  // Overlay for tooltips
             selectedBasemap: localStorage.getItem('selectedBasemap') || 'satellite',
             basemaps: Basemaps,
+            customBasemapConfig: getCustomBasemapConfig(),
             measuring: false,
             measurementStorage: null,
             hasSavedMeasurements: false,
@@ -773,12 +777,7 @@ export default {
             ]));
 
 
-            this.basemapLayer = new TileLayer({
-                source: new XYZ({
-                    url: this.basemaps[this.selectedBasemap].url,
-                    attributions: this.basemaps[this.selectedBasemap].attributions
-                })
-            });
+            this.basemapLayer = this.createBasemapLayer();
 
             this.selectionControl = new olSelection.Control({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
@@ -1669,11 +1668,49 @@ export default {
                 }
             });
         },
+        /**
+         * Create a TileLayer for the current basemap selection
+         */
+        createBasemapLayer: function () {
+            if (this.selectedBasemap === 'custom') {
+                const config = this.customBasemapConfig;
+                if (config && config.url) {
+                    const attributions = config.attribution ? [config.attribution] : [];
+                    if (config.sourceType === 'wms') {
+                        return new TileLayer({
+                            source: new TileWMS({
+                                url: config.url,
+                                params: { LAYERS: config.layerName, TILED: true },
+                                attributions: attributions
+                            })
+                        });
+                    } else {
+                        return new TileLayer({
+                            source: new XYZ({
+                                url: config.url,
+                                attributions: attributions
+                            })
+                        });
+                    }
+                }
+            }
+            // Default: built-in basemap (or fallback for invalid custom)
+            const basemap = this.basemaps[this.selectedBasemap] || this.basemaps['satellite'];
+            return new TileLayer({
+                source: new XYZ({
+                    url: basemap.url,
+                    attributions: basemap.attributions
+                })
+            });
+        },
+
         updateBasemap: function () {
-            const basemap = this.basemaps[this.selectedBasemap];
-            const source = this.basemapLayer.getSource();
-            source.setUrl(basemap.url);
-            source.setAttributions(basemap.attributions);
+            const newLayer = this.createBasemapLayer();
+            const layers = this.map.getLayers();
+            // Replace the basemap layer at position 0
+            layers.removeAt(0);
+            layers.insertAt(0, newLayer);
+            this.basemapLayer = newLayer;
             localStorage.setItem('selectedBasemap', this.selectedBasemap);
         },
 
@@ -1917,6 +1954,17 @@ export default {
         handleBasemapChanged: function(basemap) {
             this.selectedBasemap = basemap;
             this.updateBasemap();
+        },
+
+        /**
+         * Handle custom basemap configuration change from settings dialog
+         */
+        handleCustomBasemapConfigChanged: function(config) {
+            saveCustomBasemapConfig(config);
+            this.customBasemapConfig = config;
+            if (this.selectedBasemap === 'custom') {
+                this.updateBasemap();
+            }
         },
 
         /**

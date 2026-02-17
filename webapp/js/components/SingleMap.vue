@@ -54,8 +54,9 @@ import HybridXYZ from '../libs/olHybridXYZ';
 import olMeasure from './olMeasure';
 import TabViewLoader from './TabViewLoader';
 import XYZ from 'ol/source/XYZ';
+import TileWMS from 'ol/source/TileWMS';
 import { transformExtent } from 'ol/proj';
-import { Basemaps } from '../libs/basemaps';
+import { Basemaps, getCustomBasemapConfig } from '../libs/basemaps';
 import * as flatgeobuf from 'flatgeobuf';
 import Vue from 'vue';
 import FeatureInfoDialog from './FeatureInfoDialog.vue';
@@ -110,6 +111,7 @@ export default {
             error: "",
             selectedBasemap: "satellite",
             basemaps: Basemaps,
+            customBasemapConfig: getCustomBasemapConfig(),
             loading: true,
             entry: {},
             ddbURI: null,
@@ -369,12 +371,7 @@ export default {
 
             this.loaded = true;
 
-            this.basemapLayer = new TileLayer({
-                source: new XYZ({
-                    url: this.basemaps[this.selectedBasemap].url,
-                    attributions: this.basemaps[this.selectedBasemap].attributions
-                })
-            });
+            this.basemapLayer = this.createBasemapLayer();
 
             this.rasterLayer = new LayerGroup();
             const rasters = this.rasterLayer.getLayers();
@@ -696,11 +693,43 @@ export default {
                 if (this.map) this.map.updateSize();
             });
         },
+        createBasemapLayer: function () {
+            if (this.selectedBasemap === 'custom') {
+                const config = this.customBasemapConfig;
+                if (config && config.url) {
+                    const attributions = config.attribution ? [config.attribution] : [];
+                    if (config.sourceType === 'wms') {
+                        return new TileLayer({
+                            source: new TileWMS({
+                                url: config.url,
+                                params: { LAYERS: config.layerName, TILED: true },
+                                attributions: attributions
+                            })
+                        });
+                    } else {
+                        return new TileLayer({
+                            source: new XYZ({
+                                url: config.url,
+                                attributions: attributions
+                            })
+                        });
+                    }
+                }
+            }
+            const basemap = this.basemaps[this.selectedBasemap] || this.basemaps['satellite'];
+            return new TileLayer({
+                source: new XYZ({
+                    url: basemap.url,
+                    attributions: basemap.attributions
+                })
+            });
+        },
         updateBasemap: function () {
-            const basemap = this.basemaps[this.selectedBasemap];
-            const source = this.basemapLayer.getSource();
-            source.setUrl(basemap.url);
-            source.setAttributions(basemap.attributions);
+            const newLayer = this.createBasemapLayer();
+            const layers = this.map.getLayers();
+            layers.removeAt(0);
+            layers.insertAt(0, newLayer);
+            this.basemapLayer = newLayer;
         },
 
         /**
