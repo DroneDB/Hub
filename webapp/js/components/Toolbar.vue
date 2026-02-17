@@ -12,7 +12,6 @@
 </template>
 
 <script>
-//<div class="button selected" title="Select Features by Area (SHIFT)"><i class="icon square outline"></i></div>
 
 export default {
     props: ["tools", "className"],

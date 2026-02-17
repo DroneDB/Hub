@@ -45,18 +45,6 @@ class MeasureControls extends Control {
         btnStop.title = 'Stop Measuring — Cancel the current measurement. Shortcut: ESC';
         btnStop.innerHTML = '<img src="' + rootPath("/images/measure-stop.svg") + '"/>';
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
-        const btnUnits = document.createElement('button');
-        btnUnits.title = 'Change Units — Switch between metric and imperial units.';
-        btnUnits.innerHTML = '<img src="' + rootPath("/images/measure-units.svg") + '"/>';
-
-        const unitDiv = document.createElement('div');
-        unitDiv.style.display = 'none';
-        unitDiv.style.float = 'right';
-        const unitSelect = document.createElement('select');
-        unitSelect.style.marginRight = '2px';
-        unitSelect.innerHTML = '<option value="metric" ' + (unitPref === 'metric' ? 'selected' : '') + '>Metric</option>' +
-            '<option value="imperial" ' + (unitPref === 'imperial' ? 'selected' : '') + '>Imperial</option>';
-        unitDiv.appendChild(unitSelect);
 
         // Separator
         const separator = document.createElement('div');
@@ -95,8 +83,6 @@ class MeasureControls extends Control {
         element.appendChild(btnErase);
         element.appendChild(btnEdit);
         element.appendChild(btnStop);
-        element.appendChild(unitDiv);
-        element.appendChild(btnUnits);
         element.appendChild(separator);
         element.appendChild(btnSave);
         element.appendChild(btnClear);
@@ -113,8 +99,6 @@ class MeasureControls extends Control {
         btnErase.addEventListener('click', this.handleErase.bind(this), false);
         btnEdit.addEventListener('click', this.handleEdit.bind(this), false);
         btnStop.addEventListener('click', this.handleStop.bind(this), false);
-        btnUnits.addEventListener('click', this.handleToggleUnits.bind(this), false);
-        unitSelect.addEventListener('change', this.handleChangeUnits.bind(this), false);
         btnSave.addEventListener('click', this.handleSave.bind(this), false);
         btnClear.addEventListener('click', this.handleClearAll.bind(this), false);
         btnExport.addEventListener('click', this.handleExport.bind(this), false);
@@ -131,7 +115,6 @@ class MeasureControls extends Control {
         this.onDeleteSaved = options.onDeleteSaved || (() => { });
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
-        this.onUnitsChangeRequested = options.onUnitsChangeRequested || null;
 
         this.source = new VectorSource();
         this.vector = new VectorLayer({
@@ -139,8 +122,6 @@ class MeasureControls extends Control {
             style: (feature) => this.createFeatureStyle(feature),
         });
 
-        this.unitDiv = unitDiv;
-        this.unitSelect = unitSelect;
         this.unitPref = unitPref;
 
         // Store button references
@@ -208,24 +189,6 @@ class MeasureControls extends Control {
         this.deselectCurrent();
     }
 
-    handleChangeUnits() {
-        const newUnit = this.unitSelect.value;
-        const oldUnit = this.unitPref;
-
-        // If unit didn't change, do nothing
-        if (newUnit === oldUnit) {
-            return;
-        }
-
-        // If there are measurements and a callback is provided, request confirmation
-        if (this.hasMeasurements() && this.onUnitsChangeRequested) {
-            this.onUnitsChangeRequested(newUnit, oldUnit);
-        } else {
-            // No measurements or no callback, apply directly
-            this.applyUnitsChange(newUnit);
-        }
-    }
-
     /**
      * Apply units change - update preference and recalculate all measurement tooltips
      * @param {string} newUnit - The new unit preference ('metric' or 'imperial')
@@ -233,7 +196,6 @@ class MeasureControls extends Control {
     applyUnitsChange(newUnit) {
         localStorage.setItem("measureUnitPref", newUnit);
         this.unitPref = newUnit;
-        this.unitSelect.value = newUnit;
 
         // Recalculate all existing measurement tooltips
         const features = this.source.getFeatures();
@@ -243,11 +205,11 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Rollback unit select to previous value (called when user cancels the dialog)
-     * @param {string} previousUnit - The previous unit preference
+     * Get the current unit preference
+     * @returns {string} 'metric' or 'imperial'
      */
-    rollbackUnitSelect(previousUnit) {
-        this.unitSelect.value = previousUnit;
+    getUnitPref() {
+        return this.unitPref;
     }
 
     /**
@@ -256,10 +218,6 @@ class MeasureControls extends Control {
      */
     getMeasurementsCount() {
         return this.source.getFeatures().length;
-    }
-
-    handleToggleUnits() {
-        this.unitDiv.style.display = this.unitDiv.style.display === 'none' ? 'inline-block' : 'none';
     }
 
     handleSave() {

@@ -41,6 +41,7 @@ import { entry } from 'ddb';
 import shell from '../dynamic/shell';
 import env from '../dynamic/env';
 import ContextMenu from './ContextMenu';
+import reg from '../libs/sharedRegistry';
 
 export default {
     components: {
@@ -74,10 +75,12 @@ export default {
             }]);
         }
 
+        const typesWithDedicatedViewer = [ddb.entry.type.MODEL, ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD, ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA, ddb.entry.type.MARKDOWN];
+
         contextMenu = contextMenu.concat([{
             label: 'Open',
             icon: 'folder open outline',
-            isVisible: () => { return this.selectedFiles.length > 0; },
+            isVisible: () => { return this.selectedFiles.length > 0 && (this.selectedFiles.length > 1 || typesWithDedicatedViewer.indexOf(this.selectedFiles[0].entry.type) === -1); },
             click: () => {
                 this.selectedFiles.forEach(f => {
                     this.$emit('openItem', f);
@@ -131,7 +134,7 @@ export default {
         }, {
             label: "Rename",
             icon: 'pencil alternate',
-            isVisible: () => { return this.selectedFiles.length == 1; },
+            isVisible: () => { return this.canWrite && this.selectedFiles.length == 1; },
             accelerator: "CmdOrCtrl+M",
             click: () => {
                 this.$emit("moveSelectedItems");
@@ -157,7 +160,8 @@ export default {
             label: 'Build',
             icon: 'cog',
             isVisible: () => {
-                return this.selectedFiles.length === 1 &&
+                return this.canWrite &&
+                       this.selectedFiles.length === 1 &&
                        this.isBuildableFile(this.selectedFiles[0]) &&
                        !this.hasActiveBuild(this.selectedFiles[0]);
             },
@@ -167,7 +171,7 @@ export default {
         }, {
             label: "Transfer to Dataset...",
             icon: 'exchange',
-            isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+            isVisible: () => { return reg.isLoggedIn() && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             accelerator: "CmdOrCtrl+T",
             click: () => {
                 this.$emit("transferSelectedItems");
@@ -190,17 +194,18 @@ export default {
         }, {
             label: "Create Folder",
             icon: 'folder',
+            isVisible: () => { return this.canWrite; },
             accelerator: "CmdOrCtrl+N",
             click: () => {
                 this.$emit("createFolder");
             }
         }, {
-            isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+            isVisible: () => { return this.canWrite && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             type: 'separator'
         }, {
             label: "Delete",
             icon: 'trash alternate outline',
-            isVisible: () => { return this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
+            isVisible: () => { return this.canWrite && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             accelerator: "CmdOrCtrl+D",
             click: () => {
                 this.$emit("deleteSelecteditems");

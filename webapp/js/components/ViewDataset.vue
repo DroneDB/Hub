@@ -4,7 +4,7 @@
         <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
             mobileCollapsed>
             <div class="sidebar">
-                <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" @openItem="handleOpenItem"
+                <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" :canWrite="canWrite" @openItem="handleOpenItem"
                     @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
@@ -15,7 +15,7 @@
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
                 ref="mainTabSwitcher">
                 <template v-if="isMobile" v-slot:filebrowser>
-                    <FileBrowser :rootNodes="rootNodes" @openItem="handleOpenItem"
+                    <FileBrowser :rootNodes="rootNodes" :canWrite="canWrite" @openItem="handleOpenItem"
                         @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                         @openProperties="handleFileBrowserOpenProperties"
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
@@ -123,6 +123,8 @@
             :onOpen="handleLightboxOpen"
             :onClose="handleLightboxClose"
             :onShow="handleLightboxShow"
+            type="image"
+            :loadOnlyCurrentSource="true"
         />
         <div v-if="lightboxOpen" class="lightbox-toolbar-extra">
             <div class="lightbox-open-fullsize" @click="openLightboxDirectLink" title="Open in new tab">
@@ -772,15 +774,17 @@ export default {
                 });
             }
 
-            // Select All button - always visible
-            this.explorerTools.push({
-                id: 'select-all',
-                title: "Select All",
-                icon: "check square outline",
-                onClick: () => {
-                    this.fileBrowserFiles.forEach(f => f.selected = true);
-                }
-            });
+            // Select All button - hidden when all files are already selected
+            if (this.fileBrowserFiles.length > 0 && this.selectedFiles.length < this.fileBrowserFiles.length) {
+                this.explorerTools.push({
+                    id: 'select-all',
+                    title: "Select All",
+                    icon: "check square outline",
+                    onClick: () => {
+                        this.fileBrowserFiles.forEach(f => f.selected = true);
+                    }
+                });
+            }
 
             // Deselect All button - only visible when at least one file is selected
             if (this.selectedFiles.length > 0) {

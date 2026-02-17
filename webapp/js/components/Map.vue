@@ -3,13 +3,8 @@
         <Toolbar :tools="tools" ref="toolbar" />
         <div ref="map-container" class="map-container" :class="{
             'cursor-pointer': selectSingle,
-            'cursor-crosshair': selectArea || selectPolygon
+            'cursor-crosshair': selectPolygon
         }">
-            <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
-                <option v-for="(v, k) in basemaps" :value="k">
-                    {{ v.label }}
-                </option>
-            </select>
             <olMeasure ref="measure" />
         </div>
         <Alert :title="alertTitle" v-if="alertDialogOpen" @onClose="handleAlertDialogClose">
@@ -36,6 +31,16 @@
             :measurementsCount="changeUnitsMeasurementsCount"
             @onClose="handleChangeUnitsDialogClose">
         </ChangeUnitsDialog>
+        <MapSettingsDialog v-if="mapSettingsDialogOpen"
+            :basemaps="basemaps"
+            :selectedBasemap="selectedBasemap"
+            :unitPref="currentUnitPref"
+            :showFlightPath="showFlightPath"
+            @onClose="mapSettingsDialogOpen = false"
+            @basemapChanged="handleBasemapChanged"
+            @unitsChanged="handleUnitsChanged"
+            @flightPathChanged="handleFlightPathChanged">
+        </MapSettingsDialog>
         <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
         <div ref="imagePopup" class="image-popup" v-show="imagePopupVisible">
             <div class="image-popup-header">
@@ -73,7 +78,6 @@ import { Tile as TileLayer, Vector as VectorLayer, Group as LayerGroup } from 'o
 import { Vector as VectorSource, Cluster } from 'ol/source';
 import { defaults as defaultControls, Control } from 'ol/control';
 import Collection from 'ol/Collection';
-import { DragBox } from 'ol/interaction';
 import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent, getCenter as getExtentCenter, buffer as extentBuffer } from 'ol/extent';
 import { transformExtent } from 'ol/proj';
 import { bbox as bboxStrategy } from 'ol/loadingstrategy';
@@ -92,8 +96,8 @@ import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import HybridXYZ from '../libs/olHybridXYZ';
 import olMeasure from './olMeasure';
-import olPolygonSelection from './olPolygonSelection';
-import olRectangleSelection from './olRectangleSelection';
+import olSelection from './olSelection';
+import olSettings from './olSettings';
 import XYZ from 'ol/source/XYZ';
 import Toolbar from './Toolbar.vue';
 import Keyboard from '../libs/keyboard';
@@ -110,6 +114,7 @@ import { MeasurementStorage } from '../libs/measurementStorage';
 import Alert from './Alert.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
+import MapSettingsDialog from './MapSettingsDialog.vue';
 import Flash from './Flash.vue';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
@@ -117,7 +122,7 @@ import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, ChangeUnitsDialog, Flash
+        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, ChangeUnitsDialog, MapSettingsDialog, Flash
     }, props: {
         files: {
             type: Array,
@@ -149,37 +154,10 @@ export default {
                 exclusiveGroup: "select",
                 onSelect: () => {
                     this.selectSingle = true;
-                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
-                    if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate();
+                    if (this.selectionControl) this.selectionControl.deactivate();
                 },
                 onDeselect: () => {
                     this.selectSingle = false;
-                }
-            },
-            {
-                id: 'select-features-by-area',
-                title: "Select by Rectangle — Hold CTRL+SHIFT and drag to draw a rectangle. All features inside will be selected. Hold SHIFT while dragging to add/remove from selection.",
-                icon: "square outline",
-                exclusiveGroup: "select",
-                onSelect: () => {
-                    this.selectArea = true;
-                    this.map.addInteraction(this.dragBox);
-                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
-                    if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate();
-                },
-                onDeselect: () => {
-                    this.selectArea = false;
-                    this.selectFeaturesByAreaKeyPressed = false;
-                    this.map.removeInteraction(this.dragBox);
-                }
-            },
-            {
-                id: 'clear-selection',
-                title: "Clear Selection — Deselect all selected features. Shortcut: ESC",
-                icon: "ban",
-                onClick: () => {
-                    this.clearSelection();
-                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
                 }
             },
             {
@@ -213,19 +191,21 @@ export default {
         return {
             tools,
             selectSingle: false,
-            selectArea: false,
             selectPolygon: false,
             initialExtent: null,
             vectorLayers: [],
             vectorLayerColors: {}, // Store colors for vector layers
             tooltipElement: null,  // Element for vector feature tooltips
             tooltipOverlay: null,  // Overlay for tooltips
-            selectedBasemap: "satellite",
+            selectedBasemap: localStorage.getItem('selectedBasemap') || 'satellite',
             basemaps: Basemaps,
             measuring: false,
             measurementStorage: null,
             hasSavedMeasurements: false,
             currentOrthophotoEntry: null,
+            mapSettingsDialogOpen: false,
+            showFlightPath: localStorage.getItem('showFlightPath') !== 'false',
+            currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric',
 
             // Alert dialog
             alertDialogOpen: false,
@@ -792,85 +772,6 @@ export default {
                 this.markerLayer
             ]));
 
-            this.dragBox = new DragBox({ minArea: 0 }); this.dragBox.on('boxend', () => {
-                let extent = this.dragBox.getGeometry().getExtent();
-
-                // Select (default) or deselect (if all features are previously selected)
-                const intersect = [];
-
-                // Check standard features (fileFeatures and extentsFeatures)
-                [this.fileFeatures, this.extentsFeatures].forEach(layer => {
-                    layer.forEachFeatureIntersectingExtent(extent, feat => {
-                        intersect.push(feat);
-                    });
-                });
-
-                // Check vector layers - using a different approach for streamed features
-                const vectorFeatureFiles = [];
-                this.vectorLayers.forEach(vectorLayer => {
-                    // For streamed features, we need to check the layer's current features
-                    let hasIntersection = false;
-
-                    // Use forEachFeatureInExtent on the vector source
-                    // This will only check currently loaded features due to streaming
-                    if (vectorLayer.getSource().forEachFeatureInExtent) {
-                        vectorLayer.getSource().forEachFeatureInExtent(extent, feature => {
-                            hasIntersection = true;
-                        });
-                    }
-
-                    if (hasIntersection && vectorLayer.file) {
-                        vectorFeatureFiles.push(vectorLayer.file);
-                    }
-                });
-
-                let deselect = false;
-
-                // Clear previous
-                if (!Keyboard.isShiftPressed()) {
-                    this.clearSelection();
-                } else {
-                    // Check if all standard features and vector files are already selected
-                    const allFeaturesSelected = intersect.length > 0 &&
-                        intersect.filter(feat => feat.file.selected).length === intersect.length;
-                    const allVectorFilesSelected = vectorFeatureFiles.length > 0 &&
-                        vectorFeatureFiles.filter(file => file.selected).length === vectorFeatureFiles.length;
-
-                    deselect = (intersect.length > 0 || vectorFeatureFiles.length > 0) &&
-                        (allFeaturesSelected && (vectorFeatureFiles.length === 0 || allVectorFilesSelected));
-                }
-
-                if (deselect) {
-                    // Deselect all features
-                    intersect.forEach(feat => feat.file.selected = false);
-                    vectorFeatureFiles.forEach(file => file.selected = false);
-                } else {
-                    let scrolled = false;
-
-                    // Select standard features
-                    intersect.forEach(feat => {
-                        feat.file.selected = true;
-
-                        if (!scrolled) {
-                            this.$emit("scrollTo", feat.file);
-                            scrolled = true;
-                        }
-                    });
-
-                    // Select vector files
-                    vectorFeatureFiles.forEach(file => {
-                        file.selected = true;
-
-                        if (!scrolled) {
-                            this.$emit("scrollTo", file);
-                            scrolled = true;
-                        }
-                    });
-                }
-
-                // Update styles on vector layers to reflect selection changes
-                this.updateRastersOpacity();
-            });
 
             this.basemapLayer = new TileLayer({
                 source: new XYZ({
@@ -879,36 +780,24 @@ export default {
                 })
             });
 
-            this.rectangleSelectionControl = new olRectangleSelection.Control({
+            this.selectionControl = new olSelection.Control({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
                 onActivated: () => {
                     this.$refs.toolbar.deselectAll();
                     this.measureControls.deselectCurrent();
-                    if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate();
                 },
                 onDeactivated: () => {
                     this.selectPolygon = false;
-                    this.clearSelection();
                     this.updateRastersOpacity();
-                }
-            });
-
-            this.polygonSelectionControl = new olPolygonSelection.Control({
-                onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
-                onActivated: () => {
-                    this.$refs.toolbar.deselectAll();
-                    this.measureControls.deselectCurrent();
-                    if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate();
                 },
-                onDeactivated: () => {
-                    this.selectPolygon = false;
+                onClearSelection: () => {
                     this.clearSelection();
                     this.updateRastersOpacity();
                 }
             });
 
             this.measureControls = new olMeasure.Controls({
-                onToolSelected: () => { this.measuring = true; if (this.polygonSelectionControl) this.polygonSelectionControl.deactivate(); if (this.rectangleSelectionControl) this.rectangleSelectionControl.deactivate(); },
+                onToolSelected: () => { this.measuring = true; if (this.selectionControl) this.selectionControl.deactivate(); },
                 onToolDelesected: () => { this.measuring = false; },
                 onSave: () => { this.saveMeasurements(); },
                 onClearAll: () => { this.onClearAllMeasurements(); },
@@ -916,7 +805,6 @@ export default {
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
-                onUnitsChangeRequested: (newUnit, oldUnit) => { this.onUnitsChangeRequested(newUnit, oldUnit); },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
             }); this.map = new Map({
@@ -953,9 +841,9 @@ export default {
                 if (domElement && (
                     domElement.closest('.toolbar') ||
                     domElement.closest('.ol-measure-control') ||
-                    domElement.closest('.ol-polygon-selection') ||
+                    domElement.closest('.ol-selection') ||
                     domElement.closest('.ol-zoom') ||
-                    domElement.closest('#basemap-selector')
+                    domElement.closest('.ol-settings')
                 )) {
                     this.hideFeatureTooltip();
                     return;
@@ -1057,9 +945,19 @@ export default {
                 }
             });
 
-            this.map.addControl(this.rectangleSelectionControl);
-            this.map.addControl(this.polygonSelectionControl);
-            this.map.addControl(this.measureControls); const doSelectSingle = e => {
+            this.map.addControl(this.selectionControl);
+            this.map.addControl(this.measureControls);
+
+            this.settingsControl = new olSettings.Control({
+                onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
+            });
+            this.map.addControl(this.settingsControl);
+
+            // Apply flight path visibility preference
+            this.flightPathLayer.setVisible(this.showFlightPath);
+            this.markerLayer.setVisible(this.showFlightPath);
+
+            const doSelectSingle = e => {
                 let first = true;
                 let vectorLayerClicked = false;
 
@@ -1130,7 +1028,7 @@ export default {
 
             this.map.on('click', e => {
                 if (this.measuring) return;
-                if (this.selectPolygon || (this.polygonSelectionControl && this.polygonSelectionControl.isActive())) return;
+                if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
 
                 // Single selection
                 if (this.selectSingle) {
@@ -1669,12 +1567,7 @@ export default {
         },
         handleKeyDown: function (e) {
             if (Keyboard.isCtrlPressed() && this.mouseInside) {
-                if (Keyboard.isShiftPressed()) {
-                    this.selectFeaturesByAreaKeyPressed = true;
-                    this.$refs.toolbar.selectTool('select-features-by-area');
-                } else {
-                    this.$refs.toolbar.selectTool('select-features');
-                }
+                this.$refs.toolbar.selectTool('select-features');
             }
             // H key for reset view
             if (e.keyCode === 72 && this.mouseInside) {
@@ -1684,26 +1577,19 @@ export default {
         handleKeyUp: function (e) {
             // ESC
             if (e.keyCode === 27) {
-                this.$refs.toolbar.selectTool('clear-selection');
                 this.$refs.toolbar.deselectAll();
                 this.measureControls.deselectCurrent();
-                if (this.polygonSelectionControl) {
-                    this.polygonSelectionControl.deactivate();
+                if (this.selectionControl) {
+                    this.selectionControl.deactivate();
                 }
             }
 
             if (!Keyboard.isCtrlPressed() && this.mouseInside) {
-                if (!Keyboard.isShiftPressed() && this.selectFeaturesByAreaKeyPressed) {
-                    this.$refs.toolbar.deselectTool('select-features-by-area');
-                }
                 this.$refs.toolbar.deselectTool('select-features');
             }
         },
         handlePolygonSelection: function (polygon) {
             this.selectPolygon = true;
-
-            // Clear previous selection
-            this.clearSelection();
 
             let scrolled = false;
 
@@ -1788,6 +1674,7 @@ export default {
             const source = this.basemapLayer.getSource();
             source.setUrl(basemap.url);
             source.setAttributions(basemap.attributions);
+            localStorage.setItem('selectedBasemap', this.selectedBasemap);
         },
 
         /**
@@ -2018,12 +1905,42 @@ export default {
             if (result === 'confirm') {
                 // Apply the unit change
                 this.measureControls.applyUnitsChange(this.changeUnitsTargetUnit);
+                this.currentUnitPref = this.changeUnitsTargetUnit;
                 // Save measurements with new units
                 await this.saveMeasurements();
-            } else {
-                // Rollback the select to previous value
-                this.measureControls.rollbackUnitSelect(this.changeUnitsPreviousUnit);
             }
+        },
+
+        /**
+         * Handle basemap change from settings dialog
+         */
+        handleBasemapChanged: function(basemap) {
+            this.selectedBasemap = basemap;
+            this.updateBasemap();
+        },
+
+        /**
+         * Handle units change from settings dialog
+         */
+        handleUnitsChanged: function(newUnit, oldUnit) {
+            // If there are measurements, show confirmation dialog
+            if (this.measureControls && this.measureControls.hasMeasurements()) {
+                this.onUnitsChangeRequested(newUnit, oldUnit);
+            } else {
+                // No measurements, apply directly
+                this.measureControls.applyUnitsChange(newUnit);
+                this.currentUnitPref = newUnit;
+            }
+        },
+
+        /**
+         * Handle flight path toggle from settings dialog
+         */
+        handleFlightPathChanged: function(visible) {
+            this.showFlightPath = visible;
+            localStorage.setItem('showFlightPath', JSON.stringify(visible));
+            if (this.flightPathLayer) this.flightPathLayer.setVisible(visible);
+            if (this.markerLayer) this.markerLayer.setVisible(visible);
         },
 
         /**
@@ -2065,13 +1982,6 @@ export default {
 
     &.cursor-crosshair {
         cursor: crosshair;
-    }
-
-    #basemap-selector {
-        position: absolute;
-        right: 8px;
-        top: 8px;
-        z-index: 1;
     }
 }
 
