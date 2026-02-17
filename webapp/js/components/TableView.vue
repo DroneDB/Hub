@@ -74,7 +74,10 @@
                     </tr>
                 </tbody>
             </table>
-            <div v-if="files.length === 0" class="ui placeholder segment">
+            <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment">
+                <div class="ui active centered inline loader"></div>
+            </div>
+            <div v-else-if="files.length === 0" class="ui placeholder segment">
                 <div class="ui icon header">
                     <i class="folder open outline icon"></i>
                     This folder is empty
@@ -101,7 +104,7 @@ export default {
     components: {
         Toolbar, ContextMenu
     },
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite'],
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         let contextMenu = this.buildContextMenu();
 

@@ -29,7 +29,7 @@
                 <template v-slot:explorer>
                     <!-- Grid View (Explorer) -->
                     <Explorer v-if="viewMode === 'grid'" ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
@@ -38,7 +38,7 @@
                     <!-- Table View with Detail Panel (Desktop/Tablet only) -->
                     <Panel v-else-if="selectedDetailFile && !isMobile" split="vertical" amount="70%" tabletAmount="60%">
                         <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                            :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                            :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                             @transferSelectedItems="openTransferItemsDialog"
                             @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
@@ -55,7 +55,7 @@
 
                     <!-- Table View without Detail Panel -->
                     <TableView v-else ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
@@ -260,6 +260,7 @@ export default {
             isMobile: mobile,
             mainTabs: mainTabs,
             fileBrowserFiles: [],
+            isLoadingFiles: true,
             selectedUsingFileBrowserList: false,
             explorerTools: [],
             dataset: reg.Organization(this.$route.params.org)
@@ -735,10 +736,12 @@ export default {
         handleFileSelectionChanged: function (fileBrowserFiles) {
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
+            this.isLoadingFiles = false;
         },
 
         handleCurrentUriChanged: function (currentUri) {
             this.currentPath = currentUri != null ? utils.pathFromUri(currentUri).replace(/^\//, "") : null;
+            this.isLoadingFiles = true;
         },
 
 

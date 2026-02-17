@@ -13,7 +13,16 @@
             </div>
             <!--<div class="ui divider"></div>-->
         </div>
-        <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
+        <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment" style="margin: 1rem;">
+            <div class="ui active centered inline loader"></div>
+        </div>
+        <div v-else-if="files.length === 0" class="ui placeholder segment" style="margin: 1rem;">
+            <div class="ui icon header">
+                <i class="folder open outline icon"></i>
+                This folder is empty
+            </div>
+        </div>
+        <div v-else ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
             @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
             @dragenter="explorerDragEnter($event)" @dragover.prevent>
             <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable @dragstart="startDrag($event, f)"
@@ -47,7 +56,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window
     },
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite'],
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         let contextMenu = [];
 
