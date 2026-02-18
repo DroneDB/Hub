@@ -62,12 +62,6 @@
                 </select>
             </div>
 
-            <div class="setting-row">
-                <label class="setting-label setting-toggle" @click="onFlightPathToggle">
-                    <i class="icon route"></i> Show drone flight path
-                    <input type="checkbox" :checked="showFlightPath" @click.stop="onFlightPathToggle" />
-                </label>
-            </div>
         </div>
     </Window>
 </template>
@@ -94,10 +88,6 @@ export default {
             type: String,
             required: true,
             validator: (value) => ['metric', 'imperial'].includes(value)
-        },
-        showFlightPath: {
-            type: Boolean,
-            required: true
         },
         customBasemapConfig: {
             type: Object,
@@ -158,10 +148,6 @@ export default {
             if (value !== oldUnit) {
                 this.$emit('unitsChanged', value, oldUnit);
             }
-        },
-
-        onFlightPathToggle: function () {
-            this.$emit('flightPathChanged', !this.showFlightPath);
         },
 
         /**

@@ -35,12 +35,10 @@
             :basemaps="basemaps"
             :selectedBasemap="selectedBasemap"
             :unitPref="currentUnitPref"
-            :showFlightPath="showFlightPath"
             :customBasemapConfig="customBasemapConfig"
             @onClose="mapSettingsDialogOpen = false"
             @basemapChanged="handleBasemapChanged"
             @unitsChanged="handleUnitsChanged"
-            @flightPathChanged="handleFlightPathChanged"
             @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
         </MapSettingsDialog>
         <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
@@ -149,6 +147,9 @@ export default {
         }
     },
     data: function () {
+        const savedDirectionIndicators = localStorage.getItem('showDirectionIndicators') === 'true';
+        const savedFlightPath = localStorage.getItem('showFlightPath') !== 'false';
+
         const tools = [
             {
                 id: 'select-features',
@@ -191,6 +192,42 @@ export default {
             });
         }
 
+        tools.push({ id: 'separator' });
+        tools.push({
+            id: 'toggle-direction',
+            title: 'Show direction and speed indicators',
+            icon: 'location arrow',
+            selected: savedDirectionIndicators,
+            onSelect: () => {
+                this.showDirectionIndicators = true;
+                localStorage.setItem('showDirectionIndicators', 'true');
+                this.applyDirectionStyles();
+            },
+            onDeselect: () => {
+                this.showDirectionIndicators = false;
+                localStorage.setItem('showDirectionIndicators', 'false');
+                this.applyDirectionStyles();
+            }
+        });
+        tools.push({
+            id: 'toggle-flight-path',
+            title: 'Show drone flight path',
+            icon: 'map signs',
+            selected: savedFlightPath,
+            onSelect: () => {
+                this.showFlightPath = true;
+                localStorage.setItem('showFlightPath', 'true');
+                if (this.flightPathLayer) this.flightPathLayer.setVisible(true);
+                if (this.markerLayer) this.markerLayer.setVisible(true);
+            },
+            onDeselect: () => {
+                this.showFlightPath = false;
+                localStorage.setItem('showFlightPath', 'false');
+                if (this.flightPathLayer) this.flightPathLayer.setVisible(false);
+                if (this.markerLayer) this.markerLayer.setVisible(false);
+            }
+        });
+
         return {
             tools,
             selectSingle: false,
@@ -208,7 +245,8 @@ export default {
             hasSavedMeasurements: false,
             currentOrthophotoEntry: null,
             mapSettingsDialogOpen: false,
-            showFlightPath: localStorage.getItem('showFlightPath') !== 'false',
+            showFlightPath: savedFlightPath,
+            showDirectionIndicators: savedDirectionIndicators,
             currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric',
 
             // Alert dialog
@@ -599,6 +637,25 @@ export default {
                 });
             };
 
+            const genDirectionStyle = (svgName, yawDegrees, size) => {
+                if (size > 1) {
+                    // Cluster: show numbered circle, not arrow
+                    return genShotStyle('rgba(75, 150, 243, 1)', 'rgba(252, 252, 255, 1)', size);
+                }
+
+                return new Style({
+                    image: new Icon({
+                        src: rootPath(`images/${svgName}`),
+                        rotation: yawDegrees * (Math.PI / 180),
+                        rotateWithView: false,
+                        anchor: [0.5, 0.5],
+                        anchorXUnits: 'fraction',
+                        anchorYUnits: 'fraction',
+                        scale: isMobile() ? 1.2 : 1.0,
+                    })
+                });
+            };
+
             this.styles = {
                 shot: feats => {
                     let styleId = `_shot-${feats.length}`;
@@ -629,6 +686,48 @@ export default {
                         this.styles[styleId] = genShotStyle('rgba(253, 226, 147, 1)', 'rgba(252, 252, 255, 1)', feats.length);
                     }
 
+                    return this.styles[styleId];
+                },
+
+                direction: feats => {
+                    const size = feats.length;
+                    if (size > 1) {
+                        // Cluster: fallback to numbered circle
+                        return this.styles.shot(feats);
+                    }
+
+                    const feat = feats[0];
+                    const yaw = feat.file?.entry?.properties?.cameraYaw ?? 0;
+                    const hasCameraOri = feat.file?.entry?.properties?.hasCameraOrientation;
+
+                    // If orientation is not available, use circle
+                    if (!hasCameraOri) {
+                        return this.styles.shot(feats);
+                    }
+
+                    const selected = feat.file?.selected;
+                    const svgName = selected ? 'direction-arrow-selected.svg' : 'direction-arrow.svg';
+                    const styleId = `_direction-${selected ? 'sel' : 'def'}-${Math.round(yaw)}`;
+
+                    if (!this.styles[styleId]) {
+                        this.styles[styleId] = genDirectionStyle(svgName, yaw, 1);
+                    }
+                    return this.styles[styleId];
+                },
+
+                'direction-outlined': feats => {
+                    if (feats.length > 1) return this.styles['shot-outlined'](feats);
+
+                    const feat = feats[0];
+                    const yaw = feat.file?.entry?.properties?.cameraYaw ?? 0;
+                    const hasCameraOri = feat.file?.entry?.properties?.hasCameraOrientation;
+
+                    if (!hasCameraOri) return this.styles['shot-outlined'](feats);
+
+                    const styleId = `_direction-out-${Math.round(yaw)}`;
+                    if (!this.styles[styleId]) {
+                        this.styles[styleId] = genDirectionStyle('direction-arrow-outlined.svg', yaw, 1);
+                    }
                     return this.styles[styleId];
                 },
 
@@ -901,7 +1000,17 @@ export default {
                             let label;
                             if (clusterFeatures.length === 1) {
                                 const file = clusterFeatures[0].file;
+                                const feat = clusterFeatures[0];
                                 label = file.entry.path.split('/').pop();
+
+                                // Append speed info when direction indicators are active
+                                if (this.showDirectionIndicators) {
+                                    const speed = feat.computedSpeed;
+                                    if (speed !== undefined && speed !== null) {
+                                        const speedKmh = (speed * 3.6).toFixed(1);
+                                        label += ` — ${speedKmh} km/h`;
+                                    }
+                                }
                             } else {
                                 label = `${clusterFeatures.length} images`;
                             }
@@ -1043,7 +1152,7 @@ export default {
                         // Deselect style
                         if (outline.feat.get('features')) {
                             outline.feat.get('features').forEach(f => {
-                                f.style = 'shot';
+                                f.style = this.showDirectionIndicators ? 'direction' : 'shot';
                             });
                         }
 
@@ -1086,7 +1195,7 @@ export default {
 
                                 // Set style
                                 feat.get('features').forEach(f => {
-                                    f.style = 'shot-outlined';
+                                    f.style = this.showDirectionIndicators ? 'direction-outlined' : 'shot-outlined';
                                 });
 
                                 // Add geoprojected raster footprint
@@ -1271,7 +1380,7 @@ export default {
                     const coords = coordAll(f.entry.point_geom)[0];
                     const point = new Point(coords);
                     const feat = new Feature(point);
-                    feat.style = 'shot';
+                    feat.style = this.showDirectionIndicators ? 'direction' : 'shot';
                     feat.file = f;
                     feat.getGeometry().transform('EPSG:4326', 'EPSG:3857');
                     features.push(feat);
@@ -1280,7 +1389,8 @@ export default {
                         if (f.entry.properties.captureTime) {
                             flightPath.push({
                                 point,
-                                captureTime: f.entry.properties.captureTime
+                                captureTime: f.entry.properties.captureTime,
+                                feature: feat
                             });
                         }
                     }
@@ -1535,6 +1645,48 @@ export default {
             // Add flight path line
             if (flightPath.length >= 2) {
                 flightPath.sort((a, b) => a.captureTime < b.captureTime ? -1 : (a.captureTime === b.captureTime ? 0 : 1));
+
+                // Compute estimated speed from consecutive positions (fallback)
+                for (let i = 0; i < flightPath.length; i++) {
+                    const fp = flightPath[i];
+                    const feat = fp.feature;
+                    if (!feat) continue;
+
+                    // Priority 1: backend-extracted speed (DJI XMP or EXIF GPS)
+                    const backendSpeed = feat.file?.entry?.properties?.flightSpeed;
+                    if (backendSpeed !== undefined && backendSpeed !== null) {
+                        feat.computedSpeed = backendSpeed; // m/s
+                        continue;
+                    }
+
+                    // Priority 2: calculate from consecutive positions
+                    if (i > 0) {
+                        const prev = flightPath[i - 1];
+                        const coords1 = prev.point.getCoordinates(); // [lon, lat] EPSG:4326
+                        const coords2 = fp.point.getCoordinates();
+
+                        // Haversine distance
+                        const R = 6371000; // Earth radius in meters
+                        const dLat = (coords2[1] - coords1[1]) * Math.PI / 180;
+                        const dLon = (coords2[0] - coords1[0]) * Math.PI / 180;
+                        const a = Math.sin(dLat / 2) ** 2 +
+                                  Math.cos(coords1[1] * Math.PI / 180) *
+                                  Math.cos(coords2[1] * Math.PI / 180) *
+                                  Math.sin(dLon / 2) ** 2;
+                        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+                        const dt = fp.captureTime - prev.captureTime;
+                        // Only calculate if time gap is reasonable (< 5 minutes)
+                        if (dt > 0 && dt < 300) {
+                            const speed = dist / dt; // m/s
+                            // Sanity check: skip if speed > 200 km/h (~55.6 m/s)
+                            if (speed <= 55.6) {
+                                feat.computedSpeed = speed;
+                            }
+                        }
+                    }
+                }
+
                 const startPoint = flightPath[0].point;
                 const finishPoint = flightPath[flightPath.length - 1].point;
 
@@ -1564,6 +1716,28 @@ export default {
             // Load measurements for orthophotos if available
             this.loadMeasurementsForOrthophotos();
         },
+
+        applyDirectionStyles: function () {
+            // Update style of all GEOIMAGE/GEOVIDEO features without reloading layers
+            if (!this.fileFeatures) return;
+            const features = this.fileFeatures.getFeatures();
+            features.forEach(feat => {
+                if (feat.file?.entry?.type === ddb.entry.type.GEOIMAGE ||
+                    feat.file?.entry?.type === ddb.entry.type.GEOVIDEO) {
+
+                    if (this.showDirectionIndicators) {
+                        feat.style = 'direction';
+                    } else {
+                        feat.style = 'shot';
+                    }
+                }
+            });
+            // Force re-render of the layer
+            if (this.fileLayer) {
+                this.fileLayer.changed();
+            }
+        },
+
         handleKeyDown: function (e) {
             if (Keyboard.isCtrlPressed() && this.mouseInside) {
                 this.$refs.toolbar.selectTool('select-features');
@@ -1979,16 +2153,6 @@ export default {
                 this.measureControls.applyUnitsChange(newUnit);
                 this.currentUnitPref = newUnit;
             }
-        },
-
-        /**
-         * Handle flight path toggle from settings dialog
-         */
-        handleFlightPathChanged: function(visible) {
-            this.showFlightPath = visible;
-            localStorage.setItem('showFlightPath', JSON.stringify(visible));
-            if (this.flightPathLayer) this.flightPathLayer.setVisible(visible);
-            if (this.markerLayer) this.markerLayer.setVisible(visible);
         },
 
         /**
