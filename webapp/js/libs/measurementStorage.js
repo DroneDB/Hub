@@ -19,6 +19,12 @@ export class MeasurementStorage {
     getMeasurementPath() {
         const path = this.entry.path;
 
+        // If the path is already a measurements file, use it directly
+        const fileName = path.split('/').pop();
+        if (path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
+            return path;
+        }
+
         // Remove extension and add _measurements.geojson
         const lastDot = path.lastIndexOf('.');
         const basePath = lastDot > 0 ? path.substring(0, lastDot) : path;

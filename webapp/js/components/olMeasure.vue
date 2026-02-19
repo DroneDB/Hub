@@ -16,6 +16,7 @@ import { Vector as VectorLayer } from 'ol/layer';
 import { unByKey } from 'ol/Observable';
 import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
+import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '../libs/olMeasurementConverter';
 import Vue from 'vue';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
@@ -29,6 +30,9 @@ class MeasureControls extends Control {
 
         const unitPref = localStorage.getItem("measureUnitPref") || "metric";
 
+        const btnPoint = document.createElement('button');
+        btnPoint.title = 'Point Location — Click on the map to get GPS coordinates.';
+        btnPoint.innerHTML = '<img src="' + rootPath("/images/measure-point.svg") + '"/>';
         const btnLength = document.createElement('button');
         btnLength.title = 'Measure Length — Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.';
         btnLength.innerHTML = '<img src="' + rootPath("/images/measure-length.svg") + '"/>';
@@ -78,6 +82,7 @@ class MeasureControls extends Control {
 
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable ol-control';
+        element.appendChild(btnPoint);
         element.appendChild(btnLength);
         element.appendChild(btnArea);
         element.appendChild(btnErase);
@@ -94,6 +99,7 @@ class MeasureControls extends Control {
             target: options.target,
         });
 
+        btnPoint.addEventListener('click', this.handlePointLocation.bind(this), false);
         btnLength.addEventListener('click', this.handleMeasureLength.bind(this), false);
         btnArea.addEventListener('click', this.handleMeasureArea.bind(this), false);
         btnErase.addEventListener('click', this.handleErase.bind(this), false);
@@ -162,6 +168,10 @@ class MeasureControls extends Control {
         if (map) {
             this.updateButtonsVisibility(this.hasMeasurements(), false);
         }
+    }
+
+    handlePointLocation() {
+        this.onSelect('point');
     }
 
     handleMeasureLength() {
@@ -534,13 +544,15 @@ class MeasureControls extends Control {
         // Add keyboard listener for ESC to exit and Ctrl+Z for undo
         this.keyboardListener = (e) => {
             if (e.key === 'Escape' || e.keyCode === 27) {
+                e.stopPropagation();
+                e.preventDefault();
                 this.disableEditMode();
             } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault();
                 this.undo();
             }
         };
-        document.addEventListener('keydown', this.keyboardListener);
+        document.addEventListener('keydown', this.keyboardListener, true);
     }
 
     /**
@@ -575,7 +587,7 @@ class MeasureControls extends Control {
         }
 
         if (this.keyboardListener) {
-            document.removeEventListener('keydown', this.keyboardListener);
+            document.removeEventListener('keydown', this.keyboardListener, true);
             this.keyboardListener = null;
         }
 
@@ -807,10 +819,14 @@ class MeasureControls extends Control {
             this.helpTooltipElement.classList.add('hidden');
             map.removeInteraction(this.draw);
             unByKey(this.pointerMoveListener);
+            if (this._contextMenuHandler) {
+                map.getViewport().removeEventListener('contextmenu', this._contextMenuHandler, true);
+                this._contextMenuHandler = null;
+            }
 
             // Remove keyboard listener
             if (this.keyboardListener) {
-                document.removeEventListener('keydown', this.keyboardListener);
+                document.removeEventListener('keydown', this.keyboardListener, true);
                 this.keyboardListener = null;
             }
 
@@ -820,6 +836,7 @@ class MeasureControls extends Control {
             if (this.selectedTool !== tool) removeHandlers();
 
             const types = {
+                'point': 'Point',
                 'area': 'Polygon',
                 'length': 'LineString',
                 'erase': 'Point'
@@ -896,7 +913,8 @@ class MeasureControls extends Control {
                 }
 
                 let helpMsg = 'Click to start drawing. Press ESC to cancel';
-                if (tool === 'erase') helpMsg = 'Click a measurement to remove it. Press ESC to exit';
+                if (tool === 'point') helpMsg = 'Click on the map to get GPS coordinates. Press ESC to exit';
+                else if (tool === 'erase') helpMsg = 'Click a measurement to remove it. Press ESC to exit';
                 else if (sketch) {
                     const geom = sketch.getGeometry();
                     if (geom instanceof Polygon) {
@@ -957,7 +975,83 @@ class MeasureControls extends Control {
             });
             this.draw.on('drawend', function (evt) {
                 const feat = evt.feature;
-                if (tool === 'erase') {
+                if (tool === 'point') {
+                    // Point location: show coordinate popup
+                    setTimeout(() => {
+                        const coords = feat.getGeometry().getCoordinates();
+                        const [lon, lat] = toLonLat(coords);
+
+                        // Format as DMS
+                        const ddToDms = (coordinate, posSymbol, negSymbol) => {
+                            const dd = Math.abs(coordinate);
+                            const d = Math.floor(dd);
+                            const m = Math.floor((dd - d) * 60);
+                            const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
+                            const dir = coordinate >= 0 ? posSymbol : negSymbol;
+                            return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
+                        };
+
+                        const dmsLat = ddToDms(lat, 'N', 'S');
+                        const dmsLon = ddToDms(lon, 'E', 'W');
+                        const ddLat = lat.toFixed(6);
+                        const ddLon = lon.toFixed(6);
+
+                        // Create popup element
+                        const popupEl = document.createElement('div');
+                        popupEl.className = 'ol-point-popup';
+                        popupEl.innerHTML = `
+                            <div class="ol-point-popup-coords">
+                                <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
+                                <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
+                            </div>
+                            <div class="ol-point-popup-actions">
+                                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
+                                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
+                            </div>
+                        `;
+
+                        // Create overlay
+                        const popupOverlay = new Overlay({
+                            element: popupEl,
+                            offset: [0, -12],
+                            positioning: 'bottom-center',
+                            stopEvent: true,
+                            insertFirst: false,
+                        });
+                        popupOverlay.setPosition(coords);
+                        map.addOverlay(popupOverlay);
+
+                        // Store references on feature for cleanup
+                        feat.set('measureTooltipElement', popupEl);
+                        feat.set('measureTooltip', popupOverlay);
+                        feat.set('measurementType', 'point');
+                        feat.set('createdAt', new Date().toISOString());
+
+                        // Copy handler
+                        popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
+                            e.preventDefault();
+                            const text = `${ddLat}, ${ddLon}`;
+                            navigator.clipboard.writeText(text).then(() => {
+                                const copyBtn = popupEl.querySelector('.ol-point-popup-copy');
+                                const icon = copyBtn.querySelector('i');
+                                if (icon) { icon.className = 'icon check'; }
+                                setTimeout(() => { if (icon) { icon.className = 'icon copy outline'; } }, 1500);
+                            });
+                        });
+
+                        // Delete handler
+                        popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
+                            e.preventDefault();
+                            map.removeOverlay(popupOverlay);
+                            if (popupEl.parentNode) popupEl.parentNode.removeChild(popupEl);
+                            self.source.removeFeature(feat);
+                            self.updateButtonsVisibility(self.hasMeasurements(), false);
+                        });
+
+                        // Update button visibility
+                        self.updateButtonsVisibility(self.hasMeasurements(), false);
+                    }, 10);
+                } else if (tool === 'erase') {
                     setTimeout(() => {
                         // Delete the feature and everything it touches
                         const coords = feat.getGeometry().getCoordinates();
@@ -1004,6 +1098,17 @@ class MeasureControls extends Control {
                 unByKey(listener);
             });
 
+            // Right-click to stop measuring (use native DOM event on map viewport)
+            this._contextMenuHandler = (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (this.draw) {
+                    this.draw.finishDrawing();
+                }
+                this.deselectCurrent();
+            };
+            map.getViewport().addEventListener('contextmenu', this._contextMenuHandler, true);
+
             map.addInteraction(this.draw);
             this.pointerMoveListener = map.on('pointermove', this.pointerMoveHandler.bind(this));
 
@@ -1013,6 +1118,8 @@ class MeasureControls extends Control {
             // Add ESC key listener to cancel drawing
             this.keyboardListener = (e) => {
                 if (e.key === 'Escape' || e.keyCode === 27) {
+                    e.stopPropagation();
+                    e.preventDefault();
                     // Finish current drawing if in progress
                     if (this.draw) {
                         this.draw.finishDrawing();
@@ -1021,7 +1128,7 @@ class MeasureControls extends Control {
                     this.deselectCurrent();
                 }
             };
-            document.addEventListener('keydown', this.keyboardListener);
+            document.addEventListener('keydown', this.keyboardListener, true);
 
             this.onToolSelected(tool);
         } else {

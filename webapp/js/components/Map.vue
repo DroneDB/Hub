@@ -881,7 +881,8 @@ export default {
             this.selectionControl = new olSelection.Control({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
                 onActivated: () => {
-                    this.$refs.toolbar.deselectAll();
+                    this.$refs.toolbar.deselectNonToggle();
+                    this.$refs.toolbar.deselectTool('toggle-flight-path');
                     this.measureControls.deselectCurrent();
                 },
                 onDeactivated: () => {
@@ -1100,6 +1101,7 @@ export default {
 
                                 // Update the vector layer's style to reflect selection
                                 this.updateRastersOpacity();
+                                this.updateClearSelectionButton();
                             }
                         }
                     });
@@ -1139,6 +1141,8 @@ export default {
                         }
                     });
                 }
+
+                this.updateClearSelectionButton();
             };
 
             this.map.on('click', e => {
@@ -1431,7 +1435,8 @@ export default {
                     feat.getGeometry().transform('EPSG:4326', 'EPSG:3857'); features.push(feat);
                 } else if (f.entry.type === ddb.entry.type.VECTOR) {
                     // Skip measurement files (they are loaded separately as measurements)
-                    if (f.entry.path.endsWith('_measurements.geojson')) {
+                    const fileName = f.entry.path.split('/').pop();
+                    if (f.entry.path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
                         console.log(`Skipping vector layer for measurement file: ${f.entry.path}`);
                         return;
                     }
@@ -1757,7 +1762,8 @@ export default {
         handleKeyUp: function (e) {
             // ESC
             if (e.keyCode === 27) {
-                this.$refs.toolbar.deselectAll();
+                // Only deselect non-toggle tools (preserve flight path, direction indicators, etc.)
+                this.$refs.toolbar.deselectNonToggle();
                 this.measureControls.deselectCurrent();
                 if (this.selectionControl) {
                     this.selectionControl.deactivate();
@@ -1831,9 +1837,17 @@ export default {
             });
 
             this.updateRastersOpacity();
+            this.updateClearSelectionButton();
         },
         clearSelection: function () {
             this.files.forEach(f => f.selected = false);
+            this.updateClearSelectionButton();
+        },
+        updateClearSelectionButton: function () {
+            if (this.selectionControl) {
+                const hasSelection = this.files.some(f => f.selected);
+                this.selectionControl.setClearButtonVisible(hasSelection);
+            }
         }, updateRastersOpacity: function () {
             this.rasterLayer.getLayers().forEach(layer => {
                 if (layer.file.selected) layer.setOpacity(0.8);
@@ -1896,6 +1910,22 @@ export default {
         },
 
         /**
+         * Get the current folder being viewed based on the files' paths
+         * @returns {string} Current folder path or empty string for root
+         */
+        getCurrentFolder: function() {
+            if (!this.files || this.files.length === 0) return '';
+
+            // Find the first file with a valid path
+            const fileWithPath = this.files.find(f => f.entry && f.entry.path);
+            if (!fileWithPath) return '';
+
+            const path = fileWithPath.entry.path;
+            const lastSlash = path.lastIndexOf('/');
+            return lastSlash > 0 ? path.substring(0, lastSlash) : '';
+        },
+
+        /**
          * Load measurements for orthophoto and point cloud files
          */
         loadMeasurementsForOrthophotos: async function() {
@@ -1910,10 +1940,30 @@ export default {
             );
 
             if (!orthophotoFile) {
-                console.log('No orthophoto/georaster or point cloud files found');
-                // Reset measurement storage if no georaster files
-                this.currentOrthophotoEntry = null;
-                this.measurementStorage = null;
+                console.log('No orthophoto/georaster or point cloud files found, trying standalone measurements.geojson');
+                // Determine current folder from the files being displayed
+                const currentFolder = this.getCurrentFolder();
+                const measurementsPath = currentFolder ? `${currentFolder}/measurements.geojson` : 'measurements.geojson';
+                this.currentOrthophotoEntry = { path: measurementsPath };
+                this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
+
+                try {
+                    const geojson = await this.measurementStorage.load();
+                    if (geojson && geojson.features && geojson.features.length > 0) {
+                        this.measureControls.importFromGeoJSON(geojson);
+                        this.hasSavedMeasurements = true;
+                        this.measureControls.updateButtonsVisibility(true, true);
+                        console.log(`Loaded ${geojson.features.length} standalone measurements`);
+                    } else {
+                        this.currentOrthophotoEntry = null;
+                        this.measurementStorage = null;
+                        this.hasSavedMeasurements = false;
+                    }
+                } catch (e) {
+                    this.currentOrthophotoEntry = null;
+                    this.measurementStorage = null;
+                    this.hasSavedMeasurements = false;
+                }
                 return;
             }
 
@@ -1970,18 +2020,20 @@ export default {
                 console.log('Measurement storage not initialized, trying to initialize now...');
                 await this.loadMeasurementsForOrthophotos();
 
-                // Check again after initialization attempt
+                // If still no storage (no orthophoto/point cloud), create a standalone measurements file
+                if (!this.measurementStorage && this.dataset) {
+                    console.log('No orthophoto found, using standalone measurements.geojson');
+                    const currentFolder = this.getCurrentFolder();
+                    const measurementsPath = currentFolder ? `${currentFolder}/measurements.geojson` : 'measurements.geojson';
+                    this.currentOrthophotoEntry = { path: measurementsPath };
+                    this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
+                }
+
                 if (!this.measurementStorage) {
-                    console.error('Cannot save: no georaster or point cloud file found');
-                    this.showAlert('Error', 'Cannot save: no orthophoto/georaster or point cloud file found. Measurements can only be saved for orthophoto or point cloud files.');
+                    console.error('Cannot save: dataset not available');
+                    this.showAlert('Error', 'Cannot save measurements: dataset not available.');
                     return;
                 }
-            }
-
-            if (!this.currentOrthophotoEntry) {
-                console.error('Cannot save: currentOrthophotoEntry not set');
-                this.showAlert('Error', 'Cannot save: no orthophoto entry found');
-                return;
             }
 
             try {

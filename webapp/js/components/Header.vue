@@ -11,7 +11,7 @@
         <div class="right">
 
             <a :href="downloadUrl" @click="handleDownload" v-if="showDownload" title="Download"
-                class="ui button primary icon download">
+                class="ui button primary icon download" :class="{ loading: isDownloading, disabled: isDownloading }">
                 <i :class="{ hidden: !showDownloadIcon }" class="icon download"></i><span
                     :class="{ 'mobile hide': showDownloadIcon }"> {{ downloadLabel }}</span>
             </a>
@@ -122,6 +122,7 @@ export default {
             showDownload: !!this.$route.params.ds,
             showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
             selectedFiles: [],
+            isDownloading: false,
             storageInfo: null,
             storageInfoDialogOpen: false,
             usersManagement: false, // Will be set dynamically based on server configuration
@@ -170,16 +171,10 @@ export default {
                 const dataset = reg.Organization(org).Dataset(ds);
 
                 if (this.selectedFiles.length > 0) {
-                    const dUrl = dataset.downloadUrl(this.selectedFiles.map(f => {
+                    return dataset.downloadUrl(this.selectedFiles.map(f => {
                         const { path } = utils.parseUri(f.path);
                         return path;
                     }));
-
-                    // Browser limit
-                    if (dUrl.length < 2000) return dUrl;
-
-                    // We'll use a POST request
-                    else return "javascript:void(0)";
                 } else {
                     return dataset.downloadUrl();
                 }
@@ -284,23 +279,32 @@ export default {
             this.$router.push({ name: "Account" });
         },
         handleDownload: async function (e) {
-            if (this.downloadUrl === "javascript:void(0)") {
+            e.preventDefault();
+
+            if (this.isDownloading) return;
+
+            this.isDownloading = true;
+
+            try {
                 const { org, ds } = this.params;
                 const dataset = reg.Organization(org).Dataset(ds);
 
-                const { downloadUrl, error } = await dataset.download(this.selectedFiles.map(f => {
-                    const { path } = utils.parseUri(f.path);
-                    return path;
-                }));
+                const paths = this.selectedFiles.length > 0
+                    ? this.selectedFiles.map(f => {
+                        const { path } = utils.parseUri(f.path);
+                        return path;
+                    })
+                    : undefined;
 
-                if (error) {
-                    // TODO: better error message?
-                    alert(error);
+                await dataset.downloadWithCheck(paths);
+            } catch (err) {
+                if (err.status === 429) {
+                    this.$root.$emit('downloadLimitReached', err.message);
                 } else {
-                    location.href = downloadUrl;
+                    alert(err.message || err);
                 }
-            } else {
-                // href will handle it
+            } finally {
+                this.isDownloading = false;
             }
         },
 

@@ -3,9 +3,10 @@
  */
 
 import { getArea, getLength } from 'ol/sphere';
-import { LineString, Polygon } from 'ol/geom';
+import { LineString, Polygon, Point } from 'ol/geom';
 import Feature from 'ol/Feature';
 import GeoJSON from 'ol/format/GeoJSON';
+import { toLonLat } from 'ol/proj';
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -54,6 +55,15 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         measurementType = 'length';
         const length = getLength(geometry);
         calculatedValues = calculateLengthValues(length, unitPref);
+    } else if (geometryType === 'Point') {
+        measurementType = 'point';
+        // Convert point coordinates to WGS84 for storage
+        const coords = geometry.getCoordinates();
+        const [lon, lat] = toLonLat(coords);
+        calculatedValues = {
+            latitude: Math.round(lat * 1000000) / 1000000,
+            longitude: Math.round(lon * 1000000) / 1000000
+        };
     } else {
         measurementType = 'unknown';
     }
@@ -135,6 +145,12 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
 
     feature.set('tooltipText', tooltipText);
 
+    // Store point coordinate data for re-creating popup on import
+    if (props.latitude !== undefined && props.longitude !== undefined) {
+        feature.set('pointLatitude', props.latitude);
+        feature.set('pointLongitude', props.longitude);
+    }
+
     return feature;
 }
 
@@ -189,7 +205,8 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') 
             .filter(f => {
                 // Only export actual measurement features (not temporary draw features)
                 const geom = f.getGeometry();
-                return geom && (geom instanceof Polygon || geom instanceof LineString);
+                const hasType = f.get('measurementType');
+                return geom && (geom instanceof Polygon || geom instanceof LineString || (geom instanceof Point && hasType === 'point'));
             })
             .map(f => featureToGeoJSON(f, unitPref))
     };
@@ -221,10 +238,14 @@ export function importMeasurements(geojson, source, formatArea, formatLength, ma
             // Add the feature to the source
             source.addFeature(feature);
 
-            // Create tooltip element for the feature
-            const tooltipText = feature.get('tooltipText');
-            if (tooltipText && map) {
-                createStaticTooltip(feature, tooltipText, map);
+            // Create tooltip or popup for the feature
+            if (feature.get('measurementType') === 'point' && map) {
+                createPointPopup(feature, map, source);
+            } else {
+                const tooltipText = feature.get('tooltipText');
+                if (tooltipText && map) {
+                    createStaticTooltip(feature, tooltipText, map);
+                }
             }
 
             imported.push(feature);
@@ -283,6 +304,81 @@ function createStaticTooltip(feature, text, map) {
         feature.set('measureTooltipElement', measureTooltipElement);
         feature.set('measureTooltip', measureTooltip);
     }
+}
+
+/**
+ * Create a point location popup for an imported point feature
+ * @param {ol.Feature} feature - Point feature
+ * @param {ol.Map} map - OpenLayers map instance
+ * @param {ol.source.Vector} source - Vector source for cleanup
+ */
+function createPointPopup(feature, map, source) {
+    const geometry = feature.getGeometry();
+    if (!geometry) return;
+
+    const coords = geometry.getCoordinates();
+    const lat = feature.get('pointLatitude');
+    const lon = feature.get('pointLongitude');
+
+    if (lat === undefined || lon === undefined) return;
+
+    const ddToDms = (coordinate, posSymbol, negSymbol) => {
+        const dd = Math.abs(coordinate);
+        const d = Math.floor(dd);
+        const m = Math.floor((dd - d) * 60);
+        const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
+        const dir = coordinate >= 0 ? posSymbol : negSymbol;
+        return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
+    };
+
+    const dmsLat = ddToDms(lat, 'N', 'S');
+    const dmsLon = ddToDms(lon, 'E', 'W');
+    const ddLat = lat.toFixed(6);
+    const ddLon = lon.toFixed(6);
+
+    const popupEl = document.createElement('div');
+    popupEl.className = 'ol-point-popup';
+    popupEl.innerHTML = `
+        <div class="ol-point-popup-coords">
+            <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
+            <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
+        </div>
+        <div class="ol-point-popup-actions">
+            <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
+            <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
+        </div>
+    `;
+
+    const Overlay = require('ol/Overlay').default;
+    const popupOverlay = new Overlay({
+        element: popupEl,
+        offset: [0, -12],
+        positioning: 'bottom-center',
+        stopEvent: true,
+        insertFirst: false,
+    });
+    popupOverlay.setPosition(coords);
+    map.addOverlay(popupOverlay);
+
+    feature.set('measureTooltipElement', popupEl);
+    feature.set('measureTooltip', popupOverlay);
+
+    popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
+        e.preventDefault();
+        const text = `${ddLat}, ${ddLon}`;
+        navigator.clipboard.writeText(text).then(() => {
+            const icon = popupEl.querySelector('.ol-point-popup-copy i');
+            if (icon) { icon.className = 'icon check'; }
+            setTimeout(() => { if (icon) { icon.className = 'icon copy outline'; } }, 1500);
+        });
+    });
+
+    popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
+        e.preventDefault();
+        map.removeOverlay(popupOverlay);
+        if (popupEl.parentNode) popupEl.parentNode.removeChild(popupEl);
+        source.removeFeature(feature);
+    });
 }
 
 // ============================================================================

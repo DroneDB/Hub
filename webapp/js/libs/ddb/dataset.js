@@ -69,6 +69,56 @@ module.exports = class Dataset {
     }
 
     /**
+     * Downloads file(s) with a preflight check to detect 429 (Too Many Requests) before
+     * initiating the native browser download. This avoids loading the entire file as a blob
+     * in memory, and lets the browser handle streaming and progress natively.
+     *
+     * Flow:
+     * 1. Send a lightweight preflight request with X-Download-Check header
+     * 2. If 429, throw error so the caller can show a dialog
+     * 3. If 200, proceed with window.location.href for native browser download
+     *
+     * @param {string|string[]} paths - Path(s) to download
+     * @param {Object} options - Options (e.g. { inline: true })
+     * @returns {Promise<void>}
+     * @throws {Error} With .status = 429 when download limit is reached
+     */
+    async downloadWithCheck(paths, options = {}) {
+        const url = this.downloadUrl(paths, options);
+        const headers = { 'X-Download-Check': '1' };
+        const authToken = this.registry.getAuthToken();
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+        const response = await fetch(url, { headers });
+
+        if (!response.ok) {
+            let errorMessage = `Download failed (${response.status})`;
+            try {
+                const contentType = response.headers.get('Content-Type');
+                if (contentType && contentType.includes('application/json')) {
+                    const json = await response.json();
+                    errorMessage = json.error || json.message || errorMessage;
+                }
+            } catch (_) {
+                // Ignore parse errors, use default message
+            }
+            const err = new Error(errorMessage);
+            err.status = response.status;
+            throw err;
+        }
+
+        // Preflight passed — initiate native browser download
+        if (url.length < 2000) {
+            window.location.href = url;
+        } else {
+            // URL too long for browser navigation, use POST to get a temporary short URL
+            const { downloadUrl, error } = await this.download(paths);
+            if (error) throw new Error(error);
+            window.location.href = downloadUrl;
+        }
+    }
+
+    /**
      * Gets the contents of a file as raw text.
      * Uses getRequestAsText to bypass automatic JSON parsing for file downloads.
      * @param {string} path - Path to the file within the dataset

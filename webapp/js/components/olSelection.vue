@@ -34,10 +34,11 @@ class SelectionControl extends Control {
         btnPolygon.title = 'Polygon Selection — Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.';
         btnPolygon.innerHTML = '<img src="' + rootPath("/images/polygon-selection.svg") + '"/>';
 
-        // Clear selection button
+        // Clear selection button (hidden by default, shown when there's an active selection)
         const btnClear = document.createElement('button');
         btnClear.title = 'Clear Selection — Deselect all selected features.';
         btnClear.innerHTML = '<img src="' + rootPath("/images/clear-selection.svg") + '"/>';
+        btnClear.style.display = 'none';
 
         // Single container for all buttons
         const element = document.createElement('div');
@@ -279,6 +280,14 @@ class SelectionControl extends Control {
      */
     getActiveMode() {
         return this.activeMode;
+    }
+
+    /**
+     * Show or hide the clear selection button.
+     * @param {boolean} visible
+     */
+    setClearButtonVisible(visible) {
+        this.btnClear.style.display = visible ? '' : 'none';
     }
 }
 

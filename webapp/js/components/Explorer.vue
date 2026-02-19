@@ -44,7 +44,7 @@ import Window from './Window.vue';
 import BuildManager from '../libs/buildManager';
 
 import ddb from 'ddb';
-const { pathutils } = ddb;
+const { pathutils, utils } = ddb;
 
 import { entry } from 'ddb';
 import shell from '../dynamic/shell';
@@ -164,6 +164,13 @@ export default {
                 this.selectedFiles.forEach(f => {
                     this.$emit('shareEmbed', f);
                 });
+            }
+        }, {
+            label: 'Download',
+            icon: 'download',
+            isVisible: () => { return this.selectedFiles.length > 0; },
+            click: () => {
+                this.$emit('downloadItems', this.selectedFiles);
             }
         }, {
             label: 'Build',

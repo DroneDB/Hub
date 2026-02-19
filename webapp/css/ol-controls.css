@@ -94,3 +94,82 @@
 .ol-tooltip-value {
     font-size: 12px;
 }
+
+/* Point location popup */
+.ol-point-popup {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    font-size: 12px;
+    color: #333;
+    white-space: nowrap;
+    overflow: hidden;
+    z-index: 1001;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    gap: 8px;
+}
+
+.ol-point-popup::after {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    margin-left: -8px;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid white;
+}
+
+.ol-point-popup-coords {
+    display: flex;
+    flex-direction: column;
+    font-family: monospace;
+    user-select: all;
+    cursor: text;
+}
+
+.ol-point-popup-dms {
+    font-size: 12px;
+    color: #333;
+}
+
+.ol-point-popup-dd {
+    font-size: 11px;
+    color: #777;
+}
+
+.ol-point-popup-actions {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.ol-point-popup-actions .image-popup-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 3px;
+    color: #555;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+}
+
+.ol-point-popup-actions .image-popup-btn:hover {
+    background: #e0e0e0;
+    color: #222;
+}
+
+.ol-point-popup-delete:hover {
+    background: #ffcdd2 !important;
+    color: #c62828 !important;
+}
+
+.ol-point-popup-copy .icon.check {
+    color: #2e7d32;
+}

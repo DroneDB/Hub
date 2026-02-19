@@ -103,6 +103,16 @@ export default {
             }
         },
         {
+            label: 'Download',
+            icon: 'download',
+            isVisible: () => { return this.lastSelectedNode !== null; },
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('downloadItems', [this.lastSelectedNode.node]);
+                }
+            }
+        },
+        {
             label: "Rename",
             icon: 'pencil alternate',
             isVisible: () => { return this.canWrite && this.lastSelectedNode !== null; },

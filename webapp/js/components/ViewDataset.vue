@@ -10,6 +10,7 @@
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                     @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                     @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
+                    @downloadItems="handleDownloadItems"
                     @openAsText="handleOpenAsText" @error="handleError" />
             </div>
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
@@ -21,6 +22,7 @@
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                         @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                         @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
+                        @downloadItems="handleDownloadItems"
                         @openAsText="handleOpenAsText" @error="handleError" />
                 </template> <template v-slot:map>
                     <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
@@ -33,7 +35,7 @@
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                        @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
+                        @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
 
                     <!-- Table View with Detail Panel (Desktop/Tablet only) -->
                     <Panel v-else-if="selectedDetailFile && !isMobile" split="vertical" amount="70%" tabletAmount="60%">
@@ -42,7 +44,7 @@
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                             @transferSelectedItems="openTransferItemsDialog"
                             @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                            @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                            @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                             @selectionChanged="handleTableSelectionChanged" />
 
                         <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -59,7 +61,7 @@
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                        @shareEmbed="handleShareEmbed" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                        @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                         @selectionChanged="handleTableSelectionChanged" />
                 </template>
                 <template v-slot:buildhistory>
@@ -324,6 +326,12 @@ export default {
 
         this.$root.$on('openSettings', () => {
             this.showSettings = true;
+        });
+
+        this.$root.$on('downloadLimitReached', (msg) => {
+            this.flash = msg || "Download limit reached. Please wait for a download to finish before starting a new one.";
+            this.flashColor = "negative";
+            this.flashIcon = "exclamation triangle";
         });
 
         this.$root.$on('uploadItems', msg => {
@@ -754,6 +762,31 @@ export default {
 
         handleError: function (e) {
             this.showError(e, "Error");
+        },
+
+        handleDownloadItems: async function (files) {
+            if (!files || files.length === 0) return;
+
+            const paths = files.map(f => {
+                // Files from Explorer/TableView have f.entry.path
+                // Files from FileBrowser have f.entry.path too (they are tree nodes)
+                if (f.entry && f.entry.path !== undefined) return f.entry.path;
+                // Fallback: parse URI if f.path is a URI
+                const { path } = utils.parseUri(f.path);
+                return path;
+            });
+
+            try {
+                await this.dataset.downloadWithCheck(paths);
+            } catch (e) {
+                if (e.status === 429) {
+                    this.flash = "Download limit reached. Please wait for a download to finish before starting a new one.";
+                    this.flashColor = "negative";
+                    this.flashIcon = "exclamation triangle";
+                } else {
+                    this.showError(e.message || e, "Download Error");
+                }
+            }
         },
 
         updateExplorerTools: function() {

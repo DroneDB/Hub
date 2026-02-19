@@ -276,6 +276,13 @@ export default {
                     });
                 }
             }, {
+                label: 'Download',
+                icon: 'download',
+                isVisible: () => { return this.selectedFiles.length > 0; },
+                click: () => {
+                    this.$emit('downloadItems', this.selectedFiles);
+                }
+            }, {
                 label: 'Build',
                 icon: 'cog',
                 isVisible: () => {

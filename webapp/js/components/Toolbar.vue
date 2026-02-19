@@ -96,6 +96,12 @@ export default {
             });
         },
 
+        deselectNonToggle: function () {
+            this.dataTools.forEach(t => {
+                if (t.selected && !t.id.startsWith('toggle-')) this.deselectTool(t.id);
+            });
+        },
+
         toggleTool: function (toolId) {
             const tool = this.getTool(toolId);
             if (tool.disabled) return;
