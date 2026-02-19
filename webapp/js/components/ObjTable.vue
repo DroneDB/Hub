@@ -79,7 +79,7 @@ export default {
                     this.tObj = null;
                     return;
                 }
-                
+
                 let tObj = clone(this.obj);
 
                 if (tObj !== null && typeof tObj === 'object') {
@@ -109,7 +109,7 @@ export default {
 
                     tObj = sortObjectKeys(tObj);
                 }
-                
+
                 this.tObj = tObj;
             } catch (error) {
                 console.error("Error processing object in ObjTable:", error);

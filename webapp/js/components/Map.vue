@@ -1007,8 +1007,15 @@ export default {
                                 if (this.showDirectionIndicators) {
                                     const speed = feat.computedSpeed;
                                     if (speed !== undefined && speed !== null) {
-                                        const speedKmh = (speed * 3.6).toFixed(1);
-                                        label += ` — ${speedKmh} km/h`;
+                                        let speedDisplay, speedUnit;
+                                        if (this.currentUnitPref === 'imperial') {
+                                            speedDisplay = (speed * 2.23694).toFixed(1);
+                                            speedUnit = 'mph';
+                                        } else {
+                                            speedDisplay = (speed * 3.6).toFixed(1);
+                                            speedUnit = 'km/h';
+                                        }
+                                        label += ` — ${speedDisplay} ${speedUnit}`;
                                     }
                                 }
                             } else {
