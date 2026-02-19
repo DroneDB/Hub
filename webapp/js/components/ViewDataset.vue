@@ -747,7 +747,9 @@ export default {
 
 
         handleScrollTo: function (file) {
-            this.$refs.explorer.scrollTo(file);
+            if (this.$refs.explorer) {
+                this.$refs.explorer.scrollTo(file);
+            }
         },
 
         handleError: function (e) {
