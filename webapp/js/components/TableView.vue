@@ -93,6 +93,7 @@ import Keyboard from '../libs/keyboard';
 import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import BuildManager from '../libs/buildManager';
+import { isInternalDrag, dragDropMixin } from '../libs/dragDropUtils';
 
 import ddb from 'ddb';
 const { pathutils, entry } = ddb;
@@ -101,6 +102,7 @@ import ContextMenu from './ContextMenu';
 import reg from '../libs/sharedRegistry';
 
 export default {
+    mixins: [dragDropMixin],
     components: {
         Toolbar, ContextMenu
     },
@@ -338,100 +340,7 @@ export default {
             }];
         },
 
-        explorerDragEnter: function (evt) {
-            this.dropping = true;
-        },
 
-        explorerDragLeave: function (evt) {
-            this.dropping = false;
-        },
-
-        // Helper function to read all entries from a directory recursively
-        async readDirectoryEntries(directoryReader) {
-            const entries = [];
-            let batch;
-            do {
-                batch = await new Promise((resolve, reject) => {
-                    directoryReader.readEntries(resolve, reject);
-                });
-                entries.push(...batch);
-            } while (batch.length > 0);
-            return entries;
-        },
-
-        // Recursively traverse a FileSystemEntry and collect all files with their relative paths
-        async traverseFileSystemEntry(entry, basePath = '') {
-            const files = [];
-
-            if (entry.isFile) {
-                const file = await new Promise((resolve, reject) => {
-                    entry.file(resolve, reject);
-                });
-                // Set fullPath to preserve folder structure
-                const relativePath = basePath ? basePath + '/' + entry.name : entry.name;
-                file.fullPath = relativePath;
-                files.push(file);
-            } else if (entry.isDirectory) {
-                const dirReader = entry.createReader();
-                const entries = await this.readDirectoryEntries(dirReader);
-                const newBasePath = basePath ? basePath + '/' + entry.name : entry.name;
-
-                for (const childEntry of entries) {
-                    const childFiles = await this.traverseFileSystemEntry(childEntry, newBasePath);
-                    files.push(...childFiles);
-                }
-            }
-
-            return files;
-        },
-
-        // Get files from drag event, supporting folders via webkitGetAsEntry
-        async getFilesFromDrop(ev) {
-            const files = [];
-            const entries = [];
-
-            if (ev.dataTransfer.items) {
-                // Collect all entries and files synchronously first.
-                // DataTransferItemList becomes invalid after async operations,
-                // so we must call webkitGetAsEntry() and getAsFile() before any await.
-                for (const item of Array.from(ev.dataTransfer.items)) {
-                    if (item.kind === 'file') {
-                        const entry = item.webkitGetAsEntry?.();
-                        if (entry) {
-                            entries.push(entry);
-                        } else {
-                            // Fallback to getAsFile for browsers without webkitGetAsEntry
-                            const file = item.getAsFile();
-                            if (file) files.push(file);
-                        }
-                    }
-                }
-
-                // Process all entries in parallel
-                const results = await Promise.all(
-                    entries.map(entry => this.traverseFileSystemEntry(entry))
-                );
-                files.push(...results.flat());
-            } else if (ev.dataTransfer.files) {
-                files.push(...Array.from(ev.dataTransfer.files));
-            }
-
-            return files;
-        },
-
-        async explorerDropHandler(ev) {
-            ev.preventDefault();
-
-            this.dropping = false;
-
-            // Check if user has write permission
-            if (!this.canWrite) return;
-
-            const files = await this.getFilesFromDrop(ev);
-            if (files.length == 0) return;
-
-            this.$root.$emit('uploadItems', { files: files, path: this.currentPath });
-        },
 
         goTo: function (itm) {
             this.$root.$emit("folderOpened", pathutils.getTree(itm.path));
@@ -446,6 +355,12 @@ export default {
 
         onDrop(evt, item) {
             this.dropping = false;
+
+            // If this is a drop from the OS (not an internal drag), delegate to upload handler
+            if (!isInternalDrag(evt)) {
+                this.explorerDropHandler(evt);
+                return;
+            }
 
             // Check if user has write permission
             if (!this.canWrite) return;

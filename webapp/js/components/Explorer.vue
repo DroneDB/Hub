@@ -13,23 +13,25 @@
             </div>
             <!--<div class="ui divider"></div>-->
         </div>
-        <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment" style="margin: 1rem;">
-            <div class="ui active centered inline loader"></div>
-        </div>
-        <div v-else-if="files.length === 0" class="ui placeholder segment" style="margin: 1rem;">
-            <div class="ui icon header">
-                <i class="folder open outline icon"></i>
-                This folder is empty
-            </div>
-        </div>
-        <div v-else ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
+        <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
             @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
             @dragenter="explorerDragEnter($event)" @dragover.prevent>
-            <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable @dragstart="startDrag($event, f)"
-                @drop="onDrop($event, f)" @dragenter.prevent @dragover.prevent>
-                <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
-                    :lazyLoad="true" :dataset="dataset" />
+            <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment" style="margin: 1rem; width: 100%;">
+                <div class="ui active centered inline loader"></div>
             </div>
+            <div v-else-if="files.length === 0" class="ui placeholder segment" style="margin: 1rem; width: 100%;">
+                <div class="ui icon header">
+                    <i class="folder open outline icon"></i>
+                    This folder is empty
+                </div>
+            </div>
+            <template v-else>
+                <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable @dragstart="startDrag($event, f)"
+                    @drop="onDrop($event, f)" @dragenter.prevent @dragover.prevent>
+                    <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
+                        :lazyLoad="true" :dataset="dataset" />
+                </div>
+            </template>
         </div>
     </div>
 </template>
@@ -42,6 +44,7 @@ import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import Window from './Window.vue';
 import BuildManager from '../libs/buildManager';
+import { isInternalDrag, dragDropMixin } from '../libs/dragDropUtils';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -53,6 +56,7 @@ import ContextMenu from './ContextMenu';
 import reg from '../libs/sharedRegistry';
 
 export default {
+    mixins: [dragDropMixin],
     components: {
         Thumbnail, Toolbar, ContextMenu, Window
     },
@@ -278,106 +282,7 @@ export default {
     },
     methods: {
 
-        explorerDragEnter: function (evt) {
-            //evt.preventDefault();
-            console.log("Enter", evt);
-            this.dropping = true;
-        },
 
-        explorerDragLeave: function (evt) {
-            //evt.preventDefault();
-            console.log("Leave");
-            this.dropping = false;
-
-        },
-
-        // Helper function to read all entries from a directory recursively
-        async readDirectoryEntries(directoryReader) {
-            const entries = [];
-            let batch;
-            do {
-                batch = await new Promise((resolve, reject) => {
-                    directoryReader.readEntries(resolve, reject);
-                });
-                entries.push(...batch);
-            } while (batch.length > 0);
-            return entries;
-        },
-
-        // Recursively traverse a FileSystemEntry and collect all files with their relative paths
-        async traverseFileSystemEntry(entry, basePath = '') {
-            const files = [];
-
-            if (entry.isFile) {
-                const file = await new Promise((resolve, reject) => {
-                    entry.file(resolve, reject);
-                });
-                // Set fullPath to preserve folder structure
-                const relativePath = basePath ? basePath + '/' + entry.name : entry.name;
-                file.fullPath = relativePath;
-                files.push(file);
-            } else if (entry.isDirectory) {
-                const dirReader = entry.createReader();
-                const entries = await this.readDirectoryEntries(dirReader);
-                const newBasePath = basePath ? basePath + '/' + entry.name : entry.name;
-
-                for (const childEntry of entries) {
-                    const childFiles = await this.traverseFileSystemEntry(childEntry, newBasePath);
-                    files.push(...childFiles);
-                }
-            }
-
-            return files;
-        },
-
-        // Get files from drag event, supporting folders via webkitGetAsEntry
-        async getFilesFromDrop(ev) {
-            const files = [];
-            const entries = [];
-
-            if (ev.dataTransfer.items) {
-                // Collect all entries and files synchronously first.
-                // DataTransferItemList becomes invalid after async operations,
-                // so we must call webkitGetAsEntry() and getAsFile() before any await.
-                for (const item of Array.from(ev.dataTransfer.items)) {
-                    if (item.kind === 'file') {
-                        const entry = item.webkitGetAsEntry?.();
-                        if (entry) {
-                            entries.push(entry);
-                        } else {
-                            // Fallback to getAsFile for browsers without webkitGetAsEntry
-                            const file = item.getAsFile();
-                            if (file) files.push(file);
-                        }
-                    }
-                }
-
-                // Process all entries in parallel
-                const results = await Promise.all(
-                    entries.map(entry => this.traverseFileSystemEntry(entry))
-                );
-                files.push(...results.flat());
-            } else if (ev.dataTransfer.files) {
-                files.push(...Array.from(ev.dataTransfer.files));
-            }
-
-            return files;
-        },
-
-        async explorerDropHandler(ev) {
-            ev.preventDefault();
-
-            this.dropping = false;
-
-            // Check if user has write permission
-            if (!this.canWrite) return;
-
-            const files = await this.getFilesFromDrop(ev);
-            if (files.length == 0) return;
-
-            this.$root.$emit('uploadItems', { files: files, path: this.currentPath });
-
-        },
 
         goTo: function (itm) {
             this.$root.$emit("folderOpened", pathutils.getTree(itm.path));
@@ -391,8 +296,13 @@ export default {
         },
 
         onDrop(evt, item) {
-
             this.dropping = false;
+
+            // If this is a drop from the OS (not an internal drag), delegate to upload handler
+            if (!isInternalDrag(evt)) {
+                this.explorerDropHandler(evt);
+                return;
+            }
 
             // Check if user has write permission
             if (!this.canWrite) return;
