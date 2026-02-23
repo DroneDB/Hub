@@ -22,7 +22,10 @@ export default {
             errorMessage: null,
             errorMessageTitle: null,
             shareFile: null,
-            deleteResultData: { deleted: [], failed: {} }
+            deleteResultData: { deleted: [], failed: {} },
+            rescanResultDialogOpen: false,
+            rescanResultData: null,
+            rescanConfirmDialogOpen: false
         };
     },
 
@@ -313,6 +316,38 @@ export default {
 
         handleCloseShareEmbed() {
             this.shareFile = null;
+        },
+
+        // Rescan
+        handleRescanRequested() {
+            this.rescanConfirmDialogOpen = true;
+        },
+
+        handleRescanConfirmClose(id) {
+            this.rescanConfirmDialogOpen = false;
+            if (id === 'confirm') {
+                this.startRescan();
+            }
+        },
+
+        async startRescan() {
+            this.showSettings = false;
+            this.isBusy = true;
+
+            try {
+                const result = await this.dataset.rescan(false);
+                this.rescanResultData = result;
+                this.rescanResultDialogOpen = true;
+            } catch (e) {
+                this.showError(e.message, 'Rescan Error');
+            } finally {
+                this.isBusy = false;
+            }
+        },
+
+        handleRescanResultClose() {
+            this.rescanResultDialogOpen = false;
+            this.rescanResultData = null;
         },
 
         // Error Dialog

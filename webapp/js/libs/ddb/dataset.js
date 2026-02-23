@@ -267,4 +267,9 @@ module.exports = class Dataset {
         const response = await this.registry.postRequest(`${this.baseApi}/builds/clear`, {});
         return response;
     }
+
+    async rescan(stopOnError = false) {
+        const params = new URLSearchParams({ stopOnError: stopOnError.toString() });
+        return this.registry.postRequest(`${this.baseApi}/rescan?${params}`, {});
+    }
 };

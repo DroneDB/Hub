@@ -70,8 +70,8 @@
             </TabSwitcher>
         </Panel>
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
-        <SettingsDialog v-if="showSettings" :dataset="dataset" @onClose="handleSettingsClose"
-            @addMarkdown="handleAddMarkdown" />
+        <SettingsDialog v-if="showSettings" :dataset="dataset" :canWrite="canWrite" @onClose="handleSettingsClose"
+            @addMarkdown="handleAddMarkdown" @rescanRequested="handleRescanRequested" />
         <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath"
             :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true">
         </AddToDatasetDialog>
@@ -81,6 +81,13 @@
             :failed="deleteResultData.failed"
             @onClose="handleDeleteResultClose">
         </DeleteResultDialog>
+        <RescanResultDialog v-if="rescanResultDialogOpen"
+            :result="rescanResultData"
+            @onClose="handleRescanResultClose">
+        </RescanResultDialog>
+        <RescanConfirmDialog v-if="rescanConfirmDialogOpen"
+            @onClose="handleRescanConfirmClose">
+        </RescanConfirmDialog>
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
         <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
@@ -151,6 +158,8 @@ import SettingsDialog from './SettingsDialog.vue';
 import AddToDatasetDialog from './AddToDatasetDialog.vue';
 import DeleteDialog from './DeleteDialog.vue';
 import DeleteResultDialog from './DeleteResultDialog.vue';
+import RescanResultDialog from './RescanResultDialog.vue';
+import RescanConfirmDialog from './RescanConfirmDialog.vue';
 import RenameDialog from './RenameDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
 import TransferDialog from './TransferDialog.vue';
@@ -212,6 +221,8 @@ export default {
         AddToDatasetDialog,
         DeleteDialog,
         DeleteResultDialog,
+        RescanResultDialog,
+        RescanConfirmDialog,
         RenameDialog,
         NewFolderDialog,
         TransferDialog,
