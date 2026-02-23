@@ -40,6 +40,16 @@
                         </div>
                     </div>
                 </div>
+                <div class="ui grid one column">
+                    <div class="column">
+                        <div class="field">
+                            <label>Tagline</label>
+                            <input type="text" v-model="ds.tagline" maxlength="256"
+                                placeholder="Brief description of your dataset (max 256 chars)" />
+                            <small class="char-count">{{ ds.tagline ? ds.tagline.length : 0 }}/256</small>
+                        </div>
+                    </div>
+                </div>
 
             </form>
             <div v-if="mode == 'new'" class="field" style="margin-bottom: 1em;">
@@ -95,7 +105,8 @@ export default {
             ds: {
                 slug: null,
                 name: null,
-                visibility: 0
+                visibility: 0,
+                tagline: ''
             },
             title: null,
             openAfterCreate: getOpenAfterCreatePreference()
@@ -118,6 +129,7 @@ export default {
             this.ds.slug = this.model.slug;
             this.ds.name = this.model.name;
             this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : 0;
+            this.ds.tagline = this.model.tagline || '';
 
             // Set the dropdown value after initialization
             this.$nextTick(() => {
@@ -129,6 +141,7 @@ export default {
             this.ds.slug = null;
             this.ds.name = null;
             this.ds.visibility = 0;
+            this.ds.tagline = '';
 
             // Set the dropdown value after initialization
             this.$nextTick(() => {
@@ -145,7 +158,8 @@ export default {
                 name: this.ds.name,
                 visibility: this.ds.visibility,
                 slug: this.mode === 'edit' ? this.model.slug : slugFromName(this.ds.name),
-                openAfterCreate: this.openAfterCreate
+                openAfterCreate: this.openAfterCreate,
+                tagline: this.ds.tagline || ''
             });
         },
         isValid: function () {
@@ -210,5 +224,11 @@ export default {
 
 .content {
     overflow: hidden;
+}
+
+.char-count {
+    color: #999;
+    float: right;
+    margin-top: 2px;
 }
 </style>

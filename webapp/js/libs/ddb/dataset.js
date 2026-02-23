@@ -50,6 +50,12 @@ module.exports = class Dataset {
         return url;
     }
 
+    datasetThumbUrl(size) {
+        let url = `${this.baseApi}/thumb`;
+        if (size) url += `?size=${size}`;
+        return url;
+    }
+
     tileUrl(path, tz, tx, ty, options = {}) {
         let retina = "";
         if (options.retina) retina = "@2x";
@@ -207,6 +213,13 @@ module.exports = class Dataset {
         return this.registry.postFormData(`${this.baseApi}/obj`, formData);
     }
 
+    async uploadObj(path, file) {
+        const formData = new FormData();
+        formData.append('path', path);
+        formData.append('file', file);
+        return this.registry.postFormData(`${this.baseApi}/obj`, formData);
+    }
+
     async createFolder(path) {
         const formData = new FormData();
         formData.append('path', path);
@@ -229,6 +242,14 @@ module.exports = class Dataset {
         formData.append('data', data);
         formData.append('path', path);
         return this.registry.postFormData(`${this.baseApi}/meta/set`, formData);
+    }
+
+    async metaUnset(key, path = "") {
+        if (!key) throw new Error(`Invalid key ${key}`);
+        const formData = new FormData();
+        formData.append('key', key);
+        formData.append('path', path);
+        return this.registry.postFormData(`${this.baseApi}/meta/unset`, formData);
     }
 
     async setVisibility(visibility) {

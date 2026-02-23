@@ -23,11 +23,12 @@ module.exports = class Organization {
         return new Dataset(this.registry, this.org, ds);
     }
 
-    async createDataset(slug, name, visibility = Visibility.PRIVATE) {
+    async createDataset(slug, name, visibility = Visibility.PRIVATE, tagline = null) {
         const formData = new FormData();
         formData.append('slug', slug);
         if (name) formData.append('name', name);
         if (visibility !== undefined) formData.append('visibility', visibility);
+        if (tagline) formData.append('tagline', tagline);
         return await this.registry.postFormData(`/orgs/${this.org}/ds`, formData);
     }
 

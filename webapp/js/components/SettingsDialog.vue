@@ -31,6 +31,54 @@
                 </h4>
             </div>
 
+            <div class="settings-section" v-if="canWrite">
+                <h4 class="ui header">
+                    <i class="icon tag"></i>
+                    <div class="content">Tagline</div>
+                </h4>
+                <div class="tagline-field">
+                    <input type="text" v-model="tagline" maxlength="256"
+                        placeholder="Brief description of your dataset (max 256 chars)"
+                        @change="setTagline" />
+                    <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
+                </div>
+            </div>
+
+            <div class="settings-section" v-if="canWrite">
+                <h4 class="ui header">
+                    <i class="icon image"></i>
+                    <div class="content">Thumbnail</div>
+                </h4>
+                <div class="thumbnail-upload">
+                    <div class="thumbnail-preview-container">
+                        <img v-if="thumbnailPreview && !thumbnailError"
+                            :src="thumbnailPreview"
+                            class="thumbnail-preview"
+                            @error="thumbnailError = true" />
+                        <img v-else
+                            src="/images/dataset-placeholder.svg"
+                            class="thumbnail-preview thumbnail-placeholder" />
+                    </div>
+                    <div class="thumbnail-actions">
+                        <input type="file" ref="thumbnailInput"
+                            @change="handleThumbnailSelect"
+                            accept="image/webp,image/jpeg,image/png"
+                            style="display: none" />
+                        <button type="button" class="ui button basic icon small"
+                            @click="$refs.thumbnailInput.click()"
+                            :class="{ loading: thumbnailUploading }">
+                            <i class="icon upload"></i> Upload
+                        </button>
+                        <button v-if="thumbnailPreview && !thumbnailError"
+                            type="button" class="ui button basic icon small negative"
+                            @click="removeThumbnail"
+                            :class="{ loading: thumbnailRemoving }">
+                            <i class="icon trash"></i> Remove
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="settings-section" v-if="readme == null">
                 <button @click="addDocument('README.md')" class="ui button basic icon">
                     <i class="icon book" /> Add Readme
@@ -87,6 +135,11 @@ export default {
             loading: true,
             readme: null,
             license: "proprietary",
+            tagline: "",
+            thumbnailPreview: null,
+            thumbnailError: false,
+            thumbnailUploading: false,
+            thumbnailRemoving: false,
             Licenses,
             Visibilities: {
                 [ddb.Visibility.PUBLIC]: { label: "Public" },
@@ -104,6 +157,11 @@ export default {
             this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
             this.license = this.properties?.meta?.license?.data ?? 'proprietary';
             this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
+            this.tagline = this.properties?.meta?.tagline?.data ?? '';
+
+            // Load existing dataset thumbnail preview
+            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
+            this.thumbnailError = false;
 
             console.log(this.Visibilities);
         } catch (e) {
@@ -148,6 +206,69 @@ export default {
             } catch (e) {
                 this.error = e.message;
             }
+        },
+        setTagline: async function () {
+            try {
+                if (this.tagline && this.tagline.trim()) {
+                    await this.dataset.metaSet('tagline', this.tagline.trim());
+                } else {
+                    await this.dataset.metaUnset('tagline');
+                    this.tagline = '';
+                }
+            } catch (e) {
+                this.error = e.message;
+            }
+        },
+        handleThumbnailSelect: async function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            this.thumbnailUploading = true;
+            this.error = '';
+
+            try {
+                // Determine the target filename based on file type
+                const ext = file.type === 'image/webp' ? 'webp'
+                          : file.type === 'image/png' ? 'png'
+                          : 'jpg';
+                const path = `thumbnail.${ext}`;
+
+                await this.dataset.uploadObj(path, file);
+
+                // Refresh preview with cache-busting timestamp
+                this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
+                this.thumbnailError = false;
+            } catch (e) {
+                this.error = 'Failed to upload thumbnail: ' + e.message;
+            }
+
+            this.thumbnailUploading = false;
+            // Reset file input so the same file can be re-selected
+            this.$refs.thumbnailInput.value = '';
+        },
+        removeThumbnail: async function () {
+            this.thumbnailRemoving = true;
+            this.error = '';
+
+            try {
+                // Try to delete all possible thumbnail candidates
+                const candidates = ['thumbnail.webp', 'thumbnail.jpg', 'thumbnail.png',
+                                    'cover.webp', 'cover.jpg', 'cover.png'];
+                for (const candidate of candidates) {
+                    try {
+                        await this.dataset.deleteObj(candidate);
+                    } catch (e) {
+                        // Ignore 404 errors — file doesn't exist
+                    }
+                }
+
+                this.thumbnailPreview = null;
+                this.thumbnailError = true;
+            } catch (e) {
+                this.error = 'Failed to remove thumbnail: ' + e.message;
+            }
+
+            this.thumbnailRemoving = false;
         },
         addDocument: async function (document) {
 
@@ -243,5 +364,52 @@ export default {
     color: #2185d0;
     flex-shrink: 0;
     margin-top: 2px;
+}
+
+.tagline-field {
+    position: relative;
+}
+
+.tagline-field input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.tagline-field .char-count {
+    color: #999;
+    float: right;
+    margin-top: 2px;
+    font-size: 12px;
+}
+
+.thumbnail-upload {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.thumbnail-preview-container {
+    flex-shrink: 0;
+}
+
+.thumbnail-preview {
+    max-width: 120px;
+    max-height: 80px;
+    object-fit: contain;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.thumbnail-placeholder {
+    opacity: 0.4;
+}
+
+.thumbnail-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 </style>

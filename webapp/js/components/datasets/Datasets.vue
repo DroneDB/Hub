@@ -32,6 +32,7 @@
             <table class="ui selectable sortable celled table">
                 <thead>
                     <tr>
+                        <th class="ds-thumb-header"></th>
                         <th @click="sortBy('name')">
                             <i class="database icon"></i> Dataset
                             <i v-if="sortColumn === 'name'"
@@ -62,7 +63,19 @@
                 </thead>
                 <tbody>
                     <tr v-for="ds in paginatedDatasets" :key="ds.slug" @click="viewDataset(ds)" class="clickable-row">
-                        <td class="ds-name">{{ ds.slug }}</td>
+                        <td class="ds-thumb-cell">
+                            <img v-if="!ds.thumbError"
+                                :src="getDatasetThumbUrl(ds)"
+                                class="ds-thumb-img"
+                                @error="ds.thumbError = true" />
+                            <img v-else
+                                src="/images/dataset-placeholder.svg"
+                                class="ds-thumb-img ds-thumb-placeholder" />
+                        </td>
+                        <td class="ds-name">
+                            {{ ds.name || ds.slug }}
+                            <div v-if="ds.tagline" class="ds-tagline">{{ ds.tagline }}</div>
+                        </td>
                         <td>{{ formatDate(ds.creationDate) }}</td>
                         <td>{{ ds.entries }}</td>
                         <td>{{ bytesToSize(ds.size) }}</td>
@@ -86,7 +99,7 @@
                         </td>
                     </tr>
                     <tr v-if="paginatedDatasets.length === 0">
-                        <td :colspan="showActionsColumn ? 6 : 5" class="center aligned">
+                        <td :colspan="showActionsColumn ? 7 : 6" class="center aligned">
                             <h3>No datasets found</h3>
                             <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
                         </td>
@@ -94,7 +107,7 @@
                 </tbody>
                 <tfoot>
                     <tr>
-                        <th :colspan="showActionsColumn ? 6 : 5">
+                        <th :colspan="showActionsColumn ? 7 : 6">
                             <div class="ui grid three column">
                                 <div class="column left aligned middle aligned">
                                     <div class="ui left floated">
@@ -223,7 +236,9 @@ export default {
                     editing: false,
                     deleting: false,
                     name: ds.properties?.meta?.name?.data,
-                    permissions: ds.permissions
+                    tagline: ds.properties?.meta?.tagline?.data || '',
+                    permissions: ds.permissions,
+                    thumbError: false
                 };
             });
 
@@ -270,7 +285,8 @@ export default {
                 filtered = filtered.filter(ds => {
                     const name = (ds.name || ds.slug).toLowerCase();
                     const slug = ds.slug.toLowerCase();
-                    return name.includes(query) || slug.includes(query);
+                    const tagline = (ds.tagline || '').toLowerCase();
+                    return name.includes(query) || slug.includes(query) || tagline.includes(query);
                 });
             }
 
@@ -438,7 +454,8 @@ export default {
             this.dsDialogModel = {
                 slug: ds.slug,
                 name: ds.name || ds.slug, // Use slug as fallback if name is not available
-                visibility: ds.visibility !== undefined ? ds.visibility : 0
+                visibility: ds.visibility !== undefined ? ds.visibility : 0,
+                tagline: ds.tagline || ''
             };
             this.dsDialogMode = "edit";
             this.dsDialogOpen = true;
@@ -474,11 +491,13 @@ export default {
                         editing: false,
                         deleting: false,
                         name: newds.name,
+                        tagline: newds.tagline || '',
                         permissions: { canRead: true, canWrite: true, canDelete: true },
+                        thumbError: false,
                         ...loadingIndicator
                     });
 
-                    let ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility);
+                    let ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility, newds.tagline);
                     if (ret) {
                         // Find and update the temporary dataset
                         const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === newds.slug);
@@ -493,7 +512,9 @@ export default {
                                 editing: false,
                                 deleting: false,
                                 name: newds.name,
-                                permissions: { canRead: true, canWrite: true, canDelete: true }
+                                tagline: newds.tagline || '',
+                                permissions: { canRead: true, canWrite: true, canDelete: true },
+                                thumbError: false
                             });
                         }
 
@@ -536,11 +557,19 @@ export default {
                         let dsobj = this.org.Dataset(ret.slug);
                         let update = await dsobj.update(newds.name, newds.visibility);
 
+                        // Handle tagline update
+                        if (newds.tagline) {
+                            await dsobj.metaSet('tagline', newds.tagline);
+                        } else {
+                            await dsobj.metaUnset('tagline');
+                        }
+
                         if (update) {
                             // Update the object in the local dataset
                             this.$set(dsitem, 'slug', ret.slug);
                             this.$set(dsitem, 'name', newds.name);
                             this.$set(dsitem, 'visibility', newds.visibility);
+                            this.$set(dsitem, 'tagline', newds.tagline || '');
                         }
                     } else {
                         this.error = `Failed to update dataset \"${ds.slug}\"`;
@@ -568,6 +597,11 @@ export default {
 
         upload: function () {
             this.$router.push({ name: "Upload" });
+        },
+
+        getDatasetThumbUrl(ds) {
+            const dsobj = this.org.Dataset(ds.slug);
+            return dsobj.datasetThumbUrl(100);
         }
     }
 }
@@ -587,8 +621,45 @@ export default {
     }
 
     .ui.table {
+        .ds-thumb-header {
+            width: 70px;
+            cursor: default;
+
+            &:hover {
+                background: inherit !important;
+            }
+        }
+
+        .ds-thumb-cell {
+            width: 70px;
+            text-align: center;
+            padding: 4px !important;
+        }
+
+        .ds-thumb-img {
+            max-height: 48px;
+            max-width: 60px;
+            object-fit: contain;
+            border-radius: 3px;
+        }
+
+        .ds-thumb-placeholder {
+            opacity: 0.4;
+        }
+
         .ds-name {
             font-weight: bold;
+        }
+
+        .ds-tagline {
+            font-weight: normal;
+            color: #888;
+            font-size: 0.85em;
+            margin-top: 2px;
+            max-width: 350px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         th {
