@@ -1,0 +1,153 @@
+/**
+ * Mixin for measurement management (save, export, delete, clear).
+ * Shared between Map.vue and SingleMap.vue.
+ *
+ * The consuming component must provide:
+ *   - this.measureControls   (olMeasure.Controls instance)
+ *   - this.canWrite          (boolean)
+ *   - this.canDelete         (boolean)
+ *   - this.getActiveMeasurementEntry()  → the entry whose path is used for export/save
+ *   - this.initMeasurementStorage()     → (re)initialize this.measurementStorage if needed
+ */
+export default {
+    data() {
+        return {
+            measuring: false,
+            measurementStorage: null,
+            hasSavedMeasurements: false,
+            clearMeasurementsDialogOpen: false,
+            deleteSavedMeasurementsDialogOpen: false
+        };
+    },
+    methods: {
+        /**
+         * Handle clear all measurements
+         */
+        onClearAllMeasurements() {
+            this.measureControls.updateButtonsVisibility(false, this.hasSavedMeasurements);
+        },
+
+        /**
+         * Save measurements
+         */
+        async saveMeasurements() {
+            if (!this.canWrite) {
+                this.showAlert('Permission Denied', 'You do not have permission to save measurements in this dataset');
+                return;
+            }
+
+            if (!this.measureControls) {
+                this.showAlert('Error', 'Cannot save: measurement controls not initialized');
+                return;
+            }
+
+            if (!this.measureControls.hasMeasurements()) {
+                this.showAlert('Warning', 'No measurements to save');
+                return;
+            }
+
+            // Let the component initialize storage if needed
+            if (!this.measurementStorage) {
+                await this.initMeasurementStorage();
+
+                if (!this.measurementStorage) {
+                    this.showAlert('Error', 'Cannot save measurements: no valid target found.');
+                    return;
+                }
+            }
+
+            const activeEntry = this.getActiveMeasurementEntry();
+            if (!activeEntry) {
+                this.showAlert('Error', 'Cannot save: no entry found');
+                return;
+            }
+
+            try {
+                const geojson = this.measureControls.exportToGeoJSON(activeEntry.path);
+
+                if (!geojson.features || geojson.features.length === 0) {
+                    this.showAlert('Warning', 'No measurements to save');
+                    return;
+                }
+
+                await this.measurementStorage.save(geojson);
+                this.hasSavedMeasurements = true;
+                this.measureControls.updateButtonsVisibility(true, true);
+
+                console.log(`Saved ${geojson.features.length} measurements`);
+                this.showFlash(`Saved ${geojson.features.length} measurement(s)`, 'positive', 'check circle outline');
+            } catch (e) {
+                console.error('Error saving measurements:', e);
+                this.showAlert('Error', `Failed to save measurements: ${e.message}`);
+            }
+        },
+
+        /**
+         * Export measurements to file
+         */
+        exportMeasurementsToFile() {
+            const activeEntry = this.getActiveMeasurementEntry();
+            if (!this.measureControls || !activeEntry) return;
+
+            if (!this.measureControls.hasMeasurements()) {
+                this.showAlert('Warning', 'No measurements to export');
+                return;
+            }
+
+            const geojson = this.measureControls.exportToGeoJSON(activeEntry.path);
+
+            if (!geojson.features || geojson.features.length === 0) {
+                this.showAlert('Warning', 'No measurements to export');
+                return;
+            }
+
+            if (this.measurementStorage) {
+                this.measurementStorage.exportToFile(geojson);
+            }
+        },
+
+        /**
+         * Delete saved measurements
+         */
+        async deleteSavedMeasurements() {
+            if (!this.measurementStorage) return;
+
+            try {
+                await this.measurementStorage.delete();
+                this.hasSavedMeasurements = false;
+
+                this.measureControls.clearAllMeasurements();
+                this.measureControls.updateButtonsVisibility(
+                    this.measureControls.hasMeasurements(),
+                    false
+                );
+
+                console.log('Saved measurements deleted');
+                this.showFlash('Saved measurements deleted', 'positive', 'check circle outline');
+            } catch (e) {
+                console.error('Error deleting measurements:', e);
+                this.showAlert('Error', `Failed to delete measurements: ${e.message}`);
+            }
+        },
+
+        /**
+         * Handle clear measurements confirm dialog close
+         */
+        handleClearMeasurementsDialogClose(result) {
+            this.clearMeasurementsDialogOpen = false;
+            if (result === 'confirm' && this.measureControls) {
+                this.measureControls.confirmClearAll();
+            }
+        },
+
+        /**
+         * Handle delete saved measurements confirm dialog close
+         */
+        handleDeleteSavedMeasurementsDialogClose(result) {
+            this.deleteSavedMeasurementsDialogOpen = false;
+            if (result === 'confirm') {
+                this.measureControls.confirmDeleteSaved();
+            }
+        }
+    }
+};

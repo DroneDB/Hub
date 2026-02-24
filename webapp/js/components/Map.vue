@@ -6,26 +6,21 @@
             'cursor-crosshair': selectPolygon
         }">
             <olMeasure ref="measure" />
+            <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
         </div>
-        <Alert :title="alertTitle" v-if="alertDialogOpen" @onClose="handleAlertDialogClose">
-            {{ alertMessage }}
-        </Alert>
-        <ConfirmDialog v-if="clearMeasurementsDialogOpen"
-            title="Clear All Measurements"
-            message="Are you sure you want to clear all measurements?"
-            confirmText="Clear"
-            cancelText="Cancel"
-            confirmButtonClass="negative"
-            @onClose="handleClearMeasurementsDialogClose">
-        </ConfirmDialog>
-        <ConfirmDialog v-if="deleteSavedMeasurementsDialogOpen"
-            title="Delete Saved Measurements"
-            message="Are you sure you want to delete saved measurements?"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="negative"
-            @onClose="handleDeleteSavedMeasurementsDialogClose">
-        </ConfirmDialog>
+        <MapDialogs
+            :alertDialogOpen="alertDialogOpen"
+            :alertTitle="alertTitle"
+            :alertMessage="alertMessage"
+            :clearMeasurementsDialogOpen="clearMeasurementsDialogOpen"
+            :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen"
+            :flashMessage="flashMessage"
+            :flashColor="flashColor"
+            :flashIcon="flashIcon"
+            @alertClose="handleAlertDialogClose"
+            @clearMeasurementsClose="handleClearMeasurementsDialogClose"
+            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose"
+            @flashClose="closeFlash" />
         <ChangeUnitsDialog v-if="changeUnitsDialogOpen"
             :targetUnit="changeUnitsTargetUnit"
             :measurementsCount="changeUnitsMeasurementsCount"
@@ -41,7 +36,6 @@
             @unitsChanged="handleUnitsChanged"
             @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
         </MapSettingsDialog>
-        <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
         <div ref="imagePopup" class="image-popup" v-show="imagePopupVisible">
             <div class="image-popup-header">
                 <span class="image-popup-title">{{ imagePopupFileName }}</span>
@@ -90,7 +84,7 @@ import LineString from 'ol/geom/LineString';
 import Polygon from 'ol/geom/Polygon';
 import { fromExtent } from 'ol/geom/Polygon';
 import GeoJSON from 'ol/format/GeoJSON';
-import Overlay from 'ol/Overlay'; // Add overlay for tooltips
+import Overlay from 'ol/Overlay';
 
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
@@ -101,6 +95,8 @@ import olSettings from './olSettings';
 import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
 import Toolbar from './Toolbar.vue';
+import OpacityControl from './OpacityControl.vue';
+import MapDialogs from './MapDialogs.vue';
 import Keyboard from '../libs/keyboard';
 import Mouse from '../libs/mouse';
 import { rootPath } from '../dynamic/pathutils';
@@ -108,23 +104,27 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { isMobile } from '../libs/responsive';
 import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '../libs/basemaps';
 import * as flatgeobuf from 'flatgeobuf';
-import Vue from 'vue';
-import FeatureInfoDialog from './FeatureInfoDialog.vue';
 import { extractFeatureDisplayName } from '../libs/propertiesUtils';
 import { MeasurementStorage } from '../libs/measurementStorage';
-import Alert from './Alert.vue';
-import ConfirmDialog from './ConfirmDialog.vue';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
-import Flash from './Flash.vue';
+import { getVectorColor } from '../libs/mapUtils';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
+
+// Mixins
+import mapAlertFlash from '../mixins/mapAlertFlash';
+import mapBasemap from '../mixins/mapBasemap';
+import mapTooltip from '../mixins/mapTooltip';
+import mapMeasurements from '../mixins/mapMeasurements';
 
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, FeatureInfoDialog, Alert, ConfirmDialog, ChangeUnitsDialog, MapSettingsDialog, Flash
-    }, props: {
+        Map, Toolbar, olMeasure, OpacityControl, MapDialogs, ChangeUnitsDialog, MapSettingsDialog
+    },
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
+    props: {
         files: {
             type: Array,
             required: true
@@ -234,37 +234,19 @@ export default {
             selectPolygon: false,
             initialExtent: null,
             vectorLayers: [],
-            vectorLayerColors: {}, // Store colors for vector layers
-            tooltipElement: null,  // Element for vector feature tooltips
-            tooltipOverlay: null,  // Overlay for tooltips
+            vectorLayerColors: {},
             selectedBasemap: localStorage.getItem('selectedBasemap') || 'satellite',
-            basemaps: Basemaps,
-            customBasemapConfig: getCustomBasemapConfig(),
-            measuring: false,
-            measurementStorage: null,
-            hasSavedMeasurements: false,
             currentOrthophotoEntry: null,
             mapSettingsDialogOpen: false,
             showFlightPath: savedFlightPath,
             showDirectionIndicators: savedDirectionIndicators,
             currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric',
 
-            // Alert dialog
-            alertDialogOpen: false,
-            alertTitle: '',
-            alertMessage: '',
-
-            // Confirm dialogs
-            clearMeasurementsDialogOpen: false,
-            deleteSavedMeasurementsDialogOpen: false,
+            // Change units dialog
             changeUnitsDialogOpen: false,
             changeUnitsTargetUnit: 'metric',
             changeUnitsPreviousUnit: 'metric',
             changeUnitsMeasurementsCount: 0,
-
-            // Flash message
-            flashMessage: null,
-            flashIcon: 'check circle outline',
 
             // Image popup
             imagePopupVisible: false,
@@ -276,7 +258,8 @@ export default {
             imagePopupCoords: '',
             imagePopupCoordsCopied: false,
             imagePopupOverlay: null,
-            flashColor: 'positive'
+            rasterOpacity: 1.0,
+            hasRasters: false
         };
     },
     mounted: function () {
@@ -307,6 +290,9 @@ export default {
         }
     },
     watch: {
+        rasterOpacity: function () {
+            this.updateRastersOpacity();
+        },
         files: {
             deep: true,
             handler: function (newVal, oldVal) {
@@ -334,139 +320,16 @@ export default {
             }
         }
     },
-    methods: {        // Generate a unique color based on the file name or index
+    methods: {
+        // Generate a unique color based on the file name or index
         getVectorFileColor: function (file, index) {
-            // If we already have a color for this file, return it
-            if (this.vectorLayerColors[file.entry.path]) {
-                return this.vectorLayerColors[file.entry.path];
-            }
-
-            // Color palette for vector layers - bright, distinct colors with good contrast
-            const colorPalette = [
-                'rgba(66, 133, 244, 0.8)',    // Blue
-                'rgba(219, 68, 55, 0.8)',     // Red
-                'rgba(15, 157, 88, 0.8)',     // Green
-                'rgba(244, 160, 0, 0.8)',     // Yellow
-                'rgba(171, 71, 188, 0.8)',    // Purple
-                'rgba(255, 87, 34, 0.8)',     // Deep Orange
-                'rgba(3, 169, 244, 0.8)',     // Light Blue
-                'rgba(0, 150, 136, 0.8)',     // Teal
-                'rgba(124, 77, 255, 0.8)',    // Deep Purple
-                'rgba(229, 57, 53, 0.8)',     // Red
-                'rgba(0, 200, 83, 0.8)',      // Green
-                'rgba(253, 216, 53, 0.8)'     // Yellow
-            ];
-
-            // Use the index to select a color or generate a hash-based color for more files
-            let color;
-            if (index < colorPalette.length) {
-                color = colorPalette[index];
-            } else {
-                // Generate a more sophisticated hash-based color
-                // This uses HSL to ensure good saturation and lightness
-                const hash = this.stringToHashCode(file.entry.path);
-
-                // Get hue from 0-360 based on hash
-                const hue = hash % 360;
-                // Fixed high saturation for visibility
-                const saturation = 80;
-                // Medium lightness for good contrast
-                const lightness = 45;
-
-                color = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`;
-            }
-
-            // Store the color for future reference
-            this.vectorLayerColors[file.entry.path] = color;
-            return color;
+            return getVectorColor(file.entry.path, index, this.vectorLayerColors);
         },
 
-        // Helper to generate a numeric hash from a string
-        stringToHashCode: function (str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = ((hash << 5) - hash) + str.charCodeAt(i);
-                hash = hash & hash; // Convert to 32bit integer
-            }
-            return Math.abs(hash);
-        },
-        // Setup tooltip overlay for vector features
-        setupTooltipOverlay: function () {
-            // Create tooltip element
-            this.tooltipElement = document.createElement('div');
-            this.tooltipElement.className = 'vector-tooltip';
-            this.tooltipElement.style.cssText =
-                'position: absolute; ' +
-                'background-color: rgba(255, 255, 255, 0.9); ' +
-                'color: #333; ' +
-                'padding: 6px 10px; ' +
-                'border-radius: 4px; ' +
-                'border: 1px solid rgba(0, 0, 0, 0.2); ' +
-                'font-size: 13px; ' +
-                'font-weight: bold; ' +
-                'box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15); ' +
-                'pointer-events: none; ' +
-                'z-index: 1000; ' +
-                'max-width: 300px; ' +
-                'white-space: nowrap; ' +
-                'overflow: hidden; ' +
-                'text-overflow: ellipsis; ' +
-                'display: none;';
-
-            // Create and add the overlay to the map
-            this.tooltipOverlay = new Overlay({
-                element: this.tooltipElement,
-                offset: [12, 0],
-                positioning: 'center-left'
-            });
-        },
-        // Display tooltip with feature info
-        showFeatureTooltip: function (feature, pixel) {
-            if (!this.tooltipElement || !this.tooltipOverlay) return;
-
-            // Get feature info
-            let content = '';
-
-            // Try to get feature name from properties
-            const properties = feature.getProperties();
-
-            // Extract display name from properties
-            content = extractFeatureDisplayName(properties);
-
-            // Fallback to file name if no label is found
-            if (content === 'Unknown feature') {
-                const layer = this.findVectorLayerForFeature(feature);
-                if (layer && layer.file) {
-                    content = layer.file.name || 'Unknown layer';
-                }
-            }
-
-            // Set content and show tooltip
-            this.tooltipElement.innerHTML = content;
-            this.tooltipElement.style.display = 'block';
-            this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
-        },
-
-        // Hide tooltip
-        hideFeatureTooltip: function () {
-            if (this.tooltipElement) {
-                this.tooltipElement.style.display = 'none';
-            }
-        },
-
-        // Find the vector layer that contains a feature
-        findVectorLayerForFeature: function (feature) {
-            for (let i = 0; i < this.vectorLayers.length; i++) {
-                const layer = this.vectorLayers[i];
-                const source = layer.getSource();
-
-                // Check if this source contains the feature
-                if (source.getFeatures().some(f => f === feature)) {
-                    return layer;
-                }
-            }
-
-            return null;
+        // Override tooltip fallback label for Map (uses layer.file)
+        getLayerDisplayName: function (layer) {
+            if (layer && layer.file) return layer.file.name || (layer.file.entry && layer.file.entry.name) || '';
+            return '';
         },
 
         // Show image popup overlay on the map
@@ -558,48 +421,6 @@ export default {
                 document.body.removeChild(ta);
                 this.imagePopupCoordsCopied = true;
                 setTimeout(() => { this.imagePopupCoordsCopied = false; }, 2000);
-            });
-        },
-
-        // Show dialog with feature properties
-        showFeaturePropertiesDialog: function (feature) {
-            // Get feature properties
-            const properties = { ...feature.getProperties() };
-            delete properties.geometry; // Remove geometry from properties
-
-            // Try to get a good title for the dialog
-            let title = 'Feature Properties';
-
-            // Find the layer that contains this feature
-            const layer = this.findVectorLayerForFeature(feature);
-
-            // Get file name for the dialog title
-            if (layer && layer.file) {
-                const fileName = layer.file.name || layer.file.entry.name || '';
-                if (fileName) {
-                    title = `${fileName} - Feature Properties`;
-                }
-
-                // If there's a name property, include it in the title
-                if (properties.name) {
-                    title = `${fileName} - ${properties.name}`;
-                }
-            }            // Use the FeatureInfoDialog component
-            const DialogComponent = Vue.extend(FeatureInfoDialog);
-            const dialogInstance = new DialogComponent({
-                propsData: {
-                    title: title,
-                    properties: properties
-                }
-            });
-
-            dialogInstance.$mount();
-            document.body.appendChild(dialogInstance.$el);
-
-            // Handle close event
-            dialogInstance.$on('onClose', () => {
-                document.body.removeChild(dialogInstance.$el);
-                dialogInstance.$destroy();
             });
         },
 
@@ -1849,10 +1670,12 @@ export default {
                 this.selectionControl.setClearButtonVisible(hasSelection);
             }
         }, updateRastersOpacity: function () {
+            const baseOpacity = this.rasterOpacity;
             this.rasterLayer.getLayers().forEach(layer => {
-                if (layer.file.selected) layer.setOpacity(0.8);
-                else layer.setOpacity(1.0);
+                if (layer.file.selected) layer.setOpacity(baseOpacity * 0.8);
+                else layer.setOpacity(baseOpacity);
             });
+            this.hasRasters = this.rasterLayer.getLayers().getLength() > 0;
 
             // For vector layers, no need to update the style manually
             // since we're using a style function that checks the selection state
@@ -1864,41 +1687,8 @@ export default {
             });
         },
         /**
-         * Create a TileLayer for the current basemap selection
+         * Override base mixin to also persist selection to localStorage.
          */
-        createBasemapLayer: function () {
-            if (this.selectedBasemap === 'custom') {
-                const config = this.customBasemapConfig;
-                if (config && config.url) {
-                    const attributions = config.attribution ? [config.attribution] : [];
-                    if (config.sourceType === 'wms') {
-                        return new TileLayer({
-                            source: new TileWMS({
-                                url: config.url,
-                                params: { LAYERS: config.layerName, TILED: true },
-                                attributions: attributions
-                            })
-                        });
-                    } else {
-                        return new TileLayer({
-                            source: new XYZ({
-                                url: config.url,
-                                attributions: attributions
-                            })
-                        });
-                    }
-                }
-            }
-            // Default: built-in basemap (or fallback for invalid custom)
-            const basemap = this.basemaps[this.selectedBasemap] || this.basemaps['satellite'];
-            return new TileLayer({
-                source: new XYZ({
-                    url: basemap.url,
-                    attributions: basemap.attributions
-                })
-            });
-        },
-
         updateBasemap: function () {
             const newLayer = this.createBasemapLayer();
             const layers = this.map.getLayers();
@@ -1995,165 +1785,25 @@ export default {
         },
 
         /**
-         * Save measurements
+         * Required by mapMeasurements mixin — returns the entry used for measurement export path.
          */
-        saveMeasurements: async function() {
-            // Check write permissions first
-            if (!this.canWrite) {
-                this.showAlert('Permission Denied', 'You do not have permission to save measurements in this dataset');
-                return;
-            }
-
-            if (!this.measureControls) {
-                console.error('Cannot save: measureControls not initialized');
-                this.showAlert('Error', 'Cannot save: measurement controls not initialized');
-                return;
-            }
-
-            if (!this.measureControls.hasMeasurements()) {
-                this.showAlert('Warning', 'No measurements to save');
-                return;
-            }
-
-            // Try to initialize measurement storage if not already done
-            if (!this.measurementStorage) {
-                console.log('Measurement storage not initialized, trying to initialize now...');
-                await this.loadMeasurementsForOrthophotos();
-
-                // If still no storage (no orthophoto/point cloud), create a standalone measurements file
-                if (!this.measurementStorage && this.dataset) {
-                    console.log('No orthophoto found, using standalone measurements.geojson');
-                    const currentFolder = this.getCurrentFolder();
-                    const measurementsPath = currentFolder ? `${currentFolder}/measurements.geojson` : 'measurements.geojson';
-                    this.currentOrthophotoEntry = { path: measurementsPath };
-                    this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
-                }
-
-                if (!this.measurementStorage) {
-                    console.error('Cannot save: dataset not available');
-                    this.showAlert('Error', 'Cannot save measurements: dataset not available.');
-                    return;
-                }
-            }
-
-            try {
-                const geojson = this.measureControls.exportToGeoJSON(this.currentOrthophotoEntry.path);
-
-                if (!geojson.features || geojson.features.length === 0) {
-                    this.showAlert('Warning', 'No measurements to save');
-                    return;
-                }
-
-                await this.measurementStorage.save(geojson);
-                this.hasSavedMeasurements = true;
-
-                // Update button visibility
-                this.measureControls.updateButtonsVisibility(true, true);
-
-                console.log(`Saved ${geojson.features.length} measurements`);
-                this.showFlash(`Saved ${geojson.features.length} measurement(s)`, 'positive', 'check circle outline');
-            } catch (e) {
-                console.error('Error saving measurements:', e);
-                this.showAlert('Error', `Failed to save measurements: ${e.message}`);
-            }
+        getActiveMeasurementEntry: function() {
+            return this.currentOrthophotoEntry;
         },
 
         /**
-         * Handle clear all measurements
+         * Required by mapMeasurements mixin — (re)initializes measurementStorage if needed.
          */
-        onClearAllMeasurements: function() {
-            // Update button visibility after clear
-            this.measureControls.updateButtonsVisibility(false, this.hasSavedMeasurements);
-        },
+        initMeasurementStorage: async function() {
+            await this.loadMeasurementsForOrthophotos();
 
-        /**
-         * Export measurements to file
-         */
-        exportMeasurementsToFile: function() {
-            if (!this.measureControls || !this.currentOrthophotoEntry) {
-                return;
-            }
-
-            if (!this.measureControls.hasMeasurements()) {
-                this.showAlert('Warning', 'No measurements to export');
-                return;
-            }
-
-            const geojson = this.measureControls.exportToGeoJSON(this.currentOrthophotoEntry.path);
-
-            if (!geojson.features || geojson.features.length === 0) {
-                this.showAlert('Warning', 'No measurements to export');
-                return;
-            }
-
-            // Use MeasurementStorage's export method
-            if (this.measurementStorage) {
-                this.measurementStorage.exportToFile(geojson);
-            }
-        },
-
-        /**
-         * Delete saved measurements
-         */
-        deleteSavedMeasurements: async function() {
-            if (!this.measurementStorage) {
-                return;
-            }
-
-            try {
-                await this.measurementStorage.delete();
-                this.hasSavedMeasurements = false;
-
-                // Clear measurements from the map
-                this.measureControls.clearAllMeasurements();
-
-                // Update button visibility
-                this.measureControls.updateButtonsVisibility(
-                    this.measureControls.hasMeasurements(),
-                    false
-                );
-
-                console.log('Saved measurements deleted');
-                this.showFlash('Saved measurements deleted', 'positive', 'check circle outline');
-            } catch (e) {
-                console.error('Error deleting measurements:', e);
-                this.showAlert('Error', `Failed to delete measurements: ${e.message}`);
-            }
-        },
-
-        /**
-         * Show alert dialog
-         */
-        showAlert: function(title, message) {
-            this.alertTitle = title;
-            this.alertMessage = message;
-            this.alertDialogOpen = true;
-        },
-
-        /**
-         * Handle alert dialog close
-         */
-        handleAlertDialogClose: function() {
-            this.alertDialogOpen = false;
-        },
-
-        /**
-         * Handle clear measurements dialog close
-         */
-        handleClearMeasurementsDialogClose: function(result) {
-            this.clearMeasurementsDialogOpen = false;
-            if (result === 'confirm' && this.measureControls) {
-                this.measureControls.confirmClearAll();
-            }
-        },
-
-        /**
-         * Handle delete saved measurements dialog close
-         */
-        handleDeleteSavedMeasurementsDialogClose: function(result) {
-            this.deleteSavedMeasurementsDialogOpen = false;
-            if (result === 'confirm') {
-                this.measureControls.confirmDeleteSaved();
+            // If still no storage (no orthophoto/point cloud), create a standalone measurements file
+            if (!this.measurementStorage && this.dataset) {
+                console.log('No orthophoto found, using standalone measurements.geojson');
+                const currentFolder = this.getCurrentFolder();
+                const measurementsPath = currentFolder ? `${currentFolder}/measurements.geojson` : 'measurements.geojson';
+                this.currentOrthophotoEntry = { path: measurementsPath };
+                this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
             }
         },
 
@@ -2212,22 +1862,6 @@ export default {
                 this.measureControls.applyUnitsChange(newUnit);
                 this.currentUnitPref = newUnit;
             }
-        },
-
-        /**
-         * Show flash message
-         */
-        showFlash: function(message, color = 'positive', icon = 'check circle outline') {
-            this.flashMessage = message;
-            this.flashColor = color;
-            this.flashIcon = icon;
-        },
-
-        /**
-         * Close flash message
-         */
-        closeFlash: function() {
-            this.flashMessage = null;
         }
     }
 }
