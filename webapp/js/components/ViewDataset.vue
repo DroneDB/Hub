@@ -4,24 +4,26 @@
         <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
             mobileCollapsed>
             <div class="sidebar">
-                <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" :canWrite="canWrite" @openItem="handleOpenItem"
+                <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
                     @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                     @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                     @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
+                    @setAsCover="setAsCover"
                     @downloadItems="handleDownloadItems"
                     @openAsText="handleOpenAsText" @error="handleError" />
             </div>
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
                 ref="mainTabSwitcher">
                 <template v-if="isMobile" v-slot:filebrowser>
-                    <FileBrowser :rootNodes="rootNodes" :canWrite="canWrite" @openItem="handleOpenItem"
+                    <FileBrowser :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
                         @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                         @openProperties="handleFileBrowserOpenProperties"
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
                         @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
                         @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
+                        @setAsCover="setAsCover"
                         @downloadItems="handleDownloadItems"
                         @openAsText="handleOpenAsText" @error="handleError" />
                 </template> <template v-slot:map>
@@ -34,6 +36,7 @@
                         :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
+                        @setAsCover="setAsCover"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
 
@@ -43,6 +46,7 @@
                             :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                             @transferSelectedItems="openTransferItemsDialog"
+                            @setAsCover="setAsCover"
                             @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                             @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                             @selectionChanged="handleTableSelectionChanged" />
@@ -60,6 +64,7 @@
                         :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                         @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                         @transferSelectedItems="openTransferItemsDialog"
+                        @setAsCover="setAsCover"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                         @selectionChanged="handleTableSelectionChanged" />
@@ -88,6 +93,12 @@
         <RescanConfirmDialog v-if="rescanConfirmDialogOpen"
             @onClose="handleRescanConfirmClose">
         </RescanConfirmDialog>
+        <ConfirmDialog v-if="setCoverDialogOpen"
+            title="Replace Dataset Cover"
+            message="A dataset cover already exists. Do you want to replace it? This action is irreversible."
+            confirmText="Replace"
+            confirmButtonClass="negative"
+            @onClose="handleSetCoverClose" />
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
         <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
@@ -122,6 +133,12 @@
             :readonly="textEditorReadonly"
             @onClose="handleTextEditorClose"
             @saved="handleTextEditorSaved"
+        />
+        <PdfViewerDialog
+            v-if="pdfViewerOpen"
+            :dataset="dataset"
+            :entry="pdfViewerEntry"
+            @close="handlePdfViewerClose"
         />
         <FsLightbox
             v-if="lightboxSources.length > 0"
@@ -160,6 +177,7 @@ import DeleteDialog from './DeleteDialog.vue';
 import DeleteResultDialog from './DeleteResultDialog.vue';
 import RescanResultDialog from './RescanResultDialog.vue';
 import RescanConfirmDialog from './RescanConfirmDialog.vue';
+import ConfirmDialog from './ConfirmDialog.vue';
 import RenameDialog from './RenameDialog.vue';
 import NewFolderDialog from './NewFolderDialog.vue';
 import TransferDialog from './TransferDialog.vue';
@@ -179,6 +197,7 @@ import ShareEmbed from './ShareEmbed.vue';
 import BuildHistory from './BuildHistory.vue';
 import FileAvailabilityDialog from './FileAvailabilityDialog.vue';
 import TextEditorDialog from './TextEditorDialog.vue';
+import PdfViewerDialog from './PdfViewerDialog.vue';
 import FsLightbox from 'fslightbox-vue/v2';
 
 import icons from '../libs/icons';
@@ -191,7 +210,7 @@ import { renameDataset, entryLabel } from '../libs/registryUtils';
 import { b64encode } from '../libs/base64';
 import BuildManager from '../libs/buildManager';
 import FileAvailabilityChecker from '../libs/fileAvailabilityChecker';
-import { shouldOpenAsText, canOpenAsText } from '../libs/textFileUtils';
+import { shouldOpenAsText, canOpenAsText, isPdfFile } from '../libs/textFileUtils';
 
 import ddb from 'ddb';
 import { coordAll } from '@turf/meta';
@@ -223,6 +242,7 @@ export default {
         DeleteResultDialog,
         RescanResultDialog,
         RescanConfirmDialog,
+        ConfirmDialog,
         RenameDialog,
         NewFolderDialog,
         TransferDialog,
@@ -233,6 +253,7 @@ export default {
         BuildHistory,
         FileAvailabilityDialog,
         TextEditorDialog,
+        PdfViewerDialog,
         FsLightbox
     },
     data: function () {
@@ -298,6 +319,10 @@ export default {
             textEditorDialogOpen: false,
             textEditorEntry: null,
             textEditorReadonly: false,
+
+            // PDF viewer dialog
+            pdfViewerOpen: false,
+            pdfViewerEntry: null,
 
             // Image lightbox
             lightboxToggler: false,
@@ -525,7 +550,7 @@ export default {
 
                 return entries.map(e => {
                     return {
-                        icon: icons.getForType(e.type),
+                        icon: icons.getForType(e.type, e.path),
                         label: utils.entryLabel(e),
                         path: e.path,
                         expanded: true,
@@ -578,6 +603,12 @@ export default {
                     this.showError(error.message, "Error");
                 }
             } else {
+                // Open PDF in viewer
+                if (isPdfFile(node.entry)) {
+                    this.openPdfViewer(node.entry);
+                    return;
+                }
+
                 // Open images in lightbox
                 const entryType = node.entry.type;
                 if (entryType === ddb.entry.type.IMAGE || entryType === ddb.entry.type.GEOIMAGE) {
@@ -685,6 +716,16 @@ export default {
         handleTextEditorClose: function() {
             this.textEditorDialogOpen = false;
             this.textEditorEntry = null;
+        },
+
+        openPdfViewer: function(entry) {
+            this.pdfViewerEntry = entry;
+            this.pdfViewerOpen = true;
+        },
+
+        handlePdfViewerClose: function() {
+            this.pdfViewerOpen = false;
+            this.pdfViewerEntry = null;
         },
 
         handleTextEditorSaved: function(path) {

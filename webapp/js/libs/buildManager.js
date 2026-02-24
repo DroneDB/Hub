@@ -541,5 +541,6 @@ class BuildManager {
     }
 }
 
-// Export a singleton instance
+// Export a singleton instance and build states
+export { BUILD_STATES };
 export default new BuildManager();

@@ -92,7 +92,7 @@ import Toolbar from './Toolbar.vue';
 import Keyboard from '../libs/keyboard';
 import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
-import BuildManager from '../libs/buildManager';
+import BuildManager, { BUILD_STATES } from '../libs/buildManager';
 import { isInternalDrag, dragDropMixin } from '../libs/dragDropUtils';
 
 import ddb from 'ddb';
@@ -100,6 +100,8 @@ const { pathutils, entry } = ddb;
 
 import ContextMenu from './ContextMenu';
 import reg from '../libs/sharedRegistry';
+import { Features } from '../libs/features';
+import { isPdfFile } from '../libs/textFileUtils';
 
 export default {
     mixins: [dragDropMixin],
@@ -253,6 +255,15 @@ export default {
                     });
                 }
             }, {
+                label: 'Open PDF',
+                icon: 'file pdf outline',
+                isVisible: () => { return this.selectedFiles.length === 1 && isPdfFile(this.selectedFiles[0].entry); },
+                click: () => {
+                    this.selectedFiles.forEach(f => {
+                        this.$emit('openItem', f);
+                    });
+                }
+            }, {
                 label: "Rename",
                 icon: 'pencil alternate',
                 isVisible: () => { return this.canWrite && this.selectedFiles.length == 1; },
@@ -297,12 +308,34 @@ export default {
                     this.buildSelectedFile();
                 }
             }, {
-                label: "Transfer to Dataset...",
+                label: "Transfer to Dataset",
                 icon: 'exchange',
                 isVisible: () => { return reg.isLoggedIn() && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
                 accelerator: "CmdOrCtrl+T",
                 click: () => {
                     this.$emit("transferSelectedItems");
+                }
+            }, {
+                label: "Set as Dataset Thumbnail",
+                icon: 'image',
+                isVisible: () => {
+                    if (!this.canWrite || this.selectedFiles.length !== 1) return false;
+                    const file = this.selectedFiles[0];
+                    const type = file.entry.type;
+                    const isImageType = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER].includes(type);
+                    if (!isImageType) return false;
+                    // Hide for files that are themselves thumbnail candidates
+                    const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+                    if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
+                    if (type === ddb.entry.type.GEORASTER) {
+                        const buildState = BuildManager.getBuildState(this.dataset, file.entry.path);
+                        if (!buildState) return true;
+                        return buildState.currentState !== BUILD_STATES.FAILED && !this.hasActiveBuild(file);
+                    }
+                    return true;
+                },
+                click: () => {
+                    this.$emit("setAsCover", this.selectedFiles[0]);
                 }
             }, {
                 isVisible: () => { return this.selectedFiles.length > 0; },

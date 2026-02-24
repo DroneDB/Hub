@@ -2,6 +2,9 @@
  * Dialog Manager Mixin
  * Manages the state and handlers for various dialogs in ViewDataset
  */
+import reg from '../libs/sharedRegistry';
+import { Features } from '../libs/features';
+
 export default {
     data() {
         return {
@@ -25,7 +28,10 @@ export default {
             deleteResultData: { deleted: [], failed: {} },
             rescanResultDialogOpen: false,
             rescanResultData: null,
-            rescanConfirmDialogOpen: false
+            rescanConfirmDialogOpen: false,
+            setCoverDialogOpen: false,
+            setCoverFile: null,
+            setCoverExistingCovers: []
         };
     },
 
@@ -348,6 +354,85 @@ export default {
         handleRescanResultClose() {
             this.rescanResultDialogOpen = false;
             this.rescanResultData = null;
+        },
+
+        // Set as Dataset Cover
+        async setAsCover(file) {
+            try {
+                // Get the thumbnail candidates from features
+                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+                if (!candidates || candidates.length === 0) {
+                    this.showError('Dataset thumbnail candidates not configured', 'Error');
+                    return;
+                }
+
+                // Check if any cover already exists in the dataset root
+                const rootEntries = await this.dataset.list();
+                const existingCovers = rootEntries.filter(e => {
+                    const filename = e.path.split('/').pop().toLowerCase();
+                    return candidates.some(c => c.toLowerCase() === filename);
+                });
+
+                this.setCoverFile = file;
+
+                if (existingCovers.length > 0) {
+                    this.setCoverExistingCovers = existingCovers;
+                    this.setCoverDialogOpen = true;
+                } else {
+                    await this.performSetAsCover();
+                }
+            } catch (e) {
+                this.showError(e.message || e, 'Set as Dataset Cover');
+            }
+        },
+
+        handleSetCoverClose(id) {
+            this.setCoverDialogOpen = false;
+            if (id === 'confirm') {
+                this.performSetAsCover();
+            } else {
+                this.setCoverFile = null;
+                this.setCoverExistingCovers = [];
+            }
+        },
+
+        async performSetAsCover() {
+            try {
+                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+                const targetFilename = candidates[0];
+                const file = this.setCoverFile;
+
+                this.isBusy = true;
+
+                // Delete all existing cover files
+                if (this.setCoverExistingCovers.length > 0) {
+                    const coverPaths = this.setCoverExistingCovers.map(e => e.path);
+                    await this.dataset.deleteObjs(coverPaths);
+                    this.$root.$emit('deleteEntries', coverPaths);
+                }
+
+                // Fetch the thumbnail at 1024px
+                const thumbUrl = this.dataset.thumbUrl(file.entry.path, 1024);
+                const response = await fetch(thumbUrl, { credentials: 'include' });
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch thumbnail: ${response.statusText}`);
+                }
+                const blob = await response.blob();
+
+                // Upload to the dataset root with the target filename
+                await this.dataset.uploadObj(targetFilename, new File([blob], targetFilename, { type: blob.type }));
+
+                this.flash = 'Dataset cover set successfully';
+
+                // Refresh entries to show the new file
+                this.$root.$emit('refreshEntries');
+            } catch (e) {
+                this.showError(e.message || e, 'Set as Dataset Cover');
+            } finally {
+                this.isBusy = false;
+                this.setCoverFile = null;
+                this.setCoverExistingCovers = [];
+            }
         },
 
         // Error Dialog

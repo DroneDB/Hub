@@ -11,10 +11,13 @@
             </div>
             <div id="src" v-on:click="search()"><i class="icon search"></i></div>
         </div>
-        <TreeView :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
+        <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
             :getChildren="getChildren" />
         <div v-if="loading" class="loading">
             <i class="icon circle notch spin" />
+        </div>
+        <div v-if="!loading && noResults" class="no-results">
+            No files found
         </div>
     </div>
 </template>
@@ -29,6 +32,8 @@ import icons from '../libs/icons';
 import { clone, debounce } from '../libs/utils';
 import { canOpenAsText, shouldOpenAsText } from '../libs/textFileUtils';
 import reg from '../libs/sharedRegistry';
+import BuildManager, { BUILD_STATES } from '../libs/buildManager';
+import { Features } from '../libs/features';
 
 const { pathutils } = ddb;
 
@@ -44,6 +49,10 @@ export default {
         canWrite: {
             type: Boolean,
             default: false
+        },
+        dataset: {
+            type: Object,
+            default: null
         }
     },
     data: function () {
@@ -125,7 +134,7 @@ export default {
             }
         },
         {
-            label: "Transfer to Dataset...",
+            label: "Transfer to Dataset",
             icon: 'exchange',
             isVisible: () => { return reg.isLoggedIn() && this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
             accelerator: "CmdOrCtrl+T",
@@ -133,6 +142,33 @@ export default {
                 if (this.lastSelectedNode !== null) {
                     this.$emit('selectionChanged', [this.lastSelectedNode.node]);
                     this.$emit("transferSelectedItems");
+                }
+            }
+        },
+        {
+            label: "Set as Dataset Thumbnail",
+            icon: 'image',
+            isVisible: () => {
+                if (!this.canWrite || this.lastSelectedNode === null) return false;
+                const node = this.lastSelectedNode.node;
+                const type = node.entry.type;
+                const isImageType = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER].includes(type);
+                if (!isImageType) return false;
+                // Hide for files that are themselves thumbnail candidates
+                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+                if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(node.entry.path).toLowerCase())) return false;
+                if (type === ddb.entry.type.GEORASTER) {
+                    if (!this.dataset) return false;
+                    const buildState = BuildManager.getBuildState(this.dataset, node.entry.path);
+                    if (!buildState) return true;
+                    return buildState.currentState !== BUILD_STATES.FAILED;
+                }
+                return true;
+            },
+            click: () => {
+                if (this.lastSelectedNode !== null) {
+                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                    this.$emit("setAsCover", this.lastSelectedNode.node);
                 }
             }
         },
@@ -162,11 +198,13 @@ export default {
             filterRaw: null,
             filter: null,
             searchStaticPaths: null,
+            noResults: false,
         };
     },
     watch: {
         filterRaw: debounce(function (newVal) {
             this.filter = newVal;
+            if ((newVal == null || newVal.length === 0) && this.searchStaticPaths == null) return;
             this.search();
         }, 500)
     },
@@ -181,6 +219,7 @@ export default {
             this.filter = null;
             this.searchStaticPaths = null;
             this.filterRaw = null;
+            this.noResults = false;
             await this.refreshNodes();
         },
 
@@ -220,7 +259,7 @@ export default {
                     .map(entry => {
                         const base = pathutils.basename(entry.path);
                         return {
-                            icon: icons.getForType(entry.type),
+                            icon: icons.getForType(entry.type, entry.path),
                             label: base,
                             path: pathutils.join(rootPath, entry.path),
                             selected: false,
@@ -231,6 +270,8 @@ export default {
 
                 this.searchStaticPaths = {};
                 this.searchStaticPaths[rootPath] = res;
+
+                this.noResults = res.length === 0;
 
                 await this.refreshNodes();
 
@@ -282,7 +323,7 @@ export default {
                         const base = pathutils.basename(entry.path);
 
                         return {
-                            icon: icons.getForType(entry.type),
+                            icon: icons.getForType(entry.type, entry.path),
                             label: base,
                             path: pathutils.join(path, base),
                             selected: false,
@@ -445,6 +486,13 @@ export default {
         display: flex;
         align-items: center;
         margin-top: -4px;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 16px;
+        color: #999;
+        font-style: italic;
     }
 }
 </style>

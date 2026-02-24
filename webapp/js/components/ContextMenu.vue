@@ -6,7 +6,7 @@
                 <div v-else class="item"
                     :class="{ 'disabled': item.isEnabled !== undefined ? !item.isEnabled() : false }"
                     @click="handleClick(item)">
-                    <i v-if="item.icon != null" style="margin-right: 0.5rem" class="icon" v-bind:class="item.icon"></i>
+                    <i v-if="item.icon != null" style="margin-right: 0.5rem; vertical-align: middle;" class="icon" v-bind:class="item.icon"></i>
                     {{ item.label }}
                 </div>
             </template>

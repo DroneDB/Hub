@@ -132,7 +132,7 @@ export default {
                 this.$log.info("Remote uri", remoteUri);
 
                 var folderItem = {
-                    icon: icons.getForType(entry.type),
+                    icon: icons.getForType(entry.type, entry.path),
                     label: base,
                     path: remoteUri,
                     selected: false,
