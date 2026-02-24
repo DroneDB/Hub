@@ -76,13 +76,9 @@ import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue'
-import ddb from 'ddb';
 import { setTitle } from '../../libs/utils';
-import sharedReg from '../../libs/sharedRegistry';
+import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
-
-const { Registry } = ddb;
-const reg = new Registry(window.location.origin);
 
 export default {
     components: {
@@ -322,7 +318,7 @@ export default {
             return HubOptions.readOnlyOrgs;
         },
         memberManagementEnabled() {
-            return sharedReg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+            return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         }
     }
 }

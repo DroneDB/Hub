@@ -64,13 +64,7 @@
                 <tbody>
                     <tr v-for="ds in paginatedDatasets" :key="ds.slug" @click="viewDataset(ds)" class="clickable-row">
                         <td class="ds-thumb-cell">
-                            <img v-if="!ds.thumbError"
-                                :src="getDatasetThumbUrl(ds)"
-                                class="ds-thumb-img"
-                                @error="ds.thumbError = true" />
-                            <img v-else
-                                src="/images/dataset-placeholder.svg"
-                                class="ds-thumb-img ds-thumb-placeholder" />
+                            <img :src="ds.thumbUrl" class="ds-thumb-img" :class="{ 'ds-thumb-placeholder': !ds.thumbLoaded }" />
                         </td>
                         <td class="ds-name">
                             {{ ds.name || ds.slug }}
@@ -238,9 +232,13 @@ export default {
                     name: ds.properties?.meta?.name?.data,
                     tagline: ds.properties?.meta?.tagline?.data || '',
                     permissions: ds.permissions,
-                    thumbError: false
+                    thumbError: false,
+                    thumbLoaded: false,
+                    thumbUrl: '/images/dataset-placeholder.svg'
                 };
             });
+
+            this.preloadThumbnails();
 
         } catch (e) {
             if (e.status === 401) {
@@ -494,6 +492,8 @@ export default {
                         tagline: newds.tagline || '',
                         permissions: { canRead: true, canWrite: true, canDelete: true },
                         thumbError: false,
+                        thumbLoaded: false,
+                        thumbUrl: '/images/dataset-placeholder.svg',
                         ...loadingIndicator
                     });
 
@@ -514,8 +514,11 @@ export default {
                                 name: newds.name,
                                 tagline: newds.tagline || '',
                                 permissions: { canRead: true, canWrite: true, canDelete: true },
-                                thumbError: false
+                                thumbError: false,
+                                thumbLoaded: false,
+                                thumbUrl: '/images/dataset-placeholder.svg'
                             });
+                            this.preloadDatasetThumbnail(this.datasets[index]);
                         }
 
                         // Navigate to the newly created dataset if the user has enabled the preference
@@ -599,9 +602,21 @@ export default {
             this.$router.push({ name: "Upload" });
         },
 
+        preloadThumbnails() {
+            this.datasets.forEach(ds => this.preloadDatasetThumbnail(ds));
+        },
+        preloadDatasetThumbnail(ds) {
+            const url = this.getDatasetThumbUrl(ds);
+            const img = new Image();
+            img.onload = () => {
+                ds.thumbUrl = url;
+                ds.thumbLoaded = true;
+            };
+            img.src = url;
+        },
         getDatasetThumbUrl(ds) {
             const dsobj = this.org.Dataset(ds.slug);
-            return dsobj.datasetThumbUrl(100);
+            return dsobj.datasetThumbUrl(150);
         }
     }
 }
@@ -622,7 +637,7 @@ export default {
 
     .ui.table {
         .ds-thumb-header {
-            width: 70px;
+            width: 80px;
             cursor: default;
 
             &:hover {
@@ -631,20 +646,20 @@ export default {
         }
 
         .ds-thumb-cell {
-            width: 70px;
-            text-align: center;
+            width: 80px;
             padding: 4px !important;
         }
 
         .ds-thumb-img {
-            max-height: 48px;
-            max-width: 60px;
-            object-fit: contain;
+            display: block;
+            width: 72px;
+            height: 54px;
+            object-fit: cover;
             border-radius: 3px;
         }
 
         .ds-thumb-placeholder {
-            opacity: 0.4;
+            opacity: 0.35;
         }
 
         .ds-name {

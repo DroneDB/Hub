@@ -124,10 +124,8 @@
 <script>
 import Window from '../Window.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
-import ddb from 'ddb';
-
-const { Registry } = ddb;
-const reg = new Registry(window.location.origin);
+import reg from '../../libs/sharedRegistry';
+import { Features } from '../../libs/features';
 
 export default {
     components: { Window, ConfirmDialog },
