@@ -58,6 +58,14 @@ function isBinaryFile(path) {
 }
 
 /**
+ * Check if file is a PDF
+ */
+function isPdfFile(entry) {
+    if (!entry || !entry.path) return false;
+    return getExtension(entry.path) === 'pdf';
+}
+
+/**
  * Check if file can potentially be opened as text
  * (not binary AND within size limit)
  */
@@ -161,6 +169,7 @@ export {
     getExtension,
     isDefaultTextFile,
     isBinaryFile,
+    isPdfFile,
     canOpenAsText,
     shouldOpenAsText,
     getLanguageMode,
