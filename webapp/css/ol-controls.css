@@ -173,3 +173,18 @@
 .ol-point-popup-copy .icon.check {
     color: #2e7d32;
 }
+
+.ol-point-popup-description {
+    font-size: 11px;
+    color: #444;
+    white-space: normal;
+    max-width: 200px;
+    word-wrap: break-word;
+    margin-top: 2px;
+    font-family: inherit;
+}
+
+.ol-point-popup-edit:hover {
+    background: #e3f2fd !important;
+    color: #1565c0 !important;
+}

@@ -20,6 +20,7 @@ import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '../libs/olMeasurementConverter';
 import Vue from 'vue';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
+import PointAnnotationDialog from './PointAnnotationDialog.vue';
 
 class MeasureControls extends Control {
     /**
@@ -31,7 +32,7 @@ class MeasureControls extends Control {
         const unitPref = localStorage.getItem("measureUnitPref") || "metric";
 
         const btnPoint = document.createElement('button');
-        btnPoint.title = 'Point Location — Click on the map to get GPS coordinates.';
+        btnPoint.title = 'Point Annotation — Click on the map to place an annotation.';
         btnPoint.innerHTML = '<img src="' + rootPath("/images/measure-point.svg") + '"/>';
         const btnLength = document.createElement('button');
         btnLength.title = 'Measure Length — Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.';
@@ -408,7 +409,9 @@ class MeasureControls extends Control {
             return output;
         };
 
-        const result = importMeasurements(geojson, this.source, formatArea, formatLength, map);
+        const result = importMeasurements(geojson, this.source, formatArea, formatLength, map, (feature, m) => {
+            this.openPointAnnotationDialog(feature, m, true);
+        });
 
         // Update button visibility after import
         this.updateButtonsVisibility(this.hasMeasurements(), true);
@@ -743,6 +746,168 @@ class MeasureControls extends Control {
     }
 
     /**
+     * Open annotation dialog for a new or existing point feature
+     * @param {ol.Feature} feature - The point feature
+     * @param {ol.Map} map - OpenLayers map instance
+     * @param {boolean} isEdit - Whether this is editing an existing point (true) or creating a new one (false)
+     */
+    openPointAnnotationDialog(feature, map, isEdit) {
+        this.closePropertiesDialog();
+
+        const currentColor = feature.get('stroke') || '#ffcc33';
+        const currentDescription = feature.get('description') || '';
+
+        const DialogComponent = Vue.extend(PointAnnotationDialog);
+        this.propertiesDialog = new DialogComponent({
+            propsData: {
+                initialColor: currentColor,
+                initialDescription: currentDescription
+            }
+        });
+
+        this.propertiesDialog.$mount();
+        document.body.appendChild(this.propertiesDialog.$el);
+
+        this.propertiesDialog.$on('onSave', (data) => {
+            feature.set('stroke', data.color);
+            feature.set('description', data.description);
+            feature.changed();
+
+            if (isEdit) {
+                // Re-create the popup to reflect new color/description
+                this.recreatePointPopup(feature, map);
+            } else {
+                // First time: create the popup
+                this.createPointPopupElement(feature, map);
+                this.updateButtonsVisibility(this.hasMeasurements(), false);
+            }
+        });
+
+        this.propertiesDialog.$on('onDiscard', () => {
+            if (!isEdit) {
+                // New point: remove it
+                this.source.removeFeature(feature);
+                this.updateButtonsVisibility(this.hasMeasurements(), false);
+            }
+        });
+
+        this.propertiesDialog.$on('onClose', () => {
+            this.closePropertiesDialog();
+        });
+    }
+
+    /**
+     * Create the popup overlay for a point annotation feature
+     */
+    createPointPopupElement(feature, map) {
+        const coords = feature.getGeometry().getCoordinates();
+        const [lon, lat] = toLonLat(coords);
+
+        const ddToDms = (coordinate, posSymbol, negSymbol) => {
+            const dd = Math.abs(coordinate);
+            const d = Math.floor(dd);
+            const m = Math.floor((dd - d) * 60);
+            const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
+            const dir = coordinate >= 0 ? posSymbol : negSymbol;
+            return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
+        };
+
+        const dmsLat = ddToDms(lat, 'N', 'S');
+        const dmsLon = ddToDms(lon, 'E', 'W');
+        const ddLat = lat.toFixed(6);
+        const ddLon = lon.toFixed(6);
+        const description = feature.get('description') || '';
+
+        const popupEl = document.createElement('div');
+        popupEl.className = 'ol-point-popup';
+        popupEl.innerHTML = this.buildPointPopupHTML(dmsLat, dmsLon, ddLat, ddLon, description);
+
+        const popupOverlay = new Overlay({
+            element: popupEl,
+            offset: [0, -12],
+            positioning: 'bottom-center',
+            stopEvent: true,
+            insertFirst: false,
+        });
+        popupOverlay.setPosition(coords);
+        map.addOverlay(popupOverlay);
+
+        feature.set('measureTooltipElement', popupEl);
+        feature.set('measureTooltip', popupOverlay);
+
+        this.attachPointPopupHandlers(popupEl, feature, map, ddLat, ddLon);
+    }
+
+    /**
+     * Re-create popup for a point after editing its annotation
+     */
+    recreatePointPopup(feature, map) {
+        // Remove old popup
+        const oldOverlay = feature.get('measureTooltip');
+        const oldEl = feature.get('measureTooltipElement');
+        if (oldOverlay) map.removeOverlay(oldOverlay);
+        if (oldEl && oldEl.parentNode) oldEl.parentNode.removeChild(oldEl);
+
+        // Create new popup
+        this.createPointPopupElement(feature, map);
+    }
+
+    /**
+     * Build the inner HTML for a point popup
+     */
+    buildPointPopupHTML(dmsLat, dmsLon, ddLat, ddLon, description) {
+        const descHtml = description
+            ? `<div class="ol-point-popup-description">${description}</div>`
+            : '';
+        return `
+            <div class="ol-point-popup-coords">
+                <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
+                <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
+                ${descHtml}
+            </div>
+            <div class="ol-point-popup-actions">
+                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="icon pencil alternate"></i></button>
+                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
+                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
+            </div>
+        `;
+    }
+
+    /**
+     * Attach event handlers to a point popup element
+     */
+    attachPointPopupHandlers(popupEl, feature, map, ddLat, ddLon) {
+        const self = this;
+
+        // Edit handler
+        popupEl.querySelector('.ol-point-popup-edit').addEventListener('click', (e) => {
+            e.preventDefault();
+            self.openPointAnnotationDialog(feature, map, true);
+        });
+
+        // Copy handler
+        popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
+            e.preventDefault();
+            const text = `${ddLat}, ${ddLon}`;
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = popupEl.querySelector('.ol-point-popup-copy i');
+                if (icon) { icon.className = 'icon check'; }
+                setTimeout(() => { if (icon) { icon.className = 'icon copy outline'; } }, 1500);
+            });
+        });
+
+        // Delete handler
+        popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
+            e.preventDefault();
+            const overlay = feature.get('measureTooltip');
+            if (overlay) map.removeOverlay(overlay);
+            if (popupEl.parentNode) popupEl.parentNode.removeChild(popupEl);
+            self.source.removeFeature(feature);
+            self.updateButtonsVisibility(self.hasMeasurements(), false);
+        });
+    }
+
+    /**
      * Open properties dialog for a feature
      */
     openPropertiesDialog(feature) {
@@ -913,7 +1078,7 @@ class MeasureControls extends Control {
                 }
 
                 let helpMsg = 'Click to start drawing. Press ESC to cancel';
-                if (tool === 'point') helpMsg = 'Click on the map to get GPS coordinates. Press ESC to exit';
+                if (tool === 'point') helpMsg = 'Click on the map to place an annotation. Press ESC to exit';
                 else if (tool === 'erase') helpMsg = 'Click a measurement to remove it. Press ESC to exit';
                 else if (sketch) {
                     const geom = sketch.getGeometry();
@@ -976,80 +1141,12 @@ class MeasureControls extends Control {
             this.draw.on('drawend', function (evt) {
                 const feat = evt.feature;
                 if (tool === 'point') {
-                    // Point location: show coordinate popup
+                    // Point annotation: open dialog before confirming the point
                     setTimeout(() => {
-                        const coords = feat.getGeometry().getCoordinates();
-                        const [lon, lat] = toLonLat(coords);
-
-                        // Format as DMS
-                        const ddToDms = (coordinate, posSymbol, negSymbol) => {
-                            const dd = Math.abs(coordinate);
-                            const d = Math.floor(dd);
-                            const m = Math.floor((dd - d) * 60);
-                            const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
-                            const dir = coordinate >= 0 ? posSymbol : negSymbol;
-                            return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
-                        };
-
-                        const dmsLat = ddToDms(lat, 'N', 'S');
-                        const dmsLon = ddToDms(lon, 'E', 'W');
-                        const ddLat = lat.toFixed(6);
-                        const ddLon = lon.toFixed(6);
-
-                        // Create popup element
-                        const popupEl = document.createElement('div');
-                        popupEl.className = 'ol-point-popup';
-                        popupEl.innerHTML = `
-                            <div class="ol-point-popup-coords">
-                                <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
-                                <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
-                            </div>
-                            <div class="ol-point-popup-actions">
-                                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
-                                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
-                            </div>
-                        `;
-
-                        // Create overlay
-                        const popupOverlay = new Overlay({
-                            element: popupEl,
-                            offset: [0, -12],
-                            positioning: 'bottom-center',
-                            stopEvent: true,
-                            insertFirst: false,
-                        });
-                        popupOverlay.setPosition(coords);
-                        map.addOverlay(popupOverlay);
-
-                        // Store references on feature for cleanup
-                        feat.set('measureTooltipElement', popupEl);
-                        feat.set('measureTooltip', popupOverlay);
                         feat.set('measurementType', 'point');
                         feat.set('createdAt', new Date().toISOString());
 
-                        // Copy handler
-                        popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
-                            e.preventDefault();
-                            const text = `${ddLat}, ${ddLon}`;
-                            navigator.clipboard.writeText(text).then(() => {
-                                const copyBtn = popupEl.querySelector('.ol-point-popup-copy');
-                                const icon = copyBtn.querySelector('i');
-                                if (icon) { icon.className = 'icon check'; }
-                                setTimeout(() => { if (icon) { icon.className = 'icon copy outline'; } }, 1500);
-                            });
-                        });
-
-                        // Delete handler
-                        popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
-                            e.preventDefault();
-                            map.removeOverlay(popupOverlay);
-                            if (popupEl.parentNode) popupEl.parentNode.removeChild(popupEl);
-                            self.source.removeFeature(feat);
-                            self.updateButtonsVisibility(self.hasMeasurements(), false);
-                        });
-
-                        // Update button visibility
-                        self.updateButtonsVisibility(self.hasMeasurements(), false);
+                        self.openPointAnnotationDialog(feat, map, false);
                     }, 10);
                 } else if (tool === 'erase') {
                     setTimeout(() => {

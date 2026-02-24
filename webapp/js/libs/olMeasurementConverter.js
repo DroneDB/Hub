@@ -223,7 +223,7 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') 
  * @param {ol.Map} map - OpenLayers map instance
  * @returns {Array} Imported features
  */
-export function importMeasurements(geojson, source, formatArea, formatLength, map) {
+export function importMeasurements(geojson, source, formatArea, formatLength, map, onPointEdit) {
     if (!geojson || !geojson.features) {
         console.warn('Invalid GeoJSON data');
         return [];
@@ -240,7 +240,7 @@ export function importMeasurements(geojson, source, formatArea, formatLength, ma
 
             // Create tooltip or popup for the feature
             if (feature.get('measurementType') === 'point' && map) {
-                createPointPopup(feature, map, source);
+                createPointPopup(feature, map, source, onPointEdit);
             } else {
                 const tooltipText = feature.get('tooltipText');
                 if (tooltipText && map) {
@@ -307,12 +307,13 @@ function createStaticTooltip(feature, text, map) {
 }
 
 /**
- * Create a point location popup for an imported point feature
+ * Create a point annotation popup for an imported point feature
  * @param {ol.Feature} feature - Point feature
  * @param {ol.Map} map - OpenLayers map instance
  * @param {ol.source.Vector} source - Vector source for cleanup
+ * @param {Function} [onEdit] - Optional callback when edit button is clicked, receives (feature, map)
  */
-function createPointPopup(feature, map, source) {
+function createPointPopup(feature, map, source, onEdit) {
     const geometry = feature.getGeometry();
     if (!geometry) return;
 
@@ -335,6 +336,11 @@ function createPointPopup(feature, map, source) {
     const dmsLon = ddToDms(lon, 'E', 'W');
     const ddLat = lat.toFixed(6);
     const ddLon = lon.toFixed(6);
+    const description = feature.get('description') || '';
+
+    const descHtml = description
+        ? `<div class="ol-point-popup-description">${description}</div>`
+        : '';
 
     const popupEl = document.createElement('div');
     popupEl.className = 'ol-point-popup';
@@ -342,8 +348,10 @@ function createPointPopup(feature, map, source) {
         <div class="ol-point-popup-coords">
             <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
             <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
+            ${descHtml}
         </div>
         <div class="ol-point-popup-actions">
+            <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="icon pencil alternate"></i></button>
             <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
             <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
         </div>
@@ -362,6 +370,12 @@ function createPointPopup(feature, map, source) {
 
     feature.set('measureTooltipElement', popupEl);
     feature.set('measureTooltip', popupOverlay);
+
+    // Edit handler
+    popupEl.querySelector('.ol-point-popup-edit').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (onEdit) onEdit(feature, map);
+    });
 
     popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
         e.preventDefault();
