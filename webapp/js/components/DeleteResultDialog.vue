@@ -3,10 +3,10 @@
         <div class="delete-results-content">
             <!-- Success section -->
             <div v-if="deleted.length > 0" class="result-section success-section">
-                <h4><i class="check circle icon green"></i> Successfully Deleted ({{ deleted.length }})</h4>
+                <h4><i class="fa-solid fa-circle-check green"></i> Successfully Deleted ({{ deleted.length }})</h4>
                 <ul class="file-list">
                     <li v-for="path in deleted" :key="path" class="file-item success">
-                        <i class="check icon green"></i>
+                        <i class="fa-solid fa-check green"></i>
                         <span class="file-path">{{ path }}</span>
                     </li>
                 </ul>
@@ -14,10 +14,10 @@
 
             <!-- Failure section -->
             <div v-if="Object.keys(failed).length > 0" class="result-section error-section">
-                <h4><i class="exclamation circle icon red"></i> Failed to Delete ({{ Object.keys(failed).length }})</h4>
+                <h4><i class="fa-solid fa-circle-exclamation red"></i> Failed to Delete ({{ Object.keys(failed).length }})</h4>
                 <ul class="file-list">
                     <li v-for="(error, path) in failed" :key="path" class="file-item error">
-                        <i class="times icon red"></i>
+                        <i class="fa-solid fa-xmark red"></i>
                         <span class="file-path">{{ path }}</span>
                         <span class="error-message">{{ error }}</span>
                     </li>
@@ -26,9 +26,7 @@
         </div>
 
         <div class="buttons">
-            <button @click="close" class="ui button primary">
-                Close
-            </button>
+            <Button @click="close" severity="info" label="Close" />
         </div>
     </Window>
 </template>
@@ -36,10 +34,11 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window, Button
     },
 
     props: {
@@ -52,11 +51,12 @@ export default {
             default: () => ({})
         }
     },
+    emits: ['onClose'],
 
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
     methods: {
@@ -134,6 +134,8 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

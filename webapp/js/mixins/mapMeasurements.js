@@ -75,7 +75,7 @@ export default {
                 this.measureControls.updateButtonsVisibility(true, true);
 
                 console.log(`Saved ${geojson.features.length} measurements`);
-                this.showFlash(`Saved ${geojson.features.length} measurement(s)`, 'positive', 'check circle outline');
+                this.showFlash(`Saved ${geojson.features.length} measurement(s)`, 'positive', 'fa-regular fa-circle-check');
             } catch (e) {
                 console.error('Error saving measurements:', e);
                 this.showAlert('Error', `Failed to save measurements: ${e.message}`);
@@ -123,7 +123,7 @@ export default {
                 );
 
                 console.log('Saved measurements deleted');
-                this.showFlash('Saved measurements deleted', 'positive', 'check circle outline');
+                this.showFlash('Saved measurements deleted', 'positive', 'fa-regular fa-circle-check');
             } catch (e) {
                 console.error('Error deleting measurements:', e);
                 this.showAlert('Error', `Failed to delete measurements: ${e.message}`);

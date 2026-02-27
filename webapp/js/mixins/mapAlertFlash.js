@@ -1,5 +1,5 @@
 /**
- * Mixin for alert dialogs and flash messages.
+ * Mixin for alert dialogs and toast messages.
  * Shared between Map.vue and SingleMap.vue.
  */
 export default {
@@ -7,10 +7,7 @@ export default {
         return {
             alertDialogOpen: false,
             alertTitle: '',
-            alertMessage: '',
-            flashMessage: null,
-            flashIcon: 'check circle outline',
-            flashColor: 'positive'
+            alertMessage: ''
         };
     },
     methods: {
@@ -22,13 +19,12 @@ export default {
         handleAlertDialogClose() {
             this.alertDialogOpen = false;
         },
-        showFlash(message, color = 'positive', icon = 'check circle outline') {
-            this.flashMessage = message;
-            this.flashColor = color;
-            this.flashIcon = icon;
+        showFlash(message, color = 'positive', icon = 'fa-regular fa-circle-check') {
+            const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
+            this.$toast.add({ severity: severityMap[color] || 'success', summary: message, life: 3000 });
         },
         closeFlash() {
-            this.flashMessage = null;
+            // No-op: Toast auto-closes
         }
     }
 };

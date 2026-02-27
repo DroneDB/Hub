@@ -4,16 +4,15 @@
 
         <Message bindTo="error" />
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div v-else class="md-container">
             <div v-if="editing && editable" class="edit-container">
                 <textarea ref="editTextarea" v-model="rawContent"></textarea>
-                <button @click="save" class="ui basic button secondary icon save"><i class="icon save" /></button>
+                <Button @click="save" severity="secondary" outlined class="save" icon="fa-solid fa-floppy-disk" />
             </div>
             <template v-else>
-                <button v-if="editable" @click="edit" class="ui basic button secondary icon edit"><i
-                        class="icon edit" /></button>
+                <Button v-if="editable" @click="edit" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" />
                 <div v-html="content" class="content" />
             </template>
         </div>
@@ -22,13 +21,14 @@
 
 <script>
 import Message from './Message';
+import Button from 'primevue/button';
 import TabViewLoader from './TabViewLoader';
 import ddb from 'ddb';
 import MarkdownIt from 'markdown-it';
 
 export default {
     components: {
-        TabViewLoader, Message
+        TabViewLoader, Message, Button
     },
     props: {
         uri: { // DDB uri

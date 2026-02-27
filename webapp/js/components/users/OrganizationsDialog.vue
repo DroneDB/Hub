@@ -5,54 +5,36 @@
             <div v-if="loading" class="ui active centered inline loader"></div>
 
             <!-- Error message -->
-            <div v-if="error" class="ui negative message">
-                <i class="close icon" @click="error = null"></i>
-                <div class="header">Error</div>
-                <p>{{ error }}</p>
-            </div>
+            <PrimeMessage v-if="error" severity="error" @close="error = null">
+                <strong>Error</strong>: {{ error }}
+            </PrimeMessage>
 
-            <div class="ui message info">
-                <p>Managing organizations for user: <strong>{{ user.userName }}</strong></p>
-            </div>
+            <PrimeMessage severity="info" :closable="false">
+                Managing organizations for user: <strong>{{ user.userName }}</strong>
+            </PrimeMessage>
 
             <!-- Add organization section -->
             <div class="add-org-section" v-if="!loading">
                 <h4>Add Organization</h4>
-                <div class="ui form">
+                <div class="form">
                     <div class="fields">
                         <div class="seven wide field">
                             <label>Organization</label>
-                            <div class="ui search selection dropdown" ref="orgDropdown">
-                                <input type="hidden" name="orgSlug" v-model="newOrg.slug">
-                                <i class="dropdown icon"></i>
-                                <input class="search" autocomplete="off" tabindex="0">
-                                <div class="default text">Search organization...</div>
-                                <div class="menu">
-                                    <div class="item" v-for="org in availableOrganizations" :key="org.slug" :data-value="org.slug">
-                                        <i class="building icon"></i>{{ org.name || org.slug }}
-                                    </div>
-                                </div>
-                            </div>
+                            <Select v-model="newOrg.slug" :options="availableOrganizations" optionLabel="displayName" optionValue="slug" filter placeholder="Search organization..." class="w-full" />
                         </div>
                         <div class="five wide field">
                             <label>Permissions</label>
-                            <select v-model="newOrg.permissions" ref="addPermDropdown" class="ui selection dropdown">
-                                <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
-                                    {{ perm.label }}
-                                </option>
-                            </select>
+                            <Select v-model="newOrg.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-full" />
                         </div>
                         <div class="four wide field">
                             <label>&nbsp;</label>
-                            <button class="ui primary button" @click="addOrganization" :disabled="!newOrg.slug || addingOrg">
-                                <i class="plus icon"></i>&nbsp;Add
-                            </button>
+                            <Button severity="info" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="ui divider" v-if="!loading"></div>
+            <Divider v-if="!loading" />
 
             <!-- User organizations table -->
             <h4 v-if="!loading">User Organizations</h4>
@@ -69,18 +51,17 @@
                     <tr v-for="org in userOrganizations" :key="org.slug">
                         <td>
                             {{ org.name || org.slug }}
-                            <span v-if="org.isOwner" class="ui tiny yellow label">Owner</span>
+                            <span v-if="org.isOwner" class="badge bg-warning">Owner</span>
                         </td>
                         <td>
-                            <select v-if="!org.isOwner"
+                            <Select v-if="!org.isOwner"
                                     v-model="org.permissions"
+                                    :options="permissionsOptions"
+                                    optionLabel="label"
+                                    optionValue="value"
                                     @change="updatePermission(org)"
-                                    class="ui selection dropdown">
-                                <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
-                                    {{ perm.label }}
-                                </option>
-                            </select>
-                            <span v-else class="ui label">Full Access</span>
+                                    class="w-full" />
+                            <span v-else class="badge">Full Access</span>
                         </td>
                         <td>
                             <span v-if="org.grantedAt">
@@ -91,25 +72,26 @@
                             <span v-else>-</span>
                         </td>
                         <td>
-                            <button v-if="!org.isOwner"
-                                    class="ui red mini button"
+                            <Button v-if="!org.isOwner"
+                                    severity="danger" size="small"
                                     @click="confirmRemoveOrganization(org)"
-                                    :disabled="removingOrg === org.slug">
-                                <i class="trash icon"></i> Remove
-                            </button>
-                            <span v-else class="ui tiny label">Cannot remove</span>
+                                    :disabled="removingOrg === org.slug"
+                                    icon="fa-solid fa-trash" label="Remove" />
+                            <span v-else class="badge">Cannot remove</span>
                         </td>
                     </tr>
                 </tbody>
             </table>
 
-            <div v-else-if="!loading" class="ui message">
-                <p>This user is not a member of any organization.</p>
+            <div v-else-if="!loading">
+                <PrimeMessage severity="info" :closable="false">
+                    This user is not a member of any organization.
+                </PrimeMessage>
             </div>
 
             <!-- Footer -->
             <div class="buttons">
-                <button @click="close" class="ui button">Close</button>
+                <Button @click="close" label="Close" />
             </div>
         </div>
 
@@ -127,10 +109,14 @@
 <script>
 import Window from '../Window.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
+import Select from 'primevue/select';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import Divider from 'primevue/divider';
 import reg from '../../libs/sharedRegistry';
 
 export default {
-    components: { Window, ConfirmDialog },
+    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider },
 
     props: {
         user: {
@@ -138,6 +124,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     data() {
         return {
@@ -166,10 +153,12 @@ export default {
     computed: {
         availableOrganizations() {
             const userOrgSlugs = this.userOrganizations.map(o => o.slug.toLowerCase());
-            return this.allOrganizations.filter(o =>
-                o.slug.toLowerCase() !== 'public' &&
-                !userOrgSlugs.includes(o.slug.toLowerCase())
-            );
+            return this.allOrganizations
+                .filter(o =>
+                    o.slug.toLowerCase() !== 'public' &&
+                    !userOrgSlugs.includes(o.slug.toLowerCase())
+                )
+                .map(o => ({ ...o, displayName: o.name || o.slug }));
         }
     },
 
@@ -199,27 +188,7 @@ export default {
                 console.error('Failed to load user organizations:', e);
             } finally {
                 this.loading = false;
-                this.$nextTick(() => {
-                    this.initOrgDropdown();
-                    this.initPermDropdowns();
-                });
             }
-        },
-
-        initOrgDropdown() {
-            if (!this.$refs.orgDropdown) return;
-
-            $(this.$refs.orgDropdown).dropdown({
-                fullTextSearch: true,
-                match: 'text',
-                onChange: (value) => {
-                    this.newOrg.slug = value;
-                }
-            });
-        },
-
-        initPermDropdowns() {
-            $(this.$el).find('select.ui.selection.dropdown').dropdown();
         },
 
         async addOrganization() {
@@ -241,16 +210,6 @@ export default {
                 // Reset form
                 this.newOrg.slug = '';
                 this.newOrg.permissions = 1;
-
-                // Clear dropdown selection
-                this.$nextTick(() => {
-                    if (this.$refs.orgDropdown) {
-                        $(this.$refs.orgDropdown).dropdown('clear');
-                    }
-                    if (this.$refs.addPermDropdown) {
-                        $(this.$refs.addPermDropdown).dropdown('set selected', '1');
-                    }
-                });
 
             } catch (e) {
                 this.error = e.message || 'Failed to add organization';

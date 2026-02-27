@@ -5,7 +5,7 @@
         <Message bindTo="error" noDismiss />
         <div v-if="loading" class="loading">
             <p>Loading model...</p>
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div class="container">
@@ -13,7 +13,7 @@
 
             <!-- Settings gear button (bottom-left) -->
             <button v-if="loaded" class="btn-settings" @click="toggleSettings" title="Lighting settings">
-                <i class="icon cog" />
+                <i class="fa-solid fa-gear" />
             </button>
         </div>
 
@@ -56,7 +56,7 @@
                     />
                 </div>
 
-                <button class="ui mini fluid button" @click="resetDefaults">Reset</button>
+                <Button label="Reset" @click="resetDefaults" text />
             </div>
         </Window>
     </div>
@@ -67,6 +67,7 @@ import ddb from 'ddb';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 import { loadResources } from '../libs/lazy';
 
 const STORAGE_KEY = 'nexus-lighting-settings';
@@ -95,7 +96,7 @@ function saveSettings(ambient, directional, shininess) {
 
 export default {
     components: {
-        Message, TabViewLoader, Window
+        Message, TabViewLoader, Window, Button
     },
     props: ['uri'],
     data: function () {

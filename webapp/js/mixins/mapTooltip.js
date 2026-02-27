@@ -8,7 +8,7 @@
 import Overlay from 'ol/Overlay';
 import { extractFeatureDisplayName } from '../libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '../libs/mapUtils';
-import Vue from 'vue';
+import { createApp } from 'vue';
 import FeatureInfoDialog from '../components/FeatureInfoDialog.vue';
 
 export default {
@@ -91,18 +91,17 @@ export default {
                 }
             }
 
-            const DialogComponent = Vue.extend(FeatureInfoDialog);
-            const dialogInstance = new DialogComponent({
-                propsData: { title, properties }
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+            const dialogApp = createApp(FeatureInfoDialog, {
+                title,
+                properties,
+                onOnClose: () => {
+                    dialogApp.unmount();
+                    document.body.removeChild(container);
+                }
             });
-
-            dialogInstance.$mount();
-            document.body.appendChild(dialogInstance.$el);
-
-            dialogInstance.$on('onClose', () => {
-                document.body.removeChild(dialogInstance.$el);
-                dialogInstance.$destroy();
-            });
+            dialogApp.mount(container);
         },
 
         /**

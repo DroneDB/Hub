@@ -2,12 +2,8 @@
     <Window title="Change Password" id="changePwdDialog" @onClose="close" modal maxWidth="70%" fixedSize>
         <div class="dialog">
             <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
-                <div class="ui error message" v-if="error">
-                    <p>{{ error }}</p>
-                </div>
-                <div class="ui message positive" v-if="success">
-                    <p><strong>Password changed successfully!</strong></p>
-                </div>
+                <Message v-if="error" severity="error">{{ error }}</Message>
+                <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
                 <div class="field">
                     <label>Old Password</label>
                     <input ref="oldPwd" v-on:keydown="clearError()" v-on:keyup.enter="changePwd()" type="password"
@@ -32,13 +28,9 @@
                 </div>
             </form>
             <div class="buttons">
-                <button @click="close()" class="ui button" :disabled="changing">
-                    Close
-                </button>
-                <button @click="changePwd()" :disabled="changing || !isFilled()" :class="{ loading: changing }"
-                    class="ui button primary">
-                    Change Password
-                </button>
+                <Button @click="close()" severity="secondary" :disabled="changing" label="Close" />
+                <Button @click="changePwd()" :disabled="changing || !isFilled()" :loading="changing"
+                    severity="info" label="Change Password" />
             </div>
         </div>
     </Window>
@@ -46,17 +38,20 @@
 
 <script>
 import Window from '../Window.vue';
+import Button from 'primevue/button';
+import Message from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
 import { validatePassword, getPasswordRequirements } from '../../libs/passwordValidator';
 
 export default {
     components: {
-        Window
+        Window, Button, Message
     },
     props: {
 
     },
+    emits: ['onClose'],
 
     data: function () {
         return {

@@ -3,78 +3,70 @@
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div v-else>
-            <div class="top-banner ui equal width grid middle aligned">
-                <div class="column">
+            <div class="top-banner" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
                     <h1>User Management</h1>
                 </div>
-                <div class="column right aligned">
-                    <button @click.stop="showAddUserDialog = true" class="ui primary button icon">
-                        <i class="ui icon add"></i>&nbsp;New User
-                    </button>
+                <div>
+                    <Button @click.stop="showAddUserDialog = true" severity="info" icon="fa-solid fa-plus" label="New User" />
                 </div>
             </div>
 
             <!-- User Controls -->
             <div class="">
-                <div class="ui stackable grid">
-                    <div class="eight wide column">
-                        <div class="ui icon input fluid">
-                            <input v-model="searchQuery" type="text" placeholder="Search users...">
-                            <i class="search icon"></i>
-                        </div>
+                <div class="controls-row">
+                    <div class="search-col">
+                        <IconField>
+                            <InputIcon class="fa-solid fa-magnifying-glass" />
+                            <InputText v-model="searchQuery" placeholder="Search users" style="width: 100%;" />
+                        </IconField>
                     </div>
                     <!-- align right -->
-                    <div class="eight wide column right aligned">
-                        <button @click="showRoleManagement = true" class="ui button">
-                            <i class="ui icon cogs"></i> Manage Roles
-                        </button>
-                        <button @click="showOrganizationManagement = true" class="ui button">
-                            <i class="ui icon building"></i> Manage Organizations
-                        </button>
-                        <button @click="refreshUsers" class="ui button">
-                            <i class="ui icon refresh"></i> Refresh
-                        </button>
+                    <div class="actions-col" style="display: flex; gap: 8px;">
+                        <Button @click="showRoleManagement = true" icon="fa-solid fa-gears" label="Manage Roles" />
+                        <Button @click="showOrganizationManagement = true" icon="fa-solid fa-building" label="Manage Organizations" />
+                        <Button @click="refreshUsers" icon="fa-solid fa-arrows-rotate" label="Refresh" />
                     </div>
                 </div>
             </div>
 
             <!-- Users Table -->
-            <table class="ui selectable sortable celled table">
+            <table class="data-table">
                 <thead>
                     <tr>
                         <th @click="sortBy('userName')">
-                            <i class="user icon"></i> Username
+                            <i class="fa-solid fa-user"></i> Username
                             <i v-if="sortColumn === 'userName'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
+                                :class="sortDirection === 'asc' ? 'fa-solid fa-caret-up' : 'fa-solid fa-caret-down'"></i>
                         </th>
                         <th @click="sortBy('email')">
                             Email
                             <i v-if="sortColumn === 'email'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
+                                :class="sortDirection === 'asc' ? 'fa-solid fa-caret-up' : 'fa-solid fa-caret-down'"></i>
                         </th>
                         <th>Roles</th>
                         <th @click="sortBy('organizationCount')">
                             Organizations
                             <i v-if="sortColumn === 'organizationCount'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
+                                :class="sortDirection === 'asc' ? 'fa-solid fa-caret-up' : 'fa-solid fa-caret-down'"></i>
                         </th>
                         <th @click="sortBy('datasetCount')">
                             Datasets
                             <i v-if="sortColumn === 'datasetCount'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
+                                :class="sortDirection === 'asc' ? 'fa-solid fa-caret-up' : 'fa-solid fa-caret-down'"></i>
                         </th>
                         <th @click="sortBy('storageUsed')">
                             Storage
                             <i v-if="sortColumn === 'storageUsed'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
+                                :class="sortDirection === 'asc' ? 'fa-solid fa-caret-up' : 'fa-solid fa-caret-down'"></i>
                         </th>
                         <th @click="sortBy('createdDate')">
                             Created
                             <i v-if="sortColumn === 'createdDate'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
+                                :class="sortDirection === 'asc' ? 'fa-solid fa-caret-up' : 'fa-solid fa-caret-down'"></i>
                         </th>
                         <th class="center aligned">Actions</th>
                     </tr>
@@ -87,23 +79,19 @@
                         <td>{{ user.email || '-' }}</td>
                         <td>
                             <div v-if="user.roles && user.roles.length > 0">
-                                <div v-for="role in user.roles" :key="role" class="ui mini label">
-                                    {{ role }}
-                                </div>
+                                <Tag v-for="role in user.roles" :key="role" :value="role" severity="info" style="margin: 1px;" />
                             </div>
                             <span v-else class="text-muted">No roles</span>
                         </td>
                         <td>
-                            <button @click="showUserOrganizations(user)" class="ui mini button icon" title="Manage Organizations">
-                              <i class="sitemap icon" style="margin-right: 1rem"></i>&nbsp;{{ user.organizationCount }}</button>
+                            <Button @click="showUserOrganizations(user)" size="small" title="Manage Organizations"
+                              icon="fa-solid fa-sitemap" :label="String(user.organizationCount)" />
                         </td>
                         <td>{{ user.datasetCount }}</td>
                         <td>
                             <div v-if="user.storageQuota">
                                 {{ bytesToSize(user.storageUsed) }} / {{ bytesToSize(user.storageQuota) }}
-                                <div class="ui tiny progress" :data-percent="getStoragePercentage(user)">
-                                    <div class="bar" :style="{ width: getStoragePercentage(user) + '%' }"></div>
-                                </div>
+                                <ProgressBar :value="getStoragePercentage(user)" style="height: 6px; margin-top: 4px;" />
                             </div>
                             <div v-else>
                                 {{ bytesToSize(user.storageUsed) }} / Unlimited
@@ -111,21 +99,18 @@
                         </td>
                         <td>{{ formatDate(user.createdDate) }}</td>
                         <td class="center aligned">
-                            <button @click.stop="editUser(user)" class="ui button icon small blue"
-                                :class="{ loading: user.editing }" :disabled="user.editing || user.deleting"
-                                title="Edit User">
-                                <i class="ui icon edit"></i>
-                            </button>
-                            <button @click.stop="changePassword(user)" class="ui button icon small orange"
-                                :disabled="user.editing || user.deleting" title="Change Password">
-                                <i class="ui icon key"></i>
-                            </button>
-                            <button @click.stop="handleDelete(user)" class="ui button icon small negative"
-                                :class="{ loading: user.deleting }"
+                            <div style="display: flex; gap: 4px; justify-content: center;">
+                            <Button @click.stop="editUser(user)" severity="info" size="small"
+                                :loading="user.editing" :disabled="user.editing || user.deleting"
+                                title="Edit User" icon="fa-solid fa-pen-to-square" />
+                            <Button @click.stop="changePassword(user)" severity="warn" size="small"
+                                :disabled="user.editing || user.deleting" title="Change Password"
+                                icon="fa-solid fa-key" />
+                            <Button @click.stop="handleDelete(user)" severity="danger" size="small"
+                                :loading="user.deleting"
                                 :disabled="user.deleting || user.editing || user.userName === 'admin'"
-                                title="Delete User">
-                                <i class="ui icon trash"></i>
-                            </button>
+                                title="Delete User" icon="fa-solid fa-trash" />
+                            </div>
                         </td>
                     </tr>
                     <tr v-if="paginatedUsers.length === 0">
@@ -138,49 +123,22 @@
                 <tfoot>
                     <tr>
                         <th colspan="8">
-                            <div class="ui grid three column">
-                                <div class="column left aligned middle aligned">
-                                    <div class="ui left floated">
-                                        Showing {{ paginatedUsers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
-                                        {{ Math.min(currentPage * itemsPerPage, filteredUsers.length) }} of {{
-                                        filteredUsers.length }} users
-                                    </div>
+                            <div class="table-footer">
+                                <div class="footer-left">
+                                    Showing {{ paginatedUsers.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
+                                    {{ Math.min(currentPage * itemsPerPage, filteredUsers.length) }} of {{
+                                    filteredUsers.length }} users
                                 </div>
-                                <div class="column center aligned middle aligned">
-                                    <div v-if="totalPages > 1" class="ui pagination menu">
-                                        <a class="item" @click="changePage(1)" :class="{ disabled: currentPage === 1 }">
-                                            <i class="angle double left icon"></i>
-                                        </a>
-                                        <a class="item" @click="changePage(currentPage - 1)"
-                                            :class="{ disabled: currentPage === 1 }">
-                                            <i class="angle left icon"></i>
-                                        </a>
-                                        <a v-for="(page, index) in displayedPages" :key="'page-' + index" class="item"
-                                            @click="page === 'ellipsis-1' || page === 'ellipsis-2' ? null : changePage(page)"
-                                            :class="{ active: currentPage === page, disabled: page === 'ellipsis-1' || page === 'ellipsis-2' }">
-                                            {{ page === 'ellipsis-1' || page === 'ellipsis-2' ? '...' : page }}
-                                        </a>
-                                        <a class="item" @click="changePage(currentPage + 1)"
-                                            :class="{ disabled: currentPage === totalPages }">
-                                            <i class="angle right icon"></i>
-                                        </a>
-                                        <a class="item" @click="changePage(totalPages)"
-                                            :class="{ disabled: currentPage === totalPages }">
-                                            <i class="angle double right icon"></i>
-                                        </a>
-                                    </div>
+                                <div class="footer-center">
+                                    <Paginator v-if="totalPages > 1"
+                                        :rows="itemsPerPage"
+                                        :totalRecords="filteredUsers.length"
+                                        :first="(currentPage - 1) * itemsPerPage"
+                                        @page="onPageChange" />
                                 </div>
-                                <div class="column right aligned middle aligned">
-                                    <div class="ui right floated">
-                                        Items per page
-                                        <select v-model="itemsPerPage" style="margin-left: 5px" class="ui dropdown compact">
-                                            <option value="5">5</option>
-                                            <option value="10">10</option>
-                                            <option value="25">25</option>
-                                            <option value="50">50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                    </div>
+                                <div class="footer-right">
+                                    Items per page
+                                    <Select v-model="itemsPerPage" :options="itemsPerPageOptions" optionLabel="label" optionValue="value" style="margin-left: 5px; width: 80px;" />
                                 </div>
                             </div>
                         </th>
@@ -202,148 +160,131 @@
         <OrganizationManagementDialog v-if="showOrganizationManagement" @onClose="handleCloseOrganizationManagement" />
 
         <!-- Delete User Confirmation Dialog -->
-        <div v-if="showDeleteDialog" class="ui dimmer modals page transition visible active" style="display: flex !important; align-items: center; justify-content: center;">
-            <div class="ui modal transition visible active" style="position: relative; top: auto; left: auto; margin: 0;">
-                <i class="close icon" @click="showDeleteDialog = false"></i>
-                <div class="header">
-                    <i class="trash icon"></i>
-                    Delete User
-                </div>
-                <div class="content">
-                    <p>Are you sure you want to delete user <strong>{{ userToDelete && userToDelete.userName }}</strong>?</p>
+        <ConfirmDialog v-if="showDeleteDialog"
+            title="Delete User"
+            :message="deleteDialogMessage"
+            confirmText="Delete"
+            cancelText="Cancel"
+            confirmButtonClass="danger"
+            @onClose="handleDeleteDialogClose">
+            <template #extra>
+                <div class="delete-options">
+                    <div class="field">
+                        <label>Transfer data to successor (optional)</label>
+                        <Select v-model="deleteSuccessor" :options="successorOptions" optionLabel="label" optionValue="value" placeholder="-- Delete all data --" showClear class="w-full" />
+                        <small class="text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
+                    </div>
 
-                    <div class="ui segment">
-                        <div class="ui form">
-                            <div class="field">
-                                <label>Transfer data to successor (optional)</label>
-                                <select v-model="deleteSuccessor" class="ui dropdown">
-                                    <option :value="null">-- Delete all data --</option>
-                                    <option v-for="user in users.filter(u => u.userName !== (userToDelete && userToDelete.userName))"
-                                            :key="user.userName"
-                                            :value="user.userName">
-                                        {{ user.userName }} ({{ user.email || 'no email' }})
-                                    </option>
-                                </select>
-                                <small class="text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
+                    <div v-if="deleteSuccessor" class="field">
+                        <label>Conflict Resolution Strategy</label>
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" v-model="deleteConflictResolution" value="Rename" id="conflict-rename">
+                                <label for="conflict-rename">Rename conflicting datasets</label>
                             </div>
-
-                            <div v-if="deleteSuccessor" class="field">
-                                <label>Conflict Resolution Strategy</label>
-                                <div class="grouped fields">
-                                    <div class="field">
-                                        <div class="ui radio checkbox">
-                                            <input type="radio" v-model="deleteConflictResolution" value="Rename" id="conflict-rename">
-                                            <label for="conflict-rename">Rename conflicting datasets</label>
-                                        </div>
-                                    </div>
-                                    <div class="field">
-                                        <div class="ui radio checkbox">
-                                            <input type="radio" v-model="deleteConflictResolution" value="Overwrite" id="conflict-overwrite">
-                                            <label for="conflict-overwrite">Overwrite existing datasets</label>
-                                        </div>
-                                    </div>
-                                    <div class="field">
-                                        <div class="ui radio checkbox">
-                                            <input type="radio" v-model="deleteConflictResolution" value="HaltOnConflict" id="conflict-halt">
-                                            <label for="conflict-halt">Stop if conflict detected</label>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="radio-item">
+                                <input type="radio" v-model="deleteConflictResolution" value="Overwrite" id="conflict-overwrite">
+                                <label for="conflict-overwrite">Overwrite existing datasets</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" v-model="deleteConflictResolution" value="HaltOnConflict" id="conflict-halt">
+                                <label for="conflict-halt">Stop if conflict detected</label>
                             </div>
                         </div>
                     </div>
 
-                    <p v-if="!deleteSuccessor" class="ui warning message">
-                        <i class="warning icon"></i>
+                    <PrimeMessage v-if="!deleteSuccessor" severity="warn" :closable="false">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
                         <strong>Warning:</strong> All user data (organizations, datasets, files) will be permanently deleted.
-                    </p>
-                    <p v-else class="ui info message">
-                        <i class="info icon"></i>
+                    </PrimeMessage>
+                    <PrimeMessage v-else severity="info" :closable="false">
+                        <i class="fa-solid fa-circle-info"></i>
                         Organizations and datasets will be transferred to <strong>{{ deleteSuccessor }}</strong>.
-                    </p>
+                    </PrimeMessage>
                 </div>
-                <div class="actions">
-                    <button class="ui button" @click="showDeleteDialog = false">
-                        Cancel
-                    </button>
-                    <button class="ui red button" @click="confirmDelete" :class="{ loading: userToDelete && userToDelete.deleting }">
-                        <i class="trash icon"></i>
-                        {{ deleteSuccessor ? 'Delete & Transfer' : 'Delete User' }}
-                    </button>
-                </div>
-            </div>
-        </div>
+            </template>
+        </ConfirmDialog>
 
         <!-- Delete Result Dialog -->
-        <div v-if="showDeleteResultDialog" class="ui dimmer modals page transition visible active" style="display: flex !important; align-items: center; justify-content: center;">
-            <div class="ui small modal transition visible active" style="position: relative; top: auto; left: auto; margin: 0;">
-                <div class="header">
-                    <i class="check circle icon green"></i>
-                    User Deleted Successfully
-                </div>
-                <div class="content">
-                    <p>User <strong>{{ deleteResult && deleteResult.userName }}</strong> has been deleted.</p>
+        <Window v-if="showDeleteResultDialog" title="User Deleted Successfully" id="deleteResultDialog" @onClose="closeDeleteResultDialog" modal maxWidth="50%" fixedSize>
+            <p>User <strong>{{ deleteResult && deleteResult.userName }}</strong> has been deleted.</p>
 
-                    <div v-if="deleteResult" class="ui segment">
-                        <div class="ui list">
-                            <div v-if="deleteResult.successor" class="item">
-                                <i class="user icon"></i>
-                                <div class="content">Data transferred to: <strong>{{ deleteResult.successor }}</strong></div>
-                            </div>
-                            <div class="item">
-                                <i class="building icon"></i>
-                                <div class="content">Organizations transferred: <strong>{{ deleteResult.organizationsTransferred || 0 }}</strong></div>
-                            </div>
-                            <div class="item">
-                                <i class="trash icon"></i>
-                                <div class="content">Organizations deleted: <strong>{{ deleteResult.organizationsDeleted || 0 }}</strong></div>
-                            </div>
-                            <div class="item">
-                                <i class="database icon"></i>
-                                <div class="content">Datasets transferred: <strong>{{ deleteResult.datasetsTransferred || 0 }}</strong></div>
-                            </div>
-                            <div class="item">
-                                <i class="trash alternate icon"></i>
-                                <div class="content">Datasets deleted: <strong>{{ deleteResult.datasetsDeleted || 0 }}</strong></div>
-                            </div>
-                            <div class="item">
-                                <i class="clock icon"></i>
-                                <div class="content">Batches deleted: <strong>{{ deleteResult.batchesDeleted || 0 }}</strong></div>
-                            </div>
-                        </div>
-                    </div>
+            <div v-if="deleteResult" class="delete-result-details">
+                <div v-if="deleteResult.successor" class="result-item">
+                    <i class="fa-solid fa-user"></i>
+                    Data transferred to: <strong>{{ deleteResult.successor }}</strong>
                 </div>
-                <div class="actions">
-                    <button class="ui primary button" @click="closeDeleteResultDialog">
-                        <i class="check icon"></i>
-                        OK
-                    </button>
+                <div class="result-item">
+                    <i class="fa-solid fa-building"></i>
+                    Organizations transferred: <strong>{{ deleteResult.organizationsTransferred || 0 }}</strong>
+                </div>
+                <div class="result-item">
+                    <i class="fa-solid fa-trash"></i>
+                    Organizations deleted: <strong>{{ deleteResult.organizationsDeleted || 0 }}</strong>
+                </div>
+                <div class="result-item">
+                    <i class="fa-solid fa-database"></i>
+                    Datasets transferred: <strong>{{ deleteResult.datasetsTransferred || 0 }}</strong>
+                </div>
+                <div class="result-item">
+                    <i class="fa-solid fa-trash"></i>
+                    Datasets deleted: <strong>{{ deleteResult.datasetsDeleted || 0 }}</strong>
+                </div>
+                <div class="result-item">
+                    <i class="fa-solid fa-clock"></i>
+                    Batches deleted: <strong>{{ deleteResult.batchesDeleted || 0 }}</strong>
                 </div>
             </div>
-        </div>
+
+            <div class="buttons" style="margin-top: 16px; text-align: right;">
+                <Button @click="closeDeleteResultDialog" severity="info" icon="fa-solid fa-check" label="OK" />
+            </div>
+        </Window>
     </div>
 </template>
 
 <script>
 import Message from '../Message.vue';
+import Window from '../Window.vue';
+import ConfirmDialog from '../ConfirmDialog.vue';
 import AddUserDialog from './AddUserDialog.vue';
 import EditUserDialog from './EditUserDialog.vue';
 import ChangePasswordDialog from './ChangePasswordDialog.vue';
 import OrganizationsDialog from './OrganizationsDialog.vue';
 import RoleManagementDialog from './RoleManagementDialog.vue';
 import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import Tag from 'primevue/tag';
+import Select from 'primevue/select';
+import Paginator from 'primevue/paginator';
+import ProgressBar from 'primevue/progressbar';
+import InputText from 'primevue/inputtext';
+import InputIcon from 'primevue/inputicon';
+import IconField from 'primevue/iconfield';
 import reg from '../../libs/sharedRegistry';
 import { bytesToSize } from '../../libs/utils';
 
 export default {
     components: {
         Message,
+        Window,
+        ConfirmDialog,
         AddUserDialog,
         EditUserDialog,
         ChangePasswordDialog,
         OrganizationsDialog,
         RoleManagementDialog,
-        OrganizationManagementDialog
+        OrganizationManagementDialog,
+        Button,
+        PrimeMessage,
+        Tag,
+        Select,
+        Paginator,
+        ProgressBar,
+        InputText,
+        InputIcon,
+        IconField
     },
     data: function () {
         return {
@@ -374,6 +315,13 @@ export default {
             // Pagination
             currentPage: 1,
             itemsPerPage: 10,
+            itemsPerPageOptions: [
+                { label: '5', value: 5 },
+                { label: '10', value: 10 },
+                { label: '25', value: 25 },
+                { label: '50', value: 50 },
+                { label: '100', value: 100 }
+            ],
 
             // Filtering
             searchQuery: ""
@@ -452,6 +400,16 @@ export default {
             }
 
             return pages;
+        },
+        successorOptions() {
+            if (!this.userToDelete) return [];
+            return this.users
+                .filter(u => u.userName !== this.userToDelete.userName)
+                .map(u => ({ label: u.userName, value: u.userName }));
+        },
+        deleteDialogMessage() {
+            if (!this.userToDelete) return '';
+            return `Are you sure you want to delete user <strong>${this.userToDelete.userName}</strong>?`;
         }
     },
     watch: {
@@ -519,6 +477,10 @@ export default {
             }
         },
 
+        onPageChange(event) {
+            this.currentPage = event.page + 1;
+        },
+
         editUser(user) {
             this.currentUser = { ...user };
             this.showEditUserDialog = true;
@@ -540,6 +502,14 @@ export default {
             this.deleteConflictResolution = 'Rename';
             this.deleteResult = null;
             this.showDeleteDialog = true;
+        },
+
+        async handleDeleteDialogClose(action) {
+            if (action === 'confirm') {
+                await this.confirmDelete();
+            } else {
+                this.showDeleteDialog = false;
+            }
         },
 
         async confirmDelete() {
@@ -647,6 +617,23 @@ export default {
     margin-bottom: 12px;
 }
 
+.controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.table-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
 .user-name {
     font-weight: bold;
 }
@@ -660,15 +647,55 @@ export default {
     color: #999;
 }
 
-.ui.progress {
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.data-table th {
+    cursor: pointer;
+    background: #f9fafb;
+    user-select: none;
+}
+
+.data-table th:hover {
+    background: #f0f0f0;
+}
+
+.center.aligned {
+    text-align: center;
+}
+
+.delete-options .field {
+    margin-bottom: 12px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.radio-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.delete-result-details .detail-section {
+    margin-bottom: 12px;
+}
+
+.delete-result-details .detail-section ul {
     margin: 4px 0;
-}
-
-.ui.progress .bar {
-    transition: width 0.3s ease;
-}
-
-.ui.mini.label {
-    margin: 1px;
+    padding-left: 20px;
 }
 </style>

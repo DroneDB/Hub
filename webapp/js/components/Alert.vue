@@ -4,19 +4,19 @@
         <slot />
 
         <div class="buttons">
-            <button @click="dismiss('ok')" class="ui primary button" v-if="buttons.indexOf('ok') !== -1">
-                OK
-            </button>
+            <Button label="OK" @click="dismiss('ok')" v-if="buttons.indexOf('ok') !== -1" />
         </div>
     </Window>
 </template>
 
 <script>
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window,
+        Button
     },
     props: {
         title: {
@@ -35,6 +35,7 @@ export default {
             required: false
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {};

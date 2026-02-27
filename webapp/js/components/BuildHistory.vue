@@ -1,28 +1,16 @@
 <template>
     <div id="build-history" class="build-history-page">
         <div class="filters">
-            <div class="ui form">
+            <div class="filter-bar">
                 <div class="fields" style="margin: 0">
                     <div class="field">
-                        <select v-model="selectedState" class="ui dropdown" @change="applyFilters">
-                            <option value="">All States</option>
-                            <option value="Succeeded">Succeeded</option>
-                            <option value="Failed">Failed</option>
-                            <option value="Processing">Processing</option>
-                            <option value="Enqueued">Enqueued</option>
-                            <option value="Scheduled">Scheduled</option>
-                            <option value="Awaiting">Awaiting</option>
-                        </select>
+                        <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value" placeholder="All States" @change="applyFilters" class="w-full" />
                     </div>
                     <div class="field">
-                        <button class="ui button" @click="refreshData">
-                            <i class="icon refresh"></i> Refresh
-                        </button>
+                        <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" />
                     </div>
                     <div class="field">
-                        <button class="ui button negative" @click="showClearDialog" :disabled="completedBuildsCount === 0">
-                            <i class="icon trash"></i> Clear Concluded
-                        </button>
+                        <Button severity="danger" @click="showClearDialog" :disabled="completedBuildsCount === 0" icon="fa-solid fa-trash" label="Clear Concluded" />
                     </div>
                 </div>
             </div>
@@ -31,9 +19,11 @@
         <div class="content">
             <div v-if="loading" class="ui active centered inline loader"></div>
 
-            <div v-else-if="filteredBuilds.length === 0" class="ui message">
-                <div class="header">No builds found</div>
-                <p>No build history available for this dataset.</p>
+            <div v-else-if="filteredBuilds.length === 0">
+                <PrimeMessage severity="info" :closable="false">
+                    <strong>No builds found</strong>
+                    <p>No build history available for this dataset.</p>
+                </PrimeMessage>
             </div>
 
             <table v-else class="ui celled striped table">
@@ -41,19 +31,19 @@
                     <tr>
                         <th class="sortable" @click="sort('currentState')" style="width: 15%;">
                             State
-                            <i v-if="sortBy === 'currentState'" class="icon"
-                               :class="sortDesc ? 'sort down' : 'sort up'"></i>
+                            <i v-if="sortBy === 'currentState'"
+                               :class="sortDesc ? 'fa-solid fa-sort-down' : 'fa-solid fa-sort-up'"></i>
                         </th>
                         <th class="sortable" @click="sort('path')" style="width: 35%;">
                             File Path
-                            <i v-if="sortBy === 'path'" class="icon"
-                               :class="sortDesc ? 'sort down' : 'sort up'"></i>
+                            <i v-if="sortBy === 'path'"
+                               :class="sortDesc ? 'fa-solid fa-sort-down' : 'fa-solid fa-sort-up'"></i>
                         </th>
 
                         <th class="sortable" @click="sort('createdAt')" style="width: 20%;">
                             Started
-                            <i v-if="sortBy === 'createdAt'" class="icon"
-                               :class="sortDesc ? 'sort down' : 'sort up'"></i>
+                            <i v-if="sortBy === 'createdAt'"
+                               :class="sortDesc ? 'fa-solid fa-sort-down' : 'fa-solid fa-sort-up'"></i>
                         </th>
                         <th style="width: 15%;">Duration</th>
                         <th style="width: 15%;">Job Details</th>
@@ -62,15 +52,13 @@
                 <tbody>
                     <tr v-for="build in paginatedBuilds" :key="build.jobId">
                         <td>
-                            <div class="ui label" :class="getStateClass(build.currentState)">
-                                <i class="icon" :class="getStateIcon(build.currentState)"></i>
-                                {{ build.currentState }}
-                            </div>
+                            <Tag :severity="getTagSeverity(build.currentState)" :pt="{ root: { title: build.currentState } }">
+                                <i :class="getStateIcon(build.currentState)" style="font-size: 1.1em;"></i>
+                            </Tag>
                             <div v-if="canRetryBuild(build)" style="margin-top: 5px;">
-                                <button class="ui mini button" @click="retryBuild(build)"
-                                        :disabled="retryingBuilds[build.jobId]" style="font-size: 10px;">
-                                    <i class="icon redo"></i> Retry
-                                </button>
+                                <Button size="small" @click="retryBuild(build)"
+                                        :disabled="retryingBuilds[build.jobId]" style="font-size: 10px;"
+                                        icon="fa-solid fa-rotate-right" label="Retry" />
                             </div>
                         </td>
                         <td>
@@ -120,20 +108,11 @@
             </table>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 1" class="ui pagination menu">
-                <a class="icon item" :class="{ disabled: currentPage === 1 }"
-                   @click="currentPage > 1 && changePage(currentPage - 1)">
-                    <i class="left chevron icon"></i>
-                </a>
-                <a v-for="page in displayedPages" :key="page" class="item"
-                   :class="{ active: page === currentPage }" @click="changePage(page)">
-                    {{ page }}
-                </a>
-                <a class="icon item" :class="{ disabled: currentPage === totalPages }"
-                   @click="currentPage < totalPages && changePage(currentPage + 1)">
-                    <i class="right chevron icon"></i>
-                </a>
-            </div>
+            <Paginator v-if="filteredBuilds.length > pageSize"
+                :rows="pageSize"
+                :totalRecords="filteredBuilds.length"
+                :first="(currentPage - 1) * pageSize"
+                @page="onPageChange" />
         </div>
 
         <ConfirmDialog v-if="clearDialogOpen"
@@ -152,10 +131,15 @@
 <script>
 import BuildManager from '../libs/buildManager';
 import ConfirmDialog from './ConfirmDialog.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import Select from 'primevue/select';
+import Tag from 'primevue/tag';
+import Paginator from 'primevue/paginator';
 
 export default {
     components: {
-        ConfirmDialog
+        ConfirmDialog, Button, PrimeMessage, Select, Tag, Paginator
     },
 
     props: {
@@ -176,7 +160,16 @@ export default {
             currentPage: 1,
             pageSize: 20,
             retryingBuilds: {},
-            clearDialogOpen: false
+            clearDialogOpen: false,
+            stateOptions: [
+                { label: 'All States', value: '' },
+                { label: 'Succeeded', value: 'Succeeded' },
+                { label: 'Failed', value: 'Failed' },
+                { label: 'Processing', value: 'Processing' },
+                { label: 'Enqueued', value: 'Enqueued' },
+                { label: 'Scheduled', value: 'Scheduled' },
+                { label: 'Awaiting', value: 'Awaiting' }
+            ]
         };
     },
 
@@ -221,7 +214,7 @@ export default {
         BuildManager.monitorDatasetForBuilds(this.dataset);
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         this.cleanupBuildListeners();
     },
 
@@ -288,6 +281,10 @@ export default {
             }
         },
 
+        onPageChange(event) {
+            this.currentPage = event.page + 1;
+        },
+
         getFileName(path) {
             if (!path) return 'Dataset';
             return path.split('/').pop() || path;
@@ -317,21 +314,38 @@ export default {
             }
         },
 
+        getTagSeverity(state) {
+            switch (state) {
+                case 'Succeeded':
+                    return 'success';
+                case 'Failed':
+                    return 'danger';
+                case 'Processing':
+                    return 'warn';
+                case 'Enqueued':
+                case 'Scheduled':
+                case 'Awaiting':
+                    return 'info';
+                default:
+                    return 'secondary';
+            }
+        },
+
         getStateIcon(state) {
             switch (state) {
                 case 'Succeeded':
-                    return 'check';
+                    return 'fa-solid fa-check';
                 case 'Failed':
-                    return 'times';
+                    return 'fa-solid fa-xmark';
                 case 'Processing':
-                    return 'cog spin';
+                    return 'fa-solid fa-gear fa-spin';
                 case 'Enqueued':
                 case 'Scheduled':
                 case 'Awaiting':
                 case 'Created':
-                    return 'clock outline';
+                    return 'fa-regular fa-clock';
                 default:
-                    return 'question';
+                    return 'fa-solid fa-question';
             }
         },
 
@@ -397,7 +411,7 @@ export default {
         async retryBuild(build) {
             if (!build.path) return;
 
-            this.$set(this.retryingBuilds, build.jobId, true);
+            this.retryingBuilds[build.jobId] = true;
 
             try {
                 await this.dataset.build(build.path, true); // Force rebuild
@@ -407,7 +421,7 @@ export default {
                 console.error('Error retrying build:', error);
                 this.$emit('buildRetryError', { build, error: error.message });
             } finally {
-                this.$set(this.retryingBuilds, build.jobId, false);
+                this.retryingBuilds[build.jobId] = false;
             }
         },
 
@@ -545,7 +559,14 @@ export default {
     background-color: rgba(0,0,0,.05);
 }
 
-.ui.pagination.menu {
-    margin-top: 20px;
+.filter-bar {
+    display: flex;
+    align-items: center;
+}
+
+.filter-bar .fields {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 </style>

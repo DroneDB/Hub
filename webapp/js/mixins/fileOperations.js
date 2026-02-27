@@ -6,21 +6,19 @@ import { clone } from '../libs/utils';
 import icons from '../libs/icons';
 import BuildManager from '../libs/buildManager';
 import ddb from 'ddb';
+import emitter from '../libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
     data() {
         return {
-            isBusy: false,
-            flash: "",
-            flashColor: "positive",
-            flashIcon: "check circle outline"
+            isBusy: false
         };
     },
 
     methods: {
         sortFiles() {
-            this.$log.info("ViewDataset.sortFiles");
+            console.log("ViewDataset.sortFiles");
             this.fileBrowserFiles = this.fileBrowserFiles.sort((n1, n2) => {
                 var a = n1.entry;
                 var b = n2.entry;
@@ -52,7 +50,7 @@ export default {
                     this.fileBrowserFiles = this.fileBrowserFiles.filter(
                         item => !response.deleted.includes(item.entry.path)
                     );
-                    this.$root.$emit('deleteEntries', response.deleted);
+                    emitter.emit('deleteEntries', response.deleted);
                 }
 
                 // Show result dialog only if there are failures
@@ -89,8 +87,8 @@ export default {
                 }
 
                 // Tell filebrowser to remove the file in the old location and add to the new location
-                this.$root.$emit('deleteEntries', [oldPath]);
-                this.$root.$emit('addItems', [newItem]);
+                emitter.emit('deleteEntries', [oldPath]);
+                emitter.emit('addItems', [newItem]);
 
                 this.sortFiles();
 
@@ -129,7 +127,7 @@ export default {
 
                 var remoteUri = this.dataset.remoteUri(this.currentPath != null ? pathutils.join(this.currentPath, base) : base);
 
-                this.$log.info("Remote uri", remoteUri);
+                console.log("Remote uri", remoteUri);
 
                 var folderItem = {
                     icon: icons.getForType(entry.type, entry.path),
@@ -146,7 +144,7 @@ export default {
                 this.sortFiles();
 
                 // Tell filebrowser to add items
-                this.$root.$emit('addItems', [folderItem]);
+                emitter.emit('addItems', [folderItem]);
 
             } catch (e) {
                 this.showError(e, "Create folder");
@@ -170,9 +168,7 @@ export default {
         },
 
         closeFlash() {
-            this.flash = "";
-            this.flashColor = "positive";
-            this.flashIcon = "check circle outline";
+            // No-op: Toast auto-closes
         }
     }
 };

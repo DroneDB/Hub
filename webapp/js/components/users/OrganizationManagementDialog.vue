@@ -1,157 +1,139 @@
 <template>
     <Window title="Organization Management" id="organizationManagementDialog" @onClose="close" modal maxWidth="80%" fixedSize>
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <div class="ui message positive" v-if="success">
-                <p><strong>{{ successMessage }}</strong></p>
-            </div>
+            <PrimeMessage v-if="success" severity="success" :closable="false">
+                <strong>{{ successMessage }}</strong>
+            </PrimeMessage>
 
-            <div class="ui top attached tabular menu">
-                <div class="item" :class="{ active: activeTab === 'list' }" @click="activeTab = 'list'">
-                    <i class="list icon"></i>
-                    Organizations List
-                </div>
-                <div class="item" :class="{ active: activeTab === 'create' }" @click="activeTab = 'create'">
-                    <i class="plus icon"></i>
-                    Create Organization
-                </div>
-            </div>
-
-            <!-- Organizations List Tab -->
-            <div v-if="activeTab === 'list'" class="ui bottom attached active tab segment">
-                <div class="ui stackable grid">
-                    <div class="eight wide column">
-                        <div class="ui icon input fluid">
-                            <input v-model="searchQuery" type="text" placeholder="Search organizations...">
-                            <i class="search icon"></i>
+            <Tabs :value="activeTab" @update:value="val => activeTab = val">
+                <TabList>
+                    <Tab value="list"><i class="fa-solid fa-list" style="margin-right: 6px;"></i>Organizations List</Tab>
+                    <Tab value="create"><i class="fa-solid fa-plus" style="margin-right: 6px;"></i>Create Organization</Tab>
+                </TabList>
+                <TabPanels>
+                    <TabPanel value="list">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <div style="flex: 1; max-width: 300px;">
+                                <IconField>
+                                    <InputIcon class="fa-solid fa-magnifying-glass" />
+                                    <InputText v-model="searchQuery" placeholder="Search organizations" style="width: 100%;" />
+                                </IconField>
+                            </div>
+                            <Button @click="loadOrganizations" icon="fa-solid fa-arrows-rotate" label="Refresh" />
                         </div>
-                    </div>
-                    <div class="eight wide column right aligned">
-                        <button @click="loadOrganizations" class="ui button">
-                            <i class="refresh icon"></i> Refresh
-                        </button>
-                    </div>
-                </div>
 
-                <table class="ui celled table" v-if="filteredOrganizations.length > 0">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Slug</th>
-                            <th>Description</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr v-for="org in filteredOrganizations" :key="org.slug">
-                            <td><strong>{{ org.name || org.slug }}</strong></td>
-                            <td><code>{{ org.slug }}</code></td>
-                            <td>{{ org.description || '-' }}</td>
-                            <td>
-                                <button @click="confirmDeleteOrganization(org)"
-                                        class="ui small red button"
-                                        :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
-                                        :class="{ loading: deleting === org.slug }"
-                                        title="Delete Organization">
-                                    <i class="trash icon"></i>
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                        <table class="ui celled table" v-if="filteredOrganizations.length > 0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Slug</th>
+                                    <th>Description</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="org in filteredOrganizations" :key="org.slug">
+                                    <td><strong>{{ org.name || org.slug }}</strong></td>
+                                    <td><code>{{ org.slug }}</code></td>
+                                    <td>{{ org.description || '-' }}</td>
+                                    <td>
+                                        <Button @click="confirmDeleteOrganization(org)"
+                                                severity="danger" size="small"
+                                                :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
+                                                :loading="deleting === org.slug"
+                                                icon="fa-solid fa-trash" label="Delete"
+                                                title="Delete Organization" />
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
 
-                <div v-else class="ui message info">
-                    <div class="header">No Organizations Found</div>
-                    <p>{{ searchQuery ? 'Try adjusting your search criteria.' : 'No organizations available.' }}</p>
-                </div>
-            </div>
-
-            <!-- Create Organization Tab -->
-            <div v-if="activeTab === 'create'" class="ui bottom attached active tab segment">
-                <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!createError }">
-                    <div class="field">
-                        <label>Organization Name <span class="text-red">*</span></label>
-                        <input ref="txtOrgName" v-on:keydown="clearCreateError()" v-on:keyup.enter="createOrganization()"
-                               type="text" v-model="newOrgName" placeholder="Enter organization name" />
-                        <small>Organization names should be descriptive and will be converted to a valid slug</small>
-                    </div>
-
-                    <div class="field">
-                        <label>Organization Slug</label>
-                        <input type="text" v-model="newOrgSlug" :placeholder="suggestedSlug" readonly />
-                        <small>This is automatically generated from the name and cannot be changed later</small>
-                    </div>
-
-                    <div class="field">
-                        <label>Description (Optional)</label>
-                        <textarea v-model="newOrgDescription" placeholder="Brief description of the organization"></textarea>
-                    </div>
-
-                    <div class="field" v-if="createError">
-                        <div class="ui negative message">
-                            <p>{{ createError }}</p>
+                        <div v-else>
+                            <PrimeMessage severity="info" :closable="false">
+                                <strong>No Organizations Found</strong>
+                                <p>{{ searchQuery ? 'Try adjusting your search criteria.' : 'No organizations available.' }}</p>
+                            </PrimeMessage>
                         </div>
-                    </div>
+                    </TabPanel>
+                    <TabPanel value="create">
+                        <form v-on:submit.prevent class="form" v-bind:class="{ error: !!createError }">
+                            <div class="field">
+                                <label>Organization Name <span class="text-red">*</span></label>
+                                <InputText ref="txtOrgName" @keydown="clearCreateError()" @keyup.enter="createOrganization()"
+                                       v-model="newOrgName" placeholder="Enter organization name" class="w-full" />
+                                <small>Organization names should be descriptive and will be converted to a valid slug</small>
+                            </div>
 
-                    <div class="field">
-                        <button @click="createOrganization()" :disabled="creating || !newOrgName.trim()"
-                                :class="{ loading: creating }" class="ui primary button">
-                            <i class="plus icon"></i>Create Organization
-                        </button>
-                    </div>
-                </form>
-            </div>
+                            <div class="field">
+                                <label>Organization Slug</label>
+                                <InputText :modelValue="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-full" />
+                                <small>This is automatically generated from the name and cannot be changed later</small>
+                            </div>
+
+                            <div class="field">
+                                <label>Description (Optional)</label>
+                                <textarea v-model="newOrgDescription" placeholder="Brief description of the organization"></textarea>
+                            </div>
+
+                            <div class="field" v-if="createError">
+                                <PrimeMessage severity="error" :closable="false">
+                                    {{ createError }}
+                                </PrimeMessage>
+                            </div>
+
+                            <div class="field">
+                                <Button @click="createOrganization()" :disabled="creating || !newOrgName.trim()"
+                                        :loading="creating" severity="info" icon="fa-solid fa-plus" label="Create Organization" />
+                            </div>
+                        </form>
+                    </TabPanel>
+                </TabPanels>
+            </Tabs>
 
             <div class="dialog-buttons">
-                <button @click="close()" class="ui button">
-                    Close
-                </button>
+                <Button @click="close()" label="Close" />
             </div>
         </div>
 
         <!-- Delete Organization Confirmation Dialog -->
-        <div v-if="showDeleteDialog" class="ui dimmer modals page transition visible active" style="display: flex !important; align-items: center; justify-content: center;">
-            <div class="ui small modal transition visible active" style="position: relative; top: auto; left: auto; margin: 0;">
-                <i class="close icon" @click="showDeleteDialog = false"></i>
-                <div class="header">
-                    <i class="trash icon"></i>
-                    Delete Organization
-                </div>
-                <div class="content">
-                    <p>Are you sure you want to delete the organization <strong>{{ orgToDelete && orgToDelete.name || orgToDelete.slug }}</strong>?</p>
-                    <p class="ui warning message">
-                        <i class="warning icon"></i>
-                        This action cannot be undone. All data associated with this organization will be permanently removed.
-                    </p>
-                </div>
-                <div class="actions">
-                    <button class="ui button" @click="showDeleteDialog = false">
-                        Cancel
-                    </button>
-                    <button class="ui red button" @click="deleteOrganization" :class="{ loading: deleting === (orgToDelete && orgToDelete.slug) }">
-                        <i class="trash icon"></i>
-                        Delete Organization
-                    </button>
-                </div>
-            </div>
-        </div>
+        <ConfirmDialog v-if="showDeleteDialog"
+            title="Delete Organization"
+            :message="`Are you sure you want to delete the organization <strong>${orgToDelete && (orgToDelete.name || orgToDelete.slug)}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. All data associated with this organization will be permanently removed.`"
+            confirmText="Delete Organization"
+            cancelText="Cancel"
+            confirmButtonClass="negative"
+            @onClose="handleDeleteDialogClose">
+        </ConfirmDialog>
     </Window>
 </template>
 
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
+import ConfirmDialog from '../ConfirmDialog.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import InputText from 'primevue/inputtext';
+import InputIcon from 'primevue/inputicon';
+import IconField from 'primevue/iconfield';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
+import TabPanels from 'primevue/tabpanels';
+import TabPanel from 'primevue/tabpanel';
 import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
-        Window, Message
+        Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
+        InputIcon, IconField, Tabs, TabList, Tab, TabPanels, TabPanel
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -237,6 +219,15 @@ export default {
             }
             this.orgToDelete = org;
             this.showDeleteDialog = true;
+        },
+
+        async handleDeleteDialogClose(action) {
+            if (action === 'confirm') {
+                await this.deleteOrganization();
+            } else {
+                this.showDeleteDialog = false;
+                this.orgToDelete = null;
+            }
         },
 
         async deleteOrganization() {
@@ -334,7 +325,9 @@ export default {
 
 .dialog-buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .text-red {
@@ -346,10 +339,6 @@ textarea {
     resize: vertical;
 }
 
-.ui.tab.segment {
-    padding: 1rem;
-}
-
 code {
     background-color: #f5f5f5;
     padding: 2px 4px;
@@ -357,14 +346,7 @@ code {
     font-family: monospace;
 }
 
-.ui.top.attached.tabular.menu {
-    .item {
-        cursor: pointer;
-        &.active {
-            cursor: default;
-        }
-    }
-
+.w-full {
+    width: 100%;
 }
-
 </style>

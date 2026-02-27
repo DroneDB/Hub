@@ -11,13 +11,13 @@
             <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
 
             <!-- Build loading spinner (highest priority) -->
-            <i class="icon circle notch spin loading" v-if="buildLoading" />
+            <i class="fa-solid fa-circle-notch fa-spin loading" v-if="buildLoading" />
 
             <!-- Regular loading spinner (when loading thumbnails) -->
-            <i class="icon circle notch spin loading" v-else-if="loading" />
+            <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="loading" />
 
             <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
-            <i class="icon circle notch spin loading" v-else-if="!thumbnail && !icon" />
+            <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="!thumbnail && !icon" />
 
             <!-- Build Status Badges - Only show errors -->
             <div v-if="!buildLoading && !loading && buildState && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
@@ -108,7 +108,7 @@ export default {
             const state = this.buildState.currentState;
             switch (state) {
                 case 'Failed':
-                    return 'times';
+                    return 'fa-solid fa-xmark';
                 default:
                     return '';
             }
@@ -122,7 +122,7 @@ export default {
             this.setupBuildListeners();
         }
     },
-    beforeDestroy() {
+    beforeUnmount() {
         this.cleanupBuildListeners();
     },
     methods: {
@@ -155,7 +155,7 @@ export default {
         showError: function (e) {
             console.warn(e);
             this.error = e.message;
-            this.icon = "exclamation triangle";
+            this.icon = "fa-solid fa-triangle-exclamation";
             this.loading = false;
         },
         loadThumbnail: async function (force = false) {

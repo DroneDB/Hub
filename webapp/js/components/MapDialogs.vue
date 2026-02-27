@@ -19,26 +19,21 @@
             confirmButtonClass="negative"
             @onClose="$emit('deleteSavedMeasurementsClose', $event)">
         </ConfirmDialog>
-        <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="$emit('flashClose')">{{ flashMessage }}</Flash>
     </div>
 </template>
 
 <script>
 import Alert from './Alert.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
-import Flash from './Flash.vue';
 
 export default {
-    components: { Alert, ConfirmDialog, Flash },
+    components: { Alert, ConfirmDialog },
     props: {
         alertDialogOpen: { type: Boolean, default: false },
         alertTitle: { type: String, default: '' },
         alertMessage: { type: String, default: '' },
         clearMeasurementsDialogOpen: { type: Boolean, default: false },
-        deleteSavedMeasurementsDialogOpen: { type: Boolean, default: false },
-        flashMessage: { type: String, default: null },
-        flashColor: { type: String, default: 'positive' },
-        flashIcon: { type: String, default: 'check circle outline' }
+        deleteSavedMeasurementsDialogOpen: { type: Boolean, default: false }
     }
 };
 </script>

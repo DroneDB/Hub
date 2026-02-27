@@ -21,7 +21,7 @@
             </div>
             <div v-else-if="files.length === 0" class="ui placeholder segment" style="margin: 1rem; width: 100%;">
                 <div class="ui icon header">
-                    <i class="folder open outline icon"></i>
+                    <i class="fa-regular fa-folder-open icon"></i>
                     This folder is empty
                 </div>
             </div>
@@ -45,6 +45,7 @@ import { clone } from '../libs/utils';
 import Window from './Window.vue';
 import BuildManager, { BUILD_STATES } from '../libs/buildManager';
 import { isInternalDrag, dragDropMixin } from '../libs/dragDropUtils';
+import emitter from '../libs/eventBus';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -69,7 +70,7 @@ export default {
         if (env.isElectron()) {
             contextMenu = contextMenu.concat([{
                 label: "Open Item Location",
-                icon: 'open folder outline',
+                icon: 'fa-regular fa-folder-open',
                 isVisible: () => { return this.selectedFiles.length > 0; },
                 click: () => {
                     if (this.selectedFiles.length > 0) shell.showItemInFolder(this.selectedFiles[0].path);
@@ -79,7 +80,7 @@ export default {
                 type: 'separator'
             }, {
                 label: "Share",
-                icon: 'share alternate',
+                icon: 'fa-solid fa-share-nodes',
                 accelerator: "CmdOrCtrl+S",
                 isVisible: () => { return this.selectedFiles.length > 0; },
                 click: () => {
@@ -94,7 +95,7 @@ export default {
 
         contextMenu = contextMenu.concat([{
             label: 'Open',
-            icon: 'folder open outline',
+            icon: 'fa-regular fa-folder-open',
             isVisible: () => { return this.selectedFiles.length > 0 && (this.selectedFiles.length > 1 || typesWithDedicatedViewer.indexOf(this.selectedFiles[0].entry.type) === -1); },
             click: () => {
                 this.selectedFiles.forEach(f => {
@@ -103,7 +104,7 @@ export default {
             }
         }, {
             label: 'Open Map',
-            icon: 'map',
+            icon: 'fa-solid fa-map',
             isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
             click: () => {
                 this.selectedFiles.forEach(f => {
@@ -112,7 +113,7 @@ export default {
             }
         }, {
             label: 'Open Point Cloud',
-            icon: 'cube',
+            icon: 'fa-solid fa-cube',
             isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
             click: () => {
                 this.selectedFiles.forEach(f => {
@@ -121,7 +122,7 @@ export default {
             }
         }, {
             label: 'Open 3D Model',
-            icon: 'cube',
+            icon: 'fa-solid fa-cube',
             isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
             click: () => {
                 this.selectedFiles.forEach(f => {
@@ -130,7 +131,7 @@ export default {
             }
         }, {
             label: 'Open Panorama',
-            icon: 'globe',
+            icon: 'fa-solid fa-globe',
             isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1; },
             click: () => {
                 this.selectedFiles.forEach(f => {
@@ -157,7 +158,7 @@ export default {
             }
         }, {
             label: "Rename",
-            icon: 'pencil alternate',
+            icon: 'fa-solid fa-pencil',
             isVisible: () => { return this.canWrite && this.selectedFiles.length == 1; },
             accelerator: "CmdOrCtrl+M",
             click: () => {
@@ -166,14 +167,14 @@ export default {
         }, {
             label: "Properties",
             isVisible: () => { return this.selectedFiles.length > 0; },
-            icon: 'info circle',
+            icon: 'fa-solid fa-circle-info',
             accelerator: "CmdOrCtrl+P",
             click: () => {
                 this.$emit("openProperties");
             }
         }, {
             label: 'Share/Embed',
-            icon: 'share alternate',
+            icon: 'fa-solid fa-share-nodes',
             isVisible: () => { return this.selectedFiles.length === 1 },
             click: () => {
                 this.selectedFiles.forEach(f => {
@@ -182,14 +183,14 @@ export default {
             }
         }, {
             label: 'Download',
-            icon: 'download',
+            icon: 'fa-solid fa-download',
             isVisible: () => { return this.selectedFiles.length > 0; },
             click: () => {
                 this.$emit('downloadItems', this.selectedFiles);
             }
         }, {
             label: 'Build',
-            icon: 'cog',
+            icon: 'fa-solid fa-gear',
             isVisible: () => {
                 return this.canWrite &&
                        this.selectedFiles.length === 1 &&
@@ -201,7 +202,7 @@ export default {
             }
         }, {
             label: "Transfer to Dataset...",
-            icon: 'exchange',
+            icon: 'fa-solid fa-right-left',
             isVisible: () => { return reg.isLoggedIn() && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             accelerator: "CmdOrCtrl+T",
             click: () => {
@@ -209,7 +210,7 @@ export default {
             }
         }, {
             label: "Set as Dataset Thumbnail",
-            icon: 'image',
+            icon: 'fa-solid fa-image',
             isVisible: () => {
                 if (!this.canWrite || this.selectedFiles.length !== 1) return false;
                 const file = this.selectedFiles[0];
@@ -234,7 +235,7 @@ export default {
             type: 'separator'
         }, {
             label: "Select All/None",
-            icon: 'list',
+            icon: 'fa-solid fa-list',
             accelerator: "CmdOrCtrl+A",
             click: () => {
                 if (!this.$refs.thumbs) return;
@@ -246,7 +247,7 @@ export default {
             }
         }, {
             label: "Create Folder",
-            icon: 'folder',
+            icon: 'fa-solid fa-folder',
             isVisible: () => { return this.canWrite; },
             accelerator: "CmdOrCtrl+N",
             click: () => {
@@ -257,7 +258,7 @@ export default {
             type: 'separator'
         }, {
             label: "Delete",
-            icon: 'trash alternate outline',
+            icon: 'fa-solid fa-trash',
             isVisible: () => { return this.canWrite && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             accelerator: "CmdOrCtrl+D",
             click: () => {
@@ -318,7 +319,7 @@ export default {
 
 
         goTo: function (itm) {
-            this.$root.$emit("folderOpened", pathutils.getTree(itm.path));
+            emitter.emit("folderOpened", pathutils.getTree(itm.path));
         },
 
         startDrag: (evt, item) => {
@@ -355,7 +356,7 @@ export default {
         drop(sourceItem, destFolder) {
 
             if (entry.isDirectory(sourceItem.entry) && (destFolder + '/').startsWith(sourceItem.entry.path + '/')) {
-                this.$log.info("Cannot copy a folder on itself or one of its descendants");
+                console.log("Cannot copy a folder on itself or one of its descendants");
                 return;
             }
 
@@ -420,7 +421,7 @@ export default {
 
             if (entry.isDirectory(file.entry)) {
                 thumb.loading = true; // Show loading spinner
-                this.$root.$emit("folderOpened", pathutils.getTree(file.entry.path));
+                emitter.emit("folderOpened", pathutils.getTree(file.entry.path));
             } else {
                 this.$emit('openItem', file);
             }
@@ -518,7 +519,7 @@ export default {
     padding: 8px;
     overflow-y: auto;
     user-select: none;
-    transition: all 0.25s ease;
+    transition: opacity 0.25s ease;
 
     &.loading {
         opacity: 0.5;
@@ -541,9 +542,28 @@ export default {
     .breadcrumb {
         word-break: break-all;
         overflow: hidden;
+        white-space: nowrap;
 
         .section.home {
             font-family: monospace;
+        }
+
+        a.section {
+            color: #4183c4;
+            cursor: pointer;
+            text-decoration: none;
+
+            &:hover {
+                text-decoration: underline;
+            }
+        }
+
+        .divider {
+            margin: 0 0.3em;
+        }
+
+        .section.active {
+            display: inline;
         }
     }
 }

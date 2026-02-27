@@ -100,6 +100,7 @@ export default {
             default: 'LineString'
         }
     },
+    emits: ['onClose'],
     data() {
         return {
             colorPalette: [

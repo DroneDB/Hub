@@ -3,12 +3,8 @@
         Are you sure you want to delete <span v-if="files.length === 1">"{{ files[0].label }}"</span><span v-else>{{
             files.length }} entries</span>?<br />
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
-            <button @click="close('remove')" class="ui button negative">
-                Remove
-            </button>
+            <Button label="Close" @click="close('close')" severity="secondary" />
+            <Button label="Remove" @click="close('remove')" severity="danger" />
         </div>
     </Window>
 </template>
@@ -16,13 +12,16 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window,
+        Button
     },
 
     props: ["files"],
+    emits: ['onClose'],
 
     data: function () {
         return {};
@@ -30,7 +29,7 @@ export default {
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
     methods: {
@@ -48,6 +47,8 @@ export default {
 <style scoped>
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

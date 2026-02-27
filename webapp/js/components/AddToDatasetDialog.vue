@@ -18,6 +18,7 @@ export default {
     },
 
     props: ['organization', 'dataset', 'path', 'filesToUpload'],
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -47,6 +48,8 @@ export default {
 <style scoped>
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

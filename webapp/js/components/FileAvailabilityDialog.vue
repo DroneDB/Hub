@@ -1,28 +1,25 @@
 <template>
-    <div v-if="show" class="ui dimmer modals page visible active">
-        <div class="ui small modal visible active file-availability-dialog">
-            <i class="close icon" @click="handleClose"></i>
-            <div class="header">
-                <i class="icon" :class="getHeaderIcon()"></i>
+    <Window v-if="show" title="" id="fileAvailabilityDialog" @onClose="handleClose" modal maxWidth="600px" fixedSize>
+        <div class="file-availability-dialog">
+            <div class="dialog-header">
+                <i :class="getHeaderIcon()"></i>
                 {{ title }}
             </div>
             <div class="content">
                 <div class="description">
-                    <div class="ui" :class="getMessageClass()">
-                        <div class="message-content">
-                            {{ message }}
-                        </div>
-                    </div>
+                    <PrimeMessage :severity="getMessageSeverity()" :closable="false">
+                        {{ message }}
+                    </PrimeMessage>
 
                     <!-- Progress indicator for build in progress -->
-                    <div v-if="status === 'building' && waitingForBuild" class="ui segment build-progress">
+                    <div v-if="status === 'building' && waitingForBuild" class="build-progress">
                         <div class="ui active inline loader small"></div>
                         <span style="margin-left: 10px;">Waiting for build completion...</span>
                         <div class="progress-timer">{{ formatWaitTime() }}</div>
                     </div>
 
                     <!-- Build details if available -->
-                    <div v-if="buildState && showDetails" class="ui segment build-details">
+                    <div v-if="buildState && showDetails" class="build-details">
                         <h4>Build Details</h4>
                         <table class="ui very basic compact table">
                             <tbody>
@@ -33,9 +30,7 @@
                                 <tr>
                                     <td><strong>Status:</strong></td>
                                     <td>
-                                        <span class="ui label mini" :class="getStateClass(buildState.currentState)">
-                                            {{ buildState.currentState }}
-                                        </span>
+                                        <Tag :value="buildState.currentState" :severity="getTagSeverity(buildState.currentState)" />
                                     </td>
                                 </tr>
                                 <tr v-if="buildState.createdAt">
@@ -56,42 +51,37 @@
                 </div>
             </div>
             <div class="actions">
-                <button v-if="hasAction('close')" class="ui button" @click="handleClose">
-                    Close
-                </button>
-                <button v-if="hasAction('cancel')" class="ui button" @click="handleClose">
-                    Cancel
-                </button>
-                <button v-if="hasAction('details')" class="ui button" @click="toggleDetails">
-                    {{ showDetails ? 'Hide' : 'Show' }} Details
-                </button>
-                <button v-if="hasAction('start-build')" class="ui primary button"
-                        @click="handleStartBuild" :disabled="processing">
-                    <i class="play icon"></i>
-                    Start Processing
-                </button>
-                <button v-if="hasAction('retry-build')" class="ui orange button"
-                        @click="handleRetryBuild" :disabled="processing">
-                    <i class="redo icon"></i>
-                    Retry Processing
-                </button>
-                <button v-if="hasAction('wait')" class="ui button" @click="handleClose">
-                    Wait
-                </button>
-                <button v-if="hasAction('wait-and-open')" class="ui positive button"
-                        @click="handleWaitAndOpen" :disabled="waitingForBuild">
-                    <i class="hourglass half icon"></i>
-                    {{ waitingForBuild ? 'Waiting...' : 'Wait and Open' }}
-                </button>
+                <Button v-if="hasAction('close')" @click="handleClose" label="Close" />
+                <Button v-if="hasAction('cancel')" @click="handleClose" label="Cancel" />
+                <Button v-if="hasAction('details')" @click="toggleDetails"
+                    :label="showDetails ? 'Hide Details' : 'Show Details'" />
+                <Button v-if="hasAction('start-build')" severity="info"
+                        @click="handleStartBuild" :disabled="processing"
+                        icon="fa-solid fa-play" label="Start Processing" />
+                <Button v-if="hasAction('retry-build')" severity="warn"
+                        @click="handleRetryBuild" :disabled="processing"
+                        icon="fa-solid fa-rotate-right" label="Retry Processing" />
+                <Button v-if="hasAction('wait')" @click="handleClose" label="Wait" />
+                <Button v-if="hasAction('wait-and-open')" severity="success"
+                        @click="handleWaitAndOpen" :disabled="waitingForBuild"
+                        icon="fa-solid fa-hourglass-half"
+                        :label="waitingForBuild ? 'Waiting...' : 'Wait and Open'" />
             </div>
         </div>
-    </div>
+    </Window>
 </template>
 
 <script>
 import BuildManager from '../libs/buildManager';
+import Window from './Window.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import Tag from 'primevue/tag';
 
 export default {
+    components: {
+        Window, Button, PrimeMessage, Tag
+    },
     props: {
         show: {
             type: Boolean,
@@ -137,7 +127,7 @@ export default {
         };
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         this.stopPolling();
     },
 
@@ -234,49 +224,49 @@ export default {
         getHeaderIcon() {
             switch (this.status) {
                 case 'building':
-                    return 'hourglass half orange';
+                    return 'fa-solid fa-hourglass-half orange';
                 case 'failed':
-                    return 'exclamation circle red';
+                    return 'fa-solid fa-circle-exclamation red';
                 case 'queued':
-                    return 'clock outline blue';
+                    return 'fa-regular fa-clock blue';
                 case 'ready':
-                    return 'check circle green';
+                    return 'fa-solid fa-circle-check green';
                 case 'not-found':
-                    return 'question circle grey';
+                    return 'fa-solid fa-circle-question grey';
                 default:
-                    return 'info circle';
+                    return 'fa-solid fa-circle-info';
             }
         },
 
-        getMessageClass() {
+        getMessageSeverity() {
             switch (this.status) {
                 case 'building':
-                    return 'message warning';
+                    return 'warn';
                 case 'failed':
-                    return 'message error';
+                    return 'error';
                 case 'queued':
-                    return 'message info';
+                    return 'info';
                 case 'not-found':
-                    return 'message warning';
+                    return 'warn';
                 default:
-                    return 'message';
+                    return 'info';
             }
         },
 
-        getStateClass(state) {
+        getTagSeverity(state) {
             switch (state) {
                 case 'Succeeded':
-                    return 'green';
+                    return 'success';
                 case 'Failed':
-                    return 'red';
+                    return 'danger';
                 case 'Processing':
-                    return 'yellow';
+                    return 'warn';
                 case 'Enqueued':
                 case 'Scheduled':
                 case 'Awaiting':
-                    return 'blue';
+                    return 'info';
                 default:
-                    return 'grey';
+                    return 'secondary';
             }
         },
 
@@ -309,25 +299,21 @@ export default {
     max-width: 600px;
 }
 
-.file-availability-dialog .header {
+.dialog-header {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.file-availability-dialog .header .icon {
-    margin: 0 !important;
-}
-
-.message-content {
-    white-space: pre-line;
-    line-height: 1.6;
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 12px;
 }
 
 .build-progress {
     margin-top: 15px;
     text-align: center;
     padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
 }
 
 .progress-timer {
@@ -339,6 +325,8 @@ export default {
 .build-details {
     margin-top: 15px;
     background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
 }
 
 .build-details h4 {
@@ -353,22 +341,11 @@ export default {
     border-radius: 3px;
 }
 
-.ui.message {
-    text-align: left;
-}
-
-.ui.message.warning {
-    background-color: #fffaf3;
-    color: #573a08;
-}
-
-.ui.message.error {
-    background-color: #fff6f6;
-    color: #9f3a38;
-}
-
-.ui.message.info {
-    background-color: #f8ffff;
-    color: #276f86;
+.actions {
+    margin-top: 16px;
+    text-align: right;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
 }
 </style>

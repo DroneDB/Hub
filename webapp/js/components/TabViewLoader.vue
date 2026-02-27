@@ -2,7 +2,7 @@
     <div class="tab-view-loader">
         <Message bindTo="error" noDismiss />
         <div v-if="loading" class="loading">
-            <p v-if="loadingText">{{ loadingText }}</p> <i class="icon circle notch spin" />
+            <p v-if="loadingText">{{ loadingText }}</p> <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
     </div>
 </template>
@@ -13,6 +13,7 @@ import { b64encode, b64decode } from '../libs/base64';
 import { setTitle } from '../libs/utils';
 import reg from '../libs/sharedRegistry';
 import ddb from 'ddb';
+import emitter from '../libs/eventBus';
 
 export default {
     components: {
@@ -73,8 +74,7 @@ export default {
             }
 
             if (this.$route.params.encodedPath) {
-                const $header = this.$parent.$parent.$children[0];
-                $header.selectedFiles = [{ path: this.$parent.ddbURI }];
+                emitter.emit('setSelectedFiles', [{ path: this.$parent.ddbURI }]);
                 setTitle(`${ddb.pathutils.basename(entry.path)} - ${this.titleSuffix}`);
             }
         } catch (e) {

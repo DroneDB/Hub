@@ -10,105 +10,85 @@
 
         <div class="right">
 
-            <a :href="downloadUrl" @click="handleDownload" v-if="showDownload" title="Download"
-                class="ui button primary icon download" :class="{ loading: isDownloading, disabled: isDownloading }">
-                <i :class="{ hidden: !showDownloadIcon }" class="icon download"></i><span
+            <Button :href="downloadUrl" @click="handleDownload" v-if="showDownload" title="Download"
+                severity="info" :loading="isDownloading" :disabled="isDownloading" size="small">
+                <i :class="{ hidden: !showDownloadIcon }" class="fa-solid fa-download"></i><span
                     :class="{ 'mobile hide': showDownloadIcon }"> {{ downloadLabel }}</span>
-            </a>
+            </Button>
 
             <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
                     <template v-if="storageInfo.used > 0">
-                        <div class="storage-progress-container">
-                            <div class="storage-progress-bar" :style="storageBarStyle"></div>
-                        </div>
+                        <ProgressBar :value="storagePercent" :showValue="false"
+                            :pt="{ value: { style: { background: storageBarColor } } }"
+                            style="width: 300px; height: 18px; margin: 1rem auto 10px auto;" />
                         <div class="storage-percentage" :style="{ color: storageBarColor }">
-                            {{ storageInfo.usedPercentage | percent(1) }}
+                            {{ percent(storageInfo.usedPercentage, 1) }}
                         </div>
                         <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: #555;">
-                            <tr>
+                            <thead><tr>
                                 <th><b>Total</b></th>
                                 <th><b>Used</b></th>
                                 <th v-if="storageInfo.free > 0"><b>Free</b></th>
-                            </tr>
-                            <tr>
-                                <td>{{ storageInfo.total | bytes }}</td>
-                                <td>{{ storageInfo.used | bytes }}</td>
-                                <td v-if="storageInfo.free > 0">{{ storageInfo.free | bytes }}</td>
-                            </tr>
+                            </tr></thead>
+                            <tbody><tr>
+                                <td>{{ bytes(storageInfo.total) }}</td>
+                                <td>{{ bytes(storageInfo.used) }}</td>
+                                <td v-if="storageInfo.free > 0">{{ bytes(storageInfo.free) }}</td>
+                            </tr></tbody>
                         </table>
                         <div v-if="storageInfo.free <= 0" class="storage-warning">
-                            <i class="icon warning sign"></i> No storage left!
+                            <i class="fa-solid fa-triangle-exclamation"></i> No storage left!
                         </div>
                     </template>
                     <template v-else>
                         <table style="width: 100%; margin-bottom: 0; color: #555;">
-                            <tr>
+                            <thead><tr>
                                 <th><b>Total</b></th>
-                            </tr>
-                            <tr>
-                                <td>{{ storageInfo.total | bytes }}</td>
-                            </tr>
+                            </tr></thead>
+                            <tbody><tr>
+                                <td>{{ bytes(storageInfo.total) }}</td>
+                            </tr></tbody>
                         </table>
                     </template>
                 </div>
             </Alert>
 
-            <a href="javascript:void(0)" @click="handleSettings" v-if="showSettings" title="Settings"
-                class="ui circular button default icon settings">
-                <i class="icon wrench"></i>
-            </a>
-            <button v-if="!loggedIn" class="ui button primary icon" @click="login"><i class="icon lock"></i><span
-                    class="mobile hide"> Sign In</span></button>
-            <div v-else class="circular ui icon top right pointing dropdown button user-menu" @click.stop="toggleMenu"
-                :title="username">
-                <i class="icon user"></i>
-                <div class="menu" ref="menu">
-                    <div class="header">{{ username }} <span v-if="isAdmin && username != 'admin'"> —
-                            <i>admin</i></span></div>
-                    <div class="divider"></div>
-                    <div v-if="fileUploads" class="item" @click="uploadFiles"><i class="icon cloud upload"></i> Upload
-                        Files
-                    </div>
-                    <div class="item" @click="myOrganizations"><i class="icon sitemap"></i> My Organizations</div>
-                    <div class="item" @click="myDatasets"><i class="icon database"></i> My Datasets</div>
-                    <div class="divider only" v-if="storageInfo"></div>
-                    <div class="item only" @click="storageInfoDialogOpen = true"
-                        v-if="storageInfo && storageInfo.total != null && storageInfo.used > 0"><i
-                            class="icon hdd outline"></i>&nbsp;{{ storageInfo.usedPercentage | percent(2) }}</div>
-                    <div class="item only"
-                        v-if="storageInfo && storageInfo.total != null && !storageInfo.used"><i
-                            class="icon hdd outline"></i>&nbsp;{{ storageInfo.total | bytes }}</div>
-                    <div class="item only" v-if="storageInfo && storageInfo.total == null"><i
-                            class="icon hdd outline"></i>&nbsp;{{ storageInfo.used | bytes }}</div>
-                    <div v-if="(accountManagement && loggedIn) || (usersManagement && isAdmin)" class="divider"></div>
-                    <div v-if="accountManagement && loggedIn" class="item only" @click="manageAccount"><i
-                            class="icon user"></i>
-                        My Account</div>
-                    <div v-if="usersManagement && isAdmin" class="item only" @click="manageUsers"><i
-                            class="icon users"></i>
-                        Manage Users</div>
-                    <div class="divider"></div>
-                    <div class="item" @click="logout"><i class="icon sign-out"></i> Logout</div>
-                </div>
-            </div>
+            <Button @click="handleSettings" v-if="showSettings" title="Settings"
+                severity="secondary" size="small" text>
+                <i class="fa-solid fa-wrench"></i>
+            </Button>
+            <Button v-if="!loggedIn" severity="info" size="small" @click="login">
+                <i class="fa-solid fa-lock"></i><span class="mobile hide"> Sign In</span>
+            </Button>
+            <Button v-else severity="secondary" size="small" text
+                @click="toggleUserMenu" :title="username" aria-haspopup="true" aria-controls="user_menu">
+                <i class="fa-solid fa-user"></i>
+            </Button>
+            <Menu ref="userMenu" id="user_menu" :model="userMenuItems" :popup="true" />
         </div>
     </div>
 </template>
 
 <script>
 import { utils } from 'ddb';
-import mouse from '../libs/mouse';
 import reg from '../libs/sharedRegistry';
 import { Features } from '../libs/features';
 import Alert from './Alert';
 import { xAuthLogout } from '../libs/xauth';
 import { isMobile } from '../libs/responsive';
 import { bytesToSize } from '../libs/utils';
+import emitter from '../libs/eventBus';
+import Button from 'primevue/button';
+import Menu from 'primevue/menu';
+import ProgressBar from 'primevue/progressbar';
 
 export default {
     components: {
-        Alert
+        Alert,
+        Button,
+        Menu,
+        ProgressBar
     },
     data: function () {
 
@@ -120,24 +100,16 @@ export default {
             isAdmin: reg.isAdmin(),
             params: this.$route.params,
             showDownload: !!this.$route.params.ds,
-            showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath, // TODO: find a better UI design for settings
+            showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
             selectedFiles: [],
             isDownloading: false,
             storageInfo: null,
             storageInfoDialogOpen: false,
-            usersManagement: false, // Will be set dynamically based on server configuration
-            accountManagement: false // Will be set dynamically based on server configuration and disableAccountManagement option
+            usersManagement: false,
+            accountManagement: false
         }
     },
-    filters: {
-        percent: function (value, places) {
-            if (!value) return ''
-            return (value * 100).toFixed(places) + "%";
-        },
-        bytes: function (value) {
-            return bytesToSize(value);
-        }
-    },
+
     computed: {
         storageBarColor: function () {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return '#21ba45';
@@ -147,13 +119,9 @@ export default {
             if (pct >= 50) return '#fbbd08';
             return '#21ba45';
         },
-        storageBarStyle: function () {
-            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return {};
-            const pct = Math.min(this.storageInfo.usedPercentage * 100, 100);
-            return {
-                width: pct + '%',
-                backgroundColor: this.storageBarColor
-            };
+        storagePercent: function () {
+            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 0;
+            return Math.min(this.storageInfo.usedPercentage * 100, 100);
         },
         homeUrl: function () {
             const org = HubOptions.singleOrganization !== undefined ?
@@ -208,21 +176,63 @@ export default {
         },
         appName: function () {
             return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+        },
+        userMenuItems: function () {
+            const items = [];
+
+            items.push({ label: this.username + (this.isAdmin && this.username !== 'admin' ? ' — admin' : ''), disabled: true, class: 'user-menu-header' });
+            items.push({ separator: true });
+
+            if (this.fileUploads) {
+                items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up', command: () => this.uploadFiles() });
+            }
+            items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap', command: () => this.myOrganizations() });
+            items.push({ label: 'My Datasets', icon: 'fa-solid fa-database', command: () => this.myDatasets() });
+
+            if (this.storageInfo) {
+                items.push({ separator: true });
+                if (this.storageInfo.total != null && this.storageInfo.used > 0) {
+                    items.push({ label: this.percent(this.storageInfo.usedPercentage, 2), icon: 'fa-regular fa-hard-drive', command: () => { this.storageInfoDialogOpen = true; } });
+                } else if (this.storageInfo.total != null && !this.storageInfo.used) {
+                    items.push({ label: this.bytes(this.storageInfo.total), icon: 'fa-regular fa-hard-drive', command: () => {} });
+                } else if (this.storageInfo.total == null) {
+                    items.push({ label: this.bytes(this.storageInfo.used), icon: 'fa-regular fa-hard-drive', command: () => {} });
+                }
+            }
+
+            if ((this.accountManagement && this.loggedIn) || (this.usersManagement && this.isAdmin)) {
+                items.push({ separator: true });
+            }
+            if (this.accountManagement && this.loggedIn) {
+                items.push({ label: 'My Account', icon: 'fa-solid fa-user', command: () => this.manageAccount() });
+            }
+            if (this.usersManagement && this.isAdmin) {
+                items.push({ label: 'Manage Users', icon: 'fa-solid fa-users', command: () => this.manageUsers() });
+            }
+
+            items.push({ separator: true });
+            items.push({ label: 'Logout', icon: 'fa-solid fa-right-from-bracket', command: () => this.logout() });
+
+            return items;
         }
     },
     mounted: function () {
-        mouse.on('click', this.hideMenu);
-
         reg.addEventListener('login', this.onRegLogin);
         reg.addEventListener('logout', this.onRegLogout);
 
-        this.$root.$on('addItems', () => {
+        this._onAddItems = () => {
             this.refreshStorageInfo();
-        });
+        };
+        this._onDeleteEntries = () => {
+            this.refreshStorageInfo();
+        };
+        emitter.on('addItems', this._onAddItems);
+        emitter.on('deleteEntries', this._onDeleteEntries);
 
-        this.$root.$on('deleteEntries', () => {
-            this.refreshStorageInfo();
-        });
+        this._onSetSelectedFiles = (files) => {
+            this.selectedFiles = files;
+        };
+        emitter.on('setSelectedFiles', this._onSetSelectedFiles);
 
         this.refreshStorageInfo();
         this.checkUserManagement();
@@ -231,23 +241,19 @@ export default {
         $route: function (to, from) {
             const { params } = to;
 
-            // TODO: we might need have more complex
-            // logic in the future to see who has access
-            // to download files?
             this.showDownload = !!params.ds;
-
-            // TODO: we need to show this to users that
-            // have write access, not everyone
             this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
             this.params = params;
         }
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         reg.removeEventListener('login', this.onRegLogin);
         reg.removeEventListener('logout', this.onRegLogout);
 
-        mouse.off('click', this.hideMenu);
+        emitter.off('addItems', this._onAddItems);
+        emitter.off('deleteEntries', this._onDeleteEntries);
+        emitter.off('setSelectedFiles', this._onSetSelectedFiles);
     },
     methods: {
         handleStorageInfoDialogClose: function () {
@@ -299,7 +305,7 @@ export default {
                 await dataset.downloadWithCheck(paths);
             } catch (err) {
                 if (err.status === 429) {
-                    this.$root.$emit('downloadLimitReached', err.message);
+                    emitter.emit('downloadLimitReached', err.message);
                 } else {
                     alert(err.message || err);
                 }
@@ -309,7 +315,7 @@ export default {
         },
 
         handleSettings: function () {
-            this.$root.$emit("openSettings");
+            emitter.emit("openSettings");
         },
 
         onRegLogin: async function (username) {
@@ -318,8 +324,6 @@ export default {
             this.isAdmin = reg.isAdmin();
             this.refreshStorageInfo();
 
-            // Features may not be loaded yet when login event fires,
-            // so we ensure they are loaded before checking user management
             await reg.loadFeatures();
             this.checkUserManagement();
         },
@@ -348,25 +352,20 @@ export default {
             this.$router.push({ name: "Login" }).catch(() => { });
         },
 
-        toggleMenu: function () {
-            if (this.$refs.menu) this.$refs.menu.style.display = this.$refs.menu.style.display === 'block' ?
-                'none' :
-                'block';
+        toggleUserMenu: function (event) {
+            this.$refs.userMenu.toggle(event);
         },
 
-        hideMenu: function () {
-            if (this.$refs.menu) this.$refs.menu.style.display = 'none';
+        percent: function (value, places) {
+            if (!value) return '';
+            return (value * 100).toFixed(places) + '%';
         },
-
+        bytes: function (value) {
+            return bytesToSize(value);
+        },
         checkUserManagement() {
             const isLocalAuth = reg.getFeature(Features.USER_MANAGEMENT);
-
-            // Users management (admin panel) is only available with local auth
             this.usersManagement = isLocalAuth;
-
-            // Account management is enabled when:
-            // 1. Authentication is local (not external provider)
-            // 2. AND disableAccountManagement is not explicitly set to true
             this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
         }
     }
@@ -374,37 +373,22 @@ export default {
 </script>
 
 <style scoped>
-.alert {
-    height: 26px;
-    position: relative;
-    top: 3px;
-    margin-left: 8px;
-}
-
 #header {
     margin: 0;
     padding: 8px;
-    padding-top: 8px;
     width: 100%;
     box-shadow: 0px 2px 4px -2px #000000;
     display: flex;
+    align-items: center;
     z-index: 2;
+    gap: 6px;
 
     .logo {
-        margin-top: 0px;
         display: flex;
-        justify-content: center;
         align-items: center;
 
         &>img {
             height: 33px;
-        }
-
-        @media only screen and (max-width: 767px) {
-            &>img {
-                /*width: 160px;
-                margin-top: 2px;*/
-            }
         }
 
         .app-icon {
@@ -425,61 +409,19 @@ export default {
 
     .right {
         margin-left: auto;
-    }
-
-    .user-menu,
-    .settings {
-        margin-left: 6px;
-    }
-}
-
-@media only screen and (min-width: 768px) {
-    #header {
-        .button.download {
-            min-width: 120px;
-        }
-    }
-}
-
-@media only screen and (max-width: 767px) {
-    #header {
-        .button.download {
-            min-width: 38px;
-        }
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 }
 
 .storage-info-content {
     text-align: center;
 
-    .storage-progress-container {
-        width: 300px;
-        height: 18px;
-        background-color: #e8e8e8;
-        border-radius: 10px;
-        overflow: hidden;
-        margin-bottom: 10px;
-        margin-top: 1rem;
-    }
-
-    .storage-progress-bar {
-        height: 100%;
-        border-radius: 10px;
-        transition: width 0.4s ease, background-color 0.4s ease;
-        min-width: 2%;
-    }
-
     .storage-percentage {
         font-size: 1.6em;
         font-weight: bold;
         margin-bottom: 6px;
-    }
-
-    .storage-details {
-        display: flex;
-        justify-content: space-between;
-        color: #555;
-        font-size: 0.95em;
     }
 
     .storage-warning {
@@ -488,5 +430,11 @@ export default {
         font-weight: bold;
         font-size: 1em;
     }
+}
+</style>
+
+<style>
+.user-menu-header .p-menuitem-text {
+    font-weight: bold !important;
 }
 </style>

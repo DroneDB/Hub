@@ -3,33 +3,30 @@
 
         Are you sure you want to delete the dataset '{{ dsSlug }}'?<br />
 
-        <div class="ui negative message">
-            <div class="header">
-                This action is irreversible.
-            </div>
+        <PrimeMessage severity="error" :closable="false">
+            <strong>This action is irreversible.</strong>
             <p>All the files will be deleted too.</p>
-        </div>
+        </PrimeMessage>
 
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
-            <button @click="close('remove')" class="ui button negative">
-                Remove
-            </button>
+            <Button @click="close('close')" label="Close" />
+            <Button @click="close('remove')" severity="danger" label="Remove" />
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '../Window.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 
 export default {
     components: {
-        Window
+        Window, Button, PrimeMessage
     },
 
     props: ["dsSlug"],
+    emits: ['onClose'],
 
     data: function () {
         return {};
@@ -47,6 +44,8 @@ export default {
 <style scoped>
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

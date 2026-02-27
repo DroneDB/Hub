@@ -1,10 +1,10 @@
 <template>
     <div class="file-upload-row" :class="statusClass">
         <div class="file-icon">
-            <i v-if="file.status === 'pending'" class="icon clock outline grey"></i>
-            <i v-else-if="file.status === 'uploading'" class="icon circle notch spin blue"></i>
-            <i v-else-if="file.status === 'done'" class="icon check circle green"></i>
-            <i v-else-if="file.status === 'error'" class="icon times circle red"></i>
+            <i v-if="file.status === 'pending'" class="fa-regular fa-clock grey"></i>
+            <i v-else-if="file.status === 'uploading'" class="fa-solid fa-circle-notch fa-spin blue"></i>
+            <i v-else-if="file.status === 'done'" class="fa-solid fa-circle-check green"></i>
+            <i v-else-if="file.status === 'error'" class="fa-solid fa-circle-xmark red"></i>
         </div>
         <div class="file-info">
             <div class="file-name" :title="file.name">{{ file.name }}</div>
@@ -18,11 +18,11 @@
             <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
                 {{ truncatedError }}
                 <button v-if="file.canRetry" class="retry-btn" @click="$emit('retry', file)" title="Retry upload">
-                    <i class="icon redo"></i>
+                    <i class="fa-solid fa-rotate-right"></i>
                 </button>
             </div>
             <div v-else-if="file.status === 'done'" class="done-label">
-                <i class="icon check"></i> Done
+                <i class="fa-solid fa-check"></i> Done
             </div>
         </div>
     </div>
@@ -171,13 +171,4 @@ export default {
     font-weight: 500;
 }
 
-/* Spinning animation for upload icon */
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-.icon.spin {
-    animation: spin 1s linear infinite;
-}
 </style>

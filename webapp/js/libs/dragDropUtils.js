@@ -112,6 +112,8 @@ export function isInternalDrag(evt) {
     }
 }
 
+import emitter from './eventBus';
+
 /**
  * Mixin providing drag-and-drop upload support for file browser components.
  * Handles dragenter/dragleave with a counter to prevent flickering,
@@ -154,7 +156,7 @@ export const dragDropMixin = {
             const files = await getFilesFromDrop(ev);
             if (files.length === 0) return;
 
-            this.$root.$emit('uploadItems', { files: files, path: this.currentPath });
+            emitter.emit('uploadItems', { files: files, path: this.currentPath });
         }
     }
 };

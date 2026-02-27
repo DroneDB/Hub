@@ -4,8 +4,9 @@
             @closeTab="removeTab" ref="topTabButtons" v-if="position === 'top' && (!hideSingle || dynTabs.length > 1)"
             @click="setActiveTab" />
         <div class="tabs">
-            <div class="tab" v-for="t in dynTabs" :class="{ hidden: t.key !== activeTab }">
+            <div class="tab" v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }" :class="{ hidden: t.key !== activeTab }">
                 <slot :name="t.key" />
+                <component v-if="dynamicComponents[t.key]" :is="dynamicComponents[t.key].component" v-bind="dynamicComponents[t.key].props" :ref="el => { if (el) dynamicChildRefs[t.key] = el; }" />
             </div>
         </div>
         <TabButtons :tabs="dynTabs" :defaultTab="activeTab" :position="position" :buttonWidth="buttonWidth"
@@ -16,6 +17,7 @@
 
 <script>
 import { clone } from '../libs/utils';
+import { h, markRaw } from 'vue';
 import TabButtons from './TabButtons';
 
 export default {
@@ -44,18 +46,30 @@ export default {
             default: null
         }
     },
+    provide() {
+        return {
+            registerTabChild: this.registerTabChild,
+            unregisterTabChild: this.unregisterTabChild
+        };
+    },
     data: function () {
         return {
             activeTab: this.selectedTab != null ? this.selectedTab : this.tabs[0].key,
-            dynTabs: clone(this.tabs)
+            dynTabs: clone(this.tabs),
+            registeredChildren: {},
+            dynamicComponents: {},
+            dynamicChildRefs: {},
+            tabRefs: {}
         };
     },
     mounted: function () {
-        // Trigger first onTabActivated
-        const node = this.getNodeFor(this.activeTab);
-        if (node && node.onTabActivated) node.onTabActivated();
-
         this.tabMap = {};
+
+        // Trigger first onTabActivated on next tick so children have registered
+        this.$nextTick(() => {
+            const node = this.getNodeFor(this.activeTab);
+            if (node && node.onTabActivated) node.onTabActivated();
+        });
     },
     computed: {
         tabButtons: function () {
@@ -64,15 +78,18 @@ export default {
         }
     },
     methods: {
-        getTagFor(tabKey) {
-            if (!this.$slots[tabKey]) return null;
-
-            return this.$slots[tabKey][0].tag;
+        registerTabChild(key, component) {
+            this.registeredChildren[key] = component;
         },
-
+        unregisterTabChild(key) {
+            delete this.registeredChildren[key];
+        },
         getNodeFor(tabKey) {
-            const tag = this.getTagFor(tabKey);
-            return this.$children.find(c => c.$vnode.tag === tag);
+            // First check registered children (slot-based components)
+            if (this.registeredChildren[tabKey]) return this.registeredChildren[tabKey];
+            // Then check dynamic component refs
+            if (this.dynamicChildRefs[tabKey]) return this.dynamicChildRefs[tabKey];
+            return null;
         },
 
         activateTab(tabKey) {
@@ -118,17 +135,24 @@ export default {
         },
 
         onPanelResized: function () {
-            // Propagate to tabs
-            for (let i = 0; i < this.$children.length; i++) {
-                const $c = this.$children[i];
-                if ($c.onPanelResized !== undefined) {
+            // Propagate to tabs via registered children
+            for (const key in this.registeredChildren) {
+                const $c = this.registeredChildren[key];
+                if ($c && $c.onPanelResized !== undefined) {
+                    $c.onPanelResized();
+                }
+            }
+            // Also propagate to dynamic component refs
+            for (const key in this.dynamicChildRefs) {
+                const $c = this.dynamicChildRefs[key];
+                if ($c && $c.onPanelResized !== undefined) {
                     $c.onPanelResized();
                 }
             }
         },
 
         hasTab: function (key) {
-            return !!this.$slots[key];
+            return !!(this.$slots[key] || this.dynamicComponents[key]);
         },
 
         addTab: function (tab, opts = {}) {
@@ -136,13 +160,13 @@ export default {
                 const activate = opts.activate !== undefined ? !!opts.activate : true;
                 const tabIndex = opts.tabIndex !== undefined ? parseInt(opts.tabIndex) : NaN;
 
-                if (this.$slots[tab.key]) this.removeTab(tab.key);
+                if (this.hasTab(tab.key)) this.removeTab(tab.key);
 
-                const node = this.$createElement(tab.component, {
-                    props: tab.props
-                });
-
-                this.$slots[tab.key] = [node];
+                // Store the component definition in reactive data
+                this.dynamicComponents[tab.key] = {
+                    component: markRaw(tab.component),
+                    props: tab.props || {}
+                };
 
                 const tabDef = {
                     label: tab.label,
@@ -189,8 +213,10 @@ export default {
                     this.setActiveTab(this.dynTabs[tabToActivate]);
                 }
 
-                this.$slots[tabKey][0].componentInstance.$destroy();
-                delete this.$slots[tabKey];
+                // Clean up dynamic component data
+                delete this.dynamicComponents[tabKey];
+                delete this.dynamicChildRefs[tabKey];
+                delete this.tabRefs[tabKey];
                 delete this.tabMap[tabKey];
             } else {
                 console.warn(`Cannot remove tab with key: ${tabKey}`);
@@ -206,18 +232,27 @@ export default {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    min-height: 0;
     overflow: hidden;
 
     .tabs {
-        height: 100%;
+        flex: 1;
+        min-height: 0;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
 
         .tab {
             display: flex;
             flex-direction: column;
-            height: 100%;
+            flex: 1;
+            min-height: 0;
             overflow: auto;
             background: #fefefe;
+
+            &.hidden {
+                display: none !important;
+            }
         }
     }
 

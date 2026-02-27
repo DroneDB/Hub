@@ -18,7 +18,9 @@ import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '../libs/olMeasurementConverter';
-import Vue from 'vue';
+import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import Lara from '@primevue/themes/lara';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from './PointAnnotationDialog.vue';
 
@@ -757,43 +759,38 @@ class MeasureControls extends Control {
         const currentColor = feature.get('stroke') || '#ffcc33';
         const currentDescription = feature.get('description') || '';
 
-        const DialogComponent = Vue.extend(PointAnnotationDialog);
-        this.propertiesDialog = new DialogComponent({
-            propsData: {
-                initialColor: currentColor,
-                initialDescription: currentDescription
+        this._dialogContainer = document.createElement('div');
+        document.body.appendChild(this._dialogContainer);
+        this.propertiesDialogApp = createApp(PointAnnotationDialog, {
+            initialColor: currentColor,
+            initialDescription: currentDescription,
+            onOnSave: (data) => {
+                feature.set('stroke', data.color);
+                feature.set('description', data.description);
+                feature.changed();
+
+                if (isEdit) {
+                    // Re-create the popup to reflect new color/description
+                    this.recreatePointPopup(feature, map);
+                } else {
+                    // First time: create the popup
+                    this.createPointPopupElement(feature, map);
+                    this.updateButtonsVisibility(this.hasMeasurements(), false);
+                }
+            },
+            onOnDiscard: () => {
+                if (!isEdit) {
+                    // New point: remove it
+                    this.source.removeFeature(feature);
+                    this.updateButtonsVisibility(this.hasMeasurements(), false);
+                }
+            },
+            onOnClose: () => {
+                this.closePropertiesDialog();
             }
         });
-
-        this.propertiesDialog.$mount();
-        document.body.appendChild(this.propertiesDialog.$el);
-
-        this.propertiesDialog.$on('onSave', (data) => {
-            feature.set('stroke', data.color);
-            feature.set('description', data.description);
-            feature.changed();
-
-            if (isEdit) {
-                // Re-create the popup to reflect new color/description
-                this.recreatePointPopup(feature, map);
-            } else {
-                // First time: create the popup
-                this.createPointPopupElement(feature, map);
-                this.updateButtonsVisibility(this.hasMeasurements(), false);
-            }
-        });
-
-        this.propertiesDialog.$on('onDiscard', () => {
-            if (!isEdit) {
-                // New point: remove it
-                this.source.removeFeature(feature);
-                this.updateButtonsVisibility(this.hasMeasurements(), false);
-            }
-        });
-
-        this.propertiesDialog.$on('onClose', () => {
-            this.closePropertiesDialog();
-        });
+        this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
+        this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
     }
 
     /**
@@ -866,9 +863,9 @@ class MeasureControls extends Control {
                 ${descHtml}
             </div>
             <div class="ol-point-popup-actions">
-                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="icon pencil alternate"></i></button>
-                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
-                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
+                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil"></i></button>
+                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy"></i></button>
+                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="fa-solid fa-trash"></i></button>
             </div>
         `;
     }
@@ -891,8 +888,8 @@ class MeasureControls extends Control {
             const text = `${ddLat}, ${ddLon}`;
             navigator.clipboard.writeText(text).then(() => {
                 const icon = popupEl.querySelector('.ol-point-popup-copy i');
-                if (icon) { icon.className = 'icon check'; }
-                setTimeout(() => { if (icon) { icon.className = 'icon copy outline'; } }, 1500);
+                if (icon) { icon.className = 'fa-solid fa-check'; }
+                setTimeout(() => { if (icon) { icon.className = 'fa-regular fa-copy'; } }, 1500);
             });
         });
 
@@ -917,48 +914,44 @@ class MeasureControls extends Control {
         const geometry = feature.getGeometry();
         const geometryType = geometry ? geometry.getType() : 'LineString';
 
-        // Create Vue component instance
-        const DialogComponent = Vue.extend(MeasurementPropertiesDialog);
-        this.propertiesDialog = new DialogComponent({
-            propsData: {
-                feature: feature,
-                geometryType: geometryType
+        // Create Vue 3 app instance
+        this._dialogContainer = document.createElement('div');
+        document.body.appendChild(this._dialogContainer);
+        this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
+            feature: feature,
+            geometryType: geometryType,
+            onOnSave: (properties) => {
+                // Update feature properties
+                Object.keys(properties).forEach(key => {
+                    feature.set(key, properties[key]);
+                });
+
+                // Update tooltip with new name
+                updateFeatureTooltip(feature);
+
+                // Trigger re-render for style changes
+                feature.changed();
+            },
+            onOnClose: () => {
+                this.closePropertiesDialog();
             }
         });
-
-        this.propertiesDialog.$mount();
-        document.body.appendChild(this.propertiesDialog.$el);
-
-        // Handle save
-        this.propertiesDialog.$on('onSave', (properties) => {
-            // Update feature properties
-            Object.keys(properties).forEach(key => {
-                feature.set(key, properties[key]);
-            });
-
-            // Update tooltip with new name
-            updateFeatureTooltip(feature);
-
-            // Trigger re-render for style changes
-            feature.changed();
-        });
-
-        // Handle close
-        this.propertiesDialog.$on('onClose', () => {
-            this.closePropertiesDialog();
-        });
+        this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
+        this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
     }
 
     /**
      * Close properties dialog
      */
     closePropertiesDialog() {
-        if (this.propertiesDialog) {
-            if (this.propertiesDialog.$el && this.propertiesDialog.$el.parentNode) {
-                this.propertiesDialog.$el.parentNode.removeChild(this.propertiesDialog.$el);
+        if (this.propertiesDialogApp) {
+            this.propertiesDialogApp.unmount();
+            if (this._dialogContainer && this._dialogContainer.parentNode) {
+                this._dialogContainer.parentNode.removeChild(this._dialogContainer);
             }
-            this.propertiesDialog.$destroy();
+            this.propertiesDialogApp = null;
             this.propertiesDialog = null;
+            this._dialogContainer = null;
         }
     }
 

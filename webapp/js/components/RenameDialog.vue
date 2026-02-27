@@ -1,8 +1,8 @@
 <template>
     <Window title="Rename" id="rename" @onClose="close('close')" modal maxWidth="70%" fixedSize>
 
-        <input class="renameInput" ref="renameInput" v-on:keyup.enter="rename" v-on:keyup.esc="close"
-            v-model="renameText" :error="renameText == null || renameText.length == 0" />
+        <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close"
+            v-model="renameText" :invalid="renameText == null || renameText.length == 0" fluid />
 
         <!-- Checkbox to also rename the measurements file -->
         <div v-if="hasMeasurementsFile" class="measurements-rename-option">
@@ -16,33 +16,32 @@
                 </label>
             </div>
             <div class="hint">
-                <i class="info circle icon"></i>
+                <i class="fa-solid fa-circle-info"></i>
                 A measurements file was found for this point cloud
             </div>
         </div>
 
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
-            <button @click="rename" :disabled="!renameText" class="ui button positive">
-                Rename
-            </button>
+            <Button @click="close('close')" severity="secondary" label="Close" />
+            <Button @click="rename" :disabled="!renameText" severity="success" label="Rename" />
         </div>
     </Window>
 </template>
 
 <script>
 import Window from './Window.vue';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
 import ddb from 'ddb';
 import { MeasurementStorage } from '../libs/measurementStorage';
 
 export default {
     components: {
-        Window
+        Window, Button, InputText
     },
 
     props: ["file"],
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -56,12 +55,12 @@ export default {
         this.renameText = this.file.label;
 
         this.$nextTick(() => {
-            this.$refs.renameInput.focus();
-
-            this.$refs.renameInput.select();
+            const inputEl = this.$refs.renameInput.$el;
+            inputEl.focus();
+            inputEl.select();
             const dotIdx = this.renameText.indexOf(".");
             if (dotIdx !== -1) {
-                this.$refs.renameInput.selectionEnd = dotIdx;
+                inputEl.selectionEnd = dotIdx;
             }
         });
 
@@ -120,7 +119,7 @@ export default {
                 this.renameText.indexOf('..') != -1 ||
                 this.renameText.indexOf('.') == 0) {
 
-                this.$refs.renameInput.setCustomValidity("Invalid characters in path");
+                this.$refs.renameInput.$el.setCustomValidity("Invalid characters in path");
                 return;
             }
 
@@ -206,6 +205,8 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

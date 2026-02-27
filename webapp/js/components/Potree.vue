@@ -5,7 +5,7 @@
         <Message bindTo="error" noDismiss />
         <div v-if="loading" class="loading">
             <p>Loading point cloud...</p>
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div class="potree-container" :class="{ loading }">
@@ -18,21 +18,21 @@
                         :disabled="undoStack.length === 0"
                         class="btn-undo-redo"
                         title="Undo (Ctrl+Z)">
-                        <i class="undo icon"></i>
+                        <i class="fa-solid fa-rotate-left"></i>
                     </button>
                     <button
                         @click="redo"
                         :disabled="redoStack.length === 0"
                         class="btn-undo-redo"
                         title="Redo (Ctrl+Y)">
-                        <i class="redo icon"></i>
+                        <i class="fa-solid fa-rotate-right"></i>
                     </button>
                     <button
                         @click="toggleDeleteTool"
                         :class="{ active: deleteToolActive }"
                         class="btn-undo-redo btn-delete-tool"
                         title="Delete measurement tool (click on measurement to delete)">
-                        <i class="trash alternate icon"></i>
+                        <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
 
@@ -54,7 +54,7 @@
                     :disabled="savingMeasurements"
                     class="btn-measurement"
                     title="Save measurements">
-                    <i class="save icon"></i>
+                    <i class="fa-solid fa-floppy-disk"></i>
                     Save Measurements
                 </button>
 
@@ -63,7 +63,7 @@
                     @click="deleteSavedMeasurements"
                     class="btn-measurement btn-danger"
                     title="Delete saved measurements file">
-                    <i class="trash icon"></i>
+                    <i class="fa-solid fa-trash"></i>
                     Delete Saved
                 </button>
             </div>
@@ -81,17 +81,17 @@
             warningMessage="This action cannot be undone."
             @onClose="handleDeleteMeasurementsDialogClose">
         </ConfirmDialog>
-        <Flash v-if="flashMessage" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flashMessage }}</Flash>
+        <Toast position="bottom-left" />
     </div>
 </template>
 
 <script>
 import ddb from 'ddb';
-import Vue from 'vue';
+import { createApp } from 'vue';
 import Message from './Message';
 import TabViewLoader from './TabViewLoader';
 import ConfirmDialog from './ConfirmDialog.vue';
-import Flash from './Flash.vue';
+import Toast from 'primevue/toast';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import { loadResources } from '../libs/lazy';
 import { MeasurementStorage } from '../libs/measurementStorage';
@@ -100,7 +100,7 @@ import { isMobile } from '../libs/responsive';
 
 export default {
     components: {
-        Message, TabViewLoader, ConfirmDialog, Flash
+        Message, TabViewLoader, ConfirmDialog, Toast
     },
     props: ['uri'],
     data: function () {
@@ -124,11 +124,6 @@ export default {
             // Track measurement count for reactivity
             measurementCount: 0,
 
-            // Flash message
-            flashMessage: null,
-            flashIcon: 'check circle outline',
-            flashColor: 'positive',
-
             // Properties dialog for editing measurements
             propertiesDialog: null,
 
@@ -148,7 +143,7 @@ export default {
     mounted: function () {
     },
 
-    beforeDestroy: function() {
+    beforeUnmount: function() {
         // Clean up keyboard event listeners to prevent memory leaks
         if (this.undoRedoKeyHandler) {
             document.removeEventListener('keydown', this.undoRedoKeyHandler);
@@ -373,38 +368,30 @@ export default {
                 }
             };
 
-            // Create Vue component instance
-            const DialogComponent = Vue.extend(MeasurementPropertiesDialog);
-            this.propertiesDialog = new DialogComponent({
-                propsData: {
-                    feature: featureWrapper,
-                    geometryType: 'Point' // Annotations are points
-                }
-            });
-
-            this.propertiesDialog.$mount();
-            document.body.appendChild(this.propertiesDialog.$el);
-
+            // Create Vue 3 app instance
             const self = this;
+            this._dialogContainer = document.createElement('div');
+            document.body.appendChild(this._dialogContainer);
+            this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
+                feature: featureWrapper,
+                geometryType: 'Point',
+                onOnSave: (properties) => {
+                    // Update annotation properties
+                    if (properties.name !== undefined) {
+                        annotation.title = properties.name;
+                    }
+                    if (properties.description !== undefined) {
+                        annotation.description = properties.description;
+                    }
 
-            // Handle save
-            this.propertiesDialog.$on('onSave', (properties) => {
-                // Update annotation properties
-                if (properties.name !== undefined) {
-                    annotation.title = properties.name;
+                    // Update visual label for the annotation
+                    self.updateAnnotationLabel(annotation);
+                },
+                onOnClose: () => {
+                    self.closePropertiesDialog();
                 }
-                if (properties.description !== undefined) {
-                    annotation.description = properties.description;
-                }
-
-                // Update visual label for the annotation
-                self.updateAnnotationLabel(annotation);
             });
-
-            // Handle close
-            this.propertiesDialog.$on('onClose', () => {
-                self.closePropertiesDialog();
-            });
+            this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
         },
 
         /**
@@ -466,138 +453,132 @@ export default {
                 }
             };
 
-            // Create Vue component instance
-            const DialogComponent = Vue.extend(MeasurementPropertiesDialog);
-            this.propertiesDialog = new DialogComponent({
-                propsData: {
-                    feature: featureWrapper,
-                    geometryType: geometryType
-                }
-            });
-
-            this.propertiesDialog.$mount();
-            document.body.appendChild(this.propertiesDialog.$el);
-
+            // Create Vue 3 app instance
             const self = this;
+            this._dialogContainer = document.createElement('div');
+            document.body.appendChild(this._dialogContainer);
+            this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
+                feature: featureWrapper,
+                geometryType: geometryType,
+                onOnSave: (properties) => {
+                    // Update measurement properties
+                    if (properties.name !== undefined) {
+                        measure.name = properties.name;
+                    }
+                    if (properties.description !== undefined) {
+                        measure.description = properties.description;
+                    }
+                    if (properties.stroke) {
+                        measure.color = new THREE.Color(properties.stroke);
+                    }
+                    if (properties['stroke-width'] !== undefined) {
+                        measure.strokeWidth = properties['stroke-width'];
+                    }
+                    if (properties['stroke-opacity'] !== undefined) {
+                        measure.strokeOpacity = properties['stroke-opacity'];
+                    }
+                    if (properties['fill-opacity'] !== undefined) {
+                        measure.fillOpacity = properties['fill-opacity'];
+                    }
+                    if (properties.fill) {
+                        measure.fillColor = new THREE.Color(properties.fill);
+                    }
 
-            // Handle save
-            this.propertiesDialog.$on('onSave', (properties) => {
-                // Update measurement properties
-                if (properties.name !== undefined) {
-                    measure.name = properties.name;
-                }
-                if (properties.description !== undefined) {
-                    measure.description = properties.description;
-                }
-                if (properties.stroke) {
-                    measure.color = new THREE.Color(properties.stroke);
-                }
-                if (properties['stroke-width'] !== undefined) {
-                    measure.strokeWidth = properties['stroke-width'];
-                }
-                if (properties['stroke-opacity'] !== undefined) {
-                    measure.strokeOpacity = properties['stroke-opacity'];
-                }
-                if (properties['fill-opacity'] !== undefined) {
-                    measure.fillOpacity = properties['fill-opacity'];
-                }
-                if (properties.fill) {
-                    measure.fillColor = new THREE.Color(properties.fill);
-                }
+                    // Apply fill color and opacity to area mesh (for polygon measurements)
+                    self.applyAreaFillProperties(measure);
 
-                // Apply fill color and opacity to area mesh (for polygon measurements)
-                self.applyAreaFillProperties(measure);
+                    // Update the label in the viewer if exists
+                    if (measure.sphereLabels && measure.sphereLabels.length > 0) {
+                        // Potree uses edgeLabels for distances, update color
+                        if (measure.edgeLabels) {
+                            measure.edgeLabels.forEach(label => {
+                                if (label.element) {
+                                    label.element.style.color = properties.stroke;
+                                }
+                            });
+                        }
+                    }
 
-                // Update the label in the viewer if exists
-                if (measure.sphereLabels && measure.sphereLabels.length > 0) {
-                    // Potree uses edgeLabels for distances, update color
-                    if (measure.edgeLabels) {
-                        measure.edgeLabels.forEach(label => {
-                            if (label.element) {
-                                label.element.style.color = properties.stroke;
+                    // Apply stroke-width to measurement lines
+                    if (measure.edges && properties['stroke-width'] !== undefined) {
+                        measure.edges.forEach(edge => {
+                            if (edge.material && edge.material.linewidth !== undefined) {
+                                edge.material.linewidth = properties['stroke-width'];
+                                edge.material.needsUpdate = true;
                             }
                         });
                     }
-                }
 
-                // Apply stroke-width to measurement lines
-                if (measure.edges && properties['stroke-width'] !== undefined) {
-                    measure.edges.forEach(edge => {
-                        if (edge.material && edge.material.linewidth !== undefined) {
-                            edge.material.linewidth = properties['stroke-width'];
-                            edge.material.needsUpdate = true;
+                    // Apply color to spheres (for all measurement types including circle, angle, azimuth)
+                    if (measure.spheres && properties.stroke) {
+                        const color = new THREE.Color(properties.stroke);
+                        measure.spheres.forEach(sphere => {
+                            if (sphere.material) {
+                                sphere.material.color = color;
+                                sphere.material.needsUpdate = true;
+                            }
+                        });
+                    }
+
+                    // Apply color and stroke-width to circle geometry (for circle measurements)
+                    if (measure.circleGeometry && properties.stroke) {
+                        const color = new THREE.Color(properties.stroke);
+                        if (measure.circleLine && measure.circleLine.material) {
+                            measure.circleLine.material.color = color;
+                            if (properties['stroke-width'] !== undefined && measure.circleLine.material.linewidth !== undefined) {
+                                measure.circleLine.material.linewidth = properties['stroke-width'];
+                            }
+                            measure.circleLine.material.needsUpdate = true;
+                        }
+                    }
+
+                    // Apply color to angle/azimuth lines
+                    if (measure.angleLine && properties.stroke) {
+                        const color = new THREE.Color(properties.stroke);
+                        if (measure.angleLine.material) {
+                            measure.angleLine.material.color = color;
+                            if (properties['stroke-width'] !== undefined && measure.angleLine.material.linewidth !== undefined) {
+                                measure.angleLine.material.linewidth = properties['stroke-width'];
+                            }
+                            measure.angleLine.material.needsUpdate = true;
+                        }
+                    }
+
+                    // Apply color to all child Line2 objects (generic approach for all measurement types)
+                    measure.traverse((child) => {
+                        if (child.material && child.isLine2) {
+                            if (properties.stroke) {
+                                child.material.color = new THREE.Color(properties.stroke);
+                            }
+                            if (properties['stroke-width'] !== undefined && child.material.linewidth !== undefined) {
+                                child.material.linewidth = properties['stroke-width'];
+                            }
+                            child.material.needsUpdate = true;
                         }
                     });
+
+                    // Update visual name label for the measurement
+                    self.updateMeasurementNameLabel(measure);
+                },
+                onOnClose: () => {
+                    self.closePropertiesDialog();
                 }
-
-                // Apply color to spheres (for all measurement types including circle, angle, azimuth)
-                if (measure.spheres && properties.stroke) {
-                    const color = new THREE.Color(properties.stroke);
-                    measure.spheres.forEach(sphere => {
-                        if (sphere.material) {
-                            sphere.material.color = color;
-                            sphere.material.needsUpdate = true;
-                        }
-                    });
-                }
-
-                // Apply color and stroke-width to circle geometry (for circle measurements)
-                if (measure.circleGeometry && properties.stroke) {
-                    const color = new THREE.Color(properties.stroke);
-                    if (measure.circleLine && measure.circleLine.material) {
-                        measure.circleLine.material.color = color;
-                        if (properties['stroke-width'] !== undefined && measure.circleLine.material.linewidth !== undefined) {
-                            measure.circleLine.material.linewidth = properties['stroke-width'];
-                        }
-                        measure.circleLine.material.needsUpdate = true;
-                    }
-                }
-
-                // Apply color to angle/azimuth lines
-                if (measure.angleLine && properties.stroke) {
-                    const color = new THREE.Color(properties.stroke);
-                    if (measure.angleLine.material) {
-                        measure.angleLine.material.color = color;
-                        if (properties['stroke-width'] !== undefined && measure.angleLine.material.linewidth !== undefined) {
-                            measure.angleLine.material.linewidth = properties['stroke-width'];
-                        }
-                        measure.angleLine.material.needsUpdate = true;
-                    }
-                }
-
-                // Apply color to all child Line2 objects (generic approach for all measurement types)
-                measure.traverse((child) => {
-                    if (child.material && child.isLine2) {
-                        if (properties.stroke) {
-                            child.material.color = new THREE.Color(properties.stroke);
-                        }
-                        if (properties['stroke-width'] !== undefined && child.material.linewidth !== undefined) {
-                            child.material.linewidth = properties['stroke-width'];
-                        }
-                        child.material.needsUpdate = true;
-                    }
-                });
-
-                // Update visual name label for the measurement
-                self.updateMeasurementNameLabel(measure);
             });
-
-            // Handle close
-            this.propertiesDialog.$on('onClose', () => {
-                self.closePropertiesDialog();
-            });
+            this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
         },
 
         /**
          * Close properties dialog
          */
         closePropertiesDialog: function() {
-            if (this.propertiesDialog) {
-                if (this.propertiesDialog.$el && this.propertiesDialog.$el.parentNode) {
-                    this.propertiesDialog.$el.parentNode.removeChild(this.propertiesDialog.$el);
+            if (this.propertiesDialogApp) {
+                this.propertiesDialogApp.unmount();
+                if (this._dialogContainer && this._dialogContainer.parentNode) {
+                    this._dialogContainer.parentNode.removeChild(this._dialogContainer);
                 }
-                this.propertiesDialog.$destroy();
+                this.propertiesDialogApp = null;
                 this.propertiesDialog = null;
+                this._dialogContainer = null;
             }
         },
 
@@ -994,7 +975,7 @@ export default {
                             class="button-icon"
                             title="Delete measurement (click to remove)" />
                     `);*/
-                    const deleteIcon = $('<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="trash icon" style="font-size: x-large; margin: 0"></i></div>');
+                    const deleteIcon = $('<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="fa-solid fa-trash" style="font-size: x-large; margin: 0"></i></div>');
                     deleteIcon.click(() => {
                         self.toggleDeleteTool();
                         // Update visual feedback on the icon
@@ -1135,7 +1116,7 @@ export default {
                     console.log(`Loaded ${geojson.features.length} measurements`);
 
                     // Show info message to user
-                    this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`, 'positive', 'check circle outline');
+                    this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`, 'positive', 'fa-regular fa-circle-check');
                 }
             } catch (e) {
                 console.error('Error loading measurements:', e);
@@ -1185,7 +1166,7 @@ export default {
                 this.hasSavedMeasurements = true;
 
                 // Show success message
-                this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`, 'positive', 'check circle outline');
+                this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`, 'positive', 'fa-regular fa-circle-check');
 
                 console.log('Measurements saved successfully');
             } catch (e) {
@@ -1221,7 +1202,7 @@ export default {
             try {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
-                this.showFlash('Saved measurements deleted successfully', 'positive', 'check circle outline');
+                this.showFlash('Saved measurements deleted successfully', 'positive', 'fa-regular fa-circle-check');
             } catch (e) {
                 console.error('Error deleting measurements:', e);
                 this.error = `Failed to delete measurements: ${e.message}`;
@@ -1231,17 +1212,16 @@ export default {
         /**
          * Show flash message
          */
-        showFlash: function(message, color = 'positive', icon = 'check circle outline') {
-            this.flashMessage = message;
-            this.flashColor = color;
-            this.flashIcon = icon;
+        showFlash: function(message, color = 'positive', icon = 'fa-regular fa-circle-check') {
+            const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
+            this.$toast.add({ severity: severityMap[color] || 'success', summary: message, life: 3000 });
         },
 
         /**
          * Close flash message
          */
         closeFlash: function() {
-            this.flashMessage = null;
+            // No-op: Toast auto-closes
         },
 
         // ============================================================================
@@ -1326,7 +1306,7 @@ export default {
                 const measure = this.recreateMeasurement(measureData);
                 if (measure) {
                     this.viewer.scene.addMeasurement(measure);
-                    this.showFlash('Measurement restored', 'positive', 'undo icon');
+                    this.showFlash('Measurement restored', 'positive', 'fa-solid fa-rotate-left');
                 }
             }
 
@@ -1355,7 +1335,7 @@ export default {
                 for (const measure of measurements) {
                     if (this.measurementsMatch(measure, measureData)) {
                         this.viewer.scene.removeMeasurement(measure);
-                        this.showFlash('Measurement deleted', 'positive', 'redo icon');
+                        this.showFlash('Measurement deleted', 'positive', 'fa-solid fa-rotate-right');
                         break;
                     }
                 }
@@ -1428,7 +1408,7 @@ export default {
 
                     // Remove the measurement
                     self.viewer.scene.removeMeasurement(measure);
-                    self.showFlash('Measurement deleted (Ctrl+Z to undo)', 'warning', 'trash icon');
+                    self.showFlash('Measurement deleted (Ctrl+Z to undo)', 'warning', 'fa-solid fa-trash');
                 }
                 // Tool stays active for multiple deletions
             };
@@ -1443,7 +1423,7 @@ export default {
             };
             document.addEventListener('keydown', this.deleteKeyHandler);
 
-            this.showFlash('Delete tool active - Click on measurements to delete. Press ESC to exit.', 'info', 'trash icon');
+            this.showFlash('Delete tool active - Click on measurements to delete. Press ESC to exit.', 'info', 'fa-solid fa-trash');
         },
 
         /**

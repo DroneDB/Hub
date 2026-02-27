@@ -1,25 +1,25 @@
 import { entry } from 'ddb';
 
 const typeIconMap = {
-    [entry.type.DIRECTORY]: "folder outline",
-    [entry.type.GENERIC]: "file outline",
-    [entry.type.GEOIMAGE]: "crosshairs",
-    [entry.type.GEORASTER]: "map outline",
-    [entry.type.POINTCLOUD]: "braille",
-    [entry.type.IMAGE]: "file image outline",
-    [entry.type.DRONEDB]: "database",
-    [entry.type.MARKDOWN]: "book",
-    [entry.type.VIDEO]: "file video outline",
-    [entry.type.GEOVIDEO]: "film",
-    [entry.type.MODEL]: "cube",
-    [entry.type.PANORAMA]: "globe",
-    [entry.type.GEOPANORAMA]: "globe",
-    [entry.type.VECTOR]: "object ungroup outline",
+    [entry.type.DIRECTORY]: "fa-regular fa-folder",
+    [entry.type.GENERIC]: "fa-regular fa-file",
+    [entry.type.GEOIMAGE]: "fa-solid fa-crosshairs",
+    [entry.type.GEORASTER]: "fa-regular fa-map",
+    [entry.type.POINTCLOUD]: "fa-solid fa-braille",
+    [entry.type.IMAGE]: "fa-regular fa-file-image",
+    [entry.type.DRONEDB]: "fa-solid fa-database",
+    [entry.type.MARKDOWN]: "fa-solid fa-book",
+    [entry.type.VIDEO]: "fa-regular fa-file-video",
+    [entry.type.GEOVIDEO]: "fa-solid fa-film",
+    [entry.type.MODEL]: "fa-solid fa-cube",
+    [entry.type.PANORAMA]: "fa-solid fa-globe",
+    [entry.type.GEOPANORAMA]: "fa-solid fa-globe",
+    [entry.type.VECTOR]: "fa-solid fa-object-ungroup",
 };
 
 // Extension-based icon overrides for GENERIC type
 const extensionIconMap = {
-    'pdf': 'file pdf outline',
+    'pdf': 'fa-regular fa-file-pdf',
 };
 
 function getExtension(path) {
@@ -36,6 +36,6 @@ export default {
             const ext = getExtension(path);
             if (extensionIconMap[ext]) return extensionIconMap[ext];
         }
-        return typeIconMap[entryType] || "question";
+        return typeIconMap[entryType] || "fa-solid fa-question";
     }
 }

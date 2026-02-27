@@ -2,19 +2,18 @@
     <div class="file-browser">
         <ContextMenu :items="contextMenu" />
         <div id="search-box">
-            <div class="box">
-                <div id="cancel" :style="{ visibility: filterRaw != null && filterRaw.length > 0 ? 'visible' : 'hidden' }"
-                    v-on:click="clearSearch()">
-                    <i class="icon cancel"></i>
-                </div>
-                <input type="text" v-model="filterRaw" v-on:keyup.enter="search()">
+            <IconField style="width: 100%;">
+                <InputIcon class="fa-solid fa-magnifying-glass" />
+                <InputText v-model="filterRaw" @keyup.enter="search()" placeholder="Search files" style="width: 100%;" />
+            </IconField>
+            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" v-on:click="clearSearch()">
+                <i class="fa-solid fa-xmark"></i>
             </div>
-            <div id="src" v-on:click="search()"><i class="icon search"></i></div>
         </div>
         <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
             :getChildren="getChildren" />
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div v-if="!loading && noResults" class="no-results">
             No files found
@@ -26,6 +25,9 @@
 import TreeView from './TreeView.vue';
 import TreeNode from './TreeNode.vue';
 import ContextMenu from './ContextMenu';
+import InputText from 'primevue/inputtext';
+import InputIcon from 'primevue/inputicon';
+import IconField from 'primevue/iconfield';
 import env from '../dynamic/env';
 import ddb from 'ddb';
 import icons from '../libs/icons';
@@ -39,7 +41,7 @@ const { pathutils } = ddb;
 
 export default {
     components: {
-        TreeView, ContextMenu
+        TreeView, ContextMenu, InputText, InputIcon, IconField
     },
     props: {
         rootNodes: {
@@ -61,7 +63,7 @@ export default {
         if (env.isElectron()) {
             contextMenu = contextMenu.concat([{
                 label: "Open Item Location",
-                icon: 'open folder outline',
+                icon: 'fa-regular fa-folder-open',
                 isVisible: () => {
                     return this.lastSelectedNode !== null;
                 },
@@ -76,7 +78,7 @@ export default {
 
         contextMenu = contextMenu.concat([{
             label: 'Open Item',
-            icon: 'folder open outline',
+            icon: 'fa-regular fa-folder-open',
             isVisible: () => { return this.lastSelectedNode !== null; },
             click: () => {
                 if (this.lastSelectedNode !== null) this.$emit('openItem', this.lastSelectedNode.node);
@@ -84,7 +86,7 @@ export default {
         },
         {
             label: 'Open as Text',
-            icon: 'file alternate outline',
+            icon: 'fa-regular fa-file-lines',
             isVisible: () => {
                 if (this.lastSelectedNode === null) return false;
                 const entry = this.lastSelectedNode.node.entry;
@@ -102,7 +104,7 @@ export default {
         },
         {
             label: 'Properties',
-            icon: 'info circle',
+            icon: 'fa-solid fa-circle-info',
             isVisible: () => { return this.lastSelectedNode !== null; },
             click: () => {
                 if (this.lastSelectedNode !== null) {
@@ -113,7 +115,7 @@ export default {
         },
         {
             label: 'Download',
-            icon: 'download',
+            icon: 'fa-solid fa-download',
             isVisible: () => { return this.lastSelectedNode !== null; },
             click: () => {
                 if (this.lastSelectedNode !== null) {
@@ -123,7 +125,7 @@ export default {
         },
         {
             label: "Rename",
-            icon: 'pencil alternate',
+            icon: 'fa-solid fa-pencil',
             isVisible: () => { return this.canWrite && this.lastSelectedNode !== null; },
             accelerator: "CmdOrCtrl+M",
             click: () => {
@@ -135,7 +137,7 @@ export default {
         },
         {
             label: "Transfer to Dataset",
-            icon: 'exchange',
+            icon: 'fa-solid fa-right-left',
             isVisible: () => { return reg.isLoggedIn() && this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
             accelerator: "CmdOrCtrl+T",
             click: () => {
@@ -147,7 +149,7 @@ export default {
         },
         {
             label: "Set as Dataset Thumbnail",
-            icon: 'image',
+            icon: 'fa-solid fa-image',
             isVisible: () => {
                 if (!this.canWrite || this.lastSelectedNode === null) return false;
                 const node = this.lastSelectedNode.node;
@@ -178,7 +180,7 @@ export default {
         },
         {
             label: "Delete",
-            icon: 'trash alternate outline',
+            icon: 'fa-solid fa-trash',
             accelerator: "CmdOrCtrl+D",
             isVisible: () => { return this.canWrite && this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
             click: () => {
@@ -211,7 +213,7 @@ export default {
     mounted: async function () {
         await this.refreshNodes();
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
     },
     methods: {
 
@@ -276,7 +278,7 @@ export default {
                 await this.refreshNodes();
 
             } catch (e) {
-                this.$log.error("Exception", clone(e));
+                console.error("Exception", clone(e));
 
                 if (e.message == "Unauthorized") {
                     this.$emit('error', "You are not allowed to perform this action", "Load entries");
@@ -292,7 +294,7 @@ export default {
         getChildren: async function (path) {
 
             if (this.searchStaticPaths != null && (typeof this.searchStaticPaths[path] !== 'undefined')) {
-                this.$log.info("using static path");
+                console.log("using static path");
                 return this.searchStaticPaths[path];
             }
 
@@ -333,7 +335,7 @@ export default {
                     });
                 return res;
             } catch (e) {
-                this.$log.error("Exception", clone(e));
+                console.error("Exception", clone(e));
 
                 if (e.message == "Unauthorized") {
                     this.$emit('error', "You are not allowed to perform this action", "Load entries");

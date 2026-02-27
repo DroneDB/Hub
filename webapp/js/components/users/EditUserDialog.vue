@@ -2,16 +2,16 @@
     <Window title="Edit User" id="editUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <div class="ui message positive" v-if="success">
-                <p><strong>User updated successfully!</strong></p>
-            </div>
+            <PrimeMessage v-if="success" severity="success" :closable="false">
+                <strong>User updated successfully!</strong>
+            </PrimeMessage>
 
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
+            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
                 <div class="field">
                     <label>Username</label>
                     <input type="text" v-model="editUser.userName" disabled />
@@ -20,28 +20,19 @@
                     <label>Email</label>
                     <input v-on:keydown="clearError()" v-on:keyup.enter="confirmUpdate()" type="email"
                            v-model="editUser.email" placeholder="user@example.com" />
-                    <div v-if="editUser.email && !isEmailValid()" class="ui pointing red basic label">
+                    <div v-if="editUser.email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
                 <div class="field">
                     <label>Roles</label>
-                    <select multiple="multiple" v-model="editUser.roles" class="ui dropdown" ref="rolesDropdown">
-                        <option v-for="role in availableRoles" :key="role" :value="role">
-                            {{ role }}
-                        </option>
-                    </select>
-                    <small>Hold CTRL/⌘ to select multiple roles</small>
+                    <MultiSelect v-model="editUser.roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-full" display="chip" />
                 </div>
             </form>
             <div class="buttons">
-                <button @click="close()" class="ui button" :disabled="updating">
-                    Cancel
-                </button>
-                <button @click="confirmUpdate()" :disabled="updating || !isValid()" :class="{ loading: updating }"
-                    class="ui button primary">
-                    Update User
-                </button>
+                <Button @click="close()" :disabled="updating" label="Cancel" />
+                <Button @click="confirmUpdate()" :disabled="updating || !isValid()" :loading="updating"
+                    severity="info" label="Update User" />
             </div>
         </div>
     </Window>
@@ -50,11 +41,14 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
+import MultiSelect from 'primevue/multiselect';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
-        Window, Message
+        Window, Message, MultiSelect, Button, PrimeMessage
     },
     props: {
         user: {
@@ -66,6 +60,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -80,26 +75,13 @@ export default {
             }
         };
     },
+    computed: {
+        roleOptions() {
+            return this.availableRoles.map(r => ({ label: r, value: r }));
+        }
+    },
     mounted: function () {
-        // Initialize Semantic UI dropdown
-        this.$nextTick(() => {
-            if (this.$refs.rolesDropdown) {
-                $(this.$refs.rolesDropdown).dropdown({
-                    allowAdditions: false,
-                    onChange: (value, text, $selectedItem) => {
-                        // Handle both array and string values from Semantic UI dropdown
-                        if (Array.isArray(value)) {
-                            this.editUser.roles = value;
-                        } else {
-                            this.editUser.roles = value ? value.split(',') : [];
-                        }
-                    }
-                });
-
-                // Set initial values
-                $(this.$refs.rolesDropdown).dropdown('set exactly', this.editUser.roles);
-            }
-        });
+        // PrimeVue MultiSelect handles roles reactively via v-model
     },
     methods: {
         close: function () {
@@ -153,7 +135,9 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .form {

@@ -2,20 +2,20 @@
     <Window title="Change Password" id="changePasswordDialog" @onClose="close" modal maxWidth="50%" fixedSize>
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <div class="ui message positive" v-if="success">
-                <p><strong>Password changed successfully!</strong></p>
-            </div>
+            <PrimeMessage v-if="success" severity="success" :closable="false">
+                <strong>Password changed successfully!</strong>
+            </PrimeMessage>
 
-            <div class="ui message info">
-                <p>Changing password for user: <strong>{{ user.userName }}</strong></p>
-            </div>
+            <PrimeMessage severity="info" :closable="false">
+                Changing password for user: <strong>{{ user.userName }}</strong>
+            </PrimeMessage>
 
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
+            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
                 <div class="field">
                     <label>Current Password</label>
                     <input ref="txtCurrentPassword" v-on:keydown="clearError()" v-on:keyup.enter="confirmChange()"
@@ -34,13 +34,9 @@
                 </div>
             </form>
             <div class="buttons">
-                <button @click="close()" class="ui button" :disabled="changing">
-                    Cancel
-                </button>
-                <button @click="confirmChange()" :disabled="changing || !isValid()" :class="{ loading: changing }"
-                    class="ui button primary">
-                    Change Password
-                </button>
+                <Button @click="close()" :disabled="changing" label="Cancel" />
+                <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
+                    severity="info" label="Change Password" />
             </div>
         </div>
     </Window>
@@ -49,13 +45,15 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 
 export default {
     // NOTE: This dialog is used by admins to change other users' passwords.
     // Password policy validation is intentionally NOT applied here (admin override).
     components: {
-        Window, Message
+        Window, Message, Button, PrimeMessage
     },
     props: {
         user: {
@@ -63,6 +61,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -127,7 +126,9 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .form {

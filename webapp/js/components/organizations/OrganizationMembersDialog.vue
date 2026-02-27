@@ -5,52 +5,34 @@
             <div v-if="loading" class="ui active centered inline loader"></div>
 
             <!-- Error message -->
-            <div v-if="error" class="ui negative message">
-                <i class="close icon" @click="error = null"></i>
-                <div class="header">Error</div>
-                <p>{{ error }}</p>
-            </div>
+            <PrimeMessage v-if="error" severity="error" @close="error = null">
+                <strong>Error</strong>: {{ error }}
+            </PrimeMessage>
 
             <!-- Feature disabled message -->
-            <div v-if="!featureEnabled" class="ui info message">
-                <div class="header">Feature Disabled</div>
+            <PrimeMessage v-if="!featureEnabled" severity="info" :closable="false">
+                <strong>Feature Disabled</strong>
                 <p>Organization member management is disabled on this server.</p>
-            </div>
+            </PrimeMessage>
 
             <!-- Members list -->
             <div v-if="featureEnabled">
                 <!-- Add member section -->
                 <div class="add-member-section" v-if="canManageMembers">
                     <h4>Add Member</h4>
-                    <div class="ui form">
+                    <div class="form">
                         <div class="fields">
                             <div class="seven wide field">
                                 <label>User</label>
-                                <div class="ui search selection dropdown" ref="userDropdown">
-                                    <input type="hidden" name="userName" v-model="newMember.userName">
-                                    <i class="dropdown icon"></i>
-                                    <input class="search" autocomplete="off" tabindex="0">
-                                    <div class="default text">Search user...</div>
-                                    <div class="menu">
-                                        <div class="item" v-for="user in availableUsers" :key="user.userName" :data-value="user.userName">
-                                            <i class="user icon"></i>{{ user.userName }} ({{ user.email }})
-                                        </div>
-                                    </div>
-                                </div>
+                                <Select v-model="newMember.userName" :options="availableUsers" optionLabel="displayName" optionValue="userName" filter placeholder="Search user..." class="w-full" />
                             </div>
                             <div class="five wide field">
                                 <label>Permissions</label>
-                                <select v-model="newMember.permissions" ref="addPermDropdown" class="ui selection dropdown">
-                                    <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
-                                        {{ perm.label }}
-                                    </option>
-                                </select>
+                                <Select v-model="newMember.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-full" />
                             </div>
                             <div class="four wide field">
                                 <label>&nbsp;</label>
-                                <button class="ui primary button" @click="addMember" :disabled="!newMember.userName || addingMember">
-                                    <i class="plus icon"></i>&nbsp;Add
-                                </button>
+                                <Button severity="info" @click="addMember" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" />
                             </div>
                         </div>
                     </div>
@@ -73,14 +55,13 @@
                             <td>{{ member.userName }}</td>
                             <td>{{ member.email }}</td>
                             <td>
-                                <select v-if="canManageMembers"
+                                <Select v-if="canManageMembers"
                                         v-model="member.permissions"
+                                        :options="permissionsOptions"
+                                        optionLabel="label"
+                                        optionValue="value"
                                         @change="updatePermission(member)"
-                                        class="ui selection dropdown">
-                                    <option v-for="perm in permissionsOptions" :key="perm.value" :value="perm.value">
-                                        {{ perm.label }}
-                                    </option>
-                                </select>
+                                        class="w-full" />
                                 <span v-else>{{ member.permissionName }}</span>
                             </td>
                             <td>
@@ -91,22 +72,22 @@
                                 <span v-else>-</span>
                             </td>
                             <td v-if="canManageMembers">
-                                <button class="ui red mini button" @click="removeMember(member)" :disabled="removingMember === member.userName">
-                                    <i class="trash icon"></i> Remove
-                                </button>
+                                <Button severity="danger" size="small" @click="removeMember(member)" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" />
                             </td>
                         </tr>
                     </tbody>
                 </table>
 
-                <div v-else class="ui message">
-                    <p>No members in this organization yet.</p>
+                <div v-else>
+                    <PrimeMessage severity="info" :closable="false">
+                        No members in this organization yet.
+                    </PrimeMessage>
                 </div>
             </div>
 
             <!-- Footer -->
             <div class="buttons">
-                <button @click="close" class="ui button">Close</button>
+                <Button @click="close" label="Close" />
             </div>
         </div>
 
@@ -124,17 +105,21 @@
 <script>
 import Window from '../Window.vue';
 import ConfirmDialog from '../ConfirmDialog.vue';
+import Select from 'primevue/select';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
 
 export default {
-    components: { Window, ConfirmDialog },
+    components: { Window, ConfirmDialog, Select, Button, PrimeMessage },
 
     props: {
         orgSlug: { type: String, required: true },
         isOwner: { type: Boolean, default: false },
         isAdmin: { type: Boolean, default: false }
     },
+    emits: ['onClose'],
 
     data() {
         return {
@@ -164,7 +149,9 @@ export default {
     computed: {
         availableUsers() {
             const memberUserNames = this.members.map(m => m.userName);
-            return this.allUsers.filter(u => !memberUserNames.includes(u.userName));
+            return this.allUsers
+                .filter(u => !memberUserNames.includes(u.userName))
+                .map(u => ({ ...u, displayName: `${u.userName} (${u.email})` }));
         }
     },
 
@@ -202,27 +189,7 @@ export default {
                 console.error('Failed to load organization members:', e);
             } finally {
                 this.loading = false;
-                this.$nextTick(() => {
-                    this.initUserDropdown();
-                    this.initPermDropdowns();
-                });
             }
-        },
-
-        initUserDropdown() {
-            if (!this.$refs.userDropdown) return;
-
-            $(this.$refs.userDropdown).dropdown({
-                fullTextSearch: true,
-                match: 'text',
-                onChange: (value) => {
-                    this.newMember.userName = value;
-                }
-            });
-        },
-
-        initPermDropdowns() {
-            $(this.$el).find('select.ui.selection.dropdown').dropdown();
         },
 
         async addMember() {
@@ -242,16 +209,6 @@ export default {
                 // Reset form
                 this.newMember.userName = '';
                 this.newMember.permissions = 1;
-
-                // Clear dropdown selection
-                this.$nextTick(() => {
-                    if (this.$refs.userDropdown) {
-                        $(this.$refs.userDropdown).dropdown('clear');
-                    }
-                    if (this.$refs.addPermDropdown) {
-                        $(this.$refs.addPermDropdown).dropdown('set selected', '1');
-                    }
-                });
 
             } catch (e) {
                 this.error = e.message || 'Failed to add member';
@@ -327,7 +284,9 @@ export default {
 
 .buttons {
     margin-top: 1.5em;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 table.ui.celled.table {

@@ -1,4 +1,4 @@
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
+const { VueLoaderPlugin } = require('vue-loader');
 const LiveReloadPlugin = require('webpack-livereload-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
 const webpack = require('webpack');
@@ -15,7 +15,6 @@ module.exports = {
         path: path.join(__dirname, './build'),
         filename: "[name].js",
         sourceMapFilename: "[name].js.map"
-        // publicPath: "/build/"
     },
 
     devtool: "source-map",
@@ -25,16 +24,7 @@ module.exports = {
             {
                 test: /\.vue$/,
                 exclude: /(node_modules|bower_components)/,
-                loader: 'vue-loader',
-                options: {
-                    loaders: {
-                        'scss': [
-                            'vue-style-loader',
-                            'css-loader',
-                            'sass-loader'
-                        ]
-                    }
-                }
+                loader: 'vue-loader'
             }, {
                 test: /\.js$/,
                 include: [
@@ -71,21 +61,19 @@ module.exports = {
                         }
                     }
                 ],
-            },            // Handle application CSS/SCSS files
+            },
+            // Handle application CSS/SCSS files
             {
                 test: /\.s[ac]ss$/i,
                 exclude: /node_modules/,
                 use: [
+                    'vue-style-loader',
+                    'css-loader',
                     {
-                        loader: "vue-style-loader" // creates style nodes from JS strings
-                    },
-                    {
-                        loader: "css-loader" // translates CSS into CommonJS
-                    },
-                    {
-                        loader: "sass-loader",
+                        loader: 'sass-loader',
                         options: {
-                            implementation: require("sass")
+                            implementation: require('sass'),
+                            api: 'modern-compiler'
                         }
                     }
                 ]
@@ -100,21 +88,23 @@ module.exports = {
             },
             {
                 test: /\.(png|woff|woff2|eot|ttf|svg|jpg|gif)$/,
-                use: {
-                    loader: 'url-loader',
-                    options: {
-                        limit: 131072
+                type: 'asset',
+                parser: {
+                    dataUrlCondition: {
+                        maxSize: 131072
                     }
                 }
             }
         ]
-    }, plugins: [
+    },
+
+    plugins: [
         new VueLoaderPlugin(),
         new LiveReloadPlugin(),
-        new webpack.ProvidePlugin({
-            $: 'jquery',
-            jQuery: 'jquery',
-            'window.jQuery': 'jquery'
+        new webpack.DefinePlugin({
+            __VUE_OPTIONS_API__: true,
+            __VUE_PROD_DEVTOOLS__: false,
+            __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false
         }),
         new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
             resource.request = resource.request.replace(/polyfills\/node\//, `polyfills\/web\/`);
@@ -126,16 +116,16 @@ module.exports = {
         })
     ],
 
-    node: {
-        fs: 'empty'
-    },
-
     resolve: {
         alias: {
-            'vue$': 'vue/dist/vue.esm.js',
+            'vue$': 'vue/dist/vue.esm-bundler.js',
             'ddb': path.resolve(__dirname, 'webapp/js/libs/ddb')
         },
-        extensions: ['*', '.js', '.vue', '.json']
+        extensions: ['*', '.js', '.vue', '.json'],
+        fallback: {
+            fs: false,
+            path: false
+        }
     },
 
     externals: {

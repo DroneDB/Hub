@@ -6,22 +6,22 @@
         <br />
 
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
+            <Button @click="close('close')" severity="secondary" label="Close" />
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '../Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window, Button
     },
 
     props: ["message"],
+    emits: ['onClose'],
 
     data: function () {
         return {};

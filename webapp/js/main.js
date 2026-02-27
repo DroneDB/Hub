@@ -1,24 +1,21 @@
 
-import 'regenerator-runtime';
 import '../css/app.scss';
-import '../css/ol-controls.css';  // Importazione stili OpenLayers
+import '../css/ol-controls.css';
 
-// Import jQuery first and make it global BEFORE importing any jQuery-dependent libraries
-import $ from 'jquery';
-window.$ = window.jQuery = $;
-
-// Then import Semantic UI CSS and components (jQuery is already provided by webpack.ProvidePlugin)
-import 'semantic-ui-css/semantic.min.css';  // Semantic UI CSS from npm package
-import 'semantic-ui-css/components/dropdown.min';
-import 'semantic-ui-css/components/transition.min';
+// Font Awesome 6 icons (replaces Semantic UI icons)
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 import './libs/keyboard';
 import './libs/mouse';
 import './dynamic/web';
 
-import Vue from 'vue';
-import VueRouter from 'vue-router';
-import VueLogger from 'vuejs-logger';
+import { createApp } from 'vue';
+import { createRouter, createWebHistory } from 'vue-router';
+import PrimeVue from 'primevue/config';
+import Lara from '@primevue/themes/lara';
+import ConfirmationService from 'primevue/confirmationservice';
+import ToastService from 'primevue/toastservice';
+import DialogService from 'primevue/dialogservice';
 import { RecycleScroller } from 'vue-virtual-scroller';
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 
@@ -45,16 +42,6 @@ window.addEventListener('load', function () {
         window.location.href.indexOf("192.168.") == -1 &&
         window.location.href.indexOf("127.0.0.1") == -1;
 
-    const options = {
-        isEnabled: true,
-        logLevel: isProduction ? 'error' : 'debug',
-        stringifyArguments: false,
-        showLogLevel: true,
-        showMethodName: true,
-        separator: '|',
-        showConsoleColors: true
-    };
-
     let hdr = Header;
 
     var params = queryParams(window.location);
@@ -62,12 +49,6 @@ window.addEventListener('load', function () {
     // Hide header if ?embed=1 is in URL
     const embed = !!params.embed || inIframe();
     if (embed) hdr = null;
-
-    Vue.prototype.$embed = params.embed ? true : false;
-
-    Vue.use(VueLogger, options);
-    Vue.use(VueRouter);
-    Vue.component('RecycleScroller', RecycleScroller);
 
     const routes = [
         { path: '/r/:org/:ds', name: "ViewDataset", components: { content: ViewDataset, header: hdr }, meta: { title: "View Dataset" } },
@@ -83,9 +64,13 @@ window.addEventListener('load', function () {
         { path: '/admin/users', name: "Users", components: { content: Users, header: hdr }, meta: { title: "Users" } },
         { path: '/account', name: "Account", components: { content: Account, header: hdr }, meta: { title: "Account" } },
         { path: '/', name: "LoginHome", components: { content: Login, header: hdr }, meta: { title: "Login" } },
-        { path: '*', name: "NotFound", components: { content: NotFound, header: hdr }, meta: { title: "Not Found" } }
+        { path: '/:pathMatch(.*)*', name: "NotFound", components: { content: NotFound, header: hdr }, meta: { title: "Not Found" } }
     ];
-    const router = new VueRouter({ mode: "history", routes });
+
+    const router = createRouter({
+        history: createWebHistory(),
+        routes
+    });
 
     // Set titles, keep track of previous routes
     router.beforeEach((to, prev, next) => {
@@ -111,18 +96,36 @@ window.addEventListener('load', function () {
             reg.clearCredentials();
         }
 
-        const app = new Vue({
-            router
-        }).$mount("#app");
+        const app = createApp({
+            template: '<router-view name="header" /><router-view name="content" />'
+        });
 
-        Vue.config.errorHandler = function (err, vm, info) {
+        app.use(router);
+        app.use(PrimeVue, {
+            theme: {
+                preset: Lara
+            }
+        });
+        app.use(ConfirmationService);
+        app.use(ToastService);
+        app.use(DialogService);
+
+        // Global properties (replaces Vue.prototype)
+        app.config.globalProperties.$embed = params.embed ? true : false;
+
+        // Global component registration
+        app.component('RecycleScroller', RecycleScroller);
+
+        app.config.errorHandler = function (err, vm, info) {
             // Catch unauthorized error globally
             if (err.message === "Unauthorized") {
                 router.push({ name: "Login" }).catch(() => { });
             } else {
                 throw err;
             }
-        }
+        };
+
+        app.mount("#app");
 
         document.getElementById("main-loading").style.display = 'none';
     }

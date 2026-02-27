@@ -2,7 +2,7 @@
     <Window title="Rescan Dataset" id="rescan-confirm" @onClose="close('cancel')" modal maxWidth="500px" fixedSize>
         <div class="rescan-confirm-body">
             <div class="warning-box">
-                <i class="icon exclamation triangle"></i>
+                <i class="fa-solid fa-triangle-exclamation"></i>
                 <div>
                     <strong>Are you sure you want to rescan this dataset?</strong>
                 </div>
@@ -22,12 +22,8 @@
         </div>
 
         <div class="buttons">
-            <button @click="close('cancel')" class="ui button">
-                Cancel
-            </button>
-            <button @click="close('confirm')" class="ui button negative">
-                Rescan
-            </button>
+            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
+            <Button @click="close('confirm')" severity="danger" label="Rescan" />
         </div>
     </Window>
 </template>
@@ -35,16 +31,18 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window, Button
     },
+    emits: ['onClose'],
 
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
     methods: {

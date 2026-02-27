@@ -1,16 +1,16 @@
 <template>
     <Window title="Create Organization" id="createOrganizationDialog" @onClose="close" modal maxWidth="40%" fixedSize>
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <div class="ui message positive" v-if="success">
-                <p><strong>{{ successMessage }}</strong></p>
-            </div>
+            <PrimeMessage v-if="success" severity="success" :closable="false">
+                <strong>{{ successMessage }}</strong>
+            </PrimeMessage>
 
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
+            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
                 <div class="field">
                     <label>Organization Name <span class="text-red">*</span></label>
                     <input ref="txtOrgName" v-on:keydown="clearError()" v-on:keyup.enter="confirmCreate()"
@@ -31,13 +31,9 @@
             </form>
 
             <div class="dialog-buttons">
-                <button @click="close()" class="ui button">
-                    Cancel
-                </button>
-                <button @click="confirmCreate()" :disabled="creating || !organizationName.trim()"
-                        :class="{ loading: creating }" class="ui primary button">
-                    <i class="plus icon"></i>Create Organization
-                </button>
+                <Button @click="close()" label="Cancel" />
+                <Button @click="confirmCreate()" :disabled="creating || !organizationName.trim()"
+                        :loading="creating" severity="info" icon="fa-solid fa-plus" label="Create Organization" />
             </div>
         </div>
     </Window>
@@ -46,12 +42,15 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
-        Window, Message
+        Window, Message, Button, PrimeMessage
     },
+    emits: ['onClose'],
 
     data: function () {
         return {

@@ -1,85 +1,67 @@
 <template>
-    <Window title="" id="share-embed" modal fixedSize @onClose="$emit('onClose')">
+    <Window title="Share / Embed" id="share-embed" modal fixedSize @onClose="$emit('onClose')">
         <div class="content">
             <Message bindTo="error" noDismiss />
-            <i v-if="loading" class="icon circle notch spin" />
+            <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
             <div class="share-type" v-else>
-                <label for="share-mode">Share: </label> <select id='share-mode' v-model="shareMode">
-                    <option v-for="(v, k) in shareModes" :value="k">
-                        {{ v.label }}
-                    </option>
-                </select>
+                <label for="share-mode" style="margin-right: 8px; font-weight: 600;">Share: </label>
+                <Select id="share-mode" v-model="shareMode" :options="shareModeOptions" optionLabel="label" optionValue="value" style="min-width: 120px;" />
             </div>
 
-            <div v-if="shareMode === 'qgis'">
+            <div v-if="shareMode === 'qgis'" style="margin-top: 12px;">
                 <template v-if="url !== ''">
                     <div class="ui icon positive message" v-if="!error">
-                        <i class="cloud upload icon"></i>
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
                         <div class="content">
                             <div class="header">
                                 From QGIS
                             </div>
                             <div v-if="typeIs('POINTCLOUD')">
-                                Layer <i class="arrow right icon"></i> Add Point Cloud Layer <i
-                                    class="arrow right icon"></i> Source Type Protocol: HTTP(s) <i
-                                    class="arrow right icon"></i> copy/paste the URL below.
+                                Layer <i class="fa-solid fa-arrow-right"></i> Add Point Cloud Layer <i
+                                    class="fa-solid fa-arrow-right"></i> Source Type Protocol: HTTP(s) <i
+                                    class="fa-solid fa-arrow-right"></i> copy/paste the URL below.
                             </div>
                             <div v-if="typeIs('GEORASTER')">
-                                Layer <i class="arrow right icon"></i> Add Raster Layer <i class="arrow right icon"></i>
-                                Source Type Protocol: HTTP(s) <i class="arrow right icon"></i> copy/paste the URL below.
+                                Layer <i class="fa-solid fa-arrow-right"></i> Add Raster Layer <i class="fa-solid fa-arrow-right"></i>
+                                Source Type Protocol: HTTP(s) <i class="fa-solid fa-arrow-right"></i> copy/paste the URL below.
                             </div>
                             <div class="auth-note" v-if="needsAuth">
-                                <i class="lock icon"></i> For Authentication choose Basic and use your username and
+                                <i class="fa-solid fa-lock"></i> For Authentication choose Basic and use your username and
                                 password.
                             </div>
                         </div>
                     </div>
-                    <div class="ui action input fluid">
-                        <input type="text" readonly :value="url" @click="copyToClipboard" title="Copy to clipboard" />
-                        <button class="ui icon button teal" @click="copyToClipboard" title="Copy to clipboard">
-                            <i :class="copyIcon" class="icon"></i>
-                        </button>
+                    <div class="share-url-row">
+                        <InputText :modelValue="url" readonly @click="copyToClipboard" title="Copy to clipboard" style="flex: 1;" />
+                        <Button @click="copyToClipboard" title="Copy to clipboard" :icon="copyIcon" text />
                     </div>
                 </template>
                 <template v-else>
-                    <div class="ui icon info message">
-                        <div class="content">
-                            <div class="header">
-                                Not supported
-                            </div>
-                            This file cannot be streamed directly into QGIS (download it instead).
-                        </div>
-                    </div>
+                    <PrimeMessage severity="info" :closable="false">
+                        <strong>Not supported</strong> — This file cannot be streamed directly into QGIS (download it instead).
+                    </PrimeMessage>
                 </template>
             </div>
 
-            <div v-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'">
+            <div v-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" style="margin-top: 12px;">
                 <div v-if="needsAuth">
-                    <a href="javascript:void(0);" @click="handleSetUnlisted" class="ui button primary icon">
-                        <i class="icon unlock"></i> Allow access to anyone with the link
-                    </a>
+                    <Button severity="info" @click="handleSetUnlisted" icon="fa-solid fa-unlock" label="Allow access to anyone with the link" />
                 </div>
-                <div v-else class="ui action input fluid">
-                    <div class="ui icon info message" v-if="!url">
-                        <div class="content">
-                            <div class="header">
-                                Not supported
-                            </div>
-                            This file does not support this type of sharing.
-                        </div>
-                    </div>
+                <div v-else>
+                    <PrimeMessage v-if="!url" severity="info" :closable="false">
+                        <strong>Not supported</strong> — This file does not support this type of sharing.
+                    </PrimeMessage>
                     <template v-else>
                         <template v-if="shareMode === 'embed'">
-                            <textarea readonly :value="url" @click="copyToClipboard">
+                            <textarea readonly :value="url" @click="copyToClipboard" class="share-textarea">
                             </textarea>
                         </template>
                         <template v-else>
-                            <input type="text" readonly :value="url" @click="copyToClipboard"
-                                title="Copy to clipboard" />
+                            <div class="share-url-row">
+                                <InputText :modelValue="url" readonly @click="copyToClipboard" title="Copy to clipboard" style="flex: 1;" />
+                                <Button @click="copyToClipboard" title="Copy to clipboard" :icon="copyIcon" text />
+                            </div>
                         </template>
-                        <button class="ui icon button teal" @click="copyToClipboard" title="Copy to clipboard">
-                            <i :class="copyIcon" class="icon"></i>
-                        </button>
                     </template>
                 </div>
             </div>
@@ -91,6 +73,10 @@
 <script>
 import Window from './Window';
 import Message from './Message';
+import Button from 'primevue/button';
+import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
+import PrimeMessage from 'primevue/message';
 import copy from 'clipboard-copy';
 import ddb from 'ddb';
 
@@ -99,12 +85,13 @@ import { b64encode } from '../libs/base64';
 
 export default {
     components: {
-        Window, Message
+        Window, Message, Button, Select, InputText, PrimeMessage
     },
     props: ["file"],
+    emits: ['onClose'],
     data: function () {
         return {
-            copyIcon: "copy",
+            copyIcon: "fa-regular fa-copy",
             loading: true,
             error: "",
             needsAuth: false,
@@ -112,20 +99,12 @@ export default {
             shareMode: "link",
             entry: null,
             dataset: null,
-            shareModes: {
-                'link': {
-                    label: "Link"
-                },
-                'embed': {
-                    label: 'Embed'
-                },
-                'tms': {
-                    label: "TMS"
-                },
-                'qgis': {
-                    label: "QGIS"
-                }
-            }
+            shareModeOptions: [
+                { label: "Link", value: "link" },
+                { label: "Embed", value: "embed" },
+                { label: "TMS", value: "tms" },
+                { label: "QGIS", value: "qgis" }
+            ]
         };
     },
     mounted: async function () {
@@ -148,9 +127,9 @@ export default {
     methods: {
         copyToClipboard: function (n) {
             copy(this.url);
-            this.copyIcon = "check";
+            this.copyIcon = "fa-solid fa-check";
             this.copyTextTimeout = setTimeout(() => {
-                this.copyIcon = "copy";
+                this.copyIcon = "fa-regular fa-copy";
                 this.copyTextTimeout = null;
             }, 2000);
         },
@@ -212,6 +191,8 @@ textarea {
 
 .share-type {
     margin-bottom: 12px;
+    display: flex;
+    align-items: center;
 }
 
 label {
@@ -219,10 +200,29 @@ label {
 }
 
 .content {
-    width: 420px;
+    min-width: 420px;
 }
 
 .auth-note {
     margin-top: 8px;
+}
+
+.share-url-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.share-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 8px;
+    font-family: monospace;
+    font-size: 0.85em;
+    border: 1px solid rgba(34, 36, 38, 0.15);
+    border-radius: 4px;
+    margin-top: 8px;
+    resize: vertical;
 }
 </style>

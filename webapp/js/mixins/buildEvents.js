@@ -29,17 +29,17 @@ export default {
                 case 'Succeeded':
                     this.flash = `Build completed for ${fileName}`;
                     this.flashColor = "positive";
-                    this.flashIcon = "check circle outline";
+                    this.flashIcon = "fa-regular fa-circle-check";
                     break;
                 case 'Failed':
                     this.flash = `Build failed for ${fileName}`;
                     this.flashColor = "negative";
-                    this.flashIcon = "times circle outline";
+                    this.flashIcon = "fa-regular fa-circle-xmark";
                     break;
                 case 'Processing':
                     this.flash = `Building ${fileName}...`;
                     this.flashColor = "primary";
-                    this.flashIcon = "sync";
+                    this.flashIcon = "fa-solid fa-rotate";
                     break;
             }
         },

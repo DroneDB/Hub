@@ -14,13 +14,9 @@
             :alertMessage="alertMessage"
             :clearMeasurementsDialogOpen="clearMeasurementsDialogOpen"
             :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen"
-            :flashMessage="flashMessage"
-            :flashColor="flashColor"
-            :flashIcon="flashIcon"
             @alertClose="handleAlertDialogClose"
             @clearMeasurementsClose="handleClearMeasurementsDialogClose"
-            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose"
-            @flashClose="closeFlash" />
+            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
         <ChangeUnitsDialog v-if="changeUnitsDialogOpen"
             :targetUnit="changeUnitsTargetUnit"
             :measurementsCount="changeUnitsMeasurementsCount"
@@ -44,21 +40,21 @@
                         <i style="margin: 0; height: auto" class="icon external alternate"></i>
                     </a>
                     <a :href="imagePopupDownloadUrl" download class="image-popup-btn" title="Download">
-                        <i style="margin: 0; height: auto" class="icon download"></i>
+                        <i style="margin: 0; height: auto" class="fa-solid fa-download"></i>
                     </a>
                     <button class="image-popup-btn image-popup-close" @click="closeImagePopup" title="Close">
-                        <i style="margin: 0; height: auto" class="icon close"></i>
+                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
             </div>
             <div class="image-popup-body">
-                <div v-if="imagePopupLoading" class="image-popup-loading"><i class="icon spinner loading"></i></div>
+                <div v-if="imagePopupLoading" class="image-popup-loading"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
                 <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail" :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded" @error="onImagePopupLoaded" />
             </div>
             <div class="image-popup-footer" v-if="imagePopupCoords">
                 <span class="image-popup-coords" :title="imagePopupCoords">{{ imagePopupCoords }}</span>
                 <button class="image-popup-btn image-popup-copy" @click="copyCoordinates" :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
-                    <i style="margin: 0" :class="imagePopupCoordsCopied ? 'icon check' : 'icon copy outline'"></i>
+                    <i style="margin: 0" :class="imagePopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
                 </button>
             </div>
         </div>
@@ -117,6 +113,7 @@ import mapAlertFlash from '../mixins/mapAlertFlash';
 import mapBasemap from '../mixins/mapBasemap';
 import mapTooltip from '../mixins/mapTooltip';
 import mapMeasurements from '../mixins/mapMeasurements';
+import emitter from '../libs/eventBus';
 
 
 export default {
@@ -124,6 +121,10 @@ export default {
         Map, Toolbar, olMeasure, OpacityControl, MapDialogs, ChangeUnitsDialog, MapSettingsDialog
     },
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
+    inject: {
+        registerTabChild: { default: null },
+        unregisterTabChild: { default: null }
+    },
     props: {
         files: {
             type: Array,
@@ -154,7 +155,7 @@ export default {
             {
                 id: 'select-features',
                 title: "Select Features — Hold CTRL and click on a feature to select/deselect it. Hold CTRL+click multiple features to multi-select.",
-                icon: "mouse pointer",
+                icon: "fa-solid fa-arrow-pointer",
                 exclusiveGroup: "select",
                 onSelect: () => {
                     this.selectSingle = true;
@@ -167,7 +168,7 @@ export default {
             {
                 id: 'reset-view',
                 title: "Reset View — Zoom to fit all features. Shortcut: H",
-                icon: "home",
+                icon: "fa-solid fa-house",
                 onClick: () => {
                     this.resetToInitialView();
                 }
@@ -178,7 +179,7 @@ export default {
             tools.push({
                 id: 'fullscreen',
                 title: "Fullscreen — Toggle fullscreen mode. Shortcut: F11",
-                icon: "expand",
+                icon: "fa-solid fa-expand",
                 onClick: () => {
                     if (isFullScreenCurrently()) {
                         exitFullScreen();
@@ -196,7 +197,7 @@ export default {
         tools.push({
             id: 'toggle-direction',
             title: 'Show direction and speed indicators',
-            icon: 'location arrow',
+            icon: 'fa-solid fa-location-arrow',
             selected: savedDirectionIndicators,
             onSelect: () => {
                 this.showDirectionIndicators = true;
@@ -212,7 +213,7 @@ export default {
         tools.push({
             id: 'toggle-flight-path',
             title: 'Show drone flight path',
-            icon: 'map signs',
+            icon: 'fa-solid fa-signs-post',
             selected: savedFlightPath,
             onSelect: () => {
                 this.showFlightPath = true;
@@ -263,10 +264,15 @@ export default {
         };
     },
     mounted: function () {
+        if (this.registerTabChild) this.registerTabChild('map', this);
         if (!this.lazyload) this.loadMap();
-    }, beforeDestroy: function () {
+    }, beforeUnmount: function () {
+        if (this.unregisterTabChild) this.unregisterTabChild('map');
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
+
+        // Clean up event bus listener
+        if (this._addItemsHandler) emitter.off('addItems', this._addItemsHandler);
 
         // Clean up the tooltip overlay
         if (this.tooltipOverlay && this.map) {
@@ -703,7 +709,6 @@ export default {
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
                 onActivated: () => {
                     this.$refs.toolbar.deselectNonToggle();
-                    this.$refs.toolbar.deselectTool('toggle-flight-path');
                     this.measureControls.deselectCurrent();
                 },
                 onDeactivated: () => {
@@ -1082,9 +1087,10 @@ export default {
                 return false;
             });
 
-            this.$root.$on('addItems', () => {
+            this._addItemsHandler = () => {
                 this.reloadFileLayers();
-            });
+            };
+            emitter.on('addItems', this._addItemsHandler);
 
             Keyboard.onKeyDown(this.handleKeyDown);
             Keyboard.onKeyUp(this.handleKeyUp);

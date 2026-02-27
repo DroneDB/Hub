@@ -2,23 +2,19 @@
     <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
         <div v-html="message"></div>
 
-        <div v-if="warningMessage" class="ui negative message" style="margin-top: 16px;">
+        <div v-if="warningMessage" class="warning-message" style="margin-top: 16px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
             <div class="header" v-if="warningTitle">
                 {{ warningTitle }}
             </div>
             <p>{{ warningMessage }}</p>
         </div>
 
+        <slot name="extra"></slot>
+
         <div class="buttons">
-            <button @click="close('cancel')" class="ui button">
-                {{ cancelText }}
-            </button>
-            <button v-if="secondaryText" @click="close('secondary')" class="ui button" :class="secondaryButtonClass">
-                {{ secondaryText }}
-            </button>
-            <button @click="close('confirm')" class="ui button" :class="confirmButtonClass">
-                {{ confirmText }}
-            </button>
+            <Button :label="cancelText" @click="close('cancel')" severity="secondary" />
+            <Button v-if="secondaryText" :label="secondaryText" @click="close('secondary')" :severity="secondaryButtonClass" />
+            <Button :label="confirmText" @click="close('confirm')" :severity="confirmButtonClass" />
         </div>
     </Window>
 </template>
@@ -26,10 +22,12 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window,
+        Button
     },
 
     props: {
@@ -70,6 +68,7 @@ export default {
             default: null
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {};
@@ -77,7 +76,7 @@ export default {
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
     methods: {
@@ -96,6 +95,8 @@ export default {
 <style scoped>
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

@@ -3,7 +3,7 @@
         <div class="map-settings-content">
             <div class="setting-row">
                 <label class="setting-label"  style="align-items: baseline">
-                    <i class="icon map"></i> Basemap
+                    <i class="fa-solid fa-map"></i> Basemap
                 </label>
                 <select class="setting-select" :value="selectedBasemap" @change="onBasemapChange($event.target.value)">
                     <option v-for="(v, k) in basemaps" :key="k" :value="k">{{ v.label }}</option>
@@ -37,24 +37,22 @@
                             <option v-if="wmsLayers.length === 0" value="" disabled>{{ wmsLayersLoading ? 'Loading...' : 'Enter URL first' }}</option>
                             <option v-for="layer in wmsLayers" :key="layer.name" :value="layer.name">{{ layer.title || layer.name }}</option>
                         </select>
-                        <button v-if="customUrl.trim()" class="ui mini icon button fetch-layers-btn" :disabled="wmsLayersLoading" @click="fetchLayers" title="Fetch layers">
-                            <i :class="wmsLayersLoading ? 'icon spinner loading' : 'icon sync'"></i>
-                        </button>
+                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" @click="fetchLayers" title="Fetch layers"
+                            :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'" text />
                     </div>
                 </div>
                 <div v-if="customError" class="custom-error">
-                    <i class="icon exclamation triangle"></i> {{ customError }}
+                    <i class="fa-solid fa-triangle-exclamation"></i> {{ customError }}
                 </div>
                 <div class="setting-row" style="justify-content: flex-end;">
-                    <button class="ui mini primary button" :disabled="!isCustomConfigValid || customLoading" @click="applyCustomConfig">
-                        <i :class="customLoading ? 'icon spinner loading' : 'icon check'"></i> {{ customLoading ? 'Checking...' : 'Apply' }}
-                    </button>
+                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" @click="applyCustomConfig"
+                        :icon="customLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" :label="customLoading ? 'Checking...' : 'Apply'" />
                 </div>
             </div>
 
             <div class="setting-row">
                 <label class="setting-label" style="align-items: baseline">
-                    <i class="icon pencil alternate"></i> Measurement Units
+                    <i class="fa-solid fa-pencil"></i> Measurement Units
                 </label>
                 <select style="margin-left: 1rem;" class="setting-select" :value="unitPref" @change="onUnitsChange($event.target.value)">
                     <option value="metric">Metric</option>
@@ -69,10 +67,11 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window, Button
     },
 
     props: {
@@ -94,6 +93,7 @@ export default {
             default: () => null
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         const config = this.customBasemapConfig;
@@ -130,7 +130,7 @@ export default {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
 
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
 

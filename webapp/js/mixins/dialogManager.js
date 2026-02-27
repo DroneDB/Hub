@@ -4,6 +4,7 @@
  */
 import reg from '../libs/sharedRegistry';
 import { Features } from '../libs/features';
+import emitter from '../libs/eventBus';
 
 export default {
     data() {
@@ -55,7 +56,7 @@ export default {
             this.uploadDialogOpen = false;
             this.filesToUpload = null;
 
-            if (uploaded.length == 0) return;
+            if (!uploaded || uploaded.length == 0) return;
 
             var items = [];
             var addedPaths = new Set(); // Track paths we've already added to avoid duplicates
@@ -149,14 +150,14 @@ export default {
             this.sortFiles();
 
             if (items.length > 0) {
-                this.$root.$emit('addItems', items);
+                emitter.emit('addItems', items);
 
                 // Notify BuildManager about new files (use original entries, not synthetic ones)
                 const newEntries = uploaded;
                 this.BuildManager.onFilesAdded(this.dataset, newEntries);
             }
 
-            if (uploadSuccess) this.flash = `Uploaded ${uploaded.length} file${uploaded.length > 1 ? "s" : ""}`;
+            if (uploadSuccess) this.$toast.add({ severity: 'success', summary: 'Upload Complete', detail: `Uploaded ${uploaded.length} file${uploaded.length > 1 ? 's' : ''}`, life: 3000 });
         },
 
         // Delete Dialog
@@ -222,11 +223,11 @@ export default {
                         );
 
                         console.log('Both files renamed successfully');
-                        this.flash = 'Point cloud and measurements file renamed successfully';
+                        this.$toast.add({ severity: 'success', summary: 'Renamed', detail: 'Point cloud and measurements file renamed successfully', life: 3000 });
                     } catch (e) {
                         // If measurements rename fails, show warning but not critical error
                         if (e.message && e.message.includes('measurements')) {
-                            this.flash = 'Point cloud renamed, but measurements file could not be renamed';
+                            this.$toast.add({ severity: 'warn', summary: 'Partial Rename', detail: 'Point cloud renamed, but measurements file could not be renamed', life: 5000 });
                             console.warn('Measurements rename failed:', e);
                         } else {
                             this.showError(e, "Rename");
@@ -293,9 +294,9 @@ export default {
                     item => !transferredPaths.includes(item.entry.path)
                 );
 
-                this.$root.$emit('deleteEntries', transferredPaths);
+                emitter.emit('deleteEntries', transferredPaths);
 
-                this.flash = `${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`;
+                this.$toast.add({ severity: 'success', summary: 'Transfer Complete', detail: `${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`, life: 3000 });
             }
         },
 
@@ -408,7 +409,7 @@ export default {
                 if (this.setCoverExistingCovers.length > 0) {
                     const coverPaths = this.setCoverExistingCovers.map(e => e.path);
                     await this.dataset.deleteObjs(coverPaths);
-                    this.$root.$emit('deleteEntries', coverPaths);
+                    emitter.emit('deleteEntries', coverPaths);
                 }
 
                 // Fetch the thumbnail at 1024px
@@ -422,10 +423,10 @@ export default {
                 // Upload to the dataset root with the target filename
                 await this.dataset.uploadObj(targetFilename, new File([blob], targetFilename, { type: blob.type }));
 
-                this.flash = 'Dataset cover set successfully';
+                this.$toast.add({ severity: 'success', summary: 'Cover Set', detail: 'Dataset cover set successfully', life: 3000 });
 
                 // Refresh entries to show the new file
-                this.$root.$emit('refreshEntries');
+                emitter.emit('refreshEntries');
             } catch (e) {
                 this.showError(e.message || e, 'Set as Dataset Cover');
             } finally {

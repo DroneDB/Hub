@@ -53,10 +53,10 @@
                         @dragover.prevent
                         @click.stop="handleSelection($event, f)"
                         @contextmenu="handleRightClick($event, f)"
-                        @dblclick="handleOpen(f)">
+                        @dblclick.prevent="handleOpen(f)">
                         <td class="icon-column">
                             <i v-if="!isBuildLoading(f)" class="icon" :class="f.icon"></i>
-                            <i v-else class="icon circle notch spin loading"></i>
+                            <i v-else class="fa-solid fa-circle-notch fa-spin loading"></i>
                             <i v-if="getBuildBadge(f)" class="icon badge" :class="getBuildBadge(f)"></i>
                         </td>
                         <td class="name-column">
@@ -79,7 +79,7 @@
             </div>
             <div v-else-if="files.length === 0" class="ui placeholder segment">
                 <div class="ui icon header">
-                    <i class="folder open outline icon"></i>
+                    <i class="fa-regular fa-folder-open icon"></i>
                     This folder is empty
                 </div>
             </div>
@@ -94,6 +94,7 @@ import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import BuildManager, { BUILD_STATES } from '../libs/buildManager';
 import { isInternalDrag, dragDropMixin } from '../libs/dragDropUtils';
+import emitter from '../libs/eventBus';
 
 import ddb from 'ddb';
 const { pathutils, entry } = ddb;
@@ -202,7 +203,7 @@ export default {
 
             return [{
                 label: 'Open',
-                icon: 'folder open outline',
+                icon: 'fa-regular fa-folder-open',
                 isVisible: () => { return this.selectedFiles.length > 0 && (this.selectedFiles.length > 1 || typesWithDedicatedViewer.indexOf(this.selectedFiles[0].entry.type) === -1); },
                 click: () => {
                     this.selectedFiles.forEach(f => {
@@ -211,7 +212,7 @@ export default {
                 }
             }, {
                 label: 'Open Map',
-                icon: 'map',
+                icon: 'fa-solid fa-map',
                 isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
                 click: () => {
                     this.selectedFiles.forEach(f => {
@@ -220,7 +221,7 @@ export default {
                 }
             }, {
                 label: 'Open Point Cloud',
-                icon: 'cube',
+                icon: 'fa-solid fa-cube',
                 isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
                 click: () => {
                     this.selectedFiles.forEach(f => {
@@ -229,7 +230,7 @@ export default {
                 }
             }, {
                 label: 'Open 3D Model',
-                icon: 'cube',
+                icon: 'fa-solid fa-cube',
                 isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
                 click: () => {
                     this.selectedFiles.forEach(f => {
@@ -238,7 +239,7 @@ export default {
                 }
             }, {
                 label: 'Open Panorama',
-                icon: 'globe',
+                icon: 'fa-solid fa-globe',
                 isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1; },
                 click: () => {
                     this.selectedFiles.forEach(f => {
@@ -265,7 +266,7 @@ export default {
                 }
             }, {
                 label: "Rename",
-                icon: 'pencil alternate',
+                icon: 'fa-solid fa-pencil',
                 isVisible: () => { return this.canWrite && this.selectedFiles.length == 1; },
                 accelerator: "CmdOrCtrl+M",
                 click: () => {
@@ -274,14 +275,14 @@ export default {
             }, {
                 label: "Properties",
                 isVisible: () => { return this.selectedFiles.length > 0; },
-                icon: 'info circle',
+                icon: 'fa-solid fa-circle-info',
                 accelerator: "CmdOrCtrl+P",
                 click: () => {
                     this.$emit("openProperties");
                 }
             }, {
                 label: 'Share/Embed',
-                icon: 'share alternate',
+                icon: 'fa-solid fa-share-nodes',
                 isVisible: () => { return this.selectedFiles.length === 1 },
                 click: () => {
                     this.selectedFiles.forEach(f => {
@@ -290,14 +291,14 @@ export default {
                 }
             }, {
                 label: 'Download',
-                icon: 'download',
+                icon: 'fa-solid fa-download',
                 isVisible: () => { return this.selectedFiles.length > 0; },
                 click: () => {
                     this.$emit('downloadItems', this.selectedFiles);
                 }
             }, {
                 label: 'Build',
-                icon: 'cog',
+                icon: 'fa-solid fa-gear',
                 isVisible: () => {
                     return this.canWrite &&
                            this.selectedFiles.length === 1 &&
@@ -309,7 +310,7 @@ export default {
                 }
             }, {
                 label: "Transfer to Dataset",
-                icon: 'exchange',
+                icon: 'fa-solid fa-right-left',
                 isVisible: () => { return reg.isLoggedIn() && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
                 accelerator: "CmdOrCtrl+T",
                 click: () => {
@@ -317,7 +318,7 @@ export default {
                 }
             }, {
                 label: "Set as Dataset Thumbnail",
-                icon: 'image',
+                icon: 'fa-solid fa-image',
                 isVisible: () => {
                     if (!this.canWrite || this.selectedFiles.length !== 1) return false;
                     const file = this.selectedFiles[0];
@@ -342,7 +343,7 @@ export default {
                 type: 'separator'
             }, {
                 label: "Select All/None",
-                icon: 'list',
+                icon: 'fa-solid fa-list',
                 accelerator: "CmdOrCtrl+A",
                 click: () => {
                     if (this.selectedFiles.length === this.files.length) {
@@ -353,7 +354,7 @@ export default {
                 }
             }, {
                 label: "Create Folder",
-                icon: 'folder',
+                icon: 'fa-solid fa-folder',
                 isVisible: () => { return this.canWrite; },
                 accelerator: "CmdOrCtrl+N",
                 click: () => {
@@ -364,7 +365,7 @@ export default {
                 type: 'separator'
             }, {
                 label: "Delete",
-                icon: 'trash alternate outline',
+                icon: 'fa-solid fa-trash',
                 isVisible: () => { return this.canWrite && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
                 accelerator: "CmdOrCtrl+D",
                 click: () => {
@@ -376,7 +377,7 @@ export default {
 
 
         goTo: function (itm) {
-            this.$root.$emit("folderOpened", pathutils.getTree(itm.path));
+            emitter.emit("folderOpened", pathutils.getTree(itm.path));
         },
 
         startDrag: (evt, item) => {
@@ -412,7 +413,7 @@ export default {
 
         drop(sourceItem, destFolder) {
             if (entry.isDirectory(sourceItem.entry) && (destFolder + '/').startsWith(sourceItem.entry.path + '/')) {
-                this.$log.info("Cannot copy a folder on itself or one of its descendants");
+                console.log("Cannot copy a folder on itself or one of its descendants");
                 return;
             }
 
@@ -443,7 +444,7 @@ export default {
         handleOpen: async function (file) {
             if (entry.isDirectory(file.entry)) {
                 this.loading = true;
-                this.$root.$emit("folderOpened", pathutils.getTree(file.entry.path));
+                emitter.emit("folderOpened", pathutils.getTree(file.entry.path));
             } else {
                 this.$emit('openItem', file);
             }
@@ -566,7 +567,7 @@ export default {
 
             switch (buildState.currentState) {
                 case 'Failed':
-                    return 'times circle red';
+                    return 'fa-solid fa-circle-xmark red';
                 case 'Succeeded':
                     return null; // Don't show badge for success
                 default:

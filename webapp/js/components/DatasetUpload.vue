@@ -1,26 +1,16 @@
 <template>
     <div id="upload-dialog">
-        <!-- Hidden file input for file picker -->
-        <input type="file" ref="fileInput" multiple webkitdirectory style="display: none" @change="handleFileInputChange" />
-        <input type="file" ref="fileInputFiles" multiple style="display: none" @change="handleFileInputChange" />
 
         <!-- Waiting for file selection -->
         <template v-if="waitingForFiles">
             <div class="file-selection-screen">
                 <div class="selection-content">
-                    <i class="icon cloud upload huge"></i>
+                    <i class="fa-solid fa-cloud-arrow-up huge"></i>
                     <h3>Select files to upload</h3>
                     <p>Choose files or folders to upload to this dataset</p>
                     <div class="selection-buttons">
-                        <button class="ui button primary" @click="openFilePicker">
-                            <i class="file icon"></i> Select Files
-                        </button>
-                        <button class="ui button" @click="openFolderPicker">
-                            <i class="folder icon"></i> Select Folder
-                        </button>
-                    </div>
-                    <div class="selection-cancel">
-                        <button class="ui button basic" @click="cancelSelection">Cancel</button>
+                        <Button severity="info" @click="openFilePicker" icon="fa-solid fa-file" label="Select Files" />
+                        <Button severity="secondary" @click="openFolderPicker" icon="fa-solid fa-folder" label="Select Folder" />
                     </div>
                 </div>
             </div>
@@ -32,22 +22,22 @@
         <div class="upload-header">
             <div class="upload-filters">
                 <button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">
-                    <i class="icon file"></i>
+                    <i class="fa-solid fa-file"></i>
                     <span class="filter-label">All</span>
                     <span class="filter-count">{{ counts.total }}</span>
                 </button>
                 <button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'">
-                    <i class="icon circle notch" :class="{ spin: counts.uploading > 0 }"></i>
+                    <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading > 0 }"></i>
                     <span class="filter-label">In Progress</span>
                     <span class="filter-count">{{ counts.uploading + counts.pending }}</span>
                 </button>
                 <button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'">
-                    <i class="icon check"></i>
+                    <i class="fa-solid fa-check"></i>
                     <span class="filter-label">Done</span>
                     <span class="filter-count">{{ counts.done }}</span>
                 </button>
                 <button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'">
-                    <i class="icon times"></i>
+                    <i class="fa-solid fa-xmark"></i>
                     <span class="filter-label">Errors</span>
                     <span class="filter-count">{{ counts.error }}</span>
                 </button>
@@ -83,43 +73,38 @@
             <div class="upload-summary" v-if="done">
                 <div class="summary-stats">
                     <div class="summary-stat">
-                        <i class="icon clock outline"></i>
+                        <i class="fa-regular fa-clock"></i>
                         <span class="stat-label">Duration:</span>
                         <span class="stat-value">{{ uploadDuration }}</span>
                     </div>
                     <div class="summary-stat">
-                        <i class="icon database"></i>
+                        <i class="fa-solid fa-database"></i>
                         <span class="stat-label">Data transferred:</span>
                         <span class="stat-value">{{ humanTotalBytes }}</span>
                     </div>
                     <div class="summary-stat">
-                        <i class="icon tachometer alternate"></i>
+                        <i class="fa-solid fa-gauge"></i>
                         <span class="stat-label">Average speed:</span>
                         <span class="stat-value">{{ averageSpeed }}</span>
                     </div>
                 </div>
                 <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
                     <template v-if="counts.error === 0">
-                        <i class="icon check circle"></i> All {{ counts.done }} files uploaded successfully!
+                        <i class="fa-solid fa-circle-check"></i> All {{ counts.done }} files uploaded successfully!
                     </template>
                     <template v-else>
-                        <i class="icon warning sign"></i> {{ counts.done }} succeeded, {{ counts.error }} failed
+                        <i class="fa-solid fa-triangle-exclamation"></i> {{ counts.done }} succeeded, {{ counts.error }} failed
                     </template>
                 </div>
             </div>
 
             <div class="upload-actions">
-                <button v-if="uploading" class="ui button negative" @click="handleCancel">
-                    <i class="stop circle outline icon"></i> Cancel Upload
-                </button>
+                <Button v-if="uploading" severity="danger" @click="handleCancel" icon="fa-regular fa-circle-stop" label="Cancel Upload" />
 
                 <template v-if="done">
-                    <button v-if="counts.error > 0" class="ui button orange" @click="retryAllFailed">
-                        <i class="redo icon"></i> Retry Failed ({{ counts.error }})
-                    </button>
-                    <button class="ui button primary" @click="finishUpload">
-                        <i class="check icon"></i> Close
-                    </button>
+                    <Button v-if="counts.error > 0" severity="warn" @click="retryAllFailed"
+                        icon="fa-solid fa-rotate-right" :label="'Retry Failed (' + counts.error + ')'" />
+                    <Button severity="info" @click="finishUpload" icon="fa-solid fa-check" label="Close" />
                 </template>
             </div>
         </div>
@@ -130,6 +115,7 @@
 <script>
 import Message from './Message.vue';
 import FileUploadRow from './FileUploadRow.vue';
+import Button from 'primevue/button';
 import ddb from 'ddb';
 import { bytesToSize } from '../libs/utils';
 import Dropzone from '../vendor/dropzone';
@@ -144,9 +130,11 @@ const SMALL_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export default {
     components: {
         Message,
-        FileUploadRow
+        FileUploadRow,
+        Button
     },
     props: ['organization', 'dataset', 'path', 'filesToUpload'],
+    emits: ['onClose'],
     data: function () {
         return {
             error: null,
@@ -272,8 +260,8 @@ export default {
                 // Mark as error, allow manual retry for large files
                 const canManualRetry = file.size >= SMALL_FILE_SIZE || fileInfo.retryCount >= MAX_RETRIES;
                 this.updateFileStatus(fileId, 'error', 0, errorMsg);
-                this.$set(this.fileList[fileId], 'canRetry', canManualRetry);
-                this.$set(this.fileList[fileId], 'dzFile', file);
+                this.fileList[fileId].canRetry = canManualRetry;
+                this.fileList[fileId].dzFile = file;
 
                 // Keep file in dropzone for potential retry
                 file.status = Dropzone.ERROR;
@@ -304,7 +292,7 @@ export default {
 
             // Add to fileList
             const id = file.upload.uuid;
-            this.$set(this.fileList, id, {
+            this.fileList[id] = {
                 id: id,
                 name: file.fullPath || file.name,
                 size: file.size,
@@ -314,7 +302,7 @@ export default {
                 retryCount: 0,
                 canRetry: false,
                 dzFile: file
-            });
+            };
 
             this.totalBytes += file.size;
             this.uploading = true;
@@ -379,7 +367,7 @@ export default {
             this.$emit('update:closable', true);
         }
     },
-    beforeDestroy() {
+    beforeUnmount() {
         // Clean up hidden dropzone element
         if (this.hiddenDropzone && this.hiddenDropzone.parentNode) {
             this.hiddenDropzone.parentNode.removeChild(this.hiddenDropzone);
@@ -388,10 +376,10 @@ export default {
     methods: {
         updateFileStatus(id, status, progress, errorMessage = '') {
             if (this.fileList[id]) {
-                this.$set(this.fileList[id], 'status', status);
-                this.$set(this.fileList[id], 'progress', progress);
+                this.fileList[id].status = status;
+                this.fileList[id].progress = progress;
                 if (errorMessage) {
-                    this.$set(this.fileList[id], 'errorMessage', errorMessage);
+                    this.fileList[id].errorMessage = errorMessage;
                 }
             }
         },
@@ -455,11 +443,30 @@ export default {
 
         // File picker methods
         openFilePicker() {
-            this.$refs.fileInputFiles.click();
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.style.display = 'none';
+            input.addEventListener('change', (e) => {
+                this.handleFileInputChange(e);
+                document.body.removeChild(input);
+            });
+            document.body.appendChild(input);
+            input.click();
         },
 
         openFolderPicker() {
-            this.$refs.fileInput.click();
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.webkitdirectory = true;
+            input.style.display = 'none';
+            input.addEventListener('change', (e) => {
+                this.handleFileInputChange(e);
+                document.body.removeChild(input);
+            });
+            document.body.appendChild(input);
+            input.click();
         },
 
         cancelSelection() {

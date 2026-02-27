@@ -4,37 +4,33 @@
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div class="settings-body" v-else>
             <div class="settings-section">
-                <h4 class="ui header">
-                    <i class="icon" :class="{ unlock: noAuthRequired, lock: !noAuthRequired }"></i>
-                    <div class="content">
-                        Visibility: <select v-model="visibility" @change="setVisibility">
-                            <option v-for="(v, k) in Visibilities" :value="k">{{ v.label }}</option>
-                        </select>
-                    </div>
+                <h4>
+                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
+                    Visibility: <select v-model="visibility" @change="setVisibility">
+                        <option v-for="(v, k) in Visibilities" :value="k">{{ v.label }}</option>
+                    </select>
                 </h4>
                 <div class="settings-desc" v-html="description"></div>
             </div>
 
             <div class="settings-section">
-                <h4 class="ui header">
-                    <i class="icon balance scale"></i>
-                    <div class="content">
-                        License: <select style="text-overflow: ellipsis" :title="Licenses[license].name"
-                            class="license-dropdown" v-model="license" @change="setLicense">
-                            <option v-for="(v, k) in Licenses" :value="k">{{ v.name }}</option>
-                        </select>
-                    </div>
+                <h4>
+                    <i class="fa-solid fa-scale-balanced"></i>
+                    License: <select style="text-overflow: ellipsis" :title="Licenses[license].name"
+                        class="license-dropdown" v-model="license" @change="setLicense">
+                        <option v-for="(v, k) in Licenses" :value="k">{{ v.name }}</option>
+                    </select>
                 </h4>
             </div>
 
             <div class="settings-section" v-if="canWrite">
-                <h4 class="ui header">
-                    <i class="icon tag"></i>
-                    <div class="content">Tagline</div>
+                <h4>
+                    <i class="fa-solid fa-tag"></i>
+                    Tagline
                 </h4>
                 <div class="tagline-field">
                     <input type="text" v-model="tagline" maxlength="256"
@@ -45,9 +41,9 @@
             </div>
 
             <div class="settings-section" v-if="canWrite">
-                <h4 class="ui header">
-                    <i class="icon image"></i>
-                    <div class="content">Thumbnail</div>
+                <h4>
+                    <i class="fa-solid fa-image"></i>
+                    Thumbnail
                 </h4>
                 <div class="thumbnail-upload">
                     <div class="thumbnail-preview-container">
@@ -64,43 +60,34 @@
                             @change="handleThumbnailSelect"
                             accept="image/webp,image/jpeg,image/png"
                             style="display: none" />
-                        <button type="button" class="ui button basic icon small"
-                            @click="$refs.thumbnailInput.click()"
-                            :class="{ loading: thumbnailUploading }">
-                            <i class="icon upload"></i> Upload
-                        </button>
-                        <button v-if="thumbnailPreview && !thumbnailError"
-                            type="button" class="ui button basic icon small negative"
+                        <Button @click="$refs.thumbnailInput.click()"
+                            :loading="thumbnailUploading" icon="fa-solid fa-upload" label="Upload" />
+                        <Button v-if="thumbnailPreview && !thumbnailError"
+                            severity="danger"
                             @click="removeThumbnail"
-                            :class="{ loading: thumbnailRemoving }">
-                            <i class="icon trash"></i> Remove
-                        </button>
+                            :loading="thumbnailRemoving" icon="fa-solid fa-trash" label="Remove" />
                     </div>
                 </div>
             </div>
 
             <div class="settings-section" v-if="readme == null">
-                <button @click="addDocument('README.md')" class="ui button basic icon">
-                    <i class="icon book" /> Add Readme
-                </button>
+                <Button @click="addDocument('README.md')" icon="fa-solid fa-book" label="Add Readme" />
             </div>
 
             <div class="settings-section settings-maintenance" v-if="canWrite">
-                <h4 class="ui header">
-                    <i class="icon cog"></i>
-                    <div class="content">Maintenance</div>
+                <h4>
+                    <i class="fa-solid fa-gear"></i>
+                    Maintenance
                 </h4>
                 <div class="rescan-info-box">
-                    <i class="icon info circle"></i>
+                    <i class="fa-solid fa-circle-info"></i>
                     <div>
                         <strong>Rescan</strong> re-processes all indexed files to update their metadata
                         (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
                         or if file metadata appears outdated or incorrect.
                     </div>
                 </div>
-                <button @click="$emit('rescanRequested')" class="ui button basic icon">
-                    <i class="icon sync" /> Rescan Dataset
-                </button>
+                <Button @click="$emit('rescanRequested')" icon="fa-solid fa-rotate" label="Rescan Dataset" />
             </div>
         </div>
     </Window>
@@ -112,6 +99,7 @@ import mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import { Licenses } from '../libs/licenses';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 import ddb from 'ddb';
 
 export default {
@@ -125,8 +113,9 @@ export default {
             default: false
         }
     },
+    emits: ['onClose'],
     components: {
-        Message, Window
+        Message, Window, Button
     },
     data: function () {
         return {
@@ -170,7 +159,7 @@ export default {
 
         this.loading = false;
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
     },
     computed: {
         currentUrl: function () {

@@ -3,116 +3,84 @@
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div v-else>
-            <div class="top ui equal width grid middle aligned">
-                <div class="column">
-                    <h1>Account</h1>
-                </div>
+            <div class="top-header">
+                <h1>Account</h1>
             </div>
 
             <!-- User Info Section -->
-            <div class="ui segments account">
-                <div class="ui segment user-info">
-                    <div class="ui grid">
-                        <div class="sixteen wide column">
-                            <h3><i class="user icon"></i> User Information</h3>
+            <Card class="account-card">
+                <template #content>
+                    <h3><i class="fa-solid fa-user"></i> User Information</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <label>Username</label>
+                            <p>{{ username }}</p>
                         </div>
-                        <div class="eight wide column">
-                            <div class="info-item">
-                                <label>Username</label>
-                                <p>{{ username }}</p>
-                            </div>
+                        <div class="info-item">
+                            <label>Email</label>
+                            <p>{{ email || 'Not set' }}</p>
                         </div>
-                        <div class="eight wide column">
-                            <div class="info-item">
-                                <label>Email</label>
-                                <p>{{ email || 'Not set' }}</p>
-                            </div>
+                        <div class="info-item" v-if="isAdmin">
+                            <label>Role</label>
+                            <p><span class="badge red"><i class="fa-solid fa-shield"></i> Administrator</span></p>
                         </div>
-                        <div class="eight wide column" v-if="isAdmin">
-                            <div class="info-item">
-                                <label>Role</label>
-                                <p><span class="ui label red"><i class="shield icon"></i> Administrator</span></p>
-                            </div>
-                        </div>
-                        <div class="eight wide column">
-                            <div class="info-item">
-                                <label>Organizations</label>
-                                <p>{{ organizationsCount }} organization{{ organizationsCount !== 1 ? 's' : '' }}</p>
-                            </div>
+                        <div class="info-item">
+                            <label>Organizations</label>
+                            <p>{{ organizationsCount }} organization{{ organizationsCount !== 1 ? 's' : '' }}</p>
                         </div>
                     </div>
-                </div>
-            </div>
+                </template>
+            </Card>
 
             <!-- Storage Section -->
-            <div class="ui segments account">
-                <div class="ui segment storage-info">
-                    <div class="ui grid">
-                        <div class="sixteen wide column">
-                            <h3><i class="database icon"></i> Storage</h3>
+            <Card class="account-card">
+                <template #content>
+                    <h3><i class="fa-solid fa-database"></i> Storage</h3>
+                    <div class="storage-bar-container">
+                        <div class="storage-details">
+                            <span class="used">{{ formatBytes(storageUsed) }} used</span>
+                            <span class="available" v-if="storageTotal">of {{ formatBytes(storageTotal) }}</span>
+                            <span class="available" v-else>Unlimited</span>
                         </div>
-                        <div class="sixteen wide column">
-                            <div class="storage-bar-container">
-                                <div class="storage-details">
-                                    <span class="used">{{ formatBytes(storageUsed) }} used</span>
-                                    <span class="available" v-if="storageTotal">of {{ formatBytes(storageTotal) }}</span>
-                                    <span class="available" v-else>Unlimited</span>
-                                </div>
-                                <div class="ui progress" :class="storageProgressClass" v-if="storageTotal">
-                                    <div class="bar" :style="{ width: storagePercentage + '%' }">
-                                        <div class="progress">{{ storagePercentage }}%</div>
-                                    </div>
-                                </div>
-                                <div class="ui progress green" v-else>
-                                    <div class="bar" style="width: 100%">
-                                        <div class="progress">Unlimited</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="sixteen wide column" style="margin-top: 12px;">
-                            <button @click="handleUpload" class="ui button green">
-                                <i class="upload icon"></i> Upload Files
-                            </button>
-                        </div>
+                        <ProgressBar v-if="storageTotal" :value="storagePercentage" :showValue="true" />
+                        <ProgressBar v-else :value="100" :showValue="false" />
                     </div>
-                </div>
-            </div>
+                    <div style="margin-top: 12px;">
+                        <Button @click="handleUpload" severity="success" icon="fa-solid fa-upload" label="Upload Files" />
+                    </div>
+                </template>
+            </Card>
 
             <!-- Security Section (only if account management is enabled) -->
-            <div class="ui segments account" v-if="accountManagement">
-                <div class="ui segment action-item" @click="handleChangePwd">
-                    <div class="ui grid">
-                        <div class="twelve wide column main">
-                            <i class="lock icon"></i> Security
+            <Card class="account-card action-card" v-if="accountManagement" @click="handleChangePwd">
+                <template #content>
+                    <div class="action-row">
+                        <div class="main">
+                            <i class="fa-solid fa-lock"></i> Security
                         </div>
-                        <div class="four wide column right aligned">
-                            <button @click.stop="handleChangePwd" class="ui button icon small primary">
-                                <i class="ui icon pencil"></i> Change Password
-                            </button>
+                        <div>
+                            <Button @click.stop="handleChangePwd" severity="info" size="small" icon="fa-solid fa-pencil" label="Change Password" />
                         </div>
                     </div>
-                </div>
-            </div>
+                </template>
+            </Card>
 
             <!-- Session Section -->
-            <div class="ui segments account">
-                <div class="ui segment action-item logout" @click="handleLogout">
-                    <div class="ui grid">
-                        <div class="twelve wide column main">
-                            <i class="sign-out icon"></i> Session
+            <Card class="account-card action-card logout" @click="handleLogout">
+                <template #content>
+                    <div class="action-row">
+                        <div class="main">
+                            <i class="fa-solid fa-right-from-bracket"></i> Session
                         </div>
-                        <div class="four wide column right aligned">
-                            <button @click.stop="handleLogout" class="ui button icon small red" :class="{ loading: loggingOut }">
-                                <i class="ui icon sign-out"></i> Logout
-                            </button>
+                        <div>
+                            <Button @click.stop="handleLogout" severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" />
                         </div>
                     </div>
-                </div>
-            </div>
+                </template>
+            </Card>
         </div>
 
         <ChangePwdDialog @onClose="showChangePwd = false" v-if="showChangePwd" />
@@ -122,6 +90,9 @@
 <script>
 import Message from '../Message.vue';
 import ChangePwdDialog from './ChangePwdDialog.vue';
+import Button from 'primevue/button';
+import Card from 'primevue/card';
+import ProgressBar from 'primevue/progressbar';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
 import { bytesToSize } from '../../libs/utils';
@@ -131,7 +102,7 @@ import { xAuthLogout } from '../../libs/xauth';
 
 export default {
     components: {
-        Message, ChangePwdDialog
+        Message, ChangePwdDialog, Button, Card, ProgressBar
     },
     data: function () {
         return {
@@ -252,28 +223,35 @@ export default {
     max-width: 800px;
 }
 
-#account .top {
+#account .top-header {
     margin-bottom: 12px;
 }
 
-#account .account {
+#account .account-card {
     margin-bottom: 16px;
 }
 
-#account .account .segment h3 {
+#account .account-card h3 {
     margin: 0 0 16px 0;
     color: #333;
 }
 
-#account .account .segment h3 i.icon {
+#account .account-card h3 i {
     margin-right: 10px;
 }
 
-#account .user-info .info-item {
-    margin-bottom: 12px;
+.info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
 }
 
-#account .user-info .info-item label {
+.info-grid .info-item {
+    flex: 0 0 calc(50% - 8px);
+    min-width: 200px;
+}
+
+.info-item label {
     display: block;
     font-weight: bold;
     color: #666;
@@ -281,61 +259,53 @@ export default {
     margin-bottom: 4px;
 }
 
-#account .user-info .info-item p {
+.info-item p {
     margin: 0;
     font-size: 1.1em;
     color: #333;
 }
 
-#account .storage-info .storage-bar-container .storage-details {
+.storage-bar-container .storage-details {
     display: flex;
     justify-content: space-between;
     margin-bottom: 8px;
     font-size: 0.95em;
 }
 
-#account .storage-info .storage-bar-container .storage-details .used {
+.storage-bar-container .storage-details .used {
     font-weight: bold;
     color: #333;
 }
 
-#account .storage-info .storage-bar-container .storage-details .available {
+.storage-bar-container .storage-details .available {
     color: #666;
 }
 
-#account .storage-info .storage-bar-container .ui.progress {
-    margin: 0;
-}
-
-#account .storage-info .storage-bar-container .ui.progress .bar {
-    min-width: 0;
-    transition: width 0.3s ease;
-}
-
-#account .storage-info .storage-bar-container .ui.progress .bar .progress {
-    color: white;
-}
-
-#account .action-item {
+.action-card {
     cursor: pointer;
     transition: background-color 0.2s ease;
 }
 
-#account .action-item:hover {
+.action-card:hover {
     background-color: #f5f5f5;
 }
 
-#account .action-item.logout:hover {
+.action-card.logout:hover {
     background-color: #fff5f5;
 }
 
-#account .action-item .main {
-    font-weight: bold;
-    font-size: 1.1em;
-    padding-top: 6px;
+.action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
-#account .action-item .main i.icon {
+.action-row .main {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.action-row .main i {
     margin-right: 15px;
 }
 

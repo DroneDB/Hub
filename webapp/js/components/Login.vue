@@ -1,53 +1,52 @@
 <template>
     <div id="login">
-        <div class="ui grid stackable">
-            <div class="five wide column"></div>
-            <div class="six wide column">
-                <div v-if="xAuthInProgress">
-                    <i class="icon circle notch spin" />
-                </div>
-                <div v-else>
-                    <h2>Welcome Back</h2>
-                    <p>Sign in with your credentials</p>
-                    <form class="ui large form">
-                        <div class="ui segment">
-                            <div class="field">
-                                <div class="ui left icon input">
-                                    <i class="user icon"></i>
-                                    <input v-on:keyup.enter="login" v-model="username" autocomplete="off" type="text"
-                                        name="username" placeholder="Username" autocorrect="off" autocapitalize="none">
-                                </div>
-                            </div>
-                            <div class="field">
-                                <div class="ui left icon input">
-                                    <i class="key icon"></i>
-                                    <input v-on:keyup.enter="login" v-model="password" type="password" name="password"
-                                        placeholder="Password">
-                                </div>
-                            </div>
-                            <div @click="login" :class="{ loading: loggingIn }"
-                                class="ui fluid large primary submit button">Login
-                            </div>
-                        </div>
-                    </form>
-                    <div v-if="showRegistrationLink" style="margin-top:1rem">If you don't have an account, you can register for free on <a
-                            target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
-                </div>
-                <Message bindTo="error" />
+        <div class="login-container">
+            <div v-if="xAuthInProgress" class="login-loading">
+                <ProgressSpinner style="width: 50px; height: 50px" />
             </div>
-            <div class="five wide column"></div>
+            <div v-else>
+                <h2>Welcome Back</h2>
+                <p>Sign in with your credentials</p>
+                <Card>
+                    <template #content>
+                        <div class="login-form">
+                            <IconField>
+                                <InputIcon class="fa-solid fa-user" />
+                                <InputText v-model="username" placeholder="Username" autocomplete="off"
+                                    autocorrect="off" autocapitalize="none" @keyup.enter="login" fluid />
+                            </IconField>
+                            <IconField>
+                                <InputIcon class="fa-solid fa-key" />
+                                <Password v-model="password" placeholder="Password" :feedback="false"
+                                    toggleMask @keyup.enter="login" fluid inputClass="w-full" />
+                            </IconField>
+                            <Button label="Login" :loading="loggingIn" @click="login" severity="info" class="w-full" size="large" />
+                        </div>
+                    </template>
+                </Card>
+                <div v-if="showRegistrationLink" style="margin-top:1rem">If you don't have an account, you can register for free on <a
+                        target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
+            </div>
+            <Message v-if="error" severity="error" :closable="false" class="login-error">{{ error }}</Message>
         </div>
     </div>
 </template>
 
 <script>
-import Message from './Message.vue';
+import Message from 'primevue/message';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Password from 'primevue/password';
+import Card from 'primevue/card';
+import IconField from 'primevue/iconfield';
+import InputIcon from 'primevue/inputicon';
+import ProgressSpinner from 'primevue/progressspinner';
 import reg from '../libs/sharedRegistry';
 import { xAuthAvailable, getXAuthToken } from '../libs/xauth';
 
 export default {
     components: {
-        Message
+        Message, Button, InputText, Password, Card, IconField, InputIcon, ProgressSpinner
     },
     data: function () {
         return {
@@ -66,12 +65,8 @@ export default {
     },
     beforeMount: function () {
         if (reg.isLoggedIn()) {
-            this.$router.push({
-                name: "Organizations",
-                params: { org: HubOptions.singleOrganization !== undefined ? HubOptions.singleOrganization : reg.getUsername() }
-            });
+            this.$router.push({ name: "Organizations" });
         } else if (xAuthAvailable()) {
-            // Try to log-in using the xAuthToken
             this.xAuthInProgress = true;
         }
     },
@@ -89,19 +84,17 @@ export default {
     },
     methods: {
         redirectToPrevRoute: function () {
-            let redirectTo = this.$router.history.current.meta.prev.path;
+            const prev = this.$route.meta.prev;
+            let redirectTo = prev ? prev.path : '/';
 
-            // Redirect to previous path, unless it's the same as the current login path
-            // in which case redirect to home
             if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()) {
                 this.$router.push({ name: "Organizations" });
-                //this.$router.push({name: "Datasets", params: {org: reg.getUsername()}});
             } else {
                 this.$router.push({ path: redirectTo });
             }
         },
         login: async function (e) {
-            e.preventDefault();
+            if (e && e.preventDefault) e.preventDefault();
             this.loggingIn = true;
             this.error = "";
 
@@ -123,10 +116,29 @@ export default {
 #login {
     margin-top: 32px;
     text-align: center;
+    display: flex;
+    justify-content: center;
 
-    .logo {
-        width: 64px;
-        height: 64px;
+    .login-container {
+        width: 100%;
+        max-width: 420px;
+        padding: 0 1rem;
+    }
+
+    .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .login-loading {
+        display: flex;
+        justify-content: center;
+        padding: 2rem;
+    }
+
+    .login-error {
+        margin-top: 1rem;
     }
 }
 </style>

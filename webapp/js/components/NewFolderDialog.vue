@@ -1,29 +1,28 @@
 <template>
     <Window title="Create folder" id="newFolder" @onClose="close('close')" modal maxWidth="70%" fixedSize>
 
-        <input class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close"
-            v-model="newFolderPath" :error="!newFolderPath" />
+        <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close"
+            v-model="newFolderPath" :invalid="!newFolderPath" placeholder="Folder name" />
 
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
-            <button @click="createFolder" :disabled="!newFolderPath" class="ui button positive">
-                Create folder
-            </button>
+            <Button @click="close('close')" severity="secondary" label="Close" />
+            <Button @click="createFolder" :disabled="!newFolderPath" severity="success" label="Create folder" />
         </div>
     </Window>
 </template>
 
 <script>
 import Window from './Window.vue';
+import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
 
 export default {
     components: {
-        Window
+        Window, Button, InputText
     },
 
     props: [],
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -32,7 +31,8 @@ export default {
     },
     mounted: function () {
         this.$nextTick(() => {
-            this.$refs.newFolderInput.focus();
+            const el = this.$refs.newFolderInput?.$el || this.$refs.newFolderInput;
+            if (el && el.focus) el.focus();
         });
     },
     methods: {
@@ -52,15 +52,12 @@ export default {
 .newFolderInput {
     width: 100%;
     margin-top: 8px;
-    padding: 4px;
 }
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
-
-    button {
-        margin: 0;
-    }
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

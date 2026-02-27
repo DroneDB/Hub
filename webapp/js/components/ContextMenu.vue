@@ -1,27 +1,16 @@
 <template>
-    <div class="ui dropdown item" :style="[styleObj, { visibility: open ? 'visible' : 'hidden' }]">
-        <div class="menu">
-            <template v-for="item in visibleItems">
-                <div v-if="item.type === 'separator'" class="divider" />
-                <div v-else class="item"
-                    :class="{ 'disabled': item.isEnabled !== undefined ? !item.isEnabled() : false }"
-                    @click="handleClick(item)">
-                    <i v-if="item.icon != null" style="margin-right: 0.5rem; vertical-align: middle;" class="icon" v-bind:class="item.icon"></i>
-                    {{ item.label }}
-                </div>
-            </template>
-        </div>
-    </div>
+    <PrimeContextMenu ref="ctxMenu" :model="menuModel" />
 </template>
 
 <script>
-import Mouse from '../libs/mouse';
+import PrimeContextMenu from 'primevue/contextmenu';
 import Keyboard from '../libs/keyboard';
 
 let contextMenus = [];
 
 export default {
     components: {
+        PrimeContextMenu
     },
     props: {
         items: {
@@ -30,42 +19,39 @@ export default {
         }
     },
     data: function () {
-        return {
-            open: false,
-            styleObj: {}
+        return {};
+    },
+
+    computed: {
+        menuModel: function () {
+            return this.items
+                .filter(itm => typeof itm.isVisible === 'undefined' || itm.isVisible())
+                .map(item => {
+                    if (item.type === 'separator') {
+                        return { separator: true };
+                    }
+                    return {
+                        label: item.label,
+                        icon: item.icon,
+                        disabled: item.isEnabled !== undefined ? !item.isEnabled() : false,
+                        command: () => {
+                            if (item.click) item.click();
+                        }
+                    };
+                });
         }
     },
 
     mounted: function () {
-        // Move to top level, otherwise the menu is hidden
-        this.$el.parentNode.removeChild(this.$el);
-        document.body.appendChild(this.$el);
-
         this.$parent.$el.addEventListener('contextmenu', this.openContextMenu, false);
-        Mouse.on("click", this.closeContextMenu);
         Keyboard.onKeyDown(this.handleKeyDown);
-
         contextMenus.push(this);
     },
 
-    beforeDestroy: function () {
-        this.open = false;
+    beforeUnmount: function () {
         this.$parent.$el.removeEventListener('contextmenu', this.openContextMenu);
-        Mouse.off("click", this.closeContextMenu);
         Keyboard.offKeyDown(this.handleKeyDown);
-
-        // Remove DOM element that was moved to document.body in mounted
-        if (this.$el.parentNode) {
-            this.$el.parentNode.removeChild(this.$el);
-        }
-
         contextMenus = contextMenus.filter(cm => cm !== this);
-    },
-
-    computed: {
-        visibleItems: function () {
-            return this.items.filter(itm => typeof (itm.isVisible) === 'undefined' || itm.isVisible());
-        }
     },
 
     methods: {
@@ -73,52 +59,25 @@ export default {
             e.preventDefault();
             e.stopPropagation();
 
-            this.open = true;
-
             // Close others
-            contextMenus.forEach(cm => { if (cm !== this) cm.closeContextMenu() });
+            contextMenus.forEach(cm => {
+                if (cm !== this && cm.$refs.ctxMenu) cm.$refs.ctxMenu.hide();
+            });
 
-            let x = e.clientX,
-                y = e.clientY;
-
-            // Check out of window bounds
-            const menuHeight = this.$el.children[0].clientHeight,
-                menuWidth = this.$el.children[0].clientWidth;
-
-            if (menuHeight + y > window.innerHeight) y -= menuHeight;
-            if (menuWidth + x > window.innerWidth) x -= menuWidth;
-
-            this.styleObj = {
-                top: `${y}px`,
-                left: `${x}px`
-            };
+            if (this.$refs.ctxMenu) {
+                this.$refs.ctxMenu.show(e);
+            }
 
             window.dispatchEvent(new Event("contextmenuopen"));
         },
 
         handleKeyDown: function (e) {
-            if (e.keyCode === 27) { // ESC
-                this.open = false;
+            if (e.keyCode === 27) {
+                if (this.$refs.ctxMenu) this.$refs.ctxMenu.hide();
             }
-        },
-
-        closeContextMenu: function (e) {
-            this.open = false;
-        },
-
-        handleClick: function (item) {
-            if (item.click) item.click();
         }
     }
 }
 </script>
 
-<style scoped>
-.ui.dropdown {
-    position: absolute;
-}
-
-.ui.dropdown>.menu {
-    display: block;
-}
-</style>
+<style scoped></style>

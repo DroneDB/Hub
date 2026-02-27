@@ -1,7 +1,7 @@
 <template>
     <Window v-bind:title="title" id="organizationDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="org-dialog">
-            <form v-on:submit.prevent class="ui form">
+            <form v-on:submit.prevent class="form">
                 <div class="fields">
                     <div class="field">
                         <label>Name</label>
@@ -14,21 +14,15 @@
                     <label>Description</label>
                     <textarea v-model="org.description" placeholder="Description"></textarea>
                 </div>
-                <div class="inline field">
-                    <label>Public</label>
-                    <input type="checkbox" v-model="org.isPublic" />
+                <div class="inline field" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <Checkbox v-model="org.isPublic" :binary="true" inputId="orgPublic" />
+                    <label for="orgPublic" style="margin: 0; cursor: pointer;">Public</label>
                 </div>
             </form>
             <div class="buttons">
-                <button @click="close('close')" class="ui button">
-                    Close
-                </button>
-                <button v-if="mode == 'new'" @click="close('create')" class="ui button primary" :disabled="!isValid()">
-                    Create
-                </button>
-                <button v-else @click="close('save')" class="ui button primary" :disabled="!isValid()">
-                    Save
-                </button>
+                <Button @click="close('close')" label="Close" />
+                <Button v-if="mode == 'new'" @click="close('create')" severity="info" :disabled="!isValid()" label="Create" />
+                <Button v-else @click="close('save')" severity="info" :disabled="!isValid()" label="Save" />
             </div>
         </div>
     </Window>
@@ -36,16 +30,19 @@
 
 <script>
 import Window from '../Window.vue';
+import Button from 'primevue/button';
+import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '../../libs/registryUtils';
 
 var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window
+        Window, Button, Checkbox
     },
 
     props: ["mode", "model"],
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -90,7 +87,11 @@ export default {
                 e.preventDefault();
             }
         },
-        close: function (buttonId, obj) {
+        close: function (buttonId) {
+            if (buttonId === 'close') {
+                this.$emit('onClose', 'close');
+                return;
+            }
             this.$emit('onClose', buttonId, {
                 name: this.org.name,
                 description: typeof this.org.description === "string" ? this.org.description : "",
@@ -115,7 +116,9 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .form {

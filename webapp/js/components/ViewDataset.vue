@@ -3,6 +3,7 @@
         <Message bindTo="error" />
         <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
             mobileCollapsed>
+            <template #first>
             <div class="sidebar">
                 <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
                     @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
@@ -14,6 +15,8 @@
                     @downloadItems="handleDownloadItems"
                     @openAsText="handleOpenAsText" @error="handleError" />
             </div>
+            </template>
+            <template #second>
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
                 ref="mainTabSwitcher">
                 <template v-if="isMobile" v-slot:filebrowser>
@@ -42,6 +45,7 @@
 
                     <!-- Table View with Detail Panel (Desktop/Tablet only) -->
                     <Panel v-else-if="selectedDetailFile && !isMobile" split="vertical" amount="70%" tabletAmount="60%">
+                        <template #first>
                         <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
                             :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                             @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
@@ -50,13 +54,15 @@
                             @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                             @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                             @selectionChanged="handleTableSelectionChanged" />
-
+                        </template>
+                        <template #second>
                         <DetailPanel :file="selectedDetailFile" :dataset="dataset"
                             @close="handleDetailPanelClose"
                             @open="handleDetailPanelOpen"
                             @share="handleDetailPanelShare"
                             @buildStarted="handleBuildStarted"
                             @buildError="handleBuildError" />
+                        </template>
                     </Panel>
 
                     <!-- Table View without Detail Panel -->
@@ -73,6 +79,7 @@
                     <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
                 </template>
             </TabSwitcher>
+            </template>
         </Panel>
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
         <SettingsDialog v-if="showSettings" :dataset="dataset" :canWrite="canWrite" @onClose="handleSettingsClose"
@@ -107,7 +114,7 @@
             {{ errorMessage }}
         </Alert>
         <Loader v-if="isBusy"></Loader>
-        <Flash v-if="flash" :color="flashColor" :icon="flashIcon" @onClose="closeFlash">{{ flash }}</Flash>
+        <Toast position="bottom-left" />
         <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
         <FileAvailabilityDialog
             v-if="showAvailabilityDialog"
@@ -154,16 +161,16 @@
         />
         <div v-if="lightboxOpen" class="lightbox-toolbar-extra">
             <div class="lightbox-open-fullsize" @click="openLightboxDirectLink" title="Open in new tab">
-                <i class="icon external alternate"></i>
+                <i class="fa-solid fa-up-right-from-square"></i>
             </div>
         </div>
         <div v-if="lightboxOpen && lightboxCurrentEntry" class="lightbox-info-overlay">
             <div class="lightbox-info-name">{{ lightboxCurrentEntry.name }}</div>
             <div v-if="lightboxCurrentEntry.coords" class="lightbox-info-coords">
-                <i class="icon map marker alternate" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.coords }}
+                <i class="fa-solid fa-location-dot" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.coords }}
             </div>
             <div v-if="lightboxCurrentEntry.altitude !== null" class="lightbox-info-altitude">
-                <i class="icon arrows alternate vertical" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.altitude }} m
+                <i class="fa-solid fa-arrows-up-down" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.altitude }} m
             </div>
         </div>
     </div>
@@ -192,14 +199,15 @@ import TabSwitcher from './TabSwitcher.vue';
 import Panel from './Panel.vue';
 import Alert from './Alert.vue';
 import Loader from './Loader.vue';
-import Flash from './Flash.vue';
+import Toast from 'primevue/toast';
 import ShareEmbed from './ShareEmbed.vue';
 import BuildHistory from './BuildHistory.vue';
 import FileAvailabilityDialog from './FileAvailabilityDialog.vue';
 import TextEditorDialog from './TextEditorDialog.vue';
 import PdfViewerDialog from './PdfViewerDialog.vue';
-import FsLightbox from 'fslightbox-vue/v2';
+import FsLightbox from 'fslightbox-vue';
 
+import emitter from '../libs/eventBus';
 import icons from '../libs/icons';
 import reg from '../libs/sharedRegistry';
 import { setTitle } from '../libs/utils';
@@ -248,7 +256,7 @@ export default {
         TransferDialog,
         Alert,
         Loader,
-        Flash,
+        Toast,
         ShareEmbed,
         BuildHistory,
         FileAvailabilityDialog,
@@ -264,24 +272,24 @@ export default {
         if (mobile) {
             mainTabs.unshift({
                 label: 'Browser',
-                icon: 'sitemap',
+                icon: 'fa-solid fa-sitemap',
                 key: 'filebrowser'
             });
         }
 
         mainTabs = mainTabs.concat([{
             label: 'Files',
-            icon: 'folder open',
+            icon: 'fa-solid fa-folder-open',
             key: 'explorer'
         }]);
 
         mainTabs = mainTabs.concat([{
             label: 'Map',
-            icon: 'map',
+            icon: 'fa-solid fa-map',
             key: 'map'
         }, {
             label: 'Build History',
-            icon: 'history',
+            icon: 'fa-solid fa-clock-rotate-left',
             key: 'buildhistory'
         }]);
 
@@ -360,25 +368,23 @@ export default {
         BuildManager.on('buildError', this.handleBuildErrorNotification);
         BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
-        this.$root.$on('openSettings', () => {
+        emitter.on('openSettings', () => {
             this.showSettings = true;
         });
 
-        this.$root.$on('downloadLimitReached', (msg) => {
-            this.flash = msg || "Download limit reached. Please wait for a download to finish before starting a new one.";
-            this.flashColor = "negative";
-            this.flashIcon = "exclamation triangle";
+        emitter.on('downloadLimitReached', (msg) => {
+            this.$toast.add({ severity: 'error', summary: 'Download Limit', detail: msg || 'Download limit reached. Please wait for a download to finish before starting a new one.', life: 5000 });
         });
 
-        this.$root.$on('uploadItems', msg => {
+        emitter.on('uploadItems', msg => {
             this.filesToUpload = msg.files;
             this.uploadDialogOpen = true;
         });
 
-        this.$root.$on('moveItem', async (sourceItem, destItem) => {
+        emitter.on('moveItem', async (sourceItem, destItem) => {
 
             if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
-                this.$log.info("Cannot move root");
+                console.log("Cannot move root");
                 return;
             }
 
@@ -394,11 +400,11 @@ export default {
             }
 
             if (destPath.startsWith(sourceItem.entry.path)) {
-                this.$log.info("Cannot move a file onto itself");
+                console.log("Cannot move a file onto itself");
                 return;
             }
 
-            this.$log.info(`Moving ${sourceItem.entry.path} -> ${destPath}`);
+            console.log(`Moving ${sourceItem.entry.path} -> ${destPath}`);
 
             this.isBusy = true;
             await this.renameFile(sourceItem, destPath);
@@ -406,7 +412,7 @@ export default {
 
         });
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
 
         // Remove Delete key listener
@@ -570,6 +576,12 @@ export default {
         },
 
         handleOpenItem: async function (node, view) {
+            // If it's a directory, navigate into it
+            if (ddb.entry.isDirectory(node.entry)) {
+                emitter.emit("folderOpened", pathutils.getTree(node.entry.path));
+                return;
+            }
+
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
 
@@ -729,7 +741,7 @@ export default {
         },
 
         handleTextEditorSaved: function(path) {
-            this.flash = `File saved: ${path}`;
+            this.$toast.add({ severity: 'success', summary: 'File Saved', detail: `File saved: ${path}`, life: 3000 });
         },
 
         showFileNotAvailableDialog: function(availability, node) {
@@ -750,7 +762,7 @@ export default {
 
         handleBuildCompleted: function(entry) {
             this.showAvailabilityDialog = false;
-            this.flash = `Build completed for ${entry.path}. Opening viewer...`;
+            this.$toast.add({ severity: 'success', summary: 'Build Completed', detail: `Build completed for ${entry.path}. Opening viewer...`, life: 3000 });
 
             // Automatically open the viewer
             setTimeout(() => {
@@ -832,9 +844,7 @@ export default {
                 await this.dataset.downloadWithCheck(paths);
             } catch (e) {
                 if (e.status === 429) {
-                    this.flash = "Download limit reached. Please wait for a download to finish before starting a new one.";
-                    this.flashColor = "negative";
-                    this.flashIcon = "exclamation triangle";
+                    this.$toast.add({ severity: 'error', summary: 'Download Limit', detail: 'Download limit reached. Please wait for a download to finish before starting a new one.', life: 5000 });
                 } else {
                     this.showError(e.message || e, "Download Error");
                 }
@@ -850,14 +860,14 @@ export default {
                 this.explorerTools.push({
                     id: 'upload',
                     title: "Upload",
-                    icon: "plus",
+                    icon: "fa-solid fa-plus",
                     onClick: () => {
                         this.uploadDialogOpen = true;
                     }
                 }, {
                     id: 'newfolder',
                     title: "Create folder",
-                    icon: "folder",
+                    icon: "fa-solid fa-folder",
                     onClick: () => {
                         this.createFolderDialogOpen = true;
                     }
@@ -869,7 +879,7 @@ export default {
                 this.explorerTools.push({
                     id: 'select-all',
                     title: "Select All",
-                    icon: "check square outline",
+                    icon: "fa-regular fa-square-check",
                     onClick: () => {
                         this.fileBrowserFiles.forEach(f => f.selected = true);
                     }
@@ -881,7 +891,7 @@ export default {
                 this.explorerTools.push({
                     id: 'deselect-all',
                     title: "Deselect All",
-                    icon: "square outline",
+                    icon: "fa-regular fa-square",
                     onClick: () => {
                         this.fileBrowserFiles.forEach(f => f.selected = false);
                     }
@@ -893,7 +903,7 @@ export default {
                 this.explorerTools.push({
                     id: 'rename',
                     title: "Rename",
-                    icon: "edit",
+                    icon: "fa-solid fa-pen-to-square",
                     onClick: () => {
                         this.fileToRename = this.selectedFiles[0];
                         this.renameDialogOpen = true;
@@ -905,7 +915,7 @@ export default {
                 this.explorerTools.push({
                     id: 'remove',
                     title: "Remove",
-                    icon: "trash alternate",
+                    icon: "fa-solid fa-trash",
                     onClick: () => {
                         this.selectedUsingFileBrowserList = false;
                         this.deleteDialogOpen = true;
@@ -922,7 +932,7 @@ export default {
                     this.explorerTools.push({
                         id: 'share-embed',
                         title: "Share/Embed",
-                        icon: "share alternate",
+                        icon: "fa-solid fa-share-nodes",
                         onClick: () => {
                             this.handleShareEmbed(this.selectedFiles[0]);
                         }
@@ -932,7 +942,7 @@ export default {
                         this.explorerTools.push({
                             id: 'open-map',
                             title: "Open Map",
-                            icon: "map",
+                            icon: "fa-solid fa-map",
                             onClick: () => {
                                 this.handleOpenItem(this.selectedFiles[0], 'map');
                             }
@@ -943,7 +953,7 @@ export default {
                         this.explorerTools.push({
                             id: 'open-pointcloud',
                             title: "Open Point Cloud",
-                            icon: "cube",
+                            icon: "fa-solid fa-cube",
                             onClick: () => {
                                 this.handleOpenItem(this.selectedFiles[0], 'pointcloud');
                             }
@@ -954,7 +964,7 @@ export default {
                         this.explorerTools.push({
                             id: 'open-3dmodel',
                             title: "Open 3D Model",
-                            icon: "cube",
+                            icon: "fa-solid fa-cube",
                             onClick: () => {
                                 this.handleOpenItem(this.selectedFiles[0], 'model');
                             }
@@ -965,7 +975,7 @@ export default {
                         this.explorerTools.push({
                             id: 'open-panorama',
                             title: "Open Panorama",
-                            icon: "globe",
+                            icon: "fa-solid fa-globe",
                             onClick: () => {
                                 this.handleOpenItem(this.selectedFiles[0], 'panorama');
                             }
@@ -978,7 +988,7 @@ export default {
                     this.explorerTools.push({
                         id: 'open',
                         title: "Open",
-                        icon: "folder open outline",
+                        icon: "fa-solid fa-folder-open",
                         onClick: () => {
                             this.handleOpenItem(this.selectedFiles[0]);
                         }
@@ -996,7 +1006,7 @@ export default {
                 this.explorerTools.push({
                     id: 'view-toggle',
                     title: "Table View",
-                    icon: "list",
+                    icon: "fa-solid fa-list",
                     onClick: () => {
                         this.toggleViewMode();
                     }
@@ -1005,7 +1015,7 @@ export default {
                 this.explorerTools.push({
                     id: 'view-toggle',
                     title: "Grid View",
-                    icon: "th",
+                    icon: "fa-solid fa-table-cells",
                     onClick: () => {
                         this.toggleViewMode();
                     }
@@ -1028,9 +1038,8 @@ export default {
         fileBrowserFiles: {
             deep: true,
             handler: function (newVal, oldVal) {
-                const $header = this.$parent.$children[0];
                 if (!this.$embed)
-                    $header.selectedFiles = this.selectedFiles;
+                    emitter.emit('setSelectedFiles', this.selectedFiles);
             }
         },
 

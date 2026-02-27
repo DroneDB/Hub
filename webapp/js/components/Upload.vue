@@ -6,38 +6,31 @@
         <div class="container" v-if="uploading || url">
             <div v-if="uploading" class="uploading">
                 <div v-if="totalBytes === 0">
-                    <i class="icon circle notch spin" />
+                    <i class="fa-solid fa-circle-notch fa-spin" />
                 </div>
 
-                <div class="ui segment" v-if="totalBytes > 0">
+                <Card v-if="totalBytes > 0">
+                    <template #content>
                     <div v-if="Object.keys(fileUploadStatus).length === 0">
-                        <i class="icon circle notch spin" />
+                        <i class="fa-solid fa-circle-notch fa-spin" />
                     </div>
                     <div v-if="!inIframe" v-for="f in Object.keys(fileUploadStatus)" class="progress-indicator">
-                        <div class="ui indicating progress small success">
-                            <div class="bar" :style="{ 'min-width': (fileUploadStatus[f]).toFixed(2) + '%' }">
-                                <div class="progress"></div>
-                            </div>
-                            <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
-                        </div>
+                        <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :showValue="false" style="height: 0.8em; margin-bottom: 0.3em;" />
+                        <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
                     </div>
                     <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
                         <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
                     </div>
-                    <div class="ui bottom attached progress">
-                        <div class="bar" :style="{ 'min-width': totalProgress + '%' }"></div>
-                    </div>
-                </div>
+                    <ProgressBar :value="parseFloat(totalProgress)" style="height: 0.5em; margin-top: 0.5em;" :showValue="false" />
+                    </template>
+                </Card>
 
-                <button class="ui button large negative" @click="handleCancel">
-                    <i class="stop circle outline icon"></i> Cancel
-                </button>
+                <Button severity="danger" size="large" @click="handleCancel" icon="fa-solid fa-circle-stop" label="Cancel" />
             </div>
         </div>
 
         <div class="droparea" :class="{ hidden: url || uploading }" ref="droparea">
-            <div ref="btnUpload" @click="handleUpload" class="ui huge primary submit button"><i
-                    class="cloud upload icon"></i> Upload Files</div>
+            <Button ref="btnUpload" @click="handleUpload" severity="info" size="large" icon="fa-solid fa-cloud-arrow-up" label="Upload Files" />
         </div>
 
     </div>
@@ -45,6 +38,9 @@
 
 <script>
 import Message from './Message.vue';
+import Button from 'primevue/button';
+import Card from 'primevue/card';
+import ProgressBar from 'primevue/progressbar';
 import ddb from 'ddb';
 import { bytesToSize } from '../libs/utils';
 import Dropzone from '../vendor/dropzone';
@@ -55,7 +51,7 @@ const reg = new Registry(window.location.origin);
 
 export default {
     components: {
-        Message
+        Message, Button, Card, ProgressBar
     },
     data: function () {
         return {
@@ -107,7 +103,7 @@ export default {
             createImageThumbnails: false,
             maxFilesize: Number.MAX_SAFE_INTEGER,
             previewTemplate: '<div style="display:none"></div>',
-            clickable: this.$refs.btnUpload,
+            clickable: this.$refs.btnUpload.$el,
             chunkSize: Number.MAX_SAFE_INTEGER,
             timeout: 2147483647
         });
@@ -115,7 +111,7 @@ export default {
         this.dz.on("processing", (file) => {
             if (!this.uploadToken) this.dz.cancelUpload(file);
             this.dz.options.url = `/share/upload/${this.uploadToken}`;
-            this.$set(this.fileUploadStatus, file.name, 0);
+            this.fileUploadStatus[file.name] = 0;
         })
             .on("error", (file, res) => {
 
@@ -135,7 +131,7 @@ export default {
                         this.error = `Failed to upload ${file.name} after 30 retries`;
                         this.uploading = false;
                     }
-                    this.$delete(this.fileUploadStatus, file.name);
+                    delete this.fileUploadStatus[file.name];
                     setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
                 }
 
@@ -151,7 +147,7 @@ export default {
 
                     this.totalBytesSent = this.totalBytesSent + deltaBytesSent;
                     this.lastUpdated = now;
-                    this.$set(this.fileUploadStatus, file.name, progress);
+                    this.fileUploadStatus[file.name] = progress;
                     file.deltaBytesSent = bytesSent;
                 }
             })
@@ -182,7 +178,7 @@ export default {
                 if (file.status === "success") {
                     this.uploadedFiles = this.uploadedFiles + 1;
 
-                    // Update progress by removing the tracked progress and 
+                    // Update progress by removing the tracked progress and
                     // use the file size as the true number of bytes
                     this.totalBytesSent = this.totalBytesSent + file.size;
                     if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
@@ -208,7 +204,7 @@ export default {
                         this.error = err;
                     }
                 }
-                this.$delete(this.fileUploadStatus, file.name);
+                delete this.fileUploadStatus[file.name];
 
                 setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
             })

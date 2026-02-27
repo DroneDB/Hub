@@ -2,16 +2,16 @@
     <Window title="Add User" id="addUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <div class="ui message positive" v-if="success">
-                <p><strong>User added successfully!</strong></p>
-            </div>
+            <PrimeMessage v-if="success" severity="success" :closable="false">
+                <strong>User added successfully!</strong>
+            </PrimeMessage>
 
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
+            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
                 <div class="field">
                     <label>Username</label>
                     <input ref="txtUsername" v-on:keydown="clearError()" v-on:keyup.enter="confirmAddUser()" type="text"
@@ -21,7 +21,7 @@
                     <label>Email</label>
                     <input v-on:keydown="clearError()" v-on:keyup.enter="confirmAddUser()" type="email"
                         v-model="email" placeholder="user@example.com" />
-                    <div v-if="email && !isEmailValid()" class="ui pointing red basic label">
+                    <div v-if="email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
@@ -32,29 +32,20 @@
                     <div v-if="passwordPolicy && password" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
                             :class="{ met: isRequirementMet(req) }">
-                            <i :class="isRequirementMet(req) ? 'icon check green' : 'icon close red'" />
+                            <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
                             {{ req }}
                         </small>
                     </div>
                 </div>
                 <div class="field">
                     <label>Roles</label>
-                    <select multiple="multiple" v-model="roles" class="ui dropdown" ref="rolesDropdown">
-                        <option v-for="role in availableRoles" :key="role" :value="role">
-                            {{ role }}
-                        </option>
-                    </select>
-                    <small>Hold CTRL/⌘ to select multiple roles</small>
+                    <MultiSelect v-model="roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-full" display="chip" />
                 </div>
             </form>
             <div class="buttons">
-                <button @click="close()" class="ui button" :disabled="adding">
-                    Close
-                </button>
-                <button @click="confirmAddUser()" :disabled="adding || !isFilled()" :class="{ loading: adding }"
-                    class="ui button primary">
-                    Add User
-                </button>
+                <Button @click="close()" :disabled="adding" label="Close" />
+                <Button @click="confirmAddUser()" :disabled="adding || !isFilled()" :loading="adding"
+                    severity="info" label="Add User" />
             </div>
         </div>
     </Window>
@@ -63,13 +54,16 @@
 <script>
 import Window from '../Window.vue';
 import Message from '../Message.vue';
+import MultiSelect from 'primevue/multiselect';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
 import { validatePassword, getPasswordRequirements } from '../../libs/passwordValidator';
 
 export default {
     components: {
-        Window, Message
+        Window, Message, MultiSelect, Button, PrimeMessage
     },
     props: {
         availableRoles: {
@@ -77,6 +71,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -93,6 +88,11 @@ export default {
             passwordValidation: { isValid: true, errors: [] }
         };
     },
+    computed: {
+        roleOptions() {
+            return this.availableRoles.map(r => ({ label: r, value: r }));
+        }
+    },
     mounted: function () {
         this.$nextTick(() => {
             this.$refs.txtUsername.focus();
@@ -100,16 +100,6 @@ export default {
             // Load password policy from features
             this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
             this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
-
-            // Initialize Semantic UI dropdown
-            if (this.$refs.rolesDropdown) {
-                $(this.$refs.rolesDropdown).dropdown({
-                    allowAdditions: false,
-                    onChange: (value, text, $selectedItem) => {
-                        this.roles = value ? value.split(',') : [];
-                    }
-                });
-            }
         });
     },
     methods: {
@@ -184,7 +174,9 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .form {

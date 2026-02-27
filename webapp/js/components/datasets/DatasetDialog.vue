@@ -1,12 +1,12 @@
 <template>
     <Window v-bind:title="title" id="datasetDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="ds-dialog">
-            <form v-on:submit.prevent class="ui form" style="margin-right: 10px" v-bind:class="{ error: !isValid() }">
-                <div class="ui error message" v-if="isDuplicateSlug()">
-                    <p>This dataset name is already in use. It will generate a duplicate slug.</p>
-                </div>
+            <form v-on:submit.prevent class="form" style="margin-right: 10px" v-bind:class="{ error: !isValid() }">
+                <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
+                    This dataset name is already in use. It will generate a duplicate slug.
+                </PrimeMessage>
 
-                <div class="ui grid two column">
+                <div class="grid-two-column">
                     <div class="column">
                         <div class="field">
                             <label>Dataset Name</label>
@@ -17,30 +17,21 @@
                     <div class="column">
                         <div class="field">
                             <label>Visibility</label>
-                            <div class="ui selection dropdown" ref="visibilityDropdown">
-                                <input type="hidden" name="visibility" v-model="ds.visibility">
-                                <i class="dropdown icon"></i>
-                                <div class="text">{{ getVisibilityText(ds.visibility) }}</div>
-                                <div class="menu">
-                                    <div class="item" data-value="0"><i class="lock icon"></i>Private</div>
-                                    <div class="item" data-value="1"><i class="unlock icon"></i>Unlisted</div>
-                                    <div class="item" data-value="2"><i class="unlock icon"></i>Public</div>
-                                </div>
-                            </div>
+                            <Select v-model="ds.visibility" :options="visibilityOptions" optionLabel="label" optionValue="value" placeholder="Select visibility" class="w-full" />
                         </div>
                     </div>
                 </div>
-                <div class="ui grid one column">
+                <div class="grid-one-column">
                     <div class="column">
                         <div class="field">
                             <label>Dataset Slug</label>
-                            <div class="ui message">
+                            <PrimeMessage severity="info" :closable="false">
                                 <small>{{ ds.name ? slugFromName(ds.name) : "" }}</small>
-                            </div>
+                            </PrimeMessage>
                         </div>
                     </div>
                 </div>
-                <div class="ui grid one column">
+                <div class="grid-one-column">
                     <div class="column">
                         <div class="field">
                             <label>Tagline</label>
@@ -53,21 +44,15 @@
 
             </form>
             <div v-if="mode == 'new'" class="field" style="margin-bottom: 1em;">
-                <div class="ui checkbox">
-                    <input type="checkbox" id="openAfterCreate" v-model="openAfterCreate">
+                <div class="flex align-items-center gap-2">
+                    <Checkbox v-model="openAfterCreate" :binary="true" inputId="openAfterCreate" />
                     <label for="openAfterCreate">Open dataset after creation</label>
                 </div>
             </div>
             <div class="buttons">
-                <button @click="close('close')" class="ui button">
-                    Close
-                </button>
-                <button v-if="mode == 'new'" @click="close('create')" class="ui button primary" :disabled="!isValid()">
-                    Create
-                </button>
-                <button v-else @click="close('save')" class="ui button primary" :disabled="!isValid()">
-                    Save
-                </button>
+                <Button @click="close('close')" label="Close" />
+                <Button v-if="mode == 'new'" @click="close('create')" severity="info" :disabled="!isValid()" label="Create" />
+                <Button v-else @click="close('save')" severity="info" :disabled="!isValid()" label="Save" />
             </div>
         </div>
     </Window>
@@ -75,6 +60,10 @@
 
 <script>
 import Window from '../Window.vue';
+import Select from 'primevue/select';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '../../libs/registryUtils';
 import { getOpenAfterCreatePreference, saveOpenAfterCreatePreference } from '../../libs/storageUtils';
 
@@ -82,7 +71,7 @@ var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window
+        Window, Select, Button, PrimeMessage, Checkbox
     },
     props: {
         mode: {
@@ -99,6 +88,7 @@ export default {
             required: false
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -109,18 +99,16 @@ export default {
                 tagline: ''
             },
             title: null,
-            openAfterCreate: getOpenAfterCreatePreference()
+            openAfterCreate: getOpenAfterCreatePreference(),
+            visibilityOptions: [
+                { value: 0, label: 'Private' },
+                { value: 1, label: 'Unlisted' },
+                { value: 2, label: 'Public' }
+            ]
         };
     }, mounted: function () {
         this.$nextTick(() => {
             this.$refs.name.focus();
-
-            // Initialize the visibility dropdown with Semantic UI
-            $(this.$refs.visibilityDropdown).dropdown({
-                onChange: (value) => {
-                    this.ds.visibility = parseInt(value);
-                }
-            });
         });
 
         if (this.mode == 'edit') {
@@ -130,11 +118,6 @@ export default {
             this.ds.name = this.model.name;
             this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : 0;
             this.ds.tagline = this.model.tagline || '';
-
-            // Set the dropdown value after initialization
-            this.$nextTick(() => {
-                $(this.$refs.visibilityDropdown).dropdown('set selected', this.ds.visibility.toString());
-            });
         } else {
             this.title = "Create new dataset";
 
@@ -142,11 +125,6 @@ export default {
             this.ds.name = null;
             this.ds.visibility = 0;
             this.ds.tagline = '';
-
-            // Set the dropdown value after initialization
-            this.$nextTick(() => {
-                $(this.$refs.visibilityDropdown).dropdown('set selected', '0');
-            });
         }
     }, methods: {
         slugFromName,
@@ -179,15 +157,13 @@ export default {
             }
 
             return true;
-        }, isDuplicateSlug: function () {
-            const slug = slugFromName(this.ds.name);
-            return this.forbiddenSlugs.includes(slug);
         },
-
-        getVisibilityText: function (visibility) {
-            if (visibility === 2) return 'Public';
-            if (visibility === 1) return 'Unlisted';
-            return 'Private';
+        isDuplicateSlug: function () {
+            const slug = slugFromName(this.ds.name);
+            if (!slug) return false;
+            // In edit mode, the current slug is not a duplicate
+            if (this.mode === 'edit' && this.model && slug === this.model.slug) return false;
+            return this.forbiddenSlugs.includes(slug);
         }
     }
 }
@@ -201,11 +177,42 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .form {
     margin-bottom: 20px;
+}
+
+.grid-two-column {
+    display: flex;
+    gap: 16px;
+}
+
+.grid-two-column > .column {
+    flex: 1;
+}
+
+.grid-one-column {
+    display: flex;
+}
+
+.grid-one-column > .column {
+    flex: 1;
+}
+
+.flex {
+    display: flex;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.gap-2 {
+    gap: 0.5rem;
 }
 
 .fields .field:first-child {
@@ -215,11 +222,6 @@ export default {
 
 .fields .field:last-child {
     padding-right: 0px;
-}
-
-.ui.form .fields {
-    margin-left: 0;
-    margin-right: 0;
 }
 
 .content {

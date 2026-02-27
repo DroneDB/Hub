@@ -7,19 +7,19 @@
                     <strong>{{ result.totalProcessed }}</strong> entries processed
                 </span>
                 <span class="summary-item success-count" v-if="result.successCount > 0">
-                    <i class="check circle icon green"></i> {{ result.successCount }} successful
+                    <i class="fa-solid fa-circle-check green"></i> {{ result.successCount }} successful
                 </span>
                 <span class="summary-item error-count" v-if="result.errorCount > 0">
-                    <i class="exclamation circle icon red"></i> {{ result.errorCount }} errors
+                    <i class="fa-solid fa-circle-exclamation red"></i> {{ result.errorCount }} errors
                 </span>
             </div>
 
             <!-- Success section -->
             <div v-if="successEntries.length > 0" class="result-section success-section">
-                <h4><i class="check circle icon green"></i> Successfully Rescanned ({{ successEntries.length }})</h4>
+                <h4><i class="fa-solid fa-circle-check green"></i> Successfully Rescanned ({{ successEntries.length }})</h4>
                 <ul class="file-list">
                     <li v-for="entry in successEntries" :key="entry.path" class="file-item success">
-                        <i class="check icon green"></i>
+                        <i class="fa-solid fa-check green"></i>
                         <span class="file-path">{{ entry.path }}</span>
                     </li>
                 </ul>
@@ -27,10 +27,10 @@
 
             <!-- Failure section -->
             <div v-if="errorEntries.length > 0" class="result-section error-section">
-                <h4><i class="exclamation circle icon red"></i> Failed to Rescan ({{ errorEntries.length }})</h4>
+                <h4><i class="fa-solid fa-circle-exclamation red"></i> Failed to Rescan ({{ errorEntries.length }})</h4>
                 <ul class="file-list">
                     <li v-for="entry in errorEntries" :key="entry.path" class="file-item error">
-                        <i class="times icon red"></i>
+                        <i class="fa-solid fa-xmark red"></i>
                         <span class="file-path">{{ entry.path }}</span>
                         <span class="error-message">{{ entry.error }}</span>
                     </li>
@@ -39,9 +39,7 @@
         </div>
 
         <div class="buttons">
-            <button @click="close" class="ui button primary">
-                Close
-            </button>
+            <Button @click="close" severity="info" label="Close" />
         </div>
     </Window>
 </template>
@@ -49,10 +47,11 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window, Button
     },
 
     props: {
@@ -61,6 +60,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     computed: {
         successEntries() {
@@ -74,7 +74,7 @@ export default {
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
     methods: {
@@ -168,6 +168,8 @@ export default {
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>

@@ -1,15 +1,15 @@
 <template>
     <div class="opacity-control" v-if="visible">
-        <i class="icon adjust"></i>
-        <input type="range" min="0" max="1" step="0.05" :value="value" @input="$emit('input', parseFloat($event.target.value))" title="Layer opacity">
-        <span class="opacity-value">{{ Math.round(value * 100) }}%</span>
+        <i class="fa-solid fa-adjust"></i>
+        <input type="range" min="0" max="1" step="0.05" :value="modelValue" @input="$emit('update:modelValue', parseFloat($event.target.value))" title="Layer opacity">
+        <span class="opacity-value">{{ Math.round(modelValue * 100) }}%</span>
     </div>
 </template>
 
 <script>
 export default {
     props: {
-        value: {
+        modelValue: {
             type: Number,
             default: 1.0
         },
@@ -38,7 +38,7 @@ export default {
     user-select: none;
 }
 
-.opacity-control .icon {
+.opacity-control i {
     font-size: 14px;
     opacity: 0.9;
     margin: 0;

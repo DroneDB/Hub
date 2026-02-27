@@ -5,49 +5,43 @@
                 <Message bindTo="error" />
 
                 <div v-if="loading" class="loading-container">
-                    <i class="icon circle notch spin" />
+                    <i class="fa-solid fa-circle-notch fa-spin" />
                     <span>Loading file...</span>
                 </div>
 
                 <div v-else-if="fileTooLarge" class="error-container">
-                    <i class="icon exclamation triangle" />
+                    <i class="fa-solid fa-triangle-exclamation" />
                     <p>File is too large to edit ({{ formattedSize }})</p>
                     <p class="limit-info">Maximum size: {{ formattedMaxSize }}</p>
                     <div class="buttons">
-                        <button @click="close" class="ui button">Close</button>
-                        <button @click="downloadFile" class="ui button primary">Download Instead</button>
+                        <Button @click="close" severity="secondary" label="Close" />
+                        <Button @click="downloadFile" severity="info" icon="fa-solid fa-download" label="Download Instead" />
                     </div>
                 </div>
 
                 <template v-else>
                     <div class="toolbar">
                         <div class="file-info">
-                            <i :class="['icon', fileIcon]" />
+                            <i :class="['fa-solid', fileIcon]" />
                             <span class="filename">{{ fileName }}</span>
                             <span v-if="isModified" class="modified-indicator">*</span>
                         </div>
                         <div class="actions">
-                            <button v-if="!readonly && canFormatFile" @click="formatDocument" :disabled="saving"
-                                class="ui button small" title="Format document (Shift+Alt+F)">
-                                <i class="icon code" />
-                                Format
-                            </button>
-                            <button v-if="!readonly && isModified" @click="save" :disabled="saving"
-                                class="ui button primary small">
-                                <i class="icon save" />
-                                {{ saving ? 'Saving...' : 'Save' }}
-                            </button>
-                            <button @click="close" class="ui button small">
-                                <i class="icon close" />
-                                Close
-                            </button>
+                            <Button v-if="!readonly && canFormatFile" @click="formatDocument" :disabled="saving"
+                                severity="secondary" title="Format document (Shift+Alt+F)"
+                                icon="fa-solid fa-code" label="Format" />
+                            <Button v-if="!readonly && isModified" @click="save" :disabled="saving"
+                                severity="info"
+                                icon="fa-solid fa-floppy-disk" :label="saving ? 'Saving...' : 'Save'" />
+                            <Button @click="close" severity="secondary"
+                                icon="fa-solid fa-xmark" label="Close" />
                         </div>
                     </div>
 
                     <div class="editor-container" ref="editorContainer"></div>
 
                     <div v-if="!readonly && isModified" class="unsaved-warning">
-                        <i class="icon info circle" />
+                        <i class="fa-solid fa-circle-info" />
                         You have unsaved changes
                     </div>
                 </template>
@@ -71,6 +65,7 @@
 import Window from './Window.vue';
 import Message from './Message.vue';
 import ConfirmDialog from './ConfirmDialog.vue';
+import Button from 'primevue/button';
 import Keyboard from '../libs/keyboard';
 import icons from '../libs/icons';
 import { getLanguageMode, formatFileSize, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '../libs/textFileUtils';
@@ -88,7 +83,8 @@ export default {
     components: {
         Window,
         Message,
-        ConfirmDialog
+        ConfirmDialog,
+        Button
     },
 
     props: {
@@ -105,6 +101,7 @@ export default {
             default: false
         }
     },
+    emits: ['onClose'],
 
     data() {
         return {
@@ -158,7 +155,7 @@ export default {
         await this.loadFile();
     },
 
-    beforeDestroy() {
+    beforeUnmount() {
         Keyboard.offKeyDown(this.handleKeyDown);
         if (this.editor) {
             this.editor.destroy();

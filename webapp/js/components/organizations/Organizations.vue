@@ -1,58 +1,49 @@
 <template>
     <div id="organizations">
-        <Message bindTo="error" />
+        <Toast position="bottom-left" />
 
-        <div class="top-banner ui equal width grid middle aligned">
-            <div class="column">
-                <h1>Organizations</h1>
-            </div>
-            <div class="column right aligned" v-if="!readyOnly">
-                <button @click.stop="handleNew()" class="ui primary button icon"><i class="ui icon add"></i> Create
-                    Organization
-                </button>
-            </div>
+        <div class="top-banner" style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Organizations</h1>
+            <Button v-if="!readyOnly" @click.stop="handleNew()" severity="info" size="small">
+                <i class="fa-solid fa-plus"></i> Create Organization
+            </Button>
         </div>
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <ProgressSpinner style="width: 50px; height: 50px" />
         </div>
         <div v-else>
-            <div v-for="org in organizations" class="ui segments organization">
-                <div class="ui segment" @click="viewOrganization(org)">
-                    <div class="ui grid middle aligned flex-container">
-                        <div class="flex-item column left aligned main-col"><i class="sitemap icon"></i>{{ org.name ?
-                            org.name : org.slug }}
+            <div v-for="org in organizations" :key="org.slug" class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
+                <Card style="margin-bottom: 0.5rem;">
+                    <template #content>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div style="flex: 1;">
+                                <i class="fa-solid fa-sitemap" style="margin-right: 6px;"></i>
+                                <strong style="font-size: 1.15rem;">{{ org.name ? org.name : org.slug }}</strong>
+                            </div>
+                            <div style="margin-right: 1rem;">
+                                <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
+                                <Tag v-else severity="warn" icon="fa-solid fa-lock">Private</Tag>
+                            </div>
+                            <div class="org-actions" style="display: flex; gap: 4px;">
+                                <Button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
+                                    @click.stop="openMembersDialog(org)" severity="info" size="small"
+                                    icon="fa-solid fa-users" title="Manage Members" />
+                                <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                    @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
+                                    :loading="org.editing" :disabled="org.editing || org.deleting"
+                                    icon="fa-solid fa-pencil" />
+                                <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                    @click.stop="handleDelete(org)" severity="danger" size="small"
+                                    :loading="org.deleting" :disabled="org.deleting || org.editing"
+                                    icon="fa-solid fa-trash" />
+                            </div>
                         </div>
-                        <div class="flex-item column left aligned">
-                            <div v-if="org.isPublic"><i class="unlock icon"></i>Public</div>
-                            <div v-else><i class="lock icon"></i>Private</div>
-                        </div>
-                        <div class="flex-item column actions right aligned">
-                            <button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
-                                @click.stop="openMembersDialog(org)" class="ui button icon small blue"
-                                title="Manage Members">
-                                <i class="ui icon users"></i>
-                            </button>
-                            <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
-                                @click.stop="handleEdit(org)" class="ui button icon small grey"
-                                :class="{ loading: org.editing }" :disabled="org.editing || org.deleting">
-                                <i class="ui icon pencil"></i>
-                            </button>
-                            <button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
-                                @click.stop="handleDelete(org)" class="ui button icon small negative"
-                                :class="{ loading: org.deleting }" :disabled="org.deleting || org.editing"><i
-                                    class="ui icon trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                    </template>
+                </Card>
             </div>
-            <div v-if="organizations.length == 0" class="ui segment">
-                <div class="ui grid middle aligned">
-                    <div class="column">
-                        <h3>No organizations found</h3>
-                        <p>You can create a new organization by clicking the create organization button.</p>
-                    </div>
-                </div>
+            <div v-if="organizations.length == 0" style="text-align: center; padding: 2rem;">
+                <h3>No organizations found</h3>
+                <p>You can create a new organization by clicking the create organization button.</p>
             </div>
         </div>
         <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug">
@@ -75,10 +66,15 @@ import Message from '../Message.vue';
 import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
-import MessageDialog from '../common/MessageDialog.vue'
+import MessageDialog from '../common/MessageDialog.vue';
 import { setTitle } from '../../libs/utils';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
+import Button from 'primevue/button';
+import Card from 'primevue/card';
+import Tag from 'primevue/tag';
+import Toast from 'primevue/toast';
+import ProgressSpinner from 'primevue/progressspinner';
 
 export default {
     components: {
@@ -86,7 +82,12 @@ export default {
         DeleteOrganizationDialog,
         MessageDialog,
         OrganizationDialog,
-        OrganizationMembersDialog
+        OrganizationMembersDialog,
+        Button,
+        Card,
+        Tag,
+        Toast,
+        ProgressSpinner
     },
 
     data: function () {
@@ -150,7 +151,7 @@ export default {
                     this.error = "Temporary authentication issue. Please try again.";
                 }
             } else {
-                this.error = e.message;
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
             }
 
         }
@@ -181,13 +182,13 @@ export default {
                 if (ret) {
                     this.organizations = this.organizations.filter(o => o.slug !== this.currentOrgSlug);
                 } else {
-                    this.error = "Failed to delete organization \"" + this.currentOrgSlug + "\"";
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization "' + this.currentOrgSlug + '"', life: 5000 });
                     console.error(ret);
                     org.deleting = false;
                 }
             } catch (e) {
                 console.error(e);
-                this.error = "Failed to delete organization: " + e.message;
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization: ' + e.message, life: 5000 });
                 org.deleting = false;
             }
 
@@ -216,7 +217,7 @@ export default {
         async handleOrganizationClose(res, neworg) {
             this.orgDialogOpen = false;
 
-            if (res == "close") {
+            if (res == "close" || !neworg) {
                 this.orgDialogModel = null;
                 return;
             }
@@ -241,17 +242,18 @@ export default {
                             isPublic: neworg.isPublic
                         });
                     } else {
-                        this.error = "Failed to create organization \"" + neworg.slug + "\"";
+                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization "' + neworg.slug + '"', life: 5000 });
                         console.error(ret);
                     }
                 } catch (e) {
                     console.error(e);
-                    this.error = "Failed to create organization: " + e.message;
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization: ' + e.message, life: 5000 });
                 }
                 this.loading = false;
 
             } else if (this.orgDialogMode == "edit") {
                 let org = this.orgDialogModel;
+                if (!org) return;
                 this.orgDialogModel = null;
                 this.orgDialogOpen = false;
                 this.loading = true;
@@ -265,12 +267,12 @@ export default {
                         orgitem.description = neworg.description;
                         orgitem.isPublic = neworg.isPublic;
                     } else {
-                        this.error = "Failed to update organization \"" + org.slug + "\"";
+                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update organization "' + org.slug + '"', life: 5000 });
                         console.error(ret);
                     }
                 } catch (e) {
                     console.error(e);
-                    this.error = "Failed to update organization: " + e.message;
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update organization: ' + e.message, life: 5000 });
                 }
                 this.loading = false;
             }

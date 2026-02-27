@@ -3,8 +3,8 @@
         <div class="entry" draggable @dragstart="startDrag($event, node)" @drop="onDrop($event, node)" @dragover.prevent
             @dragenter.prevent @click="onClick" @dblclick="handleOpenDblClick" @contextmenu="onRightClick"
             :class="{ selected: selected }">
-            <i class="icon circle notch spin" v-if="loading" />
-            <i class="icon" @click="handleOpenCaret" :class="expanded ? 'caret down' : 'caret right'"
+            <i class="fa-solid fa-circle-notch fa-spin" v-if="loading" />
+            <i class="icon" @click="handleOpenCaret" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
                 v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
             <i class="icon nonexistant" v-if="!isExpandable || (empty && loadedChildren)" />
 
@@ -12,17 +12,19 @@
             <div class="text">{{ node.label }}</div>
         </div>        <div class="children" v-show="expanded">
             <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" :node="node" ref="nodes"
-                :getChildren="getChildren" @selected="$emit('selected', $event, arguments[1])"
-                @opened="$emit('opened', $event, arguments[1])" />
+                :getChildren="getChildren" @selected="(n, btn) => $emit('selected', n, btn)"
+                @opened="(n, sender) => $emit('opened', n, sender)" />
         </div>
     </div>
 </template>
 
 <script>
+import { defineAsyncComponent } from 'vue';
 import Keyboard from '../libs/keyboard';
 import Mouse from '../libs/mouse';
 import { clone } from '../libs/utils';
 import ddb from 'ddb';
+import emitter from '../libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
@@ -35,7 +37,7 @@ export default {
             required: true
         }
     },
-    components: { TreeNode: () => import('./TreeNode.vue') },
+    components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
     data: function () {
         return {
             children: [],
@@ -59,7 +61,7 @@ export default {
             await this.handleOpenDblClick(new CustomEvent('click'));
         }
 
-        this.$root.$on('deleteEntries', async (deleted) => {
+        this._onDeleteEntries = async (deleted) => {
 
             var els = this.children.filter(item => deleted.includes(item.entry.path));
 
@@ -69,9 +71,10 @@ export default {
 
             this.children = this.children.filter(item => !deleted.includes(item.entry.path));
 
-        });
+        };
+        emitter.on('deleteEntries', this._onDeleteEntries);
 
-        this.$root.$on('folderOpened', async (tree) => {
+        this._onFolderOpened = async (tree) => {
 
             var ourPath = this.node.entry.path;
 
@@ -85,9 +88,10 @@ export default {
                 (tree[tree.length - 1] === "/" && this.node.root))
                 this.$emit('opened', this, "explorer");
 
-        });
+        };
+        emitter.on('folderOpened', this._onFolderOpened);
 
-        this.$root.$on('addItems', async (items) => {
+        this._onAddItems = async (items) => {
 
             if (items.length == 0)
                 return;
@@ -122,16 +126,24 @@ export default {
 
             this.sortChildren();
 
-        });
+        };
+        emitter.on('addItems', this._onAddItems);
 
-        this.$root.$on('moveItemInit', (destItem) => {
+        this._onMoveItemInit = (destItem) => {
             if (this.selected) {
                 this.selected = false;
-                this.$log.info(`node '${this.node.entry.path}' calling moveItem to '${destItem.entry.path}'`);
-                this.$root.$emit('moveItem', this.node, destItem);
+                console.log(`node '${this.node.entry.path}' calling moveItem to '${destItem.entry.path}'`);
+                emitter.emit('moveItem', this.node, destItem);
             }
-        });
+        };
+        emitter.on('moveItemInit', this._onMoveItemInit);
 
+    },
+    beforeUnmount: function () {
+        emitter.off('deleteEntries', this._onDeleteEntries);
+        emitter.off('folderOpened', this._onFolderOpened);
+        emitter.off('addItems', this._onAddItems);
+        emitter.off('moveItemInit', this._onMoveItemInit);
     },
     methods: {
         onClick: function (e) {
@@ -143,6 +155,7 @@ export default {
             this.$emit('selected', this, Mouse.RIGHT);
         },
         handleOpenDblClick: async function (e) {
+            e.preventDefault();
             return this._handleOpen(e, "dblclick");
         },
         handleOpenCaret: async function (e) {
@@ -159,14 +172,14 @@ export default {
             evt.dataTransfer.setData('item', data);
 
             this.selected = true;
-            this.$log.info(`drag start '${item.entry.path}'`);
+            console.log(`drag start '${item.entry.path}'`);
         },
 
         onDrop(evt, item) {
             const sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
-            this.$log.info(`dropping '${sourceItem.entry.path}' onto '${item.entry.path}'`);
+            console.log(`dropping '${sourceItem.entry.path}' onto '${item.entry.path}'`);
 
-            this.$root.$emit('moveItemInit', item);
+            emitter.emit('moveItemInit', item);
         },
 
         sortChildren: function () {
@@ -203,7 +216,7 @@ export default {
         expand: async function () {
 
             if (!this.isExpandable) {
-                this.$log.info("Only folders can be expanded");
+                console.log("Only folders can be expanded");
                 return;
             }
 
@@ -244,6 +257,7 @@ export default {
         display: inline-block;
         white-space: nowrap;
         min-width: 100%;
+        user-select: none;
 
         &:hover {
             background: #eee;
@@ -269,12 +283,18 @@ export default {
     i {
         display: inline-block;
         margin-top: 1px;
-        margin-right: 0px;
+        margin-right: 2px;
+        width: 1em;
+        text-align: center;
+    }
+
+    i.nonexistant {
+        width: 1em;
     }
 
     .text {
         display: inline-block;
-        margin-left: 2px;
+        margin-left: 4px;
         white-space: nowrap;
         word-break: keep-all;
     }

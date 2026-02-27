@@ -17,13 +17,10 @@
             :alertMessage="alertMessage"
             :clearMeasurementsDialogOpen="clearMeasurementsDialogOpen"
             :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen"
-            :flashMessage="flashMessage"
-            :flashColor="flashColor"
-            :flashIcon="flashIcon"
             @alertClose="handleAlertDialogClose"
             @clearMeasurementsClose="handleClearMeasurementsDialogClose"
-            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose"
-            @flashClose="closeFlash" />
+            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
+        <Toast position="bottom-left" />
     </div>
 </template>
 
@@ -49,6 +46,7 @@ import { MeasurementStorage } from '../libs/measurementStorage';
 import Toolbar from './Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
 import MapDialogs from './MapDialogs.vue';
+import Toast from 'primevue/toast';
 import Keyboard from '../libs/keyboard';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '../libs/utils';
 import { getVectorColor } from '../libs/mapUtils';
@@ -61,7 +59,7 @@ import mapMeasurements from '../mixins/mapMeasurements';
 
 export default {
     components: {
-        Map, TabViewLoader, Toolbar, OpacityControl, MapDialogs
+        Map, TabViewLoader, Toolbar, OpacityControl, MapDialogs, Toast
     },
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
     props: ["uri"],
@@ -70,7 +68,7 @@ export default {
             {
                 id: 'reset-view',
                 title: "Reset View (H)",
-                icon: "home",
+                icon: "fa-solid fa-house",
                 onClick: () => {
                     this.resetToInitialView();
                 }
@@ -81,7 +79,7 @@ export default {
             tools.push({
                 id: 'fullscreen',
                 title: "Fullscreen (F11)",
-                icon: "expand",
+                icon: "fa-solid fa-expand",
                 onClick: () => {
                     if (isFullScreenCurrently()) {
                         exitFullScreen();
@@ -125,7 +123,7 @@ export default {
             }
         }
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         // Clean up keyboard event handlers
         Keyboard.offKeyDown(this.handleKeyDown);
 

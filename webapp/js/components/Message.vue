@@ -1,12 +1,16 @@
 <template>
-    <div v-if="parentRef[bindTo]" class="ui message" :class="className">
-        <i class="close icon" @click="dismiss" v-if="!noDismiss"></i>
+    <PrimeMessage v-if="parentRef[bindTo]" :severity="primeSeverity" :closable="!noDismiss" @close="dismiss">
         <span v-html="parentRef[bindTo]" />
-    </div>
+    </PrimeMessage>
 </template>
 
 <script>
+import PrimeMessage from 'primevue/message';
+
 export default {
+    components: {
+        PrimeMessage
+    },
     props: {
         bindTo: {
             type: String,
@@ -26,9 +30,20 @@ export default {
             parentRef: {}
         }
     },
+    computed: {
+        primeSeverity: function () {
+            const map = {
+                'warning': 'warn',
+                'error': 'error',
+                'negative': 'error',
+                'positive': 'success',
+                'success': 'success',
+                'info': 'info'
+            };
+            return map[this.className] || 'warn';
+        }
+    },
     beforeMount: function () {
-        // Traverse the Vue component tree until we find 
-        // a component with the bind property we need
         let p = this.$parent;
         while (p !== undefined && p[this.bindTo] === undefined) {
             p = p.$parent;

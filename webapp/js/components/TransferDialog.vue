@@ -1,47 +1,28 @@
 <template>
     <Window title="Transfer to Dataset" id="transferDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="transfer-dialog">
-            <form v-on:submit.prevent class="ui form" :class="{ error: hasError, loading: isTransferring }">
+            <form v-on:submit.prevent class="form" :class="{ error: hasError }">
 
                 <!-- Error Message -->
-                <div class="ui error message" v-if="errorMessage">
-                    <p>{{ errorMessage }}</p>
-                </div>
+                <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
+                    {{ errorMessage }}
+                </PrimeMessage>
 
                 <!-- Source Info -->
-                <div class="ui message">
-                    <p><strong>Source:</strong> {{ sourceInfo }}</p>
-                </div>
+                <PrimeMessage severity="info" :closable="false">
+                    <strong>Source:</strong> {{ sourceInfo }}
+                </PrimeMessage>
 
                 <!-- Destination Organization -->
                 <div class="field">
                     <label>Destination Organization</label>
-                    <div class="ui selection dropdown" ref="orgDropdown">
-                        <input type="hidden" name="destOrg" v-model="destOrg">
-                        <i class="dropdown icon"></i>
-                        <div class="default text">Select organization...</div>
-                        <div class="menu">
-                            <div class="item" v-for="org in organizations" :key="org.slug" :data-value="org.slug">
-                                <i class="sitemap icon"></i>{{ org.name || org.slug }}
-                            </div>
-                        </div>
-                    </div>
+                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label" optionValue="value" placeholder="Select organization..." class="w-full" />
                 </div>
 
                 <!-- Destination Dataset -->
                 <div class="field">
                     <label>Destination Dataset</label>
-                    <div class="ui selection dropdown" ref="dsDropdown" :class="{ disabled: !destOrg }">
-                        <input type="hidden" name="destDs" v-model="destDs">
-                        <i class="dropdown icon"></i>
-                        <div class="default text">Select dataset...</div>
-                        <div class="menu">
-                            <div class="item" v-for="ds in datasets" :key="ds.slug" :data-value="ds.slug"
-                                :class="{ disabled: isCurrentDataset(ds.slug) }">
-                                <i class="database icon"></i>{{ ds.name || ds.slug }}
-                            </div>
-                        </div>
-                    </div>
+                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label" optionValue="value" placeholder="Select dataset..." class="w-full" />
                 </div>
 
                 <!-- Destination Path -->
@@ -53,30 +34,24 @@
 
                 <!-- Overwrite Checkbox -->
                 <div class="field">
-                    <div class="ui checkbox">
-                        <input type="checkbox" v-model="overwrite" id="overwriteCheckbox">
+                    <div class="flex align-items-center gap-2">
+                        <Checkbox v-model="overwrite" :binary="true" inputId="overwriteCheckbox" />
                         <label for="overwriteCheckbox">Overwrite existing files</label>
                     </div>
                 </div>
 
                 <!-- Progress Bar -->
-                <div v-if="isTransferring" class="ui progress active" :class="progressClass">
-                    <div class="bar" :style="{ width: progress + '%' }">
-                        <div class="progress">{{ progressText }}</div>
-                    </div>
-                    <div class="label">{{ statusMessage }}</div>
+                <div v-if="isTransferring" class="progress-section">
+                    <ProgressBar :value="progress" :showValue="true" />
+                    <div class="progress-label">{{ statusMessage }}</div>
                 </div>
 
             </form>
 
             <!-- Buttons -->
             <div class="buttons">
-                <button @click="close('close')" class="ui button" :disabled="isTransferring">
-                    Close
-                </button>
-                <button @click="transfer" :disabled="!canTransfer" class="ui button positive">
-                    <i class="exchange icon"></i> Transfer
-                </button>
+                <Button @click="close('close')" :disabled="isTransferring" label="Close" />
+                <Button @click="transfer" :disabled="!canTransfer" severity="success" icon="fa-solid fa-right-left" label="Transfer" />
             </div>
         </div>
     </Window>
@@ -84,6 +59,11 @@
 
 <script>
 import Window from './Window.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import Select from 'primevue/select';
+import Checkbox from 'primevue/checkbox';
+import ProgressBar from 'primevue/progressbar';
 import ddb from 'ddb';
 
 const { Registry } = ddb;
@@ -91,7 +71,7 @@ const reg = new Registry(window.location.origin);
 
 export default {
     components: {
-        Window
+        Window, Button, PrimeMessage, Select, Checkbox, ProgressBar
     },
 
     props: {
@@ -108,6 +88,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -132,6 +113,21 @@ export default {
             } else {
                 return `${this.files.length} items from ${this.sourceOrg}/${this.sourceDs}`;
             }
+        },
+
+        organizationOptions: function () {
+            return this.organizations.map(org => ({
+                label: org.name || org.slug,
+                value: org.slug
+            }));
+        },
+
+        datasetOptions: function () {
+            return this.datasets.map(ds => ({
+                label: ds.name || ds.slug,
+                value: ds.slug,
+                disabled: this.isCurrentDataset(ds.slug)
+            }));
         },
 
         canTransfer: function () {
@@ -159,25 +155,6 @@ export default {
             // Extract the org data from each Organization instance
             this.organizations = orgInstances.map(orgInstance => orgInstance.org);
 
-            // Initialize organization dropdown
-            this.$nextTick(() => {
-                $(this.$refs.orgDropdown).dropdown({
-                    onChange: async (value) => {
-                        this.destOrg = value;
-                        this.destDs = null;
-                        this.datasets = [];
-                        await this.loadDatasets(value);
-                    }
-                });
-
-                // Initialize dataset dropdown (will be enabled when org is selected)
-                $(this.$refs.dsDropdown).dropdown({
-                    onChange: (value) => {
-                        this.destDs = value;
-                    }
-                });
-            });
-
         } catch (e) {
             console.error("Error loading organizations:", e);
             this.errorMessage = "Failed to load organizations: " + e.message;
@@ -185,6 +162,14 @@ export default {
     },
 
     methods: {
+        async onOrgChange() {
+            this.destDs = null;
+            this.datasets = [];
+            if (this.destOrg) {
+                await this.loadDatasets(this.destOrg);
+            }
+        },
+
         isCurrentDataset(dsSlug) {
             // Disable the current dataset if we're in the same organization
             return this.destOrg === this.sourceOrg && dsSlug === this.sourceDs;
@@ -200,12 +185,6 @@ export default {
                     slug: ds.slug,
                     name: ds.properties?.meta?.name?.data || ds.slug
                 }));
-
-                // Refresh the dataset dropdown
-                this.$nextTick(() => {
-                    $(this.$refs.dsDropdown).dropdown('clear');
-                    $(this.$refs.dsDropdown).dropdown('refresh');
-                });
             } catch (e) {
                 console.error("Error loading datasets:", e);
                 this.errorMessage = "Failed to load datasets: " + e.message;
@@ -269,7 +248,7 @@ export default {
     min-width: 500px;
 }
 
-.ui.form {
+.form {
     margin-bottom: 16px;
 }
 
@@ -284,28 +263,33 @@ export default {
     margin-top: 4px;
 }
 
-.ui.message {
+.progress-section {
+    margin-top: 16px;
     margin-bottom: 16px;
 }
 
-.ui.progress {
-    margin-top: 16px;
-    margin-bottom: 16px;
+.progress-label {
+    margin-top: 6px;
+    font-size: 0.9em;
+    color: #666;
 }
 
 .buttons {
     margin-top: 16px;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
-.buttons button {
-    margin-left: 8px;
+.flex {
+    display: flex;
 }
 
-.ui.dropdown .menu > .item.disabled {
-    color: #ccc !important;
-    cursor: default !important;
-    pointer-events: none !important;
-    opacity: 0.5 !important;
+.align-items-center {
+    align-items: center;
+}
+
+.gap-2 {
+    gap: 0.5rem;
 }
 </style>

@@ -3,154 +3,88 @@
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
-            <i class="icon circle notch spin" />
+            <ProgressSpinner style="width: 50px; height: 50px" />
         </div>
         <div v-else>
-            <div class="top-banner ui equal width grid middle aligned">
-                <div class="column">
-                    <h1>{{ orgName }}</h1>
-                </div>
-                <div class="column right aligned" v-if="canCreateDataset">
-                    <button @click.stop="handleNew()" class="ui primary button icon"><i
-                            class="ui icon add"></i>&nbsp;Create Dataset</button>
-                </div>
+            <div class="top-banner" style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>{{ orgName }}</h1>
+                <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="info" size="small">
+                    <i class="fa-solid fa-plus"></i>&nbsp;Create Dataset
+                </Button>
             </div>
 
             <!-- Dataset Controls -->
-            <div class="">
-                <div class="ui stackable grid">
-                    <div class="sixteen wide column">
-                        <div class="ui icon input fluid">
-                            <input v-model="searchQuery" type="text" placeholder="Search datasets...">
-                            <i class="search icon"></i>
-                        </div>
-                    </div>
-                </div>
+            <div style="margin-bottom: 1rem;">
+                <IconField>
+                    <InputIcon class="fa-solid fa-magnifying-glass" />
+                    <InputText v-model="searchQuery" placeholder="Search datasets..." style="width: 100%;" />
+                </IconField>
             </div>
 
             <!-- Datasets Table -->
-            <table class="ui selectable sortable celled table">
-                <thead>
-                    <tr>
-                        <th class="ds-thumb-header"></th>
-                        <th @click="sortBy('name')">
-                            <i class="database icon"></i> Dataset
-                            <i v-if="sortColumn === 'name'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
-                        </th>
-                        <th @click="sortBy('creationDate')">
-                            Creation Date
-                            <i v-if="sortColumn === 'creationDate'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
-                        </th>
-                        <th @click="sortBy('entries')">
-                            Files
-                            <i v-if="sortColumn === 'entries'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
-                        </th>
-                        <th @click="sortBy('size')">
-                            Size
-                            <i v-if="sortColumn === 'size'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
-                        </th>
-                        <th @click="sortBy('visibility')">
-                            Visibility
-                            <i v-if="sortColumn === 'visibility'"
-                                :class="sortDirection === 'asc' ? 'caret up icon' : 'caret down icon'"></i>
-                        </th>
-                        <th v-if="showActionsColumn" class="center aligned">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="ds in paginatedDatasets" :key="ds.slug" @click="viewDataset(ds)" class="clickable-row">
-                        <td class="ds-thumb-cell">
-                            <img :src="ds.thumbUrl" class="ds-thumb-img" :class="{ 'ds-thumb-placeholder': !ds.thumbLoaded }" />
-                        </td>
-                        <td class="ds-name">
-                            {{ ds.name || ds.slug }}
-                            <div v-if="ds.tagline" class="ds-tagline">{{ ds.tagline }}</div>
-                        </td>
-                        <td>{{ formatDate(ds.creationDate) }}</td>
-                        <td>{{ ds.entries }}</td>
-                        <td>{{ bytesToSize(ds.size) }}</td>
-                        <td>
-                            <div v-if="ds.visibility === 2"><i class="unlock icon"></i>{{
-                                getVisibilityText(ds.visibility) }}</div>
-                            <div v-else-if="ds.visibility === 1"><i class="unlock icon"></i>{{
-                                getVisibilityText(ds.visibility) }}</div>
-                            <div v-else><i class="lock icon"></i>{{ getVisibilityText(ds.visibility) }}</div>
-                        </td>
-                        <td v-if="showActionsColumn" class="center aligned">
-                            <button v-if="ds.permissions && ds.permissions.canWrite" @click.stop="handleEdit(ds)" class="ui button icon small grey"
-                                :class="{ loading: ds.editing }" :disabled="ds.editing || ds.deleting">
-                                <i class="ui icon pencil"></i>
-                            </button>
-                            <button v-if="ds.permissions && ds.permissions.canDelete && canDeleteGlobal" @click.stop="handleDelete(ds)"
-                                class="ui button icon small negative" :class="{ loading: ds.deleting }"
-                                :disabled="ds.deleting || ds.editing">
-                                <i class="ui icon trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                    <tr v-if="paginatedDatasets.length === 0">
-                        <td :colspan="showActionsColumn ? 7 : 6" class="center aligned">
-                            <h3>No datasets found</h3>
-                            <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
-                        </td>
-                    </tr>
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <th :colspan="showActionsColumn ? 7 : 6">
-                            <div class="ui grid three column">
-                                <div class="column left aligned middle aligned">
-                                    <div class="ui left floated">
-                                        Showing {{ paginatedDatasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 :
-                                        0 }} to
-                                        {{ Math.min(currentPage * itemsPerPage, filteredDatasets.length) }} of {{
-                                        filteredDatasets.length }} datasets
-                                    </div>
-                                </div>
-                                <div class="column center aligned middle aligned">
-                                    <div v-if="totalPages > 1" class="ui pagination menu">
-                                        <a class="item" @click="changePage(1)" :class="{ disabled: currentPage === 1 }">
-                                            <i class="angle double left icon"></i>
-                                        </a> <a class="item" @click="changePage(currentPage - 1)"
-                                            :class="{ disabled: currentPage === 1 }">
-                                            <i class="angle left icon"></i>
-                                        </a> <a v-for="(page, index) in displayedPages" :key="'page-' + index"
-                                            class="item"
-                                            @click="page === 'ellipsis-1' || page === 'ellipsis-2' ? null : changePage(page)"
-                                            :class="{ active: currentPage === page, disabled: page === 'ellipsis-1' || page === 'ellipsis-2' }">
-                                            {{ page === 'ellipsis-1' || page === 'ellipsis-2' ? '...' : page }}
-                                        </a>
-                                        <a class="item" @click="changePage(currentPage + 1)"
-                                            :class="{ disabled: currentPage === totalPages }">
-                                            <i class="angle right icon"></i>
-                                        </a>
-                                        <a class="item" @click="changePage(totalPages)"
-                                            :class="{ disabled: currentPage === totalPages }">
-                                            <i class="angle double right icon"></i>
-                                        </a>
-                                    </div>
-                                </div>
-                                <div class="column right aligned middle aligned">
-                                    <div class="ui right floated">
-                                        Items per page
-                                        <select v-model="itemsPerPage" style="margin-left: 5px" class="ui dropdown compact">
-                                            <option value="5">5</option>
-                                            <option value="10">10</option>
-                                            <option value="25">25</option>
-                                            <option value="50">50</option>
-                                            <option value="100">100</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </th>
-                    </tr>
-                </tfoot>
-            </table>
+            <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
+                @row-click="onRowClick" rowHover class="ds-table"
+                :pt="{ bodyRow: { style: 'cursor: pointer' } }">
+                <Column header="" style="width: 60px;">
+                    <template #body="slotProps">
+                        <img :src="slotProps.data.thumbUrl" class="ds-thumb-img"
+                            :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }" />
+                    </template>
+                </Column>
+                <Column field="name" :sortable="true">
+                    <template #header>
+                        <i class="fa-solid fa-database"></i> Dataset
+                    </template>
+                    <template #body="slotProps">
+                        <span class="ds-name">{{ slotProps.data.name || slotProps.data.slug }}</span>
+                        <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
+                    </template>
+                </Column>
+                <Column field="creationDate" header="Creation Date" :sortable="true">
+                    <template #body="slotProps">{{ formatDate(slotProps.data.creationDate) }}</template>
+                </Column>
+                <Column field="entries" header="Files" :sortable="true" />
+                <Column field="size" header="Size" :sortable="true">
+                    <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
+                </Column>
+                <Column field="visibility" header="Visibility" :sortable="true">
+                    <template #body="slotProps">
+                        <Tag v-if="slotProps.data.visibility === 2" severity="success" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
+                        <Tag v-else-if="slotProps.data.visibility === 1" severity="info" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
+                        <Tag v-else severity="warn" icon="fa-solid fa-lock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
+                    </template>
+                </Column>
+                <Column v-if="showActionsColumn" header="Actions" style="text-align: center; width: 120px;">
+                    <template #body="slotProps">
+                        <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
+                            @click.stop="handleEdit(slotProps.data)" severity="secondary" outlined size="small"
+                            :loading="slotProps.data.editing" :disabled="slotProps.data.editing || slotProps.data.deleting"
+                            icon="fa-solid fa-pencil" />
+                        <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
+                            @click.stop="handleDelete(slotProps.data)" severity="danger" size="small"
+                            :loading="slotProps.data.deleting" :disabled="slotProps.data.deleting || slotProps.data.editing"
+                            icon="fa-solid fa-trash" style="margin-left: 4px;" />
+                    </template>
+                </Column>
+                <template #empty>
+                    <div style="text-align: center; padding: 2rem;">
+                        <h3>No datasets found</h3>
+                        <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
+                    </div>
+                </template>
+            </DataTable>
+
+            <!-- Pagination -->
+            <div v-if="totalPages > 0" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; padding: 0.5rem;">
+                <span>
+                    Showing {{ paginatedDatasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
+                    {{ Math.min(currentPage * itemsPerPage, filteredDatasets.length) }} of {{ filteredDatasets.length }} datasets
+                </span>
+                <Paginator v-if="totalPages > 1"
+                    :rows="Number(itemsPerPage)" :totalRecords="filteredDatasets.length"
+                    :first="(currentPage - 1) * itemsPerPage"
+                    @page="onPageChange" :rowsPerPageOptions="[5, 10, 25, 50, 100]" />
+            </div>
         </div>
 
         <DeleteDatasetDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :dsSlug="currentDsSlug">
@@ -170,7 +104,16 @@ import { renameDataset, datasetName } from '../../libs/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences } from '../../libs/storageUtils';
 import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
 import DatasetDialog from './DatasetDialog.vue';
-import MessageDialog from '../common/MessageDialog.vue'
+import MessageDialog from '../common/MessageDialog.vue';
+import Button from 'primevue/button';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import InputText from 'primevue/inputtext';
+import IconField from 'primevue/iconfield';
+import InputIcon from 'primevue/inputicon';
+import Paginator from 'primevue/paginator';
+import Tag from 'primevue/tag';
+import ProgressSpinner from 'primevue/progressspinner';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -180,7 +123,16 @@ export default {
         Message,
         DeleteDatasetDialog,
         MessageDialog,
-        DatasetDialog
+        DatasetDialog,
+        Button,
+        DataTable,
+        Column,
+        InputText,
+        IconField,
+        InputIcon,
+        Paginator,
+        Tag,
+        ProgressSpinner
     },
     data: function () {
         // Load preferences from Local Storage
@@ -411,7 +363,7 @@ export default {
             }
 
             let ds = this.datasets.find(o => o.slug == this.currentDsSlug);
-            this.$set(ds, 'deleting', true);
+            ds['deleting'] = true;
 
             try {
                 let ret = await this.org.Dataset(this.currentDsSlug).delete()
@@ -426,12 +378,12 @@ export default {
                 } else {
                     this.error = "Failed to delete dataset \"" + this.currentDsSlug + "\"";
                     console.error(ret);
-                    this.$set(ds, 'deleting', false);
+                    ds['deleting'] = false;
                 }
             } catch (e) {
                 console.error(e);
                 this.error = "Failed to delete dataset: " + e.message;
-                this.$set(ds, 'deleting', false);
+                ds['deleting'] = false;
             }
         },
 
@@ -503,7 +455,7 @@ export default {
                         const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === newds.slug);
                         if (index !== -1) {
                             // Replace the temporary entry with final data
-                            this.$set(this.datasets, index, {
+                            this.datasets[index] = {
                                 slug: newds.slug,
                                 creationDate: Date.now(),
                                 visibility: newds.visibility,
@@ -517,7 +469,7 @@ export default {
                                 thumbError: false,
                                 thumbLoaded: false,
                                 thumbUrl: '/images/dataset-placeholder.svg'
-                            });
+                            };
                             this.preloadDatasetThumbnail(this.datasets[index]);
                         }
 
@@ -549,7 +501,7 @@ export default {
                 this.dsDialogModel = null;
 
                 let dsitem = this.datasets.find(o => o.slug == ds.slug);
-                this.$set(dsitem, 'editing', true);
+                dsitem['editing'] = true;
 
                 try {
                     // Use renameDataset function to update name and slug
@@ -569,10 +521,10 @@ export default {
 
                         if (update) {
                             // Update the object in the local dataset
-                            this.$set(dsitem, 'slug', ret.slug);
-                            this.$set(dsitem, 'name', newds.name);
-                            this.$set(dsitem, 'visibility', newds.visibility);
-                            this.$set(dsitem, 'tagline', newds.tagline || '');
+                            dsitem['slug'] = ret.slug;
+                            dsitem['name'] = newds.name;
+                            dsitem['visibility'] = newds.visibility;
+                            dsitem['tagline'] = newds.tagline || '';
                         }
                     } else {
                         this.error = `Failed to update dataset \"${ds.slug}\"`;
@@ -582,7 +534,7 @@ export default {
                     this.error = "Failed to update dataset: " + e.message;
                 }
 
-                this.$set(dsitem, 'editing', false);
+                dsitem['editing'] = false;
             }
         },
 
@@ -596,6 +548,15 @@ export default {
                     ds: ds.slug
                 }
             });
+        },
+
+        onRowClick(event) {
+            this.viewDataset(event.data);
+        },
+
+        onPageChange(event) {
+            this.currentPage = event.page + 1;
+            this.itemsPerPage = event.rows;
         },
 
         upload: function () {
@@ -625,6 +586,8 @@ export default {
 <style scoped>
 #datasets {
     margin: 12px;
+    height: 100%;
+    overflow-y: auto;
 
     .top-banner {
         margin-top: 12px;
@@ -635,95 +598,39 @@ export default {
         margin-bottom: 20px;
     }
 
-    .ui.table {
-        .ds-thumb-header {
-            width: 80px;
-            cursor: default;
-
-            &:hover {
-                background: inherit !important;
-            }
-        }
-
-        .ds-thumb-cell {
-            width: 80px;
-            padding: 4px !important;
-        }
-
-        .ds-thumb-img {
-            display: block;
-            width: 72px;
-            height: 54px;
-            object-fit: cover;
-            border-radius: 3px;
-        }
-
-        .ds-thumb-placeholder {
-            opacity: 0.35;
-        }
-
-        .ds-name {
-            font-weight: bold;
-        }
-
-        .ds-tagline {
-            font-weight: normal;
-            color: #888;
-            font-size: 0.85em;
-            margin-top: 2px;
-            max-width: 350px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        th {
-            cursor: pointer;
-            user-select: none;
-
-            &:hover {
-                background: rgba(0, 0, 0, 0.05);
-            }
-        }
-
-        .clickable-row {
-            cursor: pointer;
-
-            &:hover {
-                background-color: #f5f5f5;
-            }
-        }
+    .ds-thumb-img {
+        display: block;
+        width: 54px;
+        height: 40px;
+        object-fit: cover;
+        border-radius: 3px;
     }
 
-    .ui.pagination.menu {
-        box-shadow: none;
-        border: none;
-
-        .active.item {
-            background-color: rgba(0, 0, 0, 0.05);
-        }
+    .ds-thumb-placeholder {
+        opacity: 0.35;
     }
 
-    .ui.input.labeled {
-        input {
-            border-radius: 0;
-        }
+    .ds-name {
+        font-weight: bold;
+    }
+
+    .ds-tagline {
+        font-weight: normal;
+        color: #888;
+        font-size: 0.85em;
+        margin-top: 2px;
+        max-width: 350px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* Responsive adjustments */
     @media screen and (max-width: 768px) {
-        .ui.table {
-
-            td,
-            th {
+        :deep(.p-datatable) {
+            td, th {
                 padding: 0.5em;
             }
-        }
-    }
-
-    @media screen and (max-width: 576px) {
-        .ui.stackable.grid>.column:not(.row) {
-            padding: 0.5rem 0 !important;
         }
     }
 }

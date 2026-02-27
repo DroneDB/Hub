@@ -57,7 +57,7 @@ export default {
                 this.selectedNodes.forEach(n => n.selected = false);
                 this.selectedNodes = [];
 
-                this.selectRange(this.rangeStartNode, node, this.$refs.treeView.__vue__.$children);
+                this.selectRange(this.rangeStartNode, node, this.$refs.treeNodes);
             } else {
                 // Single selection
                 this.selectedNodes.forEach(n => n.selected = false);
@@ -89,7 +89,7 @@ export default {
                     return false;
                 }
 
-                if (!this.selectRange(low, high, n.$children)) return false;
+                if (!this.selectRange(low, high, n.$refs.nodes)) return false;
             }
 
             return true;

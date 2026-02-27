@@ -8,9 +8,7 @@
                     <div class="sub header">{{ getFileType(file) }}</div>
                 </div>
             </h3>
-            <button class="ui icon button" @click="handleClose" title="Close">
-                <i class="times icon"></i>
-            </button>
+            <Button severity="secondary" outlined @click="handleClose" title="Close" icon="fa-solid fa-xmark" />
         </div>
 
         <div class="detail-content">
@@ -26,7 +24,7 @@
                         class="icon massive"
                         :class="file.icon" />
 
-                    <i class="icon circle notch spin loading massive" v-if="buildLoading || loading" />
+                    <i class="fa-solid fa-circle-notch fa-spin loading massive" v-if="buildLoading || loading" />
 
                     <div v-if="buildState && shouldShowBuildBadge" class="build-status" :class="buildBadgeClass">
                         <i class="icon" :class="buildBadgeIcon"></i>
@@ -105,32 +103,20 @@
             <!-- Actions section -->
             <div class="actions-section">
                 <h4 class="ui dividing header">Actions</h4>
-                <div class="ui vertical fluid buttons">
-                    <button class="ui button" @click="handleOpen">
-                        <i class="folder open outline icon"></i>
-                        Open
-                    </button>
-                    <button class="ui button" @click="handleShare" v-if="!isDirectory">
-                        <i class="share alternate icon"></i>
-                        Share/Embed
-                    </button>
-                    <button class="ui button" @click="handleBuild"
-                        v-if="isBuildableFile && !hasActiveBuild">
-                        <i class="cog icon"></i>
-                        Build
-                    </button>
+                <div class="action-buttons">
+                    <Button severity="secondary" @click="handleOpen" icon="fa-regular fa-folder-open" label="Open" />
+                    <Button severity="secondary" @click="handleShare" v-if="!isDirectory" icon="fa-solid fa-share-nodes" label="Share/Embed" />
+                    <Button severity="secondary" @click="handleBuild"
+                        v-if="isBuildableFile && !hasActiveBuild" icon="fa-solid fa-gear" label="Build" />
                 </div>
             </div>
         </div>
     </div>
     <div class="detail-panel-empty" v-else>
-        <div class="ui icon message">
-            <i class="info circle icon"></i>
-            <div class="content">
-                <div class="header">No Selection</div>
-                <p>Select an item to view its details</p>
-            </div>
-        </div>
+        <Message severity="info" :closable="false" icon="fa-solid fa-circle-info">
+            <strong>No Selection</strong><br />
+            Select an item to view its details
+        </Message>
     </div>
 </template>
 
@@ -139,9 +125,11 @@ import { thumbs } from 'ddb';
 import BuildManager from '../libs/buildManager';
 import ddb from 'ddb';
 import ObjTable from './ObjTable.vue';
+import Button from 'primevue/button';
+import Message from 'primevue/message';
 
 export default {
-    components: { ObjTable },
+    components: { ObjTable, Button, Message },
     props: {
         file: {
             type: Object,
@@ -196,9 +184,9 @@ export default {
             const state = this.buildState.currentState;
             switch (state) {
                 case 'Failed':
-                    return 'times circle';
+                    return 'fa-solid fa-xmark fa-circle';
                 case 'Processing':
-                    return 'circle notch spin';
+                    return 'fa-solid fa-circle-notch fa-spin';
                 default:
                     return '';
             }
@@ -234,7 +222,7 @@ export default {
             this.setupBuildListeners();
         }
     },
-    beforeDestroy() {
+    beforeUnmount() {
         this.cleanupBuildListeners();
     },
     methods: {
@@ -515,6 +503,12 @@ export default {
 
 .actions-section {
     margin-bottom: 1rem;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 }
 
 .detail-panel-empty {

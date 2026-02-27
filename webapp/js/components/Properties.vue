@@ -49,6 +49,7 @@ export default {
         Window, ObjTable
     },
     props: ['files'],
+    emits: ['onClose'],
     data: function () {
         return {};
     },

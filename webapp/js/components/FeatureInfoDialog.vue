@@ -18,9 +18,7 @@
         </div>
 
         <div class="buttons">
-            <button @click="close('close')" class="ui button">
-                Close
-            </button>
+            <Button @click="close('close')" label="Close" />
         </div>
     </Window>
 </template>
@@ -28,11 +26,13 @@
 <script>
 import Window from './Window.vue';
 import ObjTable from './ObjTable.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
         Window,
-        ObjTable
+        ObjTable,
+        Button
     },
 
     props: {
@@ -45,6 +45,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {
@@ -58,23 +59,23 @@ export default {
             }
         };
     },
-    
+
     computed: {
         categorizedProperties() {
             const result = {};
-                        
+
             // Initialize categories
             for (const category in this.categoryGroups) {
                 result[category] = {};
             }
-            
+
             // Assign properties to categories
             for (const key in this.properties) {
                 let assigned = false;
-                
+
                 // Check if property belongs to any category
                 for (const category in this.categoryGroups) {
-                    if (this.categoryGroups[category].some(prop => 
+                    if (this.categoryGroups[category].some(prop =>
                         key.toLowerCase().includes(prop.toLowerCase())
                     )) {
                         result[category][key] = this.properties[key];
@@ -82,22 +83,22 @@ export default {
                         break;
                     }
                 }
-                
+
                 // If not assigned to any category, put in "Other"
                 if (!assigned) {
                     result['Other'][key] = this.properties[key];
                 }
             }
-            
+
             return result;
         }
     },
-    
+
     methods: {
         close: function (buttonId) {
             this.$emit('onClose', buttonId);
         },
-        
+
         formatValue: function(value) {
             if (value === null || value === undefined) {
                 return '-';
@@ -112,11 +113,11 @@ export default {
             if (typeof value === 'object' && value !== null) {
                 return true;
             }
-            
+
             // Check if it's a string containing JSON (array or object)
             if (typeof value === 'string') {
                 value = value.trim();
-                if ((value.startsWith('{') && value.endsWith('}')) || 
+                if ((value.startsWith('{') && value.endsWith('}')) ||
                     (value.startsWith('[') && value.endsWith(']'))) {
                     try {
                         const parsed = JSON.parse(value);
@@ -127,15 +128,15 @@ export default {
                     }
                 }
             }
-            
+
             return false;
         },
-        
+
         parseComplexValue: function(value) {
             if (typeof value === 'object') {
                 return value;
             }
-            
+
             if (typeof value === 'string') {
                 try {
                     return JSON.parse(value);
@@ -144,13 +145,13 @@ export default {
                     return value;
                 }
             }
-            
+
             return value;
         },
-        
+
         isDateString: function(value) {
             if (typeof value !== 'string') return false;
-            
+
             // ISO date format regex check (YYYY-MM-DDTHH:MM:SS.sssZ)
             const isoDatePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$/;
             if (isoDatePattern.test(value)) {
@@ -158,10 +159,10 @@ export default {
                 const date = new Date(value);
                 return !isNaN(date.getTime());
             }
-            
+
             return false;
         },
-        
+
         formatDate: function(dateString) {
             const date = new Date(dateString);
             return new Intl.DateTimeFormat(undefined, {

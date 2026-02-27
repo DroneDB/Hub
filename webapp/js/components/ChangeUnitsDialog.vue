@@ -11,12 +11,8 @@
         </div>
 
         <div class="buttons">
-            <button @click="close('cancel')" class="ui button">
-                Cancel
-            </button>
-            <button @click="close('confirm')" class="ui button primary">
-                Convert
-            </button>
+            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
+            <Button @click="close('confirm')" severity="info" label="Convert" />
         </div>
     </Window>
 </template>
@@ -24,10 +20,11 @@
 <script>
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window, Button
     },
 
     props: {
@@ -41,6 +38,7 @@ export default {
             required: true
         }
     },
+    emits: ['onClose'],
 
     computed: {
         targetUnitLabel() {
@@ -56,7 +54,7 @@ export default {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
 
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
 
@@ -88,10 +86,8 @@ export default {
 }
 
 .buttons {
-    text-align: right;
-}
-
-.buttons button {
-    margin-left: 8px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 </style>
