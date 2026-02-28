@@ -3,7 +3,7 @@
         <Tabs :value="activeTab" @update:value="onTabChange">
             <TabList>
                 <Tab v-for="t in tabs" :key="t.key" :value="t.key">
-                    <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label" style="margin-right: 6px;" /><span
+                    <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label" style="margin-right: 0.375rem;" /><span
                         v-if="!t.hideLabel" class="mobile hide"> {{ t.label }}</span>
                     <span @click.stop="closeTab(t)" v-if="!!t.canClose" class="close-btn"><i class="fa-solid fa-xmark"></i></span>
                 </Tab>
@@ -73,7 +73,7 @@ export default {
 }
 
 .close-btn {
-    margin-left: 4px;
+    margin-left: 0.25rem;
     cursor: pointer;
     &:hover {
         color: #444;
@@ -83,6 +83,6 @@ export default {
     }
 }
 .icon.padded {
-    padding-left: 3px;
+    padding-left: 0.1875rem;
 }
 </style>

@@ -10,7 +10,7 @@
             </p>
         </div>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close('cancel')" severity="secondary" label="Cancel" />
             <Button @click="close('confirm')" severity="info" label="Convert" />
         </div>
@@ -73,21 +73,15 @@ export default {
 
 <style scoped>
 .change-units-content {
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 }
 
 .change-units-content p {
-    margin: 0 0 8px 0;
+    margin: 0 0 0.5rem 0;
 }
 
 .change-units-content .description {
     color: #666;
     font-size: 0.9em;
-}
-
-.buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
     <Window title="Transfer to Dataset" id="transferDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="transfer-dialog">
-            <form v-on:submit.prevent class="form" :class="{ error: hasError }">
+            <form v-on:submit.prevent :class="{ error: hasError }">
 
                 <!-- Error Message -->
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -14,27 +14,27 @@
                 </PrimeMessage>
 
                 <!-- Destination Organization -->
-                <div class="field">
-                    <label>Destination Organization</label>
-                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label" optionValue="value" placeholder="Select organization..." class="w-full" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Destination Organization</label>
+                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label" optionValue="value" placeholder="Select organization..." class="w-100" />
                 </div>
 
                 <!-- Destination Dataset -->
-                <div class="field">
-                    <label>Destination Dataset</label>
-                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label" optionValue="value" placeholder="Select dataset..." class="w-full" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Destination Dataset</label>
+                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label" optionValue="value" placeholder="Select dataset..." class="w-100" />
                 </div>
 
                 <!-- Destination Path -->
-                <div class="field">
-                    <label>Destination Path (optional)</label>
-                    <input type="text" v-model="destPath" placeholder="Leave empty for root folder" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Destination Path (optional)</label>
+                    <InputText v-model="destPath" placeholder="Leave empty for root folder" fluid />
                     <small class="help-text">Example: folder/subfolder</small>
                 </div>
 
                 <!-- Overwrite Checkbox -->
-                <div class="field">
-                    <div class="flex align-items-center gap-2">
+                <div class="mb-3">
+                    <div class="d-flex align-items-center gap-2">
                         <Checkbox v-model="overwrite" :binary="true" inputId="overwriteCheckbox" />
                         <label for="overwriteCheckbox">Overwrite existing files</label>
                     </div>
@@ -49,7 +49,7 @@
             </form>
 
             <!-- Buttons -->
-            <div class="buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close('close')" :disabled="isTransferring" label="Close" />
                 <Button @click="transfer" :disabled="!canTransfer" severity="success" icon="fa-solid fa-right-left" label="Transfer" />
             </div>
@@ -62,6 +62,7 @@ import Window from './Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
 import ddb from 'ddb';
@@ -71,7 +72,7 @@ const reg = new Registry(window.location.origin);
 
 export default {
     components: {
-        Window, Button, PrimeMessage, Select, Checkbox, ProgressBar
+        Window, Button, PrimeMessage, Select, InputText, Checkbox, ProgressBar
     },
 
     props: {
@@ -245,51 +246,24 @@ export default {
 
 <style scoped>
 .transfer-dialog {
-    min-width: 500px;
-}
-
-.form {
-    margin-bottom: 16px;
-}
-
-.field {
-    margin-bottom: 16px;
+    min-width: 31.25rem;
 }
 
 .help-text {
     color: #999;
     font-style: italic;
     display: block;
-    margin-top: 4px;
+    margin-top: 0.25rem;
 }
 
 .progress-section {
-    margin-top: 16px;
-    margin-bottom: 16px;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
 }
 
 .progress-label {
-    margin-top: 6px;
+    margin-top: 0.375rem;
     font-size: 0.9em;
     color: #666;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.flex {
-    display: flex;
-}
-
-.align-items-center {
-    align-items: center;
-}
-
-.gap-2 {
-    gap: 0.5rem;
 }
 </style>

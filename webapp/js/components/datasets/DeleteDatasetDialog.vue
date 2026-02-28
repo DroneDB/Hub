@@ -8,7 +8,7 @@
             <p>All the files will be deleted too.</p>
         </PrimeMessage>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close('close')" label="Close" />
             <Button @click="close('remove')" severity="danger" label="Remove" />
         </div>
@@ -42,10 +42,4 @@ export default {
 </script>
 
 <style scoped>
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
 </style>

@@ -265,7 +265,7 @@ export default {
 .button,
 .container,
 .error-msg {
-    margin: 16px;
+    margin: 1rem;
 }
 
 .droparea {
@@ -283,13 +283,13 @@ export default {
     text-align: center;
 
     .circle.notch {
-        margin-bottom: 12px;
-        height: 20px;
-        width: 22px;
+        margin-bottom: 0.75rem;
+        height: 1.25rem;
+        width: 1.375rem;
     }
 
     .progress-indicator {
-        margin-bottom: 36px;
+        margin-bottom: 2.25rem;
     }
 }
 

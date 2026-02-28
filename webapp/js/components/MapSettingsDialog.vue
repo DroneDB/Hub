@@ -2,41 +2,33 @@
     <Window title="Map Settings" id="map-settings" @onClose="close" modal maxWidth="400px" fixedSize>
         <div class="map-settings-content">
             <div class="setting-row">
-                <label class="setting-label"  style="align-items: baseline">
+                <label class="setting-label align-items-baseline">
                     <i class="fa-solid fa-map"></i> Basemap
                 </label>
-                <select class="setting-select" :value="selectedBasemap" @change="onBasemapChange($event.target.value)">
-                    <option v-for="(v, k) in basemaps" :key="k" :value="k">{{ v.label }}</option>
-                </select>
+                <Select :modelValue="selectedBasemap" @update:modelValue="onBasemapChange" :options="basemapOptions" optionLabel="label" optionValue="value" class="setting-select" />
             </div>
 
             <div v-if="selectedBasemap === 'custom'" class="custom-basemap-fields">
                 <div class="setting-row">
-                    <label class="setting-label" style="align-items: baseline">
+                    <label class="setting-label align-items-baseline">
                         Source Type
                     </label>
-                    <select class="setting-select" v-model="customSourceType" @change="onSourceTypeChanged">
-                        <option value="xyz">XYZ Tiles</option>
-                        <option value="wms">WMS</option>
-                    </select>
+                    <Select v-model="customSourceType" @change="onSourceTypeChanged" :options="sourceTypeOptions" optionLabel="label" optionValue="value" class="setting-select" />
                 </div>
                 <div class="setting-row">
-                    <label class="setting-label" style="align-items: baseline">
+                    <label class="setting-label align-items-baseline">
                         URL
                     </label>
-                    <input class="setting-input" type="text" v-model="customUrl"
+                    <InputText v-model="customUrl" class="setting-input"
                         :placeholder="customSourceType === 'wms' ? 'https://example.com/wms' : 'https://example.com/{z}/{x}/{y}.png'"
                         @input="onUrlChanged" />
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
-                    <label class="setting-label" style="align-items: baseline">
+                    <label class="setting-label align-items-baseline">
                         Layer
                     </label>
                     <div class="layer-select-wrapper">
-                        <select class="setting-select" v-model="customLayerName" :disabled="wmsLayers.length === 0">
-                            <option v-if="wmsLayers.length === 0" value="" disabled>{{ wmsLayersLoading ? 'Loading...' : 'Enter URL first' }}</option>
-                            <option v-for="layer in wmsLayers" :key="layer.name" :value="layer.name">{{ layer.title || layer.name }}</option>
-                        </select>
+                        <Select v-model="customLayerName" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" optionLabel="label" optionValue="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
                         <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" @click="fetchLayers" title="Fetch layers"
                             :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'" text />
                     </div>
@@ -51,13 +43,10 @@
             </div>
 
             <div class="setting-row">
-                <label class="setting-label" style="align-items: baseline">
+                <label class="setting-label align-items-baseline">
                     <i class="fa-solid fa-pencil"></i> Measurement Units
                 </label>
-                <select style="margin-left: 1rem;" class="setting-select" :value="unitPref" @change="onUnitsChange($event.target.value)">
-                    <option value="metric">Metric</option>
-                    <option value="imperial">Imperial</option>
-                </select>
+                <Select :modelValue="unitPref" @update:modelValue="onUnitsChange" :options="unitOptions" optionLabel="label" optionValue="value" class="setting-select ms-3" />
             </div>
 
         </div>
@@ -68,10 +57,12 @@
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
 import Button from 'primevue/button';
+import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
 
 export default {
     components: {
-        Window, Button
+        Window, Button, Select, InputText
     },
 
     props: {
@@ -104,7 +95,15 @@ export default {
             wmsLayers: config && config.wmsLayers ? config.wmsLayers : [],
             wmsLayersLoading: false,
             customLoading: false,
-            customError: null
+            customError: null,
+            sourceTypeOptions: [
+                { label: 'XYZ Tiles', value: 'xyz' },
+                { label: 'WMS', value: 'wms' }
+            ],
+            unitOptions: [
+                { label: 'Metric', value: 'metric' },
+                { label: 'Imperial', value: 'imperial' }
+            ]
         };
     },
 
@@ -113,6 +112,18 @@ export default {
             if (!this.customUrl || !this.customUrl.trim()) return false;
             if (this.customSourceType === 'wms' && !this.customLayerName) return false;
             return true;
+        },
+        basemapOptions: function () {
+            return Object.entries(this.basemaps).map(([k, v]) => ({
+                value: k,
+                label: v.label
+            }));
+        },
+        wmsLayerOptions: function () {
+            return this.wmsLayers.map(l => ({
+                value: l.name,
+                label: l.title || l.name
+            }));
         }
     },
 
@@ -341,7 +352,7 @@ export default {
 
 <style scoped>
 .map-settings-content {
-    padding: 8px 0;
+    padding: 0.5rem 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
@@ -351,16 +362,16 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 12px;
+    padding: 0 0.75rem;
 }
 
 .setting-label {
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 500;
     color: #333;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0.375rem;
 }
 
 .setting-label .icon {
@@ -377,84 +388,57 @@ export default {
 
 .setting-toggle input[type="checkbox"] {
     cursor: pointer;
-    width: 16px;
-    height: 16px;
+    width: 1rem;
+    height: 1rem;
 }
 
 .setting-select {
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 13px;
-    background: white;
-    cursor: pointer;
-}
-
-.setting-select:hover {
-    border-color: #999;
+    font-size: 0.8125rem;
 }
 
 .custom-basemap-fields {
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
-    padding: 8px 0;
-    margin: 0 12px;
+    padding: 0.5rem 0;
+    margin: 0 0.75rem;
     border: 1px solid #e0e0e0;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     background: #fafafa;
 }
 
 .setting-input {
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 13px;
-    background: white;
+    font-size: 0.8125rem;
     flex: 1;
     min-width: 0;
-    margin-left: 8px;
-}
-
-.setting-input:hover {
-    border-color: #999;
-}
-
-.setting-input:focus {
-    border-color: #2185d0;
-    outline: none;
+    margin-left: 0.5rem;
 }
 
 .custom-error {
-    padding: 4px 12px;
-    font-size: 12px;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.75rem;
     color: #db2828;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
 }
 
 .custom-error .icon {
     margin: 0;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .layer-select-wrapper {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
     flex: 1;
     min-width: 0;
-    margin-left: 8px;
-}
-
-.layer-select-wrapper .setting-select {
-    flex: 1;
-    min-width: 0;
+    margin-left: 0.5rem;
 }
 
 .fetch-layers-btn {
-    padding: 4px 6px !important;
+    padding: 0.25rem 0.375rem !important;
     margin: 0 !important;
     min-height: 0 !important;
 }

@@ -14,7 +14,7 @@
                     <!-- Progress indicator for build in progress -->
                     <div v-if="status === 'building' && waitingForBuild" class="build-progress">
                         <div class="ui active inline loader small"></div>
-                        <span style="margin-left: 10px;">Waiting for build completion...</span>
+                        <span class="ms-2">Waiting for build completion...</span>
                         <div class="progress-timer">{{ formatWaitTime() }}</div>
                     </div>
 
@@ -50,7 +50,7 @@
                     </div>
                 </div>
             </div>
-            <div class="actions">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button v-if="hasAction('close')" @click="handleClose" label="Close" />
                 <Button v-if="hasAction('cancel')" @click="handleClose" label="Cancel" />
                 <Button v-if="hasAction('details')" @click="toggleDetails"
@@ -296,56 +296,48 @@ export default {
 
 <style scoped>
 .file-availability-dialog {
-    max-width: 600px;
+    max-width: 37.5rem;
 }
 
 .dialog-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
     font-size: 1.2em;
     font-weight: bold;
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 .build-progress {
-    margin-top: 15px;
+    margin-top: 0.9375rem;
     text-align: center;
-    padding: 15px;
+    padding: 0.9375rem;
     background-color: #f8f9fa;
-    border-radius: 4px;
+    border-radius: 0.25rem;
 }
 
 .progress-timer {
-    margin-top: 10px;
+    margin-top: 0.625rem;
     font-size: 0.9em;
     color: #666;
 }
 
 .build-details {
-    margin-top: 15px;
+    margin-top: 0.9375rem;
     background-color: #f8f9fa;
-    padding: 15px;
-    border-radius: 4px;
+    padding: 0.9375rem;
+    border-radius: 0.25rem;
 }
 
 .build-details h4 {
     margin-top: 0;
-    margin-bottom: 10px;
+    margin-bottom: 0.625rem;
 }
 
 .build-details code {
     font-size: 0.85em;
     background-color: #e9ecef;
-    padding: 2px 6px;
-    border-radius: 3px;
-}
-
-.actions {
-    margin-top: 16px;
-    text-align: right;
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.1875rem;
 }
 </style>

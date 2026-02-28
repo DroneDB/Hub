@@ -17,9 +17,8 @@
             </div>
             <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
                 {{ truncatedError }}
-                <button v-if="file.canRetry" class="retry-btn" @click="$emit('retry', file)" title="Retry upload">
-                    <i class="fa-solid fa-rotate-right"></i>
-                </button>
+                <Button v-if="file.canRetry" size="small" severity="danger" outlined @click="$emit('retry', file)" title="Retry upload"
+                    icon="fa-solid fa-rotate-right" class="retry-btn" />
             </div>
             <div v-else-if="file.status === 'done'" class="done-label">
                 <i class="fa-solid fa-check"></i> Done
@@ -30,9 +29,13 @@
 
 <script>
 import { bytesToSize } from '../libs/utils';
+import Button from 'primevue/button';
 
 export default {
     name: 'FileUploadRow',
+    components: {
+        Button
+    },
     props: {
         file: {
             type: Object,
@@ -60,9 +63,9 @@ export default {
 .file-upload-row {
     display: flex;
     align-items: center;
-    padding: 8px 12px;
+    padding: 0.5rem 0.75rem;
     border-bottom: 1px solid #eee;
-    height: 48px;
+    height: 3rem;
     box-sizing: border-box;
     transition: background-color 0.2s ease;
 }
@@ -84,45 +87,45 @@ export default {
 }
 
 .file-icon {
-    width: 24px;
+    width: 1.5rem;
     flex-shrink: 0;
     text-align: center;
 }
 
 .file-icon i {
-    font-size: 16px;
+    font-size: 1rem;
 }
 
 .file-info {
     flex: 1;
     min-width: 0;
-    padding: 0 12px;
+    padding: 0 0.75rem;
 }
 
 .file-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 13px;
+    font-size: 0.8125rem;
     color: #333;
 }
 
 .file-size {
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: #888;
-    margin-top: 2px;
+    margin-top: 0.125rem;
 }
 
 .file-progress {
-    width: 180px;
+    width: 11.25rem;
     flex-shrink: 0;
 }
 
 .progress-bar-container {
     position: relative;
-    height: 20px;
+    height: 1.25rem;
     background-color: #e0e0e0;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     overflow: hidden;
 }
 
@@ -137,7 +140,7 @@ export default {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: bold;
     color: #333;
 }
@@ -146,28 +149,16 @@ export default {
     display: flex;
     align-items: center;
     color: #db2828;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 
 .retry-btn {
-    background: none;
-    border: 1px solid #db2828;
-    border-radius: 4px;
-    color: #db2828;
-    cursor: pointer;
-    padding: 2px 6px;
-    margin-left: 8px;
-    font-size: 11px;
-}
-
-.retry-btn:hover {
-    background-color: #db2828;
-    color: white;
+    margin-left: 0.5rem;
 }
 
 .done-label {
     color: #21ba45;
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 500;
 }
 

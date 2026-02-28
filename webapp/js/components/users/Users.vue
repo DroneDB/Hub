@@ -6,7 +6,7 @@
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div v-else>
-            <div class="top-banner" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="top-banner d-flex justify-content-between align-items-center">
                 <div>
                     <h1>User Management</h1>
                 </div>
@@ -25,7 +25,7 @@
                         </IconField>
                     </div>
                     <!-- align right -->
-                    <div class="actions-col" style="display: flex; gap: 8px;">
+                    <div class="actions-col d-flex gap-2">
                         <Button @click="showRoleManagement = true" icon="fa-solid fa-gears" label="Manage Roles" />
                         <Button @click="showOrganizationManagement = true" icon="fa-solid fa-building" label="Manage Organizations" />
                         <Button @click="refreshUsers" icon="fa-solid fa-arrows-rotate" label="Refresh" />
@@ -79,7 +79,7 @@
                         <td>{{ user.email || '-' }}</td>
                         <td>
                             <div v-if="user.roles && user.roles.length > 0">
-                                <Tag v-for="role in user.roles" :key="role" :value="role" severity="info" style="margin: 1px;" />
+                                <Tag v-for="role in user.roles" :key="role" :value="role" severity="info" class="me-1" />
                             </div>
                             <span v-else class="text-muted">No roles</span>
                         </td>
@@ -91,7 +91,7 @@
                         <td>
                             <div v-if="user.storageQuota">
                                 {{ bytesToSize(user.storageUsed) }} / {{ bytesToSize(user.storageQuota) }}
-                                <ProgressBar :value="getStoragePercentage(user)" style="height: 6px; margin-top: 4px;" />
+                                <ProgressBar :value="getStoragePercentage(user)" style="height: 0.375rem;" class="mt-1" />
                             </div>
                             <div v-else>
                                 {{ bytesToSize(user.storageUsed) }} / Unlimited
@@ -99,7 +99,7 @@
                         </td>
                         <td>{{ formatDate(user.createdDate) }}</td>
                         <td class="center aligned">
-                            <div style="display: flex; gap: 4px; justify-content: center;">
+                            <div class="d-flex gap-1 justify-content-center">
                             <Button @click.stop="editUser(user)" severity="info" size="small"
                                 :loading="user.editing" :disabled="user.editing || user.deleting"
                                 title="Edit User" icon="fa-solid fa-pen-to-square" />
@@ -138,7 +138,7 @@
                                 </div>
                                 <div class="footer-right">
                                     Items per page
-                                    <Select v-model="itemsPerPage" :options="itemsPerPageOptions" optionLabel="label" optionValue="value" style="margin-left: 5px; width: 80px;" />
+                                    <Select v-model="itemsPerPage" :options="itemsPerPageOptions" optionLabel="label" optionValue="value" class="ms-1" style="width: 5rem;" />
                                 </div>
                             </div>
                         </th>
@@ -609,29 +609,29 @@ export default {
 
 <style scoped>
 #users {
-    margin: 12px;
-    margin-top: 36px;
+    margin: 0.75rem;
+    margin-top: 2.25rem;
 }
 
 .top-banner {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 .controls-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
     flex-wrap: wrap;
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 .table-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 0.75rem;
     flex-wrap: wrap;
-    margin-top: 12px;
+    margin-top: 0.75rem;
 }
 
 .user-name {
@@ -643,10 +643,6 @@ export default {
     cursor: pointer;
 }
 
-.text-muted {
-    color: #999;
-}
-
 .data-table {
     width: 100%;
     border-collapse: collapse;
@@ -654,7 +650,7 @@ export default {
 
 .data-table th,
 .data-table td {
-    padding: 8px 12px;
+    padding: 0.5rem 0.75rem;
     border: 1px solid #ddd;
     text-align: left;
 }
@@ -674,28 +670,28 @@ export default {
 }
 
 .delete-options .field {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 .radio-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-top: 4px;
+    gap: 0.375rem;
+    margin-top: 0.25rem;
 }
 
 .radio-item {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 0.375rem;
 }
 
 .delete-result-details .detail-section {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 .delete-result-details .detail-section ul {
-    margin: 4px 0;
-    padding-left: 20px;
+    margin: 0.25rem 0;
+    padding-left: 1.25rem;
 }
 </style>

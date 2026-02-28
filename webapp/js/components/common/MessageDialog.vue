@@ -5,7 +5,7 @@
 
         <br />
 
-        <div class="buttons">
+        <div class="text-end mt-3">
             <Button @click="close('close')" severity="secondary" label="Close" />
         </div>
     </Window>
@@ -37,8 +37,4 @@ export default {
 </script>
 
 <style scoped>
-.buttons {
-    margin-top: 16px;
-    text-align: right;
-}
 </style>

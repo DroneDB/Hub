@@ -1,25 +1,23 @@
 <template>
     <Window v-bind:title="title" id="organizationDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
         <div class="org-dialog">
-            <form v-on:submit.prevent class="form">
-                <div class="fields">
-                    <div class="field">
-                        <label>Name</label>
-                        <input type="text" ref="name"
-                            v-on:keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name"
-                            placeholder="Name" />
-                    </div>
+            <form v-on:submit.prevent>
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Name</label>
+                    <InputText ref="name"
+                        @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name"
+                        placeholder="Name" class="w-100" />
                 </div>
-                <div class="field">
-                    <label>Description</label>
-                    <textarea v-model="org.description" placeholder="Description"></textarea>
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Description</label>
+                    <Textarea v-model="org.description" placeholder="Description" rows="3" autoResize class="w-100" />
                 </div>
-                <div class="inline field" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                <div class="d-flex align-items-center gap-2 mt-2">
                     <Checkbox v-model="org.isPublic" :binary="true" inputId="orgPublic" />
-                    <label for="orgPublic" style="margin: 0; cursor: pointer;">Public</label>
+                    <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
                 </div>
             </form>
-            <div class="buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close('close')" label="Close" />
                 <Button v-if="mode == 'new'" @click="close('create')" severity="info" :disabled="!isValid()" label="Create" />
                 <Button v-else @click="close('save')" severity="info" :disabled="!isValid()" label="Save" />
@@ -32,13 +30,15 @@
 import Window from '../Window.vue';
 import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
 import { slugFromName } from '../../libs/registryUtils';
 
 var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window, Button, Checkbox
+        Window, Button, Checkbox, InputText, Textarea
     },
 
     props: ["mode", "model"],
@@ -55,7 +55,7 @@ export default {
         };
     },
     mounted: function () {
-        this.$nextTick(() => this.$refs.name.focus());
+        this.$nextTick(() => this.$refs.name.$el.querySelector('input').focus());
 
         if (this.mode == 'edit') {
 
@@ -110,40 +110,7 @@ export default {
 
 <style scoped>
 .org-dialog {
-    min-width: 320px;
-    padding: 4px;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.form {
-    margin-bottom: 20px;
-}
-
-.field {
-    width: 100%;
-}
-
-.fields .field:first-child {
-    padding-left: 0px;
-}
-
-
-.fields .field:last-child {
-    padding-right: 0px;
-}
-
-.ui.form .fields {
-    margin-left: 0;
-    margin-right: 0;
-}
-
-.content {
-    overflow: hidden;
+    min-width: 20rem;
+    padding: 0.25rem;
 }
 </style>

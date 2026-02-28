@@ -429,7 +429,7 @@ export default {
 
 .thumbnail-container {
     width: 100%;
-    min-height: 200px;
+    min-height: 12.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -438,7 +438,7 @@ export default {
 
 .detail-thumbnail {
     max-width: 100%;
-    max-height: 300px;
+    max-height: 18.75rem;
     object-fit: contain;
 }
 
@@ -449,10 +449,10 @@ export default {
 
 .build-status {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 0.625rem;
+    right: 0.625rem;
     padding: 0.5rem 1rem;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     color: white;
     font-weight: bold;
     display: flex;

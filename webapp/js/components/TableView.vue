@@ -3,14 +3,13 @@
         <ContextMenu :items="contextMenu" />
         <Toolbar :tools="tools" v-if="tools" />
         <div v-if="currentPath">
-            <div class="ui large breadcrumb" style="margin-top: 1rem; margin-bottom: 1rem; margin-left: 1rem">
-                <span v-for="(b, idx) in breadcrumbs" :key="'B,' + b.name">
-                    <a v-if="idx != breadcrumbs.length - 1" class="section" :class="{ home: idx === 0 }"
-                        v-on:click="goTo(b)">{{ b.name }}</a>
-                    <div v-if="idx == breadcrumbs.length - 1" class="section active">{{ b.name }}</div>
-                    <span v-if="idx != breadcrumbs.length - 1" class="divider">/</span>
-                </span>
-            </div>
+            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" style="margin-top: 1rem; margin-bottom: 1rem; margin-left: 1rem">
+                <template #item="{ item }">
+                    <a v-if="item.command" class="bc-link" @click="item.command()">{{ item.label }}</a>
+                    <span v-else class="bc-active">{{ item.label }}</span>
+                </template>
+                <template #separator> / </template>
+            </Breadcrumb>
             <!--<div class="ui divider"></div>-->
         </div>
         <div ref="tableview" id="table-view" :class="{ loading, dropping }"
@@ -103,11 +102,12 @@ import ContextMenu from './ContextMenu';
 import reg from '../libs/sharedRegistry';
 import { Features } from '../libs/features';
 import { isPdfFile } from '../libs/textFileUtils';
+import Breadcrumb from 'primevue/breadcrumb';
 
 export default {
     mixins: [dragDropMixin],
     components: {
-        Toolbar, ContextMenu
+        Toolbar, ContextMenu, Breadcrumb
     },
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
@@ -158,6 +158,23 @@ export default {
             }
 
             return bc;
+        },
+        breadcrumbHome: function () {
+            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
+            const home = this.breadcrumbs[0];
+            return {
+                icon: 'fa-solid fa-home',
+                command: () => this.goTo(home)
+            };
+        },
+        breadcrumbItems: function () {
+            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
+            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
+                if (idx < arr.length - 1) {
+                    return { label: b.name, command: () => this.goTo(b) };
+                }
+                return { label: b.name };
+            });
         },
         sortedFiles: function() {
             const sorted = [...this.files];
@@ -607,15 +624,33 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-}
 
-#table-view-container .breadcrumb {
-    word-break: break-all;
-    overflow: hidden;
-}
+    :deep(.p-breadcrumb) {
+        background: transparent;
+        border: none;
+        padding: 0;
+        font-size: 1rem;
 
-#table-view-container .breadcrumb .section.home {
-    font-family: monospace;
+        .p-breadcrumb-separator {
+            color: #999;
+            margin: 0 0.2em;
+        }
+    }
+
+    .bc-link {
+        color: #4183c4;
+        cursor: pointer;
+        text-decoration: none;
+
+        &:hover {
+            text-decoration: underline;
+        }
+    }
+
+    .bc-active {
+        color: inherit;
+        font-weight: 600;
+    }
 }
 
 #table-view {
@@ -696,6 +731,7 @@ export default {
 
 .ui.table .date-column {
     width: 180px;
+    text-align: right;
 }
 
 .ui.placeholder.segment {

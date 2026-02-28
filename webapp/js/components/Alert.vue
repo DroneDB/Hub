@@ -3,7 +3,7 @@
 
         <slot />
 
-        <div class="buttons">
+        <div class="text-center mt-3">
             <Button label="OK" @click="dismiss('ok')" v-if="buttons.indexOf('ok') !== -1" />
         </div>
     </Window>
@@ -51,8 +51,4 @@ export default {
 </script>
 
 <style scoped>
-.buttons {
-    margin-top: 16px;
-    text-align: center;
-}
 </style>

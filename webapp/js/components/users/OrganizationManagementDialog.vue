@@ -12,16 +12,16 @@
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="list"><i class="fa-solid fa-list" style="margin-right: 6px;"></i>Organizations List</Tab>
-                    <Tab value="create"><i class="fa-solid fa-plus" style="margin-right: 6px;"></i>Create Organization</Tab>
+                    <Tab value="list"><i class="fa-solid fa-list me-1"></i>Organizations List</Tab>
+                    <Tab value="create"><i class="fa-solid fa-plus me-1"></i>Create Organization</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="list">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <div style="flex: 1; max-width: 300px;">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div style="flex: 1; max-width: 18.75rem;">
                                 <IconField>
                                     <InputIcon class="fa-solid fa-magnifying-glass" />
-                                    <InputText v-model="searchQuery" placeholder="Search organizations" style="width: 100%;" />
+                                    <InputText v-model="searchQuery" placeholder="Search organizations" class="w-100" />
                                 </IconField>
                             </div>
                             <Button @click="loadOrganizations" icon="fa-solid fa-arrows-rotate" label="Refresh" />
@@ -61,32 +61,32 @@
                         </div>
                     </TabPanel>
                     <TabPanel value="create">
-                        <form v-on:submit.prevent class="form" v-bind:class="{ error: !!createError }">
-                            <div class="field">
-                                <label>Organization Name <span class="text-red">*</span></label>
+                        <form v-on:submit.prevent v-bind:class="{ error: !!createError }">
+                            <div class="mb-3">
+                                <label class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
                                 <InputText ref="txtOrgName" @keydown="clearCreateError()" @keyup.enter="createOrganization()"
-                                       v-model="newOrgName" placeholder="Enter organization name" class="w-full" />
+                                       v-model="newOrgName" placeholder="Enter organization name" class="w-100" />
                                 <small>Organization names should be descriptive and will be converted to a valid slug</small>
                             </div>
 
-                            <div class="field">
-                                <label>Organization Slug</label>
-                                <InputText :modelValue="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-full" />
+                            <div class="mb-3">
+                                <label class="d-block mb-1 fw-semibold">Organization Slug</label>
+                                <InputText :modelValue="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-100" />
                                 <small>This is automatically generated from the name and cannot be changed later</small>
                             </div>
 
-                            <div class="field">
-                                <label>Description (Optional)</label>
-                                <textarea v-model="newOrgDescription" placeholder="Brief description of the organization"></textarea>
+                            <div class="mb-3">
+                                <label class="d-block mb-1 fw-semibold">Description (Optional)</label>
+                                <Textarea v-model="newOrgDescription" placeholder="Brief description of the organization" rows="3" autoResize class="w-100" />
                             </div>
 
-                            <div class="field" v-if="createError">
+                            <div class="mb-3" v-if="createError">
                                 <PrimeMessage severity="error" :closable="false">
                                     {{ createError }}
                                 </PrimeMessage>
                             </div>
 
-                            <div class="field">
+                            <div class="mb-3">
                                 <Button @click="createOrganization()" :disabled="creating || !newOrgName.trim()"
                                         :loading="creating" severity="info" icon="fa-solid fa-plus" label="Create Organization" />
                             </div>
@@ -95,7 +95,7 @@
                 </TabPanels>
             </Tabs>
 
-            <div class="dialog-buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close()" label="Close" />
             </div>
         </div>
@@ -121,6 +121,7 @@ import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
+import Textarea from 'primevue/textarea';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
@@ -131,7 +132,7 @@ import reg from '../../libs/sharedRegistry';
 export default {
     components: {
         Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
-        InputIcon, IconField, Tabs, TabList, Tab, TabPanels, TabPanel
+        InputIcon, IconField, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
     },
     emits: ['onClose'],
 
@@ -319,34 +320,14 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 400px;
-    padding: 4px;
-}
-
-.dialog-buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.text-red {
-    color: #e74c3c;
-}
-
-textarea {
-    min-height: 60px;
-    resize: vertical;
+    min-width: 25rem;
+    padding: 0.25rem;
 }
 
 code {
     background-color: #f5f5f5;
-    padding: 2px 4px;
-    border-radius: 3px;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.1875rem;
     font-family: monospace;
-}
-
-.w-full {
-    width: 100%;
 }
 </style>

@@ -3,21 +3,33 @@
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
-            <ProgressSpinner style="width: 50px; height: 50px" />
+            <ProgressSpinner style="width: 3.125rem; height: 3.125rem" />
         </div>
         <div v-else>
-            <div class="top-banner" style="display: flex; justify-content: space-between; align-items: center;">
-                <h1>{{ orgName }}</h1>
+            <div class="top-banner d-flex justify-content-between align-items-center">
+                <div class="org-heading">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-sitemap org-icon"></i>
+                        <h1 class="mb-0">{{ orgName }}</h1>
+                        <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text size="small" title="Edit Organization">
+                            <i class="fa-solid fa-wrench"></i>
+                        </Button>
+                        <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" text size="small" title="Manage Members">
+                            <i class="fa-solid fa-users"></i> <span class="ms-1">Members</span>
+                        </Button>
+                    </div>
+                    <p class="text-muted mb-0 mt-1 ms-4 ps-2">{{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</p>
+                </div>
                 <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="info" size="small">
                     <i class="fa-solid fa-plus"></i>&nbsp;Create Dataset
                 </Button>
             </div>
 
             <!-- Dataset Controls -->
-            <div style="margin-bottom: 1rem;">
+            <div class="mb-3">
                 <IconField>
                     <InputIcon class="fa-solid fa-magnifying-glass" />
-                    <InputText v-model="searchQuery" placeholder="Search datasets..." style="width: 100%;" />
+                    <InputText v-model="searchQuery" placeholder="Search datasets..." class="w-100" />
                 </IconField>
             </div>
 
@@ -25,7 +37,7 @@
             <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
                 @row-click="onRowClick" rowHover class="ds-table"
                 :pt="{ bodyRow: { style: 'cursor: pointer' } }">
-                <Column header="" style="width: 60px;">
+                <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
                         <img :src="slotProps.data.thumbUrl" class="ds-thumb-img"
                             :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }" />
@@ -40,11 +52,14 @@
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
                     </template>
                 </Column>
-                <Column field="creationDate" header="Creation Date" :sortable="true">
+                <Column field="creationDate" header="Creation Date" :sortable="true"
+                    :pt="{ bodyCell: { style: 'text-align: right' }, headerCell: { style: 'text-align: right' } }">
                     <template #body="slotProps">{{ formatDate(slotProps.data.creationDate) }}</template>
                 </Column>
-                <Column field="entries" header="Files" :sortable="true" />
-                <Column field="size" header="Size" :sortable="true">
+                <Column field="entries" header="Files" :sortable="true"
+                    :pt="{ bodyCell: { style: 'text-align: right' }, headerCell: { style: 'text-align: right' } }" />
+                <Column field="size" header="Size" :sortable="true"
+                    :pt="{ bodyCell: { style: 'text-align: right' }, headerCell: { style: 'text-align: right' } }">
                     <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
                 </Column>
                 <Column field="visibility" header="Visibility" :sortable="true">
@@ -54,7 +69,7 @@
                         <Tag v-else severity="warn" icon="fa-solid fa-lock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                     </template>
                 </Column>
-                <Column v-if="showActionsColumn" header="Actions" style="text-align: center; width: 120px;">
+                <Column v-if="showActionsColumn" header="Actions" style="text-align: center; width: 7.5rem;">
                     <template #body="slotProps">
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
                             @click.stop="handleEdit(slotProps.data)" severity="secondary" outlined size="small"
@@ -63,11 +78,11 @@
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
                             @click.stop="handleDelete(slotProps.data)" severity="danger" size="small"
                             :loading="slotProps.data.deleting" :disabled="slotProps.data.deleting || slotProps.data.editing"
-                            icon="fa-solid fa-trash" style="margin-left: 4px;" />
+                            icon="fa-solid fa-trash" class="ms-1" />
                     </template>
                 </Column>
                 <template #empty>
-                    <div style="text-align: center; padding: 2rem;">
+                    <div class="text-center p-4">
                         <h3>No datasets found</h3>
                         <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
                     </div>
@@ -75,7 +90,7 @@
             </DataTable>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 0" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; padding: 0.5rem;">
+            <div v-if="totalPages > 0" class="d-flex justify-content-between align-items-center mt-2 p-2">
                 <span>
                     Showing {{ paginatedDatasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
                     {{ Math.min(currentPage * itemsPerPage, filteredDatasets.length) }} of {{ filteredDatasets.length }} datasets
@@ -93,18 +108,28 @@
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs"
             @onClose="handleDatasetClose"></DatasetDialog>
 
+        <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel"
+            @onClose="handleOrgDialogClose"></OrganizationDialog>
+        <OrganizationMembersDialog v-if="membersDialogOpen"
+            :orgSlug="$route.params.org"
+            :isOwner="isOrgOwner"
+            :isAdmin="isAdmin"
+            @onClose="closeMembersDialog">
+        </OrganizationMembersDialog>
+
     </div>
 </template>
 
 <script>
 import Message from '../Message.vue';
-import ddb from 'ddb';
 import { setTitle, bytesToSize } from '../../libs/utils';
 import { renameDataset, datasetName } from '../../libs/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences } from '../../libs/storageUtils';
 import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
 import DatasetDialog from './DatasetDialog.vue';
 import MessageDialog from '../common/MessageDialog.vue';
+import OrganizationDialog from '../organizations/OrganizationDialog.vue';
+import OrganizationMembersDialog from '../organizations/OrganizationMembersDialog.vue';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -114,9 +139,8 @@ import InputIcon from 'primevue/inputicon';
 import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
-
-const { Registry } = ddb;
-const reg = new Registry(window.location.origin);
+import reg from '../../libs/sharedRegistry';
+import { Features } from '../../libs/features';
 
 export default {
     components: {
@@ -124,6 +148,8 @@ export default {
         DeleteDatasetDialog,
         MessageDialog,
         DatasetDialog,
+        OrganizationDialog,
+        OrganizationMembersDialog,
         Button,
         DataTable,
         Column,
@@ -151,6 +177,12 @@ export default {
             dsDialogMode: null,
             dsDialogOpen: false,
 
+            orgEditDialogOpen: false,
+            orgDialogModel: null,
+            membersDialogOpen: false,
+            isOrgOwner: false,
+            isAdmin: false,
+
             orgName: "",
 
             // Sorting - use saved preferences or defaults
@@ -170,7 +202,18 @@ export default {
             this.org = reg.Organization(this.$route.params.org);
             const orgInfo = await this.org.info();
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
+            this.orgInfo = orgInfo;
             setTitle(this.orgName);
+
+            // Check permissions for org management
+            try {
+                const userInfo = await reg.info();
+                this.isAdmin = userInfo?.roles?.includes('admin') || false;
+                this.isOrgOwner = orgInfo.owner === reg.getUsername();
+            } catch (e) {
+                this.isAdmin = false;
+                this.isOrgOwner = false;
+            }
 
             const tmp = await this.org.datasets(); this.datasets = tmp.map(ds => {
                 return {
@@ -209,6 +252,12 @@ export default {
         },
         canDeleteGlobal: function () {
             return !HubOptions.disableDatasetCreation;
+        },
+        canManageOrg: function () {
+            return this.isOrgOwner || this.isAdmin;
+        },
+        memberManagementEnabled: function () {
+            return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         },
         // Check if user can create datasets in this organization
         // User can create if: dataset creation is not disabled AND at least one dataset has canWrite permission
@@ -578,6 +627,54 @@ export default {
         getDatasetThumbUrl(ds) {
             const dsobj = this.org.Dataset(ds.slug);
             return dsobj.datasetThumbUrl(150);
+        },
+
+        // Organization management
+        openOrgDialog() {
+            this.orgDialogModel = {
+                slug: this.$route.params.org,
+                name: this.orgInfo?.name || this.orgName,
+                description: this.orgInfo?.description || '',
+                isPublic: this.orgInfo?.isPublic || false
+            };
+            this.orgEditDialogOpen = true;
+        },
+
+        async handleOrgDialogClose(res, neworg) {
+            this.orgEditDialogOpen = false;
+
+            if (res === 'close' || !neworg) {
+                this.orgDialogModel = null;
+                return;
+            }
+
+            try {
+                const ret = await reg.updateOrganization(
+                    this.$route.params.org,
+                    neworg.name,
+                    neworg.description,
+                    neworg.isPublic
+                );
+                if (ret) {
+                    this.orgName = neworg.name || this.$route.params.org;
+                    this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
+                    setTitle(this.orgName);
+                } else {
+                    this.error = 'Failed to update organization';
+                }
+            } catch (e) {
+                console.error(e);
+                this.error = 'Failed to update organization: ' + e.message;
+            }
+            this.orgDialogModel = null;
+        },
+
+        openMembersDialog() {
+            this.membersDialogOpen = true;
+        },
+
+        closeMembersDialog() {
+            this.membersDialogOpen = false;
         }
     }
 }
@@ -585,25 +682,37 @@ export default {
 
 <style scoped>
 #datasets {
-    margin: 12px;
+    margin: 0.75rem;
     height: 100%;
     overflow-y: auto;
 
     .top-banner {
-        margin-top: 12px;
-        margin-bottom: 24px;
+        margin-top: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .org-heading {
+        .org-icon {
+            font-size: 1.5rem;
+            color: #6c757d;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            line-height: 1.2;
+        }
     }
 
     .filter-controls {
-        margin-bottom: 20px;
+        margin-bottom: 1.25rem;
     }
 
     .ds-thumb-img {
         display: block;
-        width: 54px;
-        height: 40px;
+        width: 3.375rem;
+        height: 2.5rem;
         object-fit: cover;
-        border-radius: 3px;
+        border-radius: 0.1875rem;
     }
 
     .ds-thumb-placeholder {
@@ -618,18 +727,24 @@ export default {
         font-weight: normal;
         color: #888;
         font-size: 0.85em;
-        margin-top: 2px;
-        max-width: 350px;
+        margin-top: 0.125rem;
+        max-width: 21.875rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
 
+    /* Visibility tags: uniform width */
+    :deep(.p-tag) {
+        min-width: 6.5rem;
+        justify-content: center;
+    }
+
     /* Responsive adjustments */
-    @media screen and (max-width: 768px) {
+    @media screen and (max-width: 767.98px) {
         :deep(.p-datatable) {
             td, th {
-                padding: 0.5em;
+                padding: 0.5rem;
             }
         }
     }

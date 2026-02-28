@@ -21,26 +21,30 @@
             <!-- Header con filtri -->
         <div class="upload-header">
             <div class="upload-filters">
-                <button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'">
+                <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'"
+                    text :severity="activeFilter === 'all' ? 'secondary' : 'secondary'">
                     <i class="fa-solid fa-file"></i>
                     <span class="filter-label">All</span>
                     <span class="filter-count">{{ counts.total }}</span>
-                </button>
-                <button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'">
+                </Button>
+                <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'"
+                    text :severity="activeFilter === 'uploading' ? 'info' : 'secondary'">
                     <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading > 0 }"></i>
                     <span class="filter-label">In Progress</span>
                     <span class="filter-count">{{ counts.uploading + counts.pending }}</span>
-                </button>
-                <button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'">
+                </Button>
+                <Button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'"
+                    text :severity="activeFilter === 'done' ? 'success' : 'secondary'">
                     <i class="fa-solid fa-check"></i>
                     <span class="filter-label">Done</span>
                     <span class="filter-count">{{ counts.done }}</span>
-                </button>
-                <button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'">
+                </Button>
+                <Button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'"
+                    text :severity="activeFilter === 'error' ? 'danger' : 'secondary'">
                     <i class="fa-solid fa-xmark"></i>
                     <span class="filter-label">Errors</span>
                     <span class="filter-count">{{ counts.error }}</span>
-                </button>
+                </Button>
             </div>
         </div>
 
@@ -508,35 +512,35 @@ export default {
 #upload-dialog {
     display: flex;
     flex-direction: column;
-    min-width: 500px;
-    max-width: 800px;
-    min-height: 300px;
+    min-width: 31.25rem;
+    max-width: 50rem;
+    min-height: 18.75rem;
     max-height: 80vh;
 }
 
 /* Header */
 .upload-header {
     flex-shrink: 0;
-    padding: 12px 16px;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid #ddd;
     background-color: #f9f9f9;
 }
 
 .upload-filters {
     display: flex;
-    gap: 6px;
+    gap: 0.375rem;
 }
 
 .filter-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
+    gap: 0.375rem;
+    padding: 0.375rem 0.75rem;
     border: 1px solid #ddd;
     background: white;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 0.75rem;
     transition: all 0.2s;
 }
 
@@ -546,11 +550,11 @@ export default {
 
 .filter-btn .filter-count {
     background-color: #e0e0e0;
-    padding: 2px 6px;
-    border-radius: 10px;
-    font-size: 11px;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.625rem;
+    font-size: 0.6875rem;
     font-weight: 600;
-    min-width: 20px;
+    min-width: 1.25rem;
     text-align: center;
 }
 
@@ -630,9 +634,9 @@ export default {
 
 /* Body */
 .upload-body {
-    flex: 0 0 350px; /* Fixed height - doesn't change when filtering */
+    flex: 0 0 21.875rem; /* Fixed height - doesn't change when filtering */
     overflow-y: auto;
-    width: 600px;
+    width: 37.5rem;
 }
 
 .file-list-scroller {
@@ -643,27 +647,27 @@ export default {
 /* Footer */
 .upload-footer {
     flex-shrink: 0;
-    padding: 12px 16px;
+    padding: 0.75rem 1rem;
     border-top: 1px solid #ddd;
     background-color: #f9f9f9;
 }
 
 .total-progress-container {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 .progress-info {
     display: flex;
     justify-content: space-between;
-    font-size: 12px;
+    font-size: 0.75rem;
     color: #666;
-    margin-bottom: 4px;
+    margin-bottom: 0.25rem;
 }
 
 .total-progress-bar {
-    height: 8px;
+    height: 0.5rem;
     background-color: #e0e0e0;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     overflow: hidden;
 }
 
@@ -676,15 +680,15 @@ export default {
 .upload-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 0.75rem;
     justify-content: flex-end;
 }
 
 .upload-result {
     flex: 1;
-    font-size: 14px;
+    font-size: 0.875rem;
     display: flex;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .upload-result.success {
@@ -710,61 +714,61 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 40px 60px;
-    min-width: 400px;
+    padding: 2.5rem 3.75rem;
+    min-width: 25rem;
 }
 
 .selection-content {
     text-align: center;
-    padding: 40px;
+    padding: 2.5rem;
 }
 
 .selection-content .icon.cloud.upload {
     color: #2185d0;
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 }
 
 .selection-content h3 {
-    margin: 0 0 8px 0;
-    font-size: 20px;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
     color: #333;
 }
 
 .selection-content p {
-    margin: 0 0 24px 0;
+    margin: 0 0 1.5rem 0;
     color: #666;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .selection-buttons {
     display: flex;
-    gap: 12px;
+    gap: 0.75rem;
     justify-content: center;
-    margin-bottom: 24px;
+    margin-bottom: 1.5rem;
 }
 
 .selection-cancel {
-    margin-top: 8px;
+    margin-top: 0.5rem;
 }
 
 /* Upload summary */
 .upload-summary {
     background-color: #f8f9fa;
-    border-radius: 6px;
+    border-radius: 0.375rem;
 }
 
 .summary-stats {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 0.75rem;
 }
 
 .summary-stat {
     display: flex;
-    gap: 6px;
-    font-size: 13px;
+    gap: 0.375rem;
+    font-size: 0.8125rem;
 }
 
 .summary-stat .icon {
@@ -782,9 +786,9 @@ export default {
 
 .upload-summary .upload-result {
     text-align: center;
-    padding-top: 12px;
+    padding-top: 0.75rem;
     border-top: 1px solid #e0e0e0;
-    margin-top: 4px;
+    margin-top: 0.25rem;
 }
 </style>
 

@@ -438,7 +438,7 @@ export default {
 <style scoped>
 .file-browser {
     .loading {
-        margin-left: 2px;
+        margin-left: 0.125rem;
     }
 
     user-select: none;
@@ -446,14 +446,17 @@ export default {
 
     height: 100%;
     min-width: 100%;
-    min-height: 100px;
+    min-height: 6.25rem;
+    display: flex;
+    flex-direction: column;
 }
 
 #search-box {
 
-    padding: 8px;
+    padding: 0.5rem;
     border-bottom: 1px solid black;
     display: flex;
+    width: 100%;
 
     .box {
         width: 100%;
@@ -469,13 +472,13 @@ export default {
         cursor: pointer;
         visibility: hidden;
         position: absolute;
-        right: 0px;
+        right: 0;
         top: 0;
         bottom: 0;
-        padding-right: 8px;
+        padding-right: 0.5rem;
         display: flex;
         align-items: center;
-        margin-top: -4px;
+        margin-top: -0.25rem;
 
         .icon {
             margin: 0;
@@ -483,16 +486,16 @@ export default {
     }
 
     #src {
-        margin-left: 8px;
+        margin-left: 0.5rem;
         cursor: pointer;
         display: flex;
         align-items: center;
-        margin-top: -4px;
+        margin-top: -0.25rem;
     }
 
     .no-results {
         text-align: center;
-        padding: 16px;
+        padding: 1rem;
         color: #999;
         font-style: italic;
     }

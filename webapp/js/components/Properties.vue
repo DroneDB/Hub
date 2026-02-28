@@ -92,11 +92,11 @@ export default {
     word-break: break-all;
 
     &.mt {
-        margin-top: 8px;
+        margin-top: 0.5rem;
     }
 
     td:first-child {
-        width: 70px;
+        width: 4.375rem;
     }
 }
 </style>

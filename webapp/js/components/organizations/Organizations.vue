@@ -2,29 +2,35 @@
     <div id="organizations">
         <Toast position="bottom-left" />
 
-        <div class="top-banner" style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>Organizations</h1>
+        <div class="top-banner d-flex justify-content-between align-items-center">
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-sitemap org-icon"></i>
+                    <h1 class="mb-0">Organizations</h1>
+                </div>
+                <p class="text-muted mb-0 mt-1 ms-4 ps-2">Organize your datasets into groups and manage team access.</p>
+            </div>
             <Button v-if="!readyOnly" @click.stop="handleNew()" severity="info" size="small">
                 <i class="fa-solid fa-plus"></i> Create Organization
             </Button>
         </div>
         <div v-if="loading" class="loading">
-            <ProgressSpinner style="width: 50px; height: 50px" />
+            <ProgressSpinner style="width: 3.125rem; height: 3.125rem" />
         </div>
         <div v-else>
             <div v-for="org in organizations" :key="org.slug" class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
-                <Card style="margin-bottom: 0.5rem;">
+                <Card class="mb-2">
                     <template #content>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div style="flex: 1;">
-                                <i class="fa-solid fa-sitemap" style="margin-right: 6px;"></i>
-                                <strong style="font-size: 1.15rem;">{{ org.name ? org.name : org.slug }}</strong>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1">
+                                <i class="fa-solid fa-sitemap me-3"></i>
+                                <strong style="font-size: large;">{{ org.name ? org.name : org.slug }}</strong>
                             </div>
-                            <div style="margin-right: 1rem;">
+                            <div class="me-3">
                                 <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
                                 <Tag v-else severity="warn" icon="fa-solid fa-lock">Private</Tag>
                             </div>
-                            <div class="org-actions" style="display: flex; gap: 4px;">
+                            <div class="org-actions d-flex gap-1">
                                 <Button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
                                     @click.stop="openMembersDialog(org)" severity="info" size="small"
                                     icon="fa-solid fa-users" title="Manage Members" />
@@ -41,7 +47,7 @@
                     </template>
                 </Card>
             </div>
-            <div v-if="organizations.length == 0" style="text-align: center; padding: 2rem;">
+            <div v-if="organizations.length == 0" class="text-center p-4">
                 <h3>No organizations found</h3>
                 <p>You can create a new organization by clicking the create organization button.</p>
             </div>
@@ -329,11 +335,21 @@ export default {
 <style scoped>
 #organizations {
     .top-banner {
-        margin-top: 12px;
-        margin-bottom: 24px;
+        margin-top: 0.75rem;
+        margin-bottom: 1.5rem;
     }
 
-    margin: 12px;
+    .org-icon {
+        font-size: 1.5rem;
+        color: #6c757d;
+    }
+
+    h1 {
+        font-size: 1.75rem;
+        line-height: 1.2;
+    }
+
+    margin: 0.75rem;
 
     .organization {
 
@@ -349,14 +365,14 @@ export default {
         }
 
         i.icon {
-            margin-right: 5px;
+            margin-right: 0.3125rem;
         }
 
         .main-col {
             font-weight: bold;
 
             i.icon {
-                margin-right: 20px;
+                margin-right: 1.25rem;
             }
         }
 
@@ -365,76 +381,6 @@ export default {
             justify-content: space-between;
             align-items: center;
         }
-
     }
-
-    .flex-container {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: nowrap;
-        justify-content: space-between;
-        align-content: stretch;
-        align-items: flex-start;
-    }
-
-    .flex-item:nth-child(1) {
-        order: 0;
-        flex: 1 1 100px;
-        align-self: auto;
-
-        @media screen and (max-width: 576px) {
-            flex-grow: 0;
-            text-align: center;
-
-            i.icon {
-                margin-right: 0;
-            }
-        }
-
-    }
-
-    .flex-item:nth-child(2) {
-        order: 0;
-        flex: 1 1 auto;
-        align-self: auto;
-    }
-
-    .flex-item:nth-child(3) {
-        order: 0;
-        flex: 1 1 auto;
-        align-self: auto;
-
-        @media screen and (max-width: 576px) {
-            display: none;
-        }
-
-    }
-
-    .flex-item:nth-child(4) {
-        order: 0;
-        flex: 0.5 1 auto;
-        align-self: auto;
-
-
-        @media screen and (max-width: 768px) {
-            text-align: center;
-
-            i.icon {
-                margin-right: 0;
-            }
-        }
-
-        @media screen and (max-width: 576px) {
-            display: none;
-        }
-    }
-
-    .flex-item:nth-child(5) {
-        order: 0;
-        flex: 0.5 1 100px;
-        align-self: auto;
-    }
-
-
 }
 </style>

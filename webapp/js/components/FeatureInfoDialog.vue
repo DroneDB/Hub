@@ -17,7 +17,7 @@
             </div>
         </div>
 
-        <div class="buttons">
+        <div class="text-end mt-3">
             <Button @click="close('close')" label="Close" />
         </div>
     </Window>
@@ -180,14 +180,14 @@ export default {
 
 <style scoped>
 .feature-info-content {
-    max-height: 400px;
+    max-height: 25rem;
     overflow-y: auto;
-    padding: 5px;
+    padding: 0.3125rem;
 }
 
 .category-title {
-    margin: 10px 0 5px 0;
-    font-size: 14px;
+    margin: 0.625rem 0 0.3125rem 0;
+    font-size: 0.875rem;
     font-weight: bold;
     color: #333;
 }
@@ -195,11 +195,11 @@ export default {
 .properties-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 15px;
+    margin-bottom: 0.9375rem;
 }
 
 .property-name {
-    padding: 5px;
+    padding: 0.3125rem;
     text-align: left;
     border-bottom: 1px solid #ddd;
     font-weight: bold;
@@ -207,7 +207,7 @@ export default {
 }
 
 .property-value {
-    padding: 5px;
+    padding: 0.3125rem;
     text-align: left;
     border-bottom: 1px solid #ddd;
     word-break: break-word;
@@ -221,11 +221,6 @@ export default {
 }
 
 .property-value :deep(.ui.table td:first-child) {
-    width: 120px;
-}
-
-.buttons {
-    margin-top: 16px;
-    text-align: right;
+    width: 7.5rem;
 }
 </style>

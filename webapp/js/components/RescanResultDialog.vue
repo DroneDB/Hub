@@ -38,7 +38,7 @@
             </div>
         </div>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close" severity="info" label="Close" />
         </div>
     </Window>
@@ -93,15 +93,15 @@ export default {
 
 <style scoped>
 .rescan-results-content {
-    max-height: 400px;
+    max-height: 25rem;
     overflow-y: auto;
 }
 
 .summary {
     display: flex;
-    gap: 16px;
-    padding: 8px 0 12px 0;
-    margin-bottom: 12px;
+    gap: 1rem;
+    padding: 0.5rem 0 0.75rem 0;
+    margin-bottom: 0.75rem;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
     flex-wrap: wrap;
     align-items: center;
@@ -110,18 +110,18 @@ export default {
 .summary-item {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
 }
 
 .result-section {
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 }
 
 .result-section h4 {
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
 }
 
 .file-list {
@@ -131,12 +131,12 @@ export default {
 }
 
 .file-item {
-    padding: 6px 8px;
-    margin: 4px 0;
-    border-radius: 4px;
+    padding: 0.375rem 0.5rem;
+    margin: 0.25rem 0;
+    border-radius: 0.25rem;
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .file-item.success {
@@ -151,7 +151,7 @@ export default {
 .file-item.error > div:first-child {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .file-path {
@@ -162,14 +162,7 @@ export default {
 .error-message {
     font-size: 0.9em;
     color: #db2828;
-    margin-left: 22px;
+    margin-left: 1.375rem;
     font-style: italic;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
 }
 </style>

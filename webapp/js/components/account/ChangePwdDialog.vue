@@ -1,33 +1,33 @@
 <template>
     <Window title="Change Password" id="changePwdDialog" @onClose="close" modal maxWidth="70%" fixedSize>
         <div class="dialog">
-            <form v-on:submit.prevent class="ui form" v-bind:class="{ error: !!error }">
+            <form v-on:submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
                 <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
-                <div class="field">
-                    <label>Old Password</label>
-                    <input ref="oldPwd" v-on:keydown="clearError()" v-on:keyup.enter="changePwd()" type="password"
-                        v-model="oldPwd" placeholder="" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Old Password</label>
+                    <Password ref="oldPwd" @keydown="clearError()" @keyup.enter="changePwd()"
+                        v-model="oldPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
                 </div>
-                <div class="field">
-                    <label>New Password</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="changePwd()" type="password" v-model="newPwd"
-                        placeholder="" @input="onPasswordInput" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">New Password</label>
+                    <Password @keydown="clearError()" @keyup.enter="changePwd()" v-model="newPwd"
+                        :feedback="false" toggleMask @input="onPasswordInput" class="w-100" inputClass="w-100" />
                     <div v-if="passwordPolicy && newPwd" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
                             :class="{ met: isRequirementMet(req) }">
-                            <i :class="isRequirementMet(req) ? 'icon check green' : 'icon close red'" />
+                            <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
                             {{ req }}
                         </small>
                     </div>
                 </div>
-                <div class="field">
-                    <label>Confirm New Password</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="changePwd()" type="password"
-                        v-model="confirmPwd" placeholder="" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
+                    <Password @keydown="clearError()" @keyup.enter="changePwd()"
+                        v-model="confirmPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
                 </div>
             </form>
-            <div class="buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close()" severity="secondary" :disabled="changing" label="Close" />
                 <Button @click="changePwd()" :disabled="changing || !isFilled()" :loading="changing"
                     severity="info" label="Change Password" />
@@ -39,6 +39,7 @@
 <script>
 import Window from '../Window.vue';
 import Button from 'primevue/button';
+import Password from 'primevue/password';
 import Message from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
@@ -46,7 +47,7 @@ import { validatePassword, getPasswordRequirements } from '../../libs/passwordVa
 
 export default {
     components: {
-        Window, Button, Message
+        Window, Button, Password, Message
     },
     props: {
 
@@ -68,7 +69,11 @@ export default {
     },
     mounted: function () {
         this.$nextTick(() => {
-            this.$refs.oldPwd.focus();
+            const el = this.$refs.oldPwd?.$el;
+            if (el) {
+                const input = el.querySelector('input');
+                if (input) input.focus();
+            }
             this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
             this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
         });
@@ -131,24 +136,15 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 320px;
-    padding: 4px;
-}
-
-.buttons {
-    margin-top: 16px;
-    text-align: right;
-}
-
-.form {
-    margin-bottom: 20px;
+    min-width: 20rem;
+    padding: 0.25rem;
 }
 
 .password-requirements {
-    margin-top: 6px;
+    margin-top: 0.375rem;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 0.125rem;
 }
 
 .password-requirements small {

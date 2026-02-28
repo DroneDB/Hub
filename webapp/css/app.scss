@@ -1,5 +1,25 @@
+// ============================================================
+// Global Styles — DroneDB Hub
+// ============================================================
+//
+// CONVENTIONS:
+// - All dimensions in rem (1rem = 16px, never use px except 1px borders)
+// - All spacing via Bootstrap utility classes (m-*, p-*, gap-*)
+//   Steps: 0=0, 1=0.25rem, 2=0.5rem, 3=1rem, 4=1.5rem, 5=3rem
+// - Layout via Bootstrap: d-flex, row/col-*, responsive classes
+// - Colors and typography via PrimeVue Lara theme tokens
+// - Forms via PrimeVue components (InputText, Password, Select, etc.)
+// - Badges via PrimeVue Tag component
+// - No PrimeFlex
+// ============================================================
+
 // PrimeVue theme is imported in main.js
+// Bootstrap grid + utilities are imported in main.js
 // Font Awesome 6 is imported in main.js
+
+html {
+    font-size: 16px;
+}
 
 html, body {
     height: 100%;
@@ -10,8 +30,8 @@ html, body {
 body {
     color: #030A03;
     background: #fefefe;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.875rem;
     line-height: 1.4285;
 }
 
@@ -53,51 +73,9 @@ body {
 }
 
 // ============================================================
-// Form utility classes (replacing Semantic UI forms)
+// Form styles removed — use PrimeVue form components:
+// InputText, Password, Select, Textarea, Checkbox, etc.
 // ============================================================
-.form {
-    .field {
-        margin-bottom: 1em;
-
-        > label {
-            display: block;
-            margin-bottom: 0.28em;
-            font-weight: 600;
-            font-size: 0.92em;
-            color: rgba(0, 0, 0, 0.87);
-        }
-    }
-
-    input[type="text"],
-    input[type="password"],
-    input[type="email"],
-    input[type="number"],
-    textarea,
-    select {
-        width: 100%;
-        padding: 0.67em 1em;
-        font-size: 1em;
-        border: 1px solid rgba(34, 36, 38, 0.15);
-        border-radius: 0.28rem;
-        outline: none;
-        transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        color: rgba(0, 0, 0, 0.87);
-        background: #fff;
-
-        &:focus {
-            border-color: #85b7d9;
-            box-shadow: 0 0 0 0.1em rgba(34, 36, 38, 0.35);
-        }
-    }
-
-    .error input,
-    .error textarea,
-    .error select {
-        border-color: #e0b4b4;
-        background-color: #fff6f6;
-        color: #9f3a38;
-    }
-}
 
 .input-group {
     position: relative;
@@ -118,46 +96,9 @@ body {
 }
 
 // ============================================================
-// Badge (replacing Semantic UI label)
+// Badge styles removed — use PrimeVue Tag component:
+// <Tag severity="warning" value="Owner" />
 // ============================================================
-.badge {
-    display: inline-block;
-    padding: 0.3em 0.6em;
-    font-size: 0.78em;
-    font-weight: 600;
-    line-height: 1;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: baseline;
-    border-radius: 0.28rem;
-    color: rgba(0, 0, 0, 0.6);
-    background-color: #e8e8e8;
-
-    &.bg-warning {
-        color: #fff;
-        background-color: #f2711c;
-    }
-
-    &.bg-secondary {
-        color: #fff;
-        background-color: #767676;
-    }
-
-    &.bg-success {
-        color: #fff;
-        background-color: #21ba45;
-    }
-
-    &.bg-danger {
-        color: #fff;
-        background-color: #db2828;
-    }
-
-    &.bg-primary {
-        color: #fff;
-        background-color: #2185d0;
-    }
-}
 
 // ============================================================
 // Divider (replacing Semantic UI divider)
@@ -179,92 +120,22 @@ body {
 .small { font-size: 0.85em; }
 
 // ============================================================
-// Fluid helper (used alongside btn)
+// Fluid helper — use Bootstrap w-100 instead
 // ============================================================
-.fluid {
-    width: 100%;
-    display: block;
-}
 
 // ============================================================
 // Semantic UI Layout Compatibility
-// Lightweight replacements for Semantic UI grid, segments,
-// tables, pagination, progress bars, labels and utilities.
+// Grid system removed — use Bootstrap row/col-* classes
+// Alignment utilities removed — use Bootstrap text-start/center/end
+// Float utilities removed — use Bootstrap float-start/float-end
 // ============================================================
-
-// --- 16-column Flexbox Grid ---
-.ui.grid {
-    display: flex;
-    flex-wrap: wrap;
-    margin: 0;
-    padding: 0;
-
-    &.middle.aligned {
-        align-items: center;
-    }
-
-    &.equal.width > .column:not(.row) {
-        flex: 1 1 0%;
-    }
-
-    &.three.column > .column {
-        width: 33.333% !important;
-        flex: 0 0 auto;
-    }
-
-    &.two.column > .column {
-        width: 50% !important;
-        flex: 0 0 auto;
-    }
-
-    > .column,
-    > .row > .column {
-        padding: 0.5rem 1rem;
-        box-sizing: border-box;
-
-        &.right.aligned  { text-align: right; }
-        &.left.aligned   { text-align: left; }
-        &.center.aligned { text-align: center; }
-        &.middle.aligned { display: flex; align-items: center; }
-    }
-
-    // Column widths (16-column grid)
-    > .one.wide.column    { width: 6.25%   !important; flex: 0 0 auto; }
-    > .two.wide.column    { width: 12.5%   !important; flex: 0 0 auto; }
-    > .three.wide.column  { width: 18.75%  !important; flex: 0 0 auto; }
-    > .four.wide.column   { width: 25%     !important; flex: 0 0 auto; }
-    > .five.wide.column   { width: 31.25%  !important; flex: 0 0 auto; }
-    > .six.wide.column    { width: 37.5%   !important; flex: 0 0 auto; }
-    > .seven.wide.column  { width: 43.75%  !important; flex: 0 0 auto; }
-    > .eight.wide.column  { width: 50%     !important; flex: 0 0 auto; }
-    > .nine.wide.column   { width: 56.25%  !important; flex: 0 0 auto; }
-    > .ten.wide.column    { width: 62.5%   !important; flex: 0 0 auto; }
-    > .eleven.wide.column { width: 68.75%  !important; flex: 0 0 auto; }
-    > .twelve.wide.column { width: 75%     !important; flex: 0 0 auto; }
-    > .thirteen.wide.column { width: 81.25% !important; flex: 0 0 auto; }
-    > .fourteen.wide.column { width: 87.5%  !important; flex: 0 0 auto; }
-    > .fifteen.wide.column  { width: 93.75% !important; flex: 0 0 auto; }
-    > .sixteen.wide.column  { width: 100%   !important; flex: 0 0 auto; }
-}
-
-// Stackable grid – full-width columns on mobile
-.ui.stackable.grid {
-    @media only screen and (max-width: 767px) {
-        flex-direction: column;
-
-        > .column:not(.row),
-        > .row > .column {
-            width: 100% !important;
-        }
-    }
-}
 
 // --- Segments (grouped card-like containers) ---
 .ui.segments {
     border: 1px solid rgba(34, 36, 38, 0.15);
-    border-radius: 0.28rem;
-    box-shadow: 0 1px 2px 0 rgba(34, 36, 38, 0.15);
-    margin: 1em 0;
+    border-radius: 0.25rem;
+    box-shadow: 0 0.0625rem 0.125rem 0 rgba(34, 36, 38, 0.15);
+    margin: 1rem 0;
     background: #fff;
 
     > .ui.segment {
@@ -284,11 +155,11 @@ body {
 
 // Segment (standalone)
 .ui.segment {
-    padding: 1em;
+    padding: 1rem;
     background: #fff;
     border: 1px solid rgba(34, 36, 38, 0.15);
-    border-radius: 0.28rem;
-    box-shadow: 0 1px 2px 0 rgba(34, 36, 38, 0.15);
+    border-radius: 0.25rem;
+    box-shadow: 0 0.0625rem 0.125rem 0 rgba(34, 36, 38, 0.15);
 }
 
 // --- Table ---
@@ -298,18 +169,18 @@ body {
     background: #fff;
     border: 1px solid rgba(34, 36, 38, 0.15);
     color: rgba(0, 0, 0, 0.87);
-    margin: 1em 0;
+    margin: 1rem 0;
 
     th {
         background: #f9fafb;
-        padding: 0.78em 0.78em;
+        padding: 0.5rem;
         font-weight: 700;
         text-align: left;
         border-bottom: 1px solid rgba(34, 36, 38, 0.15);
     }
 
     td {
-        padding: 0.78em 0.78em;
+        padding: 0.5rem;
         border-top: 1px solid rgba(34, 36, 38, 0.1);
     }
 
@@ -338,25 +209,12 @@ body {
             background: rgba(0, 0, 0, 0.05);
         }
     }
-
-    .center.aligned { text-align: center; }
-    .right.aligned  { text-align: right; }
-    .left.aligned   { text-align: left; }
 }
-
-// --- Alignment utilities ---
-.right.aligned  { text-align: right; }
-.left.aligned   { text-align: left; }
-.center.aligned { text-align: center; }
-
-// --- Float utilities ---
-.left.floated  { float: left; }
-.right.floated { float: right; }
 
 // --- Top banner (heading row) ---
 .top-banner {
-    margin-top: 12px;
-    margin-bottom: 24px;
+    margin-top: 0.75rem;
+    margin-bottom: 1.5rem;
 }
 
 // --- Page-level loading spinner ---
@@ -364,7 +222,7 @@ div.loading {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 200px;
+    min-height: 12.5rem;
     font-size: 2em;
     color: #888;
 }
@@ -425,9 +283,9 @@ body:fullscreen {
     }
 }
 
-/* Responsive breakpoints */
+/* Responsive breakpoints (aligned with Bootstrap) */
 
-@media only screen and (max-width: 767px) {
+@media only screen and (max-width: 575.98px) {
     .mobile-hide {
         display: none !important;
     }
@@ -442,13 +300,13 @@ body:fullscreen {
     }
 }
 
-@media only screen and (min-width: 768px) and (max-width: 991px) {
+@media only screen and (min-width: 576px) and (max-width: 767.98px) {
     .tablet-hide {
         display: none !important;
     }
 }
 
-@media only screen and (min-width: 992px) {
+@media only screen and (min-width: 768px) {
     .desktop-hide {
         display: none !important;
     }

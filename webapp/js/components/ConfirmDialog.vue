@@ -2,7 +2,7 @@
     <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
         <div v-html="message"></div>
 
-        <div v-if="warningMessage" class="warning-message" style="margin-top: 16px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
+        <div v-if="warningMessage" class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 0.25rem; color: #856404;">
             <div class="header" v-if="warningTitle">
                 {{ warningTitle }}
             </div>
@@ -11,7 +11,7 @@
 
         <slot name="extra"></slot>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button :label="cancelText" @click="close('cancel')" severity="secondary" />
             <Button v-if="secondaryText" :label="secondaryText" @click="close('secondary')" :severity="secondaryButtonClass" />
             <Button :label="confirmText" @click="close('confirm')" :severity="confirmButtonClass" />
@@ -93,10 +93,4 @@ export default {
 </script>
 
 <style scoped>
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
 </style>

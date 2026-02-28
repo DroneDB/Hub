@@ -10,9 +10,7 @@
             <div class="settings-section">
                 <h4>
                     <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
-                    Visibility: <select v-model="visibility" @change="setVisibility">
-                        <option v-for="(v, k) in Visibilities" :value="k">{{ v.label }}</option>
-                    </select>
+                    Visibility: <Select v-model="visibility" @change="setVisibility" :options="visibilityOptions" optionLabel="label" optionValue="value" />
                 </h4>
                 <div class="settings-desc" v-html="description"></div>
             </div>
@@ -20,10 +18,7 @@
             <div class="settings-section">
                 <h4>
                     <i class="fa-solid fa-scale-balanced"></i>
-                    License: <select style="text-overflow: ellipsis" :title="Licenses[license].name"
-                        class="license-dropdown" v-model="license" @change="setLicense">
-                        <option v-for="(v, k) in Licenses" :value="k">{{ v.name }}</option>
-                    </select>
+                    License: <Select v-model="license" @change="setLicense" :options="licenseOptions" optionLabel="label" optionValue="value" class="license-dropdown" :title="Licenses[license].name" />
                 </h4>
             </div>
 
@@ -33,9 +28,9 @@
                     Tagline
                 </h4>
                 <div class="tagline-field">
-                    <input type="text" v-model="tagline" maxlength="256"
+                    <InputText v-model="tagline" maxlength="256"
                         placeholder="Brief description of your dataset (max 256 chars)"
-                        @change="setTagline" />
+                        @change="setTagline" fluid />
                     <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
                 </div>
             </div>
@@ -100,6 +95,8 @@ import { clone } from '../libs/utils';
 import { Licenses } from '../libs/licenses';
 import Window from './Window.vue';
 import Button from 'primevue/button';
+import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
 import ddb from 'ddb';
 
 export default {
@@ -115,7 +112,7 @@ export default {
     },
     emits: ['onClose'],
     components: {
-        Message, Window, Button
+        Message, Window, Button, Select, InputText
     },
     data: function () {
         return {
@@ -176,6 +173,18 @@ export default {
             } else {
                 return `Only you and people in your organization can see and download the data.`;
             }
+        },
+        visibilityOptions: function () {
+            return Object.entries(this.Visibilities).map(([k, v]) => ({
+                value: parseInt(k),
+                label: v.label
+            }));
+        },
+        licenseOptions: function () {
+            return Object.entries(this.Licenses).map(([k, v]) => ({
+                value: k,
+                label: v.name
+            }));
         }
     },
     methods: {
@@ -288,22 +297,22 @@ export default {
 
 <style scoped>
 #settings {
-    min-height: 200px;
-    padding: 16px;
-    margin-top: 12px;
+    min-height: 12.5rem;
+    padding: 1rem;
+    margin-top: 0.75rem;
 }
 
 .loading {
     text-align: center;
-    padding: 16px;
+    padding: 1rem;
 }
 
 .settings-body {
-    padding: 4px 8px 0 8px;
+    padding: 0.25rem 0.5rem 0 0.5rem;
 }
 
 .settings-section {
-    padding: 12px 0;
+    padding: 0.75rem 0;
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
 }
 
@@ -314,13 +323,13 @@ export default {
 
 .settings-section .ui.header {
     margin-top: 0;
-    margin-bottom: 6px;
+    margin-bottom: 0.375rem;
 }
 
 .settings-desc {
     font-size: 90%;
-    margin-top: 4px;
-    max-width: 420px;
+    margin-top: 0.25rem;
+    max-width: 26.25rem;
     color: #555;
 }
 
@@ -333,17 +342,17 @@ export default {
 }
 
 .license-dropdown {
-    max-width: 250px;
+    max-width: 15.625rem;
 }
 
 .rescan-info-box {
     display: flex;
-    gap: 8px;
-    padding: 10px 12px;
-    margin-bottom: 12px;
+    gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    margin-bottom: 0.75rem;
     background-color: rgba(33, 133, 208, 0.08);
     border: 1px solid rgba(33, 133, 208, 0.2);
-    border-radius: 4px;
+    border-radius: 0.25rem;
     font-size: 90%;
     color: #444;
     line-height: 1.4;
@@ -352,26 +361,18 @@ export default {
 .rescan-info-box > .icon {
     color: #2185d0;
     flex-shrink: 0;
-    margin-top: 2px;
+    margin-top: 0.125rem;
 }
 
 .tagline-field {
     position: relative;
 }
 
-.tagline-field input {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
 .tagline-field .char-count {
     color: #999;
     float: right;
-    margin-top: 2px;
-    font-size: 12px;
+    margin-top: 0.125rem;
+    font-size: 0.75rem;
 }
 
 .thumbnail-upload {
@@ -385,11 +386,11 @@ export default {
 }
 
 .thumbnail-preview {
-    max-width: 120px;
-    max-height: 80px;
+    max-width: 7.5rem;
+    max-height: 5rem;
     object-fit: contain;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 0.25rem;
 }
 
 .thumbnail-placeholder {

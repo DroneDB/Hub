@@ -2,14 +2,14 @@
     <div id="build-history" class="build-history-page">
         <div class="filters">
             <div class="filter-bar">
-                <div class="fields" style="margin: 0">
-                    <div class="field">
-                        <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value" placeholder="All States" @change="applyFilters" class="w-full" />
+                <div class="d-flex gap-2 align-items-center">
+                    <div class="mb-0">
+                        <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value" placeholder="All States" @change="applyFilters" class="w-100" />
                     </div>
-                    <div class="field">
+                    <div class="mb-0">
                         <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" />
                     </div>
-                    <div class="field">
+                    <div class="mb-0">
                         <Button severity="danger" @click="showClearDialog" :disabled="completedBuildsCount === 0" icon="fa-solid fa-trash" label="Clear Concluded" />
                     </div>
                 </div>
@@ -491,7 +491,7 @@ export default {
 }
 
 .filters {
-    padding: 15px;
+    padding: 0.9375rem;
     background: #f8f8f9;
     flex-shrink: 0;
 }
@@ -510,7 +510,7 @@ export default {
     display: block;
     color: #999;
     font-size: 0.85em;
-    margin-top: 2px;
+    margin-top: 0.125rem;
     word-break: break-all;
 }
 
@@ -522,7 +522,7 @@ export default {
     display: block;
     color: #999;
     font-size: 0.85em;
-    margin-top: 2px;
+    margin-top: 0.125rem;
 }
 
 .duration {
@@ -541,8 +541,8 @@ export default {
 
 .job-details code {
     background: #f8f8f8;
-    padding: 2px 4px;
-    border-radius: 2px;
+    padding: 0.125rem 0.25rem;
+    border-radius: 0.125rem;
     word-break: break-all;
 }
 
@@ -561,12 +561,6 @@ export default {
 
 .filter-bar {
     display: flex;
-    align-items: center;
-}
-
-.filter-bar .fields {
-    display: flex;
-    gap: 8px;
     align-items: center;
 }
 </style>

@@ -5,7 +5,7 @@
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
                 @error="handleImageError" :src="thumbnail"
-                style="padding-right: 8px; padding-left: 8px; max-width: 100%; max-height: 100%;" />
+                style="padding-right: 0.5rem; padding-left: 0.5rem; max-width: 100%; max-height: 100%;" />
 
             <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
             <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
@@ -331,12 +331,12 @@ export default {
 
 <style scoped>
 .thumbnail {
-    margin: 2px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    margin: 0.125rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
     text-align: center;
     word-break: break-all;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     transition: 0.25s background-color ease;
 }
 
@@ -360,14 +360,14 @@ export default {
     justify-content: center;
     position: relative;
     pointer-events: none;
-    margin-bottom: 4px;
+    margin-bottom: 0.25rem;
 }
 
 /* .thumbnail .container.bordered - drop shadow removed */
 
 .thumbnail .container img {
-    padding-right: 8px;
-    padding-left: 8px;
+    padding-right: 0.5rem;
+    padding-left: 0.5rem;
     max-width: 100%;
     max-height: 100%;
 }
@@ -379,10 +379,12 @@ export default {
 .thumbnail .container i.icon-file {
     display: inline-block;
     margin-top: auto;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
 }
 
 .thumbnail .icon.badge {
-    font-size: 11px;
+    font-size: 0.6875rem;
 }
 
 .thumbnail i.icon {
@@ -393,21 +395,21 @@ export default {
     position: absolute;
     top: 63%;
     left: 50%;
-    margin-left: -10px;
+    margin-left: -0.625rem;
 }
 
 /* Build Status Badges */
 .build-badge {
     position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 20px;
-    height: 20px;
+    top: 0.25rem;
+    right: 0.25rem;
+    width: 1.25rem;
+    height: 1.25rem;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 10px;
+    font-size: 0.625rem;
     color: white;
     z-index: 10;
 }
@@ -426,7 +428,7 @@ export default {
 
 .build-badge i.icon {
     margin: 0 !important;
-    font-size: 10px;
+    font-size: 0.625rem;
     width: auto;
     height: auto;
     line-height: 1;

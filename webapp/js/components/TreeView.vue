@@ -1,4 +1,5 @@
-<template>    <div class="tree-view" ref="treeView">
+<template>
+    <div class="tree-view" ref="treeView">
         <TreeNode v-for="(node, index) in nodes" :node="node" :key="node.path + ',' + index" ref="treeNodes" @selected="handleSelection"
             @opened="handleOpen" :getChildren="getChildren" />
     </div>
@@ -100,8 +101,10 @@ export default {
 
 <style scoped>
 .tree-view {
-    padding-bottom: 8px;
-    padding-top: 8px;
+    padding-bottom: 0.5rem;
+    padding-top: 0.5rem;
     user-select: none;
+    overflow-x: scroll;
+    height: 100%;
 }
 </style>

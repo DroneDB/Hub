@@ -4,7 +4,7 @@
         <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close"
             v-model="newFolderPath" :invalid="!newFolderPath" placeholder="Folder name" />
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close('close')" severity="secondary" label="Close" />
             <Button @click="createFolder" :disabled="!newFolderPath" severity="success" label="Create folder" />
         </div>
@@ -51,13 +51,6 @@ export default {
 <style scoped>
 .newFolderInput {
     width: 100%;
-    margin-top: 8px;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    margin-top: 0.5rem;
 }
 </style>

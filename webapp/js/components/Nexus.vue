@@ -326,7 +326,7 @@ export default {
 }
 
 #nexus .ui.message {
-    margin: 8px;
+    margin: 0.5rem;
 }
 
 #nexus .container {
@@ -345,26 +345,26 @@ export default {
 #nexus .loading {
     color: #fefefe;
     font-size: 120%;
-    margin: 8px;
+    margin: 0.5rem;
     text-align: center;
 }
 
 #nexus .loading .circle.notch {
-    height: 20px;
-    width: 22px;
+    height: 1.25rem;
+    width: 1.375rem;
 }
 
 #nexus .btn-settings {
     position: absolute;
-    bottom: 14px;
-    left: 14px;
-    width: 36px;
-    height: 36px;
+    bottom: 0.875rem;
+    left: 0.875rem;
+    width: 2.25rem;
+    height: 2.25rem;
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.65);
     border: 1px solid rgba(255, 255, 255, 0.25);
     color: #fefefe;
-    font-size: 16px;
+    font-size: 1rem;
     cursor: pointer;
     z-index: 100;
     display: flex;
@@ -386,17 +386,17 @@ export default {
 }
 
 #nexus .lighting-content {
-    padding: 4px 0;
+    padding: 0.25rem 0;
 }
 
 #nexus .lighting-content .form-group {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 #nexus .lighting-content .form-group label {
     display: block;
-    margin-bottom: 4px;
-    font-size: 12px;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
     color: #555;
 }
 

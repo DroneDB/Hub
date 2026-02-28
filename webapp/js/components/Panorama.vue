@@ -91,7 +91,7 @@ export default {
 <style>
 #panorama {
     .ui.message {
-        margin: 8px;
+        margin: 0.5rem;
     }
 
     background: #030A03;
@@ -103,12 +103,12 @@ export default {
     .loading {
         color: #fefefe;
         font-size: 120%;
-        margin: 8px;
+        margin: 0.5rem;
         text-align: center;
 
         .circle.notch {
-            height: 20px;
-            width: 22px;
+            height: 1.25rem;
+            width: 1.375rem;
         }
     }
 

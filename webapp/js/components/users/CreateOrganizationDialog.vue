@@ -10,27 +10,27 @@
                 <strong>{{ successMessage }}</strong>
             </PrimeMessage>
 
-            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
-                <div class="field">
-                    <label>Organization Name <span class="text-red">*</span></label>
-                    <input ref="txtOrgName" v-on:keydown="clearError()" v-on:keyup.enter="confirmCreate()"
-                           type="text" v-model="organizationName" placeholder="Enter organization name" />
+            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
+                    <InputText ref="txtOrgName" @keydown="clearError()" @keyup.enter="confirmCreate()"
+                           v-model="organizationName" placeholder="Enter organization name" class="w-100" />
                     <small>Organization names should be descriptive and will be converted to a valid slug</small>
                 </div>
 
-                <div class="field">
-                    <label>Organization Slug</label>
-                    <input type="text" v-model="organizationSlug" :placeholder="suggestedSlug" readonly />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Organization Slug</label>
+                    <InputText :modelValue="organizationSlug" :placeholder="suggestedSlug" readonly class="w-100" />
                     <small>This is automatically generated from the name and cannot be changed later</small>
                 </div>
 
-                <div class="field">
-                    <label>Description (Optional)</label>
-                    <textarea v-model="organizationDescription" placeholder="Brief description of the organization"></textarea>
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Description (Optional)</label>
+                    <Textarea v-model="organizationDescription" placeholder="Brief description of the organization" rows="3" autoResize class="w-100" />
                 </div>
             </form>
 
-            <div class="dialog-buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close()" label="Cancel" />
                 <Button @click="confirmCreate()" :disabled="creating || !organizationName.trim()"
                         :loading="creating" severity="info" icon="fa-solid fa-plus" label="Create Organization" />
@@ -43,12 +43,14 @@
 import Window from '../Window.vue';
 import Message from '../Message.vue';
 import Button from 'primevue/button';
+import InputText from 'primevue/inputtext';
+import Textarea from 'primevue/textarea';
 import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
-        Window, Message, Button, PrimeMessage
+        Window, Message, Button, InputText, Textarea, PrimeMessage
     },
     emits: ['onClose'],
 
@@ -90,7 +92,7 @@ export default {
     methods: {
         focusNameInput() {
             if (this.$refs.txtOrgName) {
-                this.$refs.txtOrgName.focus();
+                this.$refs.txtOrgName.$el.querySelector('input').focus();
             }
         },
 
@@ -140,25 +142,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 320px;
-    padding: 4px;
-}
-
-.dialog-buttons {
-    margin-top: 16px;
-    text-align: right;
-}
-
-.form {
-    margin-bottom: 20px;
-}
-
-.text-red {
-    color: #e74c3c;
-}
-
-textarea {
-    min-height: 60px;
-    resize: vertical;
+    min-width: 20rem;
+    padding: 0.25rem;
 }
 </style>

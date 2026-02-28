@@ -4,11 +4,11 @@
             <Message bindTo="error" noDismiss />
             <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
             <div class="share-type" v-else>
-                <label for="share-mode" style="margin-right: 8px; font-weight: 600;">Share: </label>
-                <Select id="share-mode" v-model="shareMode" :options="shareModeOptions" optionLabel="label" optionValue="value" style="min-width: 120px;" />
+                <label for="share-mode" class="me-2 fw-semibold">Share: </label>
+                <Select id="share-mode" v-model="shareMode" :options="shareModeOptions" optionLabel="label" optionValue="value" style="min-width: 7.5rem;" />
             </div>
 
-            <div v-if="shareMode === 'qgis'" style="margin-top: 12px;">
+            <div v-if="shareMode === 'qgis'" class="mt-3">
                 <template v-if="url !== ''">
                     <div class="ui icon positive message" v-if="!error">
                         <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -43,7 +43,7 @@
                 </template>
             </div>
 
-            <div v-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" style="margin-top: 12px;">
+            <div v-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" class="mt-3">
                 <div v-if="needsAuth">
                     <Button severity="info" @click="handleSetUnlisted" icon="fa-solid fa-unlock" label="Allow access to anyone with the link" />
                 </div>
@@ -53,8 +53,7 @@
                     </PrimeMessage>
                     <template v-else>
                         <template v-if="shareMode === 'embed'">
-                            <textarea readonly :value="url" @click="copyToClipboard" class="share-textarea">
-                            </textarea>
+                            <Textarea readonly :modelValue="url" @click="copyToClipboard" class="share-textarea" />
                         </template>
                         <template v-else>
                             <div class="share-url-row">
@@ -77,6 +76,7 @@ import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
+import Textarea from 'primevue/textarea';
 import copy from 'clipboard-copy';
 import ddb from 'ddb';
 
@@ -85,7 +85,7 @@ import { b64encode } from '../libs/base64';
 
 export default {
     components: {
-        Window, Message, Button, Select, InputText, PrimeMessage
+        Window, Message, Button, Select, InputText, PrimeMessage, Textarea
     },
     props: ["file"],
     emits: ['onClose'],
@@ -184,13 +184,8 @@ export default {
 </script>
 
 <style scoped>
-textarea {
-    width: 100%;
-    height: 100px;
-}
-
 .share-type {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
     display: flex;
     align-items: center;
 }
@@ -200,29 +195,26 @@ label {
 }
 
 .content {
-    min-width: 420px;
+    min-width: 26.25rem;
 }
 
 .auth-note {
-    margin-top: 8px;
+    margin-top: 0.5rem;
 }
 
 .share-url-row {
     display: flex;
     align-items: center;
-    gap: 4px;
-    margin-top: 8px;
+    gap: 0.25rem;
+    margin-top: 0.5rem;
 }
 
 .share-textarea {
     width: 100%;
-    min-height: 80px;
-    padding: 8px;
+    min-height: 5rem;
     font-family: monospace;
     font-size: 0.85em;
-    border: 1px solid rgba(34, 36, 38, 0.15);
-    border-radius: 4px;
-    margin-top: 8px;
+    margin-top: 0.5rem;
     resize: vertical;
 }
 </style>

@@ -25,7 +25,7 @@
                         </div>
                         <div class="info-item" v-if="isAdmin">
                             <label>Role</label>
-                            <p><span class="badge red"><i class="fa-solid fa-shield"></i> Administrator</span></p>
+                            <p><Tag severity="danger"><i class="fa-solid fa-shield"></i> Administrator</Tag></p>
                         </div>
                         <div class="info-item">
                             <label>Organizations</label>
@@ -48,7 +48,7 @@
                         <ProgressBar v-if="storageTotal" :value="storagePercentage" :showValue="true" />
                         <ProgressBar v-else :value="100" :showValue="false" />
                     </div>
-                    <div style="margin-top: 12px;">
+                    <div class="mt-3">
                         <Button @click="handleUpload" severity="success" icon="fa-solid fa-upload" label="Upload Files" />
                     </div>
                 </template>
@@ -93,6 +93,7 @@ import ChangePwdDialog from './ChangePwdDialog.vue';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import ProgressBar from 'primevue/progressbar';
+import Tag from 'primevue/tag';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
 import { bytesToSize } from '../../libs/utils';
@@ -102,7 +103,7 @@ import { xAuthLogout } from '../../libs/xauth';
 
 export default {
     components: {
-        Message, ChangePwdDialog, Button, Card, ProgressBar
+        Message, ChangePwdDialog, Button, Card, ProgressBar, Tag
     },
     data: function () {
         return {
@@ -218,37 +219,37 @@ export default {
 
 <style scoped>
 #account {
-    margin: 12px auto;
-    margin-top: 36px;
-    max-width: 800px;
+    margin: 0.75rem auto;
+    margin-top: 2.25rem;
+    max-width: 50rem;
 }
 
 #account .top-header {
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
 }
 
 #account .account-card {
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 }
 
 #account .account-card h3 {
-    margin: 0 0 16px 0;
+    margin: 0 0 1rem 0;
     color: #333;
 }
 
 #account .account-card h3 i {
-    margin-right: 10px;
+    margin-right: 0.625rem;
 }
 
 .info-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px;
+    gap: 1rem;
 }
 
 .info-grid .info-item {
-    flex: 0 0 calc(50% - 8px);
-    min-width: 200px;
+    flex: 0 0 calc(50% - 0.5rem);
+    min-width: 12.5rem;
 }
 
 .info-item label {
@@ -256,7 +257,7 @@ export default {
     font-weight: bold;
     color: #666;
     font-size: 0.9em;
-    margin-bottom: 4px;
+    margin-bottom: 0.25rem;
 }
 
 .info-item p {
@@ -268,7 +269,7 @@ export default {
 .storage-bar-container .storage-details {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
     font-size: 0.95em;
 }
 
@@ -306,14 +307,14 @@ export default {
 }
 
 .action-row .main i {
-    margin-right: 15px;
+    margin-right: 1rem;
 }
 
 .loading {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 200px;
+    min-height: 12.5rem;
     font-size: 2em;
     color: #888;
 }

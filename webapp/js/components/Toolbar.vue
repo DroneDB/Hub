@@ -136,26 +136,26 @@ export default {
     }
 
     flex-direction: row;
-    padding: 4px;
-    min-height: 34px;
+    padding: 0.25rem;
+    min-height: 2.125rem;
 
     .button {
         padding: 0;
-        width: 26px;
-        height: 26px;
-        padding-left: 4px;
-        padding-right: 4px;
-        border-radius: 4px;
+        width: 1.625rem;
+        height: 1.625rem;
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+        border-radius: 0.25rem;
 
-        @media only screen and (max-width: 767px) {
-            width: 35px;
-            height: 34px;
-            padding-left: 7px;
-            padding-right: 6px;
-            padding-top: 2px;
+        @media only screen and (max-width: 575.98px) {
+            width: 2.1875rem;
+            height: 2.125rem;
+            padding-left: 0.4375rem;
+            padding-right: 0.375rem;
+            padding-top: 0.125rem;
         }
 
-        margin-right: 1px;
+        margin-right: 0.0625rem;
         border: 1px solid transparent;
 
         &.selected {
@@ -177,8 +177,8 @@ export default {
         }
 
         i {
-            padding-top: 3px;
-            padding-left: 0px;
+            padding-top: 0.1875rem;
+            padding-left: 0;
             margin: 0;
         }
 
@@ -195,15 +195,15 @@ export default {
     }
 
     &.large {
-        height: 44px;
+        height: 2.75rem;
 
         .button {
-            width: 36px;
-            height: 36px;
-            padding-left: 2px;
-            padding-right: 2px;
-            padding-top: 2px;
-            padding-bottom: 2px;
+            width: 2.25rem;
+            height: 2.25rem;
+            padding-left: 0.125rem;
+            padding-right: 0.125rem;
+            padding-top: 0.125rem;
+            padding-bottom: 0.125rem;
         }
 
         i {
@@ -217,10 +217,10 @@ export default {
 
     .separator {
         border-left: 1px solid #dddddd;
-        margin-top: 5px;
-        margin-bottom: 3px;
-        margin-left: 6px;
-        margin-right: 6px;
+        margin-top: 0.3125rem;
+        margin-bottom: 0.1875rem;
+        margin-left: 0.375rem;
+        margin-right: 0.375rem;
     }
 
     .spacer {

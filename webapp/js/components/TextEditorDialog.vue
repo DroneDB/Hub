@@ -13,7 +13,7 @@
                     <i class="fa-solid fa-triangle-exclamation" />
                     <p>File is too large to edit ({{ formattedSize }})</p>
                     <p class="limit-info">Maximum size: {{ formattedMaxSize }}</p>
-                    <div class="buttons">
+                    <div class="d-flex justify-content-end gap-2 mt-3">
                         <Button @click="close" severity="secondary" label="Close" />
                         <Button @click="downloadFile" severity="info" icon="fa-solid fa-download" label="Download Instead" />
                     </div>
@@ -353,7 +353,7 @@ export default {
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-height: 400px;
+    min-height: 25rem;
 }
 
 .loading-container,
@@ -362,14 +362,14 @@ export default {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 200px;
+    height: 12.5rem;
     color: #666;
 }
 
 .loading-container i,
 .error-container i {
     font-size: 2em;
-    margin-bottom: 10px;
+    margin-bottom: 0.625rem;
 }
 
 .error-container i {
@@ -385,7 +385,7 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: 0.5rem 0.75rem;
     background: #f9f9f9;
     border-bottom: 1px solid #ddd;
     flex-shrink: 0;
@@ -394,7 +394,7 @@ export default {
 .file-info {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .file-info .filename {
@@ -409,19 +409,19 @@ export default {
 
 .actions {
     display: flex;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .editor-container {
     flex: 1;
     overflow: hidden;
     border: 1px solid #ddd;
-    border-radius: 4px;
-    margin: 8px;
+    border-radius: 0.25rem;
+    margin: 0.5rem;
 }
 
 .unsaved-warning {
-    padding: 8px 12px;
+    padding: 0.5rem 0.75rem;
     background: #fff3cd;
     border-top: 1px solid #ffc107;
     color: #856404;
@@ -430,12 +430,6 @@ export default {
 }
 
 .unsaved-warning i {
-    margin-right: 6px;
-}
-
-.buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 15px;
+    margin-right: 0.375rem;
 }
 </style>

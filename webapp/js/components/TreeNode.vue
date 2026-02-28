@@ -253,7 +253,7 @@ export default {
 <style scoped>
 .tree-node {
     .entry {
-        padding: 2px 4px 2px 4px;
+        padding: 0.125rem 0.25rem 0.125rem 0.25rem;
         display: inline-block;
         white-space: nowrap;
         min-width: 100%;
@@ -276,14 +276,14 @@ export default {
 
     @media only screen and (max-width: 767px) {
         .entry {
-            padding: 4px;
+            padding: 0.25rem;
         }
     }
 
     i {
         display: inline-block;
-        margin-top: 1px;
-        margin-right: 2px;
+        margin-top: 0.0625rem;
+        margin-right: 0.125rem;
         width: 1em;
         text-align: center;
     }
@@ -294,18 +294,18 @@ export default {
 
     .text {
         display: inline-block;
-        margin-left: 4px;
+        margin-left: 0.25rem;
         white-space: nowrap;
         word-break: keep-all;
     }
 
     .circle.notch {
-        margin-left: -5px;
-        margin-top: 2px;
+        margin-left: -0.3125rem;
+        margin-top: 0.125rem;
     }
 
     .children {
-        margin-left: 16px;
+        margin-left: 1rem;
     }
 }
 </style>

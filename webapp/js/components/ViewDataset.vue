@@ -1,7 +1,7 @@
 <template>
     <div id="browser" class="cui app">
         <Message bindTo="error" />
-        <Panel split="vertical" class="container main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
+        <Panel split="vertical" class="main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
             mobileCollapsed>
             <template #first>
             <div class="sidebar">
@@ -167,10 +167,10 @@
         <div v-if="lightboxOpen && lightboxCurrentEntry" class="lightbox-info-overlay">
             <div class="lightbox-info-name">{{ lightboxCurrentEntry.name }}</div>
             <div v-if="lightboxCurrentEntry.coords" class="lightbox-info-coords">
-                <i class="fa-solid fa-location-dot" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.coords }}
+                <i class="fa-solid fa-location-dot me-1"></i>{{ lightboxCurrentEntry.coords }}
             </div>
             <div v-if="lightboxCurrentEntry.altitude !== null" class="lightbox-info-altitude">
-                <i class="fa-solid fa-arrows-up-down" style="margin-right: 4px"></i>{{ lightboxCurrentEntry.altitude }} m
+                <i class="fa-solid fa-arrows-up-down me-1"></i>{{ lightboxCurrentEntry.altitude }} m
             </div>
         </div>
     </div>

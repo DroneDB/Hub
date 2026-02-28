@@ -13,6 +13,6 @@
 <style scoped>
 #notfound {
     text-align: center;
-    padding: 12px;
+    padding: 0.75rem;
 }
 </style>

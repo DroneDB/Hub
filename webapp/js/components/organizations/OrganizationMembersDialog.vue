@@ -1,5 +1,5 @@
 <template>
-    <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal width="700px" fixedSize >
+    <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal width="43.75rem" fixedSize >
         <div class="members-dialog">
             <!-- Loading state -->
             <div v-if="loading" class="ui active centered inline loader"></div>
@@ -20,20 +20,18 @@
                 <!-- Add member section -->
                 <div class="add-member-section" v-if="canManageMembers">
                     <h4>Add Member</h4>
-                    <div class="form">
-                        <div class="fields">
-                            <div class="seven wide field">
-                                <label>User</label>
-                                <Select v-model="newMember.userName" :options="availableUsers" optionLabel="displayName" optionValue="userName" filter placeholder="Search user..." class="w-full" />
-                            </div>
-                            <div class="five wide field">
-                                <label>Permissions</label>
-                                <Select v-model="newMember.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-full" />
-                            </div>
-                            <div class="four wide field">
-                                <label>&nbsp;</label>
-                                <Button severity="info" @click="addMember" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" />
-                            </div>
+                    <div class="d-flex gap-3 flex-wrap align-items-end">
+                        <div style="flex: 7;">
+                            <label class="d-block mb-1 fw-semibold">User</label>
+                            <Select v-model="newMember.userName" :options="availableUsers" optionLabel="displayName" optionValue="userName" filter placeholder="Search user..." class="w-100" />
+                        </div>
+                        <div style="flex: 5;">
+                            <label class="d-block mb-1 fw-semibold">Permissions</label>
+                            <Select v-model="newMember.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                        </div>
+                        <div style="flex: 4;">
+                            <label class="d-block mb-1">&nbsp;</label>
+                            <Button severity="info" @click="addMember" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" />
                         </div>
                     </div>
                 </div>
@@ -86,7 +84,7 @@
             </div>
 
             <!-- Footer -->
-            <div class="buttons">
+            <div class="d-flex justify-content-end gap-2 mt-4">
                 <Button @click="close" label="Close" />
             </div>
         </div>
@@ -271,33 +269,17 @@ export default {
 
 <style scoped>
 .members-dialog {
-    padding: 1em;
-
+    padding: 1rem;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
 }
 
 .add-member-section {
-    margin-bottom: 1em;
-}
-
-.buttons {
-    margin-top: 1.5em;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    margin-bottom: 1rem;
 }
 
 table.ui.celled.table {
-    margin-top: 0.5em;
-}
-
-.ui.selection.dropdown {
-    cursor: pointer !important;
-}
-
-.ui.selection.dropdown .menu > .item {
-    cursor: pointer !important;
+    margin-top: 0.5rem;
 }
 </style>

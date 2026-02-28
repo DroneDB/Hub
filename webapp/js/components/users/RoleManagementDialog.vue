@@ -13,8 +13,8 @@
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="view"><i class="fa-solid fa-eye" style="margin-right: 6px;"></i>View Roles</Tab>
-                    <Tab value="add"><i class="fa-solid fa-plus" style="margin-right: 6px;"></i>Add Role</Tab>
+                    <Tab value="view"><i class="fa-solid fa-eye me-1"></i>View Roles</Tab>
+                    <Tab value="add"><i class="fa-solid fa-plus me-1"></i>Add Role</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="view">
@@ -40,7 +40,7 @@
                                             severity="danger" size="small" :disabled="deletingRole === role"
                                             icon="fa-solid fa-trash"
                                             :label="deletingRole === role ? 'Deleting...' : 'Delete'" />
-                                    <span v-else class="badge bg-secondary">System Role</span>
+                                    <Tag v-else severity="secondary" value="System Role" />
                                 </div>
                             </div>
                         </div>
@@ -87,6 +87,7 @@ import ConfirmDialog from '../ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
+import Tag from 'primevue/tag';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
@@ -96,7 +97,7 @@ import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
-        Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
+        Window, Message, ConfirmDialog, Button, PrimeMessage, InputText, Tag,
         Tabs, TabList, Tab, TabPanels, TabPanel
     },
     props: {
@@ -223,36 +224,36 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 400px;
-    padding: 4px;
+    min-width: 25rem;
+    padding: 0.25rem;
 }
 
 .dialog-buttons {
-    margin-top: 16px;
+    margin-top: 1rem;
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .role-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .role-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 12px;
+    padding: 0.625rem 0.75rem;
     border: 1px solid rgba(34, 36, 38, 0.15);
-    border-radius: 4px;
+    border-radius: 0.25rem;
 }
 
 .role-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.625rem;
 }
 
 .role-name {
@@ -262,10 +263,6 @@ export default {
 .role-description {
     font-size: 0.85em;
     color: rgba(0, 0, 0, 0.5);
-}
-
-.form {
-    margin-bottom: 20px;
 }
 
 .add-role-actions {

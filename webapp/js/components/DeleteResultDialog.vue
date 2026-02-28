@@ -25,7 +25,7 @@
             </div>
         </div>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close" severity="info" label="Close" />
         </div>
     </Window>
@@ -75,19 +75,19 @@ export default {
 
 <style scoped>
 .delete-results-content {
-    max-height: 400px;
+    max-height: 25rem;
     overflow-y: auto;
 }
 
 .result-section {
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 }
 
 .result-section h4 {
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
 }
 
 .file-list {
@@ -97,12 +97,12 @@ export default {
 }
 
 .file-item {
-    padding: 6px 8px;
-    margin: 4px 0;
-    border-radius: 4px;
+    padding: 0.375rem 0.5rem;
+    margin: 0.25rem 0;
+    border-radius: 0.25rem;
     display: flex;
     align-items: flex-start;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .file-item.success {
@@ -117,7 +117,7 @@ export default {
 .file-item.error > div:first-child {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
 }
 
 .file-path {
@@ -128,14 +128,7 @@ export default {
 .error-message {
     font-size: 0.9em;
     color: #db2828;
-    margin-left: 22px;
+    margin-left: 1.375rem;
     font-style: italic;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
 }
 </style>

@@ -54,9 +54,9 @@ export default {
 
     position: absolute;
     z-index: 99999999;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
     border: 1px solid black;
 }
 </style>

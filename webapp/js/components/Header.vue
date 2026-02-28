@@ -183,9 +183,9 @@ export default {
             items.push({ label: this.username + (this.isAdmin && this.username !== 'admin' ? ' — admin' : ''), disabled: true, class: 'user-menu-header' });
             items.push({ separator: true });
 
-            if (this.fileUploads) {
+            if (this.fileUploads)
                 items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up', command: () => this.uploadFiles() });
-            }
+
             items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap', command: () => this.myOrganizations() });
             items.push({ label: 'My Datasets', icon: 'fa-solid fa-database', command: () => this.myDatasets() });
 
@@ -375,24 +375,24 @@ export default {
 <style scoped>
 #header {
     margin: 0;
-    padding: 8px;
+    padding: 0.5rem;
     width: 100%;
-    box-shadow: 0px 2px 4px -2px #000000;
+    box-shadow: 0 0.125rem 0.25rem -0.125rem #000000;
     display: flex;
     align-items: center;
     z-index: 2;
-    gap: 6px;
+    gap: 0.375rem;
 
     .logo {
         display: flex;
         align-items: center;
 
         &>img {
-            height: 33px;
+            height: 2.0625rem;
         }
 
         .app-icon {
-            font-size: 31px;
+            font-size: 1.9375rem;
         }
 
         .app-name {
@@ -403,7 +403,7 @@ export default {
         }
 
         .icon-dronedb {
-            margin-right: 20px;
+            margin-right: 1.25rem;
         }
     }
 
@@ -411,7 +411,7 @@ export default {
         margin-left: auto;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 0.375rem;
     }
 }
 
@@ -421,11 +421,11 @@ export default {
     .storage-percentage {
         font-size: 1.6em;
         font-weight: bold;
-        margin-bottom: 6px;
+        margin-bottom: 0.375rem;
     }
 
     .storage-warning {
-        margin-top: 10px;
+        margin-top: 0.625rem;
         color: #db2828;
         font-weight: bold;
         font-size: 1em;
@@ -436,5 +436,12 @@ export default {
 <style>
 .user-menu-header .p-menuitem-text {
     font-weight: bold !important;
+}
+
+#user_menu .p-menuitem-icon {
+    width: 1.25rem;
+    text-align: center;
+    display: inline-flex;
+    justify-content: center;
 }
 </style>

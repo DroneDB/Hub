@@ -85,27 +85,27 @@ export default {
 
 <style scoped>
 .point-annotation-form {
-    padding: 16px;
-    min-width: 300px;
+    padding: 1rem;
+    min-width: 18.75rem;
 }
 
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: 1rem;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 0.25rem;
     font-weight: 500;
     color: #333;
 }
 
 .form-group textarea {
     width: 100%;
-    padding: 8px;
+    padding: 0.5rem;
     border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 14px;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
     box-sizing: border-box;
     resize: vertical;
 }
@@ -113,14 +113,14 @@ export default {
 .color-palette {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 0.375rem;
     align-items: center;
 }
 
 .color-swatch {
-    width: 28px;
-    height: 28px;
-    border-radius: 4px;
+    width: 1.75rem;
+    height: 1.75rem;
+    border-radius: 0.25rem;
     cursor: pointer;
     border: 2px solid transparent;
     transition: border-color 0.2s, transform 0.1s;
@@ -136,11 +136,11 @@ export default {
 }
 
 .color-picker-custom {
-    width: 28px;
-    height: 28px;
+    width: 1.75rem;
+    height: 1.75rem;
     padding: 0;
     border: 1px solid #ccc;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     cursor: pointer;
     background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
 }
@@ -148,16 +148,16 @@ export default {
 .buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 8px;
-    margin-top: 20px;
-    padding-top: 16px;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+    padding-top: 1rem;
     border-top: 1px solid #eee;
 }
 
 .buttons button {
-    padding: 8px 16px;
-    border-radius: 4px;
-    font-size: 14px;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    font-size: 0.875rem;
     cursor: pointer;
     border: none;
 }

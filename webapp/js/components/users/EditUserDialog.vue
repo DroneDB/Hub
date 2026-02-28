@@ -11,25 +11,25 @@
                 <strong>User updated successfully!</strong>
             </PrimeMessage>
 
-            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
-                <div class="field">
-                    <label>Username</label>
-                    <input type="text" v-model="editUser.userName" disabled />
+            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Username</label>
+                    <InputText v-model="editUser.userName" disabled class="w-100" />
                 </div>
-                <div class="field" :class="{ error: editUser.email && !isEmailValid() }">
-                    <label>Email</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="confirmUpdate()" type="email"
-                           v-model="editUser.email" placeholder="user@example.com" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Email</label>
+                    <InputText @keydown="clearError()" @keyup.enter="confirmUpdate()"
+                           v-model="editUser.email" placeholder="user@example.com" class="w-100" />
                     <div v-if="editUser.email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
-                <div class="field">
-                    <label>Roles</label>
-                    <MultiSelect v-model="editUser.roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-full" display="chip" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Roles</label>
+                    <MultiSelect v-model="editUser.roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
-            <div class="buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close()" :disabled="updating" label="Cancel" />
                 <Button @click="confirmUpdate()" :disabled="updating || !isValid()" :loading="updating"
                     severity="info" label="Update User" />
@@ -42,13 +42,14 @@
 import Window from '../Window.vue';
 import Message from '../Message.vue';
 import MultiSelect from 'primevue/multiselect';
+import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 
 export default {
     components: {
-        Window, Message, MultiSelect, Button, PrimeMessage
+        Window, Message, MultiSelect, InputText, Button, PrimeMessage
     },
     props: {
         user: {
@@ -129,18 +130,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 320px;
-    padding: 4px;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.form {
-    margin-bottom: 20px;
+    min-width: 20rem;
+    padding: 0.25rem;
 }
 </style>

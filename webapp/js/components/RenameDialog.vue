@@ -6,11 +6,11 @@
 
         <!-- Checkbox to also rename the measurements file -->
         <div v-if="hasMeasurementsFile" class="measurements-rename-option">
-            <div class="ui checkbox">
-                <input
-                    type="checkbox"
-                    id="renameMeasurementsCheckbox"
-                    v-model="renameMeasurements">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <Checkbox
+                    v-model="renameMeasurements"
+                    :binary="true"
+                    inputId="renameMeasurementsCheckbox" />
                 <label for="renameMeasurementsCheckbox">
                     Also rename associated measurements file
                 </label>
@@ -21,7 +21,7 @@
             </div>
         </div>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close('close')" severity="secondary" label="Close" />
             <Button @click="rename" :disabled="!renameText" severity="success" label="Rename" />
         </div>
@@ -32,12 +32,13 @@
 import Window from './Window.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
+import Checkbox from 'primevue/checkbox';
 import ddb from 'ddb';
 import { MeasurementStorage } from '../libs/measurementStorage';
 
 export default {
     components: {
-        Window, Button, InputText
+        Window, Button, InputText, Checkbox
     },
 
     props: ["file"],
@@ -168,45 +169,33 @@ export default {
 
 <style scoped>
 .renameInput {
-    margin-top: 8px;
+    margin-top: 0.5rem;
     width: 100%;
 }
 
 .measurements-rename-option {
-    margin-top: 16px;
-    padding: 12px;
+    margin-top: 1rem;
+    padding: 0.75rem;
     background: rgba(33, 133, 208, 0.1);
-    border-radius: 4px;
+    border-radius: 0.25rem;
     border-left: 3px solid #2185d0;
 }
 
-.measurements-rename-option .ui.checkbox {
-    display: block;
-    margin-bottom: 8px;
-}
-
-.measurements-rename-option .ui.checkbox label {
+.measurements-rename-option label {
     color: #2c3e50;
     font-weight: 500;
 }
 
 .measurements-rename-option .hint {
-    font-size: 12px;
+    font-size: 0.75rem;
     color: #7f8c8d;
-    margin-top: 4px;
+    margin-top: 0.25rem;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 0.25rem;
 }
 
 .measurements-rename-option .hint i {
-    font-size: 14px;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    font-size: 0.875rem;
 }
 </style>

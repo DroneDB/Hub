@@ -1,4 +1,8 @@
 
+// Bootstrap grid system and utilities only (no typography/colors - PrimeVue handles those)
+import 'bootstrap/dist/css/bootstrap-grid.min.css';
+import 'bootstrap/dist/css/bootstrap-utilities.min.css';
+
 import '../css/app.scss';
 import '../css/ol-controls.css';
 

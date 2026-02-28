@@ -16,20 +16,17 @@
             <!-- Add organization section -->
             <div class="add-org-section" v-if="!loading">
                 <h4>Add Organization</h4>
-                <div class="form">
-                    <div class="fields">
-                        <div class="seven wide field">
-                            <label>Organization</label>
-                            <Select v-model="newOrg.slug" :options="availableOrganizations" optionLabel="displayName" optionValue="slug" filter placeholder="Search organization..." class="w-full" />
-                        </div>
-                        <div class="five wide field">
-                            <label>Permissions</label>
-                            <Select v-model="newOrg.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-full" />
-                        </div>
-                        <div class="four wide field">
-                            <label>&nbsp;</label>
-                            <Button severity="info" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
-                        </div>
+                <div class="d-flex gap-3 flex-wrap align-items-end">
+                    <div class="flex-grow-1" style="min-width: 12rem;">
+                        <label class="d-block mb-1 fw-semibold">Organization</label>
+                        <Select v-model="newOrg.slug" :options="availableOrganizations" optionLabel="displayName" optionValue="slug" filter placeholder="Search organization..." class="w-100" />
+                    </div>
+                    <div style="min-width: 10rem;">
+                        <label class="d-block mb-1 fw-semibold">Permissions</label>
+                        <Select v-model="newOrg.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                    </div>
+                    <div>
+                        <Button severity="info" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
                     </div>
                 </div>
             </div>
@@ -51,7 +48,7 @@
                     <tr v-for="org in userOrganizations" :key="org.slug">
                         <td>
                             {{ org.name || org.slug }}
-                            <span v-if="org.isOwner" class="badge bg-warning">Owner</span>
+                            <Tag v-if="org.isOwner" severity="warn" value="Owner" class="ms-1" />
                         </td>
                         <td>
                             <Select v-if="!org.isOwner"
@@ -61,7 +58,7 @@
                                     optionValue="value"
                                     @change="updatePermission(org)"
                                     class="w-full" />
-                            <span v-else class="badge">Full Access</span>
+                            <Tag v-else value="Full Access" />
                         </td>
                         <td>
                             <span v-if="org.grantedAt">
@@ -77,7 +74,7 @@
                                     @click="confirmRemoveOrganization(org)"
                                     :disabled="removingOrg === org.slug"
                                     icon="fa-solid fa-trash" label="Remove" />
-                            <span v-else class="badge">Cannot remove</span>
+                            <Tag v-else value="Cannot remove" />
                         </td>
                     </tr>
                 </tbody>
@@ -113,10 +110,11 @@ import Select from 'primevue/select';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Divider from 'primevue/divider';
+import Tag from 'primevue/tag';
 import reg from '../../libs/sharedRegistry';
 
 export default {
-    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider },
+    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider, Tag },
 
     props: {
         user: {
@@ -273,30 +271,22 @@ export default {
 
 <style scoped>
 .organizations-dialog {
-    padding: 1em;
+    padding: 1rem;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
 }
 
 .add-org-section {
-    margin-bottom: 1em;
+    margin-bottom: 1rem;
 }
 
 .buttons {
-    margin-top: 1.5em;
+    margin-top: 1.5rem;
     text-align: right;
 }
 
 table.ui.celled.table {
-    margin-top: 0.5em;
-}
-
-.ui.selection.dropdown {
-    cursor: pointer !important;
-}
-
-.ui.selection.dropdown .menu > .item {
-    cursor: pointer !important;
+    margin-top: 0.5rem;
 }
 </style>

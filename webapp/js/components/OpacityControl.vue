@@ -24,34 +24,34 @@ export default {
 <style scoped>
 .opacity-control {
     position: absolute;
-    bottom: 30px;
+    bottom: 1.875rem;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1;
     display: flex;
-    gap: 6px;
+    gap: 0.375rem;
     background: rgba(0, 0, 0, 0.6);
-    padding: 5px 12px;
-    border-radius: 20px;
+    padding: 0.3125rem 0.75rem;
+    border-radius: 1.25rem;
     color: white;
-    font-size: 12px;
+    font-size: 0.75rem;
     user-select: none;
 }
 
 .opacity-control i {
-    font-size: 14px;
+    font-size: 0.875rem;
     opacity: 0.9;
     margin: 0;
 }
 
 .opacity-control input[type="range"] {
-    width: 120px;
+    width: 7.5rem;
     cursor: pointer;
     accent-color: #4fc3f7;
 }
 
 .opacity-control .opacity-value {
-    min-width: 32px;
+    min-width: 2rem;
     text-align: right;
     font-variant-numeric: tabular-nums;
 }

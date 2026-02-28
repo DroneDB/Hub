@@ -89,11 +89,11 @@ export default {
 
 <style scoped>
 .loading {
-    padding: 12px;
+    padding: 0.75rem;
     text-align: center;
 }
 
 .message.warning {
-    margin: 12px;
+    margin: 0.75rem;
 }
 </style>

@@ -15,25 +15,25 @@
                 Changing password for user: <strong>{{ user.userName }}</strong>
             </PrimeMessage>
 
-            <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
-                <div class="field">
-                    <label>Current Password</label>
-                    <input ref="txtCurrentPassword" v-on:keydown="clearError()" v-on:keyup.enter="confirmChange()"
-                           type="password" v-model="currentPassword" placeholder="Enter current password" />
+            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Current Password</label>
+                    <Password ref="txtCurrentPassword" @keydown="clearError()" @keyup.enter="confirmChange()"
+                           v-model="currentPassword" placeholder="Enter current password" :feedback="false" toggleMask class="w-100" />
                     <small>Leave empty if you don't know the current password (admin override)</small>
                 </div>
-                <div class="field">
-                    <label>New Password</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="confirmChange()"
-                           type="password" v-model="newPassword" placeholder="Enter new password" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">New Password</label>
+                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
+                           v-model="newPassword" placeholder="Enter new password" :feedback="false" toggleMask class="w-100" />
                 </div>
-                <div class="field">
-                    <label>Confirm New Password</label>
-                    <input v-on:keydown="clearError()" v-on:keyup.enter="confirmChange()"
-                           type="password" v-model="confirmPassword" placeholder="Confirm new password" />
+                <div class="mb-3">
+                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
+                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
+                           v-model="confirmPassword" placeholder="Confirm new password" :feedback="false" toggleMask class="w-100" />
                 </div>
             </form>
-            <div class="buttons">
+            <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close()" :disabled="changing" label="Cancel" />
                 <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
                     severity="info" label="Change Password" />
@@ -46,6 +46,7 @@
 import Window from '../Window.vue';
 import Message from '../Message.vue';
 import Button from 'primevue/button';
+import Password from 'primevue/password';
 import PrimeMessage from 'primevue/message';
 import reg from '../../libs/sharedRegistry';
 
@@ -53,7 +54,7 @@ export default {
     // NOTE: This dialog is used by admins to change other users' passwords.
     // Password policy validation is intentionally NOT applied here (admin override).
     components: {
-        Window, Message, Button, PrimeMessage
+        Window, Message, Button, Password, PrimeMessage
     },
     props: {
         user: {
@@ -75,7 +76,7 @@ export default {
         };
     },
     mounted: function () {
-        this.$nextTick(() => this.$refs.txtCurrentPassword.focus());
+        this.$nextTick(() => this.$refs.txtCurrentPassword.$el.querySelector('input').focus());
     },
     methods: {
         close: function () {
@@ -120,18 +121,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 320px;
-    padding: 4px;
-}
-
-.buttons {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-}
-
-.form {
-    margin-bottom: 20px;
+    min-width: 20rem;
+    padding: 0.25rem;
 }
 </style>

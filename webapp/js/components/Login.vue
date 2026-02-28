@@ -18,9 +18,9 @@
                             <IconField>
                                 <InputIcon class="fa-solid fa-key" />
                                 <Password v-model="password" placeholder="Password" :feedback="false"
-                                    toggleMask @keyup.enter="login" fluid inputClass="w-full" />
+                                    toggleMask @keyup.enter="login" fluid inputClass="w-100" />
                             </IconField>
-                            <Button label="Login" :loading="loggingIn" @click="login" severity="info" class="w-full" size="large" />
+                            <Button label="Login" :loading="loggingIn" @click="login" severity="info" class="w-100" size="large" />
                         </div>
                     </template>
                 </Card>
@@ -114,7 +114,7 @@ export default {
 
 <style scoped>
 #login {
-    margin-top: 32px;
+    margin-top: 2rem;
     text-align: center;
     display: flex;
     justify-content: center;

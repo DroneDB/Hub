@@ -21,7 +21,7 @@
             </div>
         </div>
 
-        <div class="buttons">
+        <div class="d-flex justify-content-end gap-2 mt-3">
             <Button @click="close('cancel')" severity="secondary" label="Cancel" />
             <Button @click="close('confirm')" severity="danger" label="Rescan" />
         </div>
@@ -59,19 +59,19 @@ export default {
 
 <style scoped>
 .rescan-confirm-body {
-    padding: 4px 0;
+    padding: 0.25rem 0;
     line-height: 1.5;
 }
 
 .warning-box {
     display: flex;
-    gap: 10px;
+    gap: 0.625rem;
     align-items: center;
-    padding: 12px 14px;
-    margin-bottom: 14px;
+    padding: 0.75rem 0.875rem;
+    margin-bottom: 0.875rem;
     background-color: rgba(251, 189, 8, 0.12);
     border: 1px solid rgba(251, 189, 8, 0.35);
-    border-radius: 4px;
+    border-radius: 0.25rem;
 }
 
 .warning-box > .icon {
@@ -81,26 +81,18 @@ export default {
 }
 
 .side-effects {
-    margin-top: 10px;
-    padding: 10px 14px;
+    margin-top: 0.625rem;
+    padding: 0.625rem 0.875rem;
     background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 4px;
+    border-radius: 0.25rem;
 }
 
 .side-effects ul {
-    margin: 6px 0 0 0;
-    padding-left: 20px;
+    margin: 0.375rem 0 0 0;
+    padding-left: 1.25rem;
 }
 
 .side-effects li {
-    margin-bottom: 4px;
-}
-
-.buttons {
-    margin-top: 18px;
-    text-align: right;
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
+    margin-bottom: 0.25rem;
 }
 </style>

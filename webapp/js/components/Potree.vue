@@ -1488,7 +1488,7 @@ export default {
 <style>
 #potree {
     .ui.message {
-        margin: 8px;
+        margin: 0.5rem;
     }
 
     background: #030A03;
@@ -1500,12 +1500,12 @@ export default {
     .loading {
         color: #fefefe;
         font-size: 120%;
-        margin: 8px;
+        margin: 0.5rem;
         text-align: center;
 
         .circle.notch {
-            height: 20px;
-            width: 22px;
+            height: 1.25rem;
+            width: 1.375rem;
         }
     }
 
@@ -1597,20 +1597,20 @@ export default {
     #potree_map_header {
         position: absolute;
         width: 100%;
-        height: 25px;
-        top: 0px;
+        height: 1.5625rem;
+        top: 0;
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 1000;
-        border-top-left-radius: 3px;
-        border-top-right-radius: 3px;
+        border-top-left-radius: 0.1875rem;
+        border-top-right-radius: 0.1875rem;
     }
 
     #potree_map_content {
         position: absolute;
         z-index: 100;
-        top: 25px;
+        top: 1.5625rem;
         width: 100%;
-        height: calc(100% - 25px);
+        height: calc(100% - 1.5625rem);
         border: 2px solid rgba(0, 0, 0, 0.5);
         box-sizing: border-box;
     }
@@ -1629,10 +1629,10 @@ export default {
             width: 300px;
 
             .pv-menu-list {
-                padding-right: 12px;
+                padding-right: 0.75rem;
 
                 .divider {
-                    padding: 10px 0px 15px 0px;
+                    padding: 0.625rem 0 0.9375rem 0;
                 }
 
                 a {
@@ -1668,21 +1668,21 @@ export default {
     /* Top-left toolbar container */
     .top-left-toolbar {
         position: absolute;
-        top: 10px;
-        left: 10px;
+        top: 0.625rem;
+        left: 0.625rem;
         z-index: 1001;
         display: flex;
-        gap: 8px;
+        gap: 0.5rem;
         align-items: center;
     }
 
     /* Undo/Redo toolbar */
     .undo-redo-toolbar {
         background: rgba(0, 0, 0, 0.7);
-        padding: 6px;
-        border-radius: 5px;
+        padding: 0.375rem;
+        border-radius: 0.3125rem;
         display: flex;
-        gap: 4px;
+        gap: 0.25rem;
         align-items: center;
     }
 
@@ -1690,16 +1690,16 @@ export default {
         background: #555;
         color: white;
         border: none;
-        padding: 8px 10px;
-        border-radius: 4px;
+        padding: 0.5rem 0.625rem;
+        border-radius: 0.25rem;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 16px;
+        font-size: 1rem;
         transition: background 0.2s;
-        min-width: 36px;
-        min-height: 36px;
+        min-width: 2.25rem;
+        min-height: 2.25rem;
     }
 
     .btn-undo-redo:hover:not(:disabled) {
@@ -1714,7 +1714,7 @@ export default {
 
     .btn-undo-redo.btn-delete-tool {
         background: #666;
-        margin-left: 8px;
+        margin-left: 0.5rem;
     }
 
     .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
@@ -1729,14 +1729,14 @@ export default {
     /* Toolbar for measurements */
     .measurements-toolbar {
         position: absolute;
-        top: 60px;
-        left: 10px;
+        top: 3.75rem;
+        left: 0.625rem;
         z-index: 1000;
         background: rgba(0, 0, 0, 0.7);
-        padding: 10px;
-        border-radius: 5px;
+        padding: 0.625rem;
+        border-radius: 0.3125rem;
         display: flex;
-        gap: 10px;
+        gap: 0.625rem;
         align-items: center;
     }
 
@@ -1744,13 +1744,13 @@ export default {
         background: #4a90e2;
         color: white;
         border: none;
-        padding: 8px 16px;
-        border-radius: 4px;
+        padding: 0.5rem 1rem;
+        border-radius: 0.25rem;
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 5px;
-        font-size: 14px;
+        gap: 0.3125rem;
+        font-size: 0.875rem;
         transition: background 0.3s;
     }
 
@@ -1774,13 +1774,13 @@ export default {
     /* Unit selector toolbar */
     .unit-selector-toolbar {
         background: rgba(0, 0, 0, 0.7);
-        padding: 6px 12px;
-        border-radius: 5px;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.3125rem;
         display: flex;
-        gap: 8px;
+        gap: 0.5rem;
         align-items: center;
         color: white;
-        font-size: 14px;
+        font-size: 0.875rem;
     }
 
     .unit-selector-toolbar label {
@@ -1792,10 +1792,10 @@ export default {
         background: #555;
         color: white;
         border: 1px solid #777;
-        padding: 6px 10px;
-        border-radius: 4px;
+        padding: 0.375rem 0.625rem;
+        border-radius: 0.25rem;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 0.875rem;
         outline: none;
     }
 
