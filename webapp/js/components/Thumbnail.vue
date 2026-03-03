@@ -38,6 +38,7 @@ import ddb from 'ddb';
 export default {
     components: {
     },
+    emits: ['clicked', 'open'],
     props: {
         file: {
             type: Object,

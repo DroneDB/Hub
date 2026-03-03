@@ -63,6 +63,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb
     },
+    emits: ['openItem', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         let contextMenu = [];

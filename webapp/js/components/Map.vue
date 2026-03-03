@@ -122,6 +122,7 @@ export default {
     components: {
         Map, Toolbar, olMeasure, OpacityControl, MapDialogs, ChangeUnitsDialog, MapSettingsDialog
     },
+    emits: ['scrollTo', 'openItem'],
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
     inject: {
         registerTabChild: { default: null },

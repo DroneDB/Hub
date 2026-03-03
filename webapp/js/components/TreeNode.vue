@@ -28,6 +28,7 @@ import emitter from '../libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
+    emits: ['opened', 'selected'],
     props: {
         node: {
             type: Object

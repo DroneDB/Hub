@@ -5,7 +5,7 @@
 
         <div ref="map-container" class="map-container">
             <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
-                <option v-for="(v, k) in basemaps" :value="k">
+                <option v-for="(v, k) in basemaps" :key="k" :value="k">
                     {{ v.label }}
                 </option>
             </select>

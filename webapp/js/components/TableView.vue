@@ -109,6 +109,7 @@ export default {
     components: {
         Toolbar, ContextMenu, Breadcrumb
     },
+    emits: ['openItem', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'selectionChanged', 'buildStarted', 'buildError'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         let contextMenu = this.buildContextMenu();

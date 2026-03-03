@@ -14,10 +14,12 @@
                     <div v-if="Object.keys(fileUploadStatus).length === 0">
                         <i class="fa-solid fa-circle-notch fa-spin" />
                     </div>
-                    <div v-if="!inIframe" v-for="f in Object.keys(fileUploadStatus)" class="progress-indicator">
+                    <template v-if="!inIframe">
+                    <div v-for="f in Object.keys(fileUploadStatus)" :key="f" class="progress-indicator">
                         <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :showValue="false" style="height: 0.8em; margin-bottom: 0.3em;" />
                         <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
                     </div>
+                    </template>
                     <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
                         <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
                     </div>

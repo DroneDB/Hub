@@ -43,6 +43,7 @@ export default {
     components: {
         TreeView, ContextMenu, InputText, InputIcon, IconField
     },
+    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged'],
     props: {
         rootNodes: {
             type: Function,

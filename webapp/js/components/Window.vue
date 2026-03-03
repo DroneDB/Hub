@@ -14,6 +14,7 @@ export default {
     components: {
         Dialog
     },
+    emits: ['onClose'],
     props: {
         title: {
             type: String,

@@ -16,6 +16,7 @@ export default {
     components: {
         TreeNode
     },
+    emits: ['opened', 'selectionChanged'],
     props: {
         nodes: {
             type: Array,

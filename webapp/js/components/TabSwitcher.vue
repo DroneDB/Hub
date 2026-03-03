@@ -59,12 +59,11 @@ export default {
             registeredChildren: {},
             dynamicComponents: {},
             dynamicChildRefs: {},
-            tabRefs: {}
+            tabRefs: {},
+            tabMap: {}
         };
     },
     mounted: function () {
-        this.tabMap = {};
-
         // Trigger first onTabActivated on next tick so children have registered
         this.$nextTick(() => {
             const node = this.getNodeFor(this.activeTab);
@@ -184,7 +183,6 @@ export default {
 
                 if (activate) {
                     this.setActiveTab(tab);
-                    this.$forceUpdate();
                 }
 
                 this.tabMap[tab.key] = tab;
