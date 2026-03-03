@@ -4,8 +4,9 @@
   "description": "JS Client Application for Registry",
   "main": "webpack.config.js",
   "scripts": {
+    "dev": "npx webpack --watch",
     "build": "npx webpack",
-    "build:watch": "npx webpack --watch",
+    "build:prod": "cross-env NODE_ENV=production npx webpack",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -64,6 +65,9 @@
     "@babel/plugin-transform-optional-chaining": "^7.27.1",
     "@babel/plugin-transform-private-methods": "^7.27.1",
     "@babel/plugin-transform-private-property-in-object": "^7.27.1",
+    "cross-env": "^10.1.0",
+    "html-webpack-plugin": "^5.6.6",
+    "mini-css-extract-plugin": "^2.10.0",
     "playwright": "^1.58.2",
     "prettier": "2.3.1",
     "webpack-livereload-plugin": "^3.0.2"

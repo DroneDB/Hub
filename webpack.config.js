@@ -1,11 +1,14 @@
 const { VueLoaderPlugin } = require('vue-loader');
-const LiveReloadPlugin = require('webpack-livereload-plugin');
 const CopyPlugin = require('copy-webpack-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const webpack = require('webpack');
 const path = require('path');
 
+const isProduction = process.env.NODE_ENV === 'production';
+
 module.exports = {
-    mode: 'development',
+    mode: isProduction ? 'production' : 'development',
 
     entry: {
         main: path.join(__dirname, './webapp/js/main.js')
@@ -13,11 +16,13 @@ module.exports = {
 
     output: {
         path: path.join(__dirname, './build'),
-        filename: "[name].js",
-        sourceMapFilename: "[name].js.map"
+        filename: isProduction ? "[name].[contenthash:8].js" : "[name].js",
+        sourceMapFilename: "[name].js.map",
+        publicPath: '/',
+        clean: true,
     },
 
-    devtool: "source-map",
+    devtool: isProduction ? false : "source-map",
 
     module: {
         rules: [
@@ -25,14 +30,14 @@ module.exports = {
                 test: /\.vue$/,
                 exclude: /(node_modules|bower_components)/,
                 loader: 'vue-loader'
-            }, {
+            },
+            {
                 test: /\.js$/,
                 include: [
                     path.resolve(__dirname, 'webapp'),
                     path.resolve(__dirname, 'node_modules/ol'),
                     path.resolve(__dirname, 'node_modules/color-parse'),
                     path.resolve(__dirname, 'node_modules/color-rgba'),
-                    path.resolve(__dirname, 'node_modules'),
                     path.resolve(__dirname, 'vendor')
                 ],
                 use: [
@@ -67,7 +72,7 @@ module.exports = {
                 test: /\.s[ac]ss$/i,
                 exclude: /node_modules/,
                 use: [
-                    'vue-style-loader',
+                    isProduction ? MiniCssExtractPlugin.loader : 'vue-style-loader',
                     'css-loader',
                     {
                         loader: 'sass-loader',
@@ -82,7 +87,7 @@ module.exports = {
             {
                 test: /\.css$/i,
                 use: [
-                    'vue-style-loader',
+                    isProduction ? MiniCssExtractPlugin.loader : 'vue-style-loader',
                     'css-loader'
                 ]
             },
@@ -98,22 +103,51 @@ module.exports = {
         ]
     },
 
+    optimization: isProduction ? {
+        splitChunks: {
+            chunks: 'all',
+            cacheGroups: {
+                vendor: {
+                    test: /[\\/]node_modules[\\/]/,
+                    name: 'vendors',
+                    chunks: 'all',
+                },
+                openlayers: {
+                    test: /[\\/]node_modules[\\/]ol[\\/]/,
+                    name: 'openlayers',
+                    chunks: 'all',
+                    priority: 10,
+                },
+            },
+        },
+    } : {},
+
     plugins: [
         new VueLoaderPlugin(),
-        new LiveReloadPlugin(),
+        // LiveReload only in development
+        ...(isProduction ? [] : [new (require('webpack-livereload-plugin'))()]),
         new webpack.DefinePlugin({
             __VUE_OPTIONS_API__: true,
             __VUE_PROD_DEVTOOLS__: false,
-            __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false
+            __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+            __APP_PRODUCTION__: JSON.stringify(isProduction),
         }),
         new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
             resource.request = resource.request.replace(/polyfills\/node\//, `polyfills\/web\/`);
         }),
+        new HtmlWebpackPlugin({
+            template: path.join(__dirname, 'webapp/public/index.html'),
+            inject: 'body',
+        }),
         new CopyPlugin({
             patterns: [
-                { from: 'webapp/public', to: '' }
+                { from: 'webapp/public', to: '', globOptions: { ignore: ['**/index.html'] } }
             ]
-        })
+        }),
+        // CSS extraction for production builds
+        ...(isProduction ? [new MiniCssExtractPlugin({
+            filename: '[name].[contenthash:8].css',
+        })] : []),
     ],
 
     resolve: {
@@ -121,10 +155,11 @@ module.exports = {
             'vue$': 'vue/dist/vue.esm-bundler.js',
             'ddb': path.resolve(__dirname, 'webapp/js/libs/ddb')
         },
-        extensions: ['*', '.js', '.vue', '.json'],
+        extensions: ['.js', '.vue', '.json'],
         fallback: {
             fs: false,
-            path: false
+            path: false,
+            punycode: false
         }
     },
 
