@@ -353,7 +353,10 @@ export default {
             if (!dateString) return '';
             // Parse UTC date and convert to local timezone for display
             const date = new Date(dateString);
-            return date.toLocaleDateString('it-IT') + ' ' + date.toLocaleTimeString('it-IT');
+            return new Intl.DateTimeFormat(undefined, {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }).format(date);
         },
 
         getRelativeTime(dateString) {
