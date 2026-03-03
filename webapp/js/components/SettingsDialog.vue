@@ -12,7 +12,7 @@
                     <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
                     Visibility: <Select v-model="visibility" @change="setVisibility" :options="visibilityOptions" optionLabel="label" optionValue="value" />
                 </h4>
-                <div class="settings-desc" v-html="description"></div>
+                <div class="settings-desc" v-html="safeDescription"></div>
             </div>
 
             <div class="settings-section">
@@ -98,6 +98,7 @@ import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import ddb from 'ddb';
+import { sanitizeHtml } from '../libs/sanitize';
 
 export default {
     props: {
@@ -173,6 +174,9 @@ export default {
             } else {
                 return `Only you and people in your organization can see and download the data.`;
             }
+        },
+        safeDescription: function () {
+            return sanitizeHtml(this.description);
         },
         visibilityOptions: function () {
             return Object.entries(this.Visibilities).map(([k, v]) => ({

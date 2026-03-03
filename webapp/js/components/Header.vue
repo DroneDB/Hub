@@ -184,19 +184,19 @@ export default {
             items.push({ separator: true });
 
             if (this.fileUploads)
-                items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up', command: () => this.uploadFiles() });
+                items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up fixed-icon', command: () => this.uploadFiles() });
 
-            items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap', command: () => this.myOrganizations() });
-            items.push({ label: 'My Datasets', icon: 'fa-solid fa-database', command: () => this.myDatasets() });
+            items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap fixed-icon', command: () => this.myOrganizations() });
+            items.push({ label: 'My Datasets', icon: 'fa-solid fa-database fixed-icon', command: () => this.myDatasets() });
 
             if (this.storageInfo) {
                 items.push({ separator: true });
                 if (this.storageInfo.total != null && this.storageInfo.used > 0) {
-                    items.push({ label: this.percent(this.storageInfo.usedPercentage, 2), icon: 'fa-regular fa-hard-drive', command: () => { this.storageInfoDialogOpen = true; } });
+                    items.push({ label: this.percent(this.storageInfo.usedPercentage, 2), icon: 'fa-regular fa-hard-drive fixed-icon', command: () => { this.storageInfoDialogOpen = true; } });
                 } else if (this.storageInfo.total != null && !this.storageInfo.used) {
-                    items.push({ label: this.bytes(this.storageInfo.total), icon: 'fa-regular fa-hard-drive', command: () => {} });
+                    items.push({ label: this.bytes(this.storageInfo.total), icon: 'fa-regular fa-hard-drive fixed-icon', command: () => {} });
                 } else if (this.storageInfo.total == null) {
-                    items.push({ label: this.bytes(this.storageInfo.used), icon: 'fa-regular fa-hard-drive', command: () => {} });
+                    items.push({ label: this.bytes(this.storageInfo.used), icon: 'fa-regular fa-hard-drive fixed-icon', command: () => {} });
                 }
             }
 
@@ -204,14 +204,14 @@ export default {
                 items.push({ separator: true });
             }
             if (this.accountManagement && this.loggedIn) {
-                items.push({ label: 'My Account', icon: 'fa-solid fa-user', command: () => this.manageAccount() });
+                items.push({ label: 'My Account', icon: 'fa-solid fa-user fixed-icon', command: () => this.manageAccount() });
             }
             if (this.usersManagement && this.isAdmin) {
-                items.push({ label: 'Manage Users', icon: 'fa-solid fa-users', command: () => this.manageUsers() });
+                items.push({ label: 'Manage Users', icon: 'fa-solid fa-users fixed-icon', command: () => this.manageUsers() });
             }
 
             items.push({ separator: true });
-            items.push({ label: 'Logout', icon: 'fa-solid fa-right-from-bracket', command: () => this.logout() });
+            items.push({ label: 'Logout', icon: 'fa-solid fa-right-from-bracket fixed-icon', command: () => this.logout() });
 
             return items;
         }
@@ -443,5 +443,9 @@ export default {
     text-align: center;
     display: inline-flex;
     justify-content: center;
+}
+
+.fixed-icon {
+    width: 1.25rem;
 }
 </style>

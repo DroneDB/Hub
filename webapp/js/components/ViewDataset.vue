@@ -368,20 +368,21 @@ export default {
         BuildManager.on('buildError', this.handleBuildErrorNotification);
         BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
-        emitter.on('openSettings', () => {
+        // Event bus listeners — saved as named refs for cleanup
+        this._onOpenSettings = () => {
             this.showSettings = true;
-        });
+        };
 
-        emitter.on('downloadLimitReached', (msg) => {
+        this._onDownloadLimitReached = (msg) => {
             this.$toast.add({ severity: 'error', summary: 'Download Limit', detail: msg || 'Download limit reached. Please wait for a download to finish before starting a new one.', life: 5000 });
-        });
+        };
 
-        emitter.on('uploadItems', msg => {
+        this._onUploadItems = (msg) => {
             this.filesToUpload = msg.files;
             this.uploadDialogOpen = true;
-        });
+        };
 
-        emitter.on('moveItem', async (sourceItem, destItem) => {
+        this._onMoveItem = async (sourceItem, destItem) => {
 
             if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
                 console.log("Cannot move root");
@@ -410,7 +411,12 @@ export default {
             await this.renameFile(sourceItem, destPath);
             this.isBusy = false;
 
-        });
+        };
+
+        emitter.on('openSettings', this._onOpenSettings);
+        emitter.on('downloadLimitReached', this._onDownloadLimitReached);
+        emitter.on('uploadItems', this._onUploadItems);
+        emitter.on('moveItem', this._onMoveItem);
     },
     beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
@@ -423,6 +429,12 @@ export default {
         BuildManager.off('buildStarted', this.handleBuildStartedNotification);
         BuildManager.off('buildError', this.handleBuildErrorNotification);
         BuildManager.off('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
+
+        // Cleanup event bus listeners
+        emitter.off('openSettings', this._onOpenSettings);
+        emitter.off('downloadLimitReached', this._onDownloadLimitReached);
+        emitter.off('uploadItems', this._onUploadItems);
+        emitter.off('moveItem', this._onMoveItem);
 
         // Cleanup BuildManager
         BuildManager.cleanup();
@@ -1025,6 +1037,9 @@ export default {
     },
     watch: {
         viewMode: function(newMode) {
+            // When viewMode changes, rebuild explorerTools to show the correct icon
+            this.updateExplorerTools();
+
             // When switching to grid view, trigger thumbnail loading
             if (newMode === 'grid') {
                 this.$nextTick(() => {
@@ -1047,11 +1062,6 @@ export default {
             handler: function () {
                 this.updateExplorerTools();
             }
-        },
-
-        viewMode: function(newMode) {
-            // When viewMode changes, rebuild explorerTools to show the correct icon
-            this.updateExplorerTools();
         }
     }
 }

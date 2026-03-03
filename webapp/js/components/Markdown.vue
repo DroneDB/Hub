@@ -25,6 +25,7 @@ import Button from 'primevue/button';
 import TabViewLoader from './TabViewLoader';
 import ddb from 'ddb';
 import MarkdownIt from 'markdown-it';
+import { sanitizeHtml } from '../libs/sanitize';
 
 export default {
     components: {
@@ -70,7 +71,7 @@ export default {
         },
         updateMarkdown: function () {
             const md = new MarkdownIt();
-            this.content = md.render(this.rawContent);
+            this.content = sanitizeHtml(md.render(this.rawContent));
         },
 
         edit: function () {

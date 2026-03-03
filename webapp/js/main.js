@@ -85,7 +85,7 @@ window.addEventListener('load', function () {
 
     // Refresh auth tokens and load features before mounting Vue
     async function boot() {
-        if (reg.isLoggedIn()) {
+        if (reg.ensureLoggedIn()) {
             try {
                 await reg.refreshToken();
                 reg.setAutoRefreshToken();

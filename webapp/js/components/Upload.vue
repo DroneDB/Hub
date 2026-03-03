@@ -85,7 +85,7 @@ export default {
         }
     },
     beforeMount: function () {
-        if (!reg.isLoggedIn()) {
+        if (!reg.ensureLoggedIn()) {
             this.$router.push({ name: "Login" }).catch(() => { });
         }
     },

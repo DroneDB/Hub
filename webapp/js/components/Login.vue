@@ -64,7 +64,7 @@ export default {
         }
     },
     beforeMount: function () {
-        if (reg.isLoggedIn()) {
+        if (reg.ensureLoggedIn()) {
             this.$router.push({ name: "Organizations" });
         } else if (xAuthAvailable()) {
             this.xAuthInProgress = true;

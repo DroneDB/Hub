@@ -1,6 +1,6 @@
 <template>
     <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
-        <div v-html="message"></div>
+        <div v-html="safeMessage"></div>
 
         <div v-if="warningMessage" class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 0.25rem; color: #856404;">
             <div class="header" v-if="warningTitle">
@@ -23,6 +23,7 @@
 import Keyboard from '../libs/keyboard';
 import Window from './Window.vue';
 import Button from 'primevue/button';
+import { sanitizeHtml } from '../libs/sanitize';
 
 export default {
     components: {
@@ -72,6 +73,11 @@ export default {
 
     data: function () {
         return {};
+    },
+    computed: {
+        safeMessage: function () {
+            return sanitizeHtml(this.message);
+        }
     },
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);

@@ -425,8 +425,8 @@ export default {
 
                 this.$toast.add({ severity: 'success', summary: 'Cover Set', detail: 'Dataset cover set successfully', life: 3000 });
 
-                // Refresh entries to show the new file
-                emitter.emit('refreshEntries');
+                // Notify components that new items have been added
+                emitter.emit('addItems');
             } catch (e) {
                 this.showError(e.message || e, 'Set as Dataset Cover');
             } finally {

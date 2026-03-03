@@ -1,11 +1,12 @@
 <template>
     <PrimeMessage v-if="parentRef[bindTo]" :severity="primeSeverity" :closable="!noDismiss" @close="dismiss">
-        <span v-html="parentRef[bindTo]" />
+        <span v-html="safeContent" />
     </PrimeMessage>
 </template>
 
 <script>
 import PrimeMessage from 'primevue/message';
+import { sanitizeHtml } from '../libs/sanitize';
 
 export default {
     components: {
@@ -41,6 +42,9 @@ export default {
                 'info': 'info'
             };
             return map[this.className] || 'warn';
+        },
+        safeContent: function () {
+            return sanitizeHtml(this.parentRef?.[this.bindTo] || '');
         }
     },
     beforeMount: function () {

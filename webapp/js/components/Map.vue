@@ -81,6 +81,7 @@ import Polygon from 'ol/geom/Polygon';
 import { fromExtent } from 'ol/geom/Polygon';
 import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay';
+import { unByKey } from 'ol/Observable';
 
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
@@ -105,6 +106,7 @@ import { MeasurementStorage } from '../libs/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import { getVectorColor } from '../libs/mapUtils';
+import { sanitizeHtml } from '../libs/sanitize';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -273,6 +275,18 @@ export default {
 
         // Clean up event bus listener
         if (this._addItemsHandler) emitter.off('addItems', this._addItemsHandler);
+
+        // Clean up OL map event listeners
+        if (this._olListenerKeys) {
+            this._olListenerKeys.forEach(key => unByKey(key));
+            this._olListenerKeys = [];
+        }
+
+        // Clean up vectorSource listeners
+        if (this._vectorSourceListenerKeys) {
+            this._vectorSourceListenerKeys.forEach(key => unByKey(key));
+            this._vectorSourceListenerKeys = [];
+        }
 
         // Clean up the tooltip overlay
         if (this.tooltipOverlay && this.map) {
@@ -755,7 +769,8 @@ export default {
                 this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
             });
             // Add pointer move handler for tooltips
-            this.map.on('pointermove', (e) => {
+            this._olListenerKeys = [];
+            this._olListenerKeys.push(this.map.on('pointermove', (e) => {
                 if (e.dragging || this.measuring) {
                     this.hideFeatureTooltip();
                     return;
@@ -848,7 +863,7 @@ export default {
                             } else {
                                 label = `${clusterFeatures.length} images`;
                             }
-                            this.tooltipElement.innerHTML = label;
+                            this.tooltipElement.innerHTML = sanitizeHtml(label);
                             this.tooltipElement.style.display = 'block';
                             this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(e.pixel));
                         } else {
@@ -860,9 +875,9 @@ export default {
                 } else {
                     this.hideFeatureTooltip();
                 }
-            });
+            }));
             // Add double-click handler for showing feature properties
-            this.map.on('dblclick', (e) => {
+            this._olListenerKeys.push(this.map.on('dblclick', (e) => {
                 if (this.measuring) return;
 
                 // Check if we clicked on a vector feature
@@ -885,7 +900,7 @@ export default {
                 if (dblClickedFeature) {
                     this.showFeaturePropertiesDialog(dblClickedFeature);
                 }
-            });
+            }));
 
             this.map.addControl(this.selectionControl);
             this.map.addControl(this.measureControls);
@@ -971,7 +986,7 @@ export default {
                 this.updateClearSelectionButton();
             };
 
-            this.map.on('click', e => {
+            this._olListenerKeys.push(this.map.on('click', e => {
                 if (this.measuring) return;
                 if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
 
@@ -1075,17 +1090,17 @@ export default {
                     // Update styles
                     this.fileLayer.changed();
                 }
-            });
+            }));
 
             // Right click
-            this.map.on('contextmenu', e => {
+            this._olListenerKeys.push(this.map.on('contextmenu', e => {
                 // Single selection
                 doSelectSingle(e);
 
                 e.stopPropagation();
                 e.preventDefault();
                 return false;
-            });
+            }));
 
             this._addItemsHandler = () => {
                 this.reloadFileLayers();
@@ -1461,13 +1476,14 @@ export default {
 
                             // Add event listener to zoom to all features when source changes
                             // This helps with requirement #5 - calculate initial map position
-                            vectorSource.on('change', () => {
+                            if (!this._vectorSourceListenerKeys) this._vectorSourceListenerKeys = [];
+                            this._vectorSourceListenerKeys.push(vectorSource.on('change', () => {
                                 // Only trigger if we have features and loading is done
                                 if (vectorSource.getFeatures().length > 0 && vectorSource.getState() === 'ready') {
                                     // Trigger a map extent update to include these features
                                     this.zoomToFilesExtent();
                                 }
-                            });
+                            }));
 
                         } catch (error) {
                             console.error('Error loading vector file:', error);
