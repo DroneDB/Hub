@@ -50,7 +50,7 @@
 
             <!-- Buttons -->
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button @click="close('close')" :disabled="isTransferring" label="Close" />
+                <Button @click="close('close')" severity="secondary" :disabled="isTransferring" label="Close" />
                 <Button @click="transfer" :disabled="!canTransfer" severity="success" icon="fa-solid fa-right-left" label="Transfer" />
             </div>
         </div>

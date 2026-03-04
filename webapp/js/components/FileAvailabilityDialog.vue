@@ -51,7 +51,7 @@
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button v-if="hasAction('close')" @click="handleClose" label="Close" />
+                <Button v-if="hasAction('close')" @click="handleClose" severity="secondary" label="Close" />
                 <Button v-if="hasAction('cancel')" @click="handleClose" label="Cancel" />
                 <Button v-if="hasAction('details')" @click="toggleDetails"
                     :label="showDetails ? 'Hide Details' : 'Show Details'" />

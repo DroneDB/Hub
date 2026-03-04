@@ -7,9 +7,10 @@
         </div>
         <div v-else>
             <div class="top-banner d-flex justify-content-between align-items-center">
-                <div class="org-heading">
+                <div class="org-heading d-flex align-items-center gap-3">
+                    <i class="fa-solid fa-sitemap org-icon"></i>
+                    <div>
                     <div class="d-flex align-items-center gap-2">
-                        <i class="fa-solid fa-sitemap org-icon"></i>
                         <h1 class="mb-0">{{ orgName }}</h1>
                         <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text size="small" title="Edit Organization">
                             <i class="fa-solid fa-wrench"></i>
@@ -18,7 +19,8 @@
                             <i class="fa-solid fa-users"></i> <span class="ms-1">Members</span>
                         </Button>
                     </div>
-                    <p class="text-muted mb-0 mt-1 ms-4 ps-2">{{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</p>
+                    <p class="text-muted mb-0 mt-1">{{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</p>
+                    </div>
                 </div>
                 <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="info" size="small">
                     <i class="fa-solid fa-plus"></i>&nbsp;Create Dataset

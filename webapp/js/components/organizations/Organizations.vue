@@ -3,55 +3,83 @@
         <Toast position="bottom-left" />
 
         <div class="top-banner d-flex justify-content-between align-items-center">
-            <div>
-                <div class="d-flex align-items-center gap-2">
-                    <i class="fa-solid fa-sitemap org-icon"></i>
+            <div class="d-flex align-items-center gap-3">
+                <i class="fa-solid fa-sitemap org-icon"></i>
+                <div>
                     <h1 class="mb-0">Organizations</h1>
+                    <p class="text-muted mb-0 mt-1">Organize your datasets into groups and manage team access.</p>
                 </div>
-                <p class="text-muted mb-0 mt-1 ms-4 ps-2">Organize your datasets into groups and manage team access.</p>
             </div>
             <Button v-if="!readyOnly" @click.stop="handleNew()" severity="info" size="small">
                 <i class="fa-solid fa-plus"></i> Create Organization
             </Button>
         </div>
-        <div v-if="loading" class="loading">
-            <ProgressSpinner style="width: 3.125rem; height: 3.125rem" />
-        </div>
-        <div v-else>
-            <div v-for="org in organizations" :key="org.slug" class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
-                <Card class="mb-2">
-                    <template #content>
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="flex-grow-1">
-                                <i class="fa-solid fa-sitemap me-3"></i>
-                                <strong style="font-size: large;">{{ org.name ? org.name : org.slug }}</strong>
-                            </div>
-                            <div class="me-3">
-                                <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
-                                <Tag v-else severity="warn" icon="fa-solid fa-lock">Private</Tag>
-                            </div>
-                            <div class="org-actions d-flex gap-1">
-                                <Button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
-                                    @click.stop="openMembersDialog(org)" severity="info" size="small"
-                                    icon="fa-solid fa-users" title="Manage Members" />
-                                <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
-                                    @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
-                                    :loading="org.editing" :disabled="org.editing || org.deleting"
-                                    icon="fa-solid fa-pencil" />
-                                <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
-                                    @click.stop="handleDelete(org)" severity="danger" size="small"
-                                    :loading="org.deleting" :disabled="org.deleting || org.editing"
-                                    icon="fa-solid fa-trash" />
-                            </div>
+
+        <!-- Skeleton loading state -->
+        <div v-if="loading">
+            <Card v-for="i in 4" :key="i" class="mb-3">
+                <template #content>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="flex-grow-1 d-flex align-items-center">
+                            <Skeleton shape="circle" size="1.5rem" class="me-3" />
+                            <Skeleton width="12rem" height="1.25rem" />
                         </div>
-                    </template>
-                </Card>
-            </div>
-            <div v-if="organizations.length == 0" class="text-center p-4">
-                <h3>No organizations found</h3>
-                <p>You can create a new organization by clicking the create organization button.</p>
-            </div>
+                        <div class="me-3">
+                            <Skeleton width="4.5rem" height="1.5rem" borderRadius="1rem" />
+                        </div>
+                        <div class="d-flex gap-1">
+                            <Skeleton width="2rem" height="2rem" />
+                            <Skeleton width="2rem" height="2rem" />
+                        </div>
+                    </div>
+                </template>
+            </Card>
         </div>
+
+        <!-- Data loaded -->
+        <div v-else>
+            <DataView :value="organizations" :paginator="organizations.length > 10" :rows="10" layout="list">
+                <template #list="slotProps">
+                    <div v-for="(org, index) in slotProps.items" :key="org.slug"
+                         class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
+                        <Card>
+                            <template #content>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="flex-grow-1">
+                                        <i class="fa-solid fa-sitemap me-3"></i>
+                                        <strong style="font-size: large;">{{ org.name ? org.name : org.slug }}</strong>
+                                    </div>
+                                    <div class="me-3">
+                                        <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
+                                        <Tag v-else severity="warn" icon="fa-solid fa-lock">Private</Tag>
+                                    </div>
+                                    <div class="org-actions d-flex gap-1">
+                                        <Button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
+                                            @click.stop="openMembersDialog(org)" severity="info" size="small"
+                                            icon="fa-solid fa-users" title="Manage Members" />
+                                        <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                            @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
+                                            :loading="org.editing" :disabled="org.editing || org.deleting"
+                                            icon="fa-solid fa-pencil" />
+                                        <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                            @click.stop="handleDelete(org)" severity="danger" size="small"
+                                            :loading="org.deleting" :disabled="org.deleting || org.editing"
+                                            icon="fa-solid fa-trash" />
+                                    </div>
+                                </div>
+                            </template>
+                        </Card>
+                    </div>
+                </template>
+                <template #empty>
+                    <div class="text-center p-4">
+                        <h3>No organizations found</h3>
+                        <p>You can create a new organization by clicking the create organization button.</p>
+                    </div>
+                </template>
+            </DataView>
+        </div>
+
         <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug">
         </DeleteOrganizationDialog>
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
@@ -80,7 +108,8 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Toast from 'primevue/toast';
-import ProgressSpinner from 'primevue/progressspinner';
+import DataView from 'primevue/dataview';
+import Skeleton from 'primevue/skeleton';
 
 export default {
     components: {
@@ -93,7 +122,8 @@ export default {
         Card,
         Tag,
         Toast,
-        ProgressSpinner
+        DataView,
+        Skeleton
     },
 
     data: function () {
@@ -334,6 +364,11 @@ export default {
 
 <style scoped>
 #organizations {
+
+    .org-card {
+        margin-bottom: 1rem;
+    }
+
     .top-banner {
         margin-top: 0.75rem;
         margin-bottom: 1.5rem;

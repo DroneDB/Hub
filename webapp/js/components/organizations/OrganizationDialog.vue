@@ -18,8 +18,8 @@
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button @click="close('close')" label="Close" />
-                <Button v-if="mode == 'new'" @click="close('create')" severity="info" :disabled="!isValid()" label="Create" />
+                <Button @click="close('close')" severity="secondary" label="Close" />
+                <Button v-if="mode == 'new'" @click="close('create')" severity="success" :disabled="!isValid()" label="Create" />
                 <Button v-else @click="close('save')" severity="info" :disabled="!isValid()" label="Save" />
             </div>
         </div>

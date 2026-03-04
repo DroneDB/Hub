@@ -18,7 +18,7 @@
         </div>
 
         <div class="text-end mt-3">
-            <Button @click="close('close')" label="Close" />
+            <Button @click="close('close')" severity="secondary" label="Close" />
         </div>
     </Window>
 </template>

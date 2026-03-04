@@ -43,7 +43,7 @@
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button @click="close()" :disabled="adding" label="Close" />
+                <Button @click="close()" severity="secondary" :disabled="adding" label="Close" />
                 <Button @click="confirmAddUser()" :disabled="adding || !isFilled()" :loading="adding"
                     severity="info" label="Add User" />
             </div>

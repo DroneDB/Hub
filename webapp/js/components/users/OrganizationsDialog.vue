@@ -88,7 +88,7 @@
 
             <!-- Footer -->
             <div class="buttons">
-                <Button @click="close" label="Close" />
+                <Button @click="close" severity="secondary" label="Close" />
             </div>
         </div>
 

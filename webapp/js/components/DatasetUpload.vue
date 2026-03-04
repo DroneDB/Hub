@@ -105,7 +105,7 @@
                 <template v-if="done">
                     <Button v-if="counts.error > 0" severity="warn" @click="retryAllFailed"
                         icon="fa-solid fa-rotate-right" :label="'Retry Failed (' + counts.error + ')'" />
-                    <Button severity="info" @click="finishUpload" icon="fa-solid fa-check" label="Close" />
+                    <Button severity="secondary" @click="finishUpload" icon="fa-solid fa-check" label="Close" />
                 </template>
             </div>
         </div>

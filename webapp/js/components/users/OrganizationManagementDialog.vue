@@ -96,7 +96,7 @@
             </Tabs>
 
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button @click="close()" label="Close" />
+                <Button @click="close()" severity="secondary" label="Close" />
             </div>
         </div>
 

@@ -17,7 +17,24 @@
         </div>
 
         <div class="content">
-            <div v-if="loading" class="ui active centered inline loader"></div>
+            <!-- Skeleton loading state -->
+            <DataTable v-if="loading" :value="skeletonRows" stripedRows>
+                <Column header="State" style="width: auto;">
+                    <template #body><Skeleton width="2rem" height="1.5rem" /></template>
+                </Column>
+                <Column header="File Path" style="width: 35%;">
+                    <template #body><Skeleton width="80%" /><Skeleton width="60%" height="0.75rem" class="mt-1" /></template>
+                </Column>
+                <Column header="Started" style="width: 20%;">
+                    <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
+                </Column>
+                <Column header="Duration" style="width: 15%;">
+                    <template #body><Skeleton width="3rem" /></template>
+                </Column>
+                <Column header="Job Details" style="width: 15%;">
+                    <template #body><Skeleton width="90%" height="0.75rem" /></template>
+                </Column>
+            </DataTable>
 
             <div v-else-if="filteredBuilds.length === 0">
                 <PrimeMessage severity="info" :closable="false">
@@ -26,93 +43,76 @@
                 </PrimeMessage>
             </div>
 
-            <table v-else class="ui celled striped table">
-                <thead>
-                    <tr>
-                        <th class="sortable" @click="sort('currentState')" style="width: 15%;">
-                            State
-                            <i v-if="sortBy === 'currentState'"
-                               :class="sortDesc ? 'fa-solid fa-sort-down' : 'fa-solid fa-sort-up'"></i>
-                        </th>
-                        <th class="sortable" @click="sort('path')" style="width: 35%;">
-                            File Path
-                            <i v-if="sortBy === 'path'"
-                               :class="sortDesc ? 'fa-solid fa-sort-down' : 'fa-solid fa-sort-up'"></i>
-                        </th>
-
-                        <th class="sortable" @click="sort('createdAt')" style="width: 20%;">
-                            Started
-                            <i v-if="sortBy === 'createdAt'"
-                               :class="sortDesc ? 'fa-solid fa-sort-down' : 'fa-solid fa-sort-up'"></i>
-                        </th>
-                        <th style="width: 15%;">Duration</th>
-                        <th style="width: 15%;">Job Details</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="build in paginatedBuilds" :key="build.jobId">
-                        <td>
-                            <Tag :severity="getTagSeverity(build.currentState)" :pt="{ root: { title: build.currentState } }">
-                                <i :class="getStateIcon(build.currentState)" style="font-size: 1.1em;"></i>
-                            </Tag>
-                            <div v-if="canRetryBuild(build)" style="margin-top: 5px;">
-                                <Button size="small" @click="retryBuild(build)"
-                                        :disabled="retryingBuilds[build.jobId]" style="font-size: 10px;"
-                                        icon="fa-solid fa-rotate-right" label="Retry" />
+            <DataTable v-else :value="filteredBuilds" stripedRows rowHover paginator :rows="pageSize"
+                sortField="createdAt" :sortOrder="-1" :pt="{ table: { style: 'min-width: 50rem' } }">
+                <Column field="currentState" header="State" :sortable="true" style="width: auto;">
+                    <template #body="slotProps">
+                        <Tag :severity="getTagSeverity(slotProps.data.currentState)" :pt="{ root: { title: slotProps.data.currentState } }">
+                            <i :class="getStateIcon(slotProps.data.currentState)" style="font-size: 1.1em;"></i>
+                        </Tag>
+                        <div v-if="canRetryBuild(slotProps.data)" style="margin-top: 5px;">
+                            <Button size="small" @click="retryBuild(slotProps.data)"
+                                    :disabled="retryingBuilds[slotProps.data.jobId]" style="font-size: 10px;"
+                                    icon="fa-solid fa-rotate-right" label="Retry" />
+                        </div>
+                    </template>
+                </Column>
+                <Column field="path" header="File Path" :sortable="true" style="width: 35%;">
+                    <template #body="slotProps">
+                        <div class="build-path" :title="slotProps.data.path">
+                            <strong>{{ getFileName(slotProps.data.path) }}</strong>
+                            <br>
+                            <small class="path-details">{{ getFilePath(slotProps.data.path) }}</small>
+                        </div>
+                    </template>
+                </Column>
+                <Column field="createdAt" header="Started" :sortable="true" style="width: 20%;">
+                    <template #body="slotProps">
+                        <div class="date-time">
+                            <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
+                            <small class="relative-time">{{ getRelativeTime(slotProps.data.createdAt) }}</small>
+                        </div>
+                    </template>
+                </Column>
+                <Column header="Duration" style="width: 15%;">
+                    <template #body="slotProps">
+                        <div v-if="getBuildDuration(slotProps.data)" class="duration-info">
+                            <div class="duration">{{ getBuildDuration(slotProps.data) }}</div>
+                            <small class="muted">Build Time</small>
+                        </div>
+                        <div v-if="getQueueTime(slotProps.data)" class="duration-info" style="margin-top: 5px;">
+                            <div class="duration">{{ getQueueTime(slotProps.data) }}</div>
+                            <small class="muted">Queue Time</small>
+                        </div>
+                        <div v-if="!getBuildDuration(slotProps.data) && !getQueueTime(slotProps.data)" class="muted">-</div>
+                    </template>
+                </Column>
+                <Column header="Job Details" style="width: 15%;">
+                    <template #body="slotProps">
+                        <div class="job-details">
+                            <small>
+                                <strong>ID: </strong>
+                                <code style="font-size: 10px;">{{ slotProps.data.jobId }}</code>
+                            </small>
+                            <div v-if="slotProps.data.processingAt" style="margin-top: 3px;">
+                                <small class="muted">Processing: {{ formatDateTime(slotProps.data.processingAt) }}</small>
                             </div>
-                        </td>
-                        <td>
-                            <div class="build-path" :title="build.path">
-                                <strong>{{ getFileName(build.path) }}</strong>
-                                <br>
-                                <small class="path-details">{{ getFilePath(build.path) }}</small>
-                            </div>
-                        </td>
-
-                        <td>
-                            <div class="date-time">
-                                <div>{{ formatDateTime(build.createdAt) }}</div>
-                                <small class="relative-time">{{ getRelativeTime(build.createdAt) }}</small>
-                            </div>
-                        </td>
-                        <td>
-                            <div v-if="getBuildDuration(build)" class="duration-info">
-                                <div class="duration">{{ getBuildDuration(build) }}</div>
-                                <small class="muted">Build Time</small>
-                            </div>
-                            <div v-if="getQueueTime(build)" class="duration-info" style="margin-top: 5px;">
-                                <div class="duration">{{ getQueueTime(build) }}</div>
-                                <small class="muted">Queue Time</small>
-                            </div>
-                            <div v-if="!getBuildDuration(build) && !getQueueTime(build)" class="muted">-</div>
-                        </td>
-                        <td>
-                            <div class="job-details">
-                                <small>
-                                    <strong>Job ID: </strong>
-                                    <code style="font-size: 10px;">{{ build.jobId }}</code>
+                            <div v-if="slotProps.data.succeededAt || slotProps.data.failedAt" style="margin-top: 3px;">
+                                <small class="muted">
+                                    {{ slotProps.data.succeededAt ? 'Completed' : 'Failed' }}:
+                                    {{ formatDateTime(slotProps.data.succeededAt || slotProps.data.failedAt) }}
                                 </small>
-                                <div v-if="build.processingAt" style="margin-top: 3px;">
-                                    <small class="muted">Processing: {{ formatDateTime(build.processingAt) }}</small>
-                                </div>
-                                <div v-if="build.succeededAt || build.failedAt" style="margin-top: 3px;">
-                                    <small class="muted">
-                                        {{ build.succeededAt ? 'Completed' : 'Failed' }}:
-                                        {{ formatDateTime(build.succeededAt || build.failedAt) }}
-                                    </small>
-                                </div>
                             </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <!-- Pagination -->
-            <Paginator v-if="filteredBuilds.length > pageSize"
-                :rows="pageSize"
-                :totalRecords="filteredBuilds.length"
-                :first="(currentPage - 1) * pageSize"
-                @page="onPageChange" />
+                        </div>
+                    </template>
+                </Column>
+                <template #empty>
+                    <div class="text-center p-4">
+                        <strong>No builds found</strong>
+                        <p>No build history available for this dataset.</p>
+                    </div>
+                </template>
+            </DataTable>
         </div>
 
         <ConfirmDialog v-if="clearDialogOpen"
@@ -135,11 +135,13 @@ import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
 import Tag from 'primevue/tag';
-import Paginator from 'primevue/paginator';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Skeleton from 'primevue/skeleton';
 
 export default {
     components: {
-        ConfirmDialog, Button, PrimeMessage, Select, Tag, Paginator
+        ConfirmDialog, Button, PrimeMessage, Select, Tag, DataTable, Column, Skeleton
     },
 
     props: {
@@ -155,12 +157,10 @@ export default {
             filteredBuilds: [],
             loading: false,
             selectedState: '',
-            sortBy: 'createdAt',
-            sortDesc: true,
-            currentPage: 1,
             pageSize: 20,
             retryingBuilds: {},
             clearDialogOpen: false,
+            skeletonRows: Array.from({ length: 8 }, (_, i) => ({ id: i })),
             stateOptions: [
                 { label: 'All States', value: '' },
                 { label: 'Succeeded', value: 'Succeeded' },
@@ -174,31 +174,6 @@ export default {
     },
 
     computed: {
-        paginatedBuilds() {
-            const start = (this.currentPage - 1) * this.pageSize;
-            const end = start + this.pageSize;
-            return this.filteredBuilds.slice(start, end);
-        },
-
-        totalPages() {
-            return Math.ceil(this.filteredBuilds.length / this.pageSize);
-        },
-
-        displayedPages() {
-            const current = this.currentPage;
-            const total = this.totalPages;
-            const delta = 2;
-
-            let start = Math.max(1, current - delta);
-            let end = Math.min(total, current + delta);
-
-            const pages = [];
-            for (let i = start; i <= end; i++) {
-                pages.push(i);
-            }
-            return pages;
-        },
-
         completedBuildsCount() {
             return this.builds.filter(build =>
                 build.currentState === 'Succeeded' || build.currentState === 'Failed'
@@ -246,43 +221,7 @@ export default {
                 filtered = filtered.filter(build => build.currentState === this.selectedState);
             }
 
-            // Sort
-            filtered.sort((a, b) => {
-                let aVal = a[this.sortBy];
-                let bVal = b[this.sortBy];
-
-                if (this.sortBy === 'createdAt' || this.sortBy.includes('At')) {
-                    aVal = new Date(aVal);
-                    bVal = new Date(bVal);
-                }
-
-                if (aVal < bVal) return this.sortDesc ? 1 : -1;
-                if (aVal > bVal) return this.sortDesc ? -1 : 1;
-                return 0;
-            });
-
             this.filteredBuilds = filtered;
-            this.currentPage = 1; // Reset to first page when applying a filter
-        },
-
-        sort(column) {
-            if (this.sortBy === column) {
-                this.sortDesc = !this.sortDesc;
-            } else {
-                this.sortBy = column;
-                this.sortDesc = true;
-            }
-            this.applyFilters();
-        },
-
-        changePage(page) {
-            if (page >= 1 && page <= this.totalPages) {
-                this.currentPage = page;
-            }
-        },
-
-        onPageChange(event) {
-            this.currentPage = event.page + 1;
         },
 
         getFileName(path) {
@@ -295,23 +234,6 @@ export default {
             const parts = path.split('/');
             if (parts.length <= 1) return '';
             return parts.slice(0, -1).join('/');
-        },
-
-        getStateClass(state) {
-            switch (state) {
-                case 'Succeeded':
-                    return 'green';
-                case 'Failed':
-                    return 'red';
-                case 'Processing':
-                    return 'yellow';
-                case 'Enqueued':
-                case 'Scheduled':
-                case 'Awaiting':
-                    return 'blue';
-                default:
-                    return 'grey';
-            }
         },
 
         getTagSeverity(state) {
@@ -551,15 +473,6 @@ export default {
 
 .muted {
     color: var(--ddb-text-muted);
-}
-
-.sortable {
-    cursor: pointer;
-    user-select: none;
-}
-
-.sortable:hover {
-    background-color: var(--ddb-bg-secondary);
 }
 
 .filter-bar {

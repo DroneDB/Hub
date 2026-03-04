@@ -9,7 +9,7 @@
         </PrimeMessage>
 
         <div class="d-flex justify-content-end gap-2 mt-3">
-            <Button @click="close('close')" label="Close" />
+            <Button @click="close('close')" severity="secondary" label="Close" />
             <Button @click="close('remove')" severity="danger" label="Remove" />
         </div>
     </Window>
