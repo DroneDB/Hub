@@ -104,8 +104,5 @@ export default {
 </script>
 
 <style>
-/* Global styles for Window/Dialog bridge */
-.window-dialog .p-dialog-content {
-    padding: 0.75rem 1rem;
-}
+
 </style>
