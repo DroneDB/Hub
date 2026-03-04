@@ -29,7 +29,8 @@
                         @setAsCover="setAsCover"
                         @downloadItems="handleDownloadItems"
                         @openAsText="handleOpenAsText" @error="handleError" />
-                </template> <template v-slot:map>
+                </template>
+                <template v-slot:map>
                     <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
                         @openItem="handleOpenItem" />
                 </template>
