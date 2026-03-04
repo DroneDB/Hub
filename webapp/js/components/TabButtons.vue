@@ -72,6 +72,10 @@ export default {
     -webkit-user-select: none;
 }
 
+:deep(.p-tab) {
+    font-family: inherit;
+}
+
 .close-btn {
     margin-left: 0.25rem;
     cursor: pointer;
