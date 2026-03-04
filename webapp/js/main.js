@@ -63,6 +63,13 @@ window.addEventListener('load', function () {
 
         app.use(router);
         const DdbPreset = definePreset(Lara, {
+            components: {
+                dataview: {
+                    root: {
+                        borderWidth: '0'
+                    }
+                }
+            },
             semantic: {
                 primary: {
                     50:  '#e6edfd',
