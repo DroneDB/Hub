@@ -2,7 +2,7 @@
     <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
         <div v-html="safeMessage"></div>
 
-        <div v-if="warningMessage" class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 0.25rem; color: #856404;">
+        <div v-if="warningMessage" class="warning-message" style="margin-top: 1rem; padding: 0.75rem; background: var(--ddb-warning-bg); border: 1px solid var(--ddb-warning); border-radius: 0.25rem; color: var(--ddb-warning-text);">
             <div class="header" v-if="warningTitle">
                 {{ warningTitle }}
             </div>

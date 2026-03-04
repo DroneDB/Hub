@@ -317,7 +317,7 @@ export default {
 
 <style scoped>
 #nexus {
-    background: #1a1a2e;
+    background: var(--ddb-viewer-bg);
     width: 100%;
     height: 100%;
     display: flex;
@@ -343,7 +343,7 @@ export default {
 }
 
 #nexus .loading {
-    color: #fefefe;
+    color: var(--ddb-text-on-dark);
     font-size: 120%;
     margin: 0.5rem;
     text-align: center;
@@ -363,7 +363,7 @@ export default {
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.65);
     border: 1px solid rgba(255, 255, 255, 0.25);
-    color: #fefefe;
+    color: var(--ddb-text-on-dark);
     font-size: 1rem;
     cursor: pointer;
     z-index: 100;
@@ -397,7 +397,7 @@ export default {
     display: block;
     margin-bottom: 0.25rem;
     font-size: 0.75rem;
-    color: #555;
+    color: var(--ddb-viewer-label-color);
 }
 
 #nexus .lighting-content .form-group input[type="range"] {

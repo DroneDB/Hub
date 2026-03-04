@@ -16,6 +16,7 @@ import './dynamic/web';
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
 import Lara from '@primevue/themes/lara';
+import { definePreset } from '@primevue/themes';
 import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
 import DialogService from 'primevue/dialogservice';
@@ -61,9 +62,43 @@ window.addEventListener('load', function () {
         });
 
         app.use(router);
+        const DdbPreset = definePreset(Lara, {
+            semantic: {
+                primary: {
+                    50:  '#e6edfd',
+                    100: '#b3c6f9',
+                    200: '#809ff5',
+                    300: '#4d79f1',
+                    400: '#2659ec',
+                    500: '#0041E8',
+                    600: '#003abd',
+                    700: '#002d93',
+                    800: '#002069',
+                    900: '#00133f',
+                    950: '#000a21'
+                },
+                colorScheme: {
+                    light: {
+                        primary: {
+                            color: '#0041E8',
+                            contrastColor: '#ffffff',
+                            hoverColor: '#003abd',
+                            activeColor: '#002d93'
+                        },
+                        highlight: {
+                            background: '#e8f4ff',
+                            focusBackground: '#d8e8f8',
+                            color: '#0041E8',
+                            focusColor: '#002d93'
+                        }
+                    }
+                }
+            }
+        });
+
         app.use(PrimeVue, {
             theme: {
-                preset: Lara
+                preset: DdbPreset
             }
         });
         app.use(ConfirmationService);

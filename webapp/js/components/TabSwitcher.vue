@@ -1,28 +1,42 @@
 <template>
-    <div class="tab-switcher">
-        <TabButtons :tabs="dynTabs" :defaultTab="activeTab" :position="position" :buttonWidth="buttonWidth"
-            @closeTab="removeTab" ref="topTabButtons" v-if="position === 'top' && (!hideSingle || dynTabs.length > 1)"
-            @click="setActiveTab" />
+    <div class="tab-switcher" :class="{ 'position-top': position === 'top' }">
+        <div class="tab-buttons-strip" v-if="!hideSingle || dynTabs.length > 1">
+            <Tabs :value="activeTab" @update:value="onTabChange">
+                <TabList>
+                    <Tab v-for="t in dynTabs" :key="t.key" :value="t.key">
+                        <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
+                            style="margin-right: 0.375rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
+                                t.label }}</span>
+                        <span @click.stop="removeTab(t.key)" v-if="!!t.canClose" class="close-btn"><i
+                                class="fa-solid fa-xmark"></i></span>
+                    </Tab>
+                </TabList>
+            </Tabs>
+        </div>
         <div class="tabs">
-            <div class="tab" v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }" :class="{ hidden: t.key !== activeTab }">
+            <div class="tab" v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }"
+                :class="{ hidden: t.key !== activeTab }">
                 <slot :name="t.key" />
-                <component v-if="dynamicComponents[t.key]" :is="dynamicComponents[t.key].component" v-bind="dynamicComponents[t.key].props" :ref="el => { if (el) dynamicChildRefs[t.key] = el; }" />
+                <component v-if="dynamicComponents[t.key]" :is="dynamicComponents[t.key].component"
+                    v-bind="dynamicComponents[t.key].props"
+                    :ref="el => { if (el) dynamicChildRefs[t.key] = el; }" />
             </div>
         </div>
-        <TabButtons :tabs="dynTabs" :defaultTab="activeTab" :position="position" :buttonWidth="buttonWidth"
-            @closeTab="removeTab" ref="bottomTabButtons"
-            v-if="position === 'bottom' && (!hideSingle || dynTabs.length > 1)" @click="setActiveTab" />
     </div>
 </template>
 
 <script>
 import { clone } from '../libs/utils';
 import { h, markRaw } from 'vue';
-import TabButtons from './TabButtons';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
 
 export default {
     components: {
-        TabButtons
+        Tabs,
+        TabList,
+        Tab
     },
     props: {
         tabs: {
@@ -70,12 +84,6 @@ export default {
             if (node && node.onTabActivated) node.onTabActivated();
         });
     },
-    computed: {
-        tabButtons: function () {
-            if (this.$refs.bottomTabButtons) return this.$refs.bottomTabButtons;
-            else return this.$refs.topTabButtons;
-        }
-    },
     methods: {
         registerTabChild(key, component) {
             this.registeredChildren[key] = component;
@@ -119,7 +127,6 @@ export default {
 
                 this.lastTabIndex = this.getActiveTabIndex();
                 this.activeTab = tab.key;
-                this.tabButtons.setActiveTab(tab, false);
 
                 // The Vue node is not available
                 // until the next tick
@@ -130,6 +137,13 @@ export default {
                         node.onTabActivated();
                     }
                 });
+            }
+        },
+
+        onTabChange: function (value) {
+            const tab = this.dynTabs.find(t => t.key === value);
+            if (tab) {
+                this.setActiveTab(tab);
             }
         },
 
@@ -233,6 +247,39 @@ export default {
     min-height: 0;
     overflow: hidden;
 
+    /* Default: tabs at bottom → buttons after content */
+    &.position-top {
+        .tab-buttons-strip {
+            order: -1;
+        }
+    }
+
+    .tab-buttons-strip {
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    :deep(.p-tab) {
+        font-family: inherit;
+    }
+
+    .close-btn {
+        margin-left: 0.25rem;
+        cursor: pointer;
+
+        &:hover {
+            color: var(--ddb-text-secondary);
+        }
+
+        &:active {
+            color: var(--ddb-border);
+        }
+    }
+
+    .icon.padded {
+        padding-left: 0.1875rem;
+    }
+
     .tabs {
         flex: 1;
         min-height: 0;
@@ -246,7 +293,7 @@ export default {
             flex: 1;
             min-height: 0;
             overflow: auto;
-            background: #fefefe;
+            background: var(--ddb-bg);
 
             &.hidden {
                 display: none !important;

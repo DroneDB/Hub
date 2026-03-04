@@ -1,23 +1,52 @@
 <template>
-    <div class="toolbar" :class="className">
-        <template v-for="(tool, index) in dataTools">
-            <div class="separator" v-if="tool.id === 'separator'" :key="'sep-' + index"></div>
-            <div class="spacer" v-else-if="tool.id === 'spacer'" :key="'spacer-' + index"></div>
-            <div v-else class="button" :class="{ selected: tool.selected, disabled: tool.disabled }" :title="tool.title"
-                @click="toggleTool(tool.id)" :key="tool.id">
-                <i :class="'icon ' + tool.icon"></i>
-            </div>
+    <PvToolbar :pt="{ root: { style: 'padding: 0.25rem; min-height: 2.125rem;' } }">
+        <template #start>
+            <template v-for="(tool, index) in startTools" :key="tool.id || 'start-' + index">
+                <Divider v-if="tool.id === 'separator'" layout="vertical" />
+                <Button v-else :icon="tool.icon" :title="tool.title" :disabled="tool.disabled"
+                    :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
+                    @click="toggleTool(tool.id)" />
+            </template>
         </template>
-    </div>
+        <template #end>
+            <template v-for="(tool, index) in endTools" :key="tool.id || 'end-' + index">
+                <Divider v-if="tool.id === 'separator'" layout="vertical" />
+                <Button v-else :icon="tool.icon" :title="tool.title" :disabled="tool.disabled"
+                    :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
+                    @click="toggleTool(tool.id)" />
+            </template>
+        </template>
+    </PvToolbar>
 </template>
 
 <script>
+import Toolbar from 'primevue/toolbar';
+import Button from 'primevue/button';
+import Divider from 'primevue/divider';
 
 export default {
+    components: {
+        PvToolbar: Toolbar,
+        Button,
+        Divider
+    },
     props: ["tools", "className"],
     data: function () {
         return {
             dataTools: []
+        }
+    },
+    computed: {
+        spacerIndex: function () {
+            return this.dataTools.findIndex(t => t.id === 'spacer');
+        },
+        startTools: function () {
+            if (this.spacerIndex === -1) return this.dataTools;
+            return this.dataTools.slice(0, this.spacerIndex);
+        },
+        endTools: function () {
+            if (this.spacerIndex === -1) return [];
+            return this.dataTools.slice(this.spacerIndex + 1);
         }
     },
     beforeMount: function () {
@@ -122,109 +151,4 @@ export default {
 </script>
 
 <style scoped>
-.toolbar {
-    user-select: none;
-    -webkit-user-select: none;
-    z-index: 0;
-
-    display: flex;
-    background-image: linear-gradient(#fefefe, #f3f3f3);
-
-    &.plain {
-        background: #fefefe;
-        border-bottom: 1px solid #030A03;
-    }
-
-    flex-direction: row;
-    padding: 0.25rem;
-    min-height: 2.125rem;
-
-    .button {
-        padding: 0;
-        width: 1.625rem;
-        height: 1.625rem;
-        padding-left: 0.25rem;
-        padding-right: 0.25rem;
-        border-radius: 0.25rem;
-
-        @media only screen and (max-width: 575.98px) {
-            width: 2.1875rem;
-            height: 2.125rem;
-            padding-left: 0.4375rem;
-            padding-right: 0.375rem;
-            padding-top: 0.125rem;
-        }
-
-        margin-right: 0.0625rem;
-        border: 1px solid transparent;
-
-        &.selected {
-            cursor: pointer;
-            border-color: #030A03;
-            background: #fefefe;
-        }
-
-        @media (hover: hover) {
-            &:hover {
-                cursor: pointer;
-                border-color: #030A03;
-                background: #fefefe;
-            }
-        }
-
-        &:active {
-            background: #f8f8f8;
-        }
-
-        i {
-            padding-top: 0.1875rem;
-            padding-left: 0;
-            margin: 0;
-        }
-
-        &.disabled {
-            opacity: 0.2;
-
-            &:hover,
-            &:active,
-            &:focus,
-            &.selected {
-                cursor: not-allowed;
-            }
-        }
-    }
-
-    &.large {
-        height: 2.75rem;
-
-        .button {
-            width: 2.25rem;
-            height: 2.25rem;
-            padding-left: 0.125rem;
-            padding-right: 0.125rem;
-            padding-top: 0.125rem;
-            padding-bottom: 0.125rem;
-        }
-
-        i {
-            font-size: 200%;
-        }
-    }
-
-    &.top-border {
-        border-top: 1px solid #030A03;
-    }
-
-    .separator {
-        border-left: 1px solid #dddddd;
-        margin-top: 0.3125rem;
-        margin-bottom: 0.1875rem;
-        margin-left: 0.375rem;
-        margin-right: 0.375rem;
-    }
-
-    .spacer {
-        flex-grow: 1;
-    }
-}
 </style>

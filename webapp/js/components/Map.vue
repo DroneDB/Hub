@@ -1929,14 +1929,14 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 8px 10px;
-    background: #f5f5f5;
-    border-bottom: 1px solid #e0e0e0;
+    background: var(--ddb-bg-subtle);
+    border-bottom: 1px solid var(--ddb-border-separator);
 }
 
 .image-popup-title {
     font-size: 13px;
     font-weight: 600;
-    color: #333;
+    color: var(--ddb-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1955,7 +1955,7 @@ export default {
     cursor: pointer;
     padding: 4px 6px;
     border-radius: 3px;
-    color: #555;
+    color: var(--ddb-text-secondary);
     font-size: 14px;
     display: flex;
     align-items: center;
@@ -1963,13 +1963,13 @@ export default {
 }
 
 .image-popup-btn:hover {
-    background: #e0e0e0;
-    color: #222;
+    background: var(--ddb-border-separator);
+    color: var(--ddb-text);
 }
 
 .image-popup-close:hover {
-    background: #ffcdd2;
-    color: #c62828;
+    background: var(--ddb-danger-bg);
+    color: var(--ddb-danger);
 }
 
 .image-popup-body {
@@ -1993,7 +1993,7 @@ export default {
     align-items: center;
     height: 100px;
     font-size: 24px;
-    color: #999;
+    color: var(--ddb-text-muted);
 }
 
 .image-popup-footer {
@@ -2001,15 +2001,15 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 5px 10px;
-    border-top: 1px solid #e0e0e0;
-    background: #fafafa;
+    border-top: 1px solid var(--ddb-border-separator);
+    background: var(--ddb-bg-light);
     border-radius: 0 0 6px 6px;
 }
 
 .image-popup-coords {
     font-size: 12px;
     font-family: monospace;
-    color: #555;
+    color: var(--ddb-text-secondary);
     user-select: all;
     cursor: text;
     overflow: hidden;
@@ -2023,6 +2023,6 @@ export default {
 }
 
 .image-popup-copy .icon.check {
-    color: #2e7d32;
+    color: var(--ddb-success);
 }
 </style>

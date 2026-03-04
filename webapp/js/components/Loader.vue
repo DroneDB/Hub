@@ -42,7 +42,7 @@ export default {
 }
 
 #loader-backdrop {
-  background: rgba(100, 100, 100, 0.2);
+  background: rgba(var(--ddb-text-rgb, 100, 100, 100), 0.2);
   position: absolute;
   right: 0;
   top: 0;
@@ -66,7 +66,7 @@ export default {
   border-top: 1.1em solid rgba(255, 255, 255, 0.2);
   border-right: 1.1em solid rgba(255, 255, 255, 0.2);
   border-bottom: 1.1em solid rgba(255, 255, 255, 0.2);
-  border-left: 1.1em solid #ffffff;
+  border-left: 1.1em solid var(--ddb-primary);
   -webkit-transform: translateZ(0);
   -ms-transform: translateZ(0);
   transform: translateZ(0);

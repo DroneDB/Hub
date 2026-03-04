@@ -182,10 +182,10 @@ export default {
 }
 
 .password-requirements small {
-    color: #db2828;
+    color: var(--ddb-danger);
 }
 
 .password-requirements small.met {
-    color: #21ba45;
+    color: var(--ddb-success);
 }
 </style>

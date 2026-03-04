@@ -222,14 +222,14 @@ export default {
                         fontFamily: "Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace"
                     },
                     ".cm-content": {
-                        caretColor: "#000"
+                        caretColor: "var(--ddb-text)"
                     },
                     "&.cm-focused .cm-cursor": {
-                        borderLeftColor: "#000"
+                        borderLeftColor: "var(--ddb-text)"
                     },
                     ".cm-gutters": {
-                        backgroundColor: "#f5f5f5",
-                        borderRight: "1px solid #ddd"
+                        backgroundColor: "var(--ddb-bg-subtle)",
+                        borderRight: "1px solid var(--ddb-border)"
                     }
                 })
             ];
@@ -363,7 +363,7 @@ export default {
     align-items: center;
     justify-content: center;
     height: 12.5rem;
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 
 .loading-container i,
@@ -373,12 +373,12 @@ export default {
 }
 
 .error-container i {
-    color: #db2828;
+    color: var(--ddb-danger);
 }
 
 .error-container .limit-info {
     font-size: 0.9em;
-    color: #999;
+    color: var(--ddb-text-muted);
 }
 
 .toolbar {
@@ -386,8 +386,8 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem 0.75rem;
-    background: #f9f9f9;
-    border-bottom: 1px solid #ddd;
+    background: var(--ddb-bg-light);
+    border-bottom: 1px solid var(--ddb-border);
     flex-shrink: 0;
 }
 
@@ -402,7 +402,7 @@ export default {
 }
 
 .modified-indicator {
-    color: #f2711c;
+    color: var(--ddb-warning);
     font-weight: bold;
     font-size: 1.2em;
 }
@@ -415,16 +415,16 @@ export default {
 .editor-container {
     flex: 1;
     overflow: hidden;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ddb-border);
     border-radius: 0.25rem;
     margin: 0.5rem;
 }
 
 .unsaved-warning {
     padding: 0.5rem 0.75rem;
-    background: #fff3cd;
-    border-top: 1px solid #ffc107;
-    color: #856404;
+    background: var(--ddb-warning-bg);
+    border-top: 1px solid var(--ddb-warning);
+    color: var(--ddb-warning-text);
     font-size: 0.9em;
     flex-shrink: 0;
 }

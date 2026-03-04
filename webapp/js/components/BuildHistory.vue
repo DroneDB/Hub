@@ -495,7 +495,7 @@ export default {
 
 .filters {
     padding: 0.9375rem;
-    background: #f8f8f9;
+    background: var(--ddb-bg-secondary);
     flex-shrink: 0;
 }
 
@@ -511,7 +511,7 @@ export default {
 
 .path-details {
     display: block;
-    color: #999;
+    color: var(--ddb-text-muted);
     font-size: 0.85em;
     margin-top: 0.125rem;
     word-break: break-all;
@@ -523,7 +523,7 @@ export default {
 
 .relative-time {
     display: block;
-    color: #999;
+    color: var(--ddb-text-muted);
     font-size: 0.85em;
     margin-top: 0.125rem;
 }
@@ -543,14 +543,14 @@ export default {
 }
 
 .job-details code {
-    background: #f8f8f8;
+    background: var(--ddb-bg-secondary);
     padding: 0.125rem 0.25rem;
     border-radius: 0.125rem;
     word-break: break-all;
 }
 
 .muted {
-    color: #999;
+    color: var(--ddb-text-muted);
 }
 
 .sortable {
@@ -559,7 +559,7 @@ export default {
 }
 
 .sortable:hover {
-    background-color: rgba(0,0,0,.05);
+    background-color: var(--ddb-bg-secondary);
 }
 
 .filter-bar {

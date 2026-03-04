@@ -17,6 +17,8 @@
 // Bootstrap grid + utilities are imported in main.js
 // Font Awesome 6 is imported in main.js
 
+@import 'variables';
+
 html {
     font-size: 16px;
 }
@@ -28,8 +30,8 @@ html, body {
 }
 
 body {
-    color: #030A03;
-    background: #fefefe;
+    color: var(--ddb-text);
+    background: var(--ddb-bg);
     font-family: 'Inter', sans-serif;
     font-size: 0.875rem;
     line-height: 1.4285;
@@ -105,17 +107,17 @@ body {
 // ============================================================
 .divider {
     border: none;
-    border-top: 1px solid rgba(34, 36, 38, 0.15);
+    border-top: 1px solid var(--ddb-border-light);
     margin: 1em 0;
 }
 
 // ============================================================
 // Text helpers
 // ============================================================
-.text-success { color: #21ba45 !important; }
-.text-danger { color: #db2828 !important; }
-.text-warning { color: #f2711c !important; }
-.text-muted { color: rgba(0, 0, 0, 0.4) !important; }
+.text-success { color: var(--ddb-success) !important; }
+.text-danger { color: var(--ddb-danger) !important; }
+.text-warning { color: var(--ddb-warning-text) !important; }
+.text-muted { color: var(--ddb-text-muted) !important; }
 
 .small { font-size: 0.85em; }
 
@@ -132,14 +134,14 @@ body {
 
 // --- Segments (grouped card-like containers) ---
 .ui.segments {
-    border: 1px solid rgba(34, 36, 38, 0.15);
+    border: 1px solid var(--ddb-border-light);
     border-radius: 0.25rem;
     box-shadow: 0 0.0625rem 0.125rem 0 rgba(34, 36, 38, 0.15);
     margin: 1rem 0;
-    background: #fff;
+    background: var(--ddb-bg-surface);
 
     > .ui.segment {
-        border-top: 1px solid rgba(34, 36, 38, 0.15);
+        border-top: 1px solid var(--ddb-border-light);
         border-radius: 0;
         box-shadow: none;
         border-left: none;
@@ -156,8 +158,8 @@ body {
 // Segment (standalone)
 .ui.segment {
     padding: 1rem;
-    background: #fff;
-    border: 1px solid rgba(34, 36, 38, 0.15);
+    background: var(--ddb-bg-surface);
+    border: 1px solid var(--ddb-border-light);
     border-radius: 0.25rem;
     box-shadow: 0 0.0625rem 0.125rem 0 rgba(34, 36, 38, 0.15);
 }
@@ -166,13 +168,13 @@ body {
 .ui.table {
     width: 100%;
     border-collapse: collapse;
-    background: #fff;
-    border: 1px solid rgba(34, 36, 38, 0.15);
-    color: rgba(0, 0, 0, 0.87);
+    background: var(--ddb-bg-surface);
+    border: 1px solid var(--ddb-border-light);
+    color: var(--ddb-text);
     margin: 1rem 0;
 
     th {
-        background: #f9fafb;
+        background: var(--ddb-bg-light);
         padding: 0.5rem;
         font-weight: 700;
         text-align: left;
@@ -185,7 +187,7 @@ body {
     }
 
     tfoot th {
-        background: #f9fafb;
+        background: var(--ddb-bg-light);
         border-top: 1px solid rgba(34, 36, 38, 0.15);
         border-bottom: none;
     }
@@ -224,7 +226,7 @@ div.loading {
     align-items: center;
     min-height: 12.5rem;
     font-size: 2em;
-    color: #888;
+    color: var(--ddb-text-muted);
 }
 
 .cui.app {
@@ -276,10 +278,10 @@ div.loading {
 }
 
 body:fullscreen {
-    background: #fefefe;
+    background: var(--ddb-bg);
 
     &::backdrop {
-        background: #fefefe;
+        background: var(--ddb-bg);
     }
 }
 

@@ -18,7 +18,6 @@
 
         <!-- Upload progress view -->
         <template v-else>
-            <!-- Header con filtri -->
         <div class="upload-header">
             <div class="upload-filters">
                 <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'"
@@ -48,7 +47,6 @@
             </div>
         </div>
 
-        <!-- Body con lista file scrollabile -->
         <div class="upload-body">
             <RecycleScroller
                 class="file-list-scroller"
@@ -61,7 +59,6 @@
             </RecycleScroller>
         </div>
 
-        <!-- Footer con progress totale e pulsanti -->
         <div class="upload-footer">
             <div class="total-progress-container" v-if="uploading">
                 <div class="progress-info">
@@ -522,8 +519,8 @@ export default {
 .upload-header {
     flex-shrink: 0;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #ddd;
-    background-color: #f9f9f9;
+    border-bottom: 1px solid var(--ddb-border);
+    background-color: var(--ddb-bg-light);
 }
 
 .upload-filters {
@@ -536,8 +533,8 @@ export default {
     align-items: center;
     gap: 0.375rem;
     padding: 0.375rem 0.75rem;
-    border: 1px solid #ddd;
-    background: white;
+    border: 1px solid var(--ddb-border);
+    background: var(--ddb-bg-surface);
     border-radius: 0.25rem;
     cursor: pointer;
     font-size: 0.75rem;
@@ -545,11 +542,11 @@ export default {
 }
 
 .filter-btn:hover {
-    background-color: #f0f0f0;
+    background-color: var(--ddb-bg-hover);
 }
 
 .filter-btn .filter-count {
-    background-color: #e0e0e0;
+    background-color: var(--ddb-border-separator);
     padding: 0.125rem 0.375rem;
     border-radius: 0.625rem;
     font-size: 0.6875rem;
@@ -560,76 +557,76 @@ export default {
 
 /* All filter */
 .filter-btn.filter-all {
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 .filter-btn.filter-all.active {
-    background-color: #666;
-    color: white;
-    border-color: #666;
+    background-color: var(--ddb-text-secondary);
+    color: var(--ddb-text-on-color);
+    border-color: var(--ddb-text-secondary);
 }
 .filter-btn.filter-all.active .filter-count {
     background-color: rgba(255,255,255,0.3);
-    color: white;
+    color: var(--ddb-text-on-color);
 }
 
 /* Uploading filter */
 .filter-btn.filter-uploading {
-    color: #2185d0;
-    border-color: #b3d4f0;
+    color: var(--ddb-primary);
+    border-color: rgba(var(--ddb-primary-rgb), 0.3);
 }
 .filter-btn.filter-uploading .filter-count {
-    background-color: #d4e9f9;
-    color: #2185d0;
+    background-color: rgba(var(--ddb-primary-rgb), 0.1);
+    color: var(--ddb-primary);
 }
 .filter-btn.filter-uploading.active {
-    background-color: #2185d0;
-    color: white;
-    border-color: #2185d0;
+    background-color: var(--ddb-primary);
+    color: var(--ddb-text-on-color);
+    border-color: var(--ddb-primary);
 }
 .filter-btn.filter-uploading.active .filter-count {
     background-color: rgba(255,255,255,0.3);
-    color: white;
+    color: var(--ddb-text-on-color);
 }
 
 /* Done filter */
 .filter-btn.filter-done {
-    color: #21ba45;
-    border-color: #b3e6c0;
+    color: var(--ddb-success);
+    border-color: rgba(var(--ddb-success-rgb), 0.3);
 }
 .filter-btn.filter-done .filter-count {
-    background-color: #d4f5dc;
-    color: #21ba45;
+    background-color: rgba(var(--ddb-success-rgb), 0.1);
+    color: var(--ddb-success);
 }
 .filter-btn.filter-done.active {
-    background-color: #21ba45;
-    color: white;
-    border-color: #21ba45;
+    background-color: var(--ddb-success);
+    color: var(--ddb-text-on-color);
+    border-color: var(--ddb-success);
 }
 .filter-btn.filter-done.active .filter-count {
     background-color: rgba(255,255,255,0.3);
-    color: white;
+    color: var(--ddb-text-on-color);
 }
 
 /* Error filter */
 .filter-btn.filter-error {
-    color: #db2828;
-    border-color: #f0b3b3;
+    color: var(--ddb-danger);
+    border-color: rgba(var(--ddb-danger-rgb), 0.3);
 }
 .filter-btn.filter-error .filter-count {
-    background-color: #fad4d4;
-    color: #db2828;
+    background-color: rgba(var(--ddb-danger-rgb), 0.1);
+    color: var(--ddb-danger);
 }
 .filter-btn.filter-error.has-errors {
-    border-color: #db2828;
+    border-color: var(--ddb-danger);
 }
 .filter-btn.filter-error.active {
-    background-color: #db2828;
-    color: white;
-    border-color: #db2828;
+    background-color: var(--ddb-danger);
+    color: var(--ddb-text-on-color);
+    border-color: var(--ddb-danger);
 }
 .filter-btn.filter-error.active .filter-count {
     background-color: rgba(255,255,255,0.3);
-    color: white;
+    color: var(--ddb-text-on-color);
 }
 
 /* Body */
@@ -648,8 +645,8 @@ export default {
 .upload-footer {
     flex-shrink: 0;
     padding: 0.75rem 1rem;
-    border-top: 1px solid #ddd;
-    background-color: #f9f9f9;
+    border-top: 1px solid var(--ddb-border);
+    background-color: var(--ddb-bg-light);
 }
 
 .total-progress-container {
@@ -660,20 +657,20 @@ export default {
     display: flex;
     justify-content: space-between;
     font-size: 0.75rem;
-    color: #666;
+    color: var(--ddb-text-secondary);
     margin-bottom: 0.25rem;
 }
 
 .total-progress-bar {
     height: 0.5rem;
-    background-color: #e0e0e0;
+    background-color: var(--ddb-border-separator);
     border-radius: 0.25rem;
     overflow: hidden;
 }
 
 .progress-fill {
     height: 100%;
-    background-color: #21ba45;
+    background-color: var(--ddb-success);
     transition: width 0.3s ease;
 }
 
@@ -692,11 +689,11 @@ export default {
 }
 
 .upload-result.success {
-    color: #21ba45;
+    color: var(--ddb-success);
 }
 
 .upload-result.has-errors {
-    color: #f2711c;
+    color: var(--ddb-warning);
 }
 
 /* Spinning animation */
@@ -724,19 +721,19 @@ export default {
 }
 
 .selection-content .icon.cloud.upload {
-    color: #2185d0;
+    color: var(--ddb-primary);
     margin-bottom: 1rem;
 }
 
 .selection-content h3 {
     margin: 0 0 0.5rem 0;
     font-size: 1.25rem;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .selection-content p {
     margin: 0 0 1.5rem 0;
-    color: #666;
+    color: var(--ddb-text-secondary);
     font-size: 0.875rem;
 }
 
@@ -753,7 +750,7 @@ export default {
 
 /* Upload summary */
 .upload-summary {
-    background-color: #f8f9fa;
+    background-color: var(--ddb-bg-light);
     border-radius: 0.375rem;
 }
 
@@ -772,22 +769,22 @@ export default {
 }
 
 .summary-stat .icon {
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 
 .summary-stat .stat-label {
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 
 .summary-stat .stat-value {
     font-weight: 600;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .upload-summary .upload-result {
     text-align: center;
     padding-top: 0.75rem;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--ddb-border-separator);
     margin-top: 0.25rem;
 }
 </style>

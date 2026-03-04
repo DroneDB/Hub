@@ -312,19 +312,19 @@ export default {
     margin-top: 0.9375rem;
     text-align: center;
     padding: 0.9375rem;
-    background-color: #f8f9fa;
+    background-color: var(--ddb-bg-light);
     border-radius: 0.25rem;
 }
 
 .progress-timer {
     margin-top: 0.625rem;
     font-size: 0.9em;
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 
 .build-details {
     margin-top: 0.9375rem;
-    background-color: #f8f9fa;
+    background-color: var(--ddb-bg-light);
     padding: 0.9375rem;
     border-radius: 0.25rem;
 }
@@ -336,7 +336,7 @@ export default {
 
 .build-details code {
     font-size: 0.85em;
-    background-color: #e9ecef;
+    background-color: var(--ddb-border-separator);
     padding: 0.125rem 0.375rem;
     border-radius: 0.1875rem;
 }

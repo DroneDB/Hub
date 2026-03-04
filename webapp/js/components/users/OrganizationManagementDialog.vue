@@ -325,7 +325,7 @@ export default {
 }
 
 code {
-    background-color: #f5f5f5;
+    background-color: var(--ddb-bg-subtle);
     padding: 0.125rem 0.25rem;
     border-radius: 0.1875rem;
     font-family: monospace;

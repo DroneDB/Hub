@@ -81,7 +81,7 @@ export default {
 }
 
 .change-units-content .description {
-    color: #666;
+    color: var(--ddb-text-secondary);
     font-size: 0.9em;
 }
 </style>

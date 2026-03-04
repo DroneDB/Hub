@@ -176,19 +176,19 @@ export default {
 .measurements-rename-option {
     margin-top: 1rem;
     padding: 0.75rem;
-    background: rgba(33, 133, 208, 0.1);
+    background: rgba(var(--ddb-primary-rgb), 0.1);
     border-radius: 0.25rem;
-    border-left: 3px solid #2185d0;
+    border-left: 3px solid var(--ddb-primary);
 }
 
 .measurements-rename-option label {
-    color: #2c3e50;
+    color: var(--ddb-text);
     font-weight: 500;
 }
 
 .measurements-rename-option .hint {
     font-size: 0.75rem;
-    color: #7f8c8d;
+    color: var(--ddb-text-muted);
     margin-top: 0.25rem;
     display: flex;
     align-items: center;

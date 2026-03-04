@@ -341,7 +341,7 @@ export default {
 
     .org-icon {
         font-size: 1.5rem;
-        color: #6c757d;
+        color: var(--ddb-text-secondary);
     }
 
     h1 {
@@ -355,7 +355,7 @@ export default {
 
         .segment {
             &:hover {
-                background-color: #f5f5f5;
+                background-color: var(--ddb-bg-secondary);
                 cursor: pointer;
             }
         }

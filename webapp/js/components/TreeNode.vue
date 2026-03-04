@@ -261,17 +261,17 @@ export default {
         user-select: none;
 
         &:hover {
-            background: #eee;
+            background: var(--ddb-bg-secondary);
             cursor: pointer;
         }
 
         &:focus,
         &:active {
-            background: #dadada;
+            background: var(--ddb-border);
         }
 
         &.selected {
-            background: #ddd;
+            background: var(--ddb-border);
         }
     }
 

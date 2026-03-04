@@ -1491,14 +1491,14 @@ export default {
         margin: 0.5rem;
     }
 
-    background: #030A03;
+    background: var(--ddb-viewer-bg);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
 
     .loading {
-        color: #fefefe;
+        color: var(--ddb-text-on-dark);
         font-size: 120%;
         margin: 0.5rem;
         text-align: center;
@@ -1523,13 +1523,13 @@ export default {
         display: flex;
         width: 100%;
         height: 100%;
-        background: rgb(79, 79, 79);
+        background: var(--ddb-viewer-gradient-center);
         background: -moz-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
         background: -webkit-gradient(radial, center center, 0px, center center, 100%, color-stop(0%, rgba(79, 79, 79, 1)), color-stop(100%, rgba(22, 22, 22, 1)));
         background: -webkit-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
         background: -o-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
         background: -ms-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
-        background: radial-gradient(ellipse at center, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
+        background: radial-gradient(ellipse at center, var(--ddb-viewer-gradient-center) 0%, var(--ddb-viewer-gradient-edge) 100%);
         position: relative;
         padding: 0;
 
@@ -1599,7 +1599,7 @@ export default {
         width: 100%;
         height: 1.5625rem;
         top: 0;
-        background-color: rgba(0, 0, 0, 0.5);
+        background-color: var(--ddb-viewer-toolbar-overlay);
         z-index: 1000;
         border-top-left-radius: 0.1875rem;
         border-top-right-radius: 0.1875rem;
@@ -1611,18 +1611,18 @@ export default {
         top: 1.5625rem;
         width: 100%;
         height: calc(100% - 1.5625rem);
-        border: 2px solid rgba(0, 0, 0, 0.5);
+        border: 2px solid var(--ddb-viewer-toolbar-overlay);
         box-sizing: border-box;
     }
 
     #potree_sidebar_container {
         overflow-y: auto;
         overflow-x: hidden;
-        background-color: #19282c;
+        background-color: var(--ddb-viewer-sidebar-bg);
         right: 0;
 
         a {
-            color: #111;
+            color: var(--ddb-text);
         }
 
         #sidebar_root {
@@ -1636,7 +1636,7 @@ export default {
                 }
 
                 a {
-                    color: #8Aa1c4;
+                    color: var(--ddb-viewer-sidebar-link);
                 }
             }
 
@@ -1654,7 +1654,7 @@ export default {
             }
 
             #potree_version_number {
-                color: #9AA1A4;
+                color: var(--ddb-viewer-sidebar-muted);
                 font-size: 80%;
                 font-weight: 100;
             }
@@ -1678,7 +1678,7 @@ export default {
 
     /* Undo/Redo toolbar */
     .undo-redo-toolbar {
-        background: rgba(0, 0, 0, 0.7);
+        background: var(--ddb-viewer-toolbar-bg);
         padding: 0.375rem;
         border-radius: 0.3125rem;
         display: flex;
@@ -1687,7 +1687,7 @@ export default {
     }
 
     .btn-undo-redo {
-        background: #555;
+        background: var(--ddb-viewer-btn-bg);
         color: white;
         border: none;
         padding: 0.5rem 0.625rem;
@@ -1703,27 +1703,27 @@ export default {
     }
 
     .btn-undo-redo:hover:not(:disabled) {
-        background: #777;
+        background: var(--ddb-viewer-btn-hover);
     }
 
     .btn-undo-redo:disabled {
-        background: #333;
-        color: #666;
+        background: var(--ddb-viewer-btn-disabled-bg);
+        color: var(--ddb-viewer-btn-disabled-color);
         cursor: not-allowed;
     }
 
     .btn-undo-redo.btn-delete-tool {
-        background: #666;
+        background: var(--ddb-viewer-btn-active-bg);
         margin-left: 0.5rem;
     }
 
     .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
-        background: #e74c3c;
+        background: var(--ddb-viewer-btn-danger);
     }
 
     .btn-undo-redo.btn-delete-tool.active {
-        background: #e74c3c;
-        box-shadow: 0 0 8px rgba(231, 76, 60, 0.8);
+        background: var(--ddb-viewer-btn-danger);
+        box-shadow: 0 0 8px var(--ddb-viewer-btn-danger-glow);
     }
 
     /* Toolbar for measurements */
@@ -1732,7 +1732,7 @@ export default {
         top: 3.75rem;
         left: 0.625rem;
         z-index: 1000;
-        background: rgba(0, 0, 0, 0.7);
+        background: var(--ddb-viewer-toolbar-bg);
         padding: 0.625rem;
         border-radius: 0.3125rem;
         display: flex;
@@ -1741,7 +1741,7 @@ export default {
     }
 
     .btn-measurement {
-        background: #4a90e2;
+        background: var(--ddb-viewer-btn-primary);
         color: white;
         border: none;
         padding: 0.5rem 1rem;
@@ -1755,25 +1755,25 @@ export default {
     }
 
     .btn-measurement:hover {
-        background: #357abd;
+        background: var(--ddb-viewer-btn-primary-hover);
     }
 
     .btn-measurement:disabled {
-        background: #666;
+        background: var(--ddb-viewer-btn-active-bg);
         cursor: not-allowed;
     }
 
     .btn-measurement.btn-danger {
-        background: #e74c3c;
+        background: var(--ddb-viewer-btn-danger);
     }
 
     .btn-measurement.btn-danger:hover {
-        background: #c0392b;
+        background: var(--ddb-viewer-btn-danger-hover);
     }
 
     /* Unit selector toolbar */
     .unit-selector-toolbar {
-        background: rgba(0, 0, 0, 0.7);
+        background: var(--ddb-viewer-toolbar-bg);
         padding: 0.375rem 0.75rem;
         border-radius: 0.3125rem;
         display: flex;
@@ -1789,9 +1789,9 @@ export default {
     }
 
     .unit-selector-toolbar select {
-        background: #555;
+        background: var(--ddb-viewer-select-bg);
         color: white;
-        border: 1px solid #777;
+        border: 1px solid var(--ddb-viewer-select-border);
         padding: 0.375rem 0.625rem;
         border-radius: 0.25rem;
         cursor: pointer;
@@ -1800,11 +1800,11 @@ export default {
     }
 
     .unit-selector-toolbar select:hover {
-        background: #666;
+        background: var(--ddb-viewer-btn-active-bg);
     }
 
     .unit-selector-toolbar select:focus {
-        border-color: #4a90e2;
+        border-color: var(--ddb-viewer-btn-primary);
     }
 }
 </style>

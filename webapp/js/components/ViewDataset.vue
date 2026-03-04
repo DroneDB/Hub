@@ -1082,7 +1082,7 @@ export default {
 .lightbox-direct-link,
 .lightbox-open-fullsize {
     cursor: pointer;
-    color: #ddd;
+    color: var(--ddb-text-on-dark);
     font-size: 20px;
     padding: 6px 10px;
     border-radius: 4px;
@@ -1105,7 +1105,7 @@ export default {
     transform: translateX(-50%);
     z-index: 1000000001;
     background: rgba(0, 0, 0, 0.65);
-    color: #eee;
+    color: var(--ddb-text-on-dark);
     padding: 8px 16px;
     border-radius: 6px;
     font-size: 13px;

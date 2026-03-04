@@ -25,7 +25,7 @@
                         <div class="storage-percentage" :style="{ color: storageBarColor }">
                             {{ percent(storageInfo.usedPercentage, 1) }}
                         </div>
-                        <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: #555;">
+                        <table style="width: 100%; margin-bottom: 0; margin-top: 1rem; color: var(--ddb-text-secondary);">
                             <thead><tr>
                                 <th><b>Total</b></th>
                                 <th><b>Used</b></th>
@@ -42,7 +42,7 @@
                         </div>
                     </template>
                     <template v-else>
-                        <table style="width: 100%; margin-bottom: 0; color: #555;">
+                        <table style="width: 100%; margin-bottom: 0; color: var(--ddb-text-secondary);">
                             <thead><tr>
                                 <th><b>Total</b></th>
                             </tr></thead>
@@ -112,12 +112,12 @@ export default {
 
     computed: {
         storageBarColor: function () {
-            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return '#21ba45';
+            if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 'var(--ddb-success)';
             const pct = this.storageInfo.usedPercentage * 100;
-            if (pct >= 90) return '#db2828';
-            if (pct >= 70) return '#f2711c';
-            if (pct >= 50) return '#fbbd08';
-            return '#21ba45';
+            if (pct >= 90) return 'var(--ddb-danger)';
+            if (pct >= 70) return 'var(--ddb-warning)';
+            if (pct >= 50) return 'var(--ddb-warning)';
+            return 'var(--ddb-success)';
         },
         storagePercent: function () {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 0;
@@ -377,7 +377,7 @@ export default {
     margin: 0;
     padding: 0.5rem;
     width: 100%;
-    box-shadow: 0 0.125rem 0.25rem -0.125rem #000000;
+    box-shadow: 0 0.125rem 0.25rem -0.125rem rgba(0, 0, 0, 0.3);
     display: flex;
     align-items: center;
     z-index: 2;
@@ -397,7 +397,7 @@ export default {
 
         .app-name {
             font-size: 2rem;
-            color: #030a03;
+            color: var(--ddb-text);
             font-weight: bold;
             display: inline-block;
         }
@@ -426,7 +426,7 @@ export default {
 
     .storage-warning {
         margin-top: 0.625rem;
-        color: #db2828;
+        color: var(--ddb-danger);
         font-weight: bold;
         font-size: 1em;
     }

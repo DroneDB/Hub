@@ -64,26 +64,26 @@ export default {
     display: flex;
     align-items: center;
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--ddb-border-separator);
     height: 3rem;
     box-sizing: border-box;
     transition: background-color 0.2s ease;
 }
 
 .file-upload-row:hover {
-    background-color: #f9f9f9;
+    background-color: var(--ddb-bg-light);
 }
 
 .file-upload-row.status-error {
-    background-color: #fff5f5;
+    background-color: var(--ddb-danger-bg);
 }
 
 .file-upload-row.status-done {
-    background-color: #f5fff5;
+    background-color: var(--ddb-success-bg);
 }
 
 .file-upload-row.status-uploading {
-    background-color: #f5f9ff;
+    background-color: var(--ddb-info-bg);
 }
 
 .file-icon {
@@ -107,12 +107,12 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
     font-size: 0.8125rem;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .file-size {
     font-size: 0.6875rem;
-    color: #888;
+    color: var(--ddb-text-muted);
     margin-top: 0.125rem;
 }
 
@@ -124,14 +124,14 @@ export default {
 .progress-bar-container {
     position: relative;
     height: 1.25rem;
-    background-color: #e0e0e0;
+    background-color: var(--ddb-border-separator);
     border-radius: 0.25rem;
     overflow: hidden;
 }
 
 .progress-bar {
     height: 100%;
-    background-color: #21ba45;
+    background-color: var(--ddb-success);
     transition: width 0.3s ease;
 }
 
@@ -142,13 +142,13 @@ export default {
     transform: translate(-50%, -50%);
     font-size: 0.6875rem;
     font-weight: bold;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .error-message {
     display: flex;
     align-items: center;
-    color: #db2828;
+    color: var(--ddb-danger);
     font-size: 0.75rem;
 }
 
@@ -157,7 +157,7 @@ export default {
 }
 
 .done-label {
-    color: #21ba45;
+    color: var(--ddb-success);
     font-size: 0.75rem;
     font-weight: 500;
 }

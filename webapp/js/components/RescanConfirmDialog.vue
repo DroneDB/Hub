@@ -75,7 +75,7 @@ export default {
 }
 
 .warning-box > .icon {
-    color: #f2711c;
+    color: var(--ddb-warning-text);
     font-size: 1.3em;
     flex-shrink: 0;
 }

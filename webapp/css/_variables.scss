@@ -1,0 +1,89 @@
+// ============================================================
+// DroneDB Hub — Design Tokens
+// ============================================================
+//
+// Centralized color palette.
+// All components should reference these CSS custom properties
+// instead of hardcoding hex/rgba values.
+//
+// ============================================================
+
+:root {
+    // ── Brand ──────────────────────────────────────────────
+    --ddb-primary: #0041E8;
+    --ddb-primary-rgb: 0, 65, 232;
+    --ddb-secondary: #00C4CC;
+    --ddb-secondary-rgb: 0, 196, 204;
+    --ddb-accent: #6C5CE7;
+
+    // ── Text ───────────────────────────────────────────────
+    --ddb-text: #1A1A2E;
+    --ddb-text-secondary: #555;
+    --ddb-text-muted: #999;
+    --ddb-text-on-dark: #fefefe;
+    --ddb-text-on-color: #fff;
+
+    // ── Backgrounds ────────────────────────────────────────
+    --ddb-bg: #fefefe;
+    --ddb-bg-light: #FAFBFC;
+    --ddb-bg-subtle: #f5f5f5;
+    --ddb-bg-hover: #f0f0f0;
+    --ddb-bg-dark: #212121;
+    --ddb-bg-surface: #fff;
+
+    // ── Borders ────────────────────────────────────────────
+    --ddb-border: #ddd;
+    --ddb-border-light: rgba(34, 36, 38, 0.15);
+    --ddb-border-medium: #d4d4d5;
+    --ddb-border-separator: #e0e0e0;
+
+    // ── Status ─────────────────────────────────────────────
+    --ddb-success: #198754;
+    --ddb-success-rgb: 25, 135, 84;
+    --ddb-danger: #dc3545;
+    --ddb-danger-rgb: 220, 53, 69;
+    --ddb-warning: #ffc107;
+    --ddb-warning-rgb: 255, 193, 7;
+    --ddb-warning-text: #856404;
+    --ddb-warning-bg: #fff3cd;
+    --ddb-info: #0dcaf0;
+
+    // ── Status Backgrounds (light tints) ───────────────────
+    --ddb-success-bg: #f5fff5;
+    --ddb-danger-bg: #fff5f5;
+    --ddb-info-bg: #f5f9ff;
+    --ddb-selected-bg: #e8f4ff;
+    --ddb-selected-active-bg: #d8e8f8;
+
+    // ── Link ───────────────────────────────────────────────
+    --ddb-link: var(--ddb-primary);
+
+    // ── Viewer (dark backgrounds for 3D/panorama/potree) ──
+    --ddb-viewer-bg: #1a1a2e;
+    --ddb-viewer-gradient-center: rgba(79, 79, 79, 1);
+    --ddb-viewer-gradient-edge: rgba(22, 22, 22, 1);
+
+    // ── Viewer Dark UI (sidebar & toolbars) ────────────────
+    --ddb-viewer-sidebar-bg: #19282c;
+    --ddb-viewer-sidebar-link: #8Aa1c4;
+    --ddb-viewer-sidebar-muted: #9AA1A4;
+    --ddb-viewer-toolbar-bg: rgba(0, 0, 0, 0.7);
+    --ddb-viewer-toolbar-overlay: rgba(0, 0, 0, 0.5);
+    --ddb-viewer-btn-bg: #555;
+    --ddb-viewer-btn-hover: #777;
+    --ddb-viewer-btn-disabled-bg: #333;
+    --ddb-viewer-btn-disabled-color: #666;
+    --ddb-viewer-btn-active-bg: #666;
+    --ddb-viewer-btn-primary: #4a90e2;
+    --ddb-viewer-btn-primary-hover: #357abd;
+    --ddb-viewer-btn-danger: #e74c3c;
+    --ddb-viewer-btn-danger-hover: #c0392b;
+    --ddb-viewer-btn-danger-glow: rgba(231, 76, 60, 0.8);
+    --ddb-viewer-select-bg: #555;
+    --ddb-viewer-select-border: #777;
+    --ddb-viewer-label-color: #555;
+
+    // ── Gradients
+    --ddb-gradient-start: #0025e0;
+    --ddb-gradient-end: #00bbe0;
+}

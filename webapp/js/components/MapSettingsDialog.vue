@@ -368,7 +368,7 @@ export default {
 .setting-label {
     font-size: 0.8125rem;
     font-weight: 500;
-    color: #333;
+    color: var(--ddb-text);
     display: flex;
     align-items: center;
     gap: 0.375rem;
@@ -376,7 +376,7 @@ export default {
 
 .setting-label .icon {
     margin: 0;
-    color: #555;
+    color: var(--ddb-text-secondary);
 }
 
 .setting-toggle {
@@ -402,9 +402,9 @@ export default {
     gap: 0.6rem;
     padding: 0.5rem 0;
     margin: 0 0.75rem;
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--ddb-border-separator);
     border-radius: 0.25rem;
-    background: #fafafa;
+    background: var(--ddb-bg-light);
 }
 
 .setting-input {
@@ -417,7 +417,7 @@ export default {
 .custom-error {
     padding: 0.25rem 0.75rem;
     font-size: 0.75rem;
-    color: #db2828;
+    color: var(--ddb-danger);
     display: flex;
     align-items: center;
     gap: 0.25rem;

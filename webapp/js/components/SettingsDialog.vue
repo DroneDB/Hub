@@ -334,7 +334,7 @@ export default {
     font-size: 90%;
     margin-top: 0.25rem;
     max-width: 26.25rem;
-    color: #555;
+    color: var(--ddb-text-secondary);
 }
 
 .settings-desc a {
@@ -342,7 +342,7 @@ export default {
 }
 
 .settings-section .ui.button {
-    color: #030A03 !important;
+    color: var(--ddb-text) !important;
 }
 
 .license-dropdown {
@@ -354,16 +354,16 @@ export default {
     gap: 0.5rem;
     padding: 0.625rem 0.75rem;
     margin-bottom: 0.75rem;
-    background-color: rgba(33, 133, 208, 0.08);
-    border: 1px solid rgba(33, 133, 208, 0.2);
+    background-color: rgba(var(--ddb-primary-rgb), 0.08);
+    border: 1px solid rgba(var(--ddb-primary-rgb), 0.2);
     border-radius: 0.25rem;
     font-size: 90%;
-    color: #444;
+    color: var(--ddb-text-secondary);
     line-height: 1.4;
 }
 
 .rescan-info-box > .icon {
-    color: #2185d0;
+    color: var(--ddb-primary);
     flex-shrink: 0;
     margin-top: 0.125rem;
 }
@@ -373,7 +373,7 @@ export default {
 }
 
 .tagline-field .char-count {
-    color: #999;
+    color: var(--ddb-text-muted);
     float: right;
     margin-top: 0.125rem;
     font-size: 0.75rem;
@@ -393,7 +393,7 @@ export default {
     max-width: 7.5rem;
     max-height: 5rem;
     object-fit: contain;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ddb-border);
     border-radius: 0.25rem;
 }
 

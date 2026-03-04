@@ -47,7 +47,7 @@ export default {
 .opacity-control input[type="range"] {
     width: 7.5rem;
     cursor: pointer;
-    accent-color: #4fc3f7;
+    accent-color: var(--ddb-secondary);
 }
 
 .opacity-control .opacity-value {

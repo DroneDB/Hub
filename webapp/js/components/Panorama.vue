@@ -94,14 +94,14 @@ export default {
         margin: 0.5rem;
     }
 
-    background: #030A03;
+    background: var(--ddb-viewer-bg);
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
 
     .loading {
-        color: #fefefe;
+        color: var(--ddb-text-on-dark);
         font-size: 120%;
         margin: 0.5rem;
         text-align: center;
@@ -119,11 +119,11 @@ export default {
         height: 100%;
 
         .psv-loader {
-            color: #fefefe;
+            color: var(--ddb-text-on-dark);
         }
 
         .psv-container {
-            background: #030A03;
+            background: var(--ddb-viewer-bg);
         }
     }
 

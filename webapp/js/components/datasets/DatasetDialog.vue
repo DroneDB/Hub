@@ -169,7 +169,7 @@ export default {
 }
 
 .char-count {
-    color: #999;
+    color: var(--ddb-text-muted);
     float: right;
     margin-top: 0.125rem;
 }

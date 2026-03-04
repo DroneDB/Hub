@@ -234,7 +234,7 @@ export default {
 
 #account .account-card h3 {
     margin: 0 0 1rem 0;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 #account .account-card h3 i {
@@ -255,7 +255,7 @@ export default {
 .info-item label {
     display: block;
     font-weight: bold;
-    color: #666;
+    color: var(--ddb-text-secondary);
     font-size: 0.9em;
     margin-bottom: 0.25rem;
 }
@@ -263,7 +263,7 @@ export default {
 .info-item p {
     margin: 0;
     font-size: 1.1em;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .storage-bar-container .storage-details {
@@ -275,11 +275,11 @@ export default {
 
 .storage-bar-container .storage-details .used {
     font-weight: bold;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .storage-bar-container .storage-details .available {
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 
 .action-card {
@@ -288,11 +288,11 @@ export default {
 }
 
 .action-card:hover {
-    background-color: #f5f5f5;
+    background-color: var(--ddb-bg-subtle);
 }
 
 .action-card.logout:hover {
-    background-color: #fff5f5;
+    background-color: var(--ddb-danger-bg);
 }
 
 .action-row {
@@ -316,6 +316,6 @@ export default {
     align-items: center;
     min-height: 12.5rem;
     font-size: 2em;
-    color: #888;
+    color: var(--ddb-text-muted);
 }
 </style>

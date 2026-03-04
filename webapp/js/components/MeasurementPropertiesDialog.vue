@@ -170,14 +170,14 @@ export default {
     display: block;
     margin-bottom: 0.25rem;
     font-weight: 500;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .form-group input[type="text"],
 .form-group textarea {
     width: 100%;
     padding: 0.5rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ddb-border);
     border-radius: 0.25rem;
     font-size: 0.875rem;
     box-sizing: border-box;
@@ -220,7 +220,7 @@ export default {
     width: 1.75rem;
     height: 1.75rem;
     padding: 0;
-    border: 1px solid #ccc;
+    border: 1px solid var(--ddb-border);
     border-radius: 0.25rem;
     cursor: pointer;
     background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
@@ -232,7 +232,7 @@ export default {
     gap: 0.5rem;
     margin-top: 1.25rem;
     padding-top: 1rem;
-    border-top: 1px solid #eee;
+    border-top: 1px solid var(--ddb-border-separator);
 }
 
 .buttons button {
@@ -244,20 +244,21 @@ export default {
 }
 
 .btn-cancel {
-    background-color: #e0e0e0;
-    color: #333;
+    background-color: var(--ddb-border-separator);
+    color: var(--ddb-text);
 }
 
 .btn-cancel:hover {
-    background-color: #d0d0d0;
+    background-color: var(--ddb-border);
 }
 
 .btn-save {
-    background-color: #4CAF50;
-    color: white;
+    background-color: var(--ddb-success);
+    color: var(--ddb-text-on-color);
 }
 
 .btn-save:hover {
-    background-color: #45a049;
+    background-color: var(--ddb-success);
+    filter: brightness(0.9);
 }
 </style>

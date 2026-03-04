@@ -246,7 +246,7 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: 0.625rem 0.75rem;
-    border: 1px solid rgba(34, 36, 38, 0.15);
+    border: 1px solid var(--ddb-border-light);
     border-radius: 0.25rem;
 }
 
@@ -262,7 +262,7 @@ export default {
 
 .role-description {
     font-size: 0.85em;
-    color: rgba(0, 0, 0, 0.5);
+    color: var(--ddb-text-muted);
 }
 
 .add-role-actions {

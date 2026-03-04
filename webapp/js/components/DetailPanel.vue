@@ -395,13 +395,13 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-    background: white;
-    border-left: 1px solid #d4d4d5;
+    background: var(--ddb-bg-surface);
+    border-left: 1px solid var(--ddb-border-medium);
 }
 
 .detail-header {
     padding: 1rem;
-    border-bottom: 1px solid #d4d4d5;
+    border-bottom: 1px solid var(--ddb-border-medium);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -444,7 +444,7 @@ export default {
 
 .thumbnail-container .icon.massive {
     font-size: 5em;
-    color: #999;
+    color: var(--ddb-text-muted);
 }
 
 .build-status {
@@ -460,11 +460,11 @@ export default {
 }
 
 .build-status.error {
-    background-color: #db2828;
+    background-color: var(--ddb-danger);
 }
 
 .build-status.processing {
-    background-color: #f2711c;
+    background-color: var(--ddb-warning);
 }
 
 .properties-section {
@@ -477,7 +477,7 @@ export default {
 }
 
 .ui.list .item .content .description {
-    color: #666;
+    color: var(--ddb-text-secondary);
     word-break: break-all;
 }
 
@@ -517,8 +517,8 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: white;
-    border-left: 1px solid #d4d4d5;
+    background: var(--ddb-bg-surface);
+    border-left: 1px solid var(--ddb-border-medium);
     padding: 2rem;
 }
 

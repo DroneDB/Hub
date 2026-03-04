@@ -342,17 +342,17 @@ export default {
 }
 
 .thumbnail:hover {
-    background: #eee;
+    background: var(--ddb-bg-secondary);
     cursor: pointer;
 }
 
 .thumbnail:focus,
 .thumbnail:active {
-    background: #dadada;
+    background: var(--ddb-border);
 }
 
 .thumbnail.selected {
-    background: #ddd;
+    background: var(--ddb-border);
 }
 
 .thumbnail .container {
@@ -416,15 +416,15 @@ export default {
 }
 
 .build-badge.success {
-    background-color: #21ba45;
+    background-color: var(--ddb-success);
 }
 
 .build-badge.error {
-    background-color: #db2828;
+    background-color: var(--ddb-danger);
 }
 
 .build-badge.processing {
-    background-color: #f2711c;
+    background-color: var(--ddb-warning);
 }
 
 .build-badge i.icon {

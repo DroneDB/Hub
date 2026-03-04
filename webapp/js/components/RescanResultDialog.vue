@@ -140,11 +140,11 @@ export default {
 }
 
 .file-item.success {
-    background-color: rgba(33, 186, 69, 0.1);
+    background-color: rgba(var(--ddb-success-rgb), 0.1);
 }
 
 .file-item.error {
-    background-color: rgba(219, 40, 40, 0.1);
+    background-color: rgba(var(--ddb-danger-rgb), 0.1);
     flex-direction: column;
 }
 
@@ -161,7 +161,7 @@ export default {
 
 .error-message {
     font-size: 0.9em;
-    color: #db2828;
+    color: var(--ddb-danger);
     margin-left: 1.375rem;
     font-style: italic;
 }

@@ -53,23 +53,23 @@
                     </template>
                 </Column>
                 <Column field="creationDate" header="Creation Date" :sortable="true"
-                    :pt="{ bodyCell: { style: 'text-align: right' }, headerCell: { style: 'text-align: right' } }">
+                    :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">{{ formatDate(slotProps.data.creationDate) }}</template>
                 </Column>
                 <Column field="entries" header="Files" :sortable="true"
-                    :pt="{ bodyCell: { style: 'text-align: right' }, headerCell: { style: 'text-align: right' } }" />
+                    :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
                 <Column field="size" header="Size" :sortable="true"
-                    :pt="{ bodyCell: { style: 'text-align: right' }, headerCell: { style: 'text-align: right' } }">
+                    :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
                 </Column>
-                <Column field="visibility" header="Visibility" :sortable="true">
+                <Column field="visibility" header="Visibility" :sortable="true" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
                         <Tag v-if="slotProps.data.visibility === 2" severity="success" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                         <Tag v-else-if="slotProps.data.visibility === 1" severity="info" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                         <Tag v-else severity="warn" icon="fa-solid fa-lock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                     </template>
                 </Column>
-                <Column v-if="showActionsColumn" header="Actions" style="text-align: center; width: 7.5rem;">
+                <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7.5rem;">
                     <template #body="slotProps">
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
                             @click.stop="handleEdit(slotProps.data)" severity="secondary" outlined size="small"
@@ -694,7 +694,7 @@ export default {
     .org-heading {
         .org-icon {
             font-size: 1.5rem;
-            color: #6c757d;
+            color: var(--ddb-text-secondary);
         }
 
         h1 {
@@ -725,7 +725,7 @@ export default {
 
     .ds-tagline {
         font-weight: normal;
-        color: #888;
+        color: var(--ddb-text-muted);
         font-size: 0.85em;
         margin-top: 0.125rem;
         max-width: 21.875rem;

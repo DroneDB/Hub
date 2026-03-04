@@ -189,7 +189,7 @@ export default {
     margin: 0.625rem 0 0.3125rem 0;
     font-size: 0.875rem;
     font-weight: bold;
-    color: #333;
+    color: var(--ddb-text);
 }
 
 .properties-table {
@@ -201,7 +201,7 @@ export default {
 .property-name {
     padding: 0.3125rem;
     text-align: left;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--ddb-border);
     font-weight: bold;
     width: 30%;
 }
@@ -209,7 +209,7 @@ export default {
 .property-value {
     padding: 0.3125rem;
     text-align: left;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--ddb-border);
     word-break: break-word;
 }
 

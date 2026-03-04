@@ -250,7 +250,7 @@ export default {
 }
 
 .help-text {
-    color: #999;
+    color: var(--ddb-text-muted);
     font-style: italic;
     display: block;
     margin-top: 0.25rem;
@@ -264,6 +264,6 @@ export default {
 .progress-label {
     margin-top: 0.375rem;
     font-size: 0.9em;
-    color: #666;
+    color: var(--ddb-text-secondary);
 }
 </style>

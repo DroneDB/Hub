@@ -545,8 +545,8 @@ export default {
     }
 
     &.dropping {
-        background-color: #EFEFEF;
-        box-shadow: inset 0em 0em 5px 2px grey;
+        background-color: var(--ddb-bg-hover);
+        box-shadow: inset 0em 0em 5px 2px var(--ddb-text-muted);
         cursor: copy;
     }
 }
@@ -564,13 +564,13 @@ export default {
         font-size: 1rem;
 
         .p-breadcrumb-separator {
-            color: #999;
+            color: var(--ddb-text-muted);
             margin: 0 0.2em;
         }
     }
 
     .bc-link {
-        color: #4183c4;
+        color: var(--ddb-link);
         cursor: pointer;
         text-decoration: none;
 

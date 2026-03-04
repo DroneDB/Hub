@@ -110,6 +110,6 @@ export default {
 }
 
 .panel-gutter {
-    background: #e0e0e0 !important;
+    background: var(--ddb-border-separator) !important;
 }
 </style>

@@ -497,7 +497,7 @@ export default {
     .no-results {
         text-align: center;
         padding: 1rem;
-        color: #999;
+        color: var(--ddb-text-muted);
         font-style: italic;
     }
 }

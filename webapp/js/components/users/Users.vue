@@ -639,7 +639,7 @@ export default {
 }
 
 .clickable-row:hover {
-    background-color: #f5f5f5;
+    background-color: var(--ddb-bg-subtle);
     cursor: pointer;
 }
 
@@ -651,18 +651,18 @@ export default {
 .data-table th,
 .data-table td {
     padding: 0.5rem 0.75rem;
-    border: 1px solid #ddd;
+    border: 1px solid var(--ddb-border);
     text-align: left;
 }
 
 .data-table th {
     cursor: pointer;
-    background: #f9fafb;
+    background: var(--ddb-bg-light);
     user-select: none;
 }
 
 .data-table th:hover {
-    background: #f0f0f0;
+    background: var(--ddb-bg-hover);
 }
 
 .center.aligned {
