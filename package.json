@@ -7,6 +7,7 @@
     "dev": "npx webpack --watch",
     "build": "npx webpack",
     "build:prod": "cross-env NODE_ENV=production npx webpack",
+    "pub-dev": "node scripts/pub-dev.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
