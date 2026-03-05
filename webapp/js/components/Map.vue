@@ -457,7 +457,7 @@ export default {
                 if (size > 1) {
                     text = new Text({
                         text: size.toString(),
-                        font: 'bold 14px sans-serif',
+                        font: 'bold 1rem sans-serif',
                         fill: new Fill({
                             color: 'rgba(252, 252, 255, 1)'
                         })
@@ -1426,7 +1426,7 @@ export default {
                                         // Define text style for the label
                                         const textStyle = new Text({
                                             text: label,
-                                            font: 'bold 12px Arial, Helvetica, sans-serif',
+                                            font: 'bold 0.75rem Arial, Helvetica, sans-serif',
                                             fill: new Fill({
                                                 color: '#000'
                                             }),
@@ -1915,10 +1915,10 @@ export default {
 
 .image-popup {
     background: white;
-    border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-    min-width: 260px;
-    max-width: 320px;
+    border-radius: var(--ddb-radius-md);
+    box-shadow: var(--ddb-shadow-md);
+    min-width: 16.25rem;
+    max-width: 20rem;
     overflow: hidden;
     z-index: 1001;
     font-family: inherit;
@@ -1928,24 +1928,24 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 10px;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     background: var(--ddb-bg-subtle);
-    border-bottom: 1px solid var(--ddb-border-separator);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border-separator);
 }
 
 .image-popup-title {
-    font-size: 13px;
+    font-size: var(--ddb-font-size-base);
     font-weight: 600;
     color: var(--ddb-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 160px;
+    max-width: 10rem;
 }
 
 .image-popup-actions {
     display: flex;
-    gap: 4px;
+    gap: var(--ddb-spacing-xs);
     align-items: center;
 }
 
@@ -1953,10 +1953,10 @@ export default {
     background: none;
     border: none;
     cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 3px;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+    border-radius: var(--ddb-radius-sm);
     color: var(--ddb-text-secondary);
-    font-size: 14px;
+    font-size: var(--ddb-font-size-base);
     display: flex;
     align-items: center;
     text-decoration: none;
@@ -1973,17 +1973,17 @@ export default {
 }
 
 .image-popup-body {
-    padding: 6px;
+    padding: var(--ddb-spacing-sm);
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100px;
+    min-height: 6.25rem;
 }
 
 .image-popup-img {
     max-width: 100%;
-    max-height: 240px;
-    border-radius: 4px;
+    max-height: 15rem;
+    border-radius: var(--ddb-radius-sm);
     object-fit: contain;
 }
 
@@ -1991,8 +1991,8 @@ export default {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100px;
-    font-size: 24px;
+    height: 6.25rem;
+    font-size: var(--ddb-font-size-lg);
     color: var(--ddb-text-muted);
 }
 
@@ -2000,14 +2000,14 @@ export default {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 5px 10px;
-    border-top: 1px solid var(--ddb-border-separator);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border-top: var(--ddb-border-width) solid var(--ddb-border-separator);
     background: var(--ddb-bg-light);
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 var(--ddb-radius-md) var(--ddb-radius-md);
 }
 
 .image-popup-coords {
-    font-size: 12px;
+    font-size: var(--ddb-font-size-sm);
     font-family: monospace;
     color: var(--ddb-text-secondary);
     user-select: all;
@@ -2019,7 +2019,7 @@ export default {
 
 .image-popup-copy {
     flex-shrink: 0;
-    margin-left: 6px;
+    margin-left: var(--ddb-spacing-sm);
 }
 
 .image-popup-copy .icon.check {

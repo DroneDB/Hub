@@ -24,14 +24,14 @@ export default {
 <style scoped>
 .opacity-control {
     position: absolute;
-    bottom: 1.875rem;
+    bottom: 2rem;
     left: 50%;
     transform: translateX(-50%);
     z-index: 1;
     display: flex;
-    gap: 0.375rem;
+    gap: 0.5rem;
     background: rgba(0, 0, 0, 0.6);
-    padding: 0.3125rem 0.75rem;
+    padding: 0.25rem 0.75rem;
     border-radius: 1.25rem;
     color: white;
     font-size: 0.75rem;
@@ -39,7 +39,7 @@ export default {
 }
 
 .opacity-control i {
-    font-size: 0.875rem;
+    font-size: var(--ddb-font-size-base);
     opacity: 0.9;
     margin: 0;
 }

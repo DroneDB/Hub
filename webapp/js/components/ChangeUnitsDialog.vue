@@ -1,5 +1,5 @@
 <template>
-    <Window title="Change Units" id="changeUnitsDialog" @onClose="close('cancel')" modal maxWidth="400px" fixedSize>
+    <Window title="Change Units" id="changeUnitsDialog" @onClose="close('cancel')" modal sizeClass="dialog-sm" fixedSize>
         <div class="change-units-content">
             <p>
                 Convert <strong>{{ measurementsCount }}</strong> measurement{{ measurementsCount !== 1 ? 's' : '' }}
@@ -82,6 +82,6 @@ export default {
 
 .change-units-content .description {
     color: var(--ddb-text-secondary);
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
 }
 </style>

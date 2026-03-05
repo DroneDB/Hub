@@ -56,10 +56,10 @@ class MeasureControls extends Control {
         // Separator
         const separator = document.createElement('div');
         separator.style.display = 'inline-block';
-        separator.style.width = '1px';
-        separator.style.height = '26px';
+        separator.style.width = 'var(--ddb-border-width)';
+        separator.style.height = '1.75rem';
         separator.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-        separator.style.margin = '0 4px';
+        separator.style.margin = '0 0.25rem';
         separator.style.verticalAlign = 'middle';
 
         // Save/Load/Clear buttons

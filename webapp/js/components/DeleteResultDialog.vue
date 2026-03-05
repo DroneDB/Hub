@@ -1,5 +1,5 @@
 <template>
-    <Window title="Delete Results" id="delete-results" @onClose="close" modal maxWidth="600px" fixedSize>
+    <Window title="Delete Results" id="delete-results" @onClose="close" modal sizeClass="dialog-lg" fixedSize>
         <div class="delete-results-content">
             <!-- Success section -->
             <div v-if="deleted.length > 0" class="result-section success-section">
@@ -97,12 +97,12 @@ export default {
 }
 
 .file-item {
-    padding: 0.375rem 0.5rem;
-    margin: 0.25rem 0;
-    border-radius: 0.25rem;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+    margin: var(--ddb-spacing-xs) 0;
+    border-radius: var(--ddb-radius-sm);
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--ddb-spacing-sm);
 }
 
 .file-item.success {
@@ -126,9 +126,9 @@ export default {
 }
 
 .error-message {
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-danger);
-    margin-left: 1.375rem;
+    margin-left: 1.5rem;
     font-style: italic;
 }
 </style>

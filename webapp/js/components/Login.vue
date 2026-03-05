@@ -2,7 +2,7 @@
     <div id="login">
         <div class="login-container">
             <div v-if="xAuthInProgress" class="login-loading">
-                <ProgressSpinner style="width: 50px; height: 50px" />
+                <ProgressSpinner class="login-spinner" />
             </div>
             <div v-else>
                 <h2>Welcome Back</h2>
@@ -121,8 +121,13 @@ export default {
 
     .login-container {
         width: 100%;
-        max-width: 420px;
-        padding: 0 1rem;
+        max-width: var(--ddb-login-max-width);
+        padding: 0 var(--ddb-spacing-lg);
+    }
+
+    .login-spinner {
+        width: 3rem;
+        height: 3rem;
     }
 
     .login-form {

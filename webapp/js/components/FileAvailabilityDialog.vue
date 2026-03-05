@@ -1,5 +1,5 @@
 <template>
-    <Window v-if="show" title="" id="fileAvailabilityDialog" @onClose="handleClose" modal maxWidth="600px" fixedSize>
+    <Window v-if="show" title="" id="fileAvailabilityDialog" @onClose="handleClose" modal sizeClass="dialog-lg" fixedSize>
         <div class="file-availability-dialog">
             <div class="dialog-header">
                 <i :class="getHeaderIcon()"></i>
@@ -302,42 +302,42 @@ export default {
 .dialog-header {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 1.2em;
+    gap: var(--ddb-spacing-sm);
+    font-size: var(--ddb-font-size-lg);
     font-weight: bold;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--ddb-spacing-md);
 }
 
 .build-progress {
-    margin-top: 0.9375rem;
+    margin-top: var(--ddb-spacing-lg);
     text-align: center;
-    padding: 0.9375rem;
+    padding: var(--ddb-spacing-lg);
     background-color: var(--ddb-bg-light);
-    border-radius: 0.25rem;
+    border-radius: var(--ddb-radius-sm);
 }
 
 .progress-timer {
-    margin-top: 0.625rem;
-    font-size: 0.9em;
+    margin-top: var(--ddb-spacing-sm);
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-text-secondary);
 }
 
 .build-details {
-    margin-top: 0.9375rem;
+    margin-top: var(--ddb-spacing-lg);
     background-color: var(--ddb-bg-light);
-    padding: 0.9375rem;
-    border-radius: 0.25rem;
+    padding: var(--ddb-spacing-lg);
+    border-radius: var(--ddb-radius-sm);
 }
 
 .build-details h4 {
     margin-top: 0;
-    margin-bottom: 0.625rem;
+    margin-bottom: var(--ddb-spacing-sm);
 }
 
 .build-details code {
-    font-size: 0.85em;
+    font-size: var(--ddb-font-size-sm);
     background-color: var(--ddb-border-separator);
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.1875rem;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs);
+    border-radius: var(--ddb-radius-sm);
 }
 </style>

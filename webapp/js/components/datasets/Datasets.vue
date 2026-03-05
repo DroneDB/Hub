@@ -4,7 +4,7 @@
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
-            <ProgressSpinner style="width: 3.125rem; height: 3.125rem" />
+            <ProgressSpinner style="width: 3rem; height: 3rem" />
         </div>
         <div v-else>
             <Toolbar class="top-toolbar">
@@ -12,17 +12,23 @@
                     <div class="org-heading d-flex align-items-center gap-3">
                         <i class="fa-solid fa-sitemap org-icon"></i>
                         <div>
-                            <h1 class="mb-0">{{ orgName }}</h1>
-                            <div v-if="orgInfo?.description" class="text-muted" style="font-size: 0.85em; margin-top: 0.25rem;">{{ orgInfo.description }}</div>
-                            <p class="text-muted mb-0 mt-1"><Badge :value="filteredDatasets.length" severity="secondary" /> dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</p>
+                            <div class="d-flex align-items-center gap-2">
+                                <h1 class="mb-0">{{ orgName }}</h1>
+                                <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text size="small" title="Edit Organization">
+                                    <i class="fa-solid fa-pencil"></i>
+                                </Button>
+                                <Tag severity="secondary">{{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</Tag>
+                            </div>
+                            <div v-if="orgInfo?.description" class="text-muted small mt-1">{{ orgInfo.description }}</div>
                         </div>
                     </div>
                 </template>
                 <template #end>
                     <div class="d-flex align-items-center gap-2">
-                        <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text size="small" title="Edit Organization">
-                            <i class="fa-solid fa-wrench"></i>
-                        </Button>
+                        <IconField>
+                            <InputIcon class="fa-solid fa-magnifying-glass" />
+                            <InputText v-model="searchQuery" placeholder="Search datasets..." style="min-width: 14rem" />
+                        </IconField>
                         <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" text size="small" title="Manage Members">
                             <i class="fa-solid fa-users"></i> <span class="ms-1">Members</span>
                         </Button>
@@ -32,14 +38,6 @@
                     </div>
                 </template>
             </Toolbar>
-
-            <!-- Dataset Controls -->
-            <div class="mb-3">
-                <IconField>
-                    <InputIcon class="fa-solid fa-magnifying-glass" />
-                    <InputText v-model="searchQuery" placeholder="Search datasets..." class="w-100" />
-                </IconField>
-            </div>
 
             <!-- Datasets Table -->
             <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
@@ -704,7 +702,7 @@ export default {
 
     .org-heading {
         .org-icon {
-            font-size: 1.5rem;
+            font-size: var(--ddb-font-size-lg);
             color: var(--ddb-text-secondary);
         }
 
@@ -720,10 +718,10 @@ export default {
 
     .ds-thumb-img {
         display: block;
-        width: 3.375rem;
+        width: 3.5rem;
         height: 2.5rem;
         object-fit: cover;
-        border-radius: 0.1875rem;
+        border-radius: var(--ddb-radius-sm);
     }
 
     .ds-thumb-placeholder {
@@ -737,9 +735,9 @@ export default {
     .ds-tagline {
         font-weight: normal;
         color: var(--ddb-text-muted);
-        font-size: 0.85em;
-        margin-top: 0.125rem;
-        max-width: 21.875rem;
+        font-size: var(--ddb-font-size-sm);
+        margin-top: var(--ddb-spacing-xs);
+        max-width: 22rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;

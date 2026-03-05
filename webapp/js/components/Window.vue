@@ -56,10 +56,19 @@ export default {
             type: Boolean,
             default: true
         },
+        sizeClass: {
+            type: String,
+            default: null
+        },
     },
     computed: {
         dialogStyle() {
             const style = {};
+            if (this.sizeClass) {
+                // Size managed by CSS class — no inline dimensions
+                style.width = 'auto';
+                return style;
+            }
             if (this.fixedSize) {
                 // Auto-sized dialog: use maxWidth for constraint
                 style.width = 'auto';
@@ -83,9 +92,13 @@ export default {
             return {};
         },
         dialogPt() {
+            const rootClasses = ['window-dialog'];
+            if (this.sizeClass) {
+                rootClasses.push(this.sizeClass);
+            }
             return {
                 root: {
-                    class: 'window-dialog'
+                    class: rootClasses.join(' ')
                 },
                 content: {
                     // class: 'text-selectable'

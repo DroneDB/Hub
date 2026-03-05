@@ -102,13 +102,13 @@ export default {
 
     .loading {
         color: var(--ddb-text-on-dark);
-        font-size: 120%;
+        font-size: var(--ddb-font-size-base);
         margin: 0.5rem;
         text-align: center;
 
         .circle.notch {
             height: 1.25rem;
-            width: 1.375rem;
+            width: 1.25rem;
         }
     }
 

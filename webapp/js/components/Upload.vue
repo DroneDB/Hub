@@ -16,14 +16,14 @@
                     </div>
                     <template v-if="!inIframe">
                     <div v-for="f in Object.keys(fileUploadStatus)" :key="f" class="progress-indicator">
-                        <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :showValue="false" style="height: 0.8em; margin-bottom: 0.3em;" />
+                        <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :showValue="false" style="height: 0.75rem; margin-bottom: 0.25rem;" />
                         <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
                     </div>
                     </template>
                     <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
                         <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
                     </div>
-                    <ProgressBar :value="parseFloat(totalProgress)" style="height: 0.5em; margin-top: 0.5em;" :showValue="false" />
+                    <ProgressBar :value="parseFloat(totalProgress)" style="height: 0.5rem; margin-top: 0.5rem;" :showValue="false" />
                     </template>
                 </Card>
 
@@ -285,9 +285,9 @@ export default {
     text-align: center;
 
     .circle.notch {
-        margin-bottom: 0.75rem;
+        margin-bottom: var(--ddb-spacing-md);
         height: 1.25rem;
-        width: 1.375rem;
+        width: 1.25rem;
     }
 
     .progress-indicator {

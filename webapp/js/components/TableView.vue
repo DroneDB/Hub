@@ -638,7 +638,7 @@ export default {
 
         .p-breadcrumb-separator {
             color: var(--ddb-text-muted);
-            margin: 0 0.2em;
+            margin: 0 0.25rem;
         }
     }
 
@@ -673,7 +673,7 @@ export default {
 
 #table-view.dropping {
     background-color: var(--ddb-bg-hover);
-    box-shadow: inset 0em 0em 5px 2px var(--ddb-text-muted);
+    box-shadow: inset 0 0 var(--ddb-spacing-sm) var(--ddb-spacing-xs) var(--ddb-text-muted);
     cursor: copy;
 }
 
@@ -707,7 +707,7 @@ export default {
 }
 
 .ui.table .icon-column {
-    width: 50px;
+    width: 3rem;
     text-align: center;
 }
 
@@ -716,30 +716,30 @@ export default {
 }
 
 .ui.table .icon-column i.icon.badge {
-    margin-left: 4px;
-    font-size: 0.9em;
+    margin-left: var(--ddb-spacing-xs);
+    font-size: var(--ddb-font-size-base);
 }
 
 .ui.table .name-column {
-    min-width: 200px;
+    min-width: 12.5rem;
     word-break: break-all;
 }
 
 .ui.table .type-column {
-    width: 120px;
+    width: 7.5rem;
 }
 
 .ui.table .size-column {
-    width: 100px;
+    width: 6.25rem;
     text-align: right;
 }
 
 .ui.table .date-column {
-    width: 180px;
+    width: 11.25rem;
     text-align: right;
 }
 
 .ui.placeholder.segment {
-    margin: 2em;
+    margin: var(--ddb-spacing-xl);
 }
 </style>

@@ -539,7 +539,7 @@ export default {
 
     &.dropping {
         background-color: var(--ddb-bg-hover);
-        box-shadow: inset 0em 0em 5px 2px var(--ddb-text-muted);
+        box-shadow: inset 0 0 var(--ddb-spacing-sm) var(--ddb-spacing-xs) var(--ddb-text-muted);
         cursor: copy;
     }
 }
@@ -558,7 +558,7 @@ export default {
 
         .p-breadcrumb-separator {
             color: var(--ddb-text-muted);
-            margin: 0 0.2em;
+            margin: 0 0.25rem;
         }
     }
 

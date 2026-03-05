@@ -6,9 +6,6 @@
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <PrimeMessage v-if="success" severity="success" :closable="false">
-                <strong>{{ successMessage }}</strong>
-            </PrimeMessage>
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
@@ -24,7 +21,7 @@
                                     <InputText v-model="searchQuery" placeholder="Search organizations" class="w-100" />
                                 </IconField>
                             </div>
-                            <Button @click="loadOrganizations" icon="fa-solid fa-arrows-rotate" label="Refresh" />
+                            <Button @click="loadOrganizations" severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" />
                         </div>
 
                         <table class="ui celled table" v-if="filteredOrganizations.length > 0">
@@ -140,8 +137,6 @@ export default {
         return {
             loading: true,
             error: "",
-            success: false,
-            successMessage: "",
             activeTab: "list",
             organizations: [],
             searchQuery: "",
@@ -242,21 +237,15 @@ export default {
                 // Remove organization from list
                 this.organizations = this.organizations.filter(org => org.slug !== this.orgToDelete.slug);
 
-                this.success = true;
-                this.successMessage = `Organization "${this.orgToDelete.name || this.orgToDelete.slug}" deleted successfully!`;
+                this.$toast.add({ severity: 'success', summary: 'Organization Deleted', detail: `Organization "${this.orgToDelete.name || this.orgToDelete.slug}" deleted successfully`, life: 3000 });
 
                 // Close dialog and reset state
                 this.showDeleteDialog = false;
                 this.orgToDelete = null;
                 this.deleting = null;
 
-                // Clear success message after some time
-                setTimeout(() => {
-                    this.success = false;
-                    this.successMessage = "";
-                }, 3000);
-
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization: ' + (e.message || 'Unknown error'), life: 5000 });
                 this.error = e.message || 'Failed to delete organization';
                 this.deleting = null;
             }
@@ -284,8 +273,7 @@ export default {
                 // Add to organizations list
                 this.organizations.push(newOrg);
 
-                this.success = true;
-                this.successMessage = `Organization "${this.newOrgName}" created successfully!`;
+                this.$toast.add({ severity: 'success', summary: 'Organization Created', detail: `Organization "${this.newOrgName}" created successfully`, life: 3000 });
 
                 // Reset form
                 this.resetCreateForm();
@@ -293,13 +281,8 @@ export default {
                 // Switch to list tab
                 this.activeTab = "list";
 
-                // Clear success message after some time
-                setTimeout(() => {
-                    this.success = false;
-                    this.successMessage = "";
-                }, 3000);
-
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization: ' + (e.message || 'Unknown error'), life: 5000 });
                 this.createError = e.message || 'Failed to create organization';
             }
             this.creating = false;
@@ -326,8 +309,8 @@ export default {
 
 code {
     background-color: var(--ddb-bg-subtle);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.1875rem;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs);
+    border-radius: var(--ddb-radius-sm);
     font-family: monospace;
 }
 </style>

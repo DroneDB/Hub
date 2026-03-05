@@ -63,8 +63,8 @@ export default {
 .file-upload-row {
     display: flex;
     align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--ddb-border-separator);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border-separator);
     height: 3rem;
     box-sizing: border-box;
     transition: background-color 0.2s ease;
@@ -106,14 +106,14 @@ export default {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 0.8125rem;
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-text);
 }
 
 .file-size {
-    font-size: 0.6875rem;
+    font-size: var(--ddb-font-size-sm);
     color: var(--ddb-text-muted);
-    margin-top: 0.125rem;
+    margin-top: var(--ddb-spacing-xs);
 }
 
 .file-progress {
@@ -140,7 +140,7 @@ export default {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    font-size: 0.6875rem;
+    font-size: var(--ddb-font-size-sm);
     font-weight: bold;
     color: var(--ddb-text);
 }

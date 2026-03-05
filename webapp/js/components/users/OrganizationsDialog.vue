@@ -1,5 +1,5 @@
 <template>
-    <Window title="Manage User Organizations" id="organizationsDialog" @onClose="close" modal width="750px" fixedSize>
+    <Window title="Manage User Organizations" id="organizationsDialog" @onClose="close" modal sizeClass="dialog-xl" fixedSize>
         <div class="organizations-dialog">
             <!-- Loading state -->
             <div v-if="loading" class="ui active centered inline loader"></div>
@@ -26,7 +26,7 @@
                         <Select v-model="newOrg.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
                     </div>
                     <div>
-                        <Button severity="info" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
+                        <Button severity="primary" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
                     </div>
                 </div>
             </div>
@@ -58,7 +58,7 @@
                                     optionValue="value"
                                     @change="updatePermission(org)"
                                     class="w-full" />
-                            <Tag v-else value="Full Access" />
+                            <Tag v-else severity="info" value="Full Access" />
                         </td>
                         <td>
                             <span v-if="org.grantedAt">
@@ -74,7 +74,7 @@
                                     @click="confirmRemoveOrganization(org)"
                                     :disabled="removingOrg === org.slug"
                                     icon="fa-solid fa-trash" label="Remove" />
-                            <Tag v-else value="Cannot remove" />
+                            <span v-else>-</span>
                         </td>
                     </tr>
                 </tbody>
@@ -200,6 +200,7 @@ export default {
                     this.newOrg.permissions
                 );
 
+                this.$toast.add({ severity: 'success', summary: 'Organization Added', detail: `User added to organization successfully`, life: 3000 });
                 this.hasChanges = true;
 
                 // Refresh organizations list
@@ -210,6 +211,7 @@ export default {
                 this.newOrg.permissions = 1;
 
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to add organization', life: 5000 });
                 this.error = e.message || 'Failed to add organization';
             } finally {
                 this.addingOrg = false;
@@ -223,7 +225,9 @@ export default {
                     org.slug,
                     org.permissions
                 );
+                this.$toast.add({ severity: 'success', summary: 'Permissions Updated', detail: `Permissions updated for organization "${org.name || org.slug}"`, life: 3000 });
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to update permissions', life: 5000 });
                 this.error = e.message || 'Failed to update permissions';
                 // Reload to get correct state
                 await this.loadData();
@@ -246,9 +250,11 @@ export default {
             this.removingOrg = this.orgToRemove.slug;
             try {
                 await reg.removeUserFromOrganization(this.user.userName, this.orgToRemove.slug);
+                this.$toast.add({ severity: 'success', summary: 'Organization Removed', detail: `User removed from organization successfully`, life: 3000 });
                 this.hasChanges = true;
                 await this.loadData();
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to remove from organization', life: 5000 });
                 this.error = e.message || 'Failed to remove from organization';
             } finally {
                 this.removingOrg = null;
@@ -271,7 +277,6 @@ export default {
 
 <style scoped>
 .organizations-dialog {
-    padding: 1rem;
     overflow-y: auto;
     display: flex;
     flex-direction: column;

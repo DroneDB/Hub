@@ -198,14 +198,18 @@ export default {
         setVisibility: async function () {
             try {
                 this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);
+                this.$toast.add({ severity: 'success', summary: 'Visibility Updated', detail: 'Dataset visibility updated successfully', life: 3000 });
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update visibility: ' + e.message, life: 5000 });
                 this.error = e.message;
             }
         },
         setLicense: async function () {
             try {
                 this.properties.meta.license = await this.dataset.metaSet("license", this.license);
+                this.$toast.add({ severity: 'success', summary: 'License Updated', detail: 'Dataset license updated successfully', life: 3000 });
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update license: ' + e.message, life: 5000 });
                 this.error = e.message;
             }
         },
@@ -213,11 +217,14 @@ export default {
             try {
                 if (this.tagline && this.tagline.trim()) {
                     await this.dataset.metaSet('tagline', this.tagline.trim());
+                    this.$toast.add({ severity: 'success', summary: 'Tagline Updated', detail: 'Tagline updated successfully', life: 3000 });
                 } else {
                     await this.dataset.metaUnset('tagline');
                     this.tagline = '';
+                    this.$toast.add({ severity: 'success', summary: 'Tagline Removed', detail: 'Tagline removed successfully', life: 3000 });
                 }
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update tagline: ' + e.message, life: 5000 });
                 this.error = e.message;
             }
         },
@@ -240,7 +247,9 @@ export default {
                 // Refresh preview with cache-busting timestamp
                 this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
                 this.thumbnailError = false;
+                this.$toast.add({ severity: 'success', summary: 'Thumbnail Updated', detail: 'Thumbnail uploaded successfully', life: 3000 });
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to upload thumbnail: ' + e.message, life: 5000 });
                 this.error = 'Failed to upload thumbnail: ' + e.message;
             }
 
@@ -266,7 +275,9 @@ export default {
 
                 this.thumbnailPreview = null;
                 this.thumbnailError = true;
+                this.$toast.add({ severity: 'success', summary: 'Thumbnail Removed', detail: 'Thumbnail removed successfully', life: 3000 });
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove thumbnail: ' + e.message, life: 5000 });
                 this.error = 'Failed to remove thumbnail: ' + e.message;
             }
 
@@ -278,20 +289,22 @@ export default {
 
             var entry = null;
 
-            switch (document) {
-                // case "LICENSE.md":
-                //     entry = await this.dataset.writeObj(document, "# License\n");
-                //     this.license = document;
-                //     break;
-                case "README.md":
-                    entry = await this.dataset.writeObj(document, "\n");
-                    this.readme = document;
-                    break;
-                default:
-                    throw new Error("Invalid document: " + document);
-            }
+            try {
+                switch (document) {
+                    case "README.md":
+                        entry = await this.dataset.writeObj(document, "\n");
+                        this.readme = document;
+                        break;
+                    default:
+                        throw new Error("Invalid document: " + document);
+                }
 
-            this.$emit('addMarkdown', document, entry);
+                this.$toast.add({ severity: 'success', summary: 'Document Created', detail: `${document} created successfully`, life: 3000 });
+                this.$emit('addMarkdown', document, entry);
+            } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create document: ' + e.message, life: 5000 });
+                this.error = e.message;
+            }
 
             this.loading = false;
         }
@@ -316,8 +329,8 @@ export default {
 }
 
 .settings-section {
-    padding: 0.75rem 0;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding: var(--ddb-spacing-md) 0;
+    border-bottom: var(--ddb-border-width) solid rgba(0, 0, 0, 0.08);
 }
 
 .settings-section:last-child {
@@ -327,7 +340,7 @@ export default {
 
 .settings-section .ui.header {
     margin-top: 0;
-    margin-bottom: 0.375rem;
+    margin-bottom: var(--ddb-spacing-xs);
 }
 
 .settings-desc {
@@ -346,18 +359,18 @@ export default {
 }
 
 .license-dropdown {
-    max-width: 15.625rem;
+    max-width: 16rem;
 }
 
 .rescan-info-box {
     display: flex;
-    gap: 0.5rem;
-    padding: 0.625rem 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    margin-bottom: var(--ddb-spacing-md);
     background-color: rgba(var(--ddb-primary-rgb), 0.08);
-    border: 1px solid rgba(var(--ddb-primary-rgb), 0.2);
-    border-radius: 0.25rem;
-    font-size: 90%;
+    border: var(--ddb-border-width) solid rgba(var(--ddb-primary-rgb), 0.2);
+    border-radius: var(--ddb-radius-sm);
+    font-size: var(--ddb-font-size-sm);
     color: var(--ddb-text-secondary);
     line-height: 1.4;
 }
@@ -365,7 +378,7 @@ export default {
 .rescan-info-box > .icon {
     color: var(--ddb-primary);
     flex-shrink: 0;
-    margin-top: 0.125rem;
+    margin-top: var(--ddb-spacing-xs);
 }
 
 .tagline-field {
@@ -375,8 +388,8 @@ export default {
 .tagline-field .char-count {
     color: var(--ddb-text-muted);
     float: right;
-    margin-top: 0.125rem;
-    font-size: 0.75rem;
+    margin-top: var(--ddb-spacing-xs);
+    font-size: var(--ddb-font-size-sm);
 }
 
 .thumbnail-upload {
@@ -393,8 +406,8 @@ export default {
     max-width: 7.5rem;
     max-height: 5rem;
     object-fit: contain;
-    border: 1px solid var(--ddb-border);
-    border-radius: 0.25rem;
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
 }
 
 .thumbnail-placeholder {

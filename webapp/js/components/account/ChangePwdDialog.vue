@@ -141,10 +141,10 @@ export default {
 }
 
 .password-requirements {
-    margin-top: 0.375rem;
+    margin-top: var(--ddb-spacing-xs);
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: var(--ddb-spacing-xs);
 }
 
 .password-requirements small {

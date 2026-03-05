@@ -262,8 +262,8 @@ export default {
 }
 
 .progress-label {
-    margin-top: 0.375rem;
-    font-size: 0.9em;
+    margin-top: var(--ddb-spacing-xs);
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-text-secondary);
 }
 </style>

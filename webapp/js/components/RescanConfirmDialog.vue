@@ -1,5 +1,5 @@
 <template>
-    <Window title="Rescan Dataset" id="rescan-confirm" @onClose="close('cancel')" modal maxWidth="500px" fixedSize>
+    <Window title="Rescan Dataset" id="rescan-confirm" @onClose="close('cancel')" modal sizeClass="dialog-md" fixedSize>
         <div class="rescan-confirm-body">
             <div class="warning-box">
                 <i class="fa-solid fa-triangle-exclamation"></i>
@@ -65,30 +65,30 @@ export default {
 
 .warning-box {
     display: flex;
-    gap: 0.625rem;
+    gap: var(--ddb-spacing-sm);
     align-items: center;
-    padding: 0.75rem 0.875rem;
-    margin-bottom: 0.875rem;
+    padding: var(--ddb-spacing-md) var(--ddb-spacing-md);
+    margin-bottom: var(--ddb-spacing-md);
     background-color: rgba(251, 189, 8, 0.12);
-    border: 1px solid rgba(251, 189, 8, 0.35);
-    border-radius: 0.25rem;
+    border: var(--ddb-border-width) solid rgba(251, 189, 8, 0.35);
+    border-radius: var(--ddb-radius-sm);
 }
 
 .warning-box > .icon {
     color: var(--ddb-warning-text);
-    font-size: 1.3em;
+    font-size: var(--ddb-font-size-lg);
     flex-shrink: 0;
 }
 
 .side-effects {
-    margin-top: 0.625rem;
-    padding: 0.625rem 0.875rem;
+    margin-top: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     background-color: rgba(0, 0, 0, 0.03);
-    border-radius: 0.25rem;
+    border-radius: var(--ddb-radius-sm);
 }
 
 .side-effects ul {
-    margin: 0.375rem 0 0 0;
+    margin: var(--ddb-spacing-xs) 0 0 0;
     padding-left: 1.25rem;
 }
 

@@ -1,5 +1,5 @@
 <template>
-    <Window :title="dialogTitle" id="measurement-properties" @onClose="cancel" modal fixedSize maxWidth="400px">
+    <Window :title="dialogTitle" id="measurement-properties" @onClose="cancel" modal fixedSize sizeClass="dialog-sm">
         <div class="measurement-properties-form">
             <div class="form-group">
                 <label for="mp-name">Name</label>
@@ -176,10 +176,10 @@ export default {
 .form-group input[type="text"],
 .form-group textarea {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--ddb-border);
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
+    padding: var(--ddb-spacing-sm);
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    font-size: var(--ddb-font-size-base);
     box-sizing: border-box;
 }
 
@@ -194,16 +194,16 @@ export default {
 .color-palette {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem;
+    gap: var(--ddb-spacing-xs);
     align-items: center;
 }
 
 .color-swatch {
     width: 1.75rem;
     height: 1.75rem;
-    border-radius: 0.25rem;
+    border-radius: var(--ddb-radius-sm);
     cursor: pointer;
-    border: 2px solid transparent;
+    border: var(--ddb-border-width) solid transparent;
     transition: border-color 0.2s, transform 0.1s;
 }
 
@@ -213,15 +213,15 @@ export default {
 
 .color-swatch.selected {
     border-color: #000;
-    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #000;
+    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
 }
 
 .color-picker-custom {
     width: 1.75rem;
     height: 1.75rem;
     padding: 0;
-    border: 1px solid var(--ddb-border);
-    border-radius: 0.25rem;
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
     cursor: pointer;
     background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
 }
@@ -229,16 +229,16 @@ export default {
 .buttons {
     display: flex;
     justify-content: flex-end;
-    gap: 0.5rem;
+    gap: var(--ddb-spacing-sm);
     margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--ddb-border-separator);
+    padding-top: var(--ddb-spacing-lg);
+    border-top: var(--ddb-border-width) solid var(--ddb-border-separator);
 }
 
 .buttons button {
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
+    border-radius: var(--ddb-radius-sm);
+    font-size: var(--ddb-font-size-base);
     cursor: pointer;
     border: none;
 }

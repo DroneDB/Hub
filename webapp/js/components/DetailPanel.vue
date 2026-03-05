@@ -396,12 +396,12 @@ export default {
     display: flex;
     flex-direction: column;
     background: var(--ddb-bg-surface);
-    border-left: 1px solid var(--ddb-border-medium);
+    border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
 }
 
 .detail-header {
-    padding: 1rem;
-    border-bottom: 1px solid var(--ddb-border-medium);
+    padding: var(--ddb-spacing-lg);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border-medium);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -443,20 +443,20 @@ export default {
 }
 
 .thumbnail-container .icon.massive {
-    font-size: 5em;
+    font-size: var(--ddb-font-size-xl);
     color: var(--ddb-text-muted);
 }
 
 .build-status {
     position: absolute;
-    top: 0.625rem;
-    right: 0.625rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
+    top: var(--ddb-spacing-sm);
+    right: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
+    border-radius: var(--ddb-radius-sm);
     color: white;
     font-weight: bold;
     display: flex;
-    gap: 0.5rem;
+    gap: var(--ddb-spacing-sm);
 }
 
 .build-status.error {
@@ -484,7 +484,7 @@ export default {
 .path-text,
 .hash-text {
     font-family: monospace;
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
 }
 
 .metadata-list {
@@ -492,8 +492,8 @@ export default {
 }
 
 .metadata-item {
-    padding: 0.25rem 0;
-    font-size: 0.9em;
+    padding: var(--ddb-spacing-xs) 0;
+    font-size: var(--ddb-font-size-base);
 }
 
 .metadata-item strong {
@@ -518,7 +518,7 @@ export default {
     align-items: center;
     justify-content: center;
     background: var(--ddb-bg-surface);
-    border-left: 1px solid var(--ddb-border-medium);
+    border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
     padding: 2rem;
 }
 
@@ -527,18 +527,18 @@ export default {
 }
 
 .extended-properties {
-    margin-top: 1rem;
+    margin-top: var(--ddb-spacing-lg);
 }
 
 .extended-properties h5.ui.header {
-    margin-bottom: 0.5rem;
+    margin-bottom: var(--ddb-spacing-sm);
 }
 
 .extended-properties :deep(.ui.table) {
-    font-size: 0.85em;
+    font-size: var(--ddb-font-size-sm);
 }
 
 .extended-properties :deep(.ui.table td) {
-    padding: 0.4em 0.6em;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
 }
 </style>

@@ -54,7 +54,7 @@
                                             <i class="fa-solid fa-sitemap me-3"></i>
                                             <strong style="font-size: x-large;">{{ org.name ? org.name : org.slug }}</strong>
                                         </div>
-                                        <div v-if="org.description" class="text-muted mt-2" style="font-size: medium; margin-left: 2.25rem;">{{ org.description }}</div>
+                                        <div v-if="org.description" class="text-muted mt-1" style="font-size: medium;">{{ org.description }}</div>
                                     </div>
                                     <div class="me-3">
                                         <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
@@ -387,7 +387,7 @@ export default {
     }
 
     .org-icon {
-        font-size: 1.5rem;
+        font-size: var(--ddb-font-size-lg);
         color: var(--ddb-text-secondary);
     }
 
@@ -412,7 +412,7 @@ export default {
         }
 
         i.icon {
-            margin-right: 0.3125rem;
+            margin-right: var(--ddb-spacing-xs);
         }
 
         .main-col {

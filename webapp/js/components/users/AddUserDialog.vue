@@ -7,9 +7,6 @@
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <PrimeMessage v-if="success" severity="success" :closable="false">
-                <strong>User added successfully!</strong>
-            </PrimeMessage>
 
             <form v-on:submit.prevent v-bind:class="{ error: !!error }">
                 <div class="mb-3">
@@ -78,7 +75,6 @@ export default {
     data: function () {
         return {
             adding: false,
-            success: false,
             loading: false,
             error: "",
             username: "",
@@ -154,12 +150,11 @@ export default {
             this.adding = true;
             try {
                 const user = await reg.addUser(this.username, this.password, this.roles, this.email);
-                this.success = true;
-                setTimeout(() => {
-                    this.adding = false;
-                    this.$emit('onClose', user);
-                }, 2500);
+                this.$toast.add({ severity: 'success', summary: 'User Added', detail: `User "${this.username}" created successfully`, life: 3000 });
+                this.adding = false;
+                this.$emit('onClose', user);
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add user: ' + e.message, life: 5000 });
                 this.error = e.message;
                 this.adding = false;
             }
@@ -175,10 +170,10 @@ export default {
 }
 
 .password-requirements {
-    margin-top: 0.375rem;
+    margin-top: 0.5rem;
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;
+    gap: 0.25rem;
 }
 
 .password-requirements small {

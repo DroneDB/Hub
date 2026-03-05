@@ -1071,21 +1071,21 @@ export default {
 <style scoped>
 .lightbox-toolbar-extra {
     position: fixed;
-    top: 7px;
-    right: 90px;
+    top: var(--ddb-spacing-sm);
+    right: var(--ddb-spacing-2xl);
     z-index: 1000000001;
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: var(--ddb-spacing-xs);
 }
 
 .lightbox-direct-link,
 .lightbox-open-fullsize {
     cursor: pointer;
     color: var(--ddb-text-on-dark);
-    font-size: 20px;
-    padding: 6px 10px;
-    border-radius: 4px;
+    font-size: var(--ddb-font-size-lg);
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border-radius: var(--ddb-radius-sm);
     transition: color 0.2s, background-color 0.2s;
     display: flex;
     align-items: center;
@@ -1094,26 +1094,26 @@ export default {
 
 .lightbox-direct-link:hover,
 .lightbox-open-fullsize:hover {
-    color: #fff;
+    color: var(--ddb-text-on-color);
     background-color: rgba(255, 255, 255, 0.15);
 }
 
 .lightbox-info-overlay {
     position: fixed;
-    bottom: 20px;
+    bottom: var(--ddb-spacing-xl);
     left: 50%;
     transform: translateX(-50%);
     z-index: 1000000001;
-    background: rgba(0, 0, 0, 0.65);
+    background: var(--ddb-overlay-bg);
     color: var(--ddb-text-on-dark);
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 13px;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
+    border-radius: var(--ddb-radius-md);
+    font-size: var(--ddb-font-size-base);
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: var(--ddb-spacing-lg);
     white-space: nowrap;
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(var(--ddb-spacing-xs));
     pointer-events: none;
     user-select: none;
     max-width: 90vw;
@@ -1123,7 +1123,7 @@ export default {
 
 .lightbox-info-name {
     font-weight: 600;
-    max-width: 300px;
+    max-width: var(--ddb-tooltip-max-width);
     overflow: hidden;
     text-overflow: ellipsis;
 }

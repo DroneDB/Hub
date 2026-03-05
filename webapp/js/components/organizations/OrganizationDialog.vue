@@ -111,6 +111,5 @@ export default {
 <style scoped>
 .org-dialog {
     min-width: 20rem;
-    padding: 0.25rem;
 }
 </style>

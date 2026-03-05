@@ -54,19 +54,19 @@ export default {
 .loader,
 .loader:after {
   border-radius: 50%;
-  width: 10em;
-  height: 10em;
+  width: 10rem;
+  height: 10rem;
 }
 
 .loader {
-  margin: 60px auto;
-  font-size: 10px;
+  margin: var(--ddb-spacing-2xl) auto;
+  font-size: var(--ddb-font-size-sm);
   position: relative;
-  text-indent: -9999em;
-  border-top: 1.1em solid rgba(255, 255, 255, 0.2);
-  border-right: 1.1em solid rgba(255, 255, 255, 0.2);
-  border-bottom: 1.1em solid rgba(255, 255, 255, 0.2);
-  border-left: 1.1em solid var(--ddb-primary);
+  text-indent: -9999rem;
+  border-top: 1.25rem solid rgba(255, 255, 255, 0.2);
+  border-right: 1.25rem solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1.25rem solid rgba(255, 255, 255, 0.2);
+  border-left: 1.25rem solid var(--ddb-primary);
   -webkit-transform: translateZ(0);
   -ms-transform: translateZ(0);
   transform: translateZ(0);

@@ -1,5 +1,5 @@
 <template>
-    <PvToolbar :pt="{ root: { style: 'padding: 0.25rem; min-height: 2.125rem;' } }">
+    <PvToolbar :pt="{ root: { style: 'padding: 0.25rem; min-height: 2rem;' } }">
         <template #start>
             <template v-for="(tool, index) in startTools" :key="tool.id || 'start-' + index">
                 <Divider v-if="tool.id === 'separator'" layout="vertical" />

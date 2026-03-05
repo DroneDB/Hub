@@ -6,7 +6,7 @@ import 'bootstrap/dist/css/bootstrap-utilities.min.css';
 import '../css/app.scss';
 import '../css/ol-controls.css';
 
-// Font Awesome 6 icons (replaces Semantic UI icons)
+// Font Awesome 6 icons
 import '@fortawesome/fontawesome-free/css/all.min.css';
 
 import './libs/keyboard';

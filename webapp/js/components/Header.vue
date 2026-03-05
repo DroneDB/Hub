@@ -33,7 +33,7 @@
                     <template v-if="storageInfo.used > 0">
                         <ProgressBar :value="storagePercent" :showValue="false"
                             :pt="{ value: { style: { background: storageBarColor } } }"
-                            style="width: 300px; height: 18px; margin: 1rem auto 10px auto;" />
+                            class="storage-progress-bar" />
                         <div class="storage-percentage" :style="{ color: storageBarColor }">
                             {{ percent(storageInfo.usedPercentage, 1) }}
                         </div>
@@ -397,24 +397,24 @@ export default {
 <style scoped>
 #header {
     margin: 0;
-    padding: 0.5rem;
+    padding: var(--ddb-spacing-sm);
     width: 100%;
-    box-shadow: 0 0.125rem 0.25rem -0.125rem rgba(0, 0, 0, 0.3);
+    box-shadow: var(--ddb-shadow-sm);
     display: flex;
     align-items: center;
     z-index: 2;
-    gap: 0.375rem;
+    gap: var(--ddb-spacing-xs);
 
     .logo {
         display: flex;
         align-items: center;
 
         &>img {
-            height: 2.0625rem;
+            height: 2rem;
         }
 
         .app-icon {
-            font-size: 1.9375rem;
+            font-size: var(--ddb-font-size-lg);
         }
 
         .app-name {
@@ -433,24 +433,30 @@ export default {
         margin-left: auto;
         display: flex;
         align-items: center;
-        gap: 0.375rem;
+        gap: var(--ddb-spacing-xs);
     }
 }
 
 .storage-info-content {
     text-align: center;
 
+    .storage-progress-bar {
+        width: var(--ddb-sidebar-width);
+        height: var(--ddb-spacing-lg);
+        margin: var(--ddb-spacing-lg) auto var(--ddb-spacing-sm) auto;
+    }
+
     .storage-percentage {
-        font-size: 1.6em;
+        font-size: var(--ddb-font-size-lg);
         font-weight: bold;
-        margin-bottom: 0.375rem;
+        margin-bottom: var(--ddb-spacing-xs);
     }
 
     .storage-warning {
-        margin-top: 0.625rem;
+        margin-top: var(--ddb-spacing-sm);
         color: var(--ddb-danger);
         font-weight: bold;
-        font-size: 1em;
+        font-size: var(--ddb-font-size-base);
     }
 }
 </style>

@@ -419,7 +419,7 @@ export default {
                             // Define text style for the label
                             const textStyle = new Text({
                                 text: label,
-                                font: 'bold 12px Arial, Helvetica, sans-serif',
+                                font: 'bold 0.75rem Arial, Helvetica, sans-serif',
                                 fill: new Fill({
                                     color: '#000'
                                 }),
@@ -576,8 +576,8 @@ export default {
 
     #basemap-selector {
         position: absolute;
-        right: 8px;
-        top: 8px;
+        right: var(--ddb-spacing-sm);
+        top: var(--ddb-spacing-sm);
         z-index: 1;
     }
 }

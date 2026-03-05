@@ -18,7 +18,7 @@
         </div>
 
         <!-- Lighting settings Window dialog -->
-        <Window v-if="showSettings" title="Lighting" id="nexus-lighting" @onClose="toggleSettings" fixedSize maxWidth="280px">
+        <Window v-if="showSettings" title="Lighting" id="nexus-lighting" @onClose="toggleSettings" fixedSize sizeClass="dialog-xs">
             <div class="lighting-content">
                 <div class="form-group">
                     <label>Ambient: {{ ambientIntensity.toFixed(1) }}</label>
@@ -344,27 +344,27 @@ export default {
 
 #nexus .loading {
     color: var(--ddb-text-on-dark);
-    font-size: 120%;
+    font-size: var(--ddb-font-size-base);
     margin: 0.5rem;
     text-align: center;
 }
 
 #nexus .loading .circle.notch {
     height: 1.25rem;
-    width: 1.375rem;
+    width: 1.25rem;
 }
 
 #nexus .btn-settings {
     position: absolute;
-    bottom: 0.875rem;
-    left: 0.875rem;
+    bottom: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 50%;
-    background: rgba(0, 0, 0, 0.65);
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
     color: var(--ddb-text-on-dark);
-    font-size: 1rem;
+    font-size: var(--ddb-font-size-base);
     cursor: pointer;
     z-index: 100;
     display: flex;

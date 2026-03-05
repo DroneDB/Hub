@@ -238,7 +238,7 @@ export default {
 }
 
 #account .account-card h3 i {
-    margin-right: 0.625rem;
+    margin-right: 0.5rem;
 }
 
 .info-grid {
@@ -256,13 +256,13 @@ export default {
     display: block;
     font-weight: bold;
     color: var(--ddb-text-secondary);
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-sm);
     margin-bottom: 0.25rem;
 }
 
 .info-item p {
     margin: 0;
-    font-size: 1.1em;
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-text);
 }
 
@@ -270,7 +270,7 @@ export default {
     display: flex;
     justify-content: space-between;
     margin-bottom: 0.5rem;
-    font-size: 0.95em;
+    font-size: var(--ddb-font-size-base);
 }
 
 .storage-bar-container .storage-details .used {
@@ -303,7 +303,7 @@ export default {
 
 .action-row .main {
     font-weight: bold;
-    font-size: 1.1em;
+    font-size: var(--ddb-font-size-base);
 }
 
 .action-row .main i {
@@ -315,7 +315,7 @@ export default {
     justify-content: center;
     align-items: center;
     min-height: 12.5rem;
-    font-size: 2em;
+    font-size: var(--ddb-font-size-xl);
     color: var(--ddb-text-muted);
 }
 </style>

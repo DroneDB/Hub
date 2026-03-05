@@ -48,11 +48,11 @@
                 <Column field="currentState" header="State" :sortable="true" style="width: 5rem;">
                     <template #body="slotProps">
                         <Tag :severity="getTagSeverity(slotProps.data.currentState)" :pt="{ root: { title: slotProps.data.currentState } }">
-                            <i :class="getStateIcon(slotProps.data.currentState)" style="font-size: 1.1em;"></i>
+                            <i :class="getStateIcon(slotProps.data.currentState)" style="font-size: 1rem;"></i>
                         </Tag>
-                        <div v-if="canRetryBuild(slotProps.data)" style="margin-top: 5px;">
+                        <div v-if="canRetryBuild(slotProps.data)" class="mt-1">
                             <Button size="small" @click="retryBuild(slotProps.data)"
-                                    :disabled="retryingBuilds[slotProps.data.jobId]" style="font-size: 10px;"
+                                    :disabled="retryingBuilds[slotProps.data.jobId]" class="build-retry-btn"
                                     icon="fa-solid fa-rotate-right" label="Retry" />
                         </div>
                     </template>
@@ -80,7 +80,7 @@
                             <div class="duration">{{ getBuildDuration(slotProps.data) }}</div>
                             <small class="muted">Build Time</small>
                         </div>
-                        <div v-if="getQueueTime(slotProps.data)" class="duration-info" style="margin-top: 5px;">
+                        <div v-if="getQueueTime(slotProps.data)" class="duration-info mt-1">
                             <div class="duration">{{ getQueueTime(slotProps.data) }}</div>
                             <small class="muted">Queue Time</small>
                         </div>
@@ -92,12 +92,12 @@
                         <div class="job-details">
                             <small>
                                 <strong>ID: </strong>
-                                <code style="font-size: 10px;">{{ slotProps.data.jobId }}</code>
+                                <code class="build-job-id">{{ slotProps.data.jobId }}</code>
                             </small>
-                            <div v-if="slotProps.data.processingAt" style="margin-top: 3px;">
+                            <div v-if="slotProps.data.processingAt" class="mt-1">
                                 <small class="muted">Processing: {{ formatDateTime(slotProps.data.processingAt) }}</small>
                             </div>
-                            <div v-if="slotProps.data.succeededAt || slotProps.data.failedAt" style="margin-top: 3px;">
+                            <div v-if="slotProps.data.succeededAt || slotProps.data.failedAt" class="mt-1">
                                 <small class="muted">
                                     {{ slotProps.data.succeededAt ? 'Completed' : 'Failed' }}:
                                     {{ formatDateTime(slotProps.data.succeededAt || slotProps.data.failedAt) }}
@@ -416,7 +416,7 @@ export default {
 }
 
 .filters {
-    padding: 0.9375rem;
+    padding: var(--ddb-spacing-lg);
     background: var(--ddb-bg-secondary);
     flex-shrink: 0;
 }
@@ -434,8 +434,8 @@ export default {
 .path-details {
     display: block;
     color: var(--ddb-text-muted);
-    font-size: 0.85em;
-    margin-top: 0.125rem;
+    font-size: var(--ddb-font-size-sm);
+    margin-top: var(--ddb-spacing-xs);
     word-break: break-all;
 }
 
@@ -446,8 +446,8 @@ export default {
 .relative-time {
     display: block;
     color: var(--ddb-text-muted);
-    font-size: 0.85em;
-    margin-top: 0.125rem;
+    font-size: var(--ddb-font-size-sm);
+    margin-top: var(--ddb-spacing-xs);
 }
 
 .duration {
@@ -460,14 +460,14 @@ export default {
 }
 
 .job-details {
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
     line-height: 1.3;
 }
 
 .job-details code {
     background: var(--ddb-bg-secondary);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.125rem;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs);
+    border-radius: var(--ddb-radius-sm);
     word-break: break-all;
 }
 
@@ -478,5 +478,13 @@ export default {
 .filter-bar {
     display: flex;
     align-items: center;
+}
+
+.build-retry-btn {
+    font-size: var(--ddb-font-size-sm);
+}
+
+.build-job-id {
+    font-size: var(--ddb-font-size-sm);
 }
 </style>

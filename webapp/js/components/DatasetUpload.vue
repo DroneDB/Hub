@@ -518,26 +518,26 @@ export default {
 /* Header */
 .upload-header {
     flex-shrink: 0;
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--ddb-border);
+    padding: var(--ddb-spacing-md) var(--ddb-spacing-lg);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     background-color: var(--ddb-bg-light);
 }
 
 .upload-filters {
     display: flex;
-    gap: 0.375rem;
+    gap: var(--ddb-spacing-xs);
 }
 
 .filter-btn {
     display: flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0.375rem 0.75rem;
-    border: 1px solid var(--ddb-border);
+    gap: var(--ddb-spacing-xs);
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+    border: var(--ddb-border-width) solid var(--ddb-border);
     background: var(--ddb-bg-surface);
-    border-radius: 0.25rem;
+    border-radius: var(--ddb-radius-sm);
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: var(--ddb-font-size-sm);
     transition: all 0.2s;
 }
 
@@ -547,9 +547,9 @@ export default {
 
 .filter-btn .filter-count {
     background-color: var(--ddb-border-separator);
-    padding: 0.125rem 0.375rem;
-    border-radius: 0.625rem;
-    font-size: 0.6875rem;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs);
+    border-radius: var(--ddb-radius-md);
+    font-size: var(--ddb-font-size-sm);
     font-weight: 600;
     min-width: 1.25rem;
     text-align: center;
@@ -631,7 +631,7 @@ export default {
 
 /* Body */
 .upload-body {
-    flex: 0 0 21.875rem; /* Fixed height - doesn't change when filtering */
+    flex: 0 0 22rem; /* Fixed height - doesn't change when filtering */
     overflow-y: auto;
     width: 37.5rem;
 }
@@ -644,8 +644,8 @@ export default {
 /* Footer */
 .upload-footer {
     flex-shrink: 0;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--ddb-border);
+    padding: var(--ddb-spacing-md) var(--ddb-spacing-lg);
+    border-top: var(--ddb-border-width) solid var(--ddb-border);
     background-color: var(--ddb-bg-light);
 }
 
@@ -683,9 +683,9 @@ export default {
 
 .upload-result {
     flex: 1;
-    font-size: 0.875rem;
+    font-size: var(--ddb-font-size-base);
     display: flex;
-    gap: 0.5rem;
+    gap: var(--ddb-spacing-sm);
 }
 
 .upload-result.success {
@@ -711,13 +711,13 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 2.5rem 3.75rem;
+    padding: var(--ddb-spacing-xl) 3.75rem;
     min-width: 25rem;
 }
 
 .selection-content {
     text-align: center;
-    padding: 2.5rem;
+    padding: var(--ddb-spacing-xl);
 }
 
 .selection-content .icon.cloud.upload {
@@ -726,15 +726,15 @@ export default {
 }
 
 .selection-content h3 {
-    margin: 0 0 0.5rem 0;
+    margin: 0 0 var(--ddb-spacing-sm) 0;
     font-size: 1.25rem;
     color: var(--ddb-text);
 }
 
 .selection-content p {
-    margin: 0 0 1.5rem 0;
+    margin: 0 0 var(--ddb-spacing-xl) 0;
     color: var(--ddb-text-secondary);
-    font-size: 0.875rem;
+    font-size: var(--ddb-font-size-base);
 }
 
 .selection-buttons {
@@ -751,21 +751,21 @@ export default {
 /* Upload summary */
 .upload-summary {
     background-color: var(--ddb-bg-light);
-    border-radius: 0.375rem;
+    border-radius: var(--ddb-radius-sm);
 }
 
 .summary-stats {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 0.75rem;
+    margin-bottom: var(--ddb-spacing-md);
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: var(--ddb-spacing-md);
 }
 
 .summary-stat {
     display: flex;
-    gap: 0.375rem;
-    font-size: 0.8125rem;
+    gap: var(--ddb-spacing-xs);
+    font-size: var(--ddb-font-size-base);
     align-items: center;
 }
 
@@ -784,9 +784,9 @@ export default {
 
 .upload-summary .upload-result {
     text-align: center;
-    padding-top: 0.75rem;
-    border-top: 1px solid var(--ddb-border-separator);
-    margin-top: 0.25rem;
+    padding-top: var(--ddb-spacing-md);
+    border-top: var(--ddb-border-width) solid var(--ddb-border-separator);
+    margin-top: var(--ddb-spacing-xs);
 }
 </style>
 

@@ -216,7 +216,7 @@ label {
     width: 100%;
     min-height: 5rem;
     font-family: monospace;
-    font-size: 0.85em;
+    font-size: var(--ddb-font-size-sm);
     margin-top: 0.5rem;
     resize: vertical;
 }

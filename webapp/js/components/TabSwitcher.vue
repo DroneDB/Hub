@@ -5,7 +5,7 @@
                 <TabList>
                     <Tab v-for="t in dynTabs" :key="t.key" :value="t.key">
                         <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
-                            style="margin-right: 0.375rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
+                            style="margin-right: 0.5rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
                                 t.label }}</span>
                         <span @click.stop="removeTab(t.key)" v-if="!!t.canClose" class="close-btn"><i
                                 class="fa-solid fa-xmark"></i></span>
@@ -277,7 +277,7 @@ export default {
     }
 
     .icon.padded {
-        padding-left: 0.1875rem;
+        padding-left: 0.25rem;
     }
 
     .tabs {

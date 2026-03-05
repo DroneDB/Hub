@@ -694,20 +694,11 @@ export default {
             // Create tooltip for description (popup on hover)
             if (measure.description && measure.description.trim() !== '') {
                 const tooltip = document.createElement('div');
-                tooltip.className = 'potree-measurement-tooltip';
+                tooltip.className = 'potree-measurement-tooltip ddb-tooltip ddb-tooltip--dark';
                 tooltip.innerHTML = `<strong>${measure.name}</strong><br>${measure.description}`;
                 tooltip.style.cssText = `
                     position: fixed;
-                    background: rgba(0, 0, 0, 0.85);
-                    color: white;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    font-size: 13px;
-                    max-width: 300px;
-                    z-index: 10000;
-                    pointer-events: none;
                     display: none;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                 `;
                 document.body.appendChild(tooltip);
                 measure._nameLabelTooltip = tooltip;
@@ -785,20 +776,11 @@ export default {
                 if (!domElement || !(domElement instanceof HTMLElement)) return;
 
                 const tooltip = document.createElement('div');
-                tooltip.className = 'potree-annotation-tooltip';
+                tooltip.className = 'potree-annotation-tooltip ddb-tooltip ddb-tooltip--dark';
                 tooltip.innerHTML = annotation.description;
                 tooltip.style.cssText = `
                     position: fixed;
-                    background: rgba(0, 0, 0, 0.85);
-                    color: white;
-                    padding: 8px 12px;
-                    border-radius: 4px;
-                    font-size: 13px;
-                    max-width: 300px;
-                    z-index: 10000;
-                    pointer-events: none;
                     display: none;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
                 `;
                 document.body.appendChild(tooltip);
                 annotation._descriptionTooltip = tooltip;
@@ -938,12 +920,12 @@ export default {
 
             viewer.toggleSidebar = () => {
                 let renderArea = this.$refs.container;
-                let isVisible = renderArea.style.right === '300px';
+                let isVisible = renderArea.style.right === 'var(--ddb-sidebar-width)';
 
                 if (isVisible) {
-                    renderArea.style.right = '0px';
+                    renderArea.style.right = '0';
                 } else {
-                    renderArea.style.right = '300px';
+                    renderArea.style.right = 'var(--ddb-sidebar-width)';
                 }
             };
             viewer.setEDLEnabled(false);
@@ -975,13 +957,13 @@ export default {
                             class="button-icon"
                             title="Delete measurement (click to remove)" />
                     `);*/
-                    const deleteIcon = $('<div style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="fa-solid fa-trash" style="font-size: x-large; margin: 0"></i></div>');
+                    const deleteIcon = $('<div style="width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="fa-solid fa-trash" style="font-size: x-large; margin: 0"></i></div>');
                     deleteIcon.click(() => {
                         self.toggleDeleteTool();
                         // Update visual feedback on the icon
                         if (self.deleteToolActive) {
                             deleteIcon.css('background-color', 'rgba(231, 76, 60, 0.5)');
-                            deleteIcon.css('border-radius', '4px');
+                            deleteIcon.css('border-radius', 'var(--ddb-radius-sm)');
                         } else {
                             deleteIcon.css('background-color', '');
                         }
@@ -1500,18 +1482,18 @@ export default {
     .loading {
         color: var(--ddb-text-on-dark);
         font-size: 120%;
-        margin: 0.5rem;
+        margin: var(--ddb-spacing-sm);
         text-align: center;
 
         .circle.notch {
             height: 1.25rem;
-            width: 1.375rem;
+            width: 1.25rem;
         }
     }
 
     #potree_quick_buttons {
         left: auto !important;
-        right: 40px !important;
+        right: 3rem !important;
     }
 
     .potree-container {
@@ -1519,7 +1501,7 @@ export default {
             visibility: hidden;
         }
 
-        margin: 1px 50px 0 0;
+        margin: 0 3rem 0 0;
         display: flex;
         width: 100%;
         height: 100%;
@@ -1551,7 +1533,7 @@ export default {
     .dg {
         &.main {
             position: absolute;
-            right: 0px;
+            right: 0;
         }
 
         .c {
@@ -1565,10 +1547,10 @@ export default {
     /* Potree specific */
     #potree_map {
         position: absolute;
-        left: 50px;
-        top: 50px;
-        width: 400px;
-        height: 400px;
+        left: 3rem;
+        top: 3rem;
+        width: 25rem;
+        height: 25rem;
         display: none
     }
 
@@ -1597,21 +1579,21 @@ export default {
     #potree_map_header {
         position: absolute;
         width: 100%;
-        height: 1.5625rem;
+        height: 1.5rem;
         top: 0;
         background-color: var(--ddb-viewer-toolbar-overlay);
         z-index: 1000;
-        border-top-left-radius: 0.1875rem;
-        border-top-right-radius: 0.1875rem;
+        border-top-left-radius: var(--ddb-radius-sm);
+        border-top-right-radius: var(--ddb-radius-sm);
     }
 
     #potree_map_content {
         position: absolute;
         z-index: 100;
-        top: 1.5625rem;
+        top: 1.5rem;
         width: 100%;
-        height: calc(100% - 1.5625rem);
-        border: 2px solid var(--ddb-viewer-toolbar-overlay);
+        height: calc(100% - 1.5rem);
+        border: var(--ddb-border-width) solid var(--ddb-viewer-toolbar-overlay);
         box-sizing: border-box;
     }
 
@@ -1626,13 +1608,13 @@ export default {
         }
 
         #sidebar_root {
-            width: 300px;
+            width: var(--ddb-sidebar-width);
 
             .pv-menu-list {
                 padding-right: 0.75rem;
 
                 .divider {
-                    padding: 0.625rem 0 0.9375rem 0;
+                    padding: var(--ddb-spacing-sm) 0 var(--ddb-spacing-lg) 0;
                 }
 
                 a {
@@ -1668,8 +1650,8 @@ export default {
     /* Top-left toolbar container */
     .top-left-toolbar {
         position: absolute;
-        top: 0.625rem;
-        left: 0.625rem;
+        top: var(--ddb-spacing-sm);
+        left: var(--ddb-spacing-sm);
         z-index: 1001;
         display: flex;
         gap: 0.5rem;
@@ -1679,8 +1661,8 @@ export default {
     /* Undo/Redo toolbar */
     .undo-redo-toolbar {
         background: var(--ddb-viewer-toolbar-bg);
-        padding: 0.375rem;
-        border-radius: 0.3125rem;
+        padding: var(--ddb-spacing-xs);
+        border-radius: var(--ddb-radius-sm);
         display: flex;
         gap: 0.25rem;
         align-items: center;
@@ -1690,8 +1672,8 @@ export default {
         background: var(--ddb-viewer-btn-bg);
         color: white;
         border: none;
-        padding: 0.5rem 0.625rem;
-        border-radius: 0.25rem;
+        padding: var(--ddb-spacing-sm) var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-sm);
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -1714,7 +1696,7 @@ export default {
 
     .btn-undo-redo.btn-delete-tool {
         background: var(--ddb-viewer-btn-active-bg);
-        margin-left: 0.5rem;
+        margin-left: var(--ddb-spacing-sm);
     }
 
     .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
@@ -1723,20 +1705,20 @@ export default {
 
     .btn-undo-redo.btn-delete-tool.active {
         background: var(--ddb-viewer-btn-danger);
-        box-shadow: 0 0 8px var(--ddb-viewer-btn-danger-glow);
+        box-shadow: var(--ddb-shadow-sm);
     }
 
     /* Toolbar for measurements */
     .measurements-toolbar {
         position: absolute;
         top: 3.75rem;
-        left: 0.625rem;
+        left: var(--ddb-spacing-sm);
         z-index: 1000;
         background: var(--ddb-viewer-toolbar-bg);
-        padding: 0.625rem;
-        border-radius: 0.3125rem;
+        padding: var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-sm);
         display: flex;
-        gap: 0.625rem;
+        gap: var(--ddb-spacing-sm);
         align-items: center;
     }
 
@@ -1744,13 +1726,13 @@ export default {
         background: var(--ddb-viewer-btn-primary);
         color: white;
         border: none;
-        padding: 0.5rem 1rem;
-        border-radius: 0.25rem;
+        padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
+        border-radius: var(--ddb-radius-sm);
         cursor: pointer;
         display: flex;
         align-items: center;
-        gap: 0.3125rem;
-        font-size: 0.875rem;
+        gap: var(--ddb-spacing-xs);
+        font-size: var(--ddb-font-size-base);
         transition: background 0.3s;
     }
 
@@ -1774,13 +1756,13 @@ export default {
     /* Unit selector toolbar */
     .unit-selector-toolbar {
         background: var(--ddb-viewer-toolbar-bg);
-        padding: 0.375rem 0.75rem;
-        border-radius: 0.3125rem;
+        padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+        border-radius: var(--ddb-radius-sm);
         display: flex;
         gap: 0.5rem;
         align-items: center;
         color: white;
-        font-size: 0.875rem;
+        font-size: var(--ddb-font-size-base);
     }
 
     .unit-selector-toolbar label {
@@ -1791,11 +1773,11 @@ export default {
     .unit-selector-toolbar select {
         background: var(--ddb-viewer-select-bg);
         color: white;
-        border: 1px solid var(--ddb-viewer-select-border);
-        padding: 0.375rem 0.625rem;
-        border-radius: 0.25rem;
+        border: var(--ddb-border-width) solid var(--ddb-viewer-select-border);
+        padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-sm);
         cursor: pointer;
-        font-size: 0.875rem;
+        font-size: var(--ddb-font-size-base);
         outline: none;
     }
 

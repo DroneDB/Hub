@@ -102,7 +102,7 @@ export default {
 <style>
 .markdown {
     .loading {
-        margin-top: 12px;
+        margin-top: var(--ddb-spacing-md);
         text-align: center;
     }
 
@@ -123,17 +123,17 @@ export default {
 
         button.edit {
             float: right;
-            margin: 10px;
+            margin: var(--ddb-spacing-md);
         }
 
         button.save {
             position: absolute;
-            top: 10px;
-            right: 7px;
+            top: var(--ddb-spacing-md);
+            right: var(--ddb-spacing-sm);
         }
 
         textarea {
-            padding: 12px;
+            padding: var(--ddb-spacing-md);
             width: 100%;
             flex-grow: 1;
             border: none;
@@ -144,7 +144,7 @@ export default {
     }
 
     .content {
-        padding: 12px;
+        padding: var(--ddb-spacing-md);
 
         img {
             max-width: 100%;

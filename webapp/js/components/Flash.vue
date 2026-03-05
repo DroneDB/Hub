@@ -57,6 +57,6 @@ export default {
     left: 0.5rem;
     right: 0.5rem;
     bottom: 0.5rem;
-    border: 1px solid black;
+    border: var(--ddb-border-width) solid black;
 }
 </style>

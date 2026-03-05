@@ -254,7 +254,7 @@ export default {
 <style scoped>
 .tree-node {
     .entry {
-        padding: 0.125rem 0.25rem 0.125rem 0.25rem;
+        padding: 0.25rem;
         display: inline-block;
         white-space: nowrap;
         min-width: 100%;
@@ -283,14 +283,14 @@ export default {
 
     i {
         display: inline-block;
-        margin-top: 0.0625rem;
-        margin-right: 0.125rem;
-        width: 1em;
+        margin-top: var(--ddb-border-width);
+        margin-right: var(--ddb-spacing-xs);
+        width: 1rem;
         text-align: center;
     }
 
     i.nonexistant {
-        width: 1em;
+        width: 1rem;
     }
 
     .text {
@@ -301,8 +301,8 @@ export default {
     }
 
     .circle.notch {
-        margin-left: -0.3125rem;
-        margin-top: 0.125rem;
+        margin-left: -0.25rem;
+        margin-top: var(--ddb-spacing-xs);
     }
 
     .children {

@@ -96,7 +96,7 @@ export default {
     }
 
     td:first-child {
-        width: 4.375rem;
+        width: 4.5rem;
     }
 }
 </style>

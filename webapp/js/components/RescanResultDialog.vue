@@ -1,5 +1,5 @@
 <template>
-    <Window title="Rescan Results" id="rescan-results" @onClose="close" modal maxWidth="600px" fixedSize>
+    <Window title="Rescan Results" id="rescan-results" @onClose="close" modal sizeClass="dialog-lg" fixedSize>
         <div class="rescan-results-content">
             <!-- Summary -->
             <div class="summary">
@@ -99,10 +99,10 @@ export default {
 
 .summary {
     display: flex;
-    gap: 1rem;
-    padding: 0.5rem 0 0.75rem 0;
-    margin-bottom: 0.75rem;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    gap: var(--ddb-spacing-lg);
+    padding: var(--ddb-spacing-sm) 0 var(--ddb-spacing-md) 0;
+    margin-bottom: var(--ddb-spacing-md);
+    border-bottom: var(--ddb-border-width) solid rgba(0, 0, 0, 0.1);
     flex-wrap: wrap;
     align-items: center;
 }
@@ -131,12 +131,12 @@ export default {
 }
 
 .file-item {
-    padding: 0.375rem 0.5rem;
-    margin: 0.25rem 0;
-    border-radius: 0.25rem;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+    margin: var(--ddb-spacing-xs) 0;
+    border-radius: var(--ddb-radius-sm);
     display: flex;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: var(--ddb-spacing-sm);
 }
 
 .file-item.success {
@@ -160,9 +160,9 @@ export default {
 }
 
 .error-message {
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-danger);
-    margin-left: 1.375rem;
+    margin-left: 1.5rem;
     font-style: italic;
 }
 </style>

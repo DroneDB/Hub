@@ -1,5 +1,5 @@
 <template>
-    <Window title="Map Settings" id="map-settings" @onClose="close" modal maxWidth="400px" fixedSize>
+    <Window title="Map Settings" id="map-settings" @onClose="close" modal sizeClass="dialog-sm" fixedSize>
         <div class="map-settings-content">
             <div class="setting-row">
                 <label class="setting-label align-items-baseline">
@@ -369,12 +369,12 @@ export default {
 }
 
 .setting-label {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 500;
     color: var(--ddb-text);
     display: flex;
     align-items: center;
-    gap: 0.375rem;
+    gap: 0.5rem;
 }
 
 .setting-label .icon {
@@ -396,25 +396,25 @@ export default {
 }
 
 .setting-select {
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
 }
 
 .custom-basemap-fields {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    padding: 0.5rem 0;
-    margin: 0 0.75rem;
-    border: 1px solid var(--ddb-border-separator);
-    border-radius: 0.25rem;
+    gap: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-sm) 0;
+    margin: 0 var(--ddb-spacing-md);
+    border: var(--ddb-border-width) solid var(--ddb-border-separator);
+    border-radius: var(--ddb-radius-sm);
     background: var(--ddb-bg-light);
 }
 
 .setting-input {
-    font-size: 0.8125rem;
+    font-size: var(--ddb-font-size-base);
     flex: 1;
     min-width: 0;
-    margin-left: 0.5rem;
+    margin-left: var(--ddb-spacing-sm);
 }
 
 .custom-error {
@@ -441,7 +441,7 @@ export default {
 }
 
 .fetch-layers-btn {
-    padding: 0.25rem 0.375rem !important;
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs) !important;
     margin: 0 !important;
     min-height: 0 !important;
 }

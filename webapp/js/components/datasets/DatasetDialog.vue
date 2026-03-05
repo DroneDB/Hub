@@ -165,12 +165,11 @@ export default {
 <style scoped>
 .ds-dialog {
     min-width: 20rem;
-    padding: 0.25rem;
 }
 
 .char-count {
     color: var(--ddb-text-muted);
     float: right;
-    margin-top: 0.125rem;
+    margin-top: 0.25rem;
 }
 </style>

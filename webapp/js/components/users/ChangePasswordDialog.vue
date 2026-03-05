@@ -7,11 +7,8 @@
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <PrimeMessage v-if="success" severity="success" :closable="false">
-                <strong>Password changed successfully!</strong>
-            </PrimeMessage>
 
-            <PrimeMessage severity="info" :closable="false">
+            <PrimeMessage severity="info" :closable="false" class="mb-3">
                 Changing password for user: <strong>{{ user.userName }}</strong>
             </PrimeMessage>
 
@@ -34,7 +31,7 @@
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" :disabled="changing" label="Cancel" />
+                <Button @click="close()" severity="secondary" :disabled="changing" label="Cancel" />
                 <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
                     severity="primary" label="Change Password" />
             </div>
@@ -67,7 +64,6 @@ export default {
     data: function () {
         return {
             changing: false,
-            success: false,
             loading: false,
             error: "",
             currentPassword: "",
@@ -105,12 +101,11 @@ export default {
                     this.newPassword
                 );
 
-                this.success = true;
-                setTimeout(() => {
-                    this.changing = false;
-                    this.$emit('onClose', 'updated');
-                }, 1500);
+                this.$toast.add({ severity: 'success', summary: 'Password Changed', detail: `Password changed successfully for "${this.user.userName}"`, life: 3000 });
+                this.changing = false;
+                this.$emit('onClose', 'updated');
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to change password: ' + (e.message || 'Unknown error'), life: 5000 });
                 this.error = e.message || 'Failed to change password';
                 this.changing = false;
             }

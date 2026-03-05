@@ -215,7 +215,7 @@ export default {
                 EditorView.theme({
                     "&": {
                         height: "100%",
-                        fontSize: "14px"
+                        fontSize: "1rem"
                     },
                     ".cm-scroller": {
                         overflow: "auto",
@@ -229,7 +229,7 @@ export default {
                     },
                     ".cm-gutters": {
                         backgroundColor: "var(--ddb-bg-subtle)",
-                        borderRight: "1px solid var(--ddb-border)"
+                        borderRight: "var(--ddb-border-width) solid var(--ddb-border)"
                     }
                 })
             ];
@@ -368,8 +368,8 @@ export default {
 
 .loading-container i,
 .error-container i {
-    font-size: 2em;
-    margin-bottom: 0.625rem;
+    font-size: 2rem;
+    margin-bottom: var(--ddb-spacing-sm);
 }
 
 .error-container i {
@@ -377,7 +377,7 @@ export default {
 }
 
 .error-container .limit-info {
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-text-muted);
 }
 
@@ -385,9 +385,9 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.5rem 0.75rem;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     background: var(--ddb-bg-light);
-    border-bottom: 1px solid var(--ddb-border);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     flex-shrink: 0;
 }
 
@@ -404,7 +404,7 @@ export default {
 .modified-indicator {
     color: var(--ddb-warning);
     font-weight: bold;
-    font-size: 1.2em;
+    font-size: var(--ddb-font-size-lg);
 }
 
 .actions {
@@ -415,21 +415,21 @@ export default {
 .editor-container {
     flex: 1;
     overflow: hidden;
-    border: 1px solid var(--ddb-border);
-    border-radius: 0.25rem;
-    margin: 0.5rem;
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    margin: var(--ddb-spacing-sm);
 }
 
 .unsaved-warning {
-    padding: 0.5rem 0.75rem;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     background: var(--ddb-warning-bg);
-    border-top: 1px solid var(--ddb-warning);
+    border-top: var(--ddb-border-width) solid var(--ddb-warning);
     color: var(--ddb-warning-text);
-    font-size: 0.9em;
+    font-size: var(--ddb-font-size-base);
     flex-shrink: 0;
 }
 
 .unsaved-warning i {
-    margin-right: 0.375rem;
+    margin-right: var(--ddb-spacing-xs);
 }
 </style>

@@ -174,11 +174,11 @@ export default {
 }
 
 .measurements-rename-option {
-    margin-top: 1rem;
-    padding: 0.75rem;
+    margin-top: var(--ddb-spacing-lg);
+    padding: var(--ddb-spacing-md);
     background: rgba(var(--ddb-primary-rgb), 0.1);
-    border-radius: 0.25rem;
-    border-left: 3px solid var(--ddb-primary);
+    border-radius: var(--ddb-radius-sm);
+    border-left: 0.25rem solid var(--ddb-primary);
 }
 
 .measurements-rename-option label {
@@ -196,6 +196,6 @@ export default {
 }
 
 .measurements-rename-option .hint i {
-    font-size: 0.875rem;
+    font-size: var(--ddb-font-size-base);
 }
 </style>

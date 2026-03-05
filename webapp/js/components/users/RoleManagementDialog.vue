@@ -7,9 +7,6 @@
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <PrimeMessage v-if="success" severity="success" :closable="false">
-                <strong>{{ successMessage }}</strong>
-            </PrimeMessage>
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
@@ -57,14 +54,14 @@
                         </form>
                         <div class="add-role-actions">
                             <Button @click="confirmAddRole()" :disabled="addingRole || !newRoleName.trim()"
-                                    :loading="addingRole" severity="info" icon="fa-solid fa-plus" label="Add Role" />
+                                    :loading="addingRole" severity="primary" icon="fa-solid fa-plus" label="Add Role" />
                         </div>
                     </TabPanel>
                 </TabPanels>
             </Tabs>
 
             <div class="dialog-buttons">
-                <Button @click="close()" label="Close" />
+                <Button @click="close()" severity="secondary" label="Close" />
             </div>
         </div>
 
@@ -74,7 +71,7 @@
             :message="`Are you sure you want to delete the role <strong>${roleToDelete}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. Users with this role will lose associated permissions.`"
             confirmText="Delete Role"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             @onClose="handleDeleteDialogClose">
         </ConfirmDialog>
     </Window>
@@ -112,8 +109,6 @@ export default {
         return {
             loading: false,
             error: "",
-            success: false,
-            successMessage: "",
             activeTab: 'view',
             currentRoles: [...this.roles],
             newRoleName: "",
@@ -151,7 +146,6 @@ export default {
 
         clearError: function () {
             this.error = "";
-            this.success = false;
         },
 
         async confirmAddRole() {
@@ -162,17 +156,13 @@ export default {
                 await reg.createRole(this.newRoleName.trim());
 
                 this.currentRoles.push(this.newRoleName.trim());
-                this.success = true;
-                this.successMessage = `Role "${this.newRoleName}" created successfully!`;
+                this.$toast.add({ severity: 'success', summary: 'Role Created', detail: `Role "${this.newRoleName}" created successfully`, life: 3000 });
                 this.newRoleName = "";
                 this.activeTab = 'view';
 
                 this.$emit('onRolesChanged');
-
-                setTimeout(() => {
-                    this.success = false;
-                }, 3000);
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create role: ' + e.message, life: 5000 });
                 this.error = e.message;
             }
             this.addingRole = false;
@@ -202,18 +192,14 @@ export default {
                 // This is normal and indicates success
 
                 this.currentRoles = this.currentRoles.filter(role => role !== this.roleToDelete);
-                this.success = true;
-                this.successMessage = `Role "${this.roleToDelete}" deleted successfully!`;
+                this.$toast.add({ severity: 'success', summary: 'Role Deleted', detail: `Role "${this.roleToDelete}" deleted successfully`, life: 3000 });
 
                 this.$emit('onRolesChanged');
 
                 this.showDeleteDialog = false;
                 this.roleToDelete = null;
-
-                setTimeout(() => {
-                    this.success = false;
-                }, 3000);
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete role: ' + e.message, life: 5000 });
                 this.error = e.message;
             }
             this.deletingRole = null;
@@ -245,15 +231,15 @@ export default {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.625rem 0.75rem;
-    border: 1px solid var(--ddb-border-light);
-    border-radius: 0.25rem;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
+    border-radius: var(--ddb-radius-sm);
 }
 
 .role-info {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
+    gap: var(--ddb-spacing-sm);
 }
 
 .role-name {
@@ -261,7 +247,7 @@ export default {
 }
 
 .role-description {
-    font-size: 0.85em;
+    font-size: var(--ddb-font-size-sm);
     color: var(--ddb-text-muted);
 }
 

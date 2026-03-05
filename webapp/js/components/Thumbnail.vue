@@ -1,6 +1,6 @@
 <template>
     <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
-        :style="{ 'maxWidth': size + 'px' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
+        :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
@@ -69,11 +69,11 @@ export default {
             buildState: null,
             buildLoading: false,
             iconStyle: {
-                fontSize: parseInt(this.size / 3) + 'px'
+                fontSize: (parseInt(this.size / 3) / 16) + 'rem'
             },
             sizeStyle: {
-                width: this.size + 'px',
-                height: this.size + 'px'
+                width: (this.size / 16) + 'rem',
+                height: (this.size / 16) + 'rem'
             },
             loading: false
         }
@@ -332,12 +332,12 @@ export default {
 
 <style scoped>
 .thumbnail {
-    margin: 0.125rem;
-    padding-top: 0.375rem;
-    padding-bottom: 0.375rem;
+    margin: var(--ddb-spacing-xs);
+    padding-top: var(--ddb-spacing-xs);
+    padding-bottom: var(--ddb-spacing-xs);
     text-align: center;
     word-break: break-all;
-    border-radius: 0.25rem;
+    border-radius: var(--ddb-radius-sm);
     transition: 0.25s background-color ease;
 }
 
@@ -385,7 +385,7 @@ export default {
 }
 
 .thumbnail .icon.badge {
-    font-size: 0.6875rem;
+    font-size: var(--ddb-font-size-sm);
 }
 
 .thumbnail i.icon {
@@ -396,21 +396,21 @@ export default {
     position: absolute;
     top: 63%;
     left: 50%;
-    margin-left: -0.625rem;
+    margin-left: -0.5rem;
 }
 
 /* Build Status Badges */
 .build-badge {
     position: absolute;
-    top: 0.25rem;
-    right: 0.25rem;
+    top: var(--ddb-spacing-xs);
+    right: var(--ddb-spacing-xs);
     width: 1.25rem;
     height: 1.25rem;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.625rem;
+    font-size: var(--ddb-font-size-sm);
     color: white;
     z-index: 10;
 }
@@ -429,7 +429,7 @@ export default {
 
 .build-badge i.icon {
     margin: 0 !important;
-    font-size: 0.625rem;
+    font-size: var(--ddb-font-size-sm);
     width: auto;
     height: auto;
     line-height: 1;

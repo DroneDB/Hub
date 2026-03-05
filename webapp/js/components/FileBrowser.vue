@@ -439,7 +439,7 @@ export default {
 <style scoped>
 .file-browser {
     .loading {
-        margin-left: 0.125rem;
+        margin-left: 0.25rem;
     }
 
     user-select: none;
@@ -455,7 +455,7 @@ export default {
 #search-box {
 
     padding: 0.5rem;
-    border-bottom: 1px solid black;
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     display: flex;
     width: 100%;
 

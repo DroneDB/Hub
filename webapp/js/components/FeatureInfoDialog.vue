@@ -182,12 +182,12 @@ export default {
 .feature-info-content {
     max-height: 25rem;
     overflow-y: auto;
-    padding: 0.3125rem;
+    padding: 0.25rem;
 }
 
 .category-title {
-    margin: 0.625rem 0 0.3125rem 0;
-    font-size: 0.875rem;
+    margin: 0.75rem 0 0.25rem 0;
+    font-size: var(--ddb-font-size-base);
     font-weight: bold;
     color: var(--ddb-text);
 }
@@ -195,21 +195,21 @@ export default {
 .properties-table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 0.9375rem;
+    margin-bottom: var(--ddb-spacing-lg);
 }
 
 .property-name {
-    padding: 0.3125rem;
+    padding: var(--ddb-spacing-xs);
     text-align: left;
-    border-bottom: 1px solid var(--ddb-border);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-weight: bold;
     width: 30%;
 }
 
 .property-value {
-    padding: 0.3125rem;
+    padding: var(--ddb-spacing-xs);
     text-align: left;
-    border-bottom: 1px solid var(--ddb-border);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     word-break: break-word;
 }
 

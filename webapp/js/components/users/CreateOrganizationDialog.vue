@@ -6,9 +6,6 @@
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <PrimeMessage v-if="success" severity="success" :closable="false">
-                <strong>{{ successMessage }}</strong>
-            </PrimeMessage>
 
             <form v-on:submit.prevent v-bind:class="{ error: !!error }">
                 <div class="mb-3">
@@ -31,7 +28,7 @@
             </form>
 
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button @click="close()" label="Cancel" />
+                <Button @click="close()" severity="secondary" label="Cancel" />
                 <Button @click="confirmCreate()" :disabled="creating || !organizationName.trim()"
                         :loading="creating" severity="primary" icon="fa-solid fa-plus" label="Create Organization" />
             </div>
@@ -58,8 +55,6 @@ export default {
         return {
             loading: false,
             error: "",
-            success: false,
-            successMessage: "",
             organizationName: "",
             organizationDescription: "",
             creating: false
@@ -102,7 +97,6 @@ export default {
 
         clearError: function () {
             this.error = "";
-            this.success = false;
         },
 
         async confirmCreate() {
@@ -124,14 +118,11 @@ export default {
                     description: this.organizationDescription.trim() || undefined
                 });
 
-                this.success = true;
-                this.successMessage = `Organization "${this.organizationName}" created successfully!`;
-
-                setTimeout(() => {
-                    this.creating = false;
-                    this.$emit('onClose', 'created');
-                }, 1500);
+                this.$toast.add({ severity: 'success', summary: 'Organization Created', detail: `Organization "${this.organizationName}" created successfully`, life: 3000 });
+                this.creating = false;
+                this.$emit('onClose', 'created');
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization: ' + (e.message || 'Unknown error'), life: 5000 });
                 this.error = e.message || 'Failed to create organization';
                 this.creating = false;
             }

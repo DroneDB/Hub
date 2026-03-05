@@ -3,11 +3,15 @@
 // ============================================================
 //
 // CONVENTIONS:
-// - All dimensions in rem (1rem = 16px, never use px except 1px borders)
+// - All dimensions on the Bootstrap scale: 0, 0.25, 0.5, 0.75, 1, 1.5, 3 rem
+// - No magic numbers — every value is a --ddb-* token or a Bootstrap class
 // - All spacing via Bootstrap utility classes (m-*, p-*, gap-*)
 //   Steps: 0=0, 1=0.25rem, 2=0.5rem, 3=1rem, 4=1.5rem, 5=3rem
+// - Borders via Bootstrap utility classes (.border, .border-top, etc.)
+//   In CSS-only contexts use var(--ddb-border-width)
 // - Layout via Bootstrap: d-flex, row/col-*, responsive classes
 // - Colors and typography via PrimeVue Lara theme tokens
+// - Font sizes: var(--ddb-font-size-sm/base/lg/xl) only
 // - Forms via PrimeVue components (InputText, Password, Select, etc.)
 // - Badges via PrimeVue Tag component
 // - No PrimeFlex
@@ -33,8 +37,8 @@ body {
     color: var(--ddb-text);
     background: var(--ddb-bg);
     font-family: 'Inter', sans-serif;
-    font-size: 0.875rem;
-    line-height: 1.4285;
+    font-size: var(--ddb-font-size-base);
+    line-height: 1.5;
 }
 
 /*
@@ -86,12 +90,12 @@ body {
 
     input {
         flex: 1;
-        padding-left: 2.5em;
+        padding-left: var(--ddb-spacing-2xl);
     }
 
     i {
         position: absolute;
-        left: 0.7em;
+        left: var(--ddb-spacing-md);
         opacity: 0.5;
         color: rgba(0, 0, 0, 0.87);
     }
@@ -107,8 +111,8 @@ body {
 // ============================================================
 .divider {
     border: none;
-    border-top: 1px solid var(--ddb-border-light);
-    margin: 1em 0;
+    border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+    margin: var(--ddb-spacing-lg) 0;
 }
 
 // ============================================================
@@ -119,7 +123,7 @@ body {
 .text-warning { color: var(--ddb-warning-text) !important; }
 .text-muted { color: var(--ddb-text-muted) !important; }
 
-.small { font-size: 0.85em; }
+.small { font-size: var(--ddb-font-size-sm); }
 
 // ============================================================
 // Fluid helper — use Bootstrap w-100 instead
@@ -134,14 +138,14 @@ body {
 
 // --- Segments (grouped card-like containers) ---
 .ui.segments {
-    border: 1px solid var(--ddb-border-light);
-    border-radius: 0.25rem;
-    box-shadow: 0 0.0625rem 0.125rem 0 rgba(34, 36, 38, 0.15);
-    margin: 1rem 0;
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
+    border-radius: var(--ddb-radius-sm);
+    box-shadow: var(--ddb-shadow-sm);
+    margin: var(--ddb-spacing-lg) 0;
     background: var(--ddb-bg-surface);
 
     > .ui.segment {
-        border-top: 1px solid var(--ddb-border-light);
+        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
         border-radius: 0;
         box-shadow: none;
         border-left: none;
@@ -157,11 +161,11 @@ body {
 
 // Segment (standalone)
 .ui.segment {
-    padding: 1rem;
+    padding: var(--ddb-spacing-lg);
     background: var(--ddb-bg-surface);
-    border: 1px solid var(--ddb-border-light);
-    border-radius: 0.25rem;
-    box-shadow: 0 0.0625rem 0.125rem 0 rgba(34, 36, 38, 0.15);
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
+    border-radius: var(--ddb-radius-sm);
+    box-shadow: var(--ddb-shadow-sm);
 }
 
 // --- Table ---
@@ -169,32 +173,32 @@ body {
     width: 100%;
     border-collapse: collapse;
     background: var(--ddb-bg-surface);
-    border: 1px solid var(--ddb-border-light);
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
     color: var(--ddb-text);
-    margin: 1rem 0;
+    margin: var(--ddb-spacing-lg) 0;
 
     th {
         background: var(--ddb-bg-light);
-        padding: 0.5rem;
+        padding: var(--ddb-spacing-sm);
         font-weight: 700;
         text-align: left;
-        border-bottom: 1px solid rgba(34, 36, 38, 0.15);
+        border-bottom: var(--ddb-border-width) solid var(--ddb-border-light);
     }
 
     td {
-        padding: 0.5rem;
-        border-top: 1px solid rgba(34, 36, 38, 0.1);
+        padding: var(--ddb-spacing-sm);
+        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
     }
 
     tfoot th {
         background: var(--ddb-bg-light);
-        border-top: 1px solid rgba(34, 36, 38, 0.15);
+        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
         border-bottom: none;
     }
 
     &.celled {
         th, td {
-            border: 1px solid rgba(34, 36, 38, 0.15);
+            border: var(--ddb-border-width) solid var(--ddb-border-light);
         }
     }
 
@@ -215,8 +219,8 @@ body {
 
 // --- Top banner (heading row) ---
 .top-banner {
-    margin-top: 0.75rem;
-    margin-bottom: 1.5rem;
+    margin-top: var(--ddb-spacing-md);
+    margin-bottom: var(--ddb-spacing-xl);
 }
 
 // --- Page-level loading spinner ---
@@ -224,8 +228,8 @@ div.loading {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 12.5rem;
-    font-size: 2em;
+    min-height: var(--ddb-spacing-2xl);
+    font-size: var(--ddb-font-size-lg);
     color: var(--ddb-text-muted);
 }
 
@@ -315,6 +319,43 @@ body:fullscreen {
 }
 
 
+// ============================================================
+// Dialog / Window size classes
+// ============================================================
+.dialog-xs  { max-width: 17.5rem;  }  // 280px
+.dialog-sm  { max-width: 25rem;    }  // 400px
+.dialog-md  { max-width: 31.25rem; }  // 500px
+.dialog-lg  { max-width: 37.5rem;  }  // 600px
+.dialog-xl  { max-width: 47rem;    }  // ~750px
+
+// ============================================================
+// Tooltip shared styles (replaces duplicated inline CSS in
+// Potree.vue, mapUtils.js, etc.)
+// ============================================================
+.ddb-tooltip {
+    position: absolute;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border-radius: var(--ddb-radius-sm);
+    font-size: var(--ddb-font-size-sm);
+    max-width: var(--ddb-tooltip-max-width);
+    box-shadow: var(--ddb-shadow-sm);
+    pointer-events: none;
+    z-index: 10000;
+    white-space: pre-wrap;
+
+    &--dark {
+        background: var(--ddb-tooltip-bg);
+        color: var(--ddb-text-on-color);
+        border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.2);
+    }
+
+    &--light {
+        background: var(--ddb-tooltip-bg-light);
+        color: var(--ddb-tooltip-text-dark);
+        border: var(--ddb-border-width) solid var(--ddb-border-light);
+    }
+}
+
 @font-face {
     font-family: 'dronedb';
     src: url('../fonts/dronedb.woff2?91670630') format('woff2'),
@@ -332,8 +373,8 @@ body:fullscreen {
 
     display: inline-block;
     text-decoration: inherit;
-    width: 1em;
-    margin-right: .2em;
+    width: 1rem;
+    margin-right: .25rem;
     text-align: center;
     /* opacity: .8; */
 
@@ -342,11 +383,11 @@ body:fullscreen {
     text-transform: none;
 
     /* fix buttons height, for twitter bootstrap */
-    line-height: 1em;
+    line-height: 1rem;
 
     /* Animation center compensation - margins should be symmetric */
     /* remove if not needed */
-    margin-left: .2em;
+    margin-left: .25rem;
 
     /* you can be more comfortable with increased icons size */
     /* font-size: 120%; */

@@ -1,5 +1,5 @@
 <template>
-    <Window title="Point Annotation" id="point-annotation" @onClose="discard" modal fixedSize maxWidth="400px">
+    <Window title="Point Annotation" id="point-annotation" @onClose="discard" modal fixedSize sizeClass="dialog-sm">
         <div class="point-annotation-form">
             <div class="mb-3">
                 <label class="d-block mb-1 fw-semibold">Color</label>
@@ -96,16 +96,16 @@ export default {
 .color-palette {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.375rem;
+    gap: 0.5rem;
     align-items: center;
 }
 
 .color-swatch {
     width: 1.75rem;
     height: 1.75rem;
-    border-radius: 0.25rem;
+    border-radius: var(--ddb-radius-sm);
     cursor: pointer;
-    border: 2px solid transparent;
+    border: var(--ddb-border-width) solid transparent;
     transition: border-color 0.2s, transform 0.1s;
 }
 
@@ -115,15 +115,15 @@ export default {
 
 .color-swatch.selected {
     border-color: #000;
-    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #000;
+    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
 }
 
 .color-picker-custom {
     width: 1.75rem;
     height: 1.75rem;
     padding: 0;
-    border: 1px solid var(--ddb-border);
-    border-radius: 0.25rem;
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
     cursor: pointer;
     background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
 }

@@ -7,9 +7,6 @@
 
         <div v-else class="dialog">
             <Message bindTo="error" />
-            <PrimeMessage v-if="success" severity="success" :closable="false">
-                <strong>User updated successfully!</strong>
-            </PrimeMessage>
 
             <form v-on:submit.prevent v-bind:class="{ error: !!error }">
                 <div class="mb-3">
@@ -30,7 +27,7 @@
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" :disabled="updating" label="Cancel" />
+                <Button @click="close()" severity="secondary" :disabled="updating" label="Cancel" />
                 <Button @click="confirmUpdate()" :disabled="updating || !isValid()" :loading="updating"
                     severity="primary" label="Update User" />
             </div>
@@ -66,7 +63,6 @@ export default {
     data: function () {
         return {
             updating: false,
-            success: false,
             loading: false,
             error: "",
             editUser: {
@@ -114,12 +110,11 @@ export default {
                 // Update user with both email and roles
                 await reg.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
 
-                this.success = true;
-                setTimeout(() => {
-                    this.updating = false;
-                    this.$emit('onClose', 'updated');
-                }, 1500);
+                this.$toast.add({ severity: 'success', summary: 'User Updated', detail: `User "${this.editUser.userName}" updated successfully`, life: 3000 });
+                this.updating = false;
+                this.$emit('onClose', 'updated');
             } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update user: ' + e.message, life: 5000 });
                 this.error = e.message;
                 this.updating = false;
             }
