@@ -1,8 +1,8 @@
 <template>
     <Window title="Confirm delete" id="remove" @onClose="close('close')" modal maxWidth="70%" fixedSize>
-        Are you sure you want to delete <span v-if="files.length === 1">"{{ files[0].label }}"</span><span v-else>{{
-            files.length }} entries</span>?<br />
-        <div class="d-flex justify-content-end gap-2 mt-3">
+        <div class="mb-3">Are you sure you want to delete <span v-if="files.length === 1">"{{ files[0].label }}"</span><span v-else>{{
+            files.length }} entries</span>?</div>
+        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
             <Button label="Close" @click="close('close')" severity="secondary" />
             <Button label="Remove" @click="close('remove')" severity="danger" />
         </div>

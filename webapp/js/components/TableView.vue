@@ -5,7 +5,10 @@
         <div v-if="currentPath">
             <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" style="margin-top: 1rem; margin-bottom: 1rem; margin-left: 1rem">
                 <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">{{ item.label }}</a>
+                    <a v-if="item.command" class="bc-link" @click="item.command()">
+                        <i v-if="item.icon" :class="item.icon"></i>
+                        <template v-else>{{ item.label }}</template>
+                    </a>
                     <span v-else class="bc-active">{{ item.label }}</span>
                 </template>
                 <template #separator> / </template>
@@ -50,6 +53,7 @@
                         @drop.stop="onDrop($event, f)"
                         @dragenter.prevent
                         @dragover.prevent
+                        @mousedown.prevent
                         @click.stop="handleSelection($event, f)"
                         @contextmenu="handleRightClick($event, f)"
                         @dblclick.prevent="handleOpen(f)">

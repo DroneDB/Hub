@@ -50,7 +50,7 @@
                     </div>
                 </div>
             </div>
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button v-if="hasAction('close')" @click="handleClose" severity="secondary" label="Close" />
                 <Button v-if="hasAction('cancel')" @click="handleClose" label="Cancel" />
                 <Button v-if="hasAction('details')" @click="toggleDetails"

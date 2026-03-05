@@ -21,7 +21,7 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3">
+        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
             <Button @click="close('cancel')" severity="secondary" label="Cancel" />
             <Button @click="close('confirm')" severity="danger" label="Rescan" />
         </div>

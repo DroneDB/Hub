@@ -65,6 +65,9 @@
                 </div>
             </div>
 
+            <div class="d-flex justify-content-end mt-3">
+                <Button @click="$emit('onClose')" severity="secondary" label="Close" />
+            </div>
         </div>
     </Window>
 </template>

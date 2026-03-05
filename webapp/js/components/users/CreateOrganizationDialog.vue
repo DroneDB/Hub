@@ -33,7 +33,7 @@
             <div class="d-flex justify-content-end gap-2 mt-3">
                 <Button @click="close()" label="Cancel" />
                 <Button @click="confirmCreate()" :disabled="creating || !organizationName.trim()"
-                        :loading="creating" severity="info" icon="fa-solid fa-plus" label="Create Organization" />
+                        :loading="creating" severity="primary" icon="fa-solid fa-plus" label="Create Organization" />
             </div>
         </div>
     </Window>

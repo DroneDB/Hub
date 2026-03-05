@@ -33,10 +33,10 @@
                            v-model="confirmPassword" placeholder="Confirm new password" :feedback="false" toggleMask class="w-100" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close()" :disabled="changing" label="Cancel" />
                 <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
-                    severity="info" label="Change Password" />
+                    severity="primary" label="Change Password" />
             </div>
         </div>
     </Window>

@@ -38,7 +38,7 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3">
+        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
             <Button @click="close" severity="secondary" label="Close" />
         </div>
     </Window>

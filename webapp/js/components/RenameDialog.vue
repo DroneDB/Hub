@@ -21,9 +21,9 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3">
+        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
             <Button @click="close('close')" severity="secondary" label="Close" />
-            <Button @click="rename" :disabled="!renameText" severity="success" label="Rename" />
+            <Button @click="rename" :disabled="!renameText || renameText === file.label" severity="primary" label="Rename" />
         </div>
     </Window>
 </template>

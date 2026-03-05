@@ -27,7 +27,7 @@
                         v-model="confirmPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close()" severity="secondary" :disabled="changing" label="Close" />
                 <Button @click="changePwd()" :disabled="changing || !isFilled()" :loading="changing"
                     severity="info" label="Change Password" />

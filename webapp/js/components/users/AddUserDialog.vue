@@ -42,10 +42,10 @@
                     <MultiSelect v-model="roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close()" severity="secondary" :disabled="adding" label="Close" />
                 <Button @click="confirmAddUser()" :disabled="adding || !isFilled()" :loading="adding"
-                    severity="info" label="Add User" />
+                    severity="primary" label="Add User" />
             </div>
         </div>
     </Window>

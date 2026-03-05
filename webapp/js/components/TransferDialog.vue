@@ -14,7 +14,7 @@
                 </PrimeMessage>
 
                 <!-- Destination Organization -->
-                <div class="mb-3">
+                <div class="my-3">
                     <label class="d-block mb-1 fw-semibold">Destination Organization</label>
                     <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label" optionValue="value" placeholder="Select organization..." class="w-100" />
                 </div>
@@ -49,9 +49,9 @@
             </form>
 
             <!-- Buttons -->
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close('close')" severity="secondary" :disabled="isTransferring" label="Close" />
-                <Button @click="transfer" :disabled="!canTransfer" severity="success" icon="fa-solid fa-right-left" label="Transfer" />
+                <Button @click="transfer" :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left" label="Transfer" />
             </div>
         </div>
     </Window>

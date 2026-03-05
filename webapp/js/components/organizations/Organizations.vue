@@ -2,18 +2,22 @@
     <div id="organizations">
         <Toast position="bottom-left" />
 
-        <div class="top-banner d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-3">
-                <i class="fa-solid fa-sitemap org-icon"></i>
-                <div>
-                    <h1 class="mb-0">Organizations</h1>
-                    <p class="text-muted mb-0 mt-1">Organize your datasets into groups and manage team access.</p>
+        <Toolbar class="top-toolbar">
+            <template #start>
+                <div class="d-flex align-items-center gap-3">
+                    <i class="fa-solid fa-sitemap org-icon"></i>
+                    <div>
+                        <h1 class="mb-0">Organizations</h1>
+                        <p class="text-muted mb-0 mt-1">Organize your datasets into groups and manage team access.</p>
+                    </div>
                 </div>
-            </div>
-            <Button v-if="!readyOnly" @click.stop="handleNew()" severity="info" size="small">
-                <i class="fa-solid fa-plus"></i> Create Organization
-            </Button>
-        </div>
+            </template>
+            <template #end>
+                <Button v-if="!readyOnly" @click.stop="handleNew()" severity="info" size="small">
+                    <i class="fa-solid fa-plus"></i> Create Organization
+                </Button>
+            </template>
+        </Toolbar>
 
         <!-- Skeleton loading state -->
         <div v-if="loading">
@@ -46,22 +50,25 @@
                             <template #content>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="flex-grow-1">
-                                        <i class="fa-solid fa-sitemap me-3"></i>
-                                        <strong style="font-size: large;">{{ org.name ? org.name : org.slug }}</strong>
+                                        <div>
+                                            <i class="fa-solid fa-sitemap me-3"></i>
+                                            <strong style="font-size: x-large;">{{ org.name ? org.name : org.slug }}</strong>
+                                        </div>
+                                        <div v-if="org.description" class="text-muted mt-2" style="font-size: medium; margin-left: 2.25rem;">{{ org.description }}</div>
                                     </div>
                                     <div class="me-3">
                                         <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
                                         <Tag v-else severity="warn" icon="fa-solid fa-lock">Private</Tag>
                                     </div>
                                     <div class="org-actions d-flex gap-1">
-                                        <Button v-if="memberManagementEnabled && !readyOnly && (org.owner === userName || isAdmin)"
+                                        <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
                                             @click.stop="openMembersDialog(org)" severity="info" size="small"
                                             icon="fa-solid fa-users" title="Manage Members" />
-                                        <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                        <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
                                             @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
                                             :loading="org.editing" :disabled="org.editing || org.deleting"
                                             icon="fa-solid fa-pencil" />
-                                        <Button v-if="!readyOnly && org.slug !== 'public' && org.slug !== org.owner"
+                                        <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
                                             @click.stop="handleDelete(org)" severity="danger" size="small"
                                             :loading="org.deleting" :disabled="org.deleting || org.editing"
                                             icon="fa-solid fa-trash" />
@@ -87,8 +94,7 @@
             @onClose="handleOrganizationClose"></OrganizationDialog>
         <OrganizationMembersDialog v-if="membersDialogOpen"
             :orgSlug="selectedOrgForMembers.slug"
-            :isOwner="selectedOrgForMembers.owner === userName"
-            :isAdmin="isAdmin"
+            :canManageMembers="selectedOrgForMembers.permissions?.canManageMembers || false"
             @onClose="closeMembersDialog">
         </OrganizationMembersDialog>
 
@@ -108,6 +114,7 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Toast from 'primevue/toast';
+import Toolbar from 'primevue/toolbar';
 import DataView from 'primevue/dataview';
 import Skeleton from 'primevue/skeleton';
 
@@ -122,6 +129,7 @@ export default {
         Card,
         Tag,
         Toast,
+        Toolbar,
         DataView,
         Skeleton
     },
@@ -150,13 +158,7 @@ export default {
         setTitle("Organizations");
 
         try {
-            // Check if current user is admin
-            try {
-                const userInfo = await reg.info();
-                this.isAdmin = userInfo?.roles?.includes('admin') || false;
-            } catch (e) {
-                this.isAdmin = false;
-            }
+            this.isAdmin = reg.isAdmin();
 
             let tmp = await reg.getOrganizations()
 
@@ -170,7 +172,8 @@ export default {
                     description: org.description,
                     creationDate: Date.parse(org.creationDate),
                     owner: org.owner,
-                    isPublic: org.isPublic
+                    isPublic: org.isPublic,
+                    permissions: org.permissions
                 };
             });
 
@@ -217,6 +220,7 @@ export default {
 
                 if (ret) {
                     this.organizations = this.organizations.filter(o => o.slug !== this.currentOrgSlug);
+                    this.$toast.add({ severity: 'success', summary: 'Organization Deleted', detail: 'Organization deleted successfully', life: 3000 });
                 } else {
                     this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization "' + this.currentOrgSlug + '"', life: 5000 });
                     console.error(ret);
@@ -275,8 +279,13 @@ export default {
                             slug: neworg.slug,
                             name: neworg.name,
                             description: neworg.description,
-                            isPublic: neworg.isPublic
+                            isPublic: neworg.isPublic,
+                            editing: false,
+                            deleting: false,
+                            owner: this.userName,
+                            permissions: { canRead: true, canWrite: true, canDelete: true, canManageMembers: true }
                         });
+                        this.$toast.add({ severity: 'success', summary: 'Organization Created', detail: 'Organization created successfully', life: 3000 });
                     } else {
                         this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization "' + neworg.slug + '"', life: 5000 });
                         console.error(ret);
@@ -302,6 +311,7 @@ export default {
                         orgitem.name = neworg.name;
                         orgitem.description = neworg.description;
                         orgitem.isPublic = neworg.isPublic;
+                        this.$toast.add({ severity: 'success', summary: 'Organization Updated', detail: 'Organization updated successfully', life: 3000 });
                     } else {
                         this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update organization "' + org.slug + '"', life: 5000 });
                         console.error(ret);
@@ -369,9 +379,11 @@ export default {
         margin-bottom: 1rem;
     }
 
-    .top-banner {
-        margin-top: 0.75rem;
+    .top-toolbar {
         margin-bottom: 1.5rem;
+        border: none;
+        background: transparent;
+        padding: 0.75rem 0;
     }
 
     .org-icon {

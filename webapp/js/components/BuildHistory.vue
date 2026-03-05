@@ -7,7 +7,7 @@
                         <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value" placeholder="All States" @change="applyFilters" class="w-100" />
                     </div>
                     <div class="mb-0">
-                        <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" />
+                        <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary" :loading="loading" />
                     </div>
                     <div class="mb-0">
                         <Button severity="danger" @click="showClearDialog" :disabled="completedBuildsCount === 0" icon="fa-solid fa-trash" label="Clear Concluded" />
@@ -19,7 +19,7 @@
         <div class="content">
             <!-- Skeleton loading state -->
             <DataTable v-if="loading" :value="skeletonRows" stripedRows>
-                <Column header="State" style="width: auto;">
+                <Column header="State" style="width: 3rem;">
                     <template #body><Skeleton width="2rem" height="1.5rem" /></template>
                 </Column>
                 <Column header="File Path" style="width: 35%;">
@@ -45,7 +45,7 @@
 
             <DataTable v-else :value="filteredBuilds" stripedRows rowHover paginator :rows="pageSize"
                 sortField="createdAt" :sortOrder="-1" :pt="{ table: { style: 'min-width: 50rem' } }">
-                <Column field="currentState" header="State" :sortable="true" style="width: auto;">
+                <Column field="currentState" header="State" :sortable="true" style="width: 5rem;">
                     <template #body="slotProps">
                         <Tag :severity="getTagSeverity(slotProps.data.currentState)" :pt="{ root: { title: slotProps.data.currentState } }">
                             <i :class="getStateIcon(slotProps.data.currentState)" style="font-size: 1.1em;"></i>
@@ -120,7 +120,7 @@
             :message="`Are you sure you want to delete all completed and failed builds?<br/><strong>${completedBuildsCount} build(s)</strong> will be removed from the history.`"
             confirmText="Clear"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             warningTitle="Warning"
             warningMessage="This action cannot be undone."
             @onClose="handleClearDialogClose">

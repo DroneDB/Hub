@@ -88,14 +88,14 @@
 
                             <div class="mb-3">
                                 <Button @click="createOrganization()" :disabled="creating || !newOrgName.trim()"
-                                        :loading="creating" severity="info" icon="fa-solid fa-plus" label="Create Organization" />
+                                        :loading="creating" severity="primary" icon="fa-solid fa-plus" label="Create Organization" />
                             </div>
                         </form>
                     </TabPanel>
                 </TabPanels>
             </Tabs>
 
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close()" severity="secondary" label="Close" />
             </div>
         </div>

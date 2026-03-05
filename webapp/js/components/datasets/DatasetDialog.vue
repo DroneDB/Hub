@@ -41,10 +41,10 @@
                     <label for="openAfterCreate">Open dataset after creation</label>
                 </div>
             </div>
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close('close')" severity="secondary" label="Close" />
-                <Button v-if="mode == 'new'" @click="close('create')" severity="info" :disabled="!isValid()" label="Create" />
-                <Button v-else @click="close('save')" severity="info" :disabled="!isValid()" label="Save" />
+                <Button v-if="mode == 'new'" @click="close('create')" severity="primary" :disabled="!isValid()" label="Create" />
+                <Button v-else @click="close('save')" severity="primary" :disabled="!isValid()" label="Save" />
             </div>
         </div>
     </Window>

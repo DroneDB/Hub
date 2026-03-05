@@ -88,7 +88,7 @@ export default {
                     class: 'window-dialog'
                 },
                 content: {
-                    class: 'text-selectable'
+                    // class: 'text-selectable'
                 }
             };
         }

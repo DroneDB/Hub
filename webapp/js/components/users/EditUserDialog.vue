@@ -29,10 +29,10 @@
                     <MultiSelect v-model="editUser.roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3">
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close()" :disabled="updating" label="Cancel" />
                 <Button @click="confirmUpdate()" :disabled="updating || !isValid()" :loading="updating"
-                    severity="info" label="Update User" />
+                    severity="primary" label="Update User" />
             </div>
         </div>
     </Window>

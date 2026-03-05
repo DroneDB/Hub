@@ -1,8 +1,8 @@
 <template>
     <Window title="Point Annotation" id="point-annotation" @onClose="discard" modal fixedSize maxWidth="400px">
         <div class="point-annotation-form">
-            <div class="form-group">
-                <label>Color</label>
+            <div class="mb-3">
+                <label class="d-block mb-1 fw-semibold">Color</label>
                 <div class="color-palette">
                     <div
                         v-for="color in colorPalette"
@@ -21,14 +21,14 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label for="pa-description">Description</label>
-                <textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3"></textarea>
+            <div class="mb-3">
+                <label class="d-block mb-1 fw-semibold" for="pa-description">Description</label>
+                <Textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3" autoResize class="w-100" />
             </div>
 
-            <div class="buttons">
-                <button class="btn-discard" @click="discard">Discard</button>
-                <button class="btn-save" @click="save">Save</button>
+            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+                <Button @click="discard" severity="secondary" label="Discard" />
+                <Button @click="save" severity="primary" label="Save" />
             </div>
         </div>
     </Window>
@@ -36,10 +36,14 @@
 
 <script>
 import Window from './Window.vue';
+import Button from 'primevue/button';
+import Textarea from 'primevue/textarea';
 
 export default {
     components: {
-        Window
+        Window,
+        Button,
+        Textarea
     },
     props: {
         initialColor: {
@@ -89,27 +93,6 @@ export default {
     min-width: 18.75rem;
 }
 
-.form-group {
-    margin-bottom: 1rem;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-weight: 500;
-    color: var(--ddb-text);
-}
-
-.form-group textarea {
-    width: 100%;
-    padding: 0.5rem;
-    border: 1px solid var(--ddb-border);
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    box-sizing: border-box;
-    resize: vertical;
-}
-
 .color-palette {
     display: flex;
     flex-wrap: wrap;
@@ -143,41 +126,5 @@ export default {
     border-radius: 0.25rem;
     cursor: pointer;
     background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
-}
-
-.buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1.25rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--ddb-border-separator);
-}
-
-.buttons button {
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-    border: none;
-}
-
-.btn-discard {
-    background-color: var(--ddb-border-separator);
-    color: var(--ddb-text);
-}
-
-.btn-discard:hover {
-    background-color: var(--ddb-border);
-}
-
-.btn-save {
-    background-color: var(--ddb-success);
-    color: var(--ddb-text-on-color);
-}
-
-.btn-save:hover {
-    background-color: var(--ddb-success);
-    filter: brightness(0.9);
 }
 </style>

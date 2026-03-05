@@ -13,9 +13,9 @@
                     <i class="fa-solid fa-triangle-exclamation" />
                     <p>File is too large to edit ({{ formattedSize }})</p>
                     <p class="limit-info">Maximum size: {{ formattedMaxSize }}</p>
-                    <div class="d-flex justify-content-end gap-2 mt-3">
+                    <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                         <Button @click="close" severity="secondary" label="Close" />
-                        <Button @click="downloadFile" severity="info" icon="fa-solid fa-download" label="Download Instead" />
+                        <Button @click="downloadFile" severity="primary" icon="fa-solid fa-download" label="Download Instead" />
                     </div>
                 </div>
 

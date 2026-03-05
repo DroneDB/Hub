@@ -1,31 +1,37 @@
 <template>
     <div id="datasets">
+        <Toast position="bottom-left" />
         <Message bindTo="error" />
 
         <div v-if="loading" class="loading">
             <ProgressSpinner style="width: 3.125rem; height: 3.125rem" />
         </div>
         <div v-else>
-            <div class="top-banner d-flex justify-content-between align-items-center">
-                <div class="org-heading d-flex align-items-center gap-3">
-                    <i class="fa-solid fa-sitemap org-icon"></i>
-                    <div>
+            <Toolbar class="top-toolbar">
+                <template #start>
+                    <div class="org-heading d-flex align-items-center gap-3">
+                        <i class="fa-solid fa-sitemap org-icon"></i>
+                        <div>
+                            <h1 class="mb-0">{{ orgName }}</h1>
+                            <div v-if="orgInfo?.description" class="text-muted" style="font-size: 0.85em; margin-top: 0.25rem;">{{ orgInfo.description }}</div>
+                            <p class="text-muted mb-0 mt-1"><Badge :value="filteredDatasets.length" severity="secondary" /> dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</p>
+                        </div>
+                    </div>
+                </template>
+                <template #end>
                     <div class="d-flex align-items-center gap-2">
-                        <h1 class="mb-0">{{ orgName }}</h1>
                         <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text size="small" title="Edit Organization">
                             <i class="fa-solid fa-wrench"></i>
                         </Button>
                         <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" text size="small" title="Manage Members">
                             <i class="fa-solid fa-users"></i> <span class="ms-1">Members</span>
                         </Button>
+                        <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="primary" size="small">
+                            <i class="fa-solid fa-plus"></i>&nbsp;Create Dataset
+                        </Button>
                     </div>
-                    <p class="text-muted mb-0 mt-1">{{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</p>
-                    </div>
-                </div>
-                <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="info" size="small">
-                    <i class="fa-solid fa-plus"></i>&nbsp;Create Dataset
-                </Button>
-            </div>
+                </template>
+            </Toolbar>
 
             <!-- Dataset Controls -->
             <div class="mb-3">
@@ -114,8 +120,7 @@
             @onClose="handleOrgDialogClose"></OrganizationDialog>
         <OrganizationMembersDialog v-if="membersDialogOpen"
             :orgSlug="$route.params.org"
-            :isOwner="isOrgOwner"
-            :isAdmin="isAdmin"
+            :canManageMembers="orgInfo?.permissions?.canManageMembers || false"
             @onClose="closeMembersDialog">
         </OrganizationMembersDialog>
 
@@ -140,7 +145,10 @@ import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
+import Toolbar from 'primevue/toolbar';
 import ProgressSpinner from 'primevue/progressspinner';
+import Toast from 'primevue/toast';
+import Badge from 'primevue/badge';
 import reg from '../../libs/sharedRegistry';
 import { Features } from '../../libs/features';
 
@@ -160,7 +168,10 @@ export default {
         InputIcon,
         Paginator,
         Tag,
-        ProgressSpinner
+        Toolbar,
+        ProgressSpinner,
+        Toast,
+        Badge
     },
     data: function () {
         // Load preferences from Local Storage
@@ -182,10 +193,9 @@ export default {
             orgEditDialogOpen: false,
             orgDialogModel: null,
             membersDialogOpen: false,
-            isOrgOwner: false,
-            isAdmin: false,
 
             orgName: "",
+            orgInfo: null,
 
             // Sorting - use saved preferences or defaults
             sortColumn: prefs?.sortColumn || "name",
@@ -206,16 +216,6 @@ export default {
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
             this.orgInfo = orgInfo;
             setTitle(this.orgName);
-
-            // Check permissions for org management
-            try {
-                const userInfo = await reg.info();
-                this.isAdmin = userInfo?.roles?.includes('admin') || false;
-                this.isOrgOwner = orgInfo.owner === reg.getUsername();
-            } catch (e) {
-                this.isAdmin = false;
-                this.isOrgOwner = false;
-            }
 
             const tmp = await this.org.datasets(); this.datasets = tmp.map(ds => {
                 return {
@@ -256,7 +256,7 @@ export default {
             return !HubOptions.disableDatasetCreation;
         },
         canManageOrg: function () {
-            return this.isOrgOwner || this.isAdmin;
+            return this.orgInfo?.permissions?.canManageMembers || false;
         },
         memberManagementEnabled: function () {
             return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
@@ -266,6 +266,8 @@ export default {
         // OR if there are no datasets yet (server will validate permission)
         canCreateDataset: function () {
             if (HubOptions.disableDatasetCreation) return false;
+            // If user has write permission on the org, they can create datasets
+            if (this.orgInfo?.permissions?.canWrite) return true;
             if (this.datasets.length === 0) return true;
             return this.datasets.some(ds => ds.permissions && ds.permissions.canWrite);
         },
@@ -426,14 +428,15 @@ export default {
                         // Only remove the specific dataset instead of recreating the entire array
                         this.datasets.splice(index, 1);
                     }
+                    this.$toast.add({ severity: 'success', summary: 'Dataset Deleted', detail: 'Dataset deleted successfully', life: 3000 });
                 } else {
-                    this.error = "Failed to delete dataset \"" + this.currentDsSlug + "\"";
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete dataset "' + this.currentDsSlug + '"', life: 5000 });
                     console.error(ret);
                     ds['deleting'] = false;
                 }
             } catch (e) {
                 console.error(e);
-                this.error = "Failed to delete dataset: " + e.message;
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete dataset: ' + e.message, life: 5000 });
                 ds['deleting'] = false;
             }
         },
@@ -524,6 +527,8 @@ export default {
                             this.preloadDatasetThumbnail(this.datasets[index]);
                         }
 
+                        this.$toast.add({ severity: 'success', summary: 'Dataset Created', detail: 'Dataset created successfully', life: 3000 });
+
                         // Navigate to the newly created dataset if the user has enabled the preference
                         if (newds.openAfterCreate) {
                             this.$router.push({
@@ -537,14 +542,14 @@ export default {
                     } else {
                         // Remove the temporary dataset on error
                         this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
-                        this.error = "Failed to create dataset \"" + newds.slug + "\"";
+                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create dataset "' + newds.slug + '"', life: 5000 });
                         console.error(ret);
                     }
                 } catch (e) {
                     // Remove the temporary dataset on error
                     this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
                     console.error(e);
-                    this.error = "Failed to create dataset: " + e.message;
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create dataset: ' + e.message, life: 5000 });
                 }
 
             } else if (this.dsDialogMode == "edit") {
@@ -576,13 +581,14 @@ export default {
                             dsitem['name'] = newds.name;
                             dsitem['visibility'] = newds.visibility;
                             dsitem['tagline'] = newds.tagline || '';
+                            this.$toast.add({ severity: 'success', summary: 'Dataset Updated', detail: 'Dataset updated successfully', life: 3000 });
                         }
                     } else {
-                        this.error = `Failed to update dataset \"${ds.slug}\"`;
+                        this.$toast.add({ severity: 'error', summary: 'Error', detail: `Failed to update dataset "${ds.slug}"`, life: 5000 });
                     }
                 } catch (e) {
                     console.error(e);
-                    this.error = "Failed to update dataset: " + e.message;
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update dataset: ' + e.message, life: 5000 });
                 }
 
                 dsitem['editing'] = false;
@@ -661,6 +667,7 @@ export default {
                     this.orgName = neworg.name || this.$route.params.org;
                     this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
                     setTitle(this.orgName);
+                    this.$toast.add({ severity: 'success', summary: 'Organization Updated', detail: 'Organization updated successfully', life: 3000 });
                 } else {
                     this.error = 'Failed to update organization';
                 }
@@ -688,9 +695,11 @@ export default {
     height: 100%;
     overflow-y: auto;
 
-    .top-banner {
-        margin-top: 0.75rem;
+    .top-toolbar {
         margin-bottom: 1.5rem;
+        border: none;
+        background: transparent;
+        padding: 0.75rem 0;
     }
 
     .org-heading {

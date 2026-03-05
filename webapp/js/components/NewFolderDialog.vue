@@ -4,9 +4,9 @@
         <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close"
             v-model="newFolderPath" :invalid="!newFolderPath" placeholder="Folder name" />
 
-        <div class="d-flex justify-content-end gap-2 mt-3">
+        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
             <Button @click="close('close')" severity="secondary" label="Close" />
-            <Button @click="createFolder" :disabled="!newFolderPath" severity="success" label="Create folder" />
+            <Button @click="createFolder" :disabled="!newFolderPath" severity="primary" label="Create folder" />
         </div>
     </Window>
 </template>

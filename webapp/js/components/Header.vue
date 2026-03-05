@@ -10,11 +10,23 @@
 
         <div class="right">
 
-            <Button :href="downloadUrl" @click="handleDownload" v-if="showDownload" title="Download"
-                severity="info" :loading="isDownloading" :disabled="isDownloading" size="small">
-                <i :class="{ hidden: !showDownloadIcon }" class="fa-solid fa-download"></i><span
-                    :class="{ 'mobile hide': showDownloadIcon }"> {{ downloadLabel }}</span>
+            <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
+                :title="selectedFiles.length > 0 ? `Download ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : 'Download'" :disabled="isDownloading">
+                <i class="fa-solid fa-download"></i>
+                <span v-if="selectedFiles.length > 0" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
+            <Button v-if="showSettings" @click="handleSettings" severity="secondary" size="small" text title="Settings">
+                <i class="fa-solid fa-wrench"></i>
+            </Button>
+
+            <ConfirmDialog v-if="downloadConfirmOpen"
+                title="Download"
+                :message="downloadConfirmMessage"
+                confirmText="Download"
+                cancelText="Cancel"
+                confirmButtonClass="primary"
+                @onClose="handleDownloadConfirmClose">
+            </ConfirmDialog>
 
             <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
@@ -54,10 +66,6 @@
                 </div>
             </Alert>
 
-            <Button @click="handleSettings" v-if="showSettings" title="Settings"
-                severity="secondary" size="small" text>
-                <i class="fa-solid fa-wrench"></i>
-            </Button>
             <Button v-if="!loggedIn" severity="info" size="small" @click="login">
                 <i class="fa-solid fa-lock"></i><span class="mobile hide"> Sign In</span>
             </Button>
@@ -75,6 +83,7 @@ import { utils } from 'ddb';
 import reg from '../libs/sharedRegistry';
 import { Features } from '../libs/features';
 import Alert from './Alert';
+import ConfirmDialog from './ConfirmDialog';
 import { xAuthLogout } from '../libs/xauth';
 import { isMobile } from '../libs/responsive';
 import { bytesToSize } from '../libs/utils';
@@ -86,6 +95,7 @@ import ProgressBar from 'primevue/progressbar';
 export default {
     components: {
         Alert,
+        ConfirmDialog,
         Button,
         Menu,
         ProgressBar
@@ -103,6 +113,7 @@ export default {
             showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
             selectedFiles: [],
             isDownloading: false,
+            downloadConfirmOpen: false,
             storageInfo: null,
             storageInfoDialogOpen: false,
             usersManagement: false,
@@ -176,6 +187,12 @@ export default {
         },
         appName: function () {
             return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+        },
+        downloadConfirmMessage: function () {
+            if (this.selectedFiles.length > 0) {
+                return `Are you sure you want to download ${this.selectedFiles.length} selected file${this.selectedFiles.length !== 1 ? 's' : ''}?`;
+            }
+            return 'Are you sure you want to download the entire dataset?';
         },
         userMenuItems: function () {
             const items = [];
@@ -284,9 +301,14 @@ export default {
         manageAccount: function () {
             this.$router.push({ name: "Account" });
         },
-        handleDownload: async function (e) {
-            e.preventDefault();
+        handleDownload: function () {
+            this.downloadConfirmOpen = true;
+        },
 
+        handleDownloadConfirmClose: async function (action) {
+            this.downloadConfirmOpen = false;
+
+            if (action !== 'confirm') return;
             if (this.isDownloading) return;
 
             this.isDownloading = true;

@@ -766,6 +766,7 @@ export default {
     display: flex;
     gap: 0.375rem;
     font-size: 0.8125rem;
+    align-items: center;
 }
 
 .summary-stat .icon {

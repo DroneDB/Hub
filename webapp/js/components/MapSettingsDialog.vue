@@ -50,6 +50,9 @@
             </div>
 
         </div>
+        <div class="d-flex justify-content-end mt-3" style="padding: 0 0.75rem;">
+            <Button @click="close" severity="secondary" label="Close" />
+        </div>
     </Window>
 </template>
 

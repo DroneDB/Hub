@@ -51,6 +51,7 @@ export default {
                         item => !response.deleted.includes(item.entry.path)
                     );
                     emitter.emit('deleteEntries', response.deleted);
+                    this.$toast.add({ severity: 'success', summary: 'Deleted', detail: `${response.deleted.length} file${response.deleted.length > 1 ? 's' : ''} deleted successfully`, life: 3000 });
                 }
 
                 // Show result dialog only if there are failures
@@ -91,6 +92,8 @@ export default {
                 emitter.emit('addItems', [newItem]);
 
                 this.sortFiles();
+
+                this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File renamed successfully`, life: 3000 });
 
             } catch (e) {
                 this.showError(e, "Rename file");

@@ -5,7 +5,10 @@
         <div v-if="currentPath">
             <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="mt-3 ms-3">
                 <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">{{ item.label }}</a>
+                    <a v-if="item.command" class="bc-link" @click="item.command()">
+                        <i v-if="item.icon" :class="item.icon"></i>
+                        <template v-else>{{ item.label }}</template>
+                    </a>
                     <span v-else class="bc-active">{{ item.label }}</span>
                 </template>
                 <template #separator> / </template>
@@ -467,26 +470,16 @@ export default {
             }
         },
 
-        selectRange: function (low, high) {
-            let idxLow = parseInt(low.$el.getAttribute('data-idx')),
-                idxHigh = parseInt(high.$el.getAttribute('data-idx'));
+        selectRange: function (startThumb, endThumb) {
+            let idxLow = parseInt(startThumb.$el.getAttribute('data-idx'));
+            let idxHigh = parseInt(endThumb.$el.getAttribute('data-idx'));
 
             if (idxLow > idxHigh) {
-                [low, high] = [high, low];
                 [idxLow, idxHigh] = [idxHigh, idxLow];
             }
 
-            let $n = low.$el;
-            while ($n != high.$el && $n !== null) {
-                const f = $n.__vue__.file;
-                f.selected = true;
-                $n = $n.parentElement.nextSibling.children[0];
-            }
-
-            if ($n !== null) {
-                // Select last
-                const f = $n.__vue__.file;
-                f.selected = true;
+            for (let i = idxLow; i <= idxHigh; i++) {
+                this.files[i].selected = true;
             }
         },
 
