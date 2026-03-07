@@ -633,7 +633,6 @@ export default {
 .upload-body {
     flex: 0 0 22rem; /* Fixed height - doesn't change when filtering */
     overflow-y: auto;
-    width: 37.5rem;
 }
 
 .file-list-scroller {
