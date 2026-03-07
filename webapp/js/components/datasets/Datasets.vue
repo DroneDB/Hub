@@ -6,7 +6,7 @@
         <div v-if="loading" class="loading">
             <ProgressSpinner style="width: 3rem; height: 3rem" />
         </div>
-        <div v-else>
+        <div v-else class="ds-content">
             <Toolbar class="top-toolbar">
                 <template #start>
                     <div class="org-heading d-flex align-items-center gap-3">
@@ -42,6 +42,7 @@
             <!-- Datasets Table -->
             <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
                 @row-click="onRowClick" rowHover class="ds-table"
+                scrollable scrollHeight="flex"
                 :pt="{ bodyRow: { style: 'cursor: pointer' } }">
                 <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
@@ -96,7 +97,7 @@
             </DataTable>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 0" class="d-flex justify-content-between align-items-center mt-2 p-2">
+            <div v-if="totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
                 <span>
                     Showing {{ paginatedDatasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
                     {{ Math.min(currentPage * itemsPerPage, filteredDatasets.length) }} of {{ filteredDatasets.length }} datasets
@@ -691,13 +692,33 @@ export default {
 #datasets {
     margin: 0.75rem;
     height: 100%;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    .ds-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        min-height: 0;
+    }
 
     .top-toolbar {
+        flex-shrink: 0;
         margin-bottom: 1.5rem;
         border: none;
         background: transparent;
         padding: 0.75rem 0;
+    }
+
+    .ds-table {
+        flex: 1;
+        min-height: 0;
+    }
+
+    .ds-pagination {
+        flex-shrink: 0;
     }
 
     .org-heading {

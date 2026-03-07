@@ -279,6 +279,13 @@ div.loading {
     display: flex;
     flex-direction: column;
     height: 100%;
+
+    // Content area fills remaining space below header
+    > :last-child {
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
+    }
 }
 
 body:fullscreen {
