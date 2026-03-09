@@ -3,8 +3,31 @@
         <Toast position="bottom-left" />
         <Message bindTo="error" />
 
-        <div v-if="loading" class="loading">
-            <ProgressSpinner style="width: 3rem; height: 3rem" />
+        <div v-if="loading" class="ds-content">
+            <div class="p-3">
+                <Skeleton width="16rem" height="2rem" class="mb-3" />
+                <DataTable :value="skeletonRows" stripedRows class="ds-table">
+                    <Column header="" style="width: 3.75rem;">
+                        <template #body><Skeleton width="2.5rem" height="2.5rem" /></template>
+                    </Column>
+                    <Column>
+                        <template #header><i class="fa-solid fa-database"></i> Dataset</template>
+                        <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
+                    </Column>
+                    <Column header="Creation Date">
+                        <template #body><Skeleton width="6rem" /></template>
+                    </Column>
+                    <Column header="Files">
+                        <template #body><Skeleton width="2rem" /></template>
+                    </Column>
+                    <Column header="Size">
+                        <template #body><Skeleton width="4rem" /></template>
+                    </Column>
+                    <Column header="Visibility">
+                        <template #body><Skeleton width="5rem" height="1.5rem" borderRadius="1rem" /></template>
+                    </Column>
+                </DataTable>
+            </div>
         </div>
         <div v-else class="ds-content">
             <Toolbar class="top-toolbar">
@@ -146,6 +169,7 @@ import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
 import Toolbar from 'primevue/toolbar';
 import ProgressSpinner from 'primevue/progressspinner';
+import Skeleton from 'primevue/skeleton';
 import Toast from 'primevue/toast';
 import Badge from 'primevue/badge';
 import reg from '../../libs/sharedRegistry';
@@ -169,6 +193,7 @@ export default {
         Tag,
         Toolbar,
         ProgressSpinner,
+        Skeleton,
         Toast,
         Badge
     },
@@ -177,6 +202,7 @@ export default {
         const prefs = getDatasetTablePreferences();
 
         return {
+            skeletonRows: new Array(5).fill({}),
             error: "",
             datasets: [],
             loading: true,
