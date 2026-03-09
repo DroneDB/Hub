@@ -448,25 +448,29 @@ export default {
             }
         },
         handleSelection: function (thumb, mouseBtn) {
-            if (!thumb) return; // Top
-            // if (mouseBtn === Mouse.RIGHT && this.selectedFiles.length > 1) return; // Prevent accidental deselection
+            if (!thumb) return;
             const file = thumb.file;
 
             if (Keyboard.isShiftPressed() && this.selectedFiles.length > 0 && this.rangeStartThumb) {
                 // Range selection
                 this.selectedFiles.forEach(f => f.selected = false);
                 this.selectRange(this.rangeStartThumb, thumb);
-            } else {
-
-                // Single selection
-                if (mouseBtn === Mouse.RIGHT) {
-                    if (!file.selected) this.selectedFiles.forEach(f => f.selected = false);
-                    file.selected = false;
-                }
+            } else if (Keyboard.isCtrlPressed()) {
+                // Ctrl+click: toggle selection
                 file.selected = !file.selected;
-
-                // Keep rangeStart from the first selected file
-                if (this.selectedFiles.length === 1) this.rangeStartThumb = thumb;
+                if (file.selected) this.rangeStartThumb = thumb;
+            } else if (mouseBtn === Mouse.RIGHT) {
+                // Right-click: select only if not already selected
+                if (!file.selected) {
+                    this.selectedFiles.forEach(f => f.selected = false);
+                    file.selected = true;
+                    this.rangeStartThumb = thumb;
+                }
+            } else {
+                // Normal click: deselect all, select only this file
+                this.selectedFiles.forEach(f => f.selected = false);
+                file.selected = true;
+                this.rangeStartThumb = thumb;
             }
         },
 

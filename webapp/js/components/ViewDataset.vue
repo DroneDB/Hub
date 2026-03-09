@@ -44,37 +44,27 @@
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                         @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
 
-                    <!-- Table View with Detail Panel (Desktop/Tablet only) -->
-                    <Panel v-else-if="selectedDetailFile && !isMobile" split="vertical" amount="70%" tabletAmount="60%">
-                        <template #first>
-                        <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                            :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
-                            @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
-                            @transferSelectedItems="openTransferItemsDialog"
-                            @setAsCover="setAsCover"
-                            @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                            @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                            @selectionChanged="handleTableSelectionChanged" />
-                        </template>
-                        <template #second>
-                        <DetailPanel :file="selectedDetailFile" :dataset="dataset"
-                            @close="handleDetailPanelClose"
-                            @open="handleDetailPanelOpen"
-                            @share="handleDetailPanelShare"
-                            @buildStarted="handleBuildStarted"
-                            @buildError="handleBuildError" />
-                        </template>
-                    </Panel>
-
-                    <!-- Table View without Detail Panel -->
-                    <TableView v-else ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
-                        @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
-                        @transferSelectedItems="openTransferItemsDialog"
-                        @setAsCover="setAsCover"
-                        @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                        @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                        @selectionChanged="handleTableSelectionChanged" />
+                    <!-- Table View with optional Detail Panel -->
+                    <div v-else class="table-detail-layout">
+                        <div class="table-detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
+                            <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
+                                :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                                @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
+                                @transferSelectedItems="openTransferItemsDialog"
+                                @setAsCover="setAsCover"
+                                @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                                @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                                @selectionChanged="handleTableSelectionChanged" />
+                        </div>
+                        <div v-if="selectedDetailFile && !isMobile" class="table-detail-side">
+                            <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                                @close="handleDetailPanelClose"
+                                @open="handleDetailPanelOpen"
+                                @share="handleDetailPanelShare"
+                                @buildStarted="handleBuildStarted"
+                                @buildError="handleBuildError" />
+                        </div>
+                    </div>
                 </template>
                 <template v-slot:buildhistory>
                     <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
@@ -1069,6 +1059,30 @@ export default {
 </script>
 
 <style scoped>
+.table-detail-layout {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+}
+
+.table-detail-main {
+    flex: 1;
+    min-width: 0;
+    overflow: auto;
+}
+
+.table-detail-main.with-detail {
+    flex: 7;
+}
+
+.table-detail-side {
+    flex: 3;
+    min-width: 15rem;
+    max-width: 25rem;
+    overflow-y: auto;
+    border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
+}
+
 .lightbox-toolbar-extra {
     position: fixed;
     top: var(--ddb-spacing-sm);

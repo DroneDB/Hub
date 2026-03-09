@@ -3,7 +3,7 @@
         <ContextMenu :items="contextMenu" />
         <Toolbar :tools="tools" v-if="tools" />
         <div v-if="currentPath">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" style="margin-top: 1rem; margin-bottom: 1rem; margin-left: 1rem">
+            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-4">
                 <template #item="{ item }">
                     <a v-if="item.command" class="bc-link" @click="item.command()">
                         <i v-if="item.icon" :class="item.icon"></i>
@@ -481,6 +481,7 @@ export default {
                 // Range selection
                 this.selectedFiles.forEach(f => f.selected = false);
                 this.selectRange(this.rangeStartIdx, idx);
+                return;
             } else if (Keyboard.isCtrlPressed()) {
                 // Toggle selection
                 file.selected = !file.selected;

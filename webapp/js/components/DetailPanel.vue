@@ -5,7 +5,6 @@
                 <i class="icon" :class="file.icon"></i>
                 <div class="content">
                     {{ file.label }}
-                    <div class="sub header">{{ getFileType(file) }}</div>
                 </div>
             </h3>
             <Button severity="secondary" outlined @click="handleClose" title="Close" icon="fa-solid fa-xmark" />
@@ -13,7 +12,7 @@
 
         <div class="detail-content">
             <!-- Thumbnail section -->
-            <div class="thumbnail-section">
+            <div class="thumbnail-section" v-if="hasThumbnailSupport">
                 <div class="thumbnail-container">
                     <img v-if="thumbnail && !loading && !buildLoading"
                         @error="handleImageError"
@@ -153,6 +152,10 @@ export default {
     computed: {
         isDirectory() {
             return this.file && ddb.entry.isDirectory(this.file.entry);
+        },
+        hasThumbnailSupport() {
+            if (!this.file || this.isDirectory) return false;
+            return thumbs.supportedForType(this.file.entry.type);
         },
         isBuildableFile() {
             if (!this.file || !this.dataset) return false;
@@ -396,7 +399,6 @@ export default {
     display: flex;
     flex-direction: column;
     background: var(--ddb-bg-surface);
-    border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
 }
 
 .detail-header {
@@ -518,7 +520,6 @@ export default {
     align-items: center;
     justify-content: center;
     background: var(--ddb-bg-surface);
-    border-left: var(--ddb-border-width) solid var(--ddb-border-medium);
     padding: 2rem;
 }
 
