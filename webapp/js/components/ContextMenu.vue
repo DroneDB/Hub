@@ -4,7 +4,7 @@
 
 <script>
 import PrimeContextMenu from 'primevue/contextmenu';
-import Keyboard from '../libs/keyboard';
+import Keyboard from '@/libs/keyboard';
 
 let contextMenus = [];
 

@@ -25,8 +25,8 @@ import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
 
 import { createAppRouter } from './router';
 
-import reg from './libs/sharedRegistry';
-import { queryParams, inIframe } from './libs/utils';
+import reg from '@/libs/api/sharedRegistry';
+import { queryParams, inIframe } from '@/libs/utils';
 
 /* global __APP_PRODUCTION__ */
 const isProduction = typeof __APP_PRODUCTION__ !== 'undefined' ? __APP_PRODUCTION__ : true;

@@ -20,11 +20,11 @@
 </template>
 
 <script>
-import Keyboard from '../libs/keyboard';
-import Window from './Window.vue';
+import Keyboard from '@/libs/keyboard';
+import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import { sanitizeHtml } from '../libs/sanitize';
+import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
     components: {

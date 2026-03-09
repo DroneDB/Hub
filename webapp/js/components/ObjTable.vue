@@ -43,7 +43,7 @@
 </template>
 
 <script>
-import { clone, sortObjectKeys } from '../libs/utils';
+import { clone, sortObjectKeys } from '@/libs/utils';
 export default {
     name: 'ObjTable',
     components: {

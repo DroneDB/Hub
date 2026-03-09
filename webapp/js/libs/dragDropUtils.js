@@ -112,7 +112,7 @@ export function isInternalDrag(evt) {
     }
 }
 
-import emitter from './eventBus';
+import emitter from '@/libs/eventBus';
 
 /**
  * Mixin providing drag-and-drop upload support for file browser components.

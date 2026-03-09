@@ -13,7 +13,7 @@
 <script>
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
-import { isMobile, isTablet } from '../libs/responsive';
+import { isMobile, isTablet } from '@/libs/responsive';
 
 export default {
     components: {

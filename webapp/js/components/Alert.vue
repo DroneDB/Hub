@@ -10,7 +10,7 @@
 </template>
 
 <script>
-import Window from './Window.vue';
+import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
 export default {

@@ -6,7 +6,7 @@
 
 <script>
 import PrimeMessage from 'primevue/message';
-import { sanitizeHtml } from '../libs/sanitize';
+import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
     components: {
