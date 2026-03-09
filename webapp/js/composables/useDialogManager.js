@@ -244,17 +244,11 @@ export default {
                 this.isBusy = true;
                 try {
                     const newDs = await this.renameDataset(this.$route.params.org, this.$route.params.ds, newPath);
-                    this.$router.push({
-                        name: "ViewDataset", params: {
-                            org: this.$route.params.org,
-                            ds: newDs.slug
-                        }
-                    });
-                    location.reload(true);
+                    window.location.href = `/r/${this.$route.params.org}/${newDs.slug}`;
                 } catch (e) {
                     this.showError(e, "Rename");
+                    this.isBusy = false;
                 }
-                this.isBusy = false;
             }
             this.renameDialogOpen = false;
         },
