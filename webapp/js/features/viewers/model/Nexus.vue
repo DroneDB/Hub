@@ -21,42 +21,43 @@
         <Window v-if="showSettings" title="Lighting" id="nexus-lighting" @onClose="toggleSettings" fixedSize sizeClass="dialog-xs">
             <div class="lighting-content">
                 <div class="form-group">
-                    <label>Ambient: {{ ambientIntensity.toFixed(1) }}</label>
-                    <input
+                    <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
+                    <div><input class="w-100"
                         type="range"
                         v-model.number="ambientIntensity"
                         min="0"
                         max="3"
                         step="0.1"
                         @input="updateAmbient"
-                    />
+                    /></div>
                 </div>
 
                 <div class="form-group">
-                    <label>Directional: {{ directionalIntensity.toFixed(1) }}</label>
-                    <input
+                    <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
+                    <div><input class="w-100"
                         type="range"
                         v-model.number="directionalIntensity"
                         min="0"
                         max="3"
                         step="0.1"
                         @input="updateDirectional"
-                    />
+                    /></div>
                 </div>
 
                 <div v-if="!modelInfo.hasTexture" class="form-group">
-                    <label>Shininess: {{ shininess }}</label>
-                    <input
+                    <div><label>Shininess: {{ shininess }}</label></div>
+                    <div><input class="w-100"
                         type="range"
                         v-model.number="shininess"
                         min="0"
                         max="100"
                         step="5"
                         @input="updateShininess"
-                    />
+                    /></div>
                 </div>
 
                 <Button label="Reset" @click="resetDefaults" text />
+                <Button label="Close" severity="secondary" @click="toggleSettings" text />
             </div>
         </Window>
     </div>
