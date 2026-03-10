@@ -5,7 +5,7 @@
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
                 @error="handleImageError" :src="thumbnail"
-                style="padding-right: 0.5rem; padding-left: 0.5rem; max-width: 100%; max-height: 100%;" />
+                style="max-width: 100%; max-height: 100%;" />
 
             <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
             <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
@@ -346,8 +346,6 @@ export default {
 /* .thumbnail .container.bordered - drop shadow removed */
 
 .thumbnail .container img {
-    padding-right: 0.5rem;
-    padding-left: 0.5rem;
     max-width: 100%;
     max-height: 100%;
 }
@@ -358,9 +356,6 @@ export default {
 
 .thumbnail .container i.icon-file {
     display: inline-block;
-    margin-top: auto;
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
 }
 
 .thumbnail .icon.badge {
