@@ -386,7 +386,6 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
-    background: var(--ddb-bg-light);
     border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     flex-shrink: 0;
 }
