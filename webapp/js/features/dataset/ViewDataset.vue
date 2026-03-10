@@ -46,7 +46,8 @@
                         @transferSelectedItems="openTransferItemsDialog"
                         @setAsCover="setAsCover"
                         @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                        @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError" />
+                        @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                        @openAsText="handleOpenAsText" />
 
                     <!-- Table View with optional Detail Panel -->
                     <div v-else class="table-detail-layout">
@@ -58,6 +59,7 @@
                                 @setAsCover="setAsCover"
                                 @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                                @openAsText="handleOpenAsText"
                                 @selectionChanged="handleTableSelectionChanged" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="table-detail-side">

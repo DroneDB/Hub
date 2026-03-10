@@ -32,10 +32,8 @@ import env from '@/dynamic/env';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
-import { canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import reg from '@/libs/api/sharedRegistry';
-import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
-import { Features } from '@/libs/features';
+import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator } from '@/libs/contextMenuItems';
+import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 
 const { pathutils } = ddb;
 
@@ -43,7 +41,7 @@ export default {
     components: {
         TreeView, ContextMenu, InputText, InputIcon, IconField
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll'],
+    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError'],
     props: {
         rootNodes: {
             type: Function,
@@ -59,6 +57,25 @@ export default {
         }
     },
     data: function () {
+        // Adapter: wrap lastSelectedNode as single-element array for the shared context menu factory
+        const ctx = {
+            getSelectedEntries: () => {
+                if (this.lastSelectedNode === null) return [];
+                return [this.lastSelectedNode.node];
+            },
+            get canWrite() { return this.component.canWrite; },
+            get dataset() { return this.component.dataset; },
+            emit: (event, ...args) => {
+                // For FileBrowser, some actions need to emit selectionChanged first
+                const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
+                if (needsSelectionSync.includes(event) && this.lastSelectedNode !== null) {
+                    this.component.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                }
+                this.component.$emit(event, ...args);
+            },
+            component: this
+        };
+
         let contextMenu = [];
 
         if (env.isElectron()) {
@@ -94,120 +111,10 @@ export default {
                 this.$emit('createFolder');
             }
         },
-        {
-            label: 'Open Item',
-            icon: 'fa-regular fa-folder-open',
-            isVisible: () => { return this.lastSelectedNode !== null; },
-            click: () => {
-                if (this.lastSelectedNode !== null) this.$emit('openItem', this.lastSelectedNode.node);
-            }
-        },
-        {
-            label: 'Open as Text',
-            icon: 'fa-regular fa-file-lines',
-            isVisible: () => {
-                if (this.lastSelectedNode === null) return false;
-                const entry = this.lastSelectedNode.node.entry;
-                // Show only for non-directory files that can be opened as text
-                // but are not already default text files (those open automatically)
-                return !ddb.entry.isDirectory(entry) &&
-                       canOpenAsText(entry) &&
-                       !shouldOpenAsText(entry);
-            },
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('openAsText', this.lastSelectedNode.node);
-                }
-            }
-        },
-        {
-            label: 'Properties',
-            icon: 'fa-solid fa-circle-info',
-            isVisible: () => { return this.lastSelectedNode !== null; },
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                    this.$emit("openProperties");
-                }
-            }
-        },
-        {
-            label: 'Download',
-            icon: 'fa-solid fa-download',
-            isVisible: () => { return this.lastSelectedNode !== null; },
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('downloadItems', [this.lastSelectedNode.node]);
-                }
-            }
-        },
-        {
-            label: "Rename",
-            icon: 'fa-solid fa-pencil',
-            isVisible: () => { return this.canWrite && this.lastSelectedNode !== null; },
-            accelerator: "CmdOrCtrl+M",
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                    this.$emit("moveSelectedItems");
-                }
-            }
-        },
-        {
-            label: "Transfer to Dataset",
-            icon: 'fa-solid fa-right-left',
-            isVisible: () => { return reg.isLoggedIn() && this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
-            accelerator: "CmdOrCtrl+T",
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                    this.$emit("transferSelectedItems");
-                }
-            }
-        },
-        {
-            label: "Set as Dataset Thumbnail",
-            icon: 'fa-solid fa-image',
-            isVisible: () => {
-                if (!this.canWrite || this.lastSelectedNode === null) return false;
-                const node = this.lastSelectedNode.node;
-                const type = node.entry.type;
-                const isImageType = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER].includes(type);
-                if (!isImageType) return false;
-                // Hide for files that are themselves thumbnail candidates
-                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
-                if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(node.entry.path).toLowerCase())) return false;
-                if (type === ddb.entry.type.GEORASTER) {
-                    if (!this.dataset) return false;
-                    const buildState = BuildManager.getBuildState(this.dataset, node.entry.path);
-                    if (!buildState) return true;
-                    return buildState.currentState !== BUILD_STATES.FAILED;
-                }
-                return true;
-            },
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                    this.$emit("setAsCover", this.lastSelectedNode.node);
-                }
-            }
-        },
-        {
-            type: 'separator',
-            isVisible: () => { return this.canWrite && this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
-        },
-        {
-            label: "Delete",
-            icon: 'fa-solid fa-trash',
-            accelerator: "CmdOrCtrl+D",
-            isVisible: () => { return this.canWrite && this.lastSelectedNode !== null && this.lastSelectedNode.node.entry.type !== ddb.entry.type.DRONEDB; },
-            click: () => {
-                if (this.lastSelectedNode !== null) {
-                    this.$emit('selectionChanged', [this.lastSelectedNode.node]);
-                    this.$emit("deleteSelecteditems");
-                }
-            }
-        },
+        ...buildViewerMenuItems(ctx),
+        ...buildActionMenuItems(ctx),
+        deleteSeparator(ctx),
+        deleteItem(ctx),
         ]);
 
         return {
@@ -261,21 +168,10 @@ export default {
 
                 const entries = await ddb.searchEntries(rootPath, query);
 
-                var res = entries.filter(entry => {
-                    return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
-                })
-                    .sort((a, b) => {
-                        // Folders first
-                        let aDir = ddb.entry.isDirectory(a);
-                        let bDir = ddb.entry.isDirectory(b);
-
-                        if (aDir && !bDir) return -1;
-                        else if (!aDir && bDir) return 1;
-                        else {
-                            // then filename ascending
-                            return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                        }
-                    })
+                var res = sortEntriesDirectoriesFirst(
+                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
+                    e => pathutils.basename(e.path)
+                )
                     .map(entry => {
                         const base = pathutils.basename(entry.path);
                         return {
@@ -324,21 +220,10 @@ export default {
                     stopOnError: false
                 });
 
-                var res = entries.filter(entry => {
-                    return pathutils.basename(entry.path)[0] != "." // Hidden files/folders
-                })
-                    .sort((a, b) => {
-                        // Folders first
-                        let aDir = ddb.entry.isDirectory(a);
-                        let bDir = ddb.entry.isDirectory(b);
-
-                        if (aDir && !bDir) return -1;
-                        else if (!aDir && bDir) return 1;
-                        else {
-                            // then filename ascending
-                            return pathutils.basename(a.path.toLowerCase()) > pathutils.basename(b.path.toLowerCase()) ? 1 : -1
-                        }
-                    })
+                var res = sortEntriesDirectoriesFirst(
+                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
+                    e => pathutils.basename(e.path)
+                )
                     .map(entry => {
                         const base = pathutils.basename(entry.path);
 

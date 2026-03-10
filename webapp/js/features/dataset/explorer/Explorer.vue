@@ -45,9 +45,10 @@ import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import { clone } from '@/libs/utils';
 import Window from '@/components/Window.vue';
-import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import { isInternalDrag, dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
+import { buildStandardContextMenu } from '@/libs/contextMenuItems';
+import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHelpers';
 
 import ddb from 'ddb';
 const { pathutils, utils } = ddb;
@@ -56,9 +57,6 @@ import { entry } from 'ddb';
 import shell from '@/dynamic/shell';
 import env from '@/dynamic/env';
 import ContextMenu from '@/components/ContextMenu';
-import reg from '@/libs/api/sharedRegistry';
-import { Features } from '@/libs/features';
-import { isPdfFile } from '@/libs/textFileUtils';
 import Breadcrumb from 'primevue/breadcrumb';
 
 export default {
@@ -66,9 +64,25 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb
     },
-    emits: ['openItem', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError'],
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
+        const ctx = {
+            getSelectedEntries: () => this.selectedFiles,
+            get canWrite() { return this.component.canWrite; },
+            get dataset() { return this.component.dataset; },
+            emit: (...args) => this.$emit(...args),
+            onSelectAllNone: () => {
+                if (!this.$refs.thumbs) return;
+                if (this.selectedFiles.length === this.$refs.thumbs.length) {
+                    this.deselectAll();
+                } else {
+                    this.selectAll();
+                }
+            },
+            component: this
+        };
+
         let contextMenu = [];
 
         if (env.isElectron()) {
@@ -95,181 +109,7 @@ export default {
             }]);
         }
 
-        const typesWithDedicatedViewer = [ddb.entry.type.MODEL, ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD, ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA, ddb.entry.type.MARKDOWN];
-
-        contextMenu = contextMenu.concat([{
-            label: 'Open',
-            icon: 'fa-regular fa-folder-open',
-            isVisible: () => { return this.selectedFiles.length > 0 && (this.selectedFiles.length > 1 || typesWithDedicatedViewer.indexOf(this.selectedFiles[0].entry.type) === -1); },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f);
-                });
-            }
-        }, {
-            label: 'Open Map',
-            icon: 'fa-solid fa-map',
-            isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD].indexOf(this.selectedFiles[0].entry.type) !== -1; },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f, 'map');
-                });
-            }
-        }, {
-            label: 'Open Point Cloud',
-            icon: 'fa-solid fa-cube',
-            isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.POINTCLOUD; },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f, 'pointcloud');
-                });
-            }
-        }, {
-            label: 'Open 3D Model',
-            icon: 'fa-solid fa-cube',
-            isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MODEL; },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f, 'model');
-                });
-            }
-        }, {
-            label: 'Open Panorama',
-            icon: 'fa-solid fa-globe',
-            isVisible: () => { return this.selectedFiles.length === 1 && [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(this.selectedFiles[0].entry.type) !== -1; },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f, 'panorama');
-                });
-            }
-        }, {
-            label: 'Open Markdown',
-            icon: 'book',
-            isVisible: () => { return this.selectedFiles.length === 1 && this.selectedFiles[0].entry.type === ddb.entry.type.MARKDOWN; },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f, 'markdown');
-                });
-            }
-        }, {
-            label: 'Open PDF',
-            icon: 'file pdf outline',
-            isVisible: () => { return this.selectedFiles.length === 1 && isPdfFile(this.selectedFiles[0].entry); },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('openItem', f);
-                });
-            }
-        }, {
-            label: "Rename",
-            icon: 'fa-solid fa-pencil',
-            isVisible: () => { return this.canWrite && this.selectedFiles.length == 1; },
-            accelerator: "CmdOrCtrl+M",
-            click: () => {
-                this.$emit("moveSelectedItems");
-            }
-        }, {
-            label: "Properties",
-            isVisible: () => { return this.selectedFiles.length > 0; },
-            icon: 'fa-solid fa-circle-info',
-            accelerator: "CmdOrCtrl+P",
-            click: () => {
-                this.$emit("openProperties");
-            }
-        }, {
-            label: 'Share/Embed',
-            icon: 'fa-solid fa-share-nodes',
-            isVisible: () => { return this.selectedFiles.length === 1 },
-            click: () => {
-                this.selectedFiles.forEach(f => {
-                    this.$emit('shareEmbed', f);
-                });
-            }
-        }, {
-            label: 'Download',
-            icon: 'fa-solid fa-download',
-            isVisible: () => { return this.selectedFiles.length > 0; },
-            click: () => {
-                this.$emit('downloadItems', this.selectedFiles);
-            }
-        }, {
-            label: 'Build',
-            icon: 'fa-solid fa-gear',
-            isVisible: () => {
-                return this.canWrite &&
-                       this.selectedFiles.length === 1 &&
-                       this.isBuildableFile(this.selectedFiles[0]) &&
-                       !this.hasActiveBuild(this.selectedFiles[0]);
-            },
-            click: () => {
-                this.buildSelectedFile();
-            }
-        }, {
-            label: "Transfer to Dataset",
-            icon: 'fa-solid fa-right-left',
-            isVisible: () => { return reg.isLoggedIn() && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
-            accelerator: "CmdOrCtrl+T",
-            click: () => {
-                this.$emit("transferSelectedItems");
-            }
-        }, {
-            label: "Set as Dataset Thumbnail",
-            icon: 'fa-solid fa-image',
-            isVisible: () => {
-                if (!this.canWrite || this.selectedFiles.length !== 1) return false;
-                const file = this.selectedFiles[0];
-                const type = file.entry.type;
-                const isImageType = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER].includes(type);
-                if (!isImageType) return false;
-                // Hide for files that are themselves thumbnail candidates
-                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
-                if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
-                if (type === ddb.entry.type.GEORASTER) {
-                    const buildState = BuildManager.getBuildState(this.dataset, file.entry.path);
-                    if (!buildState) return true;
-                    return buildState.currentState !== BUILD_STATES.FAILED && !this.hasActiveBuild(file);
-                }
-                return true;
-            },
-            click: () => {
-                this.$emit("setAsCover", this.selectedFiles[0]);
-            }
-        }, {
-            isVisible: () => { return this.selectedFiles.length > 0; },
-            type: 'separator'
-        }, {
-            label: "Select All/None",
-            icon: 'fa-solid fa-list',
-            accelerator: "CmdOrCtrl+A",
-            click: () => {
-                if (!this.$refs.thumbs) return;
-                if (this.selectedFiles.length === this.$refs.thumbs.length) {
-                    this.deselectAll();
-                } else {
-                    this.selectAll();
-                }
-            }
-        }, {
-            label: "Create Folder",
-            icon: 'fa-solid fa-folder',
-            isVisible: () => { return this.canWrite; },
-            accelerator: "CmdOrCtrl+N",
-            click: () => {
-                this.$emit("createFolder");
-            }
-        }, {
-            isVisible: () => { return this.canWrite && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
-            type: 'separator'
-        }, {
-            label: "Delete",
-            icon: 'fa-solid fa-trash',
-            isVisible: () => { return this.canWrite && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
-            accelerator: "CmdOrCtrl+D",
-            click: () => {
-                this.$emit("deleteSelecteditems");
-            }
-        }
-        ]);
+        contextMenu = contextMenu.concat(buildStandardContextMenu(ctx));
 
         return {
             loading: false,
@@ -494,30 +334,13 @@ export default {
             }
         },
 
-        // Build management methods
+        // Build management methods (delegated to shared helpers)
         isBuildableFile: function(file) {
-            if (!this.dataset) return false;
-            return BuildManager.isBuildableType(file.entry.type);
+            return isBuildableFile(this.dataset, file);
         },
 
         hasActiveBuild: function(file) {
-            if (!this.dataset) return false;
-            return BuildManager.hasActiveBuild(this.dataset, file.entry.path);
-        },
-
-        buildSelectedFile: async function() {
-            if (this.selectedFiles.length !== 1) return;
-
-            const file = this.selectedFiles[0];
-
-            try {
-                await BuildManager.startBuild(this.dataset, file.entry.path, true);
-                // Emit event to notify parent
-                this.$emit('buildStarted', file);
-            } catch (error) {
-                // Emit error event
-                this.$emit('buildError', { file, error: error.message });
-            }
+            return hasActiveBuild(this.dataset, file);
         }
     }
 }

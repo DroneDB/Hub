@@ -72,15 +72,21 @@ export default {
         async renameFile(file, newPath) {
             try {
                 var oldPath = file.entry.path;
-                await this.dataset.moveObj(oldPath, newPath);
+                var updatedEntry = await this.dataset.moveObj(oldPath, newPath);
 
                 // Remove both the new file path and the old one because it could be a replace
                 this.fileBrowserFiles = this.fileBrowserFiles.filter(item => item.entry.path != oldPath && item.entry.path != newPath);
 
                 var newItem = clone(file);
-                newItem.path = this.dataset.remoteUri(newPath),
-                    newItem.label = pathutils.basename(newPath);
-                newItem.entry.path = newPath;
+                newItem.path = this.dataset.remoteUri(newPath);
+                newItem.label = pathutils.basename(newPath);
+
+                // Use server-returned entry (includes updated type after extension change)
+                if (updatedEntry && typeof updatedEntry === 'object') {
+                    newItem.entry = updatedEntry;
+                } else {
+                    newItem.entry.path = newPath;
+                }
 
                 // Add it to our explorer (we are in the same folder)
                 if (pathutils.getParentFolder(newPath) == (this.currentPath || null)) {
@@ -92,6 +98,11 @@ export default {
                 emitter.emit('addItems', [newItem]);
 
                 this.sortFiles();
+
+                // If the file became buildable after rename, notify build manager
+                if (BuildManager.isBuildableType(newItem.entry.type)) {
+                    BuildManager.onFilesAdded(this.dataset, [newItem.entry]);
+                }
 
                 this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File renamed successfully`, life: 3000 });
 
