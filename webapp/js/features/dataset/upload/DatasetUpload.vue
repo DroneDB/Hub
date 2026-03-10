@@ -135,7 +135,7 @@ export default {
         Button
     },
     props: ['organization', 'dataset', 'path', 'filesToUpload'],
-    emits: ['onClose'],
+    emits: ['onClose', 'update:waitingForFiles'],
     data: function () {
         return {
             error: null,
@@ -209,6 +209,11 @@ export default {
             if (durationMs <= 0) return '0 B/s';
             const bytesPerSecond = (this.totalBytesSent / durationMs) * 1000;
             return bytesToSize(bytesPerSecond) + '/s';
+        }
+    },
+    watch: {
+        waitingForFiles(val) {
+            this.$emit('update:waitingForFiles', val);
         }
     },
     mounted: async function () {

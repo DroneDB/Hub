@@ -1,10 +1,6 @@
 <template>
-    <Window v-if="show" title="" id="fileAvailabilityDialog" @onClose="handleClose" modal sizeClass="dialog-lg" fixedSize>
+    <Window v-if="show" :title="title" id="fileAvailabilityDialog" @onClose="handleClose" modal sizeClass="dialog-lg" fixedSize>
         <div class="file-availability-dialog">
-            <div class="dialog-header">
-                <i :class="getHeaderIcon()"></i>
-                {{ title }}
-            </div>
             <div class="content">
                 <div class="description">
                     <PrimeMessage :severity="getMessageSeverity()" :closable="false">
@@ -221,23 +217,6 @@ export default {
             return this.actions.includes(action);
         },
 
-        getHeaderIcon() {
-            switch (this.status) {
-                case 'building':
-                    return 'fa-solid fa-hourglass-half orange';
-                case 'failed':
-                    return 'fa-solid fa-circle-exclamation red';
-                case 'queued':
-                    return 'fa-regular fa-clock blue';
-                case 'ready':
-                    return 'fa-solid fa-circle-check green';
-                case 'not-found':
-                    return 'fa-solid fa-circle-question grey';
-                default:
-                    return 'fa-solid fa-circle-info';
-            }
-        },
-
         getMessageSeverity() {
             switch (this.status) {
                 case 'building':
@@ -297,15 +276,6 @@ export default {
 <style scoped>
 .file-availability-dialog {
     max-width: 37.5rem;
-}
-
-.dialog-header {
-    display: flex;
-    align-items: center;
-    gap: var(--ddb-spacing-sm);
-    font-size: var(--ddb-font-size-lg);
-    font-weight: bold;
-    margin-bottom: var(--ddb-spacing-md);
 }
 
 .build-progress {

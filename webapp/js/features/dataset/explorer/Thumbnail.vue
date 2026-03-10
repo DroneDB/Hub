@@ -131,11 +131,9 @@ export default {
             return this.$el.getBoundingClientRect();
         },
         handleImageError: function (e) {
-            console.log('Image error for:', this.file.entry.path, 'URL:', this.thumbnail, 'Error:', e);
             // Retry
             if (!this.retryNumber) this.retryNumber = 0;
             if (this.retryNumber < 1000 && this.thumbnail.startsWith("/orgs")) {
-                console.log('Retrying thumbnail load, attempt:', this.retryNumber + 1);
                 if (this.loadTimeout) {
                     clearTimeout(this.loadTimeout);
                     this.loadTimeout = null;
@@ -149,7 +147,6 @@ export default {
                     this.retryNumber += 1;
                 }, 5000);
             } else {
-                console.log('Retry limit exceeded for:', this.file.entry.path);
                 this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
             }
         },
@@ -160,19 +157,14 @@ export default {
             this.loading = false;
         },
         loadThumbnail: async function (force = false) {
-            console.log('loadThumbnail called for:', this.file.entry.path, 'force:', force);
-
             // Use single loading flag to prevent multiple calls
             if (this.loading) {
-                console.log('Already loading, skipping');
                 return; // Already loading
             }
             if (!force && this.thumbnail && !this.error) {
-                console.log('Already loaded, skipping');
                 return; // Already loaded (unless forced)
             }
             if (!force && this.error) {
-                console.log('Has error, skipping');
                 return; // Skip if error (unless forced)
             }
 
@@ -186,7 +178,6 @@ export default {
                         const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
 
                         if (activeStates.includes(buildState.currentState)) {
-                            console.log('Active build found for', this.file.entry.path, '- state:', buildState.currentState);
                             this.buildLoading = true;
                             this.buildState = buildState;
                             this.icon = this.file.icon;
@@ -209,7 +200,6 @@ export default {
                         );
 
                         if (activeBuild) {
-                            console.log('Active build found via API for', this.file.entry.path, '- showing build loading');
                             this.buildLoading = true;
                             this.buildState = activeBuild;
                             this.icon = this.file.icon;
@@ -224,42 +214,34 @@ export default {
                         );
 
                         if (!hasSuccessfulBuild) {
-                            console.log('Buildable file without successful build - showing build loading initially');
                             this.buildLoading = true;
                             this.icon = this.file.icon;
                             // Don't return here - let it fall through to try thumbnail generation
                         }
                     }
                 } catch (e) {
-                    console.log('Error checking builds, proceeding with thumbnail:', e);
                     // If build check fails, continue with thumbnail load
                 }
             }
 
             this.loading = true;
-            console.log('Starting thumbnail load');
 
             try {
                 if (thumbs.supportedForType(this.file.entry.type)) {
-                    console.log('Type supported, fetching thumbnail for:', this.file.path);
                     this.thumbnail = await thumbs.fetch(this.file.path);
-                    console.log('Thumbnail fetch completed:', this.thumbnail);
 
                     this.loading = false;
                     this.buildLoading = false; // Clear build loading when thumbnail succeeds
                 } else {
-                    console.log('Type not supported, using icon');
                     this.icon = this.file.icon;
                     this.loading = false;
                     this.buildLoading = false; // Clear build loading when using icon
                 }
             } catch (e) {
-                console.log('Thumbnail fetch error:', e);
                 this.loading = false; // Reset loading state on error
 
                 // For buildable files that fail thumbnail generation, keep showing build loading
                 if (this.dataset && BuildManager.isBuildableType(this.file.entry.type) && !this.buildState) {
-                    console.log('Thumbnail failed for buildable file - keeping build loading state');
                     this.buildLoading = true;
                     this.icon = this.file.icon;
                 } else {
@@ -297,13 +279,11 @@ export default {
 
         onBuildStateChanged(data) {
             if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
-                console.log('Build state changed for', this.file.entry.path, ':', data.newState);
                 this.buildState = data.buildInfo;
                 this.buildLoading = false;
 
                 // If build succeeded, refresh the thumbnail
                 if (data.newState === 'Succeeded') {
-                    console.log('Build succeeded - refreshing thumbnail');
                     // Clear existing state and reload
                     this.thumbnail = null;
                     this.error = null;
@@ -316,7 +296,6 @@ export default {
 
         onBuildStarted(data) {
             if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
-                console.log('Build started for', this.file.entry.path);
                 this.buildLoading = true;
                 this.loading = false;
                 this.error = null;

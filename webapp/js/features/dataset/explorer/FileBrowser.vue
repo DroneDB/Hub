@@ -43,7 +43,7 @@ export default {
     components: {
         TreeView, ContextMenu, InputText, InputIcon, IconField
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged'],
+    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll'],
     props: {
         rootNodes: {
             type: Function,
@@ -77,7 +77,24 @@ export default {
             ]);
         }
 
-        contextMenu = contextMenu.concat([{
+        contextMenu = contextMenu.concat([
+        {
+            label: 'Select All',
+            icon: 'fa-regular fa-square-check',
+            isVisible: () => { return this.lastSelectedNode === null; },
+            click: () => {
+                this.$emit('selectAll');
+            }
+        },
+        {
+            label: 'Create folder',
+            icon: 'fa-solid fa-folder',
+            isVisible: () => { return this.canWrite && this.lastSelectedNode === null; },
+            click: () => {
+                this.$emit('createFolder');
+            }
+        },
+        {
             label: 'Open Item',
             icon: 'fa-regular fa-folder-open',
             isVisible: () => { return this.lastSelectedNode !== null; },

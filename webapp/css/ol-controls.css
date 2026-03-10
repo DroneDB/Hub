@@ -48,6 +48,11 @@
     left: 0.5rem;
 }
 
+.ol-map-buttons {
+    top: 0.5rem;
+    right: 0.5rem;
+}
+
 .ol-tooltip-static:before {
     border-top-color: var(--ddb-measure-color);
 }

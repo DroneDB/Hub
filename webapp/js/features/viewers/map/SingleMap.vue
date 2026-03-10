@@ -1,16 +1,18 @@
 <template>
     <div class="singleMap" @mouseover="setMouseInside(true)" @mouseleave="setMouseInside(false)">
         <TabViewLoader @loaded="loadMap" titleSuffix="Map" />
-        <Toolbar :tools="tools" ref="toolbar" />
 
         <div ref="map-container" class="map-container">
-            <select id="basemap-selector" v-model="selectedBasemap" @change="updateBasemap">
-                <option v-for="(v, k) in basemaps" :key="k" :value="k">
-                    {{ v.label }}
-                </option>
-            </select>
             <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
         </div>
+        <MapSettingsDialog v-if="mapSettingsDialogOpen"
+            :basemaps="basemaps"
+            :selectedBasemap="selectedBasemap"
+            :customBasemapConfig="customBasemapConfig"
+            @onClose="mapSettingsDialogOpen = false"
+            @basemapChanged="handleBasemapChanged"
+            @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
+        </MapSettingsDialog>
         <MapDialogs
             :alertDialogOpen="alertDialogOpen"
             :alertTitle="alertTitle"
@@ -43,13 +45,16 @@ import { transformExtent } from 'ol/proj';
 import * as flatgeobuf from 'flatgeobuf';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
-import Toolbar from '@/components/Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
 import MapDialogs from './MapDialogs.vue';
+import MapSettingsDialog from './MapSettingsDialog.vue';
+import olSettings from './olSettings';
 import Toast from 'primevue/toast';
 import Keyboard from '@/libs/keyboard';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { getVectorColor } from '@/libs/map/mapUtils';
+import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
+import { Control } from 'ol/control';
 
 // Mixins
 import mapAlertFlash from '@/composables/useMapAlertFlash';
@@ -59,42 +64,13 @@ import mapMeasurements from '@/composables/useMapMeasurements';
 
 export default {
     components: {
-        Map, TabViewLoader, Toolbar, OpacityControl, MapDialogs, Toast
+        Map, TabViewLoader, OpacityControl, MapDialogs, MapSettingsDialog, Toast
     },
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
     props: ["uri"],
     data: function () {
-        const tools = [
-            {
-                id: 'reset-view',
-                title: "Reset View (H)",
-                icon: "fa-solid fa-house",
-                onClick: () => {
-                    this.resetToInitialView();
-                }
-            }
-        ];
-
-        if (supportsFullScreen()) {
-            tools.push({
-                id: 'fullscreen',
-                title: "Fullscreen (F11)",
-                icon: "fa-solid fa-expand",
-                onClick: () => {
-                    if (isFullScreenCurrently()) {
-                        exitFullScreen();
-                    } else {
-                        requestFullScreen(this.$el);
-                        setTimeout(() => {
-                            this.map.updateSize();
-                        }, 500);
-                    }
-                }
-            });
-        }
-
         return {
-            tools,
+            mapSettingsDialogOpen: false,
             initialExtent: null,
             mouseInside: false,
             error: "",
@@ -232,6 +208,54 @@ export default {
             });
             this.map.addControl(this.measureControls);
 
+            // Add settings control (gear button)
+            this.settingsControl = new olSettings.Control({
+                onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
+            });
+            this.map.addControl(this.settingsControl);
+
+            // Add map utility controls (Reset View, Fullscreen, Back to Dataset) in top-right
+            const controlContainer = document.createElement('div');
+            controlContainer.className = 'ol-map-buttons ol-unselectable ol-control';
+
+            // Back to Dataset button
+            const backBtn = document.createElement('button');
+            backBtn.title = 'Back to Dataset';
+            backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+            backBtn.addEventListener('click', () => {
+                this.$router.push({ name: 'ViewDataset', params: this.$route.params });
+            });
+            controlContainer.appendChild(backBtn);
+
+            // Reset View button
+            const resetBtn = document.createElement('button');
+            resetBtn.title = 'Reset View (H)';
+            resetBtn.innerHTML = '<i class="fa-solid fa-house"></i>';
+            resetBtn.addEventListener('click', () => {
+                this.resetToInitialView();
+            });
+            controlContainer.appendChild(resetBtn);
+
+            // Fullscreen button
+            if (supportsFullScreen()) {
+                const fsBtn = document.createElement('button');
+                fsBtn.title = 'Fullscreen (F11)';
+                fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+                fsBtn.addEventListener('click', () => {
+                    if (isFullScreenCurrently()) {
+                        exitFullScreen();
+                    } else {
+                        requestFullScreen(this.$el);
+                        setTimeout(() => {
+                            this.map.updateSize();
+                        }, 500);
+                    }
+                });
+                controlContainer.appendChild(fsBtn);
+            }
+
+            this.map.addControl(new Control({ element: controlContainer }));
+
             // Setup tooltip overlay for vector features
             this.setupTooltipOverlay();
             this.map.addOverlay(this.tooltipOverlay);
@@ -248,7 +272,7 @@ export default {
                 if (domElement && (
                     domElement.closest('.ol-measure-control') ||
                     domElement.closest('.ol-zoom') ||
-                    domElement.closest('#basemap-selector')
+                    domElement.closest('.ol-map-buttons')
                 )) {
                     this.hideFeatureTooltip();
                     return;
@@ -555,6 +579,19 @@ export default {
          */
         initMeasurementStorage: async function() {
             await this.loadMeasurementsForOrthophoto();
+        },
+
+        handleBasemapChanged: function(basemap) {
+            this.selectedBasemap = basemap;
+            this.updateBasemap();
+        },
+
+        handleCustomBasemapConfigChanged: function(config) {
+            saveCustomBasemapConfig(config);
+            this.customBasemapConfig = config;
+            if (this.selectedBasemap === 'custom') {
+                this.updateBasemap();
+            }
         }
     }
 }
@@ -573,12 +610,5 @@ export default {
     position: relative;
     width: 100%;
     height: 100%;
-
-    #basemap-selector {
-        position: absolute;
-        right: var(--ddb-spacing-sm);
-        top: var(--ddb-spacing-sm);
-        z-index: 1;
-    }
 }
 </style>

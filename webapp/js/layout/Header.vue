@@ -10,6 +10,10 @@
 
         <div class="right">
 
+            <Button v-if="showBackToOrg" @click="goToOrganization" severity="secondary" size="small" text
+                title="Back to organization">
+                <i class="fa-solid fa-sitemap"></i>
+            </Button>
             <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
                 :title="selectedFiles.length > 0 ? `Download ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : 'Download'" :disabled="isDownloading">
                 <i class="fa-solid fa-download"></i>
@@ -111,6 +115,8 @@ export default {
             params: this.$route.params,
             showDownload: !!this.$route.params.ds,
             showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
+            showBackToOrg: false,
+            orgInfoCache: {},
             selectedFiles: [],
             isDownloading: false,
             downloadConfirmOpen: false,
@@ -253,6 +259,7 @@ export default {
 
         this.refreshStorageInfo();
         this.checkUserManagement();
+        this.updateBackToOrgVisibility();
     },
     watch: {
         $route: function (to, from) {
@@ -262,6 +269,7 @@ export default {
             this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
             this.params = params;
+            this.updateBackToOrgVisibility();
         }
     },
     beforeUnmount: function () {
@@ -275,6 +283,32 @@ export default {
     methods: {
         handleStorageInfoDialogClose: function () {
             this.storageInfoDialogOpen = false;
+        },
+
+        goToOrganization: function () {
+            const org = this.$route.params.org;
+            if (org) {
+                this.$router.push({ name: 'Datasets', params: { org } });
+            }
+        },
+
+        updateBackToOrgVisibility: async function () {
+            const org = this.$route.params.org;
+            const ds = this.$route.params.ds;
+            if (!org || !ds) {
+                this.showBackToOrg = false;
+                return;
+            }
+            try {
+                let orgInfo = this.orgInfoCache[org];
+                if (!orgInfo) {
+                    orgInfo = await reg.Organization(org).info();
+                    this.orgInfoCache[org] = orgInfo;
+                }
+                this.showBackToOrg = orgInfo.isPublic || (orgInfo.permissions && orgInfo.permissions.canRead);
+            } catch (e) {
+                this.showBackToOrg = false;
+            }
         },
 
         refreshStorageInfo: async function () {

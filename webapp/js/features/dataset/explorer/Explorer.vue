@@ -205,7 +205,7 @@ export default {
                 this.buildSelectedFile();
             }
         }, {
-            label: "Transfer to Dataset...",
+            label: "Transfer to Dataset",
             icon: 'fa-solid fa-right-left',
             isVisible: () => { return reg.isLoggedIn() && this.selectedFiles.length > 0 && !this.selectedFiles.find(f => f.entry.type === ddb.entry.type.DRONEDB); },
             accelerator: "CmdOrCtrl+T",

@@ -64,7 +64,7 @@
 
             <!-- Datasets Table -->
             <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
-                @row-click="onRowClick" rowHover class="ds-table"
+                @row-click="onRowClick" @row-contextmenu="onRowContextMenu" rowHover class="ds-table"
                 scrollable scrollHeight="flex"
                 :pt="{ bodyRow: { style: 'cursor: pointer' } }">
                 <Column header="" style="width: 3.75rem;">
@@ -119,6 +119,8 @@
                 </template>
             </DataTable>
 
+            <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" />
+
             <!-- Pagination -->
             <div v-if="totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
                 <span>
@@ -172,6 +174,7 @@ import ProgressSpinner from 'primevue/progressspinner';
 import Skeleton from 'primevue/skeleton';
 import Toast from 'primevue/toast';
 import Badge from 'primevue/badge';
+import PrimeContextMenu from 'primevue/contextmenu';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 
@@ -195,7 +198,8 @@ export default {
         ProgressSpinner,
         Skeleton,
         Toast,
-        Badge
+        Badge,
+        PrimeContextMenu
     },
     data: function () {
         // Load preferences from Local Storage
@@ -218,6 +222,8 @@ export default {
             orgEditDialogOpen: false,
             orgDialogModel: null,
             membersDialogOpen: false,
+
+            contextMenuDataset: null,
 
             orgName: "",
             orgInfo: null,
@@ -302,6 +308,37 @@ export default {
                 (ds.permissions && ds.permissions.canWrite) ||
                 (ds.permissions && ds.permissions.canDelete && this.canDeleteGlobal)
             );
+        },
+        datasetContextMenuItems: function () {
+            const ds = this.contextMenuDataset;
+            if (!ds) return [];
+
+            const items = [{
+                label: 'Open',
+                icon: 'fa-regular fa-folder-open',
+                command: () => { this.viewDataset(ds); }
+            }];
+
+            if (ds.permissions && ds.permissions.canWrite) {
+                items.push({
+                    label: 'Edit',
+                    icon: 'fa-solid fa-pencil',
+                    command: () => { this.handleEdit(ds); }
+                });
+            }
+
+            if (ds.permissions && ds.permissions.canDelete && this.canDeleteGlobal) {
+                items.push({
+                    separator: true
+                });
+                items.push({
+                    label: 'Delete',
+                    icon: 'fa-solid fa-trash',
+                    command: () => { this.handleDelete(ds); }
+                });
+            }
+
+            return items;
         },
         // Filtering
         filteredDatasets: function () {
@@ -634,6 +671,11 @@ export default {
 
         onRowClick(event) {
             this.viewDataset(event.data);
+        },
+
+        onRowContextMenu(event) {
+            this.contextMenuDataset = event.data;
+            this.$refs.datasetContextMenu.show(event.originalEvent);
         },
 
         onPageChange(event) {

@@ -1,8 +1,9 @@
 <template>
-    <Window title="Upload Progress" id="addToDataset" @onClose="close" modal :closable="closable" :fixedSize="true">
+    <Window :title="dialogTitle" id="addToDataset" @onClose="close" modal :closable="closable" :fixedSize="true">
         <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
             @onUpload="onUploaded" @done="done" :filesToUpload="filesToUpload"
-            @update:closable="updateClosable" @onClose="close"></DatasetUpload>
+            @update:closable="updateClosable" @onClose="close"
+            @update:waitingForFiles="updateWaitingForFiles"></DatasetUpload>
     </Window>
 </template>
 
@@ -23,8 +24,14 @@ export default {
     data: function () {
         return {
             uploaded: [],
-            closable: false
+            closable: false,
+            waitingForFiles: !this.filesToUpload || this.filesToUpload.length === 0
         };
+    },
+    computed: {
+        dialogTitle() {
+            return this.waitingForFiles ? 'Upload' : 'Upload Progress';
+        }
     },
     mounted: function () {
     },
@@ -40,6 +47,9 @@ export default {
         },
         updateClosable: function (value) {
             this.closable = value;
+        },
+        updateWaitingForFiles: function (value) {
+            this.waitingForFiles = value;
         }
     }
 }

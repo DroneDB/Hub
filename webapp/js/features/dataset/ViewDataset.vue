@@ -13,6 +13,8 @@
                     @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
                     @setAsCover="setAsCover"
                     @downloadItems="handleDownloadItems"
+                    @createFolder="handleCreateFolder"
+                    @selectAll="handleSelectAll"
                     @openAsText="handleOpenAsText" @error="handleError" />
             </div>
             </template>
@@ -28,6 +30,8 @@
                         @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
                         @setAsCover="setAsCover"
                         @downloadItems="handleDownloadItems"
+                        @createFolder="handleCreateFolder"
+                        @selectAll="handleSelectAll"
                         @openAsText="handleOpenAsText" @error="handleError" />
                 </template>
                 <template v-slot:map>
@@ -812,6 +816,10 @@ export default {
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
             this.isLoadingFiles = false;
+        },
+
+        handleSelectAll: function () {
+            this.fileBrowserFiles.forEach(f => f.selected = true);
         },
 
         handleCurrentUriChanged: function (currentUri) {
