@@ -35,7 +35,7 @@
                 <div class="org-header-layout d-flex align-items-center">
                     <!-- Left: identity -->
                     <div class="org-identity">
-                        <div class="d-flex align-items-start gap-3">
+                        <div class="d-flex align-items-center gap-3">
                             <div class="org-icon-wrapper d-flex align-items-center justify-content-center">
                                 <i class="fa-solid fa-sitemap"></i>
                             </div>
