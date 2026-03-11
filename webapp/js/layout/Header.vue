@@ -463,6 +463,13 @@ export default {
         }
     }
 
+    @media screen and (max-width: 767.98px) {
+        .logo > img {
+            height: 1.5rem;
+            max-width: 8rem;
+        }
+    }
+
     .right {
         margin-left: auto;
         display: flex;
