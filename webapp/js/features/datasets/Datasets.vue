@@ -30,37 +30,51 @@
             </div>
         </div>
         <div v-else class="ds-content">
-            <Toolbar class="top-toolbar">
-                <template #start>
-                    <div class="org-heading d-flex align-items-center gap-3">
-                        <i class="fa-solid fa-sitemap org-icon"></i>
-                        <div>
-                            <div class="d-flex align-items-center gap-2">
-                                <h1 class="mb-0">{{ orgName }}</h1>
-                                <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text size="small" title="Edit Organization">
-                                    <i class="fa-solid fa-pencil"></i>
-                                </Button>
-                                <Tag severity="secondary">{{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}</Tag>
+            <!-- Organization header -->
+            <div class="org-header">
+                <div class="org-header-layout d-flex align-items-center">
+                    <!-- Left: identity -->
+                    <div class="org-identity">
+                        <div class="d-flex align-items-start gap-3">
+                            <div class="org-icon-wrapper d-flex align-items-center justify-content-center">
+                                <i class="fa-solid fa-sitemap"></i>
                             </div>
-                            <div v-if="orgInfo?.description" class="text-muted small mt-1">{{ orgInfo.description }}</div>
+                            <div>
+                                <div class="org-title-row">
+                                    <h1 class="my-0">{{ orgName }}</h1>
+                                    <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text rounded size="small" title="Edit Organization" icon="fa-solid fa-pencil" />
+                                    <div class="org-tags d-flex align-items-center gap-2 flex-wrap">
+                                        <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
+                                            {{ orgInfo.owner }}
+                                        </Tag>
+                                        <Tag rounded :severity="orgInfo?.isPublic ? 'success' : 'warn'" :icon="orgInfo?.isPublic ? 'fa-solid fa-globe' : 'fa-solid fa-lock'">
+                                            {{ orgInfo?.isPublic ? 'Public' : 'Private' }}
+                                        </Tag>
+                                        <Tag rounded severity="info" icon="fa-solid fa-database">
+                                            {{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}
+                                        </Tag>
+                                        <Tag v-if="userRole" rounded severity="contrast" icon="fa-solid fa-shield-halved">
+                                            {{ userRole }}
+                                        </Tag>
+                                    </div>
+                                </div>
+                                <div v-if="orgInfo?.description" class="org-description mt-1">{{ orgInfo.description }}</div>
+                            </div>
                         </div>
                     </div>
-                </template>
-                <template #end>
-                    <div class="d-flex align-items-center gap-2">
-                        <IconField>
+                    <!-- Right: actions -->
+                    <div class="org-actions">
+                        <div class="d-flex align-items-center gap-2">
+                            <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" />
+                            <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" />
+                        </div>
+                        <IconField class="mt-2">
                             <InputIcon class="fa-solid fa-magnifying-glass" />
-                            <InputText v-model="searchQuery" placeholder="Search datasets..." style="min-width: 14rem" />
+                            <InputText v-model="searchQuery" small placeholder="Search datasets" fluid />
                         </IconField>
-                        <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" text size="small" title="Manage Members">
-                            <i class="fa-solid fa-users"></i> <span class="ms-1">Members</span>
-                        </Button>
-                        <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="primary" size="small">
-                            <i class="fa-solid fa-plus"></i>&nbsp;Create Dataset
-                        </Button>
                     </div>
-                </template>
-            </Toolbar>
+                </div>
+            </div>
 
             <!-- Datasets Table -->
             <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
@@ -169,7 +183,7 @@ import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
-import Toolbar from 'primevue/toolbar';
+import Divider from 'primevue/divider';
 import ProgressSpinner from 'primevue/progressspinner';
 import Skeleton from 'primevue/skeleton';
 import Toast from 'primevue/toast';
@@ -194,7 +208,7 @@ export default {
         InputIcon,
         Paginator,
         Tag,
-        Toolbar,
+        Divider,
         ProgressSpinner,
         Skeleton,
         Toast,
@@ -288,6 +302,15 @@ export default {
         },
         canManageOrg: function () {
             return this.orgInfo?.permissions?.canManageMembers || false;
+        },
+        userRole: function () {
+            const p = this.orgInfo?.permissions;
+            if (!p) return null;
+            if (p.canManageMembers) return 'Admin';
+            if (p.canDelete) return 'Editor+';
+            if (p.canWrite) return 'Editor';
+            if (p.canRead) return 'Viewer';
+            return null;
         },
         memberManagementEnabled: function () {
             return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
@@ -772,12 +795,77 @@ export default {
         min-height: 0;
     }
 
-    .top-toolbar {
+    .org-header {
         flex-shrink: 0;
-        margin-bottom: 1.5rem;
-        border: none;
-        background: transparent;
-        padding: 0.75rem 0;
+        padding: var(--ddb-spacing-md) 0;
+
+        .org-header-layout {
+            display: flex;
+            align-items: flex-start;
+            gap: var(--ddb-spacing-xl);
+        }
+
+        .org-identity {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .org-actions {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .org-icon-wrapper {
+            width: 3rem;
+            height: 3rem;
+            border-radius: var(--ddb-radius-md);
+            background: var(--p-primary-50);
+            color: var(--p-primary-color);
+            font-size: var(--ddb-font-size-lg);
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            line-height: 1.2;
+        }
+
+        .org-title-row {
+            display: flex;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        .org-description {
+            color: var(--ddb-text-secondary);
+            font-size: var(--ddb-font-size-sm);
+        }
+    }
+
+    /* Responsive: stack header vertically on small screens */
+    @media screen and (max-width: 767.98px) {
+        .org-header {
+            .org-header-layout {
+                flex-direction: column;
+                gap: var(--ddb-spacing-md);
+            }
+
+            .org-actions {
+                align-items: stretch;
+                width: 100%;
+
+                > .d-flex {
+                    justify-content: stretch;
+                }
+            }
+
+            h1 {
+                font-size: var(--ddb-font-size-lg);
+            }
+        }
     }
 
     .ds-table {
@@ -787,22 +875,6 @@ export default {
 
     .ds-pagination {
         flex-shrink: 0;
-    }
-
-    .org-heading {
-        .org-icon {
-            font-size: var(--ddb-font-size-lg);
-            color: var(--ddb-text-secondary);
-        }
-
-        h1 {
-            font-size: 1.75rem;
-            line-height: 1.2;
-        }
-    }
-
-    .filter-controls {
-        margin-bottom: 1.25rem;
     }
 
     .ds-thumb-img {
@@ -832,8 +904,8 @@ export default {
         white-space: nowrap;
     }
 
-    /* Visibility tags: uniform width */
-    :deep(.p-tag) {
+    /* Visibility tags in table: uniform width */
+    .ds-table :deep(.p-tag) {
         min-width: 6.5rem;
         justify-content: center;
     }

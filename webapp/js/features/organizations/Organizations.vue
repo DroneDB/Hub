@@ -2,22 +2,29 @@
     <div id="organizations">
         <Toast position="bottom-left" />
 
-        <Toolbar class="top-toolbar">
-            <template #start>
-                <div class="d-flex align-items-center gap-3">
-                    <i class="fa-solid fa-sitemap org-icon"></i>
-                    <div>
-                        <h1 class="mb-0">Organizations</h1>
-                        <p class="text-muted mb-0 mt-1">Organize your datasets into groups and manage team access.</p>
+        <div class="org-page-header">
+            <div class="org-header-layout">
+                <div class="org-identity">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="org-icon-wrapper d-flex align-items-center justify-content-center">
+                            <i class="fa-solid fa-sitemap"></i>
+                        </div>
+                        <div>
+                            <div class="org-title-row">
+                                <h1 class="my-0">Organizations</h1>
+                                <Tag rounded severity="info" icon="fa-solid fa-layer-group">
+                                    {{ organizations.length }} org{{ organizations.length !== 1 ? 's' : '' }}
+                                </Tag>
+                            </div>
+                            <p class="org-description mt-1 mb-0">Organize your datasets into groups and manage team access.</p>
+                        </div>
                     </div>
                 </div>
-            </template>
-            <template #end>
-                <Button v-if="!readyOnly" @click.stop="handleNew()" severity="info" size="small">
-                    <i class="fa-solid fa-plus"></i> Create Organization
-                </Button>
-            </template>
-        </Toolbar>
+                <div class="org-actions">
+                    <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" />
+                </div>
+            </div>
+        </div>
 
         <!-- Skeleton loading state -->
         <div v-if="loading">
@@ -50,19 +57,22 @@
                             <template #content>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="flex-grow-1">
-                                        <div>
-                                            <i class="fa-solid fa-sitemap me-3"></i>
-                                            <strong style="font-size: x-large;">{{ org.name ? org.name : org.slug }}</strong>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="fa-solid fa-sitemap"></i>
+                                            <strong class="org-name">{{ org.name ? org.name : org.slug }}</strong>
                                         </div>
-                                        <div v-if="org.description" class="text-muted mt-1" style="font-size: medium;">{{ org.description }}</div>
+                                        <div v-if="org.description" class="org-card-description mt-1">{{ org.description }}</div>
                                     </div>
-                                    <div class="me-3">
-                                        <Tag v-if="org.isPublic" severity="success" icon="fa-solid fa-unlock">Public</Tag>
-                                        <Tag v-else severity="warn" icon="fa-solid fa-lock">Private</Tag>
+                                    <div class="d-flex align-items-center gap-2 ms-3 org-card-tags">
+                                        <Tag v-if="org.owner" rounded severity="secondary" icon="fa-solid fa-user">
+                                            {{ org.owner }}
+                                        </Tag>
+                                        <Tag v-if="org.isPublic" rounded severity="success" icon="fa-solid fa-globe">Public</Tag>
+                                        <Tag v-else rounded severity="warn" icon="fa-solid fa-lock">Private</Tag>
                                     </div>
-                                    <div class="org-actions d-flex gap-1">
+                                    <div class="org-card-actions d-flex gap-1 ms-3">
                                         <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
-                                            @click.stop="openMembersDialog(org)" severity="info" size="small"
+                                            @click.stop="openMembersDialog(org)" severity="secondary" outlined size="small"
                                             icon="fa-solid fa-users" title="Manage Members" />
                                         <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
                                             @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
@@ -114,7 +124,6 @@ import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Toast from 'primevue/toast';
-import Toolbar from 'primevue/toolbar';
 import DataView from 'primevue/dataview';
 import Skeleton from 'primevue/skeleton';
 
@@ -129,7 +138,6 @@ export default {
         Card,
         Tag,
         Toast,
-        Toolbar,
         DataView,
         Skeleton
     },
@@ -374,59 +382,102 @@ export default {
 
 <style scoped>
 #organizations {
-
-    .org-card {
-        margin-bottom: 1rem;
-    }
-
-    .top-toolbar {
-        margin-bottom: 1.5rem;
-        border: none;
-        background: transparent;
-        padding: 0.75rem 0;
-    }
-
-    .org-icon {
-        font-size: var(--ddb-font-size-lg);
-        color: var(--ddb-text-secondary);
-    }
-
-    h1 {
-        font-size: 1.75rem;
-        line-height: 1.2;
-    }
-
     margin: 0.75rem;
 
-    .organization {
+    .org-page-header {
+        padding: var(--ddb-spacing-md) 0;
 
-        .segment {
-            &:hover {
-                background-color: var(--ddb-bg-secondary);
-                cursor: pointer;
-            }
-        }
-
-        .column {
-            font-size: large;
-        }
-
-        i.icon {
-            margin-right: var(--ddb-spacing-xs);
-        }
-
-        .main-col {
-            font-weight: bold;
-
-            i.icon {
-                margin-right: 1.25rem;
-            }
-        }
-
-        .item {
+        .org-header-layout {
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            gap: var(--ddb-spacing-xl);
+        }
+
+        .org-identity {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .org-actions {
+            flex-shrink: 0;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .org-icon-wrapper {
+            width: 3rem;
+            height: 3rem;
+            border-radius: var(--ddb-radius-md);
+            background: var(--p-primary-50);
+            color: var(--p-primary-color);
+            font-size: var(--ddb-font-size-lg);
+            flex-shrink: 0;
+        }
+
+        .org-title-row {
+            display: flex;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
+            flex-wrap: wrap;
+        }
+
+        h1 {
+            font-size: 1.75rem;
+            line-height: 1.2;
+        }
+
+        .org-description {
+            color: var(--ddb-text-secondary);
+            font-size: var(--ddb-font-size-sm);
+        }
+    }
+
+    .org-card {
+        margin-bottom: var(--ddb-spacing-sm);
+
+        .org-name {
+            font-size: 1.25rem;
+        }
+
+        .org-card-description {
+            color: var(--ddb-text-secondary);
+            font-size: var(--ddb-font-size-sm);
+        }
+
+        .org-card-tags {
+            flex-shrink: 0;
+        }
+    }
+
+    /* Responsive */
+    @media screen and (max-width: 767.98px) {
+        .org-page-header {
+            .org-header-layout {
+                flex-direction: column;
+                gap: var(--ddb-spacing-md);
+            }
+
+            .org-actions {
+                width: 100%;
+            }
+
+            h1 {
+                font-size: var(--ddb-font-size-lg);
+            }
+        }
+
+        .org-card {
+            :deep(.p-card-body) {
+                padding: var(--ddb-spacing-sm);
+            }
+
+            .org-card-tags {
+                display: none;
+            }
+
+            .org-card-actions {
+                flex-direction: column;
+            }
         }
     }
 }
