@@ -97,7 +97,7 @@
             :message="`Are you sure you want to remove <strong>${user.userName}</strong> from organization <strong>${orgToRemove ? (orgToRemove.name || orgToRemove.slug) : ''}</strong>?`"
             confirmText="Remove"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             @onClose="handleRemoveOrgDialogClose">
         </ConfirmDialog>
     </Window>

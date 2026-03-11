@@ -76,7 +76,7 @@
             message="Are you sure you want to delete all saved measurements?"
             confirmText="Delete"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             warningTitle="Warning"
             warningMessage="This action cannot be undone."
             @onClose="handleDeleteMeasurementsDialogClose">

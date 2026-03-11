@@ -8,7 +8,7 @@
             message="Are you sure you want to clear all measurements?"
             confirmText="Clear"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             @onClose="$emit('clearMeasurementsClose', $event)">
         </ConfirmDialog>
         <ConfirmDialog v-if="deleteSavedMeasurementsDialogOpen"
@@ -16,7 +16,7 @@
             message="Are you sure you want to delete saved measurements?"
             confirmText="Delete"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             @onClose="$emit('deleteSavedMeasurementsClose', $event)">
         </ConfirmDialog>
     </div>

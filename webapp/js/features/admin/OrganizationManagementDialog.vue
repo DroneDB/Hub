@@ -103,7 +103,7 @@
             :message="`Are you sure you want to delete the organization <strong>${orgToDelete && (orgToDelete.name || orgToDelete.slug)}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. All data associated with this organization will be permanently removed.`"
             confirmText="Delete Organization"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             @onClose="handleDeleteDialogClose">
         </ConfirmDialog>
     </Window>

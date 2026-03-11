@@ -121,7 +121,7 @@
             title="Replace Dataset Cover"
             message="A dataset cover already exists. Do you want to replace it? This action is irreversible."
             confirmText="Replace"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             @onClose="handleSetCoverClose" />
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
