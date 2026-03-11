@@ -103,7 +103,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'onRolesChanged'],
 
     data: function () {
         return {
