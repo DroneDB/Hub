@@ -87,7 +87,9 @@ export default {
     methods: {
         focusNameInput() {
             if (this.$refs.txtOrgName) {
-                this.$refs.txtOrgName.$el.querySelector('input').focus();
+                const el = this.$refs.txtOrgName.$el || this.$refs.txtOrgName;
+                const input = el.querySelector ? el.querySelector('input') : el;
+                if (input && input.focus) input.focus();
             }
         },
 
