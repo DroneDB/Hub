@@ -105,7 +105,10 @@ window.addEventListener('load', function () {
 
         app.use(PrimeVue, {
             theme: {
-                preset: DdbPreset
+                preset: DdbPreset,
+                options: {
+                    darkModeSelector: false
+                }
             }
         });
         app.use(ConfirmationService);
