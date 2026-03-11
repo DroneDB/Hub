@@ -6,7 +6,7 @@
             <i class="fa-solid fa-circle-notch fa-spin" v-if="loading" />
             <i class="icon" @click="handleOpenCaret" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
                 v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
-            <i class="icon nonexistant" v-if="!isExpandable || (empty && loadedChildren)" />
+            <i class="icon nonexistent" v-if="!isExpandable || (empty && loadedChildren)" />
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
@@ -289,7 +289,7 @@ export default {
         text-align: center;
     }
 
-    i.nonexistant {
+    i.nonexistent {
         width: 1rem;
     }
 
