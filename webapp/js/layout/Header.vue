@@ -431,7 +431,7 @@ export default {
 <style scoped>
 #header {
     margin: 0;
-    padding: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-md);
     width: 100%;
     box-shadow: var(--ddb-shadow-sm);
     display: flex;
