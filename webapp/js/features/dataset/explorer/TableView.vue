@@ -3,7 +3,7 @@
         <ContextMenu :items="contextMenu" />
         <Toolbar :tools="tools" v-if="tools" />
         <div v-if="currentPath">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-4">
+            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-3">
                 <template #item="{ item }">
                     <a v-if="item.command" class="bc-link" @click="item.command()">
                         <i v-if="item.icon" :class="item.icon"></i>
@@ -21,71 +21,74 @@
             @dragenter="explorerDragEnter($event)"
             @dragover.prevent
             @click="onClick">
-            <table class="ui selectable celled table">
-                <thead>
-                    <tr>
-                        <th class="icon-column"></th>
-                        <th @click="sortBy('name')">
+            <DataTable :value="sortedFiles" :paginator="false" scrollable scrollHeight="flex" size="small"
+                dataKey="path" stripedRows
+                :rowClass="rowClass"
+                :pt="{ bodyRow: rowPt }"
+                @row-click="onRowClick"
+                @row-dblclick="onRowDblClick"
+                @row-contextmenu="onRowContextMenu">
+                <Column header="" style="width: 3rem; text-align: center;">
+                    <template #body="{ data }">
+                        <i v-if="!isBuildLoading(data)" class="icon" :class="data.icon"></i>
+                        <i v-else class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
+                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)"></i>
+                    </template>
+                </Column>
+                <Column field="label" style="min-width: 12.5rem;">
+                    <template #header>
+                        <span @click="sortBy('name')" class="sortable-header">
                             Name
-                            <i v-if="sortColumn === 'name'" class="icon" :class="sortDirection === 'asc' ? 'angle up' : 'angle down'"></i>
-                        </th>
-                        <th @click="sortBy('type')" class="type-column">
+                            <i v-if="sortColumn === 'name'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                        </span>
+                    </template>
+                    <template #body="{ data }">
+                        <span class="file-name">{{ data.label }}</span>
+                    </template>
+                </Column>
+                <Column style="width: 7.5rem;">
+                    <template #header>
+                        <span @click="sortBy('type')" class="sortable-header">
                             Type
-                            <i v-if="sortColumn === 'type'" class="icon" :class="sortDirection === 'asc' ? 'angle up' : 'angle down'"></i>
-                        </th>
-                        <th @click="sortBy('size')" class="size-column">
+                            <i v-if="sortColumn === 'type'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                        </span>
+                    </template>
+                    <template #body="{ data }">
+                        <span class="file-type">{{ getFileType(data) }}</span>
+                    </template>
+                </Column>
+                <Column style="width: 6.25rem;">
+                    <template #header>
+                        <span @click="sortBy('size')" class="sortable-header">
                             Size
-                            <i v-if="sortColumn === 'size'" class="icon" :class="sortDirection === 'asc' ? 'angle up' : 'angle down'"></i>
-                        </th>
-                        <th @click="sortBy('modified')" class="date-column">
+                            <i v-if="sortColumn === 'size'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                        </span>
+                    </template>
+                    <template #body="{ data }">
+                        <span class="file-size">{{ getFileSize(data) }}</span>
+                    </template>
+                </Column>
+                <Column style="width: 11.25rem;">
+                    <template #header>
+                        <span @click="sortBy('modified')" class="sortable-header">
                             Modified
-                            <i v-if="sortColumn === 'modified'" class="icon" :class="sortDirection === 'asc' ? 'angle up' : 'angle down'"></i>
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(f, idx) in sortedFiles"
-                        :key="'T,' + f.path"
-                        :class="{ selected: f.selected, active: f.selected }"
-                        :data-idx="idx"
-                        draggable
-                        @dragstart="startDrag($event, f)"
-                        @drop.stop="onDrop($event, f)"
-                        @dragenter.prevent
-                        @dragover.prevent
-                        @mousedown.prevent
-                        @click.stop="handleSelection($event, f)"
-                        @contextmenu="handleRightClick($event, f)"
-                        @dblclick.prevent="handleOpen(f)">
-                        <td class="icon-column">
-                            <i v-if="!isBuildLoading(f)" class="icon" :class="f.icon"></i>
-                            <i v-else class="fa-solid fa-circle-notch fa-spin loading"></i>
-                            <i v-if="getBuildBadge(f)" class="icon badge" :class="getBuildBadge(f)"></i>
-                        </td>
-                        <td class="name-column">
-                            <span class="file-name">{{ f.label }}</span>
-                        </td>
-                        <td class="type-column">
-                            <span class="file-type">{{ getFileType(f) }}</span>
-                        </td>
-                        <td class="size-column">
-                            <span class="file-size">{{ getFileSize(f) }}</span>
-                        </td>
-                        <td class="date-column">
-                            <span class="file-date">{{ getModifiedDate(f) }}</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment">
-                <div class="ui active centered inline loader"></div>
-            </div>
-            <div v-else-if="files.length === 0" class="ui placeholder segment">
-                <div class="ui icon header">
-                    <i class="fa-regular fa-folder-open icon"></i>
-                    This folder is empty
-                </div>
-            </div>
+                            <i v-if="sortColumn === 'modified'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                        </span>
+                    </template>
+                    <template #body="{ data }">
+                        <span class="file-date">{{ getModifiedDate(data) }}</span>
+                    </template>
+                </Column>
+                <template #empty>
+                    <div v-if="isLoadingFiles" class="text-center p-4">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                    </div>
+                    <div v-else class="text-center p-4">
+                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;"></i>
+                        <p class="mt-2">This folder is empty</p>
+                    </div>
+                </template>
+            </DataTable>
         </div>
     </div>
 </template>
@@ -107,11 +110,13 @@ const { pathutils, entry } = ddb;
 
 import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
 
 export default {
     mixins: [dragDropMixin],
     components: {
-        Toolbar, ContextMenu, Breadcrumb
+        Toolbar, ContextMenu, Breadcrumb, DataTable, Column
     },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'selectionChanged', 'buildStarted', 'buildError'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
@@ -232,9 +237,49 @@ export default {
             });
 
             return sorted;
+        },
+        rowPt: function () {
+            const self = this;
+            return {
+                onDragstart(e) {
+                    const row = e.target.closest('tr');
+                    if (!row) return;
+                    const idx = row.rowIndex - 1; // account for header row
+                    const file = self.sortedFiles[idx];
+                    if (file) self.startDrag(e, file);
+                },
+                onDrop(e) {
+                    e.stopPropagation();
+                    const row = e.target.closest('tr');
+                    if (!row) return;
+                    const idx = row.rowIndex - 1;
+                    const file = self.sortedFiles[idx];
+                    if (file) self.onDrop(e, file);
+                },
+                onDragenter(e) { e.preventDefault(); },
+                onDragover(e) { e.preventDefault(); },
+                onMousedown(e) { e.preventDefault(); },
+                draggable: true
+            };
         }
     },
     methods: {
+        rowClass(data) {
+            return data.selected ? 'row-selected' : '';
+        },
+
+        onRowClick(event) {
+            this.handleSelection(event.originalEvent, event.data);
+        },
+
+        onRowDblClick(event) {
+            this.handleOpen(event.data);
+        },
+
+        onRowContextMenu(event) {
+            this.handleRightClick(event.originalEvent, event.data);
+        },
+
         goTo: function (itm) {
             emitter.emit("folderOpened", pathutils.getTree(itm.path));
         },
@@ -281,8 +326,9 @@ export default {
         },
 
         onClick: function (e) {
-            // Clicked an empty area
-            if (e.target.id === 'table-view' || e.target.tagName === 'TABLE' || e.target.tagName === 'TBODY') {
+            // Clicked an empty area (DataTable wrapper or empty body)
+            const target = e.target;
+            if (target.id === 'table-view' || target.closest('.p-datatable-empty-message') || (!target.closest('tr') && target.closest('.p-datatable'))) {
                 this.clearSelection();
             }
         },
@@ -459,7 +505,8 @@ export default {
     height: 100%;
     overflow-y: auto;
     user-select: none;
-    transition: all 0.25s ease;
+    flex: 1;
+    min-height: 0;
 }
 
 #table-view.loading {
@@ -473,69 +520,59 @@ export default {
     cursor: copy;
 }
 
-.ui.table {
-    margin: 0;
-}
+#table-view :deep(.p-datatable) {
+    .p-datatable-header-cell {
+        user-select: none;
+    }
 
-.ui.table thead th {
-    cursor: pointer;
-    user-select: none;
-}
+    .p-datatable-row-action {
+        cursor: pointer;
+    }
 
-.ui.table thead th:hover {
-    background-color: var(--ddb-bg-subtle);
-}
+    .sortable-header {
+        cursor: pointer;
+        user-select: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
 
-.ui.table tbody tr {
-    cursor: pointer;
-}
+        &:hover {
+            color: var(--ddb-primary);
+        }
+    }
 
-.ui.table tbody tr.selected {
-    background-color: var(--ddb-selected-bg) !important;
-}
+    tr {
+        cursor: pointer;
+    }
 
-.ui.table tbody tr:hover {
-    background-color: var(--ddb-bg-light) !important;
-}
+    tr.row-selected {
+        background-color: var(--ddb-selected-bg) !important;
 
-.ui.table tbody tr.selected:hover {
-    background-color: var(--ddb-selected-active-bg) !important;
-}
+        &:hover {
+            background-color: var(--ddb-selected-active-bg) !important;
+        }
+    }
 
-.ui.table .icon-column {
-    width: 3rem;
-    text-align: center;
-}
+    .icon-column i.icon {
+        margin: 0;
+    }
 
-.ui.table .icon-column i.icon {
-    margin: 0;
-}
+    .icon-column i.icon.badge {
+        margin-left: var(--ddb-spacing-xs);
+        font-size: var(--ddb-font-size-base);
+    }
 
-.ui.table .icon-column i.icon.badge {
-    margin-left: var(--ddb-spacing-xs);
-    font-size: var(--ddb-font-size-base);
-}
+    .loading-icon {
+        color: var(--ddb-text-muted);
+    }
 
-.ui.table .name-column {
-    min-width: 12.5rem;
-    word-break: break-all;
-}
+    .file-name {
+        word-break: break-all;
+    }
 
-.ui.table .type-column {
-    width: 7.5rem;
-}
-
-.ui.table .size-column {
-    width: 6.25rem;
-    text-align: right;
-}
-
-.ui.table .date-column {
-    width: 11.25rem;
-    text-align: right;
-}
-
-.ui.placeholder.segment {
-    margin: var(--ddb-spacing-xl);
+    .file-size, .file-date {
+        text-align: right;
+        display: block;
+    }
 }
 </style>
