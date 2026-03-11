@@ -1,21 +1,18 @@
 <template>
     <div class="flash" @mouseup="closeMouseUp">
-        <div :class="color" class="ui icon message">
-            <i :class="icon" class="icon" v-if="icon"></i>
-            <div class="content">
-                <div class="header">
-                    <slot />
-                </div>
-            </div>
-            <div class="close" @mouseup="closeMouseUp">
-                <i class="icon close"></i>
-            </div>
-        </div>
+        <PrimeMessage :severity="primeSeverity" :closable="true" @close="closeMouseUp" :icon="icon || undefined">
+            <slot />
+        </PrimeMessage>
     </div>
 </template>
 
 <script>
+import PrimeMessage from 'primevue/message';
+
 export default {
+    components: {
+        PrimeMessage
+    },
     props: {
         icon: {
             type: String,
@@ -29,12 +26,20 @@ export default {
     data: function () {
         return {};
     },
-    mounted: function () {
+    computed: {
+        primeSeverity: function () {
+            const map = {
+                'positive': 'success',
+                'negative': 'error',
+                'warning': 'warn',
+                'info': 'info'
+            };
+            return map[this.color] || 'success';
+        }
     },
-
     methods: {
         closeMouseUp: function (e) {
-            e.stopPropagation();
+            if (e) e.stopPropagation();
             this.$emit("onClose");
         }
     }
@@ -49,17 +54,9 @@ export default {
 
     position: absolute;
     z-index: 99999999;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    border: 1px solid black;
-
-    .message {
-        padding: 8px;
-    }
-
-    .icon.close {
-        font-size: 1.5em;
-    }
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    border: var(--ddb-border-width) solid black;
 }
 </style>

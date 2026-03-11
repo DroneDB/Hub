@@ -1,0 +1,411 @@
+<template>
+    <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
+        :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
+        <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
+            <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
+            <img v-if="thumbnail && !loading && !buildLoading"
+                @error="handleImageError" :src="thumbnail"
+                style="max-width: 100%; max-height: 100%;" />
+
+            <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
+            <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
+
+            <!-- Build loading spinner (highest priority) -->
+            <i class="fa-solid fa-circle-notch fa-spin loading" v-if="buildLoading" />
+
+            <!-- Regular loading spinner (when loading thumbnails) -->
+            <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="loading" />
+
+            <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
+            <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="!thumbnail && !icon" />
+
+            <!-- Build Status Badges - Only show errors -->
+            <div v-if="!buildLoading && !loading && buildState && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
+                <i class="icon" :class="buildBadgeIcon"></i>
+            </div>
+        </div>
+        {{ label }}
+    </div>
+</template>
+
+<script>
+import { thumbs, pathutils } from 'ddb';
+import Mouse from '@/libs/mouse';
+import Keyboard from '@/libs/keyboard';
+import BuildManager from '@/libs/build/buildManager';
+import ddb from 'ddb';
+
+export default {
+    components: {
+    },
+    emits: ['clicked', 'open'],
+    props: {
+        file: {
+            type: Object,
+            required: true
+        },
+        size: {
+            type: Number,
+            required: false,
+            default: 128
+        },
+        lazyLoad: {
+            type: Boolean,
+            default: false
+        },
+        dataset: {
+            type: Object,
+            required: false
+        }
+    },
+    data: function () {
+        const label = this.file.label;
+
+        return {
+            label,
+            thumbnail: null,
+            icon: null,
+            error: null,
+            buildState: null,
+            buildLoading: false,
+            iconStyle: {
+                fontSize: (parseInt(this.size / 3) / 16) + 'rem'
+            },
+            sizeStyle: {
+                width: (this.size / 16) + 'rem',
+                height: (this.size / 16) + 'rem'
+            },
+            loading: false
+        }
+    },
+    computed: {
+        getTitleText() {
+            if (this.error) return this.error;
+            if (this.buildState) {
+                return `${this.file.path}\nBuild Status: ${this.buildState.currentState}`;
+            }
+            return this.file.path;
+        },
+        shouldShowBuildBadge() {
+            if (!this.buildState) return false;
+            const state = this.buildState.currentState;
+            // Only show badges for errors/failures
+            return state === 'Failed';
+        },
+        buildBadgeClass() {
+            if (!this.buildState) return '';
+
+            const state = this.buildState.currentState;
+            switch (state) {
+                case 'Failed':
+                    return 'error';
+                default:
+                    return '';
+            }
+        },
+        buildBadgeIcon() {
+            if (!this.buildState) return '';
+
+            const state = this.buildState.currentState;
+            switch (state) {
+                case 'Failed':
+                    return 'fa-solid fa-xmark';
+                default:
+                    return '';
+            }
+        }
+    },
+    mounted: async function () {
+        if (!this.lazyLoad) await this.loadThumbnail();
+
+        // Setup build listeners if dataset is available
+        if (this.dataset) {
+            this.setupBuildListeners();
+        }
+    },
+    beforeUnmount() {
+        this.cleanupBuildListeners();
+    },
+    methods: {
+        getBoundingRect: function () {
+            return this.$el.getBoundingClientRect();
+        },
+        handleImageError: function (e) {
+            // Retry
+            if (!this.retryNumber) this.retryNumber = 0;
+            if (this.retryNumber < 1000 && this.thumbnail.startsWith("/orgs")) {
+                if (this.loadTimeout) {
+                    clearTimeout(this.loadTimeout);
+                    this.loadTimeout = null;
+                }
+                this.loadTimeout = setTimeout(() => {
+                    if (this.retryNumber > 0 && this.thumbnail.endsWith(`&retry=${this.retryNumber}`)) {
+                        this.thumbnail = this.thumbnail.replace(new RegExp("&retry=" + this.retryNumber) + "$", `&retry=${this.retryNumber + 1}`);
+                    } else {
+                        this.thumbnail += "&retry=1";
+                    }
+                    this.retryNumber += 1;
+                }, 5000);
+            } else {
+                this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
+            }
+        },
+        showError: function (e) {
+            console.warn(e);
+            this.error = e.message;
+            this.icon = "fa-solid fa-triangle-exclamation";
+            this.loading = false;
+        },
+        loadThumbnail: async function (force = false) {
+            // Use single loading flag to prevent multiple calls
+            if (this.loading) {
+                return; // Already loading
+            }
+            if (!force && this.thumbnail && !this.error) {
+                return; // Already loaded (unless forced)
+            }
+            if (!force && this.error) {
+                return; // Skip if error (unless forced)
+            }
+
+            // For buildable files, check if there's an active build or if it needs building
+            if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
+                try {
+                    // Check BuildManager cache first (more reliable)
+                    const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
+
+                    if (buildState) {
+                        const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
+
+                        if (activeStates.includes(buildState.currentState)) {
+                            this.buildLoading = true;
+                            this.buildState = buildState;
+                            this.icon = this.file.icon;
+                            return;
+                        }
+
+                        // If build failed or succeeded, continue with thumbnail load
+                        this.buildState = buildState;
+                    } else {
+                        // No build state found - might be a new file that needs building
+                        // Direct API call to check current builds - no cache
+                        const builds = await this.dataset.getBuilds(1, 200);
+                        const activeBuild = builds.find(build =>
+                            build.path === this.file.entry.path &&
+                            (build.currentState === 'Processing' ||
+                             build.currentState === 'Enqueued' ||
+                             build.currentState === 'Scheduled' ||
+                             build.currentState === 'Awaiting' ||
+                             build.currentState === 'Created')
+                        );
+
+                        if (activeBuild) {
+                            this.buildLoading = true;
+                            this.buildState = activeBuild;
+                            this.icon = this.file.icon;
+                            return;
+                        }
+
+                        // For buildable types without a successful build, show build loading initially
+                        // This covers newly uploaded files that need processing
+                        const hasSuccessfulBuild = builds.find(build =>
+                            build.path === this.file.entry.path &&
+                            build.currentState === 'Succeeded'
+                        );
+
+                        if (!hasSuccessfulBuild) {
+                            this.buildLoading = true;
+                            this.icon = this.file.icon;
+                            // Don't return here - let it fall through to try thumbnail generation
+                        }
+                    }
+                } catch (e) {
+                    // If build check fails, continue with thumbnail load
+                }
+            }
+
+            this.loading = true;
+
+            try {
+                if (thumbs.supportedForType(this.file.entry.type)) {
+                    this.thumbnail = await thumbs.fetch(this.file.path);
+
+                    this.loading = false;
+                    this.buildLoading = false; // Clear build loading when thumbnail succeeds
+                } else {
+                    this.icon = this.file.icon;
+                    this.loading = false;
+                    this.buildLoading = false; // Clear build loading when using icon
+                }
+            } catch (e) {
+                this.loading = false; // Reset loading state on error
+
+                // For buildable files that fail thumbnail generation, keep showing build loading
+                if (this.dataset && BuildManager.isBuildableType(this.file.entry.type) && !this.buildState) {
+                    this.buildLoading = true;
+                    this.icon = this.file.icon;
+                } else {
+                    this.buildLoading = false;
+                    this.showError(e);
+                }
+            }
+        },
+        onClick: function (e) {
+            Keyboard.updateState(e);
+            this.$emit('clicked', this, Mouse.LEFT);
+        },
+        onRightClick: function (e) {
+            Keyboard.updateState(e);
+            this.$emit('clicked', this, Mouse.RIGHT);
+        },
+        onDblClick: function () {
+            this.$emit("open", this);
+        },
+
+        // Build management methods
+
+        setupBuildListeners() {
+            if (!this.dataset) return;
+
+            // Listen to build events (only for UI feedback)
+            BuildManager.on('buildStateChanged', this.onBuildStateChanged);
+            BuildManager.on('buildStarted', this.onBuildStarted);
+        },
+
+        cleanupBuildListeners() {
+            BuildManager.off('buildStateChanged', this.onBuildStateChanged);
+            BuildManager.off('buildStarted', this.onBuildStarted);
+        },
+
+        onBuildStateChanged(data) {
+            if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                this.buildState = data.buildInfo;
+                this.buildLoading = false;
+
+                // If build succeeded, refresh the thumbnail
+                if (data.newState === 'Succeeded') {
+                    // Clear existing state and reload
+                    this.thumbnail = null;
+                    this.error = null;
+                    this.icon = null;
+                    this.loading = false;
+                    this.loadThumbnail(true);
+                }
+            }
+        },
+
+        onBuildStarted(data) {
+            if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                this.buildLoading = true;
+                this.loading = false;
+                this.error = null;
+                this.thumbnail = null;
+                this.icon = this.file.icon;
+            }
+        },
+
+
+    }
+}
+</script>
+
+<style scoped>
+.thumbnail {
+    margin: var(--ddb-spacing-xs);
+    padding-top: var(--ddb-spacing-xs);
+    padding-bottom: var(--ddb-spacing-xs);
+    text-align: center;
+    word-break: break-all;
+    border-radius: var(--ddb-radius-sm);
+    transition: 0.25s background-color ease;
+}
+
+.thumbnail:hover {
+    background: var(--ddb-bg-secondary);
+    cursor: pointer;
+}
+
+.thumbnail:focus,
+.thumbnail:active {
+    background: var(--ddb-border);
+}
+
+.thumbnail.selected {
+    background: var(--ddb-border);
+}
+
+.thumbnail .container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+    pointer-events: none;
+    margin-bottom: 0.25rem;
+}
+
+/* .thumbnail .container.bordered - drop shadow removed */
+
+.thumbnail .container img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.thumbnail .container img.hide {
+    visibility: hidden;
+}
+
+.thumbnail .container i.icon-file {
+    display: inline-block;
+}
+
+.thumbnail .icon.badge {
+    font-size: var(--ddb-font-size-sm);
+}
+
+.thumbnail i.icon {
+    margin: 0;
+}
+
+.thumbnail i.loading {
+    position: absolute;
+    top: 63%;
+    left: 50%;
+    margin-left: -0.5rem;
+}
+
+/* Build Status Badges */
+.build-badge {
+    position: absolute;
+    top: var(--ddb-spacing-xs);
+    right: var(--ddb-spacing-xs);
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--ddb-font-size-sm);
+    color: white;
+    z-index: 10;
+}
+
+.build-badge.success {
+    background-color: var(--ddb-success);
+}
+
+.build-badge.error {
+    background-color: var(--ddb-danger);
+}
+
+.build-badge.processing {
+    background-color: var(--ddb-warning);
+}
+
+.build-badge i.icon {
+    margin: 0 !important;
+    font-size: var(--ddb-font-size-sm);
+    width: auto;
+    height: auto;
+    line-height: 1;
+}
+</style>

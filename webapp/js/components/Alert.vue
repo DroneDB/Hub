@@ -3,20 +3,20 @@
 
         <slot />
 
-        <div class="buttons">
-            <button @click="dismiss('ok')" class="ui primary button" v-if="buttons.indexOf('ok') !== -1">
-                OK
-            </button>
+        <div class="text-center mt-3">
+            <Button severity="secondary" label="Close" @click="dismiss('ok')" v-if="buttons.indexOf('ok') !== -1" />
         </div>
     </Window>
 </template>
 
 <script>
-import Window from './Window.vue';
+import Window from '@/components/Window.vue';
+import Button from 'primevue/button';
 
 export default {
     components: {
-        Window
+        Window,
+        Button
     },
     props: {
         title: {
@@ -35,6 +35,7 @@ export default {
             required: false
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {};
@@ -50,8 +51,4 @@ export default {
 </script>
 
 <style scoped>
-.buttons {
-    margin-top: 16px;
-    text-align: center;
-}
 </style>

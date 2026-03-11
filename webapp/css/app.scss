@@ -1,13 +1,44 @@
-// Import Semantic UI from npm package
-// Semantic UI is now imported in main.js directly
+// ============================================================
+// Global Styles — DroneDB Hub
+// ============================================================
+//
+// CONVENTIONS:
+// - All dimensions on the Bootstrap scale: 0, 0.25, 0.5, 0.75, 1, 1.5, 3 rem
+// - No magic numbers — every value is a --ddb-* token or a Bootstrap class
+// - All spacing via Bootstrap utility classes (m-*, p-*, gap-*)
+//   Steps: 0=0, 1=0.25rem, 2=0.5rem, 3=1rem, 4=1.5rem, 5=3rem
+// - Borders via Bootstrap utility classes (.border, .border-top, etc.)
+//   In CSS-only contexts use var(--ddb-border-width)
+// - Layout via Bootstrap: d-flex, row/col-*, responsive classes
+// - Colors and typography via PrimeVue Lara theme tokens
+// - Font sizes: var(--ddb-font-size-sm/base/lg/xl) only
+// - Forms via PrimeVue components (InputText, Password, Select, etc.)
+// - Badges via PrimeVue Tag component
+// - No PrimeFlex
+// ============================================================
+
+// PrimeVue theme is imported in main.js
+// Bootstrap grid + utilities are imported in main.js
+// Font Awesome 6 is imported in main.js
+
+@import 'variables';
 
 html {
+    font-size: 16px;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
     overflow: hidden;
 }
 
 body {
-    color: #030A03;
-    background: #fefefe;
+    color: var(--ddb-text);
+    background: var(--ddb-bg);
+    font-family: 'Inter', sans-serif;
+    font-size: var(--ddb-font-size-base);
+    line-height: 1.5;
 }
 
 /*
@@ -28,6 +59,7 @@ body {
  */
 * {
     user-select: none;
+    box-sizing: border-box;
 }
 
 .text-selectable,
@@ -46,27 +78,159 @@ body {
     animation: rotation 2s infinite linear;
 }
 
-.circle.notch {
-    height: 17px;
-    line-height: 17px;
-    width: 22px;
-}
+// ============================================================
+// Form styles removed — use PrimeVue form components:
+// InputText, Password, Select, Textarea, Checkbox, etc.
+// ============================================================
 
-.cui.select.icon {
+.input-group {
     position: relative;
+    display: flex;
+    align-items: center;
 
-    select {
-        text-indent: 24px;
+    input {
+        flex: 1;
+        padding-left: var(--ddb-spacing-2xl);
     }
 
     i {
         position: absolute;
-        left: 13px;
-        z-index: 1;
-        top: 10px;
+        left: var(--ddb-spacing-md);
         opacity: 0.5;
         color: rgba(0, 0, 0, 0.87);
     }
+}
+
+// ============================================================
+// Badge styles removed — use PrimeVue Tag component:
+// <Tag severity="warning" value="Owner" />
+// ============================================================
+
+// ============================================================
+// Divider (replacing Semantic UI divider)
+// ============================================================
+.divider {
+    border: none;
+    border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+    margin: var(--ddb-spacing-lg) 0;
+}
+
+// ============================================================
+// Text helpers
+// ============================================================
+.text-success { color: var(--ddb-success) !important; }
+.text-danger { color: var(--ddb-danger) !important; }
+.text-warning { color: var(--ddb-warning-text) !important; }
+.text-muted { color: var(--ddb-text-muted) !important; }
+
+.small { font-size: var(--ddb-font-size-sm); }
+
+// ============================================================
+// Fluid helper — use Bootstrap w-100 instead
+// ============================================================
+
+// ============================================================
+// Semantic UI Layout Compatibility
+// Grid system removed — use Bootstrap row/col-* classes
+// Alignment utilities removed — use Bootstrap text-start/center/end
+// Float utilities removed — use Bootstrap float-start/float-end
+// ============================================================
+
+// --- Segments (grouped card-like containers) ---
+.ui.segments {
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
+    border-radius: var(--ddb-radius-sm);
+    box-shadow: var(--ddb-shadow-sm);
+    margin: var(--ddb-spacing-lg) 0;
+    background: var(--ddb-bg-surface);
+
+    > .ui.segment {
+        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+        border-radius: 0;
+        box-shadow: none;
+        border-left: none;
+        border-right: none;
+        border-bottom: none;
+        margin: 0;
+
+        &:first-child {
+            border-top: none;
+        }
+    }
+}
+
+// Segment (standalone)
+.ui.segment {
+    padding: var(--ddb-spacing-lg);
+    background: var(--ddb-bg-surface);
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
+    border-radius: var(--ddb-radius-sm);
+    box-shadow: var(--ddb-shadow-sm);
+}
+
+// --- Table ---
+.ui.table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--ddb-bg-surface);
+    border: var(--ddb-border-width) solid var(--ddb-border-light);
+    color: var(--ddb-text);
+    margin: var(--ddb-spacing-lg) 0;
+
+    th {
+        background: var(--ddb-bg-light);
+        padding: var(--ddb-spacing-sm);
+        font-weight: 700;
+        text-align: left;
+        border-bottom: var(--ddb-border-width) solid var(--ddb-border-light);
+    }
+
+    td {
+        padding: var(--ddb-spacing-sm);
+        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+    }
+
+    tfoot th {
+        background: var(--ddb-bg-light);
+        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+        border-bottom: none;
+    }
+
+    &.celled {
+        th, td {
+            border: var(--ddb-border-width) solid var(--ddb-border-light);
+        }
+    }
+
+    &.selectable tbody tr:hover {
+        background: rgba(0, 0, 0, 0.05);
+        cursor: pointer;
+    }
+
+    &.sortable th {
+        cursor: pointer;
+        user-select: none;
+
+        &:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+    }
+}
+
+// --- Top banner (heading row) ---
+.top-banner {
+    margin-top: var(--ddb-spacing-md);
+    margin-bottom: var(--ddb-spacing-xl);
+}
+
+// --- Page-level loading spinner ---
+div.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: var(--ddb-spacing-2xl);
+    font-size: var(--ddb-font-size-lg);
+    color: var(--ddb-text-muted);
 }
 
 .cui.app {
@@ -114,34 +278,28 @@ body {
 #app {
     display: flex;
     flex-direction: column;
+    height: 100%;
 
-    &.fullpage {
-        height: 100%;
-
-        &>div#views {
-            height: 100%;
-        }
+    // Content area fills remaining space below header
+    > :last-child {
+        flex: 1;
+        overflow: hidden;
+        min-height: 0;
     }
 }
 
 body:fullscreen {
-    background: #fefefe;
+    background: var(--ddb-bg);
 
     &::backdrop {
-        background: #fefefe;
+        background: var(--ddb-bg);
     }
 }
 
-/* Mobile */
+/* Responsive breakpoints (aligned with Bootstrap) */
 
-@media only screen and (max-width: 767px) {
-
-    [class*="mobile hide"],
-    [class*="tablet only"]:not(.mobile),
-    [class*="computer only"]:not(.mobile),
-    [class*="large monitor only"]:not(.mobile),
-    [class*="widescreen monitor only"]:not(.mobile),
-    [class*="or lower hide"] {
+@media only screen and (max-width: 575.98px) {
+    .mobile-hide {
         display: none !important;
     }
 
@@ -153,77 +311,57 @@ body:fullscreen {
     textarea {
         font-size: 120%;
     }
-
-    .ui.button,
-    .ui.buttons .button,
-    .ui.buttons .or,
-    .ui.dropdown .menu,
-    .ui.dropdown .menu>.item,
-    i.icon,
-    i.icons {
-        font-size: 1.2rem;
-    }
 }
 
-
-/* Tablet / iPad Portrait */
-
-@media only screen and (min-width: 768px) and (max-width: 991px) {
-
-    [class*="mobile only"]:not(.tablet),
-    [class*="tablet hide"],
-    [class*="computer only"]:not(.tablet),
-    [class*="large monitor only"]:not(.tablet),
-    [class*="widescreen monitor only"]:not(.tablet),
-    [class*="or lower hide"]:not(.mobile) {
+@media only screen and (min-width: 576px) and (max-width: 767.98px) {
+    .tablet-hide {
         display: none !important;
     }
 }
 
-/* Computer / Desktop / iPad Landscape */
-
-@media only screen and (min-width: 992px) and (max-width: 1199px) {
-
-    [class*="mobile only"]:not(.computer),
-    [class*="tablet only"]:not(.computer),
-    [class*="computer hide"],
-    [class*="large monitor only"]:not(.computer),
-    [class*="widescreen monitor only"]:not(.computer),
-    [class*="or lower hide"]:not(.tablet):not(.mobile) {
+@media only screen and (min-width: 768px) {
+    .desktop-hide {
         display: none !important;
     }
 }
 
 
-/* Large Monitor */
+// ============================================================
+// Dialog / Window size classes
+// ============================================================
+.dialog-xs  { max-width: 17.5rem;  }  // 280px
+.dialog-sm  { max-width: 25rem;    }  // 400px
+.dialog-md  { max-width: 31.25rem; }  // 500px
+.dialog-lg  { max-width: 37.5rem;  }  // 600px
+.dialog-xl  { max-width: 47rem;    }  // ~750px
 
-@media only screen and (min-width: 1200px) and (max-width: 1919px) {
+// ============================================================
+// Tooltip shared styles (replaces duplicated inline CSS in
+// Potree.vue, mapUtils.js, etc.)
+// ============================================================
+.ddb-tooltip {
+    position: absolute;
+    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
+    border-radius: var(--ddb-radius-sm);
+    font-size: var(--ddb-font-size-sm);
+    max-width: var(--ddb-tooltip-max-width);
+    box-shadow: var(--ddb-shadow-sm);
+    pointer-events: none;
+    z-index: 10000;
+    white-space: pre-wrap;
 
-    [class*="mobile only"]:not([class*="large monitor"]),
-    [class*="tablet only"]:not([class*="large monitor"]),
-    [class*="computer only"]:not([class*="large monitor"]),
-    [class*="large monitor hide"],
-    [class*="widescreen monitor only"]:not([class*="large monitor"]),
-    [class*="or lower hide"]:not(.computer):not(.tablet):not(.mobile) {
-        display: none !important;
+    &--dark {
+        background: var(--ddb-tooltip-bg);
+        color: var(--ddb-text-on-color);
+        border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.2);
+    }
+
+    &--light {
+        background: var(--ddb-tooltip-bg-light);
+        color: var(--ddb-tooltip-text-dark);
+        border: var(--ddb-border-width) solid var(--ddb-border-light);
     }
 }
-
-
-/* Widescreen Monitor */
-
-@media only screen and (min-width: 1920px) {
-
-    [class*="mobile only"]:not([class*="widescreen monitor"]),
-    [class*="tablet only"]:not([class*="widescreen monitor"]),
-    [class*="computer only"]:not([class*="widescreen monitor"]),
-    [class*="large monitor only"]:not([class*="widescreen monitor"]),
-    [class*="widescreen monitor hide"],
-    [class*="widescreen monitor or lower hide"] {
-        display: none !important;
-    }
-}
-
 
 @font-face {
     font-family: 'dronedb';
@@ -242,8 +380,8 @@ body:fullscreen {
 
     display: inline-block;
     text-decoration: inherit;
-    width: 1em;
-    margin-right: .2em;
+    width: 1rem;
+    margin-right: .25rem;
     text-align: center;
     /* opacity: .8; */
 
@@ -252,11 +390,11 @@ body:fullscreen {
     text-transform: none;
 
     /* fix buttons height, for twitter bootstrap */
-    line-height: 1em;
+    line-height: 1rem;
 
     /* Animation center compensation - margins should be symmetric */
     /* remove if not needed */
-    margin-left: .2em;
+    margin-left: .25rem;
 
     /* you can be more comfortable with increased icons size */
     /* font-size: 120%; */

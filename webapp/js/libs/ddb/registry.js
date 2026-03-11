@@ -114,7 +114,7 @@ module.exports = class Registry {
     }
 
     async storageInfo() {
-        if (this.isLoggedIn()) {
+        if (this.ensureLoggedIn()) {
             const res = await this.getRequest(`/users/storage`);
 
             if (res.total == null) {
@@ -192,16 +192,25 @@ module.exports = class Registry {
     }
 
     async refreshToken() {
-        if (!this.isLoggedIn()) {
+        if (!this.ensureLoggedIn()) {
             throw new Error("logged out");
         }
 
-        // Prevent concurrent refresh requests
-        if (this._refreshingToken) {
-            return;
+        // If a refresh is already in-flight, return the same promise
+        if (this._refreshPromise) {
+            return this._refreshPromise;
         }
 
-        this._refreshingToken = true;
+        this._refreshPromise = this._doRefreshToken();
+
+        try {
+            return await this._refreshPromise;
+        } finally {
+            this._refreshPromise = null;
+        }
+    }
+
+    async _doRefreshToken() {
         try {
             const res = await this.postRequest('/users/authenticate/refresh');
 
@@ -217,8 +226,6 @@ module.exports = class Registry {
                 throw new Error("logged out");
             }
             throw error;
-        } finally {
-            this._refreshingToken = false;
         }
     }
 
@@ -286,14 +293,14 @@ module.exports = class Registry {
     }
 
     getUsername() {
-        if (this.isLoggedIn()) {
+        if (this.ensureLoggedIn()) {
             return this._getUsernameFromStorage();
         }
         return null;
     }
 
     isAdmin() {
-        if (this.isLoggedIn()) {
+        if (this.ensureLoggedIn()) {
             const token = this.getAuthToken();
             if (!token)
                 return false;
@@ -316,7 +323,7 @@ module.exports = class Registry {
     }
 
     async createOrganization(slugOrData, name, description, isPublic) {
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         const formData = new FormData();
@@ -340,7 +347,7 @@ module.exports = class Registry {
     }
 
     async updateOrganization(slug, name, description, isPublic) {
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         const formData = new FormData();
@@ -358,7 +365,7 @@ module.exports = class Registry {
 
     async deleteOrganization(orgSlug) {
 
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         return await this.deleteRequest(`/orgs/${orgSlug}`);
@@ -411,7 +418,7 @@ module.exports = class Registry {
      * @returns {Promise<Array>} List of organization members
      */
     async getOrganizationMembers(orgSlug) {
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         return await this.getRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`);
@@ -425,7 +432,7 @@ module.exports = class Registry {
      * @returns {Promise<void>}
      */
     async addOrganizationMember(orgSlug, userName, permissions = 1) {
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         return await this.postRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`, {
@@ -442,7 +449,7 @@ module.exports = class Registry {
      * @returns {Promise<void>}
      */
     async updateMemberPermissions(orgSlug, userName, permissions) {
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         return await this.putRequest(
@@ -458,7 +465,7 @@ module.exports = class Registry {
      * @returns {Promise<void>}
      */
     async removeOrganizationMember(orgSlug, userName) {
-        if (!this.isLoggedIn())
+        if (!this.ensureLoggedIn())
             throw new Error("not logged in");
 
         return await this.deleteRequest(
@@ -506,8 +513,20 @@ module.exports = class Registry {
         }
     }
 
+    /**
+     * Pure check: returns true if the user has a valid, non-expired token.
+     * No side effects.
+     */
     isLoggedIn() {
-        const loggedIn = this.getAuthToken() !== null && this.getAuthTokenExpiration() > new Date();
+        return this.getAuthToken() !== null && this.getAuthTokenExpiration() > new Date();
+    }
+
+    /**
+     * Check login status and clear stale credentials if expired.
+     * Use this when you want to enforce logout on expiration.
+     */
+    ensureLoggedIn() {
+        const loggedIn = this.isLoggedIn();
         if (!loggedIn) this.clearCredentials();
         return loggedIn;
     }

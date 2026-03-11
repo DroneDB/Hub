@@ -1,0 +1,209 @@
+// ============================================================
+// DroneDB Hub — Design Tokens
+// ============================================================
+//
+// Centralized palette AND dimensional scale.
+// All components should reference these CSS custom properties
+// instead of hardcoding hex/rgba values or pixel dimensions.
+//
+// SPACING SCALE (aligned with Bootstrap 5):
+//   0 = 0,  xs = 0.25rem,  sm = 0.5rem,  md = 0.75rem,
+//   lg = 1rem,  xl = 1.5rem,  2xl = 3rem
+//
+// FONT-SIZE SCALE:
+//   sm = 0.75rem, base = 1rem, lg = 1.5rem, xl = 3rem
+//
+// ALL rem values MUST be multiples of 0.25rem (n × 0.25).
+// NO px units except for the documented exceptions below.
+//
+// ── DOCUMENTED EXCEPTIONS ──────────────────────────────────
+//
+// 1. app.scss: html { font-size: 16px }
+//    Root font-size definition — required to establish rem base.
+//
+// 2. Loader.vue: spinner animation border widths (1.25rem)
+//    Use rem now; the spinner scales with the component's
+//    font-size token. Previously em-based for relative scaling.
+//
+// 3. Potree.vue: vendor-prefixed radial gradients
+//    (-moz-, -webkit-, -o-, -ms-) contain rgba() fallbacks
+//    and 0px in -webkit-gradient(). The standard background
+//    line uses var(--ddb-viewer-gradient-*) tokens. Vendor
+//    lines are kept as fallbacks for legacy browsers.
+//
+// 4. Potree.vue / olMeasure.vue: tooltip positioning
+//    tooltip.style.left/top use cursor-relative pixel offsets
+//    calculated from getBoundingClientRect(). These MUST stay
+//    as px because they're screen-coordinate offsets.
+//
+// 5. @media breakpoints (app.scss, TreeNode.vue, Datasets.vue)
+//    CSS media queries use px values (767px, 575.98px, etc.)
+//    per Bootstrap convention. These are viewport breakpoints
+//    and must remain in px.
+//
+// 6. Third-party CSS (public/ folder):
+//    ol.css, photo-sphere-viewer.min.css are vendor files
+//    and must NOT be modified.
+//
+// 7. OL / Canvas rendering colors in JS:
+//    Map.vue, SingleMap.vue, olMeasure.vue, olSelection.vue
+//    construct OpenLayers Style objects with rgba() color
+//    strings. These are rendering-engine colors, not CSS.
+//    Color tokens exist (--ddb-map-*, --ddb-measure-*) as
+//    reference but are not consumed by OL JS code.
+//
+// 8. Color picker palette arrays:
+//    PointAnnotationDialog.vue, MeasurementPropertiesDialog.vue
+//    contain hard-coded hex color arrays for user selection.
+//    These are application data, not styling constants.
+//
+// 9. Thumbnail.vue: dynamic size prop
+//    The size prop (number) is converted from px to rem via
+//    (size / 16) + 'rem' in JS data. The division by 16
+//    maps the legacy pixel API to rem.
+//
+// RADIUS SCALE:
+//   sm = 0.25rem (rounded-1), md = 0.5rem (rounded-3), lg = 1rem (rounded-4)
+//
+// EXCEPTIONS (px still allowed):
+//   - Mouse-tracking positions (event.clientX/Y in JS)
+//   - Thumbnail.vue dynamic prop-based sizes
+//   - Media queries (@media max-width)
+//   - CSS spinner animation borders (Loader.vue)
+//   - Canvas font strings (OL Text API)
+//   - OL pseudo-element tooltip arrows (::before/::after)
+//
+// ============================================================
+
+:root {
+    // ── Brand ──────────────────────────────────────────────
+    --ddb-primary: #0070e0;
+    --ddb-primary-rgb: 0, 112, 224;
+    --ddb-secondary: #00C4CC;
+    --ddb-secondary-rgb: 0, 196, 204;
+    --ddb-accent: #6C5CE7;
+
+    // ── Text ───────────────────────────────────────────────
+    --ddb-text: #1A1A2E;
+    --ddb-text-secondary: #555;
+    --ddb-text-muted: #999;
+    --ddb-text-on-dark: #fefefe;
+    --ddb-text-on-color: #fff;
+
+    // ── Backgrounds ────────────────────────────────────────
+    --ddb-bg: #fefefe;
+    --ddb-bg-light: #FAFBFC;
+    --ddb-bg-subtle: #f5f5f5;
+    --ddb-bg-hover: #f0f0f0;
+    --ddb-bg-dark: #212121;
+    --ddb-bg-surface: #fff;
+
+    // ── Borders ────────────────────────────────────────────
+    --ddb-border: #ddd;
+    --ddb-border-light: rgba(34, 36, 38, 0.15);
+    --ddb-border-medium: #d4d4d5;
+    --ddb-border-separator: #e0e0e0;
+    --ddb-border-width: 0.0625rem;
+
+    // ── Spacing (Bootstrap 5 scale) ────────────────────────
+    --ddb-spacing-xs: 0.25rem;   // 4px  — Bootstrap m-1/p-1
+    --ddb-spacing-sm: 0.5rem;    // 8px  — Bootstrap m-2/p-2
+    --ddb-spacing-md: 0.75rem;   // 12px — between p-2 and p-3
+    --ddb-spacing-lg: 1rem;      // 16px — Bootstrap m-3/p-3
+    --ddb-spacing-xl: 1.5rem;    // 24px — Bootstrap m-4/p-4
+    --ddb-spacing-2xl: 3rem;     // 48px — Bootstrap m-5/p-5
+
+    // ── Font Size (strict scale) ───────────────────────────
+    --ddb-font-size-sm: 0.75rem;   // 12px — small/captions
+    --ddb-font-size-base: 1rem;    // 16px — body text
+    --ddb-font-size-lg: 1.5rem;    // 24px — headings
+    --ddb-font-size-xl: 3rem;      // 48px — display/hero
+
+    // ── Border Radius ──────────────────────────────────────
+    --ddb-radius-sm: 0.25rem;    // Bootstrap rounded-1
+    --ddb-radius-md: 0.5rem;     // Bootstrap rounded-3
+    --ddb-radius-lg: 1rem;       // Bootstrap rounded-4
+
+    // ── Shadows ────────────────────────────────────────────
+    --ddb-shadow-sm: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+    --ddb-shadow-md: 0 0.25rem 1rem rgba(0, 0, 0, 0.15);
+    --ddb-shadow-lg: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+
+    // ── Layout ─────────────────────────────────────────────
+    --ddb-sidebar-width: 18.75rem;     // 300px
+    --ddb-tooltip-max-width: 18.75rem; // 300px
+    --ddb-login-max-width: 26.25rem;   // 420px
+
+    // ── Status ─────────────────────────────────────────────
+    --ddb-success: #20a96b;
+    --ddb-success-rgb: 32, 169, 107;
+    --ddb-danger: #dc3545;
+    --ddb-danger-rgb: 220, 53, 69;
+    --ddb-warning: #ffc107;
+    --ddb-warning-rgb: 255, 193, 7;
+    --ddb-warning-text: #856404;
+    --ddb-warning-bg: #fff3cd;
+    --ddb-info: #00bbe0;
+
+    // ── Status Backgrounds (light tints) ───────────────────
+    --ddb-success-bg: #f5fff5;
+    --ddb-danger-bg: #fff5f5;
+    --ddb-info-bg: #f5f9ff;
+    --ddb-selected-bg: #e8f4ff;
+    --ddb-selected-active-bg: #d8e8f8;
+
+    // ── Link ───────────────────────────────────────────────
+    --ddb-link: var(--ddb-primary);
+
+    // ── Measure / Annotation colors ────────────────────────
+    --ddb-measure-color: #ffcc33;
+    --ddb-measure-fill: rgba(255, 204, 51, 0.7);
+    --ddb-measure-vertex-fill: rgba(0, 0, 0, 0.9);
+    --ddb-measure-vertex-stroke: rgba(255, 255, 255, 0.4);
+    --ddb-measure-sketch-fill: rgba(255, 255, 255, 0.4);
+
+    // ── Map colors ─────────────────────────────────────────
+    --ddb-map-shot-color: rgba(75, 150, 243, 1);
+    --ddb-map-shot-selected: rgba(255, 158, 103, 1);
+    --ddb-map-shot-hover: rgba(253, 226, 147, 1);
+    --ddb-map-label-color: #000;
+    --ddb-map-label-halo: #fff;
+    --ddb-map-vector-selected: rgba(255, 158, 103, 0.8);
+
+    // ── Tooltip ────────────────────────────────────────────
+    --ddb-tooltip-bg: rgba(0, 0, 0, 0.85);
+    --ddb-tooltip-bg-light: rgba(255, 255, 255, 0.9);
+    --ddb-tooltip-text-dark: #333;
+
+    // ── Overlay ────────────────────────────────────────────
+    --ddb-overlay-bg: rgba(0, 0, 0, 0.65);
+
+    // ── Viewer (dark backgrounds for 3D/panorama/potree) ──
+    --ddb-viewer-bg: #1a1a2e;
+    --ddb-viewer-gradient-center: rgba(79, 79, 79, 1);
+    --ddb-viewer-gradient-edge: rgba(22, 22, 22, 1);
+
+    // ── Viewer Dark UI (sidebar & toolbars) ────────────────
+    --ddb-viewer-sidebar-bg: #19282c;
+    --ddb-viewer-sidebar-link: #8Aa1c4;
+    --ddb-viewer-sidebar-muted: #9AA1A4;
+    --ddb-viewer-toolbar-bg: rgba(0, 0, 0, 0.7);
+    --ddb-viewer-toolbar-overlay: rgba(0, 0, 0, 0.5);
+    --ddb-viewer-btn-bg: #555;
+    --ddb-viewer-btn-hover: #777;
+    --ddb-viewer-btn-disabled-bg: #333;
+    --ddb-viewer-btn-disabled-color: #666;
+    --ddb-viewer-btn-active-bg: #666;
+    --ddb-viewer-btn-primary: #4a90e2;
+    --ddb-viewer-btn-primary-hover: #357abd;
+    --ddb-viewer-btn-danger: #e74c3c;
+    --ddb-viewer-btn-danger-hover: #c0392b;
+    --ddb-viewer-btn-danger-glow: rgba(231, 76, 60, 0.8);
+    --ddb-viewer-select-bg: #555;
+    --ddb-viewer-select-border: #777;
+    --ddb-viewer-label-color: #555;
+
+    // ── Gradients
+    --ddb-gradient-start: #0025e0;
+    --ddb-gradient-end: #00bbe0;
+}

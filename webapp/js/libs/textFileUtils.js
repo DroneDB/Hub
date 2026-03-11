@@ -7,7 +7,7 @@ const { pathutils } = ddb;
 
 // Extensions that should open as text by default
 const TEXT_EXTENSIONS = [
-    'txt', 'md', 'markdown', 'json', 'geojson',
+    'txt', 'md', 'markdown', 'json',
     'csv', 'xml', 'yml', 'yaml', 'ini', 'cfg', 'conf',
     'log', 'properties', 'env', 'gitignore', 'dockerignore',
     'sh', 'bash', 'zsh', 'bat', 'cmd', 'ps1',

@@ -1,35 +1,36 @@
 <template>
     <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
-        <div v-html="message"></div>
+        <div v-html="safeMessage"></div>
 
-        <div v-if="warningMessage" class="ui negative message" style="margin-top: 16px;">
-            <div class="header" v-if="warningTitle">
-                {{ warningTitle }}
-            </div>
-            <p>{{ warningMessage }}</p>
-        </div>
+        <PrimeMessage v-if="warningMessage" severity="warn" :closable="false" class="mt-3">
+            <template v-if="warningTitle" #default>
+                <strong>{{ warningTitle }}</strong><br />{{ warningMessage }}
+            </template>
+            <template v-else #default>{{ warningMessage }}</template>
+        </PrimeMessage>
 
-        <div class="buttons">
-            <button @click="close('cancel')" class="ui button">
-                {{ cancelText }}
-            </button>
-            <button v-if="secondaryText" @click="close('secondary')" class="ui button" :class="secondaryButtonClass">
-                {{ secondaryText }}
-            </button>
-            <button @click="close('confirm')" class="ui button" :class="confirmButtonClass">
-                {{ confirmText }}
-            </button>
+        <slot name="extra"></slot>
+
+        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+            <Button :label="cancelText" @click="close('cancel')" severity="secondary" />
+            <Button v-if="secondaryText" :label="secondaryText" @click="close('secondary')" :severity="secondaryButtonClass" />
+            <Button :label="confirmText" @click="close('confirm')" :severity="confirmButtonClass" />
         </div>
     </Window>
 </template>
 
 <script>
-import Keyboard from '../libs/keyboard';
-import Window from './Window.vue';
+import Keyboard from '@/libs/keyboard';
+import Window from '@/components/Window.vue';
+import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
+import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
     components: {
-        Window
+        Window,
+        Button,
+        PrimeMessage
     },
 
     props: {
@@ -70,14 +71,20 @@ export default {
             default: null
         }
     },
+    emits: ['onClose'],
 
     data: function () {
         return {};
     },
+    computed: {
+        safeMessage: function () {
+            return sanitizeHtml(this.message);
+        }
+    },
     mounted: function () {
         Keyboard.onKeyDown(this.handleKeyDown);
     },
-    beforeDestroy: function () {
+    beforeUnmount: function () {
         Keyboard.offKeyDown(this.handleKeyDown);
     },
     methods: {
@@ -94,8 +101,4 @@ export default {
 </script>
 
 <style scoped>
-.buttons {
-    margin-top: 16px;
-    text-align: right;
-}
 </style>

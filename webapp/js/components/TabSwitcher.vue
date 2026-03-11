@@ -1,26 +1,42 @@
 <template>
-    <div class="tab-switcher">
-        <TabButtons :tabs="dynTabs" :defaultTab="activeTab" :position="position" :buttonWidth="buttonWidth"
-            @closeTab="removeTab" ref="topTabButtons" v-if="position === 'top' && (!hideSingle || dynTabs.length > 1)"
-            @click="setActiveTab" />
+    <div class="tab-switcher" :class="{ 'position-top': position === 'top' }">
+        <div class="tab-buttons-strip" v-if="!hideSingle || dynTabs.length > 1">
+            <Tabs :value="activeTab" @update:value="onTabChange">
+                <TabList>
+                    <Tab v-for="t in dynTabs" :key="t.key" :value="t.key">
+                        <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
+                            style="margin-right: 0.5rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
+                                t.label }}</span>
+                        <span @click.stop="removeTab(t.key)" v-if="!!t.canClose" class="close-btn"><i
+                                class="fa-solid fa-xmark"></i></span>
+                    </Tab>
+                </TabList>
+            </Tabs>
+        </div>
         <div class="tabs">
-            <div class="tab" v-for="t in dynTabs" :class="{ hidden: t.key !== activeTab }">
+            <div class="tab" v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }"
+                :class="{ hidden: t.key !== activeTab }">
                 <slot :name="t.key" />
+                <component v-if="dynamicComponents[t.key]" :is="dynamicComponents[t.key].component"
+                    v-bind="dynamicComponents[t.key].props"
+                    :ref="el => { if (el) dynamicChildRefs[t.key] = el; }" />
             </div>
         </div>
-        <TabButtons :tabs="dynTabs" :defaultTab="activeTab" :position="position" :buttonWidth="buttonWidth"
-            @closeTab="removeTab" ref="bottomTabButtons"
-            v-if="position === 'bottom' && (!hideSingle || dynTabs.length > 1)" @click="setActiveTab" />
     </div>
 </template>
 
 <script>
-import { clone } from '../libs/utils';
-import TabButtons from './TabButtons';
+import { clone } from '@/libs/utils';
+import { h, markRaw } from 'vue';
+import Tabs from 'primevue/tabs';
+import TabList from 'primevue/tablist';
+import Tab from 'primevue/tab';
 
 export default {
     components: {
-        TabButtons
+        Tabs,
+        TabList,
+        Tab
     },
     props: {
         tabs: {
@@ -44,35 +60,43 @@ export default {
             default: null
         }
     },
+    provide() {
+        return {
+            registerTabChild: this.registerTabChild,
+            unregisterTabChild: this.unregisterTabChild
+        };
+    },
     data: function () {
         return {
             activeTab: this.selectedTab != null ? this.selectedTab : this.tabs[0].key,
-            dynTabs: clone(this.tabs)
+            dynTabs: clone(this.tabs),
+            registeredChildren: {},
+            dynamicComponents: {},
+            dynamicChildRefs: {},
+            tabRefs: {},
+            tabMap: {}
         };
     },
     mounted: function () {
-        // Trigger first onTabActivated
-        const node = this.getNodeFor(this.activeTab);
-        if (node && node.onTabActivated) node.onTabActivated();
-
-        this.tabMap = {};
-    },
-    computed: {
-        tabButtons: function () {
-            if (this.$refs.bottomTabButtons) return this.$refs.bottomTabButtons;
-            else return this.$refs.topTabButtons;
-        }
+        // Trigger first onTabActivated on next tick so children have registered
+        this.$nextTick(() => {
+            const node = this.getNodeFor(this.activeTab);
+            if (node && node.onTabActivated) node.onTabActivated();
+        });
     },
     methods: {
-        getTagFor(tabKey) {
-            if (!this.$slots[tabKey]) return null;
-
-            return this.$slots[tabKey][0].tag;
+        registerTabChild(key, component) {
+            this.registeredChildren[key] = component;
         },
-
+        unregisterTabChild(key) {
+            delete this.registeredChildren[key];
+        },
         getNodeFor(tabKey) {
-            const tag = this.getTagFor(tabKey);
-            return this.$children.find(c => c.$vnode.tag === tag);
+            // First check registered children (slot-based components)
+            if (this.registeredChildren[tabKey]) return this.registeredChildren[tabKey];
+            // Then check dynamic component refs
+            if (this.dynamicChildRefs[tabKey]) return this.dynamicChildRefs[tabKey];
+            return null;
         },
 
         activateTab(tabKey) {
@@ -103,7 +127,6 @@ export default {
 
                 this.lastTabIndex = this.getActiveTabIndex();
                 this.activeTab = tab.key;
-                this.tabButtons.setActiveTab(tab, false);
 
                 // The Vue node is not available
                 // until the next tick
@@ -117,18 +140,32 @@ export default {
             }
         },
 
+        onTabChange: function (value) {
+            const tab = this.dynTabs.find(t => t.key === value);
+            if (tab) {
+                this.setActiveTab(tab);
+            }
+        },
+
         onPanelResized: function () {
-            // Propagate to tabs
-            for (let i = 0; i < this.$children.length; i++) {
-                const $c = this.$children[i];
-                if ($c.onPanelResized !== undefined) {
+            // Propagate to tabs via registered children
+            for (const key in this.registeredChildren) {
+                const $c = this.registeredChildren[key];
+                if ($c && $c.onPanelResized !== undefined) {
+                    $c.onPanelResized();
+                }
+            }
+            // Also propagate to dynamic component refs
+            for (const key in this.dynamicChildRefs) {
+                const $c = this.dynamicChildRefs[key];
+                if ($c && $c.onPanelResized !== undefined) {
                     $c.onPanelResized();
                 }
             }
         },
 
         hasTab: function (key) {
-            return !!this.$slots[key];
+            return !!(this.$slots[key] || this.dynamicComponents[key]);
         },
 
         addTab: function (tab, opts = {}) {
@@ -136,13 +173,13 @@ export default {
                 const activate = opts.activate !== undefined ? !!opts.activate : true;
                 const tabIndex = opts.tabIndex !== undefined ? parseInt(opts.tabIndex) : NaN;
 
-                if (this.$slots[tab.key]) this.removeTab(tab.key);
+                if (this.hasTab(tab.key)) this.removeTab(tab.key);
 
-                const node = this.$createElement(tab.component, {
-                    props: tab.props
-                });
-
-                this.$slots[tab.key] = [node];
+                // Store the component definition in reactive data
+                this.dynamicComponents[tab.key] = {
+                    component: markRaw(tab.component),
+                    props: tab.props || {}
+                };
 
                 const tabDef = {
                     label: tab.label,
@@ -160,7 +197,6 @@ export default {
 
                 if (activate) {
                     this.setActiveTab(tab);
-                    this.$forceUpdate();
                 }
 
                 this.tabMap[tab.key] = tab;
@@ -189,8 +225,10 @@ export default {
                     this.setActiveTab(this.dynTabs[tabToActivate]);
                 }
 
-                this.$slots[tabKey][0].componentInstance.$destroy();
-                delete this.$slots[tabKey];
+                // Clean up dynamic component data
+                delete this.dynamicComponents[tabKey];
+                delete this.dynamicChildRefs[tabKey];
+                delete this.tabRefs[tabKey];
                 delete this.tabMap[tabKey];
             } else {
                 console.warn(`Cannot remove tab with key: ${tabKey}`);
@@ -206,18 +244,60 @@ export default {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    min-height: 0;
     overflow: hidden;
 
+    /* Default: tabs at bottom → buttons after content */
+    &.position-top {
+        .tab-buttons-strip {
+            order: -1;
+        }
+    }
+
+    .tab-buttons-strip {
+        user-select: none;
+        -webkit-user-select: none;
+    }
+
+    :deep(.p-tab) {
+        font-family: inherit;
+    }
+
+    .close-btn {
+        margin-left: 0.25rem;
+        cursor: pointer;
+
+        &:hover {
+            color: var(--ddb-text-secondary);
+        }
+
+        &:active {
+            color: var(--ddb-border);
+        }
+    }
+
+    .icon.padded {
+        padding-left: 0.25rem;
+    }
+
     .tabs {
-        height: 100%;
+        flex: 1;
+        min-height: 0;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
 
         .tab {
             display: flex;
             flex-direction: column;
-            height: 100%;
+            flex: 1;
+            min-height: 0;
             overflow: auto;
-            background: #fefefe;
+            background: var(--ddb-bg);
+
+            &.hidden {
+                display: none !important;
+            }
         }
     }
 
