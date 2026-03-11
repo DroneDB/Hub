@@ -72,31 +72,31 @@ window.addEventListener('load', function () {
             },
             semantic: {
                 primary: {
-                    50:  '#e6edfd',
-                    100: '#b3c6f9',
-                    200: '#809ff5',
-                    300: '#4d79f1',
-                    400: '#2659ec',
-                    500: '#0041E8',
-                    600: '#003abd',
-                    700: '#002d93',
-                    800: '#002069',
-                    900: '#00133f',
-                    950: '#000a21'
+                    50:  '#e6f1fd',
+                    100: '#b3d5f9',
+                    200: '#80b8f5',
+                    300: '#4d9cf0',
+                    400: '#2685e8',
+                    500: '#0070e0',
+                    600: '#0060bf',
+                    700: '#004a95',
+                    800: '#00356b',
+                    900: '#001f40',
+                    950: '#001122'
                 },
                 colorScheme: {
                     light: {
                         primary: {
-                            color: '#0041E8',
+                            color: '#0070e0',
                             contrastColor: '#ffffff',
-                            hoverColor: '#003abd',
-                            activeColor: '#002d93'
+                            hoverColor: '#0060bf',
+                            activeColor: '#004a95'
                         },
                         highlight: {
                             background: '#e8f4ff',
                             focusBackground: '#d8e8f8',
-                            color: '#0041E8',
-                            focusColor: '#002d93'
+                            color: '#0070e0',
+                            focusColor: '#004a95'
                         }
                     }
                 }
