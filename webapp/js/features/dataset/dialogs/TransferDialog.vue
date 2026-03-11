@@ -16,13 +16,15 @@
                 <!-- Destination Organization -->
                 <div class="my-3">
                     <label class="d-block mb-1 fw-semibold">Destination Organization</label>
-                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label" optionValue="value" placeholder="Select organization..." class="w-100" />
+                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label"
+                        optionValue="value" placeholder="Select organization" class="w-100" />
                 </div>
 
                 <!-- Destination Dataset -->
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Destination Dataset</label>
-                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label" optionValue="value" placeholder="Select dataset..." class="w-100" />
+                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label"
+                        optionValue="value" optionDisabled="disabled" placeholder="Select dataset" class="w-100" />
                 </div>
 
                 <!-- Destination Path -->
@@ -51,7 +53,8 @@
             <!-- Buttons -->
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                 <Button @click="close('close')" severity="secondary" :disabled="isTransferring" label="Close" />
-                <Button @click="transfer" :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left" label="Transfer" />
+                <Button @click="transfer" :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left"
+                    label="Transfer" />
             </div>
         </div>
     </Window>
