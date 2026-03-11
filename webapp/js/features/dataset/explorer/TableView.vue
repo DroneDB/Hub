@@ -366,8 +366,8 @@ export default {
         },
 
         getFileSize: function(file) {
-            if (entry.isDirectory(file.entry)) return '--';
-            if (!file.entry.size) return '--';
+            if (entry.isDirectory(file.entry)) return '';
+            if (!file.entry.size) return '';
             return formatFileSize(file.entry.size);
         },
 
