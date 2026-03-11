@@ -101,7 +101,7 @@
         </div>
 
         <!-- Sticky paginator -->
-        <div v-if="!loading && filteredOrganizations.length > itemsPerPage" class="org-pagination">
+        <div v-if="!loading" class="org-pagination">
             <Paginator :rows="Number(itemsPerPage)" :totalRecords="filteredOrganizations.length"
                 :first="(currentPage - 1) * itemsPerPage"
                 @page="onPageChange" :rowsPerPageOptions="[5, 10, 25, 50, 100]" />
