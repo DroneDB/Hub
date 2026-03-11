@@ -546,9 +546,6 @@ export default {
 
             this.viewMode = mode;
             localStorage.setItem('fileViewMode', mode);
-
-            // Clear selection when switching views
-            this.selectedDetailFile = null;
         },
 
         toggleViewMode() {
