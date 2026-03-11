@@ -4,7 +4,7 @@
             <div class="content">
                 <div class="description">
                     <PrimeMessage :severity="getMessageSeverity()" :closable="false">
-                        {{ message }}
+                        <span style="white-space: pre-line;">{{ message }}</span>
                     </PrimeMessage>
 
                     <!-- Progress indicator for build in progress -->
