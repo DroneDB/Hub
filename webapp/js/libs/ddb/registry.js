@@ -358,8 +358,8 @@ module.exports = class Registry {
         return await this.putFormData(`/orgs/${slug}`, formData);
     }
 
-    async getOrganizations() {
-        const res = await this.getRequest(`/orgs`);
+    async getOrganizations(ownedOnly = false) {
+        const res = await this.getRequest(`/orgs${ownedOnly ? '?ownedOnly=true' : ''}`);
         return res.map(org => new Organization(this, org));
     }
 

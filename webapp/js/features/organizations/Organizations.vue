@@ -13,21 +13,29 @@
                             <div class="org-title-row">
                                 <h1 class="my-0">Organizations</h1>
                                 <Tag rounded severity="info" icon="fa-solid fa-layer-group">
-                                    {{ organizations.length }} org{{ organizations.length !== 1 ? 's' : '' }}
+                                    {{ filteredOrganizations.length }} org{{ filteredOrganizations.length !== 1 ? 's' : '' }}
                                 </Tag>
+                                <label class="d-flex align-items-center gap-2 ms-2">
+                                    <ToggleSwitch v-model="showAll" />
+                                    <span class="show-all-label">Show all</span>
+                                </label>
                             </div>
                             <p class="org-description mt-1 mb-0">Organize your datasets into groups and manage team access.</p>
                         </div>
                     </div>
                 </div>
                 <div class="org-actions">
+                    <IconField>
+                        <InputIcon class="fa-solid fa-magnifying-glass" />
+                        <InputText v-model="searchQuery" small placeholder="Search organizations" />
+                    </IconField>
                     <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" />
                 </div>
             </div>
         </div>
 
         <!-- Skeleton loading state -->
-        <div v-if="loading">
+        <div v-if="loading" class="org-cards-area">
             <Card v-for="i in 4" :key="i" class="mb-3">
                 <template #content>
                     <div class="d-flex justify-content-between align-items-center">
@@ -48,53 +56,55 @@
         </div>
 
         <!-- Data loaded -->
-        <div v-else>
-            <DataView :value="organizations" :paginator="organizations.length > 10" :rows="10" layout="list">
-                <template #list="slotProps">
-                    <div v-for="(org, index) in slotProps.items" :key="org.slug"
-                         class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
-                        <Card>
-                            <template #content>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div class="flex-grow-1">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <i class="fa-solid fa-sitemap"></i>
-                                            <strong class="org-name">{{ org.name ? org.name : org.slug }}</strong>
-                                        </div>
-                                        <div v-if="org.description" class="org-card-description mt-1">{{ org.description }}</div>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2 ms-3 org-card-tags">
-                                        <Tag v-if="org.owner" rounded severity="secondary" icon="fa-solid fa-user">
-                                            {{ org.owner }}
-                                        </Tag>
-                                        <Tag v-if="org.isPublic" rounded severity="success" icon="fa-solid fa-globe">Public</Tag>
-                                        <Tag v-else rounded severity="warn" icon="fa-solid fa-lock">Private</Tag>
-                                    </div>
-                                    <div class="org-card-actions d-flex gap-1 ms-3">
-                                        <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
-                                            @click.stop="openMembersDialog(org)" severity="secondary" outlined size="small"
-                                            icon="fa-solid fa-users" title="Manage Members" />
-                                        <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
-                                            @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
-                                            :loading="org.editing" :disabled="org.editing || org.deleting"
-                                            icon="fa-solid fa-pencil" />
-                                        <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
-                                            @click.stop="handleDelete(org)" severity="danger" size="small"
-                                            :loading="org.deleting" :disabled="org.deleting || org.editing"
-                                            icon="fa-solid fa-trash" />
-                                    </div>
+        <div v-else class="org-cards-area">
+            <div v-if="paginatedOrganizations.length === 0" class="text-center p-4">
+                <h3>No organizations found</h3>
+                <p v-if="searchQuery">Try adjusting your search criteria.</p>
+                <p v-else>You can create a new organization by clicking the create organization button.</p>
+            </div>
+            <div v-for="org in paginatedOrganizations" :key="org.slug"
+                 class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
+                <Card>
+                    <template #content>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="fa-solid fa-sitemap"></i>
+                                    <strong class="org-name">{{ org.name ? org.name : org.slug }}</strong>
                                 </div>
-                            </template>
-                        </Card>
-                    </div>
-                </template>
-                <template #empty>
-                    <div class="text-center p-4">
-                        <h3>No organizations found</h3>
-                        <p>You can create a new organization by clicking the create organization button.</p>
-                    </div>
-                </template>
-            </DataView>
+                                <div v-if="org.description" class="org-card-description mt-1">{{ org.description }}</div>
+                            </div>
+                            <div class="d-flex align-items-center gap-2 ms-3 org-card-tags">
+                                <Tag v-if="org.owner" rounded severity="secondary" icon="fa-solid fa-user">
+                                    {{ org.owner }}
+                                </Tag>
+                                <Tag v-if="org.isPublic" rounded severity="success" icon="fa-solid fa-globe">Public</Tag>
+                                <Tag v-else rounded severity="warn" icon="fa-solid fa-lock">Private</Tag>
+                            </div>
+                            <div class="org-card-actions d-flex gap-1 ms-3">
+                                <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
+                                    @click.stop="openMembersDialog(org)" severity="secondary" outlined size="small"
+                                    icon="fa-solid fa-users" title="Manage Members" />
+                                <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
+                                    @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
+                                    :loading="org.editing" :disabled="org.editing || org.deleting"
+                                    icon="fa-solid fa-pencil" />
+                                <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
+                                    @click.stop="handleDelete(org)" severity="danger" size="small"
+                                    :loading="org.deleting" :disabled="org.deleting || org.editing"
+                                    icon="fa-solid fa-trash" />
+                            </div>
+                        </div>
+                    </template>
+                </Card>
+            </div>
+        </div>
+
+        <!-- Sticky paginator -->
+        <div v-if="!loading && filteredOrganizations.length > itemsPerPage" class="org-pagination">
+            <Paginator :rows="Number(itemsPerPage)" :totalRecords="filteredOrganizations.length"
+                :first="(currentPage - 1) * itemsPerPage"
+                @page="onPageChange" :rowsPerPageOptions="[5, 10, 25, 50, 100]" />
         </div>
 
         <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug">
@@ -118,14 +128,19 @@ import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
+import { getOrgPagePreferences, saveOrgPagePreferences } from '@/libs/storageUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Toast from 'primevue/toast';
-import DataView from 'primevue/dataview';
 import Skeleton from 'primevue/skeleton';
+import ToggleSwitch from 'primevue/toggleswitch';
+import InputText from 'primevue/inputtext';
+import InputIcon from 'primevue/inputicon';
+import IconField from 'primevue/iconfield';
+import Paginator from 'primevue/paginator';
 
 export default {
     components: {
@@ -138,11 +153,16 @@ export default {
         Card,
         Tag,
         Toast,
-        DataView,
-        Skeleton
+        Skeleton,
+        ToggleSwitch,
+        InputText,
+        InputIcon,
+        IconField,
+        Paginator
     },
 
     data: function () {
+        const prefs = getOrgPagePreferences();
         return {
             error: "",
             organizations: [],
@@ -159,52 +179,84 @@ export default {
             orgDialogOpen: false,
 
             membersDialogOpen: false,
-            selectedOrgForMembers: null
+            selectedOrgForMembers: null,
+
+            showAll: prefs?.ownedOnly === false,
+            searchQuery: '',
+            currentPage: 1,
+            itemsPerPage: prefs?.itemsPerPage || 10
         }
     },
     mounted: async function () {
         setTitle("Organizations");
-
-        try {
-            this.isAdmin = reg.isAdmin();
-
-            let tmp = await reg.getOrganizations()
-
-            this.organizations = tmp.map(item => {
-                let org = item.org;
-                return {
-                    slug: org.slug,
-                    name: org.name,
-                    editing: false,
-                    deleting: false,
-                    description: org.description,
-                    creationDate: Date.parse(org.creationDate),
-                    owner: org.owner,
-                    isPublic: org.isPublic,
-                    permissions: org.permissions
-                };
-            });
-
-            if (this.organizations.length === 0) {
-                this.$router.push({ name: "Upload" }).catch(() => {
-                });
-            }
-        } catch (e) {
-            if (e.status === 401) {
-                if (e.noRetry) {
-                    reg.logout(); // Clear JWT token and related data
-                    this.$router.push({ name: "Login" }).catch(() => { });
-                } else {
-                    this.error = "Temporary authentication issue. Please try again.";
-                }
-            } else {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
-            }
-
+        await this.fetchOrganizations();
+    },
+    watch: {
+        showAll: async function () {
+            this.currentPage = 1;
+            this.savePreferences();
+            await this.fetchOrganizations();
+        },
+        itemsPerPage: function () {
+            this.currentPage = 1;
+            this.savePreferences();
+        },
+        searchQuery: function () {
+            this.currentPage = 1;
         }
-        this.loading = false;
     },
     methods: {
+
+        async fetchOrganizations() {
+            this.loading = true;
+            try {
+                this.isAdmin = reg.isAdmin();
+
+                let tmp = await reg.getOrganizations(!this.showAll);
+
+                this.organizations = tmp.map(item => {
+                    let org = item.org;
+                    return {
+                        slug: org.slug,
+                        name: org.name,
+                        editing: false,
+                        deleting: false,
+                        description: org.description,
+                        creationDate: Date.parse(org.creationDate),
+                        owner: org.owner,
+                        isPublic: org.isPublic,
+                        permissions: org.permissions
+                    };
+                });
+
+                if (this.organizations.length === 0 && !this.showAll) {
+                    this.$router.push({ name: "Upload" }).catch(() => {
+                    });
+                }
+            } catch (e) {
+                if (e.status === 401) {
+                    if (e.noRetry) {
+                        reg.logout();
+                        this.$router.push({ name: "Login" }).catch(() => { });
+                    } else {
+                        this.error = "Temporary authentication issue. Please try again.";
+                    }
+                } else {
+                    this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
+                }
+            }
+            this.loading = false;
+        },
+
+        savePreferences() {
+            saveOrgPagePreferences(this.itemsPerPage, !this.showAll);
+        },
+
+        onPageChange(event) {
+            this.currentPage = event.page + 1;
+            this.itemsPerPage = event.rows;
+            this.savePreferences();
+        },
 
         handleDelete(org) {
             this.currentOrgSlug = org.slug;
@@ -375,6 +427,21 @@ export default {
         },
         memberManagementEnabled() {
             return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+        },
+        filteredOrganizations() {
+            if (!this.searchQuery) return this.organizations;
+            const query = this.searchQuery.toLowerCase();
+            return this.organizations.filter(org => {
+                const name = (org.name || org.slug).toLowerCase();
+                const slug = org.slug.toLowerCase();
+                const description = (org.description || '').toLowerCase();
+                const owner = (org.owner || '').toLowerCase();
+                return name.includes(query) || slug.includes(query) || description.includes(query) || owner.includes(query);
+            });
+        },
+        paginatedOrganizations() {
+            const start = (this.currentPage - 1) * this.itemsPerPage;
+            return this.filteredOrganizations.slice(start, start + this.itemsPerPage);
         }
     }
 }
@@ -383,9 +450,14 @@ export default {
 <style scoped>
 #organizations {
     margin: 0.75rem;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 
     .org-page-header {
         padding: var(--ddb-spacing-md) 0;
+        flex-shrink: 0;
 
         .org-header-layout {
             display: flex;
@@ -401,7 +473,8 @@ export default {
         .org-actions {
             flex-shrink: 0;
             display: flex;
-            align-items: flex-start;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
         }
 
         .org-icon-wrapper {
@@ -430,6 +503,27 @@ export default {
             color: var(--ddb-text-secondary);
             font-size: var(--ddb-font-size-sm);
         }
+    }
+
+    .show-all-label {
+        font-size: var(--ddb-font-size-sm);
+        white-space: nowrap;
+    }
+
+    .org-cards-area {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    .org-pagination {
+        flex-shrink: 0;
+        position: sticky;
+        bottom: 0;
+        z-index: 10;
+        background: var(--p-content-background);
+        border-top: 1px solid var(--p-content-border-color);
+        padding: var(--ddb-spacing-xs) 0;
     }
 
     .org-card {

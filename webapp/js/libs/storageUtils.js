@@ -76,3 +76,26 @@ export function saveOpenAfterCreatePreference(value) {
         console.error('Error saving open after create preference to Local Storage:', e);
     }
 }
+
+const ORG_PAGE_PREFS_KEY = 'org_page_prefs';
+
+export function getOrgPagePreferences() {
+    try {
+        const prefs = localStorage.getItem(ORG_PAGE_PREFS_KEY);
+        if (prefs) {
+            return JSON.parse(prefs);
+        }
+    } catch (e) {
+        console.error('Error reading org page preferences from Local Storage:', e);
+    }
+    return null;
+}
+
+export function saveOrgPagePreferences(itemsPerPage, ownedOnly) {
+    const prefs = { itemsPerPage, ownedOnly };
+    try {
+        localStorage.setItem(ORG_PAGE_PREFS_KEY, JSON.stringify(prefs));
+    } catch (e) {
+        console.error('Error saving org page preferences to Local Storage:', e);
+    }
+}
