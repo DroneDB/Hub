@@ -285,7 +285,7 @@ export default {
         display: inline-block;
         margin-top: var(--ddb-border-width);
         margin-right: var(--ddb-spacing-xs);
-        width: 1rem;
+        width: 1.3rem;
         text-align: center;
     }
 
