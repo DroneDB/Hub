@@ -53,9 +53,9 @@
             message="You have unsaved changes. Are you sure you want to close?"
             confirmText="Discard and Close"
             cancelText="Cancel"
-            confirmButtonClass="negative"
+            confirmButtonClass="danger"
             secondaryText="Save and Close"
-            secondaryButtonClass="positive"
+            secondaryButtonClass="success"
             @onClose="handleConfirmClose"
         />
     </div>
