@@ -6,7 +6,7 @@ export default {
     methods: {
         // Build event handlers
         handleBuildStarted(file) {
-            this.flash = `Build started for ${file.label}`;
+            this.$toast.add({ severity: 'info', summary: 'Build Started', detail: `Build started for ${file.label}`, life: 3000 });
         },
 
         handleBuildError(data) {
@@ -14,7 +14,7 @@ export default {
         },
 
         handleBuildRetried(build) {
-            this.flash = `Build restarted for ${build.path}`;
+            this.$toast.add({ severity: 'info', summary: 'Build Restarted', detail: `Build restarted for ${build.path}`, life: 3000 });
         },
 
         handleBuildRetryError(data) {
@@ -27,26 +27,20 @@ export default {
 
             switch (data.newState) {
                 case 'Succeeded':
-                    this.flash = `Build completed for ${fileName}`;
-                    this.flashColor = "positive";
-                    this.flashIcon = "fa-regular fa-circle-check";
+                    this.$toast.add({ severity: 'success', summary: 'Build Completed', detail: `Build completed for ${fileName}`, life: 3000 });
                     break;
                 case 'Failed':
-                    this.flash = `Build failed for ${fileName}`;
-                    this.flashColor = "negative";
-                    this.flashIcon = "fa-regular fa-circle-xmark";
+                    this.$toast.add({ severity: 'error', summary: 'Build Failed', detail: `Build failed for ${fileName}`, life: 5000 });
                     break;
                 case 'Processing':
-                    this.flash = `Building ${fileName}...`;
-                    this.flashColor = "primary";
-                    this.flashIcon = "fa-solid fa-rotate";
+                    this.$toast.add({ severity: 'info', summary: 'Building', detail: `Building ${fileName}...`, life: 3000 });
                     break;
             }
         },
 
         handleBuildStartedNotification(data) {
             const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
-            this.flash = `Build started for ${fileName}`;
+            this.$toast.add({ severity: 'info', summary: 'Build Started', detail: `Build started for ${fileName}`, life: 3000 });
         },
 
         handleBuildErrorNotification(data) {
@@ -57,7 +51,7 @@ export default {
             console.log('New buildable files detected notification:', data);
             if (data.dataset === this.dataset) {
                 const fileCount = data.filePaths.length;
-                this.flash = `${fileCount} buildable file${fileCount > 1 ? 's' : ''} detected - processing in background`;
+                this.$toast.add({ severity: 'info', summary: 'Buildable Files Detected', detail: `${fileCount} buildable file${fileCount > 1 ? 's' : ''} detected - processing in background`, life: 3000 });
             }
         }
     }

@@ -420,7 +420,7 @@ export default {
                 this.$toast.add({ severity: 'success', summary: 'Cover Set', detail: 'Dataset cover set successfully', life: 3000 });
 
                 // Notify components that new items have been added
-                emitter.emit('addItems');
+                emitter.emit('addItems', []);
             } catch (e) {
                 this.showError(e.message || e, 'Set as Dataset Cover');
             } finally {
