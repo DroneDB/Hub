@@ -17,7 +17,7 @@
             <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
                 :title="selectedFiles.length > 0 ? `Download ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : 'Download'" :disabled="isDownloading">
                 <i class="fa-solid fa-download"></i>
-                <span v-if="selectedFiles.length > 0" class="ms-1">{{ selectedFiles.length }}</span>
+                <span v-if="selectedFiles.length > 0" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
             <Button v-if="showSettings" @click="handleSettings" severity="secondary" size="small" text title="Settings">
                 <i class="fa-solid fa-wrench"></i>
