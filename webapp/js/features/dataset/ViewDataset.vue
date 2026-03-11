@@ -39,19 +39,31 @@
                         @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
-                    <!-- Grid View (Explorer) -->
-                    <Explorer v-if="viewMode === 'grid'" ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                        :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
-                        @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
-                        @transferSelectedItems="openTransferItemsDialog"
-                        @setAsCover="setAsCover"
-                        @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
-                        @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                        @openAsText="handleOpenAsText" />
+                    <!-- Grid View (Explorer) with optional Detail Panel -->
+                    <div v-if="viewMode === 'grid'" class="detail-layout">
+                        <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
+                            <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
+                                :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                                @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
+                                @transferSelectedItems="openTransferItemsDialog"
+                                @setAsCover="setAsCover"
+                                @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                                @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" />
+                        </div>
+                        <div v-if="selectedDetailFile && !isMobile" class="detail-side">
+                            <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                                @close="handleDetailPanelClose"
+                                @open="handleDetailPanelOpen"
+                                @share="handleDetailPanelShare"
+                                @buildStarted="handleBuildStarted"
+                                @buildError="handleBuildError" />
+                        </div>
+                    </div>
 
                     <!-- Table View with optional Detail Panel -->
-                    <div v-else class="table-detail-layout">
-                        <div class="table-detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
+                    <div v-else class="detail-layout">
+                        <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
                             <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
                                 :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                                 @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
@@ -62,7 +74,7 @@
                                 @openAsText="handleOpenAsText"
                                 @selectionChanged="handleTableSelectionChanged" />
                         </div>
-                        <div v-if="selectedDetailFile && !isMobile" class="table-detail-side">
+                        <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
                                 @close="handleDetailPanelClose"
                                 @open="handleDetailPanelOpen"
@@ -74,6 +86,14 @@
                 </template>
                 <template v-slot:buildhistory>
                     <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
+                </template>
+                <template v-if="isMobile" v-slot:properties>
+                    <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                        @close="handleDetailPanelClose"
+                        @open="handleDetailPanelOpen"
+                        @share="handleDetailPanelShare"
+                        @buildStarted="handleBuildStarted"
+                        @buildError="handleBuildError" />
                 </template>
             </TabSwitcher>
             </template>
@@ -279,6 +299,14 @@ export default {
             icon: 'fa-solid fa-folder-open',
             key: 'explorer'
         }]);
+
+        if (mobile) {
+            mainTabs.push({
+                label: 'Properties',
+                icon: 'fa-solid fa-circle-info',
+                key: 'properties'
+            });
+        }
 
         mainTabs = mainTabs.concat([{
             label: 'Map',
@@ -520,9 +548,7 @@ export default {
             localStorage.setItem('fileViewMode', mode);
 
             // Clear selection when switching views
-            if (mode === 'table') {
-                this.selectedDetailFile = null;
-            }
+            this.selectedDetailFile = null;
         },
 
         toggleViewMode() {
@@ -818,6 +844,14 @@ export default {
             this.fileBrowserFiles.forEach(f => f.selected = false);
             this.fileBrowserFiles = fileBrowserFiles;
             this.isLoadingFiles = false;
+
+            // Update selectedDetailFile for Properties tab (mobile)
+            // When a single non-directory file is selected from the tree, show its details
+            if (fileBrowserFiles.length === 1 && fileBrowserFiles[0].entry && !ddb.entry.isDirectory(fileBrowserFiles[0].entry)) {
+                this.selectedDetailFile = fileBrowserFiles[0];
+            } else {
+                this.selectedDetailFile = null;
+            }
         },
 
         handleSelectAll: function () {
@@ -1069,23 +1103,23 @@ export default {
 </script>
 
 <style scoped>
-.table-detail-layout {
+.detail-layout {
     display: flex;
     height: 100%;
     overflow: hidden;
 }
 
-.table-detail-main {
+.detail-main {
     flex: 1;
     min-width: 0;
     overflow: auto;
 }
 
-.table-detail-main.with-detail {
+.detail-main.with-detail {
     flex: 7;
 }
 
-.table-detail-side {
+.detail-side {
     flex: 3;
     min-width: 15rem;
     max-width: 25rem;

@@ -64,7 +64,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError'],
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError', 'selectionChanged'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         const ctx = {
@@ -276,6 +276,7 @@ export default {
         },
         clearSelection: function () {
             this.files.forEach(f => f.selected = false);
+            this.$emit('selectionChanged');
         },
         handleOpen: async function (thumb) {
             const file = thumb.file;
@@ -312,6 +313,8 @@ export default {
                 file.selected = true;
                 this.rangeStartThumb = thumb;
             }
+
+            this.$emit('selectionChanged');
         },
 
         selectRange: function (startThumb, endThumb) {
