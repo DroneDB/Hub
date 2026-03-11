@@ -877,6 +877,18 @@ export default {
         flex-shrink: 0;
     }
 
+    @media screen and (max-width: 767.98px) {
+        .ds-pagination {
+            flex-direction: column;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
+
+            > span {
+                font-size: var(--ddb-font-size-sm);
+            }
+        }
+    }
+
     .ds-thumb-img {
         display: block;
         width: 3.5rem;
