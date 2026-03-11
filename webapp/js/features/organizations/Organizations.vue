@@ -29,7 +29,8 @@
                         <InputIcon class="fa-solid fa-magnifying-glass" />
                         <InputText v-model="searchQuery" small placeholder="Search organizations" />
                     </IconField>
-                    <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" />
+                    <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" class="d-inline-flex d-sm-none" />
+                    <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" class="d-none d-sm-inline-flex" />
                 </div>
             </div>
         </div>
@@ -566,7 +567,9 @@ export default {
             }
 
             .org-card-tags {
-                display: none;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: var(--ddb-spacing-xs);
             }
 
             .org-card-actions {
