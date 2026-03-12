@@ -68,7 +68,7 @@
                         <span class="file-size">{{ getFileSize(data) }}</span>
                     </template>
                 </Column>
-                <Column style="width: 11.25rem;">
+                <Column style="width: 12rem">
                     <template #header>
                         <span @click="sortBy('modified')" class="sortable-header">
                             Modified
@@ -573,6 +573,10 @@ export default {
     .file-size, .file-date {
         text-align: right;
         display: block;
+    }
+
+    .file-date {
+        white-space: nowrap;
     }
 }
 </style>
