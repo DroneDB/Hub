@@ -13,6 +13,7 @@
                     @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
                     @setAsCover="setAsCover"
                     @downloadItems="handleDownloadItems"
+                    @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
                     @openAsText="handleOpenAsText" @error="handleError" />
@@ -30,6 +31,7 @@
                         @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
                         @setAsCover="setAsCover"
                         @downloadItems="handleDownloadItems"
+                        @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
                         @openAsText="handleOpenAsText" @error="handleError" />
