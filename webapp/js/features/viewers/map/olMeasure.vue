@@ -83,6 +83,11 @@ class MeasureControls extends Control {
         btnDelete.innerHTML = '<img src="' + rootPath("/images/trash.svg") + '"/>';
         btnDelete.style.display = 'none';
 
+        const btnList = document.createElement('button');
+        btnList.title = 'Measurement List — View and manage all measurements.';
+        btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem"></i>';
+        btnList.style.display = 'none';
+
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable ol-control';
         element.appendChild(btnPoint);
@@ -92,6 +97,7 @@ class MeasureControls extends Control {
         element.appendChild(btnEdit);
         element.appendChild(btnStop);
         element.appendChild(separator);
+        element.appendChild(btnList);
         element.appendChild(btnSave);
         element.appendChild(btnClear);
         element.appendChild(btnExport);
@@ -112,6 +118,7 @@ class MeasureControls extends Control {
         btnClear.addEventListener('click', this.handleClearAll.bind(this), false);
         btnExport.addEventListener('click', this.handleExport.bind(this), false);
         btnDelete.addEventListener('click', this.handleDeleteSaved.bind(this), false);
+        btnList.addEventListener('click', this.handleListOpen.bind(this), false);
 
         this.selectedTool = null;
         this.onToolSelected = options.onToolSelected || (() => { });
@@ -124,6 +131,7 @@ class MeasureControls extends Control {
         this.onDeleteSaved = options.onDeleteSaved || (() => { });
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
+        this.onListOpen = options.onListOpen || (() => { });
 
         this.source = new VectorSource();
         this.vector = new VectorLayer({
@@ -140,6 +148,7 @@ class MeasureControls extends Control {
         this.btnClear = btnClear;
         this.btnExport = btnExport;
         this.btnDelete = btnDelete;
+        this.btnList = btnList;
         this.separator = separator;
 
         // Store keyboard listener reference
@@ -274,10 +283,58 @@ class MeasureControls extends Control {
         const canShowDelete = this.canDelete;
         const displaySave = (hasMeasurements && canShowSave) ? 'block' : 'none';
         this.separator.style.display = hasMeasurements ? 'block' : 'none';
+        this.btnList.style.display = hasMeasurements ? 'block' : 'none';
         this.btnSave.style.display = displaySave;
         this.btnClear.style.display = hasMeasurements ? 'block' : 'none';
         this.btnExport.style.display = hasMeasurements ? 'block' : 'none';
         this.btnDelete.style.display = (hasSavedMeasurements && canShowDelete) ? 'block' : 'none';
+    }
+
+    handleListOpen() {
+        this.onListOpen();
+    }
+
+    /**
+     * Get a list of all measurements with their details
+     * @returns {Array} Array of { name, type, value, feature }
+     */
+    getMeasurementsList() {
+        const features = this.source.getFeatures();
+        return features
+            .filter(f => f.get('measurementType'))
+            .map(f => {
+                const type = f.get('measurementType');
+                const name = f.get('name') || f.get('title') || '';
+                let value = '';
+                if (type === 'point') {
+                    const coords = f.getGeometry().getCoordinates();
+                    const lonLat = toLonLat(coords);
+                    value = `${lonLat[1].toFixed(6)}, ${lonLat[0].toFixed(6)}`;
+                } else {
+                    // Strip HTML tags from tooltip text
+                    const tooltipText = f.get('tooltipText') || '';
+                    value = tooltipText.replace(/<[^>]*>/g, '');
+                }
+                return { name, type, value, feature: f };
+            });
+    }
+
+    /**
+     * Delete a single measurement by its feature reference
+     * @param {ol.Feature} feature - The feature to remove
+     */
+    deleteMeasurement(feature) {
+        const map = this.getMap();
+        const tooltipOverlay = feature.get('measureTooltip');
+        if (tooltipOverlay && map) {
+            map.removeOverlay(tooltipOverlay);
+        }
+        const tooltipElement = feature.get('measureTooltipElement');
+        if (tooltipElement && tooltipElement.parentNode) {
+            tooltipElement.parentNode.removeChild(tooltipElement);
+        }
+        this.source.removeFeature(feature);
+        this.updateButtonsVisibility(this.hasMeasurements(), false);
     }
 
     /**
@@ -499,12 +556,20 @@ class MeasureControls extends Control {
             evt.features.forEach(feature => {
                 this.updateMeasurementValue(feature);
                 this.updateTooltipPosition(feature);
+                // Rebuild point popup to reflect new coordinates
+                if (feature.get('measurementType') === 'point') {
+                    this.recreatePointPopup(feature, this.getMap());
+                }
             });
         });
 
         this.translateInteraction.on('translateend', (evt) => {
             evt.features.forEach(feature => {
                 this.updateTooltipPosition(feature);
+                // Rebuild point popup to reflect new coordinates
+                if (feature.get('measurementType') === 'point') {
+                    this.recreatePointPopup(feature, this.getMap());
+                }
             });
         });
 
@@ -657,6 +722,10 @@ class MeasureControls extends Control {
         // Update tooltip display and position
         this.updateMeasurementValue(feature);
         this.updateTooltipPosition(feature);
+        // Rebuild point popup to reflect restored coordinates
+        if (feature.get('measurementType') === 'point') {
+            this.recreatePointPopup(feature, this.getMap());
+        }
     }
 
     /**
@@ -740,6 +809,8 @@ class MeasureControls extends Control {
             position = geometry.getInteriorPoint().getCoordinates();
         } else if (geometry instanceof LineString) {
             position = geometry.getLastCoordinate();
+        } else if (geometry instanceof Point) {
+            position = geometry.getCoordinates();
         }
 
         if (position) {
@@ -1164,6 +1235,31 @@ class MeasureControls extends Control {
                         self.updateButtonsVisibility(self.hasMeasurements(), false);
                     }, 100);
                 } else {
+                    // Validate measurement: discard degenerate geometries (0m lines, 0m² areas)
+                    const geom = feat.getGeometry();
+                    let isDegenerate = false;
+                    if (geom instanceof LineString) {
+                        isDegenerate = getLength(geom) < 0.01; // less than 1cm
+                    } else if (geom instanceof Polygon) {
+                        isDegenerate = getArea(geom) < 0.01; // less than 1cm²
+                    }
+
+                    if (isDegenerate) {
+                        // Remove degenerate measurement
+                        self.source.removeFeature(feat);
+                        if (self.measureTooltipElement && self.measureTooltipElement.parentNode) {
+                            self.measureTooltipElement.parentNode.removeChild(self.measureTooltipElement);
+                        }
+                        if (self.measureTooltip) {
+                            map.removeOverlay(self.measureTooltip);
+                        }
+                        self.measureTooltipElement = null;
+                        self.createMeasureTooltipElement(map);
+                        sketch = null;
+                        unByKey(listener);
+                        return;
+                    }
+
                     // Save tooltip text and timestamp to feature
                     feat.set('tooltipText', self.measureTooltipElement.innerHTML);
                     feat.set('createdAt', new Date().toISOString());
