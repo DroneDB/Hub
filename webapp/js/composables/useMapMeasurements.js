@@ -148,6 +148,28 @@ export default {
             if (result === 'confirm') {
                 this.measureControls.confirmDeleteSaved();
             }
+        },
+
+        /**
+         * Open measurement list dialog
+         */
+        openMeasurementListDialog() {
+            if (!this.measureControls) return;
+            this.measurementListItems = this.measureControls.getMeasurementsList();
+            this.measurementListDialogOpen = true;
+        },
+
+        /**
+         * Delete a measurement from the list dialog
+         */
+        handleDeleteMeasurementFromList(item) {
+            if (!this.measureControls || !item.feature) return;
+            this.measureControls.deleteMeasurement(item.feature);
+            // Refresh the list
+            this.measurementListItems = this.measureControls.getMeasurementsList();
+            if (this.measurementListItems.length === 0) {
+                this.measurementListDialogOpen = false;
+            }
         }
     }
 };

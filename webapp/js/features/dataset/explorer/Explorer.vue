@@ -67,20 +67,21 @@ export default {
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError', 'selectionChanged'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
+        const self = this;
         const ctx = {
-            getSelectedEntries: () => this.selectedFiles,
-            get canWrite() { return this.component.canWrite; },
-            get dataset() { return this.component.dataset; },
-            emit: (...args) => this.$emit(...args),
+            getSelectedEntries: () => self.selectedFiles,
+            get canWrite() { return self.canWrite; },
+            get dataset() { return self.dataset; },
+            emit: (...args) => self.$emit(...args),
             onSelectAllNone: () => {
-                if (!this.$refs.thumbs) return;
-                if (this.selectedFiles.length === this.$refs.thumbs.length) {
-                    this.deselectAll();
+                if (!self.$refs.thumbs) return;
+                if (self.selectedFiles.length === self.$refs.thumbs.length) {
+                    self.deselectAll();
                 } else {
-                    this.selectAll();
+                    self.selectAll();
                 }
             },
-            component: this
+            component: self
         };
 
         let contextMenu = [];

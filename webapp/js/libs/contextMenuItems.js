@@ -191,7 +191,6 @@ function buildItem(ctx) {
             if (sel.length !== 1) return;
             try {
                 await buildFile(ctx.dataset, sel[0]);
-                ctx.emit('buildStarted', sel[0]);
             } catch (error) {
                 ctx.emit('buildError', { file: sel[0], error: error.message });
             }

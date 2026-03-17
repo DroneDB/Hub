@@ -22,6 +22,10 @@
             :measurementsCount="changeUnitsMeasurementsCount"
             @onClose="handleChangeUnitsDialogClose">
         </ChangeUnitsDialog>
+        <MeasurementListDialog v-if="measurementListDialogOpen"
+            :measurements="measurementListItems"
+            @onClose="measurementListDialogOpen = false"
+            @deleteMeasurement="handleDeleteMeasurementFromList" />
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
             :basemaps="basemaps"
             :selectedBasemap="selectedBasemap"
@@ -105,6 +109,7 @@ import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
+import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
 
@@ -120,7 +125,7 @@ import emitter from '@/libs/eventBus';
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, MapDialogs, ChangeUnitsDialog, MapSettingsDialog
+        Map, Toolbar, olMeasure, OpacityControl, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
     },
     emits: ['scrollTo', 'openItem'],
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
@@ -263,7 +268,9 @@ export default {
             imagePopupCoordsCopied: false,
             imagePopupOverlay: null,
             rasterOpacity: 1.0,
-            hasRasters: false
+            hasRasters: false,
+            measurementListDialogOpen: false,
+            measurementListItems: []
         };
     },
     mounted: function () {
@@ -745,6 +752,7 @@ export default {
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
+                onListOpen: () => { this.openMeasurementListDialog(); },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
             }); this.map = new Map({

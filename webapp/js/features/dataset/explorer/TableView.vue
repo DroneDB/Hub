@@ -121,19 +121,20 @@ export default {
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'selectionChanged', 'buildStarted', 'buildError'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
+        const self = this;
         const ctx = {
-            getSelectedEntries: () => this.selectedFiles,
-            get canWrite() { return this.component.canWrite; },
-            get dataset() { return this.component.dataset; },
-            emit: (...args) => this.$emit(...args),
+            getSelectedEntries: () => self.selectedFiles,
+            get canWrite() { return self.canWrite; },
+            get dataset() { return self.dataset; },
+            emit: (...args) => self.$emit(...args),
             onSelectAllNone: () => {
-                if (this.selectedFiles.length === this.files.length) {
-                    this.deselectAll();
+                if (self.selectedFiles.length === self.files.length) {
+                    self.deselectAll();
                 } else {
-                    this.selectAll();
+                    self.selectAll();
                 }
             },
-            component: this
+            component: self
         };
 
         let contextMenu = buildStandardContextMenu(ctx);
@@ -446,7 +447,6 @@ export default {
             const file = this.selectedFiles[0];
             try {
                 await buildFile(this.dataset, file);
-                this.$emit('buildStarted', file);
             } catch (error) {
                 this.$emit('buildError', { file, error: error.message });
             }

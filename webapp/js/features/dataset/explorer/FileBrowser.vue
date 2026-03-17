@@ -58,22 +58,23 @@ export default {
     },
     data: function () {
         // Adapter: wrap lastSelectedNode as single-element array for the shared context menu factory
+        const self = this;
         const ctx = {
             getSelectedEntries: () => {
-                if (this.lastSelectedNode === null) return [];
-                return [this.lastSelectedNode.node];
+                if (self.lastSelectedNode === null) return [];
+                return [self.lastSelectedNode.node];
             },
-            get canWrite() { return this.component.canWrite; },
-            get dataset() { return this.component.dataset; },
+            get canWrite() { return self.canWrite; },
+            get dataset() { return self.dataset; },
             emit: (event, ...args) => {
                 // For FileBrowser, some actions need to emit selectionChanged first
                 const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
-                if (needsSelectionSync.includes(event) && this.lastSelectedNode !== null) {
-                    this.component.$emit('selectionChanged', [this.lastSelectedNode.node]);
+                if (needsSelectionSync.includes(event) && self.lastSelectedNode !== null) {
+                    self.$emit('selectionChanged', [self.lastSelectedNode.node]);
                 }
-                this.component.$emit(event, ...args);
+                self.$emit(event, ...args);
             },
-            component: this
+            component: self
         };
 
         let contextMenu = [];

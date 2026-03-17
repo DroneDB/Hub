@@ -22,6 +22,10 @@
             @alertClose="handleAlertDialogClose"
             @clearMeasurementsClose="handleClearMeasurementsDialogClose"
             @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
+        <MeasurementListDialog v-if="measurementListDialogOpen"
+            :measurements="measurementListItems"
+            @onClose="measurementListDialogOpen = false"
+            @deleteMeasurement="handleDeleteMeasurementFromList" />
         <Toast position="bottom-left" />
     </div>
 </template>
@@ -48,6 +52,7 @@ import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import OpacityControl from './OpacityControl.vue';
 import MapDialogs from './MapDialogs.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
+import MeasurementListDialog from './MeasurementListDialog.vue';
 import olSettings from './olSettings';
 import Toast from 'primevue/toast';
 import Keyboard from '@/libs/keyboard';
@@ -64,7 +69,7 @@ import mapMeasurements from '@/composables/useMapMeasurements';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, MapDialogs, MapSettingsDialog, Toast
+        Map, TabViewLoader, OpacityControl, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
     },
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
     props: ["uri"],
@@ -84,7 +89,9 @@ export default {
             canDelete: false,
             canRead: false,
             rasterOpacity: 1.0,
-            hasRasters: false
+            hasRasters: false,
+            measurementListDialogOpen: false,
+            measurementListItems: []
         };
     },
     mounted: async function () {
@@ -191,6 +198,7 @@ export default {
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
+                onListOpen: () => { this.openMeasurementListDialog(); },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
             });

@@ -352,7 +352,6 @@ export default {
             try {
                 await BuildManager.startBuild(this.dataset, this.file.entry.path, true);
                 this.buildLoading = true;
-                this.$emit('buildStarted', this.file);
             } catch (error) {
                 this.$emit('buildError', { file: this.file, error: error.message });
             }
