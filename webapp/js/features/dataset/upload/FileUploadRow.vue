@@ -119,6 +119,7 @@ export default {
 .file-progress {
     width: 11.25rem;
     flex-shrink: 0;
+    text-align: center;
 }
 
 .progress-bar-container {

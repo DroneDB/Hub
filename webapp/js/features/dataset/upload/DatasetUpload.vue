@@ -65,6 +65,10 @@
                     <span>{{ humanBytesSent }} / {{ humanTotalBytes }}</span>
                     <span>{{ totalProgress.toFixed(1) }}%</span>
                 </div>
+                <div class="progress-speed-info">
+                    <span><i class="fa-solid fa-gauge"></i> {{ currentSpeedFormatted }}</span>
+                    <span><i class="fa-regular fa-clock"></i> {{ etaFormatted }}</span>
+                </div>
                 <div class="total-progress-bar">
                     <div class="progress-fill" :style="{ width: totalProgress + '%' }"></div>
                 </div>
@@ -154,7 +158,12 @@ export default {
 
             // Time tracking
             uploadStartTime: null,
-            uploadEndTime: null
+            uploadEndTime: null,
+
+            // Speed & ETA tracking
+            speedHistory: [],
+            currentSpeed: 0,
+            estimatedTimeRemaining: null
         }
     },
     computed: {
@@ -209,6 +218,24 @@ export default {
             if (durationMs <= 0) return '0 B/s';
             const bytesPerSecond = (this.totalBytesSent / durationMs) * 1000;
             return bytesToSize(bytesPerSecond) + '/s';
+        },
+
+        currentSpeedFormatted() {
+            if (this.currentSpeed <= 0) return '0 B/s';
+            return bytesToSize(this.currentSpeed) + '/s';
+        },
+
+        etaFormatted() {
+            if (this.estimatedTimeRemaining === null) return 'Calculating...';
+            const seconds = Math.floor(this.estimatedTimeRemaining);
+            if (seconds < 1) return '< 1s';
+            if (seconds < 60) return `${seconds}s`;
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
         }
     },
     watch: {
@@ -289,6 +316,7 @@ export default {
                 this.lastUpdated = now;
                 this.updateFileStatus(file.upload.uuid, 'uploading', progress);
                 file.deltaBytesSent = bytesSent;
+                this.updateSpeedAndEta(now);
             }
         })
         .on("addedfile", (file) => {
@@ -380,6 +408,29 @@ export default {
         }
     },
     methods: {
+        updateSpeedAndEta(now) {
+            this.speedHistory.push({ time: now, bytes: this.totalBytesSent });
+
+            // Keep only samples from the last 5 seconds
+            const windowMs = 5000;
+            const cutoff = now - windowMs;
+            while (this.speedHistory.length > 0 && this.speedHistory[0].time < cutoff) {
+                this.speedHistory.shift();
+            }
+
+            if (this.speedHistory.length < 2) return;
+
+            const oldest = this.speedHistory[0];
+            const newest = this.speedHistory[this.speedHistory.length - 1];
+            const elapsed = newest.time - oldest.time;
+            if (elapsed <= 0) return;
+
+            this.currentSpeed = ((newest.bytes - oldest.bytes) / elapsed) * 1000;
+
+            const remaining = this.totalBytes - this.totalBytesSent;
+            this.estimatedTimeRemaining = this.currentSpeed > 0 ? remaining / this.currentSpeed : null;
+        },
+
         updateFileStatus(id, status, progress, errorMessage = '') {
             if (this.fileList[id]) {
                 this.fileList[id].status = status;
@@ -408,6 +459,9 @@ export default {
             this.activeFilter = 'all';
             this.uploadStartTime = null;
             this.uploadEndTime = null;
+            this.speedHistory = [];
+            this.currentSpeed = 0;
+            this.estimatedTimeRemaining = null;
             if (this.dz) this.dz.removeAllFiles(true);
         },
 
@@ -525,7 +579,6 @@ export default {
     flex-shrink: 0;
     padding: var(--ddb-spacing-md) var(--ddb-spacing-lg);
     border-bottom: var(--ddb-border-width) solid var(--ddb-border);
-    background-color: var(--ddb-bg-light);
 }
 
 .upload-filters {
@@ -542,7 +595,7 @@ export default {
     background: var(--ddb-bg-surface);
     border-radius: var(--ddb-radius-sm);
     cursor: pointer;
-    font-size: var(--ddb-font-size-sm);
+    font-size: var(--ddb-font-size-base);
     transition: all 0.2s;
 }
 
@@ -554,7 +607,7 @@ export default {
     background-color: var(--ddb-border-separator);
     padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs);
     border-radius: var(--ddb-radius-md);
-    font-size: var(--ddb-font-size-sm);
+    font-size: var(--ddb-font-size-base);
     font-weight: 600;
     min-width: 1.25rem;
     text-align: center;
@@ -650,7 +703,6 @@ export default {
     flex-shrink: 0;
     padding: var(--ddb-spacing-md) var(--ddb-spacing-lg);
     border-top: var(--ddb-border-width) solid var(--ddb-border);
-    background-color: var(--ddb-bg-light);
 }
 
 .total-progress-container {
@@ -660,9 +712,21 @@ export default {
 .progress-info {
     display: flex;
     justify-content: space-between;
-    font-size: 0.75rem;
+    font-size: var(--ddb-font-size-base);
     color: var(--ddb-text-secondary);
     margin-bottom: 0.25rem;
+}
+
+.progress-speed-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--ddb-font-size-base);
+    color: var(--ddb-text-secondary);
+    margin-bottom: 0.25rem;
+}
+
+.progress-speed-info i {
+    margin-right: 0.25rem;
 }
 
 .total-progress-bar {
@@ -689,6 +753,7 @@ export default {
     flex: 1;
     font-size: var(--ddb-font-size-base);
     display: flex;
+    align-items: center;
     gap: var(--ddb-spacing-sm);
 }
 
@@ -754,7 +819,6 @@ export default {
 
 /* Upload summary */
 .upload-summary {
-    background-color: var(--ddb-bg-light);
     border-radius: var(--ddb-radius-sm);
 }
 
@@ -789,7 +853,6 @@ export default {
 .upload-summary .upload-result {
     text-align: center;
     padding-top: var(--ddb-spacing-md);
-    border-top: var(--ddb-border-width) solid var(--ddb-border-separator);
     margin-top: var(--ddb-spacing-xs);
 }
 </style>
