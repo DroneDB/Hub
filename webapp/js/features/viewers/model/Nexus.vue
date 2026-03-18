@@ -8,7 +8,7 @@
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
-        <div class="container">
+        <div class="container-wrapper">
             <canvas ref="canvas"></canvas>
 
             <!-- Settings gear button (bottom-left) -->
@@ -330,14 +330,14 @@ export default {
     margin: 0.5rem;
 }
 
-#nexus .container {
+#nexus .container-wrapper {
     display: flex;
     width: 100%;
     height: 100%;
     position: relative;
 }
 
-#nexus .container canvas {
+#nexus .container-wrapper canvas {
     display: flex;
     width: 100%;
     height: 100%;
