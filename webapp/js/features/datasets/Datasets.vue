@@ -51,7 +51,7 @@
                                             {{ orgInfo?.isPublic ? 'Public' : 'Private' }}
                                         </Tag>
                                         <Tag rounded severity="info" icon="fa-solid fa-database">
-                                            {{ filteredDatasets.length }} dataset{{ filteredDatasets.length !== 1 ? 's' : '' }}
+                                            {{ filteredDatasets.length }}
                                         </Tag>
                                         <Tag v-if="userRole" rounded severity="contrast" icon="fa-solid fa-shield-halved">
                                             {{ userRole }}

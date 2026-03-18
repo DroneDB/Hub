@@ -13,7 +13,7 @@
                             <div class="org-title-row">
                                 <h1 class="my-0">Organizations</h1>
                                 <Tag rounded severity="info" icon="fa-solid fa-layer-group">
-                                    {{ filteredOrganizations.length }} org{{ filteredOrganizations.length !== 1 ? 's' : '' }}
+                                    {{ filteredOrganizations.length }}
                                 </Tag>
                                 <label class="d-flex align-items-center gap-2 ms-2">
                                     <ToggleSwitch v-model="showAll" />
