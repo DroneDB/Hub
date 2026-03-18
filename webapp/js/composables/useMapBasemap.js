@@ -5,6 +5,9 @@
 import { Tile as TileLayer } from 'ol/layer';
 import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
+import TileGrid from 'ol/tilegrid/TileGrid';
+import { get as getProjection } from 'ol/proj';
+import { getWidth } from 'ol/extent';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 
 export default {
@@ -25,12 +28,28 @@ export default {
                 if (config && config.url) {
                     const attributions = config.attribution ? [config.attribution] : [];
                     if (config.sourceType === 'wms') {
+                        const wmsParams = { LAYERS: config.layerName, TILED: true, STYLES: '' };
+                        if (config.defaultTime) wmsParams.TIME = config.defaultTime;
+                        const tileSize = config.tileSize || 256;
+                        const sourceOpts = {
+                            url: config.url,
+                            params: wmsParams,
+                            attributions: attributions
+                        };
+                        if (tileSize !== 256) {
+                            const projection = getProjection('EPSG:3857');
+                            const projExtent = projection.getExtent();
+                            const size = getWidth(projExtent) / tileSize;
+                            const resolutions = [];
+                            for (let z = 0; z < 21; z++) resolutions.push(size / Math.pow(2, z));
+                            sourceOpts.tileGrid = new TileGrid({
+                                extent: projExtent,
+                                resolutions: resolutions,
+                                tileSize: [tileSize, tileSize]
+                            });
+                        }
                         return new TileLayer({
-                            source: new TileWMS({
-                                url: config.url,
-                                params: { LAYERS: config.layerName, TILED: true },
-                                attributions: attributions
-                            })
+                            source: new TileWMS(sourceOpts)
                         });
                     } else {
                         return new TileLayer({

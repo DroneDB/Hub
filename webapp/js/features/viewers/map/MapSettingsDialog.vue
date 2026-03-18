@@ -33,6 +33,12 @@
                             :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'" text />
                     </div>
                 </div>
+                <div v-if="customSourceType === 'wms'" class="setting-row">
+                    <label class="setting-label align-items-baseline">
+                        Tile Size
+                    </label>
+                    <Select v-model="customTileSize" :options="tileSizeOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                </div>
                 <div v-if="customError" class="custom-error">
                     <i class="fa-solid fa-triangle-exclamation"></i> {{ customError }}
                 </div>
@@ -95,6 +101,7 @@ export default {
             customSourceType: config ? config.sourceType : 'xyz',
             customUrl: config ? config.url : '',
             customLayerName: config ? config.layerName : '',
+            customTileSize: config && config.tileSize ? config.tileSize : 256,
             wmsLayers: config && config.wmsLayers ? config.wmsLayers : [],
             wmsLayersLoading: false,
             customLoading: false,
@@ -102,6 +109,10 @@ export default {
             sourceTypeOptions: [
                 { label: 'XYZ Tiles', value: 'xyz' },
                 { label: 'WMS', value: 'wms' }
+            ],
+            tileSizeOptions: [
+                { label: '256 x 256', value: 256 },
+                { label: '512 x 512', value: 512 }
             ],
             unitOptions: [
                 { label: 'Metric', value: 'metric' },
@@ -136,6 +147,7 @@ export default {
                 this.customSourceType = config.sourceType || 'xyz';
                 this.customUrl = config.url || '';
                 this.customLayerName = config.layerName || '';
+                this.customTileSize = config.tileSize || 256;
             }
         }
     },
@@ -182,6 +194,7 @@ export default {
         onSourceTypeChanged: function () {
             this.wmsLayers = [];
             this.customLayerName = '';
+            this.customTileSize = 256;
             this.customError = null;
         },
 
@@ -245,9 +258,28 @@ export default {
                             const nameEl = el.querySelector(':scope > Name');
                             if (nameEl) {
                                 const titleEl = el.querySelector(':scope > Title');
+                                // Extract TIME dimension default value if present
+                                let defaultTime = '';
+                                const dims = el.querySelectorAll(':scope > Dimension');
+                                dims.forEach(dim => {
+                                    if ((dim.getAttribute('name') || '').toLowerCase() === 'time') {
+                                        defaultTime = dim.getAttribute('default') || '';
+                                        if (!defaultTime) {
+                                            // Fallback: use last value from extent text
+                                            const extent = (dim.textContent || '').trim();
+                                            if (extent) {
+                                                const parts = extent.split(',');
+                                                const last = parts[parts.length - 1].trim();
+                                                // Extract first ISO date from range (e.g. "2026-03-12T12:28:18Z/...")
+                                                defaultTime = last.split('/')[0];
+                                            }
+                                        }
+                                    }
+                                });
                                 layers.push({
                                     name: nameEl.textContent,
-                                    title: titleEl ? titleEl.textContent : ''
+                                    title: titleEl ? titleEl.textContent : '',
+                                    defaultTime: defaultTime
                                 });
                             }
                         });
@@ -273,11 +305,17 @@ export default {
         buildTestUrl: function (config) {
             if (config.sourceType === 'wms') {
                 const separator = config.url.includes('?') ? '&' : '?';
-                return config.url + separator +
+                const size = config.tileSize || 256;
+                let testParams = config.url + separator +
                     'SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1' +
                     '&LAYERS=' + encodeURIComponent(config.layerName) +
+                    '&STYLES=' +
                     '&SRS=EPSG:3857&BBOX=0,0,20037508,20037508' +
-                    '&WIDTH=256&HEIGHT=256&FORMAT=image/png&TILED=true';
+                    '&WIDTH=' + size + '&HEIGHT=' + size + '&FORMAT=image/png&TILED=true';
+                if (config.defaultTime) {
+                    testParams += '&TIME=' + encodeURIComponent(config.defaultTime);
+                }
+                return testParams;
             } else {
                 return config.url
                     .replace('{z}', '0')
@@ -325,10 +363,19 @@ export default {
             const attribution = this.getAttributionFromUrl(url);
 
             try {
+                // Find the selected layer's defaultTime if available
+                let defaultTime = '';
+                if (this.customSourceType === 'wms' && this.wmsLayers.length > 0) {
+                    const sel = this.wmsLayers.find(l => l.name === this.customLayerName);
+                    if (sel && sel.defaultTime) defaultTime = sel.defaultTime;
+                }
+
                 const config = {
                     sourceType: this.customSourceType,
                     url: url,
                     layerName: this.customSourceType === 'wms' ? this.customLayerName : '',
+                    tileSize: this.customSourceType === 'wms' ? this.customTileSize : 256,
+                    defaultTime: defaultTime,
                     attribution: attribution,
                     wmsLayers: this.customSourceType === 'wms' ? this.wmsLayers : []
                 };

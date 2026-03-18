@@ -774,7 +774,9 @@ export default {
 
             // Setup tooltip overlay for vector features
             this.setupTooltipOverlay();
-            this.map.addOverlay(this.tooltipOverlay); this.map.once("postrender", () => {
+            this.map.addOverlay(this.tooltipOverlay);
+
+            this.map.once("postrender", () => {
                 this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
             });
             // Add pointer move handler for tooltips
