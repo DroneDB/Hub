@@ -1128,12 +1128,15 @@ export default {
 
 .lightbox-toolbar-extra {
     position: fixed;
-    top: var(--ddb-spacing-sm);
-    right: var(--ddb-spacing-2xl);
+    right: 90px;
+    background: rgba(35,35,35,.65);
+    top: 0px;
+    height: 45px;
+    width: 45px;
     z-index: 1000000001;
     display: flex;
     align-items: center;
-    gap: var(--ddb-spacing-xs);
+    justify-content: center;
 }
 
 .lightbox-direct-link,
@@ -1188,6 +1191,7 @@ export default {
 .lightbox-info-coords,
 .lightbox-info-altitude {
     display: flex;
+    align-items: center;
     opacity: 0.9;
 }
 </style>
