@@ -59,6 +59,7 @@ import PrimeMessage from 'primevue/message';
 import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '@/libs/api/registryUtils';
 import { getOpenAfterCreatePreference, saveOpenAfterCreatePreference } from '@/libs/storageUtils';
+import { Visibility } from 'ddb';
 
 var re = /^[a-z0-9\-_]+$/;
 
@@ -88,15 +89,15 @@ export default {
             ds: {
                 slug: null,
                 name: null,
-                visibility: 0,
+                visibility: Visibility.PRIVATE,
                 tagline: ''
             },
             title: null,
             openAfterCreate: getOpenAfterCreatePreference(),
             visibilityOptions: [
-                { value: 0, label: 'Private' },
-                { value: 1, label: 'Unlisted' },
-                { value: 2, label: 'Public' }
+                { value: Visibility.PRIVATE, label: 'Private' },
+                { value: Visibility.UNLISTED, label: 'Unlisted' },
+                { value: Visibility.PUBLIC, label: 'Public' }
             ]
         };
     }, mounted: function () {
@@ -109,14 +110,14 @@ export default {
 
             this.ds.slug = this.model.slug;
             this.ds.name = this.model.name;
-            this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : 0;
+            this.ds.visibility = this.model.visibility !== undefined ? this.model.visibility : Visibility.PRIVATE;
             this.ds.tagline = this.model.tagline || '';
         } else {
             this.title = "Create new dataset";
 
             this.ds.slug = null;
             this.ds.name = null;
-            this.ds.visibility = 0;
+            this.ds.visibility = Visibility.PRIVATE;
             this.ds.tagline = '';
         }
     }, methods: {

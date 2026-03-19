@@ -162,16 +162,6 @@ const ddb = {
             });
         };
 
-        this.chattr = async function (ddbPath, attrs = {}) {
-            console.warn("DEPRECATED call to chattr (please use meta.set instead)")
-            return new Promise((resolve, reject) => {
-                n.chattr(ddbPath, attrs, (err, attrs) => {
-                    if (err) reject(err);
-                    else resolve(attrs);
-                });
-            });
-        };
-
         this.delta = async function (sourceStamp, targetStamp) {
             return new Promise((resolve, reject) => {
                 n.delta(JSON.stringify(sourceStamp), JSON.stringify(targetStamp), (err, delta) => {
@@ -202,7 +192,7 @@ const ddb = {
         this.meta = {
             add: async function(ddbPath, path, key, data){
                 if (path === undefined || path === null) path = "";
-                
+
                 return new Promise((resolve, reject) => {
                     n.metaAdd(ddbPath, path, key, JSON.stringify(data), (err, meta) => {
                         if (err) reject(err);
@@ -296,7 +286,7 @@ const ddb = {
             _shFileOperation: async function(operation, from, to, opts = {}){
                 if (typeof from === 'string') from = [from];
                 if (!opts.winId && this._winId) opts.winId = this._winId;
-    
+
                 return new Promise((resolve, reject) => {
                     // Black magic: allow progress windows to appear in the foreground!
                     n._shell_AltPress();

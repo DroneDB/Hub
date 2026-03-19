@@ -108,8 +108,8 @@
                 </Column>
                 <Column field="visibility" header="Visibility" :sortable="true" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
-                        <Tag v-if="slotProps.data.visibility === 2" severity="success" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
-                        <Tag v-else-if="slotProps.data.visibility === 1" severity="info" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
+                        <Tag v-if="slotProps.data.visibility === Visibility.PUBLIC" severity="success" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
+                        <Tag v-else-if="slotProps.data.visibility === Visibility.UNLISTED" severity="info" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                         <Tag v-else severity="warn" icon="fa-solid fa-lock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                     </template>
                 </Column>
@@ -191,6 +191,7 @@ import Badge from 'primevue/badge';
 import PrimeContextMenu from 'primevue/contextmenu';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import { Visibility } from 'ddb';
 
 export default {
     components: {
@@ -220,6 +221,7 @@ export default {
         const prefs = getDatasetTablePreferences();
 
         return {
+            Visibility,
             skeletonRows: new Array(5).fill({}),
             error: "",
             datasets: [],
@@ -266,7 +268,7 @@ export default {
                 return {
                     slug: ds.slug,
                     creationDate: Date.parse(ds.creationDate),
-                    visibility: ds.properties?.meta?.visibility?.data !== undefined ? ds.properties?.meta?.visibility?.data : 0,
+                    visibility: ds.properties?.meta?.visibility?.data !== undefined ? ds.properties?.meta?.visibility?.data : Visibility.PRIVATE,
                     entries: ds.properties.entries,
                     size: ds.size,
                     editing: false,
@@ -467,8 +469,8 @@ export default {
         },
 
         getVisibilityText(visibility) {
-            if (visibility === 2) return 'Public';
-            if (visibility === 1) return 'Unlisted';
+            if (visibility === Visibility.PUBLIC) return 'Public';
+            if (visibility === Visibility.UNLISTED) return 'Unlisted';
             return 'Private';
         },
 
@@ -543,7 +545,7 @@ export default {
             this.dsDialogModel = {
                 slug: ds.slug,
                 name: ds.name || ds.slug, // Use slug as fallback if name is not available
-                visibility: ds.visibility !== undefined ? ds.visibility : 0,
+                visibility: ds.visibility !== undefined ? ds.visibility : Visibility.PRIVATE,
                 tagline: ds.tagline || ''
             };
             this.dsDialogMode = "edit";

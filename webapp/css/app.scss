@@ -79,41 +79,9 @@ body {
 }
 
 // ============================================================
-// Form styles removed — use PrimeVue form components:
-// InputText, Password, Select, Textarea, Checkbox, etc.
-// ============================================================
-
-.input-group {
-    position: relative;
-    display: flex;
-    align-items: center;
-
-    input {
-        flex: 1;
-        padding-left: var(--ddb-spacing-2xl);
-    }
-
-    i {
-        position: absolute;
-        left: var(--ddb-spacing-md);
-        opacity: 0.5;
-        color: rgba(0, 0, 0, 0.87);
-    }
-}
-
-// ============================================================
 // Badge styles removed — use PrimeVue Tag component:
 // <Tag severity="warning" value="Owner" />
 // ============================================================
-
-// ============================================================
-// Divider (replacing Semantic UI divider)
-// ============================================================
-.divider {
-    border: none;
-    border-top: var(--ddb-border-width) solid var(--ddb-border-light);
-    margin: var(--ddb-spacing-lg) 0;
-}
 
 // ============================================================
 // Text helpers
@@ -135,38 +103,6 @@ body {
 // Alignment utilities removed — use Bootstrap text-start/center/end
 // Float utilities removed — use Bootstrap float-start/float-end
 // ============================================================
-
-// --- Segments (grouped card-like containers) ---
-.ui.segments {
-    border: var(--ddb-border-width) solid var(--ddb-border-light);
-    border-radius: var(--ddb-radius-sm);
-    box-shadow: var(--ddb-shadow-sm);
-    margin: var(--ddb-spacing-lg) 0;
-    background: var(--ddb-bg-surface);
-
-    > .ui.segment {
-        border-top: var(--ddb-border-width) solid var(--ddb-border-light);
-        border-radius: 0;
-        box-shadow: none;
-        border-left: none;
-        border-right: none;
-        border-bottom: none;
-        margin: 0;
-
-        &:first-child {
-            border-top: none;
-        }
-    }
-}
-
-// Segment (standalone)
-.ui.segment {
-    padding: var(--ddb-spacing-lg);
-    background: var(--ddb-bg-surface);
-    border: var(--ddb-border-width) solid var(--ddb-border-light);
-    border-radius: var(--ddb-radius-sm);
-    box-shadow: var(--ddb-shadow-sm);
-}
 
 // --- Table ---
 .ui.table {
@@ -199,20 +135,6 @@ body {
     &.celled {
         th, td {
             border: var(--ddb-border-width) solid var(--ddb-border-light);
-        }
-    }
-
-    &.selectable tbody tr:hover {
-        background: rgba(0, 0, 0, 0.05);
-        cursor: pointer;
-    }
-
-    &.sortable th {
-        cursor: pointer;
-        user-select: none;
-
-        &:hover {
-            background: rgba(0, 0, 0, 0.05);
         }
     }
 }
@@ -299,10 +221,6 @@ body:fullscreen {
 /* Responsive breakpoints (aligned with Bootstrap) */
 
 @media only screen and (max-width: 575.98px) {
-    .mobile-hide {
-        display: none !important;
-    }
-
     body,
     button,
     input,
@@ -312,19 +230,6 @@ body:fullscreen {
         font-size: 120%;
     }
 }
-
-@media only screen and (min-width: 576px) and (max-width: 767.98px) {
-    .tablet-hide {
-        display: none !important;
-    }
-}
-
-@media only screen and (min-width: 768px) {
-    .desktop-hide {
-        display: none !important;
-    }
-}
-
 
 // ============================================================
 // Dialog / Window size classes
