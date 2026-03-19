@@ -15,7 +15,7 @@
             </Breadcrumb>
             <!--<div class="ui divider"></div>-->
         </div>
-        <div ref="tableview" id="table-view" :class="{ loading, dropping }"
+        <div ref="tableview" id="table-view" :class="{ dropping }"
             @drop="explorerDropHandler($event)"
             @dragleave="explorerDragLeave($event)"
             @dragenter="explorerDragEnter($event)"
@@ -507,11 +507,6 @@ export default {
     user-select: none;
     flex: 1;
     min-height: 0;
-}
-
-#table-view.loading {
-    opacity: 0.5;
-    pointer-events: none;
 }
 
 #table-view.dropping {
