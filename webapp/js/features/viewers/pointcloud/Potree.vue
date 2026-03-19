@@ -88,6 +88,8 @@
 <script>
 import ddb from 'ddb';
 import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import Lara from '@primevue/themes/lara';
 import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -391,6 +393,7 @@ export default {
                     self.closePropertiesDialog();
                 }
             });
+            this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
             this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
         },
 
@@ -564,6 +567,7 @@ export default {
                     self.closePropertiesDialog();
                 }
             });
+            this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
             this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
         },
 

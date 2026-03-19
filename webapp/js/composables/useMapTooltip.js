@@ -9,6 +9,8 @@ import Overlay from 'ol/Overlay';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
 import { createApp } from 'vue';
+import PrimeVue from 'primevue/config';
+import Lara from '@primevue/themes/lara';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
 
 export default {
@@ -101,6 +103,7 @@ export default {
                     document.body.removeChild(container);
                 }
             });
+            dialogApp.use(PrimeVue, { theme: { preset: Lara } });
             dialogApp.mount(container);
         },
 
