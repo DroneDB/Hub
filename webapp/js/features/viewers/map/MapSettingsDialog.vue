@@ -39,9 +39,9 @@
                     </label>
                     <Select v-model="customTileSize" :options="tileSizeOptions" optionLabel="label" optionValue="value" class="setting-select" />
                 </div>
-                <div v-if="customError" class="custom-error">
-                    <i class="fa-solid fa-triangle-exclamation"></i> {{ customError }}
-                </div>
+                <PrimeMessage v-if="customError" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
+                    {{ customError }}
+                </PrimeMessage>
                 <div class="setting-row" style="justify-content: flex-end;">
                     <Button severity="info" :disabled="!isCustomConfigValid || customLoading" @click="applyCustomConfig"
                         :icon="customLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" :label="customLoading ? 'Checking...' : 'Apply'" />
@@ -68,10 +68,11 @@ import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
+import PrimeMessage from 'primevue/message';
 
 export default {
     components: {
-        Window, Button, Select, InputText
+        Window, Button, Select, InputText, PrimeMessage
     },
 
     props: {
@@ -464,19 +465,7 @@ export default {
     margin-left: var(--ddb-spacing-sm);
 }
 
-.custom-error {
-    padding: 0.25rem 0.75rem;
-    font-size: 0.75rem;
-    color: var(--ddb-danger);
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
 
-.custom-error .icon {
-    margin: 0;
-    font-size: 0.75rem;
-}
 
 .layer-select-wrapper {
     display: flex;
