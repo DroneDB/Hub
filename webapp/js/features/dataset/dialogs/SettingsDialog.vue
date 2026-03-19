@@ -8,25 +8,27 @@
         </div>
         <div class="settings-body" v-else>
             <div class="settings-section">
-                <h4>
+                <div class="mb-2">
                     <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
                     Visibility: <Select v-model="visibility" @change="setVisibility" :options="visibilityOptions" optionLabel="label" optionValue="value" />
-                </h4>
-                <div class="settings-desc" v-html="safeDescription"></div>
+                </div>
+                <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
+                    <span v-html="safeDescription" />
+                </PrimeMessage>
             </div>
 
             <div class="settings-section">
-                <h4>
+                <div>
                     <i class="fa-solid fa-scale-balanced"></i>
                     License: <Select v-model="license" @change="setLicense" :options="licenseOptions" optionLabel="label" optionValue="value" class="license-dropdown" :title="Licenses[license].name" />
-                </h4>
+                </div>
             </div>
 
             <div class="settings-section" v-if="canWrite">
-                <h4>
+                <div class="mb-2">
                     <i class="fa-solid fa-tag"></i>
                     Tagline
-                </h4>
+                </div>
                 <div class="tagline-field">
                     <InputText v-model="tagline" maxlength="256"
                         placeholder="Brief description of your dataset (max 256 chars)"
@@ -36,10 +38,10 @@
             </div>
 
             <div class="settings-section" v-if="canWrite">
-                <h4>
+                <div class="mb-2">
                     <i class="fa-solid fa-image"></i>
                     Thumbnail
-                </h4>
+                </div>
                 <div class="thumbnail-upload">
                     <div class="thumbnail-preview-container">
                         <img v-if="thumbnailPreview && !thumbnailError"
@@ -70,18 +72,15 @@
             </div>
 
             <div class="settings-section settings-maintenance" v-if="canWrite">
-                <h4>
+                <div class="mb-2">
                     <i class="fa-solid fa-gear"></i>
                     Maintenance
-                </h4>
-                <div class="rescan-info-box">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <div>
-                        <strong>Rescan</strong> re-processes all indexed files to update their metadata
-                        (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
-                        or if file metadata appears outdated or incorrect.
-                    </div>
                 </div>
+                <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-2">
+                    <strong>Rescan</strong> re-processes all indexed files to update their metadata
+                    (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
+                    or if file metadata appears outdated or incorrect.
+                </PrimeMessage>
                 <Button @click="$emit('rescanRequested')" icon="fa-solid fa-rotate" label="Rescan Dataset" />
             </div>
         </div>
@@ -97,6 +96,7 @@ import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
+import PrimeMessage from 'primevue/message';
 import ddb from 'ddb';
 import { sanitizeHtml } from '@/libs/sanitize';
 
@@ -113,7 +113,7 @@ export default {
     },
     emits: ['onClose'],
     components: {
-        Message, Window, Button, Select, InputText
+        Message, Window, Button, Select, InputText, PrimeMessage
     },
     data: function () {
         return {
@@ -362,24 +362,7 @@ export default {
     max-width: 16rem;
 }
 
-.rescan-info-box {
-    display: flex;
-    gap: var(--ddb-spacing-sm);
-    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
-    margin-bottom: var(--ddb-spacing-md);
-    background-color: rgba(var(--ddb-primary-rgb), 0.08);
-    border: var(--ddb-border-width) solid rgba(var(--ddb-primary-rgb), 0.2);
-    border-radius: var(--ddb-radius-sm);
-    font-size: var(--ddb-font-size-sm);
-    color: var(--ddb-text-secondary);
-    line-height: 1.4;
-}
 
-.rescan-info-box > .icon {
-    color: var(--ddb-primary);
-    flex-shrink: 0;
-    margin-top: var(--ddb-spacing-xs);
-}
 
 .tagline-field {
     position: relative;

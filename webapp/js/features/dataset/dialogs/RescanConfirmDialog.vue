@@ -1,12 +1,9 @@
 <template>
     <Window title="Rescan Dataset" id="rescan-confirm" @onClose="close('cancel')" modal sizeClass="dialog-md" fixedSize>
         <div class="rescan-confirm-body">
-            <div class="warning-box">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                <div>
-                    <strong>Are you sure you want to rescan this dataset?</strong>
-                </div>
-            </div>
+            <PrimeMessage severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
+                <strong>Are you sure you want to rescan this dataset?</strong>
+            </PrimeMessage>
 
             <p>This operation will re-process all indexed files to update their metadata (GPS coordinates, timestamps, thumbnails, etc.).</p>
 
@@ -32,10 +29,11 @@
 import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 
 export default {
     components: {
-        Window, Button
+        Window, Button, PrimeMessage
     },
     emits: ['onClose'],
 
@@ -63,22 +61,7 @@ export default {
     line-height: 1.5;
 }
 
-.warning-box {
-    display: flex;
-    gap: var(--ddb-spacing-sm);
-    align-items: center;
-    padding: var(--ddb-spacing-md) var(--ddb-spacing-md);
-    margin-bottom: var(--ddb-spacing-md);
-    background-color: rgba(251, 189, 8, 0.12);
-    border: var(--ddb-border-width) solid rgba(251, 189, 8, 0.35);
-    border-radius: var(--ddb-radius-sm);
-}
 
-.warning-box > .icon {
-    color: var(--ddb-warning-text);
-    font-size: var(--ddb-font-size-lg);
-    flex-shrink: 0;
-}
 
 .side-effects {
     margin-top: var(--ddb-spacing-sm);
