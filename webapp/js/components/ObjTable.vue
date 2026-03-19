@@ -53,6 +53,10 @@ export default {
         obj: {
             required: true,
             default: null
+        },
+        preserveOrder: {
+            type: Boolean,
+            default: false
         }
     },
     data() {
@@ -91,7 +95,7 @@ export default {
 
                     // Image / GeoImage Adjustments
                     if (tObj.width !== undefined && tObj.height !== undefined) {
-                        tObj["Image Dimensions"] = `${tObj.width} x ${tObj.height}`;
+                        tObj["Dimensions"] = `${tObj.width} x ${tObj.height}`;
                         delete (tObj.width);
                         delete (tObj.height);
                     }
@@ -107,7 +111,9 @@ export default {
                         tObj.sensor = tObj.sensor.toUpperCase();
                     }
 
-                    tObj = sortObjectKeys(tObj);
+                    if (!this.preserveOrder) {
+                        tObj = sortObjectKeys(tObj);
+                    }
                 }
 
                 this.tObj = tObj;

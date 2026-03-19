@@ -35,68 +35,7 @@
             <!-- Properties section -->
             <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
-
-                <div class="ui relaxed divided list">
-                    <div class="item" v-if="!isDirectory">
-                        <div class="content">
-                            <div class="header">Size</div>
-                            <div class="description">{{ getFileSize(file) }}</div>
-                        </div>
-                    </div>
-
-                    <div class="item">
-                        <div class="content">
-                            <div class="header">Type</div>
-                            <div class="description">{{ getFileType(file) }}</div>
-                        </div>
-                    </div>
-
-                    <div class="item" v-if="file.entry.mtime">
-                        <div class="content">
-                            <div class="header">Modified</div>
-                            <div class="description">{{ getModifiedDate(file) }}</div>
-                        </div>
-                    </div>
-
-                    <div class="item">
-                        <div class="content">
-                            <div class="header">Path</div>
-                            <div class="description path-text">{{ file.entry.path }}</div>
-                        </div>
-                    </div>
-
-                    <!-- Additional metadata -->
-                    <div class="item" v-if="file.entry.hash">
-                        <div class="content">
-                            <div class="header">Hash</div>
-                            <div class="description hash-text">{{ file.entry.hash }}</div>
-                        </div>
-                    </div>
-
-                    <div class="item" v-if="file.entry && file.entry.point_geom && file.entry.point_geom.geometry && file.entry.point_geom.geometry.coordinates">
-                        <div class="content">
-                            <div class="header">Coordinates</div>
-                            <div class="description hash-text"><div v-if="file.entry.point_geom.crs && file.entry.point_geom.crs.properties && file.entry.point_geom.crs.properties.name">{{ file.entry.point_geom.crs.properties.name }}</div>{{ file.entry.point_geom.geometry.coordinates[0] }}, {{ file.entry.point_geom.geometry.coordinates[1] }}<span v-if="file.entry.point_geom.geometry.coordinates[2] !== undefined">, {{ file.entry.point_geom.geometry.coordinates[2].toFixed(2) }}m</span></div>
-                        </div>
-                    </div>
-
-                    <div class="item" v-if="file.entry.properties && file.entry.properties.meta">
-                        <div class="content">
-                            <div class="header">Metadata</div>
-                            <div class="metadata-list">
-                                <div v-for="(value, key) in file.entry.properties.meta" :key="key" class="metadata-item">
-                                    <strong>{{ formatMetaKey(key) }}:</strong> {{ formatMetaValue(value) }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Extended Properties -->
-                <div v-if="extendedProperties && Object.keys(extendedProperties).length > 0" class="extended-properties">
-                    <h5 class="ui dividing header">Extended Properties</h5>
-                    <ObjTable :obj="extendedProperties" />
-                </div>
+                <ObjTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" />
             </div>
 
             <!-- Actions section -->
@@ -206,6 +145,50 @@ export default {
                 }
             }
             return Object.keys(filtered).length > 0 ? filtered : null;
+        },
+        allProperties() {
+            if (!this.file) return null;
+            const entry = this.file.entry;
+            const props = {};
+
+            props['type'] = this.getFileType(this.file);
+            props['path'] = entry.path;
+            if (!this.isDirectory && entry.size) {
+                props['size'] = this.getFileSize(this.file);
+            }
+            if (entry.hash) {
+                props['hash'] = entry.hash;
+            }
+            if (entry.mtime) {
+                props['modified'] = this.getModifiedDate(this.file);
+            }
+            if (entry.point_geom && entry.point_geom.geometry && entry.point_geom.geometry.coordinates) {
+                const coords = entry.point_geom.geometry.coordinates;
+                let coordStr = '';
+                if (entry.point_geom.crs && entry.point_geom.crs.properties && entry.point_geom.crs.properties.name) {
+                    coordStr += entry.point_geom.crs.properties.name + ' ';
+                }
+                coordStr += coords[0] + ', ' + coords[1];
+                if (coords[2] !== undefined) {
+                    coordStr += ', ' + coords[2].toFixed(2) + 'm';
+                }
+                props['coordinates'] = coordStr;
+            }
+            if (entry.properties && entry.properties.meta) {
+                props['metadata'] = entry.properties.meta;
+            }
+
+            // Extended properties
+            if (entry.properties) {
+                const excluded = ['meta', 'permissions'];
+                for (const key in entry.properties) {
+                    if (!excluded.includes(key)) {
+                        props[key] = entry.properties[key];
+                    }
+                }
+            }
+
+            return Object.keys(props).length > 0 ? props : null;
         }
     },
     watch: {
@@ -472,34 +455,12 @@ export default {
     margin-bottom: 1.5rem;
 }
 
-.ui.list .item .content .header {
-    font-weight: bold;
-    margin-bottom: 0.25rem;
+.properties-section :deep(.ui.table) {
+    font-size: var(--ddb-font-size-sm);
 }
 
-.ui.list .item .content .description {
-    color: var(--ddb-text-secondary);
-    word-break: break-all;
-}
-
-.path-text,
-.hash-text {
-    font-family: monospace;
-    font-size: var(--ddb-font-size-base);
-}
-
-.metadata-list {
-    margin-top: 0.5rem;
-}
-
-.metadata-item {
-    padding: var(--ddb-spacing-xs) 0;
-    font-size: var(--ddb-font-size-base);
-}
-
-.metadata-item strong {
-    font-weight: bold;
-    margin-right: 0.5rem;
+.properties-section :deep(.ui.table td) {
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
 }
 
 .actions-section {
@@ -524,21 +485,5 @@ export default {
 
 .detail-panel-empty .ui.message {
     text-align: center;
-}
-
-.extended-properties {
-    margin-top: var(--ddb-spacing-lg);
-}
-
-.extended-properties h5.ui.header {
-    margin-bottom: var(--ddb-spacing-sm);
-}
-
-.extended-properties :deep(.ui.table) {
-    font-size: var(--ddb-font-size-sm);
-}
-
-.extended-properties :deep(.ui.table td) {
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
 }
 </style>
