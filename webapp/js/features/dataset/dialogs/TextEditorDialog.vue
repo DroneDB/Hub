@@ -9,40 +9,34 @@
                     <span>Loading file...</span>
                 </div>
 
-                <div v-else-if="fileTooLarge" class="error-container">
-                    <i class="fa-solid fa-triangle-exclamation" />
+                <PrimeMessage v-else-if="fileTooLarge" severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                     <p>File is too large to edit ({{ formattedSize }})</p>
-                    <p class="limit-info">Maximum size: {{ formattedMaxSize }}</p>
+                    <p class="text-muted">Maximum size: {{ formattedMaxSize }}</p>
                     <div class="d-flex justify-content-end gap-2 mt-3 w-100">
                         <Button @click="close" severity="secondary" label="Close" />
                         <Button @click="downloadFile" severity="primary" icon="fa-solid fa-download" label="Download Instead" />
                     </div>
-                </div>
+                </PrimeMessage>
 
                 <template v-else>
-                    <div class="toolbar">
-                        <div class="file-info">
-                            <i :class="['fa-solid', fileIcon]" />
-                            <span class="filename">{{ fileName }}</span>
-                            <span v-if="isModified" class="modified-indicator">*</span>
-                        </div>
-                        <div class="actions">
+                    <div class="editor-container" ref="editorContainer"></div>
+
+                    <PrimeMessage v-if="!readonly && isModified" severity="info" :closable="false" icon="fa-solid fa-circle-info">
+                        You have unsaved changes
+                    </PrimeMessage>
+
+                    <div class="footer-actions">
+                        <div class="footer-left">
                             <Button v-if="!readonly && canFormatFile" @click="formatDocument" :disabled="saving"
                                 severity="secondary" title="Format document (Shift+Alt+F)"
                                 icon="fa-solid fa-code" label="Format" />
+                        </div>
+                        <div class="footer-right">
                             <Button v-if="!readonly && isModified" @click="save" :disabled="saving"
                                 severity="info"
                                 icon="fa-solid fa-floppy-disk" :label="saving ? 'Saving...' : 'Save'" />
-                            <Button @click="close" severity="secondary"
-                                icon="fa-solid fa-xmark" label="Close" />
+                            <Button @click="close" severity="secondary" label="Close" />
                         </div>
-                    </div>
-
-                    <div class="editor-container" ref="editorContainer"></div>
-
-                    <div v-if="!readonly && isModified" class="unsaved-warning">
-                        <i class="fa-solid fa-circle-info" />
-                        You have unsaved changes
                     </div>
                 </template>
             </div>
@@ -66,8 +60,8 @@ import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
+import PrimeMessage from 'primevue/message';
 import Keyboard from '@/libs/keyboard';
-import icons from '@/libs/icons';
 import { getLanguageMode, formatFileSize, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '@/libs/textFileUtils';
 
 // CodeMirror imports
@@ -84,7 +78,8 @@ export default {
         Window,
         Message,
         ConfirmDialog,
-        Button
+        Button,
+        PrimeMessage
     },
 
     props: {
@@ -126,11 +121,6 @@ export default {
             if (!this.entry || !this.entry.path) return '';
             const parts = this.entry.path.split('/');
             return parts[parts.length - 1];
-        },
-
-        fileIcon() {
-            if (!this.entry) return 'file outline';
-            return icons.getForType(this.entry.type);
         },
 
         isModified() {
@@ -356,8 +346,7 @@ export default {
     min-height: 25rem;
 }
 
-.loading-container,
-.error-container {
+.loading-container {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -366,47 +355,21 @@ export default {
     color: var(--ddb-text-secondary);
 }
 
-.loading-container i,
-.error-container i {
+.loading-container i {
     font-size: 2rem;
     margin-bottom: var(--ddb-spacing-sm);
 }
 
-.error-container i {
-    color: var(--ddb-danger);
-}
-
-.error-container .limit-info {
-    font-size: var(--ddb-font-size-base);
-    color: var(--ddb-text-muted);
-}
-
-.toolbar {
+.footer-actions {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
-    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
+    border-top: var(--ddb-border-width) solid var(--ddb-border);
     flex-shrink: 0;
 }
 
-.file-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.file-info .filename {
-    font-weight: 500;
-}
-
-.modified-indicator {
-    color: var(--ddb-warning);
-    font-weight: bold;
-    font-size: var(--ddb-font-size-lg);
-}
-
-.actions {
+.footer-right {
     display: flex;
     gap: 0.5rem;
 }
@@ -419,16 +382,5 @@ export default {
     margin: var(--ddb-spacing-sm);
 }
 
-.unsaved-warning {
-    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
-    background: var(--ddb-warning-bg);
-    border-top: var(--ddb-border-width) solid var(--ddb-warning);
-    color: var(--ddb-warning-text);
-    font-size: var(--ddb-font-size-base);
-    flex-shrink: 0;
-}
 
-.unsaved-warning i {
-    margin-right: var(--ddb-spacing-xs);
-}
 </style>
