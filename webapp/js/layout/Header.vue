@@ -53,9 +53,9 @@
                                 <td v-if="storageInfo.free > 0">{{ bytes(storageInfo.free) }}</td>
                             </tr></tbody>
                         </table>
-                        <div v-if="storageInfo.free <= 0" class="storage-warning">
-                            <i class="fa-solid fa-triangle-exclamation"></i> No storage left!
-                        </div>
+                        <PrimeMessage v-if="storageInfo.free <= 0" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
+                            No storage left!
+                        </PrimeMessage>
                     </template>
                     <template v-else>
                         <table style="width: 100%; margin-bottom: 0; color: var(--ddb-text-secondary);">
@@ -95,6 +95,7 @@ import emitter from '@/libs/eventBus';
 import Button from 'primevue/button';
 import Menu from 'primevue/menu';
 import ProgressBar from 'primevue/progressbar';
+import PrimeMessage from 'primevue/message';
 
 export default {
     components: {
@@ -102,7 +103,8 @@ export default {
         ConfirmDialog,
         Button,
         Menu,
-        ProgressBar
+        ProgressBar,
+        PrimeMessage
     },
     data: function () {
 
@@ -491,13 +493,6 @@ export default {
         font-size: var(--ddb-font-size-lg);
         font-weight: bold;
         margin-bottom: var(--ddb-spacing-xs);
-    }
-
-    .storage-warning {
-        margin-top: var(--ddb-spacing-sm);
-        color: var(--ddb-danger);
-        font-weight: bold;
-        font-size: var(--ddb-font-size-base);
     }
 }
 </style>
