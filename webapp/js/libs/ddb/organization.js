@@ -11,8 +11,10 @@ module.exports = class Organization {
         this.org = org;
     }
 
-    async datasets() {
-        return this.registry.getRequest(`/orgs/${this.org}/ds`);
+    async datasets(opts) {
+        let url = `/orgs/${this.org}/ds`;
+        if (opts?.includeThumbnailCheck) url += '?includeThumbnailCheck=true';
+        return this.registry.getRequest(url);
     }
 
     async info(){

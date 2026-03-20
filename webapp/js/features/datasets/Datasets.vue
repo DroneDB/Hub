@@ -264,7 +264,7 @@ export default {
             this.orgInfo = orgInfo;
             setTitle(this.orgName);
 
-            const tmp = await this.org.datasets(); this.datasets = tmp.map(ds => {
+            const tmp = await this.org.datasets({ includeThumbnailCheck: true }); this.datasets = tmp.map(ds => {
                 return {
                     slug: ds.slug,
                     creationDate: Date.parse(ds.creationDate),
@@ -276,6 +276,7 @@ export default {
                     name: ds.properties?.meta?.name?.data,
                     tagline: ds.properties?.meta?.tagline?.data || '',
                     permissions: ds.permissions,
+                    hasThumbnail: ds.hasThumbnail === true,
                     thumbError: false,
                     thumbLoaded: false,
                     thumbUrl: '/images/dataset-placeholder.svg'
@@ -716,6 +717,7 @@ export default {
             this.datasets.forEach(ds => this.preloadDatasetThumbnail(ds));
         },
         preloadDatasetThumbnail(ds) {
+            if (!ds.hasThumbnail) return;
             const url = this.getDatasetThumbUrl(ds);
             const img = new Image();
             img.onload = () => {
