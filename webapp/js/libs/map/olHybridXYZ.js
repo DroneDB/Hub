@@ -27,7 +27,7 @@ function genTileFSLoadFunction(filePath, minZoom) {
     };
 }
 
-function genTileDDBLoadFunction(ddbUri, minZoom) {
+function genTileDDBLoadFunction(ddbUri, minZoom, vizParams) {
     const [dataset, path] = ddb.utils.datasetPathFromUri(ddbUri);
 
     return (tile, src) => {
@@ -46,7 +46,11 @@ function genTileDDBLoadFunction(ddbUri, minZoom) {
                 console.error(e);
                 tile.setState(TileState.ERROR);
             };
-            tile.getImage().src = dataset.tileUrl(path, tz, tx, ty);
+            if (vizParams && Object.keys(vizParams).length > 0) {
+                tile.getImage().src = dataset.tileExUrl(path, tz, tx, ty, vizParams);
+            } else {
+                tile.getImage().src = dataset.tileUrl(path, tz, tx, ty);
+            }
         }
     };
 }
@@ -62,16 +66,18 @@ class HybridXYZ extends XYZ {
             delete (opt_options.minZoom);
         }
         const url = opt_options.url;
+        const vizParams = opt_options.vizParams || null;
 
         // Override opt_options.url to a dummy URL
         // so that we can send parallel tile requests
         opt_options.url = "https://{z}/{x}/{y}";
+        delete opt_options.vizParams;
         super(opt_options);
 
         if (isFS) {
             this.tileLoadFunction = genTileFSLoadFunction(url, minZoom).bind(this);
         } else if (isDDB) {
-            this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom).bind(this);
+            this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom, vizParams).bind(this);
         }
     }
 };

@@ -64,6 +64,55 @@ module.exports = class Dataset {
         return url;
     }
 
+    tileExUrl(path, tz, tx, ty, vizParams = {}, options = {}) {
+        let retina = "";
+        if (options.retina) retina = "@2x";
+
+        let url = `${this.baseApi}/tiles-ex/${tz}/${tx}/${ty}${retina}.webp?path=${encodeURIComponent(path)}`;
+        if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;
+        if (vizParams.bands) url += `&bands=${encodeURIComponent(vizParams.bands)}`;
+        if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;
+        if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
+        if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
+        if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        return url;
+    }
+
+    thumbExUrl(path, size, vizParams = {}) {
+        let url = `${this.baseApi}/thumb-ex?path=${encodeURIComponent(path)}`;
+        if (size) url += `&size=${size}`;
+        if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;
+        if (vizParams.bands) url += `&bands=${encodeURIComponent(vizParams.bands)}`;
+        if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;
+        if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
+        if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
+        if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        return url;
+    }
+
+    async getRasterInfo(path) {
+        return this.registry.getRequest(`${this.baseApi}/raster-info?path=${encodeURIComponent(path)}`);
+    }
+
+    async getRasterMetadata(path, formula, bandFilter) {
+        let url = `${this.baseApi}/raster-metadata?path=${encodeURIComponent(path)}`;
+        if (formula) url += `&formula=${encodeURIComponent(formula)}`;
+        if (bandFilter) url += `&bandFilter=${encodeURIComponent(bandFilter)}`;
+        return this.registry.getRequest(url);
+    }
+
+    async validateMergeMultispectral(paths) {
+        return this.registry.postRequest(`${this.baseApi}/merge-multispectral/validate`, { paths });
+    }
+
+    async previewMergeMultispectral(paths, previewBands, thumbSize) {
+        return this.registry.postRequest(`${this.baseApi}/merge-multispectral/preview`, { paths, previewBands, thumbSize });
+    }
+
+    async mergeMultispectral(paths, outputPath) {
+        return this.registry.postRequest(`${this.baseApi}/merge-multispectral`, { paths, outputPath });
+    }
+
     Entry(fileEntry) {
         return new Entry(this, fileEntry);
     }

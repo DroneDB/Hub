@@ -116,6 +116,21 @@ function openPdfItem(ctx) {
     };
 }
 
+function plantHealthItem(ctx) {
+    return {
+        label: 'Plant Health',
+        icon: 'fa-solid fa-leaf',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GEORASTER;
+        },
+        click: () => {
+            const sel = ctx.getSelectedEntries();
+            if (sel.length === 1) ctx.emit('openItem', sel[0], 'planthealth');
+        }
+    };
+}
+
 function editItem(ctx) {
     return {
         label: 'Edit',
@@ -300,7 +315,8 @@ function buildViewerMenuItems(ctx) {
         openModelItem(ctx),
         openPanoramaItem(ctx),
         openMarkdownItem(ctx),
-        openPdfItem(ctx)
+        openPdfItem(ctx),
+        plantHealthItem(ctx)
     ];
 }
 
@@ -357,6 +373,7 @@ export {
     openPanoramaItem,
     openMarkdownItem,
     openPdfItem,
+    plantHealthItem,
     editItem,
     renameItem,
     propertiesItem,

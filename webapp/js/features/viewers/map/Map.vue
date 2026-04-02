@@ -7,6 +7,12 @@
         }">
             <olMeasure ref="measure" />
             <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
+            <PlantHealthPanel
+                :visible="plantHealthVisible"
+                :dataset="dataset"
+                :filePath="plantHealthFilePath"
+                @close="closePlantHealth"
+                @vizParamsChanged="handleVizParamsChanged" />
         </div>
         <MapDialogs
             :alertDialogOpen="alertDialogOpen"
@@ -97,6 +103,7 @@ import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
 import Toolbar from '@/components/Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
+import PlantHealthPanel from './PlantHealthPanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
@@ -125,7 +132,7 @@ import emitter from '@/libs/eventBus';
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
+        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
     },
     emits: ['scrollTo', 'openItem'],
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
@@ -270,7 +277,10 @@ export default {
             rasterOpacity: 1.0,
             hasRasters: false,
             measurementListDialogOpen: false,
-            measurementListItems: []
+            measurementListItems: [],
+            plantHealthVisible: false,
+            plantHealthFilePath: null,
+            currentVizParams: {}
         };
     },
     mounted: function () {
@@ -1895,6 +1905,52 @@ export default {
                 this.measureControls.applyUnitsChange(newUnit);
                 this.currentUnitPref = newUnit;
             }
+        },
+
+        openPlantHealth(file) {
+            if (!file || !file.entry) return;
+            this.plantHealthFilePath = file.entry.path;
+            this.plantHealthVisible = true;
+        },
+
+        closePlantHealth() {
+            this.plantHealthVisible = false;
+            this.plantHealthFilePath = null;
+            this.currentVizParams = {};
+            this.refreshRasterLayers();
+        },
+
+        handleVizParamsChanged(params) {
+            this.currentVizParams = params;
+            this.refreshRasterLayers();
+        },
+
+        refreshRasterLayers() {
+            // Refresh all raster tile layers with current vizParams
+            if (!this.rasterLayer) return;
+
+            this.rasterLayer.getLayers().forEach(layer => {
+                if (!layer.file) return;
+                const source = layer.getSource();
+                if (!source) return;
+
+                // Only apply vizParams to the file that has plant health open
+                const vizParams = (this.plantHealthFilePath &&
+                    layer.file.entry && layer.file.entry.path === this.plantHealthFilePath)
+                    ? this.currentVizParams : {};
+
+                // Re-create the source with new vizParams
+                const extent = layer.getExtent();
+                const newSource = new HybridXYZ({
+                    url: layer.file.path,
+                    tileSize: 256,
+                    transition: 200,
+                    minZoom: 14,
+                    maxZoom: 22,
+                    vizParams: Object.keys(vizParams).length > 0 ? vizParams : undefined
+                });
+                layer.setSource(newSource);
+            });
         }
     }
 }

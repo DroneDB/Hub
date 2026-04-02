@@ -37,7 +37,7 @@
                         @openAsText="handleOpenAsText" @error="handleError" />
                 </template>
                 <template v-slot:map>
-                    <Map lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
+                    <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
                         @openItem="handleOpenItem" />
                 </template>
                 <template v-slot:explorer>
@@ -626,6 +626,19 @@ export default {
             }
 
             if (view) {
+                // Plant Health opens the map tab with the panel
+                if (view === 'planthealth') {
+                    if (this.$refs.mainTabSwitcher) {
+                        this.$refs.mainTabSwitcher.selectTab('map');
+                    }
+                    this.$nextTick(() => {
+                        if (this.$refs.mapViewer && this.$refs.mapViewer.openPlantHealth) {
+                            this.$refs.mapViewer.openPlantHealth(node);
+                        }
+                    });
+                    return;
+                }
+
                 // Pre-opening check of file availability
                 try {
                     const availability = await FileAvailabilityChecker.check(
