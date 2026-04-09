@@ -4,6 +4,13 @@
 
         <div ref="map-container" class="map-container">
             <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
+            <PlantHealthPanel
+                :visible="plantHealthVisible"
+                :dataset="dataset"
+                :filePath="plantHealthFilePath"
+                :initialParams="plantHealthInitialParams"
+                @close="closePlantHealth"
+                @vizParamsChanged="handleVizParamsChanged" />
         </div>
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
             :basemaps="basemaps"
@@ -50,6 +57,7 @@ import * as flatgeobuf from 'flatgeobuf';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import OpacityControl from './OpacityControl.vue';
+import PlantHealthPanel from './PlantHealthPanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
@@ -66,12 +74,13 @@ import mapAlertFlash from '@/composables/useMapAlertFlash';
 import mapBasemap from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
 import mapMeasurements from '@/composables/useMapMeasurements';
+import mapPlantHealth from '@/composables/usePlantHealth';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
+        Map, TabViewLoader, OpacityControl, PlantHealthPanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
     },
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth],
     props: ["uri"],
     data: function () {
         return {
@@ -178,9 +187,10 @@ export default {
                         transition: 200,
                         minZoom: 14,
                         maxZoom: 22
-                        // TODO: get min/max zoom from file
                     })
                 });
+                tileLayer.entryPath = entry.path;
+                tileLayer.ddbUrl = this.ddbURI;
                 rasters.push(tileLayer);
                 this.hasRasters = true;
                 extendExtent(ext, extent);
@@ -260,6 +270,21 @@ export default {
                     }
                 });
                 controlContainer.appendChild(fsBtn);
+            }
+
+            // Plant Health button (for GEORASTER files)
+            if (entry.type === ddb.entry.type.GEORASTER) {
+                const phBtn = document.createElement('button');
+                phBtn.title = 'Plant Health';
+                phBtn.innerHTML = '<i class="fa-solid fa-leaf"></i>';
+                phBtn.addEventListener('click', () => {
+                    if (this.plantHealthVisible) {
+                        this.closePlantHealth();
+                    } else {
+                        this.openPlantHealth(entry.path);
+                    }
+                });
+                controlContainer.appendChild(phBtn);
             }
 
             this.map.addControl(new Control({ element: controlContainer }));
@@ -372,6 +397,11 @@ export default {
 
             // Register keyboard handler
             Keyboard.onKeyDown(this.handleKeyDown);
+
+            // Restore Plant Health state from URL hash
+            if (entry.type === ddb.entry.type.GEORASTER) {
+                this.restorePlantHealthFromHash();
+            }
         },
 
         // Load vector layer for the entry

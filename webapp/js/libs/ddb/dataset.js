@@ -75,6 +75,7 @@ module.exports = class Dataset {
         if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
         if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
         if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        if (vizParams.stretch) url += `&stretch=${encodeURIComponent(vizParams.stretch)}`;
         return url;
     }
 
@@ -87,6 +88,7 @@ module.exports = class Dataset {
         if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
         if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
         if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        if (vizParams.stretch) url += `&stretch=${encodeURIComponent(vizParams.stretch)}`;
         return url;
     }
 
@@ -111,6 +113,17 @@ module.exports = class Dataset {
 
     async mergeMultispectral(paths, outputPath) {
         return this.registry.postRequest(`${this.baseApi}/merge-multispectral`, { paths, outputPath });
+    }
+
+    exportUrl(path, vizParams = {}) {
+        let url = `${this.baseApi}/export?path=${encodeURIComponent(path)}&format=geotiff`;
+        if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;
+        if (vizParams.bands) url += `&bands=${encodeURIComponent(vizParams.bands)}`;
+        if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;
+        if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
+        if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
+        if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
+        return url;
     }
 
     Entry(fileEntry) {

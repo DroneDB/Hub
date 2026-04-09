@@ -307,6 +307,21 @@ function selectionSeparator(ctx) {
  * Build the standard viewer context menu items.
  * These are the Open/Open Map/Open Point Cloud/etc items shared across all views.
  */
+function ndviQuickItem(ctx) {
+    return {
+        label: 'Quick NDVI',
+        icon: 'fa-solid fa-seedling',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GEORASTER;
+        },
+        click: () => {
+            const sel = ctx.getSelectedEntries();
+            if (sel.length === 1) ctx.emit('openItem', sel[0], 'planthealth', { preset: 'ndvi' });
+        }
+    };
+}
+
 function buildViewerMenuItems(ctx) {
     return [
         openItem(ctx),
@@ -316,7 +331,8 @@ function buildViewerMenuItems(ctx) {
         openPanoramaItem(ctx),
         openMarkdownItem(ctx),
         openPdfItem(ctx),
-        plantHealthItem(ctx)
+        plantHealthItem(ctx),
+        ndviQuickItem(ctx)
     ];
 }
 
@@ -324,6 +340,22 @@ function buildViewerMenuItems(ctx) {
  * Build the standard action context menu items.
  * These are Edit/Rename/Properties/Share/Download/Build/Transfer/Thumbnail items.
  */
+function mergeMultispectralItem(ctx) {
+    return {
+        label: 'Merge Multispectral Bands',
+        icon: 'fa-solid fa-layer-group',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            if (!ctx.canWrite || sel.length < 2) return false;
+            return sel.every(f =>
+                (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.GEOIMAGE) &&
+                f.entry.path.toLowerCase().match(/\.tiff?$/)
+            );
+        },
+        click: () => ctx.emit('mergeMultispectral', ctx.getSelectedEntries())
+    };
+}
+
 function buildActionMenuItems(ctx) {
     return [
         editItem(ctx),
@@ -332,6 +364,7 @@ function buildActionMenuItems(ctx) {
         shareEmbedItem(ctx),
         downloadItem(ctx),
         buildItem(ctx),
+        mergeMultispectralItem(ctx),
         transferItem(ctx),
         setThumbnailItem(ctx)
     ];
@@ -374,6 +407,7 @@ export {
     openMarkdownItem,
     openPdfItem,
     plantHealthItem,
+    ndviQuickItem,
     editItem,
     renameItem,
     propertiesItem,
@@ -382,6 +416,7 @@ export {
     buildItem,
     transferItem,
     setThumbnailItem,
+    mergeMultispectralItem,
     deleteItem,
     deleteSeparator,
     selectAllNoneItem,

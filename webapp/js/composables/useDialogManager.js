@@ -32,7 +32,11 @@ export default {
             rescanConfirmDialogOpen: false,
             setCoverDialogOpen: false,
             setCoverFile: null,
-            setCoverExistingCovers: []
+            setCoverExistingCovers: [],
+
+            // Merge multispectral dialog
+            mergeMultispectralDialogOpen: false,
+            mergeMultispectralFiles: []
         };
     },
 
@@ -439,6 +443,27 @@ export default {
 
         handleErrorDialogClose() {
             this.errorDialogOpen = false;
+        },
+
+        // Merge Multispectral Dialog
+        openMergeMultispectralDialog(files) {
+            if (!files || files.length < 2) return;
+            this.mergeMultispectralFiles = files;
+            this.mergeMultispectralDialogOpen = true;
+        },
+
+        handleMergeMultispectralClose(action, result) {
+            this.mergeMultispectralDialogOpen = false;
+            this.mergeMultispectralFiles = [];
+
+            if (action === 'merged') {
+                this.$toast.add({
+                    severity: 'success',
+                    summary: 'Merge Started',
+                    detail: `Merge job started. Check Build History for progress.`,
+                    life: 5000
+                });
+            }
         }
     }
 };

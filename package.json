@@ -38,6 +38,7 @@
     "@turf/meta": "^6.0.2",
     "babel-loader": "^9.1.3",
     "bootstrap": "^5.3.8",
+    "chart.js": "^4.5.1",
     "clipboard-copy": "^4.0.1",
     "copy-webpack-plugin": "^12.0.0",
     "css-loader": "^6.10.0",

@@ -16,7 +16,7 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" />
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" />
             </div>
             </template>
             <template #second>
@@ -34,7 +34,7 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" />
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" />
                 </template>
                 <template v-slot:map>
                     <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
@@ -51,7 +51,7 @@
                                 @setAsCover="setAsCover"
                                 @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" />
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -74,7 +74,7 @@
                                 @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" />
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -126,6 +126,7 @@
             confirmButtonClass="danger"
             @onClose="handleSetCoverClose" />
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
+        <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
         <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
             :sourceOrg="dataset.org" :sourceDs="dataset.ds"></TransferDialog>
@@ -224,6 +225,7 @@ import BuildHistory from './BuildHistory.vue';
 import FileAvailabilityDialog from './dialogs/FileAvailabilityDialog.vue';
 import TextEditorDialog from './dialogs/TextEditorDialog.vue';
 import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
+import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
 import FsLightbox from 'fslightbox-vue';
 
 import emitter from '@/libs/eventBus';
@@ -281,6 +283,7 @@ export default {
         FileAvailabilityDialog,
         TextEditorDialog,
         PdfViewerDialog,
+        MergeMultispectralDialog,
         FsLightbox
     },
     data: function () {
@@ -609,7 +612,7 @@ export default {
             }
         },
 
-        handleOpenItem: async function (node, view) {
+        handleOpenItem: async function (node, view, options) {
             // If it's a directory, navigate into it
             if (ddb.entry.isDirectory(node.entry)) {
                 emitter.emit("folderOpened", pathutils.getTree(node.entry.path));
@@ -629,11 +632,11 @@ export default {
                 // Plant Health opens the map tab with the panel
                 if (view === 'planthealth') {
                     if (this.$refs.mainTabSwitcher) {
-                        this.$refs.mainTabSwitcher.selectTab('map');
+                        this.$refs.mainTabSwitcher.activateTab('map');
                     }
                     this.$nextTick(() => {
                         if (this.$refs.mapViewer && this.$refs.mapViewer.openPlantHealth) {
-                            this.$refs.mapViewer.openPlantHealth(node);
+                            this.$refs.mapViewer.openPlantHealth(node, options);
                         }
                     });
                     return;

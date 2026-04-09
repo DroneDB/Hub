@@ -11,6 +11,7 @@
                 :visible="plantHealthVisible"
                 :dataset="dataset"
                 :filePath="plantHealthFilePath"
+                :initialParams="plantHealthInitialParams"
                 @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
         </div>
@@ -127,6 +128,7 @@ import mapAlertFlash from '@/composables/useMapAlertFlash';
 import mapBasemap from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
 import mapMeasurements from '@/composables/useMapMeasurements';
+import mapPlantHealth from '@/composables/usePlantHealth';
 import emitter from '@/libs/eventBus';
 
 
@@ -135,7 +137,7 @@ export default {
         Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
     },
     emits: ['scrollTo', 'openItem'],
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -244,6 +246,22 @@ export default {
             }
         });
 
+        tools.push({ id: 'separator' });
+        tools.push({
+            id: 'plant-health',
+            title: 'Plant Health — Open multispectral visualization panel',
+            icon: 'fa-solid fa-leaf',
+            onClick: () => {
+                if (this.plantHealthVisible) {
+                    this.closePlantHealth();
+                } else {
+                    const georaster = this.files.find(f => f.entry && f.entry.type === ddb.entry.type.GEORASTER);
+                    if (georaster) this.openPlantHealth(georaster);
+                }
+            }
+        });
+
+
         return {
             tools,
             selectSingle: false,
@@ -277,10 +295,7 @@ export default {
             rasterOpacity: 1.0,
             hasRasters: false,
             measurementListDialogOpen: false,
-            measurementListItems: [],
-            plantHealthVisible: false,
-            plantHealthFilePath: null,
-            currentVizParams: {}
+            measurementListItems: []
         };
     },
     mounted: function () {
@@ -1591,6 +1606,13 @@ export default {
 
             // Load measurements for orthophotos if available
             this.loadMeasurementsForOrthophotos();
+
+            // Restore plant health state from URL hash (once)
+            this.restoreFromHash();
+        },
+
+        restoreFromHash() {
+            this.restorePlantHealthFromHash(this.files);
         },
 
         applyDirectionStyles: function () {
@@ -1905,52 +1927,6 @@ export default {
                 this.measureControls.applyUnitsChange(newUnit);
                 this.currentUnitPref = newUnit;
             }
-        },
-
-        openPlantHealth(file) {
-            if (!file || !file.entry) return;
-            this.plantHealthFilePath = file.entry.path;
-            this.plantHealthVisible = true;
-        },
-
-        closePlantHealth() {
-            this.plantHealthVisible = false;
-            this.plantHealthFilePath = null;
-            this.currentVizParams = {};
-            this.refreshRasterLayers();
-        },
-
-        handleVizParamsChanged(params) {
-            this.currentVizParams = params;
-            this.refreshRasterLayers();
-        },
-
-        refreshRasterLayers() {
-            // Refresh all raster tile layers with current vizParams
-            if (!this.rasterLayer) return;
-
-            this.rasterLayer.getLayers().forEach(layer => {
-                if (!layer.file) return;
-                const source = layer.getSource();
-                if (!source) return;
-
-                // Only apply vizParams to the file that has plant health open
-                const vizParams = (this.plantHealthFilePath &&
-                    layer.file.entry && layer.file.entry.path === this.plantHealthFilePath)
-                    ? this.currentVizParams : {};
-
-                // Re-create the source with new vizParams
-                const extent = layer.getExtent();
-                const newSource = new HybridXYZ({
-                    url: layer.file.path,
-                    tileSize: 256,
-                    transition: 200,
-                    minZoom: 14,
-                    maxZoom: 22,
-                    vizParams: Object.keys(vizParams).length > 0 ? vizParams : undefined
-                });
-                layer.setSource(newSource);
-            });
         }
     }
 }

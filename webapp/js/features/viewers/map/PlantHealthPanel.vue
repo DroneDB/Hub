@@ -26,45 +26,84 @@
                 <label class="section-label">Formula</label>
                 <select v-model="selectedFormula" @change="onFormulaChange" class="panel-select">
                     <option value="">None (bands only)</option>
-                    <option v-for="f in availableFormulas" :key="f.id" :value="f.id">{{ f.name }}</option>
+                    <option v-for="f in availableFormulas" :key="f.id" :value="f.id"
+                        :disabled="f.disabled"
+                        :title="f.disabled ? f.disabledReason : f.help">
+                        {{ f.name }}{{ f.disabled ? ' ✗' : '' }}
+                    </option>
                 </select>
             </div>
 
             <!-- Band Mapping (when no formula) -->
             <div class="section" v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3">
                 <label class="section-label">Bands (R,G,B)</label>
-                <input v-model="customBands" @change="apply" class="panel-input" placeholder="e.g. 4,3,2" />
+                <BandSelector
+                    v-model="customBands"
+                    :bands="rasterInfo.bands"
+                    @update:modelValue="debouncedApply" />
             </div>
 
             <!-- Colormap (when formula is active) -->
             <div class="section" v-if="selectedFormula">
                 <label class="section-label">Colormap</label>
-                <select v-model="selectedColormap" @change="apply" class="panel-select">
-                    <option v-for="cm in availableColormaps" :key="cm" :value="cm">{{ cm }}</option>
+                <ColormapDropdown
+                    v-model="selectedColormap"
+                    :colormaps="availableColormaps"
+                    @update:modelValue="debouncedApply" />
+            </div>
+
+            <!-- Stretch Type -->
+            <div class="section" v-if="rasterInfo && ((rasterInfo.dataType && rasterInfo.dataType !== 'Byte') || selectedFormula)">
+                <label class="section-label">Stretch</label>
+                <select v-model="selectedStretch" @change="onStretchChange" class="panel-select">
+                    <option value="percentile">Percentile (2%-98%)</option>
+                    <option value="minmax">Min / Max</option>
+                    <option value="stddev">Std Dev (±2σ)</option>
+                    <option value="none">None</option>
                 </select>
             </div>
 
             <!-- Rescale (when formula is active) -->
             <div class="section" v-if="selectedFormula">
                 <label class="section-label">Rescale</label>
-                <input v-model="rescale" @change="apply" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" />
+                <input v-model="rescale" @change="debouncedApply" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" />
             </div>
 
             <!-- Histogram -->
+            <div class="section" v-if="histogramData">
+                <label class="section-label">Histogram</label>
+                <HistogramChart
+                    :data="histogramData"
+                    :min="histogramMin"
+                    :max="histogramMax"
+                    :colormap="selectedFormula ? selectedColormap : null"
+                    :height="100"
+                    @update:range="onHistogramRangeChange" />
+            </div>
+
+            <!-- Statistics -->
             <div class="section" v-if="metadata && metadata.statistics">
                 <label class="section-label">Statistics</label>
                 <div class="stats-grid">
-                    <span>Min: {{ formatNum(metadata.statistics.min) }}</span>
-                    <span>Max: {{ formatNum(metadata.statistics.max) }}</span>
-                    <span>Mean: {{ formatNum(metadata.statistics.mean) }}</span>
-                    <span>StdDev: {{ formatNum(metadata.statistics.stddev) }}</span>
+                    <span>Min: {{ formatNum(firstBandStats.min) }}</span>
+                    <span>Max: {{ formatNum(firstBandStats.max) }}</span>
+                    <span>Mean: {{ formatNum(firstBandStats.mean) }}</span>
+                    <span>StdDev: {{ formatNum(firstBandStats.stddev || firstBandStats.std) }}</span>
                 </div>
             </div>
 
-            <!-- Apply / Reset -->
+            <!-- Reset / Toggle / Copy Link / Export -->
             <div class="section actions">
-                <button class="btn btn-primary btn-sm" @click="apply">Apply</button>
                 <button class="btn btn-secondary btn-sm" @click="reset">Reset</button>
+                <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView" :title="originalView ? 'Showing original — click to apply processing' : 'Showing processed — click to show original'">
+                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                </button>
+                <button class="btn btn-secondary btn-sm" @click="copyLink" title="Copy shareable link">
+                    <i class="fas fa-link"></i>
+                </button>
+                <button class="btn btn-secondary btn-sm" @click="exportGeoTiff" :disabled="exporting" title="Export GeoTIFF">
+                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+                </button>
             </div>
         </div>
 
@@ -75,11 +114,18 @@
 </template>
 
 <script>
+import HistogramChart from '@/components/HistogramChart.vue';
+import ColormapDropdown from '@/components/ColormapDropdown.vue';
+import BandSelector from '@/components/BandSelector.vue';
+import clipboardCopy from 'clipboard-copy';
+
 export default {
+    components: { HistogramChart, ColormapDropdown, BandSelector },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, required: true },
-        filePath: { type: String, default: null }
+        filePath: { type: String, default: null },
+        initialParams: { type: Object, default: null }
     },
 
     emits: ['close', 'vizParamsChanged'],
@@ -92,10 +138,49 @@ export default {
             selectedFormula: '',
             customBands: '',
             selectedColormap: 'rdylgn',
+            selectedStretch: 'percentile',
             rescale: '',
             availableFormulas: [],
-            availableColormaps: ['rdylgn', 'discrete_ndvi', 'spectral', 'viridis', 'plasma', 'inferno', 'magma', 'grayscale', 'ironbow', 'rainbow', 'bugn']
+            availableColormaps: ['rdylgn', 'discrete_ndvi', 'spectral', 'viridis', 'plasma', 'inferno', 'magma', 'grayscale', 'ironbow', 'rainbow', 'bugn', 'whitehot', 'blackhot', 'arctic', 'lava'],
+            exporting: false,
+            originalView: false
         };
+    },
+
+    computed: {
+        normalizedColormaps() {
+            return this.availableColormaps.map(cm =>
+                typeof cm === 'string' ? { id: cm, name: cm } : cm
+            );
+        },
+        enabledFormulas() {
+            if (!this.rasterInfo || !this.availableFormulas) return [];
+            return this.availableFormulas.filter(f => !f.disabled);
+        },
+        firstBandStats() {
+            if (!this.metadata || !this.metadata.statistics) return {};
+            const stats = this.metadata.statistics;
+            // Statistics may be keyed by band number ("1") or flat
+            if (stats['1']) return stats['1'];
+            return stats;
+        },
+        histogramData() {
+            const s = this.firstBandStats;
+            if (s && s.histogram) return s.histogram;
+            return null;
+        },
+        histogramMin() {
+            const s = this.firstBandStats;
+            if (!s) return 0;
+            if (s.percentiles && s.percentiles.p2 !== undefined) return s.percentiles.p2;
+            return s.min || 0;
+        },
+        histogramMax() {
+            const s = this.firstBandStats;
+            if (!s) return 1;
+            if (s.percentiles && s.percentiles.p98 !== undefined) return s.percentiles.p98;
+            return s.max || 1;
+        }
     },
 
     watch: {
@@ -126,6 +211,17 @@ export default {
                 if (meta.autoBands) {
                     this.customBands = meta.autoBands;
                 }
+
+                // Apply initial params from URL hash (if provided)
+                if (this.initialParams && !this._initialParamsApplied) {
+                    this._initialParamsApplied = true;
+                    if (this.initialParams.preset) this.selectedPreset = this.initialParams.preset;
+                    if (this.initialParams.formula) this.selectedFormula = this.initialParams.formula;
+                    if (this.initialParams.bands) this.customBands = this.initialParams.bands;
+                    if (this.initialParams.colormap) this.selectedColormap = this.initialParams.colormap;
+                    if (this.initialParams.rescale) this.rescale = this.initialParams.rescale;
+                    this.apply();
+                }
             } catch (e) {
                 console.error('Failed to load raster info:', e);
             }
@@ -155,14 +251,21 @@ export default {
         },
 
         apply() {
+            this.originalView = false; // Any param change exits original view
             const params = {};
             if (this.selectedPreset) params.preset = this.selectedPreset;
             if (this.selectedFormula) params.formula = this.selectedFormula;
             if (this.customBands && !this.selectedPreset && !this.selectedFormula) params.bands = this.customBands;
             if (this.selectedFormula && this.selectedColormap) params.colormap = this.selectedColormap;
             if (this.rescale) params.rescale = this.rescale;
+            if (this.selectedStretch) params.stretch = this.selectedStretch;
 
             this.$emit('vizParamsChanged', params);
+        },
+
+        debouncedApply() {
+            if (this._debounceTimer) clearTimeout(this._debounceTimer);
+            this._debounceTimer = setTimeout(() => this.apply(), 300);
         },
 
         reset() {
@@ -170,14 +273,105 @@ export default {
             this.selectedFormula = '';
             this.customBands = '';
             this.selectedColormap = 'rdylgn';
+            this.selectedStretch = 'percentile';
             this.rescale = '';
             this.metadata = null;
+            this.originalView = false;
             this.$emit('vizParamsChanged', {});
         },
 
         close() {
             this.reset();
             this.$emit('close');
+        },
+
+        toggleOriginalView() {
+            this.originalView = !this.originalView;
+            if (this.originalView) {
+                // Show original raster without any processing
+                this.$emit('vizParamsChanged', {});
+            } else {
+                // Re-apply current settings
+                this.apply();
+            }
+        },
+
+        onStretchChange() {
+            const s = this.firstBandStats;
+            if (!s) { this.apply(); return; }
+
+            if (this.selectedStretch === 'percentile') {
+                const lo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : s.min;
+                const hi = (s.percentiles && s.percentiles.p98 !== undefined) ? s.percentiles.p98 : s.max;
+                this.rescale = `${Number(lo).toFixed(3)},${Number(hi).toFixed(3)}`;
+            } else if (this.selectedStretch === 'minmax') {
+                this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
+            } else if (this.selectedStretch === 'stddev') {
+                const std = s.stddev || s.std || 0;
+                const mean = s.mean || 0;
+                this.rescale = `${(mean - 2 * std).toFixed(3)},${(mean + 2 * std).toFixed(3)}`;
+            } else if (this.selectedStretch === 'none') {
+                this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
+            }
+            this.apply();
+        },
+
+        onHistogramRangeChange({ min, max }) {
+            this.rescale = `${min.toFixed(3)},${max.toFixed(3)}`;
+            this.apply();
+        },
+
+        async exportGeoTiff() {
+            if (!this.filePath || !this.dataset) return;
+            const vizParams = {};
+            if (this.selectedPreset) vizParams.preset = this.selectedPreset;
+            if (this.selectedFormula) vizParams.formula = this.selectedFormula;
+            if (this.customBands && !this.selectedPreset && !this.selectedFormula) vizParams.bands = this.customBands;
+            if (this.selectedFormula && this.selectedColormap) vizParams.colormap = this.selectedColormap;
+            if (this.rescale) vizParams.rescale = this.rescale;
+
+            const url = this.dataset.exportUrl(this.filePath, vizParams);
+            try {
+                this.exporting = true;
+                const resp = await fetch(url, { cache: 'no-store' });
+                if (!resp.ok) throw new Error(`Export failed (HTTP ${resp.status})`);
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                const disposition = resp.headers.get('content-disposition');
+                const match = disposition && disposition.match(/filename=([^;]+)/);
+                a.download = match ? match[1].trim() : 'export.tif';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                console.error('Export error:', e);
+                if (this.$toast) {
+                    this.$toast.add({ severity: 'error', summary: 'Export Failed', detail: e.message, life: 5000 });
+                }
+            } finally {
+                this.exporting = false;
+            }
+        },
+
+        copyLink() {
+            const url = new URL(window.location.href);
+            // Build hash params
+            const hashParams = new URLSearchParams();
+            hashParams.set('path', this.filePath);
+            if (this.selectedPreset) hashParams.set('preset', this.selectedPreset);
+            if (this.selectedFormula) hashParams.set('formula', this.selectedFormula);
+            if (this.customBands && !this.selectedPreset && !this.selectedFormula) hashParams.set('bands', this.customBands);
+            if (this.selectedFormula && this.selectedColormap) hashParams.set('colormap', this.selectedColormap);
+            if (this.rescale) hashParams.set('rescale', this.rescale);
+            url.hash = hashParams.toString();
+
+            // Update browser URL
+            window.history.replaceState(null, '', url.toString());
+
+            clipboardCopy(url.toString());
         },
 
         formatNum(val) {
@@ -281,6 +475,15 @@ export default {
     border-color: rgba(76, 175, 80, 0.6);
 }
 
+.panel-select option {
+    background: #2a2a2a;
+    color: #eee;
+}
+
+.panel-select option:disabled {
+    color: #777;
+}
+
 .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -323,5 +526,32 @@ export default {
 
 .btn-sm {
     flex: 1;
+}
+
+/* Responsive: bottom-sheet on mobile */
+@media (max-width: 768px) {
+    .plant-health-panel {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 50vh;
+        border-radius: 0.75rem 0.75rem 0 0;
+        transition: transform 0.3s ease;
+    }
+
+    .panel-body {
+        padding: 0.5rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .actions {
+        flex-wrap: wrap;
+    }
 }
 </style>
