@@ -68,6 +68,7 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { Control } from 'ol/control';
+import { isPlantHealthCapable } from '@/libs/entryTypes';
 
 // Mixins
 import mapAlertFlash from '@/composables/useMapAlertFlash';
@@ -177,7 +178,7 @@ export default {
             const rasters = this.rasterLayer.getLayers();
             const ext = createEmptyExtent();
 
-            if (entry.polygon_geom && (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.POINTCLOUD)) {
+            if (entry.polygon_geom && (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.GEOIMAGE || entry.type === ddb.entry.type.POINTCLOUD)) {
                 const extent = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
                 const tileLayer = new TileLayer({
                     extent,
@@ -272,8 +273,8 @@ export default {
                 controlContainer.appendChild(fsBtn);
             }
 
-            // Plant Health button (for GEORASTER files)
-            if (entry.type === ddb.entry.type.GEORASTER) {
+            // Plant Health button (for raster files with georeference)
+            if (isPlantHealthCapable(entry)) {
                 const phBtn = document.createElement('button');
                 phBtn.title = 'Plant Health';
                 phBtn.innerHTML = '<i class="fa-solid fa-leaf"></i>';

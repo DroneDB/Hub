@@ -120,6 +120,7 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
+import { isPlantHealthCapable } from '@/libs/entryTypes';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -255,8 +256,8 @@ export default {
                 if (this.plantHealthVisible) {
                     this.closePlantHealth();
                 } else {
-                    const georaster = this.files.find(f => f.entry && f.entry.type === ddb.entry.type.GEORASTER);
-                    if (georaster) this.openPlantHealth(georaster);
+                    const rasterFile = this.files.find(f => f.entry && isPlantHealthCapable(f.entry));
+                    if (rasterFile) this.openPlantHealth(rasterFile);
                 }
             }
         });
@@ -1283,7 +1284,7 @@ export default {
                             });
                         }
                     }
-                } else if (f.entry.polygon_geom && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.POINTCLOUD)) {
+                } else if (f.entry.polygon_geom && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.GEOIMAGE || f.entry.type === ddb.entry.type.POINTCLOUD)) {
                     const extent = transformExtent(bbox(f.entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
                     const tileLayer = new TileLayer({
                         extent,

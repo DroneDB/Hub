@@ -5,7 +5,7 @@ import { OpenItemDefaults } from '@/libs/openItemDefaults';
 const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
 
 // Type groupings used across the application
-const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR];
+const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
 const THUMBNAIL_CANDIDATE_TYPES = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER];
 
@@ -28,6 +28,12 @@ function isThumbnailCandidate(type) {
 
 function isDroneDB(type) {
     return type === ddb.entry.type.DRONEDB;
+}
+
+function isPlantHealthCapable(entry) {
+    if (entry.type === ddb.entry.type.GEORASTER) return true;
+    if (entry.type === ddb.entry.type.GEOIMAGE && entry.polygon_geom && /\.tiff?$/i.test(entry.path)) return true;
+    return false;
 }
 
 // Human-readable type names for display (extends entry.typeToHuman with display-friendly labels)
@@ -77,6 +83,7 @@ export {
     isPanoramaType,
     isThumbnailCandidate,
     isDroneDB,
+    isPlantHealthCapable,
     getTypeDisplayName,
     sortEntriesDirectoriesFirst
 };

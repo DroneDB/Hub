@@ -1,7 +1,7 @@
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB } from '@/libs/entryTypes';
+import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
@@ -122,7 +122,7 @@ function plantHealthItem(ctx) {
         icon: 'fa-solid fa-leaf',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GEORASTER;
+            return sel.length === 1 && isPlantHealthCapable(sel[0].entry);
         },
         click: () => {
             const sel = ctx.getSelectedEntries();
@@ -307,21 +307,6 @@ function selectionSeparator(ctx) {
  * Build the standard viewer context menu items.
  * These are the Open/Open Map/Open Point Cloud/etc items shared across all views.
  */
-function ndviQuickItem(ctx) {
-    return {
-        label: 'Quick NDVI',
-        icon: 'fa-solid fa-seedling',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GEORASTER;
-        },
-        click: () => {
-            const sel = ctx.getSelectedEntries();
-            if (sel.length === 1) ctx.emit('openItem', sel[0], 'planthealth', { preset: 'ndvi' });
-        }
-    };
-}
-
 function buildViewerMenuItems(ctx) {
     return [
         openItem(ctx),
@@ -331,8 +316,7 @@ function buildViewerMenuItems(ctx) {
         openPanoramaItem(ctx),
         openMarkdownItem(ctx),
         openPdfItem(ctx),
-        plantHealthItem(ctx),
-        ndviQuickItem(ctx)
+        plantHealthItem(ctx)
     ];
 }
 
@@ -407,7 +391,6 @@ export {
     openMarkdownItem,
     openPdfItem,
     plantHealthItem,
-    ndviQuickItem,
     editItem,
     renameItem,
     propertiesItem,

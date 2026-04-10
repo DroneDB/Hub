@@ -43,6 +43,14 @@
                     @update:modelValue="debouncedApply" />
             </div>
 
+            <!-- Single band info message -->
+            <div class="section" v-if="rasterInfo.bands && rasterInfo.bands.length === 1">
+                <div class="single-band-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Single band image. Use <strong>Merge Multispectral</strong> to combine bands for vegetation indices.</span>
+                </div>
+            </div>
+
             <!-- Colormap (when formula is active) -->
             <div class="section" v-if="selectedFormula">
                 <label class="section-label">Colormap</label>
@@ -490,6 +498,25 @@ export default {
     gap: 0.15rem;
     font-size: 0.75rem;
     color: #ccc;
+}
+
+.single-band-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: #bbb;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 0.4rem 0.5rem;
+    line-height: 1.3;
+}
+
+.single-band-info i {
+    color: #66b3ff;
+    margin-top: 0.1rem;
+    flex-shrink: 0;
 }
 
 .actions {
