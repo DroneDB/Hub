@@ -452,17 +452,57 @@ export default {
             this.mergeMultispectralDialogOpen = true;
         },
 
-        handleMergeMultispectralClose(action, result) {
+        async handleMergeMultispectralClose(action, result) {
             this.mergeMultispectralDialogOpen = false;
             this.mergeMultispectralFiles = [];
 
-            if (action === 'merged') {
+            if (action === 'merged' && result) {
+                const sources = result.sourceNames || [];
+                const dest = result.outputPath || 'output';
+                const fileList = sources.length > 3
+                    ? sources.slice(0, 3).join(', ') + ` and ${sources.length - 3} more`
+                    : sources.join(', ');
                 this.$toast.add({
                     severity: 'success',
-                    summary: 'Merge Started',
-                    detail: `Merge job started. Check Build History for progress.`,
-                    life: 5000
+                    summary: 'Merge Completed',
+                    detail: `${fileList} merged into ${dest}`,
+                    life: 8000
                 });
+
+                try {
+                    // Add merged file to file browser
+                    const entry = await this.dataset.listOne(result.outputPath);
+                    const entryParentPath = this.pathutils.getParentFolder(entry.path);
+                    const normalizedCurrentPath = (this.currentPath != null && this.currentPath.length > 0) ? this.currentPath : null;
+
+                    if (entryParentPath === normalizedCurrentPath) {
+                        if (!this.fileBrowserFiles.some(f => f.entry.path === entry.path)) {
+                            const item = {
+                                icon: this.icons.getForType(entry.type),
+                                label: this.pathutils.basename(entry.path),
+                                path: this.dataset.remoteUri(entry.path),
+                                entry: entry,
+                                isExpandable: this.ddb.entry.isDirectory(entry),
+                                selected: false
+                            };
+                            this.fileBrowserFiles.push(item);
+                            emitter.emit('addItems', [item]);
+                        }
+                    }
+
+                    // Delete source files if requested
+                    if (result.deleteSource && result.sourcePaths && result.sourcePaths.length > 0) {
+                        await this.dataset.deleteObjs(result.sourcePaths);
+                        this.fileBrowserFiles = this.fileBrowserFiles.filter(
+                            f => !result.sourcePaths.includes(f.entry.path)
+                        );
+                        emitter.emit('deleteEntries', result.sourcePaths);
+                    }
+
+                    this.sortFiles();
+                } catch (e) {
+                    console.warn('Could not refresh file browser after merge:', e);
+                }
             }
         }
     }

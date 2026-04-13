@@ -108,7 +108,7 @@ module.exports = class Dataset {
     }
 
     async previewMergeMultispectral(paths, previewBands, thumbSize) {
-        return this.registry.postRequest(`${this.baseApi}/merge-multispectral/preview`, { paths, previewBands, thumbSize });
+        return this.registry.makeRequest(`${this.baseApi}/merge-multispectral/preview`, "POST", { paths, previewBands, thumbSize }, null, 'blob');
     }
 
     async mergeMultispectral(paths, outputPath) {

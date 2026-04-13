@@ -1,5 +1,5 @@
 <template>
-    <Window title="Merge Multispectral Bands" id="merge-multispectral" @onClose="close" modal width="550px" fixedPosition>
+    <Window title="Merge Multispectral Bands" id="merge-multispectral" @onClose="close" modal width="550px" height="auto" fixedPosition>
         <div class="merge-ms-dialog">
             <!-- Band list with drag & drop reordering -->
             <div class="section">
@@ -61,7 +61,7 @@
 
             <!-- Output name -->
             <div class="section">
-                <label class="section-label">Output filename</label>
+                <label class="section-label">Output path</label>
                 <InputText v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
                     @input="validateOutputName" placeholder="merged.tif" />
                 <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
@@ -143,7 +143,19 @@ export default {
     methods: {
         generateOutputName() {
             if (this.files.length === 0) return;
-            // Find common base name among files
+
+            // Find common folder among source files
+            const paths = this.files.map(f => f.entry.path);
+            let commonFolder = '';
+            const folders = paths.map(p => {
+                const idx = p.lastIndexOf('/');
+                return idx >= 0 ? p.substring(0, idx + 1) : '';
+            });
+            if (folders.length > 0 && folders.every(f => f === folders[0])) {
+                commonFolder = folders[0];
+            }
+
+            // Find common base name among file names (without folder)
             const names = this.files.map(f => f.label || f.entry.path.split('/').pop());
             // Try to find common prefix
             let prefix = names[0];
@@ -154,8 +166,10 @@ export default {
             }
             // Remove trailing non-alphanumeric chars
             prefix = prefix.replace(/[^a-zA-Z0-9]+$/, '');
+
+            let filename;
             if (prefix.length > 2) {
-                this.outputName = prefix + '_merged.tif';
+                filename = prefix + '_merged.tif';
             } else {
                 const now = new Date();
                 const ts = now.getFullYear().toString() +
@@ -164,8 +178,9 @@ export default {
                     now.getHours().toString().padStart(2, '0') +
                     now.getMinutes().toString().padStart(2, '0') +
                     now.getSeconds().toString().padStart(2, '0');
-                this.outputName = 'merged_' + ts + '.tif';
+                filename = 'merged_' + ts + '.tif';
             }
+            this.outputName = commonFolder + filename;
         },
 
         async validate() {
@@ -219,8 +234,12 @@ export default {
                 this.outputNameError = 'Output filename is required';
                 return;
             }
-            if (name.includes('/') || name.includes('\\') || name.includes('..')) {
-                this.outputNameError = 'Invalid characters in filename';
+            if (name.includes('\\') || name.includes('..')) {
+                this.outputNameError = 'Invalid characters in path';
+                return;
+            }
+            if (name.startsWith('/')) {
+                this.outputNameError = 'Path must be relative';
                 return;
             }
             if (!name.toLowerCase().endsWith('.tif') && !name.toLowerCase().endsWith('.tiff')) {
@@ -261,7 +280,9 @@ export default {
                 let outputPath = this.outputName.trim();
 
                 await this.dataset.mergeMultispectral(paths, outputPath);
-                this.$emit('onClose', 'merged', { outputPath, deleteSource: this.deleteSource });
+
+                const sourceNames = paths.map(p => p.split('/').pop());
+                this.$emit('onClose', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
             } catch (e) {
                 this.validationResult = { ok: false, errors: [e.message || 'Merge failed'], warnings: [] };
             }

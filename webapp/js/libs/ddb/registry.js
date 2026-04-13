@@ -739,6 +739,16 @@ module.exports = class Registry {
                 return text;
             }
 
+            // Handle binary content types (images, etc.)
+            if (contentType && (contentType.toLowerCase().includes("image/") || contentType.toLowerCase().includes("application/octet-stream"))) {
+                return await response.blob();
+            }
+
+            // Handle explicit blob response type
+            if (responseType === 'blob') {
+                return await response.blob();
+            }
+
             // For other content types, try to read as text
             return await response.text();
 
