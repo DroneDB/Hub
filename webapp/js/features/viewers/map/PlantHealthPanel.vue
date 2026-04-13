@@ -68,13 +68,14 @@
                     <option value="minmax">Min / Max</option>
                     <option value="stddev">Std Dev (±2σ)</option>
                     <option value="none">None</option>
+                    <option value="custom">Custom</option>
                 </select>
             </div>
 
             <!-- Rescale (when formula is active) -->
             <div class="section" v-if="selectedFormula">
                 <label class="section-label">Rescale</label>
-                <input v-model="rescale" @change="debouncedApply" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" />
+                <input v-model="rescale" @change="onRescaleManualChange" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" />
             </div>
 
             <!-- Histogram -->
@@ -177,17 +178,44 @@ export default {
             if (s && s.histogram) return s.histogram;
             return null;
         },
-        histogramMin() {
+        stretchRange() {
             const s = this.firstBandStats;
-            if (!s) return 0;
-            if (s.percentiles && s.percentiles.p2 !== undefined) return s.percentiles.p2;
-            return s.min || 0;
+            const fallback = [s ? (s.min || 0) : 0, s ? (s.max || 1) : 1];
+            if (!s) return fallback;
+
+            switch (this.selectedStretch) {
+                case 'percentile': {
+                    const lo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : fallback[0];
+                    const hi = (s.percentiles && s.percentiles.p98 !== undefined) ? s.percentiles.p98 : fallback[1];
+                    return [lo, hi];
+                }
+                case 'minmax':
+                case 'none':
+                    return fallback;
+                case 'stddev': {
+                    const mean = s.mean || 0;
+                    const std = s.stddev || s.std || 0;
+                    return [mean - 2 * std, mean + 2 * std];
+                }
+                case 'custom':
+                    if (this.rescale) {
+                        const parts = this.rescale.split(',');
+                        const lo = parts.length >= 1 ? parseFloat(parts[0]) : NaN;
+                        const hi = parts.length >= 2 ? parseFloat(parts[1]) : NaN;
+                        if (!isNaN(lo) && !isNaN(hi)) return [lo, hi];
+                    }
+                    break;
+            }
+            // Default: percentile if available, else min/max
+            const pLo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : fallback[0];
+            const pHi = (s.percentiles && s.percentiles.p98 !== undefined) ? s.percentiles.p98 : fallback[1];
+            return [pLo, pHi];
+        },
+        histogramMin() {
+            return this.stretchRange[0];
         },
         histogramMax() {
-            const s = this.firstBandStats;
-            if (!s) return 1;
-            if (s.percentiles && s.percentiles.p98 !== undefined) return s.percentiles.p98;
-            return s.max || 1;
+            return this.stretchRange[1];
         }
     },
 
@@ -228,6 +256,8 @@ export default {
                     if (this.initialParams.bands) this.customBands = this.initialParams.bands;
                     if (this.initialParams.colormap) this.selectedColormap = this.initialParams.colormap;
                     if (this.initialParams.rescale) this.rescale = this.initialParams.rescale;
+                    if (this.initialParams.stretch) this.selectedStretch = this.initialParams.stretch;
+                    this.computeRescaleFromStretch();
                     this.apply();
                 }
             } catch (e) {
@@ -255,6 +285,7 @@ export default {
                     console.error('Failed to load formula metadata:', e);
                 }
             }
+            this.computeRescaleFromStretch();
             this.apply();
         },
 
@@ -276,16 +307,26 @@ export default {
             this._debounceTimer = setTimeout(() => this.apply(), 300);
         },
 
-        reset() {
+        async reset() {
             this.selectedPreset = '';
             this.selectedFormula = '';
             this.customBands = '';
             this.selectedColormap = 'rdylgn';
             this.selectedStretch = 'percentile';
             this.rescale = '';
-            this.metadata = null;
             this.originalView = false;
             this.$emit('vizParamsChanged', {});
+
+            // Reload base metadata (statistics, histogram) for the original raster
+            if (this.filePath && this.dataset) {
+                try {
+                    const meta = await this.dataset.getRasterMetadata(this.filePath);
+                    this.metadata = meta;
+                    if (meta.autoBands) this.customBands = meta.autoBands;
+                } catch (e) {
+                    console.error('Failed to reload metadata after reset:', e);
+                }
+            }
         },
 
         close() {
@@ -305,8 +346,14 @@ export default {
         },
 
         onStretchChange() {
+            this.computeRescaleFromStretch();
+            this.apply();
+        },
+
+        computeRescaleFromStretch() {
+            if (this.selectedStretch === 'custom') return;
             const s = this.firstBandStats;
-            if (!s) { this.apply(); return; }
+            if (!s) return;
 
             if (this.selectedStretch === 'percentile') {
                 const lo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : s.min;
@@ -321,12 +368,17 @@ export default {
             } else if (this.selectedStretch === 'none') {
                 this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
             }
-            this.apply();
         },
 
         onHistogramRangeChange({ min, max }) {
             this.rescale = `${min.toFixed(3)},${max.toFixed(3)}`;
+            this.selectedStretch = 'custom';
             this.apply();
+        },
+
+        onRescaleManualChange() {
+            this.selectedStretch = 'custom';
+            this.debouncedApply();
         },
 
         async exportGeoTiff() {
@@ -374,6 +426,7 @@ export default {
             if (this.customBands && !this.selectedPreset && !this.selectedFormula) hashParams.set('bands', this.customBands);
             if (this.selectedFormula && this.selectedColormap) hashParams.set('colormap', this.selectedColormap);
             if (this.rescale) hashParams.set('rescale', this.rescale);
+            if (this.selectedStretch) hashParams.set('stretch', this.selectedStretch);
             url.hash = hashParams.toString();
 
             // Update browser URL

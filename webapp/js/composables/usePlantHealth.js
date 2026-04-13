@@ -104,6 +104,7 @@ export default {
                 if (params.get('bands')) vizParams.bands = params.get('bands');
                 if (params.get('colormap')) vizParams.colormap = params.get('colormap');
                 if (params.get('rescale')) vizParams.rescale = params.get('rescale');
+                if (params.get('stretch')) vizParams.stretch = params.get('stretch');
 
                 if (Object.keys(vizParams).length > 0) {
                     this.plantHealthInitialParams = vizParams;
