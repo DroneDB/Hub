@@ -1,102 +1,103 @@
 <template>
-    <Window title="Merge Multispectral Bands" id="merge-multispectral" @onClose="close" modal width="550px" height="auto" fixedPosition>
+    <Window title="Merge Multispectral Bands" id="merge-multispectral" @onClose="close" modal width="900px" height="auto" fixedPosition>
         <div class="merge-ms-dialog">
-            <!-- Band list with drag & drop reordering -->
-            <div class="section">
-                <label class="section-label">Band Order (drag to reorder)</label>
-                <div class="band-list" ref="bandList">
-                    <div v-for="(item, index) in orderedFiles" :key="item.entry.path"
-                        class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
-                        draggable="true"
-                        @dragstart="onDragStart(index, $event)"
-                        @dragover.prevent="onDragOver(index)"
-                        @dragleave="onDragLeave"
-                        @drop.prevent="onDrop(index)"
-                        @dragend="onDragEnd">
-                        <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
-                        <span class="band-index">{{ index + 1 }}.</span>
-                        <span class="band-name" :title="item.entry.path">{{ item.label }}</span>
-                        <span v-if="bandInfo[item.entry.path]" class="band-meta">
-                            ({{ bandInfo[item.entry.path].dataType }})
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Validation result / summary -->
-            <div v-if="validating" class="section status-info">
-                <i class="fa-solid fa-spinner fa-spin"></i> Validating...
-            </div>
-
-            <div v-if="validationResult" class="section">
-                <!-- Errors -->
-                <div v-if="validationResult.errors && validationResult.errors.length > 0" class="validation-errors">
-                    <div v-for="(err, i) in validationResult.errors" :key="'e'+i" class="validation-msg error">
-                        <i class="fa-solid fa-circle-xmark"></i> {{ err }}
-                    </div>
-                </div>
-                <!-- Warnings -->
-                <div v-if="validationResult.warnings && validationResult.warnings.length > 0" class="validation-warnings">
-                    <div v-for="(warn, i) in validationResult.warnings" :key="'w'+i" class="validation-msg warning">
-                        <i class="fa-solid fa-triangle-exclamation"></i> {{ warn }}
-                    </div>
-                </div>
-                <!-- Alignment banner -->
-                <div v-if="alignmentWarning" class="alignment-warning">
-                    <i class="fa-solid fa-circle-info"></i>
-                    <div>
-                        <strong>Band misalignment detected</strong>
-                        <p>
-                            These images come from a multi-camera sensor where each band is
-                            captured from a slightly different viewpoint (~{{ maxShift }} pixel shift).
-                            An approximate correction will be applied during merge.
-                        </p>
-                        <p>
-                            For accurate results (vegetation indices, spectral analysis), process
-                            the raw imagery with a photogrammetry tool such as
-                            <a href="https://webodm.org/" target="_blank">WebODM</a>.
-                        </p>
-                    </div>
-                </div>
-                <!-- Summary -->
-                <div v-if="validationResult.ok || (validationResult.errors && validationResult.errors.length === 0)" class="merge-summary">
-                    <div class="summary-row" v-if="validationResult.summary">
-                        <div class="d-flex gap-3 flex-wrap">
-                            <div v-if="validationResult.summary.crs"><strong>CRS:</strong> {{ validationResult.summary.crs }}</div>
-                            <div><strong>Size:</strong> {{ validationResult.summary.width }}×{{ validationResult.summary.height }}</div>
-                            <div><strong>Bands:</strong> {{ validationResult.summary.totalBands }} × {{ validationResult.summary.dataType }}</div>
-                            <div v-if="estimatedSize"><strong>Est.:</strong> {{ estimatedSize }}</div>
+            <!-- 3-column layout -->
+            <div class="columns-row">
+                <!-- Column 1: Band order -->
+                <div class="col-bands">
+                    <label class="section-label">Band Order (drag to reorder)</label>
+                    <div class="band-list" ref="bandList">
+                        <div v-for="(item, index) in orderedFiles" :key="item.entry.path"
+                            class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
+                            draggable="true"
+                            @dragstart="onDragStart(index, $event)"
+                            @dragover.prevent="onDragOver(index)"
+                            @dragleave="onDragLeave"
+                            @drop.prevent="onDrop(index)"
+                            @dragend="onDragEnd">
+                            <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <span class="band-index">{{ index + 1 }}.</span>
+                            <span class="band-name" :title="item.entry.path">{{ item.label }}</span>
+                            <span v-if="bandInfo[item.entry.path]" class="band-meta">
+                                ({{ bandInfo[item.entry.path].dataType }})
+                            </span>
                         </div>
                     </div>
                 </div>
+
+                <!-- Column 2: Validation info -->
+                <div class="col-info">
+                    <div v-if="validating" class="status-info">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Validating...
+                    </div>
+
+                    <template v-if="validationResult">
+                        <!-- Errors -->
+                        <div v-if="validationResult.errors && validationResult.errors.length > 0" class="validation-errors">
+                            <div v-for="(err, i) in validationResult.errors" :key="'e'+i" class="validation-msg error">
+                                <i class="fa-solid fa-circle-xmark"></i> {{ err }}
+                            </div>
+                        </div>
+                        <!-- Warnings (filtered to remove misalignment duplicates) -->
+                        <div v-if="filteredWarnings.length > 0" class="validation-warnings">
+                            <div v-for="(warn, i) in filteredWarnings" :key="'w'+i" class="validation-msg warning">
+                                <i class="fa-solid fa-triangle-exclamation"></i> {{ warn }}
+                            </div>
+                        </div>
+                        <!-- Alignment banner -->
+                        <div v-if="alignmentWarning" class="alignment-warning">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <div>
+                                <strong>Band misalignment detected</strong>
+                                <p>
+                                    Multi-camera sensor (~{{ maxShift }}px shift).
+                                    Approximate correction will be applied.
+                                    For accurate results, process with
+                                    <a href="https://webodm.org/" target="_blank">WebODM</a>.
+                                </p>
+                            </div>
+                        </div>
+                        <!-- Summary -->
+                        <div v-if="validationResult.ok || (validationResult.errors && validationResult.errors.length === 0)" class="merge-summary">
+                            <div class="summary-row" v-if="validationResult.summary">
+                                <div class="d-flex gap-3 flex-wrap">
+                                    <div v-if="validationResult.summary.crs"><strong>CRS:</strong> {{ validationResult.summary.crs }}</div>
+                                    <div><strong>Size:</strong> {{ validationResult.summary.width }}×{{ validationResult.summary.height }}</div>
+                                    <div><strong>Bands:</strong> {{ validationResult.summary.totalBands }} × {{ validationResult.summary.dataType }}</div>
+                                    <div v-if="estimatedSize"><strong>Est.:</strong> {{ estimatedSize }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Column 3: Preview -->
+                <div class="col-preview" v-if="previewUrl">
+                    <img :src="previewUrl" class="preview-thumb" alt="Merge preview" />
+                </div>
             </div>
 
-            <!-- Preview thumbnail -->
-            <div v-if="previewUrl" class="section preview-section">
-                <img :src="previewUrl" class="preview-thumb" alt="Merge preview" />
-            </div>
-
-            <!-- Output name -->
-            <div class="section">
-                <label class="section-label">Output path</label>
-                <InputText v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
-                    @input="validateOutputName" placeholder="merged.tif" />
-                <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
-            </div>
-
-            <!-- Delete source checkbox -->
-            <div class="section d-flex align-items-center gap-2">
-                <Checkbox v-model="deleteSource" :binary="true" inputId="deleteSrcCheckbox" />
-                <label for="deleteSrcCheckbox">Delete source files after merge</label>
-            </div>
-            <div v-if="deleteSource" class="delete-warning">
-                <i class="fa-solid fa-triangle-exclamation"></i> Source files will be permanently deleted after merge.
-            </div>
-
-            <!-- Actions -->
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close" severity="secondary" label="Cancel" />
-                <Button @click="merge" :disabled="!canMerge" severity="primary" label="Merge" />
+            <!-- Bottom section: Output + actions (full width) -->
+            <div class="bottom-row">
+                <div class="bottom-left">
+                    <div class="section">
+                        <label class="section-label">Output path</label>
+                        <InputText v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
+                            @input="validateOutputName" placeholder="merged.tif" />
+                        <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <Checkbox v-model="deleteSource" :binary="true" inputId="deleteSrcCheckbox" />
+                        <label for="deleteSrcCheckbox">Delete source files after merge</label>
+                    </div>
+                    <div v-if="deleteSource" class="delete-warning">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Source files will be permanently deleted after merge.
+                    </div>
+                </div>
+                <div class="bottom-actions">
+                    <Button @click="close" severity="secondary" label="Cancel" />
+                    <Button @click="merge" :disabled="!canMerge" severity="primary" label="Merge" />
+                </div>
             </div>
         </div>
     </Window>
@@ -149,6 +150,11 @@ export default {
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
             if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
             return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        },
+        filteredWarnings() {
+            const warnings = this.validationResult?.warnings || [];
+            if (!this.alignmentWarning) return warnings;
+            return warnings.filter(w => !w.toLowerCase().includes('misalignment'));
         },
         alignmentWarning() {
             const a = this.validationResult?.alignment;
@@ -333,8 +339,28 @@ export default {
     min-width: 400px;
 }
 
-.section {
-    margin-bottom: 0.75rem;
+.columns-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+}
+
+.col-bands {
+    flex: 0 0 auto;
+    min-width: 200px;
+    max-width: 280px;
+}
+
+.col-info {
+    flex: 1 1 0;
+    min-width: 200px;
+}
+
+.col-preview {
+    flex: 0 0 auto;
+    text-align: center;
+    display: flex;
+    align-items: flex-start;
 }
 
 .section-label {
@@ -348,17 +374,20 @@ export default {
     border: 1px solid var(--p-surface-300);
     border-radius: 0.375rem;
     overflow: hidden;
+    max-height: 280px;
+    overflow-y: auto;
 }
 
 .band-item {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
+    padding: 0.35rem 0.5rem;
     border-bottom: 1px solid var(--p-surface-200);
     cursor: grab;
     background: var(--p-surface-0);
     transition: background 0.15s;
+    font-size: 0.85rem;
 }
 
 .band-item:last-child {
@@ -380,7 +409,7 @@ export default {
 
 .band-index {
     font-weight: 600;
-    min-width: 1.5rem;
+    min-width: 1.2rem;
     color: var(--p-primary-color);
 }
 
@@ -393,14 +422,15 @@ export default {
 
 .band-meta {
     color: var(--p-surface-500);
-    font-size: 0.8rem;
+    font-size: 0.75rem;
 }
 
 .validation-msg {
-    padding: 0.3rem 0.5rem;
+    padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.8rem;
+    word-break: break-word;
 }
 
 .validation-msg.error {
@@ -414,21 +444,41 @@ export default {
 }
 
 .merge-summary {
-    padding: 0.5rem;
+    padding: 0.4rem 0.5rem;
     background: var(--p-surface-50);
     border-radius: 0.375rem;
-    font-size: 0.85rem;
-}
-
-.preview-section {
-    text-align: center;
+    font-size: 0.8rem;
+    margin-top: 0.5rem;
 }
 
 .preview-thumb {
-    max-width: 256px;
-    max-height: 256px;
+    max-width: 220px;
+    max-height: 220px;
     border: 1px solid var(--p-surface-200);
     border-radius: 0.375rem;
+}
+
+.bottom-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--p-surface-200);
+}
+
+.bottom-left {
+    flex: 1;
+}
+
+.bottom-left .section {
+    margin-bottom: 0.5rem;
+}
+
+.bottom-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-shrink: 0;
 }
 
 .output-error {
@@ -450,27 +500,36 @@ export default {
 
 .alignment-warning {
     display: flex;
-    gap: 0.6rem;
-    padding: 0.6rem 0.75rem;
+    gap: 0.5rem;
+    padding: 0.5rem 0.6rem;
     background: var(--p-orange-50);
     border-left: 3px solid var(--p-orange-400);
     border-radius: 0.375rem;
     margin-top: 0.5rem;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--p-orange-800);
 }
 
 .alignment-warning i {
-    margin-top: 0.15rem;
-    font-size: 1rem;
+    margin-top: 0.1rem;
+    font-size: 0.9rem;
 }
 
 .alignment-warning p {
-    margin: 0.3rem 0 0 0;
+    margin: 0.2rem 0 0 0;
 }
 
 .alignment-warning a {
     color: var(--p-orange-700);
     text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+    .columns-row {
+        flex-direction: column;
+    }
+    .col-bands {
+        max-width: 100%;
+    }
 }
 </style>
