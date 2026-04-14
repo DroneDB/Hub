@@ -41,6 +41,23 @@
                         <i class="fa-solid fa-triangle-exclamation"></i> {{ warn }}
                     </div>
                 </div>
+                <!-- Alignment banner -->
+                <div v-if="alignmentWarning" class="alignment-warning">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <div>
+                        <strong>Band misalignment detected</strong>
+                        <p>
+                            These images come from a multi-camera sensor where each band is
+                            captured from a slightly different viewpoint (~{{ maxShift }} pixel shift).
+                            An approximate correction will be applied during merge.
+                        </p>
+                        <p>
+                            For accurate results (vegetation indices, spectral analysis), process
+                            the raw imagery with a photogrammetry tool such as
+                            <a href="https://webodm.org/" target="_blank">WebODM</a>.
+                        </p>
+                    </div>
+                </div>
                 <!-- Summary -->
                 <div v-if="validationResult.ok || (validationResult.errors && validationResult.errors.length === 0)" class="merge-summary">
                     <div class="summary-row" v-if="validationResult.summary">
@@ -132,6 +149,13 @@ export default {
             if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
             if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
             return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        },
+        alignmentWarning() {
+            const a = this.validationResult?.alignment;
+            return a && a.detected && a.maxShiftPixels > 2;
+        },
+        maxShift() {
+            return Math.round(this.validationResult?.alignment?.maxShiftPixels || 0);
         }
     },
 
@@ -422,5 +446,31 @@ export default {
 .status-info {
     color: var(--p-surface-500);
     font-size: 0.85rem;
+}
+
+.alignment-warning {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    background: var(--p-orange-50);
+    border-left: 3px solid var(--p-orange-400);
+    border-radius: 0.375rem;
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--p-orange-800);
+}
+
+.alignment-warning i {
+    margin-top: 0.15rem;
+    font-size: 1rem;
+}
+
+.alignment-warning p {
+    margin: 0.3rem 0 0 0;
+}
+
+.alignment-warning a {
+    color: var(--p-orange-700);
+    text-decoration: underline;
 }
 </style>
