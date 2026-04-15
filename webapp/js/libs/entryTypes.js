@@ -36,6 +36,18 @@ function isPlantHealthCapable(entry) {
     return false;
 }
 
+function isThermalCapable(entry) {
+    if (!entry || !entry.properties) return false;
+
+    // Explicit thermal sensor from EXIF detection
+    if (entry.properties.sensorCategory === 'thermal' && isPlantHealthCapable(entry)) return true;
+
+    // Single-band GeoRasters (thermal mosaics, processed thermal orthophotos)
+    if (entry.type === ddb.entry.type.GEORASTER && Array.isArray(entry.properties.bands) && entry.properties.bands.length === 1) return true;
+
+    return false;
+}
+
 // Human-readable type names for display (extends entry.typeToHuman with display-friendly labels)
 const TYPE_DISPLAY_NAMES = {
     [ddb.entry.type.DIRECTORY]: 'Folder',
@@ -84,6 +96,7 @@ export {
     isThumbnailCandidate,
     isDroneDB,
     isPlantHealthCapable,
+    isThermalCapable,
     getTypeDisplayName,
     sortEntriesDirectoriesFirst
 };

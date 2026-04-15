@@ -11,6 +11,15 @@
                 :initialParams="plantHealthInitialParams"
                 @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
+            <ThermalControls
+                :visible="thermalVisible"
+                :dataset="dataset"
+                :filePath="thermalFilePath"
+                :initialParams="thermalInitialParams"
+                :spotInfo="thermalSpotInfo"
+                :areaStats="thermalAreaStats"
+                @close="closeThermal"
+                @vizParamsChanged="handleThermalVizParamsChanged" />
         </div>
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
             :basemaps="basemaps"
@@ -58,6 +67,7 @@ import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
+import ThermalControls from './ThermalControls.vue';
 import MapDialogs from './MapDialogs.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
@@ -68,7 +78,7 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { Control } from 'ol/control';
-import { isPlantHealthCapable } from '@/libs/entryTypes';
+import { isPlantHealthCapable, isThermalCapable } from '@/libs/entryTypes';
 
 // Mixins
 import mapAlertFlash from '@/composables/useMapAlertFlash';
@@ -76,12 +86,13 @@ import mapBasemap from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
 import mapMeasurements from '@/composables/useMapMeasurements';
 import mapPlantHealth from '@/composables/usePlantHealth';
+import mapThermal from '@/composables/useThermal';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, PlantHealthPanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
+        Map, TabViewLoader, OpacityControl, PlantHealthPanel, ThermalControls, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
     },
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapThermal],
     props: ["uri"],
     data: function () {
         return {
@@ -95,6 +106,7 @@ export default {
             vectorLayers: [],
             vectorLayerColors: {},
             measureControls: null,
+            dataset: null,
             canWrite: false,
             canDelete: false,
             canRead: false,
@@ -286,6 +298,21 @@ export default {
                     }
                 });
                 controlContainer.appendChild(phBtn);
+            }
+
+            // Thermal button (for thermal images)
+            if (isThermalCapable(entry)) {
+                const thBtn = document.createElement('button');
+                thBtn.title = 'Thermal';
+                thBtn.innerHTML = '<i class="fa-solid fa-temperature-high"></i>';
+                thBtn.addEventListener('click', () => {
+                    if (this.thermalVisible) {
+                        this.closeThermal();
+                    } else {
+                        this.openThermal(entry.path);
+                    }
+                });
+                controlContainer.appendChild(thBtn);
             }
 
             this.map.addControl(new Control({ element: controlContainer }));

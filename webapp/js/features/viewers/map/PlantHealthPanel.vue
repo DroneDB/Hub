@@ -61,13 +61,12 @@
             </div>
 
             <!-- Stretch Type -->
-            <div class="section" v-if="rasterInfo && ((rasterInfo.dataType && rasterInfo.dataType !== 'Byte') || selectedFormula)">
+            <div class="section" v-if="selectedFormula">
                 <label class="section-label">Stretch</label>
                 <select v-model="selectedStretch" @change="onStretchChange" class="panel-select">
                     <option value="percentile">Percentile (2%-98%)</option>
                     <option value="minmax">Min / Max</option>
                     <option value="stddev">Std Dev (±2σ)</option>
-                    <option value="none">None</option>
                     <option value="custom">Custom</option>
                 </select>
             </div>
@@ -104,7 +103,7 @@
             <!-- Reset / Toggle / Copy Link / Export -->
             <div class="section actions">
                 <button class="btn btn-secondary btn-sm" @click="reset">Reset</button>
-                <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView" :title="originalView ? 'Showing original — click to apply processing' : 'Showing processed — click to show original'">
+                <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView" :title="originalView ? 'Showing original - click to apply processing' : 'Showing processed - click to show original'">
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
                 </button>
                 <button class="btn btn-secondary btn-sm" @click="copyLink" title="Copy shareable link">
@@ -132,7 +131,7 @@ export default {
     components: { HistogramChart, ColormapDropdown, BandSelector },
     props: {
         visible: { type: Boolean, default: false },
-        dataset: { type: Object, required: true },
+        dataset: { type: Object, default: null },
         filePath: { type: String, default: null },
         initialParams: { type: Object, default: null }
     },
@@ -244,7 +243,7 @@ export default {
                 if (meta.colormaps) {
                     this.availableColormaps = meta.colormaps;
                 }
-                if (meta.autoBands) {
+                if (meta.autoBands && typeof meta.autoBands === 'string') {
                     this.customBands = meta.autoBands;
                 }
 
@@ -275,15 +274,16 @@ export default {
 
         async onFormulaChange() {
             this.selectedPreset = '';
-            if (this.selectedFormula) {
-                try {
-                    const meta = await this.dataset.getRasterMetadata(
-                        this.filePath, this.selectedFormula
-                    );
-                    this.metadata = meta;
-                } catch (e) {
-                    console.error('Failed to load formula metadata:', e);
-                }
+            if (!this.selectedFormula) {
+                this.rescale = '';
+            }
+            try {
+                const meta = await this.dataset.getRasterMetadata(
+                    this.filePath, this.selectedFormula || undefined
+                );
+                this.metadata = meta;
+            } catch (e) {
+                console.error('Failed to load formula metadata:', e);
             }
             this.computeRescaleFromStretch();
             this.apply();
@@ -296,8 +296,8 @@ export default {
             if (this.selectedFormula) params.formula = this.selectedFormula;
             if (this.customBands && !this.selectedPreset && !this.selectedFormula) params.bands = this.customBands;
             if (this.selectedFormula && this.selectedColormap) params.colormap = this.selectedColormap;
-            if (this.rescale) params.rescale = this.rescale;
-            if (this.selectedStretch) params.stretch = this.selectedStretch;
+            if (this.selectedFormula && this.rescale) params.rescale = this.rescale;
+            if (this.selectedFormula && this.selectedStretch) params.stretch = this.selectedStretch;
 
             this.$emit('vizParamsChanged', params);
         },
@@ -322,7 +322,7 @@ export default {
                 try {
                     const meta = await this.dataset.getRasterMetadata(this.filePath);
                     this.metadata = meta;
-                    if (meta.autoBands) this.customBands = meta.autoBands;
+                    if (meta.autoBands && typeof meta.autoBands === 'string') this.customBands = meta.autoBands;
                 } catch (e) {
                     console.error('Failed to reload metadata after reset:', e);
                 }
@@ -366,7 +366,7 @@ export default {
                 const mean = s.mean || 0;
                 this.rescale = `${(mean - 2 * std).toFixed(3)},${(mean + 2 * std).toFixed(3)}`;
             } else if (this.selectedStretch === 'none') {
-                this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
+                this.rescale = '';
             }
         },
 
@@ -388,7 +388,7 @@ export default {
             if (this.selectedFormula) vizParams.formula = this.selectedFormula;
             if (this.customBands && !this.selectedPreset && !this.selectedFormula) vizParams.bands = this.customBands;
             if (this.selectedFormula && this.selectedColormap) vizParams.colormap = this.selectedColormap;
-            if (this.rescale) vizParams.rescale = this.rescale;
+            if (this.selectedFormula && this.rescale) vizParams.rescale = this.rescale;
 
             const url = this.dataset.exportUrl(this.filePath, vizParams);
             try {
@@ -447,7 +447,7 @@ export default {
 .plant-health-panel {
     position: absolute;
     top: 0.5rem;
-    right: 0.5rem;
+    right: 4rem;
     z-index: 2;
     width: 16rem;
     background: rgba(0, 0, 0, 0.85);

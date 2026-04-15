@@ -53,9 +53,13 @@ export default {
                 const source = layer.getSource();
                 if (!source) return;
 
-                // Only apply vizParams to the file that has plant health open
-                const vizParams = (this.plantHealthFilePath && layerPath === this.plantHealthFilePath)
-                    ? this.currentVizParams : {};
+                // Apply vizParams to the file that has plant health or thermal open
+                let vizParams = {};
+                if (this.plantHealthFilePath && layerPath === this.plantHealthFilePath) {
+                    vizParams = this.currentVizParams;
+                } else if (this.thermalFilePath && layerPath === this.thermalFilePath) {
+                    vizParams = this.currentVizParams;
+                }
 
                 const url = this._getLayerUrl(layer);
                 if (!url) return;

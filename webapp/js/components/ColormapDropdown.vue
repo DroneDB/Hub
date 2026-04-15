@@ -135,7 +135,6 @@ export default {
     min-width: 3rem;
     height: 0.7rem;
     border-radius: 2px;
-    border: 1px solid rgba(255,255,255,0.15);
 }
 
 .colormap-label {

@@ -115,6 +115,18 @@ module.exports = class Dataset {
         return this.registry.postRequest(`${this.baseApi}/merge-multispectral`, { paths, outputPath });
     }
 
+    async getThermalInfo(path) {
+        return this.registry.getRequest(`${this.baseApi}/thermal-info?path=${encodeURIComponent(path)}`);
+    }
+
+    async getThermalPoint(path, x, y) {
+        return this.registry.getRequest(`${this.baseApi}/thermal-point?path=${encodeURIComponent(path)}&x=${x}&y=${y}`);
+    }
+
+    async getThermalAreaStats(path, x0, y0, x1, y1) {
+        return this.registry.getRequest(`${this.baseApi}/thermal-area-stats?path=${encodeURIComponent(path)}&x0=${x0}&y0=${y0}&x1=${x1}&y1=${y1}`);
+    }
+
     exportUrl(path, vizParams = {}) {
         let url = `${this.baseApi}/export?path=${encodeURIComponent(path)}&format=geotiff`;
         if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;

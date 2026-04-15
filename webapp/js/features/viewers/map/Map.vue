@@ -14,6 +14,15 @@
                 :initialParams="plantHealthInitialParams"
                 @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
+            <ThermalControls
+                :visible="thermalVisible"
+                :dataset="dataset"
+                :filePath="thermalFilePath"
+                :initialParams="thermalInitialParams"
+                :spotInfo="thermalSpotInfo"
+                :areaStats="thermalAreaStats"
+                @close="closeThermal"
+                @vizParamsChanged="handleThermalVizParamsChanged" />
         </div>
         <MapDialogs
             :alertDialogOpen="alertDialogOpen"
@@ -105,6 +114,7 @@ import TileWMS from 'ol/source/TileWMS';
 import Toolbar from '@/components/Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
+import ThermalControls from './ThermalControls.vue';
 import MapDialogs from './MapDialogs.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
@@ -120,7 +130,7 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
-import { isPlantHealthCapable } from '@/libs/entryTypes';
+import { isPlantHealthCapable, isThermalCapable } from '@/libs/entryTypes';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -130,15 +140,16 @@ import mapBasemap from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
 import mapMeasurements from '@/composables/useMapMeasurements';
 import mapPlantHealth from '@/composables/usePlantHealth';
+import mapThermal from '@/composables/useThermal';
 import emitter from '@/libs/eventBus';
 
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
+        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, ThermalControls, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
     },
     emits: ['scrollTo', 'openItem'],
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapThermal],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -258,6 +269,19 @@ export default {
                 } else {
                     const rasterFile = this.files.find(f => f.entry && isPlantHealthCapable(f.entry));
                     if (rasterFile) this.openPlantHealth(rasterFile);
+                }
+            }
+        });
+        tools.push({
+            id: 'thermal',
+            title: 'Thermal — Open thermal visualization panel',
+            icon: 'fa-solid fa-temperature-high',
+            onClick: () => {
+                if (this.thermalVisible) {
+                    this.closeThermal();
+                } else {
+                    const thermalFile = this.files.find(f => f.entry && isThermalCapable(f.entry));
+                    if (thermalFile) this.openThermal(thermalFile);
                 }
             }
         });
