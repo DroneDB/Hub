@@ -560,10 +560,22 @@ export default {
         handleTableSelectionChanged(file) {
             // Update selected file for DetailPanel
             const selectedFiles = this.fileBrowserFiles.filter(f => f.selected);
-            this.selectedDetailFile = selectedFiles.length === 1 ? selectedFiles[0] : null;
+            const newDetailFile = selectedFiles.length === 1 ? selectedFiles[0] : null;
+
+            // If the detail panel is already open, update immediately (no reflow).
+            // If it's closed, delay opening to avoid reflow that disrupts double-click.
+            clearTimeout(this._detailPanelTimeout);
+            if (this.selectedDetailFile || !newDetailFile) {
+                this.selectedDetailFile = newDetailFile;
+            } else {
+                this._detailPanelTimeout = setTimeout(() => {
+                    this.selectedDetailFile = newDetailFile;
+                }, 250);
+            }
         },
 
         handleDetailPanelClose() {
+            clearTimeout(this._detailPanelTimeout);
             this.selectedDetailFile = null;
         },
 
@@ -613,6 +625,7 @@ export default {
         },
 
         handleOpenItem: async function (node, view, options) {
+            clearTimeout(this._detailPanelTimeout);
             // If it's a directory, navigate into it
             if (ddb.entry.isDirectory(node.entry)) {
                 emitter.emit("folderOpened", pathutils.getTree(node.entry.path));
