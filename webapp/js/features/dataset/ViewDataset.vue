@@ -560,7 +560,11 @@ export default {
         handleTableSelectionChanged(file) {
             // Update selected file for DetailPanel
             const selectedFiles = this.fileBrowserFiles.filter(f => f.selected);
-            const newDetailFile = selectedFiles.length === 1 ? selectedFiles[0] : null;
+
+            // Use the clicked file if it's selected, otherwise pick the first selected file
+            const newDetailFile = selectedFiles.length > 0
+                ? (file && file.selected ? file : selectedFiles[0])
+                : null;
 
             // If the detail panel is already open, update immediately (no reflow).
             // If it's closed, delay opening to avoid reflow that disrupts double-click.

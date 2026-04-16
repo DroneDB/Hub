@@ -365,7 +365,6 @@ export default {
                 // Range selection
                 this.selectedFiles.forEach(f => f.selected = false);
                 this.selectRange(this.rangeStartIdx, idx);
-                return;
             } else if (Keyboard.isCtrlPressed()) {
                 // Toggle selection
                 file.selected = !file.selected;

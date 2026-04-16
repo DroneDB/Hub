@@ -315,7 +315,7 @@ export default {
                 this.rangeStartThumb = thumb;
             }
 
-            this.$emit('selectionChanged');
+            this.$emit('selectionChanged', file);
         },
 
         selectRange: function (startThumb, endThumb) {
