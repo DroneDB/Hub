@@ -77,7 +77,7 @@ export default {
          * Open a dialog showing all properties of a feature.
          */
         showFeaturePropertiesDialog(feature) {
-            const properties = { ...feature.getProperties() };
+            const properties = { ...(feature.getProperties() || {}) };
             delete properties.geometry;
 
             let title = 'Feature Properties';
@@ -95,14 +95,25 @@ export default {
 
             const container = document.createElement('div');
             document.body.appendChild(container);
+
+            const cleanup = () => {
+                try {
+                    dialogApp.unmount();
+                } catch (_) { /* already unmounted */ }
+                if (container.parentNode) {
+                    document.body.removeChild(container);
+                }
+            };
+
             const dialogApp = createApp(FeatureInfoDialog, {
                 title,
                 properties,
-                onOnClose: () => {
-                    dialogApp.unmount();
-                    document.body.removeChild(container);
-                }
+                onOnClose: cleanup
             });
+            dialogApp.config.errorHandler = (err) => {
+                console.error('FeatureInfoDialog error:', err);
+                cleanup();
+            };
             dialogApp.use(PrimeVue, { theme: { preset: Lara } });
             dialogApp.mount(container);
         },

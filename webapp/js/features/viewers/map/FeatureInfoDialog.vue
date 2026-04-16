@@ -1,7 +1,8 @@
 <template>
-    <Window :title="title" id="feature-info" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window :title="title" id="feature-info" @onClose="close('close')" modal closeModalOnClick maxWidth="70%" fixedSize>
         <div class="feature-info-content">
-            <div v-for="(categoryProps, category) in categorizedProperties" :key="category" class="category-section" v-if="Object.keys(categoryProps).length > 0">
+            <template v-for="(categoryProps, category) in categorizedProperties" :key="category">
+            <div class="category-section" v-if="categoryProps && Object.keys(categoryProps).length > 0">
                 <h3 class="category-title">{{ category }}</h3>
                 <table class="properties-table">
                     <tr v-for="(value, key) in categoryProps" :key="key">
@@ -15,6 +16,7 @@
                     </tr>
                 </table>
             </div>
+            </template>
         </div>
 
         <div class="text-end mt-3">
@@ -68,6 +70,8 @@ export default {
             for (const category in this.categoryGroups) {
                 result[category] = {};
             }
+
+            if (!this.properties || typeof this.properties !== 'object') return result;
 
             // Assign properties to categories
             for (const key in this.properties) {

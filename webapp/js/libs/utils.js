@@ -121,6 +121,7 @@ export function debounce(fn, delay) {
 }
 
 export function sortObjectKeys(unorderedObj) {
+    if (!unorderedObj || typeof unorderedObj !== 'object') return unorderedObj;
     return Object.keys(unorderedObj).sort().reduce(
         (obj, key) => {
             obj[key] = unorderedObj[key];
