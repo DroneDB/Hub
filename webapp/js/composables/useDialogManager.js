@@ -177,10 +177,10 @@ export default {
         },
 
         async handleDeleteClose(id) {
+            this.deleteDialogOpen = false;
             if (id == "remove") {
                 await this.deleteSelectedFiles();
             }
-            this.deleteDialogOpen = false;
         },
 
         // Delete Result Dialog
