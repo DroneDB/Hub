@@ -223,7 +223,7 @@ export default {
 
         return {
             Visibility,
-            skeletonRows: new Array(5).fill({}),
+            skeletonRows: new Array(10).fill({}),
             error: "",
             datasets: [],
             loading: true,
