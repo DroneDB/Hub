@@ -340,6 +340,20 @@ function mergeMultispectralItem(ctx) {
     };
 }
 
+function maskBordersItem(ctx) {
+    return {
+        label: 'Mask Borders',
+        icon: 'fa-solid fa-eraser',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite &&
+                sel.length === 1 &&
+                sel[0].entry.type === ddb.entry.type.GEORASTER;
+        },
+        click: () => ctx.emit('maskBorders', ctx.getSelectedEntries()[0])
+    };
+}
+
 function buildActionMenuItems(ctx) {
     return [
         editItem(ctx),
@@ -349,6 +363,7 @@ function buildActionMenuItems(ctx) {
         downloadItem(ctx),
         buildItem(ctx),
         mergeMultispectralItem(ctx),
+        maskBordersItem(ctx),
         transferItem(ctx),
         setThumbnailItem(ctx)
     ];

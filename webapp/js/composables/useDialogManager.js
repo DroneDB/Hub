@@ -5,6 +5,7 @@
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import emitter from '@/libs/eventBus';
+import BuildManager from '@/libs/build/buildManager';
 
 export default {
     data() {
@@ -36,7 +37,12 @@ export default {
 
             // Merge multispectral dialog
             mergeMultispectralDialogOpen: false,
-            mergeMultispectralFiles: []
+            mergeMultispectralFiles: [],
+
+            // Mask borders dialog
+            maskBordersConfirmOpen: false,
+            maskBordersEntry: null,
+            maskBordersOutputPath: null
         };
     },
 
@@ -503,6 +509,48 @@ export default {
                 } catch (e) {
                     console.warn('Could not refresh file browser after merge:', e);
                 }
+            }
+        },
+
+        // Mask Borders
+        async handleMaskBorders(entry) {
+            try {
+                const check = await this.dataset.checkMaskedFileExists(entry.entry.path);
+
+                if (check.exists) {
+                    this.maskBordersEntry = entry;
+                    this.maskBordersOutputPath = check.outputPath;
+                    this.maskBordersConfirmOpen = true;
+                    return;
+                }
+
+                await this.startMaskBorders(entry);
+            } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
+            }
+        },
+
+        async handleMaskBordersConfirm(action) {
+            this.maskBordersConfirmOpen = false;
+            if (action === 'confirm') {
+                await this.startMaskBorders(this.maskBordersEntry);
+            }
+            this.maskBordersEntry = null;
+            this.maskBordersOutputPath = null;
+        },
+
+        async startMaskBorders(entry) {
+            try {
+                await this.dataset.maskBorders(entry.entry.path);
+                this.$toast.add({
+                    severity: 'info',
+                    summary: 'Mask Borders',
+                    detail: `Masking started for ${entry.label}...`,
+                    life: 5000
+                });
+                BuildManager.startPolling(this.dataset);
+            } catch (e) {
+                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
             }
         }
     }

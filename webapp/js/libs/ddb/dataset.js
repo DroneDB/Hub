@@ -127,6 +127,14 @@ module.exports = class Dataset {
         return this.registry.getRequest(`${this.baseApi}/thermal-area-stats?path=${encodeURIComponent(path)}&x0=${x0}&y0=${y0}&x1=${x1}&y1=${y1}`);
     }
 
+    async checkMaskedFileExists(path) {
+        return this.registry.postRequest(`${this.baseApi}/mask-borders/check`, { path });
+    }
+
+    async maskBorders(path, near = 15, white = false) {
+        return this.registry.postRequest(`${this.baseApi}/mask-borders`, { path, near, white });
+    }
+
     exportUrl(path, vizParams = {}) {
         let url = `${this.baseApi}/export?path=${encodeURIComponent(path)}&format=geotiff`;
         if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;

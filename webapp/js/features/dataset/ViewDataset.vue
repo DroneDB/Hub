@@ -16,7 +16,7 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" />
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
             </div>
             </template>
             <template #second>
@@ -34,7 +34,7 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" />
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
                 </template>
                 <template v-slot:map>
                     <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
@@ -51,7 +51,7 @@
                                 @setAsCover="setAsCover"
                                 @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" />
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -74,7 +74,7 @@
                                 @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" />
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -127,6 +127,12 @@
             @onClose="handleSetCoverClose" />
         <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
+        <ConfirmDialog v-if="maskBordersConfirmOpen"
+            title="Mask Borders"
+            :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
+            confirmText="Overwrite"
+            confirmButtonClass="danger"
+            @onClose="handleMaskBordersConfirm" />
         <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
         <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
             :sourceOrg="dataset.org" :sourceDs="dataset.ds"></TransferDialog>
