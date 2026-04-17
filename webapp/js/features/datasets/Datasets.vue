@@ -80,6 +80,7 @@
             <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
                 @row-click="onRowClick" @row-contextmenu="onRowContextMenu" rowHover class="ds-table"
                 scrollable scrollHeight="flex"
+                :sortField="sortColumn" :sortOrder="sortOrderPrimevue" @sort="onSort"
                 :pt="{ bodyRow: { style: 'cursor: pointer' } }">
                 <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
@@ -441,6 +442,9 @@ export default {
             }
 
             return pages;
+        },
+        sortOrderPrimevue: function () {
+            return this.sortDirection === 'asc' ? 1 : -1;
         }
     },
     watch: {
@@ -449,9 +453,11 @@ export default {
             this.savePreferences();
         },
         sortColumn: function () {
+            this.currentPage = 1;
             this.savePreferences();
         },
         sortDirection: function () {
+            this.currentPage = 1;
             this.savePreferences();
         }
     }, methods: {
@@ -473,6 +479,11 @@ export default {
             if (visibility === Visibility.PUBLIC) return 'Public';
             if (visibility === Visibility.UNLISTED) return 'Unlisted';
             return 'Private';
+        },
+
+        onSort(event) {
+            this.sortColumn = event.sortField;
+            this.sortDirection = event.sortOrder === 1 ? 'asc' : 'desc';
         },
 
         sortBy(column) {
