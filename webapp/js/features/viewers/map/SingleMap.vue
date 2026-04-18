@@ -294,6 +294,11 @@ export default {
                     if (this.plantHealthVisible) {
                         this.closePlantHealth();
                     } else {
+
+                        // If thermal panel is open, close it since they share the same files and it can be confusing to have both open at the same time
+                        if (this.thermalVisible)
+                            this.closeThermal();
+
                         this.openPlantHealth(entry.path);
                     }
                 });
@@ -309,6 +314,11 @@ export default {
                     if (this.thermalVisible) {
                         this.closeThermal();
                     } else {
+
+                        // If plant health panel is open, close it since they share the same files and it can be confusing to have both open at the same time
+                        if (this.plantHealthVisible)
+                            this.closePlantHealth();
+
                         this.openThermal(entry.path);
                     }
                 });

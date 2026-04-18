@@ -261,12 +261,17 @@ export default {
         tools.push({ id: 'separator' });
         tools.push({
             id: 'plant-health',
-            title: 'Plant Health — Open multispectral visualization panel',
+            title: 'Plant Health - Open multispectral visualization panel',
             icon: 'fa-solid fa-leaf',
             onClick: () => {
                 if (this.plantHealthVisible) {
                     this.closePlantHealth();
                 } else {
+
+                    // If thermal panel is open, close it since they share the same files and it can be confusing to have both open at the same time
+                    if (this.thermalVisible)
+                        this.closeThermal();
+
                     const rasterFile = this.files.find(f => f.entry && isPlantHealthCapable(f.entry));
                     if (rasterFile) this.openPlantHealth(rasterFile);
                 }
@@ -274,12 +279,17 @@ export default {
         });
         tools.push({
             id: 'thermal',
-            title: 'Thermal — Open thermal visualization panel',
+            title: 'Thermal - Open thermal visualization panel',
             icon: 'fa-solid fa-temperature-high',
             onClick: () => {
                 if (this.thermalVisible) {
                     this.closeThermal();
                 } else {
+
+                    // If plant health panel is open, close it since they share the same files and it can be confusing to have both open at the same time
+                    if (this.plantHealthVisible)
+                        this.closePlantHealth();
+
                     const thermalFile = this.files.find(f => f.entry && isThermalCapable(f.entry));
                     if (thermalFile) this.openThermal(thermalFile);
                 }
