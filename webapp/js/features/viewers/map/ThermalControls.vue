@@ -81,9 +81,16 @@
                 <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView">
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
                 </button>
-                <button class="btn btn-secondary btn-sm" @click="exportGeoTiff" :disabled="exporting" title="Export GeoTIFF">
+                <button v-if="!isExportTooLarge"
+                        class="btn btn-secondary btn-sm"
+                        @click="exportGeoTiff"
+                        :disabled="exporting"
+                        title="Export GeoTIFF">
                     <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
                 </button>
+                <span v-else class="export-limit-hint" :title="exportLimitTooltip">
+                    <i class="fas fa-download"></i>
+                </span>
             </div>
         </div>
 
@@ -95,6 +102,9 @@
 
 <script>
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
+import reg from '@/libs/api/sharedRegistry';
+import { Features } from '@/libs/features';
+import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 
 export default {
     components: { ColormapDropdown },
@@ -129,6 +139,21 @@ export default {
             exporting: false,
             originalView: false
         };
+    },
+
+    computed: {
+        maxExportSizeBytes() {
+            return reg.getFeatureValue(Features.MAX_EXPORT_SIZE_BYTES);
+        },
+        isExportTooLarge() {
+            return computeIsExportTooLarge(this.thermalInfo, this.maxExportSizeBytes);
+        },
+        exportLimitTooltip() {
+            const limit = this.maxExportSizeBytes;
+            return limit
+                ? `Export disabled: estimated output exceeds the configured limit (${formatBytes(limit)})`
+                : 'Export disabled';
+        }
     },
 
     watch: {
@@ -430,6 +455,18 @@ export default {
 
 .btn-sm {
     flex: 1;
+}
+
+.export-limit-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 0.85rem;
+    color: #aaa;
+    cursor: default;
+    flex: 1;
+    justify-content: center;
 }
 
 .no-calibration-info {
