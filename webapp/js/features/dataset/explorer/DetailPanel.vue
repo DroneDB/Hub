@@ -35,7 +35,7 @@
             <!-- Properties section -->
             <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
-                <ObjTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" />
+                <PropsTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" />
             </div>
 
             <!-- Actions section -->
@@ -62,12 +62,13 @@
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import ddb from 'ddb';
-import ObjTable from '@/components/ObjTable.vue';
+import PropsTable from '@/components/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
+import { buildAllProperties, isDirectory } from '@/libs/propertiesUtils';
 
 export default {
-    components: { ObjTable, Button, Message },
+    components: { PropsTable, Button, Message },
     props: {
         file: {
             type: Object,
@@ -90,7 +91,7 @@ export default {
     },
     computed: {
         isDirectory() {
-            return this.file && ddb.entry.isDirectory(this.file.entry);
+            return this.file && isDirectory(this.file.entry);
         },
         hasThumbnailSupport() {
             if (!this.file || this.isDirectory) return false;
@@ -148,47 +149,7 @@ export default {
         },
         allProperties() {
             if (!this.file) return null;
-            const entry = this.file.entry;
-            const props = {};
-
-            props['type'] = this.getFileType(this.file);
-            props['path'] = entry.path;
-            if (!this.isDirectory && entry.size) {
-                props['size'] = this.getFileSize(this.file);
-            }
-            if (entry.hash) {
-                props['hash'] = entry.hash;
-            }
-            if (entry.mtime) {
-                props['modified'] = this.getModifiedDate(this.file);
-            }
-            if (entry.point_geom && entry.point_geom.geometry && entry.point_geom.geometry.coordinates) {
-                const coords = entry.point_geom.geometry.coordinates;
-                let coordStr = '';
-                if (entry.point_geom.crs && entry.point_geom.crs.properties && entry.point_geom.crs.properties.name) {
-                    coordStr += entry.point_geom.crs.properties.name + ' ';
-                }
-                coordStr += coords[0] + ', ' + coords[1];
-                if (coords[2] !== undefined) {
-                    coordStr += ', ' + coords[2].toFixed(2) + 'm';
-                }
-                props['coordinates'] = coordStr;
-            }
-            if (entry.properties && entry.properties.meta) {
-                props['metadata'] = entry.properties.meta;
-            }
-
-            // Extended properties
-            if (entry.properties) {
-                const excluded = ['meta', 'permissions'];
-                for (const key in entry.properties) {
-                    if (!excluded.includes(key)) {
-                        props[key] = entry.properties[key];
-                    }
-                }
-            }
-
-            return Object.keys(props).length > 0 ? props : null;
+            return buildAllProperties(this.file);
         }
     },
     watch: {

@@ -49,25 +49,29 @@ export function clone(obj) {
     }
 }
 
+/**
+ * Format bytes to human-readable string using binary units (1 KB = 1024 bytes).
+ * This is the single source of truth for file size formatting across the app.
+ * @param {number} bytes - The number of bytes
+ * @param {number} [decimals=2] - Number of decimal places
+ * @returns {string} Formatted size string (e.g., "1.50 MB")
+ */
 export function bytesToSize(bytes, decimals = 2) {
-    if (bytes == 0) return '0 byte';
-    var k = 1000; // or 1024 for binary
-    var dm = decimals || 3;
-    var sizes = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
-    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    if (bytes == 0) return '0 B';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
 
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {
-    var fse = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
+    const fse = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;
 
     // If no element is in full-screen
-    if (fse === null)
-        return false;
-    else
-        return true;
+    return fse !== null;
 }
 
 export function supportsFullScreen() {
@@ -82,7 +86,7 @@ export function requestFullScreen(element) {
     }
 
     // Supports most browsers and their versions.
-    var requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
+    const requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
 
     if (requestMethod) { // Native full screen.
         requestMethod.call(element);

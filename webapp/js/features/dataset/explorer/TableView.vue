@@ -103,7 +103,7 @@ import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, buildFile } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { formatFileSize } from '@/libs/textFileUtils';
+import { bytesToSize } from '@/libs/utils';
 
 import ddb from 'ddb';
 const { pathutils, entry } = ddb;
@@ -414,7 +414,7 @@ export default {
         getFileSize: function(file) {
             if (entry.isDirectory(file.entry)) return '';
             if (!file.entry.size) return '';
-            return formatFileSize(file.entry.size);
+            return bytesToSize(file.entry.size);
         },
 
         getModifiedDate: function(file) {

@@ -62,7 +62,8 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Keyboard from '@/libs/keyboard';
-import { getLanguageMode, formatFileSize, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '@/libs/textFileUtils';
+import { getLanguageMode, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '@/libs/textFileUtils';
+import { bytesToSize } from '@/libs/utils';
 
 // CodeMirror imports
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
@@ -128,11 +129,11 @@ export default {
         },
 
         formattedSize() {
-            return formatFileSize(this.entry?.size || 0);
+            return bytesToSize(this.entry?.size || 0);
         },
 
         formattedMaxSize() {
-            return formatFileSize(MAX_TEXT_FILE_SIZE);
+            return bytesToSize(MAX_TEXT_FILE_SIZE);
         },
 
         canFormatFile() {

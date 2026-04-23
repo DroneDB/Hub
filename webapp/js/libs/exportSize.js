@@ -74,19 +74,7 @@ export function isExportTooLarge(info, maxBytes) {
 }
 
 /**
- * Human-readable byte size formatter (binary units, matches server-side FormatBytes).
- * @param {number} bytes
- * @returns {string}
+ * Human-readable byte size formatter.
+ * Re-exports bytesToSize from utils.js as the single source of truth.
  */
-export function formatBytes(bytes) {
-    if (!bytes || bytes <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let value = bytes;
-    let unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-        value /= 1024;
-        unit++;
-    }
-    const rounded = value >= 100 ? Math.round(value) : Math.round(value * 100) / 100;
-    return `${rounded} ${units[unit]}`;
-}
+export { bytesToSize as formatBytes } from './utils';

@@ -1,6 +1,9 @@
 /**
  * Utility functions for handling properties from geo features
  */
+import ddb from 'ddb';
+import { getTypeDisplayName } from '@/libs/entryTypes';
+import { bytesToSize } from '@/libs/utils';
 
 /**
  * Extracts the best display name from a feature's properties, checking various property names
@@ -37,4 +40,104 @@ export function extractFeatureDisplayName(properties, defaultValue = 'Unknown fe
 
     // Fallback to default
     return defaultValue;
+}
+
+/**
+ * Check if an entry is a directory
+ * @param {Object} entry - The entry object
+ * @returns {boolean}
+ */
+export function isDirectory(entry) {
+    return ddb.entry.isDirectory(entry);
+}
+
+/**
+ * Get human-readable file type name
+ * @param {number} type - The entry type code
+ * @returns {string}
+ */
+export function getFileTypeName(type) {
+    return getTypeDisplayName(type);
+}
+
+/**
+ * Format file size for display (-- for directories/missing)
+ * @param {Object} entry - The entry object
+ * @returns {string}
+ */
+export function getFileSizeDisplay(entry) {
+    if (isDirectory(entry)) return '--';
+    if (!entry.size) return '--';
+    return bytesToSize(entry.size);
+}
+
+/**
+ * Format modification timestamp to locale string
+ * @param {number} mtime - Unix timestamp (seconds)
+ * @returns {string}
+ */
+export function formatModifiedDate(mtime) {
+    if (!mtime) return '--';
+    return new Date(mtime * 1000).toLocaleString();
+}
+
+/**
+ * Format coordinates from point_geom geometry
+ * @param {Object} pointGeom - The point_geom object
+ * @returns {string|null}
+ */
+export function formatCoordinates(pointGeom) {
+    if (!pointGeom || !pointGeom.geometry || !pointGeom.geometry.coordinates) return null;
+    const coords = pointGeom.geometry.coordinates;
+    let coordStr = '';
+    if (pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name) {
+        coordStr += pointGeom.crs.properties.name + ' ';
+    }
+    coordStr += coords[0] + ', ' + coords[1];
+    if (coords[2] !== undefined) {
+        coordStr += ', ' + coords[2].toFixed(2) + 'm';
+    }
+    return coordStr;
+}
+
+/**
+ * Build the complete properties object for display (same logic as DetailPanel)
+ * @param {Object} file - The file object with entry property
+ * @returns {Object|null}
+ */
+export function buildAllProperties(file) {
+    if (!file) return null;
+    const entry = file.entry;
+    const props = {};
+
+    props['type'] = getFileTypeName(entry.type);
+    props['path'] = entry.path;
+    if (!isDirectory(entry) && entry.size) {
+        props['size'] = getFileSizeDisplay(entry);
+    }
+    if (entry.hash) {
+        props['hash'] = entry.hash;
+    }
+    if (entry.mtime) {
+        props['modified'] = formatModifiedDate(entry.mtime);
+    }
+    const coordStr = formatCoordinates(entry.point_geom);
+    if (coordStr) {
+        props['coordinates'] = coordStr;
+    }
+    if (entry.properties && entry.properties.meta) {
+        props['metadata'] = entry.properties.meta;
+    }
+
+    // Extended properties (exclude meta and permissions)
+    if (entry.properties) {
+        const excluded = ['meta', 'permissions'];
+        for (const key in entry.properties) {
+            if (!excluded.includes(key)) {
+                props[key] = entry.properties[key];
+            }
+        }
+    }
+
+    return Object.keys(props).length > 0 ? props : null;
 }

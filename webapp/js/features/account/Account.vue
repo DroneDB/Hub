@@ -142,9 +142,7 @@ export default {
         await this.loadUserInfo();
     },
     methods: {
-        formatBytes(bytes) {
-            return bytesToSize(bytes);
-        },
+        formatBytes: bytesToSize,
 
         async loadUserInfo() {
             this.loading = true;

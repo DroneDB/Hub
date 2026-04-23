@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import ddb from 'ddb';
+import { bytesToSize } from './utils';
 const { pathutils } = ddb;
 
 // Extensions that should open as text by default
@@ -113,17 +114,6 @@ function getLanguageMode(path) {
 }
 
 /**
- * Format file size for display
- */
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-/**
  * Check if file format supports auto-formatting
  */
 function canFormat(path) {
@@ -173,7 +163,6 @@ export {
     canOpenAsText,
     shouldOpenAsText,
     getLanguageMode,
-    formatFileSize,
     canFormat,
     formatContent
 };

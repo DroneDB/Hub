@@ -1,102 +1,78 @@
 <template>
     <Window height="80%" width="40%" title="Properties" id="properties"
         @onClose="$emit('onClose', $event, arguments[1])">
-        <div v-if="files.length === 1">
-            <table class="ui compact celled definition unstackable table">
-                <tbody>
-                    <tr>
-                        <td>Name</td>
-                        <td>{{ files[0].label }}</td>
-                    </tr>
-                    <tr v-if="files[0].entry.size">
-                        <td>Size</td>
-                        <td>{{ bytesToSize(files[0].entry.size) }}</td>
-                    </tr>
-                    <tr>
-                        <td>Type</td>
-                        <td>{{ typeToHuman(files[0]) }}</td>
-                    </tr>
-                </tbody>
-            </table>
-            <ObjTable v-if="files[0].entry.properties != null" :obj="files[0].entry.properties"></ObjTable>
+        <div v-if="files.length === 1" class="text-selectable">
+            <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserveOrder="true" />
         </div>
         <div v-if="files.length >= 2">
-            <div>{{ files.length }} items</div>
-            <table class="ui compact celled definition unstackable table mt">
-                <tbody>
-                    <tr>
-                        <td>Size</td>
-                        <td>{{ sumSizes(files) }}</td>
-                    </tr>
-                    <tr>
-                        <td>Type</td>
-                        <td>{{ typesToHuman(files) }}</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="multi-count">{{ files.length }} items</div>
+            <DataTable :value="multiFileRows" size="small" :showGridlines="true" class="multi-props-datatable">
+                <Column field="key" style="font-weight: 600; width: 40%; white-space: nowrap;" />
+                <Column field="value" />
+            </DataTable>
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import ObjTable from '@/components/ObjTable.vue';
+import PropsTable from '@/components/PropsTable.vue';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import { buildAllProperties, getFileTypeName } from '@/libs/propertiesUtils';
 import { bytesToSize } from '@/libs/utils';
-import ddb from 'ddb';
 
 export default {
     components: {
-        Window, ObjTable
+        Window, PropsTable, DataTable, Column
     },
     props: ['files'],
     emits: ['onClose'],
-    data: function () {
-        return {};
-    },
-    mounted: function () {
+    computed: {
+        singleFileProperties() {
+            if (!this.files || this.files.length !== 1) return null;
+            return buildAllProperties(this.files[0]);
+        },
+        multiFileRows() {
+            if (!this.files || this.files.length < 2) return [];
+            return [
+                { key: 'Size', value: this.sumSizes(this.files) },
+                { key: 'Type', value: this.typesToHuman(this.files) }
+            ];
+        }
     },
     methods: {
-        typeToHuman: function (file) {
-            return ddb.entry.typeToHuman(file.entry.type);
-        },
-
-        typesToHuman: function (files) {
-            if (!files) return "";
-            if (!files.length) return "";
-
+        typesToHuman(files) {
+            if (!files || !files.length) return "";
             const types = {};
-            files.forEach(f => types[this.typeToHuman(f)] = true);
+            files.forEach(f => types[getFileTypeName(f.entry.type)] = true);
             const keys = Object.keys(types);
-            if (keys.length >= 2) {
-                return "Multiple types";
-            } else {
-                return "All of type " + this.typeToHuman(files[0]);
-            }
+            if (keys.length >= 2) return "Multiple types";
+            return "All of type " + getFileTypeName(files[0].entry.type);
         },
-
-        bytesToSize,
 
         sumSizes(files) {
             let sum = 0;
-            files.forEach(f => {
-                if (f.entry) sum += f.entry.size;
-            });
-            return this.bytesToSize(sum);
+            files.forEach(f => { if (f.entry) sum += f.entry.size; });
+            return bytesToSize(sum);
         }
     }
 }
 </script>
 
 <style scoped>
-.ui.table {
-    word-break: break-all;
+.multi-count {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
 
-    &.mt {
-        margin-top: 0.5rem;
-    }
+.multi-props-datatable :deep(.p-datatable-thead) {
+    display: none;
+}
 
-    td:first-child {
-        width: 4.5rem;
-    }
+.multi-props-datatable :deep(.p-datatable-tbody > tr > td) {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+    vertical-align: top;
 }
 </style>
