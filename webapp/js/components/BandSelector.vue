@@ -31,7 +31,10 @@ export default {
     watch: {
         modelValue: {
             handler(val) {
-                if (!val) return;
+                if (!val) {
+                    this.selected = { r: 1, g: 2, b: 3 };
+                    return;
+                }
                 const parts = val.split(',').map(Number);
                 if (parts.length >= 3) {
                     this.selected = { r: parts[0], g: parts[1], b: parts[2] };
