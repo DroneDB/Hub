@@ -30,8 +30,15 @@ function isDroneDB(type) {
     return type === ddb.entry.type.DRONEDB;
 }
 
+// Returns the number of data bands, excluding alpha bands
+function countDataBands(entry) {
+    if (!entry || !Array.isArray(entry.properties?.bands)) return 0;
+    return entry.properties.bands.filter(b => b.colorInterp !== 'Alpha').length;
+}
+
 function isPlantHealthCapable(entry) {
-    if (entry.type === ddb.entry.type.GEORASTER) return true;
+    // GeoRasters need at least 2 data bands for vegetation indices / band mapping
+    if (entry.type === ddb.entry.type.GEORASTER) return countDataBands(entry) >= 2;
     if (entry.type === ddb.entry.type.GEOIMAGE && entry.polygon_geom && /\.tiff?$/i.test(entry.path)) return true;
     return false;
 }
@@ -40,10 +47,10 @@ function isThermalCapable(entry) {
     if (!entry || !entry.properties) return false;
 
     // Explicit thermal sensor from EXIF detection
-    if (entry.properties.sensorCategory === 'thermal' && isPlantHealthCapable(entry)) return true;
+    if (entry.properties.sensorCategory === 'thermal' && (entry.type === ddb.entry.type.GEORASTER || (entry.type === ddb.entry.type.GEOIMAGE && entry.polygon_geom && /\.tiff?$/i.test(entry.path)))) return true;
 
     // Single-band GeoRasters (thermal mosaics, processed thermal orthophotos)
-    if (entry.type === ddb.entry.type.GEORASTER && Array.isArray(entry.properties.bands) && entry.properties.bands.length === 1) return true;
+    if (entry.type === ddb.entry.type.GEORASTER && countDataBands(entry) === 1) return true;
 
     return false;
 }
