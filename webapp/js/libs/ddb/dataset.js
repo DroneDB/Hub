@@ -115,16 +115,50 @@ module.exports = class Dataset {
         return this.registry.postRequest(`${this.baseApi}/merge-multispectral`, { paths, outputPath });
     }
 
-    async getThermalInfo(path) {
-        return this.registry.getRequest(`${this.baseApi}/thermal-info?path=${encodeURIComponent(path)}`);
+    async getRasterValueInfo(path) {
+        return this.registry.getRequest(`${this.baseApi}/raster-value-info?path=${encodeURIComponent(path)}`);
     }
 
-    async getThermalPoint(path, x, y) {
-        return this.registry.getRequest(`${this.baseApi}/thermal-point?path=${encodeURIComponent(path)}&x=${x}&y=${y}`);
+    async getRasterPointValue(path, x, y) {
+        return this.registry.getRequest(`${this.baseApi}/raster-point-value?path=${encodeURIComponent(path)}&x=${x}&y=${y}`);
     }
 
-    async getThermalAreaStats(path, x0, y0, x1, y1) {
-        return this.registry.getRequest(`${this.baseApi}/thermal-area-stats?path=${encodeURIComponent(path)}&x0=${x0}&y0=${y0}&x1=${x1}&y1=${y1}`);
+    async getRasterAreaStats(path, x0, y0, x1, y1) {
+        return this.registry.getRequest(`${this.baseApi}/raster-area-stats?path=${encodeURIComponent(path)}&x0=${x0}&y0=${y0}&x1=${x1}&y1=${y1}`);
+    }
+
+    async getRasterProfile(path, lineStringGeoJson, samples = 256) {
+        // POST: GeoJSON geometries can exceed the URL length budget.
+        const body = {
+            path,
+            lineString: typeof lineStringGeoJson === 'string'
+                ? lineStringGeoJson
+                : JSON.stringify(lineStringGeoJson),
+            samples,
+        };
+        return this.registry.postRequest(`${this.baseApi}/raster-profile`, body);
+    }
+
+    async getStockpileMaterials() {
+        return this.registry.getRequest(`${this.baseApi}/stockpile/materials`);
+    }
+
+    async calculateStockpileVolume(path, polygonGeoJson, { baseMethod = 'lowest_perimeter', flatElevation = 0, material = null } = {}) {
+        const body = {
+            path,
+            polygon: typeof polygonGeoJson === 'string'
+                ? polygonGeoJson
+                : JSON.stringify(polygonGeoJson),
+            baseMethod,
+            flatElevation,
+            material,
+        };
+        return this.registry.postRequest(`${this.baseApi}/stockpile/calculate`, body);
+    }
+
+    async detectStockpile(path, lat, lon, { radius = 50, sensitivity = 0.5 } = {}) {
+        const body = { path, lat, lon, radius, sensitivity };
+        return this.registry.postRequest(`${this.baseApi}/stockpile/detect`, body);
     }
 
     async checkMaskedFileExists(path) {

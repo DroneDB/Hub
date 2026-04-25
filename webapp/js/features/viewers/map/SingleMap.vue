@@ -11,15 +11,47 @@
                 :initialParams="plantHealthInitialParams"
                 @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
-            <ThermalControls
-                :visible="thermalVisible"
+            <RasterAnalysisControls
+                :visible="rasterPanelVisible"
                 :dataset="dataset"
-                :filePath="thermalFilePath"
-                :initialParams="thermalInitialParams"
-                :spotInfo="thermalSpotInfo"
-                :areaStats="thermalAreaStats"
-                @close="closeThermal"
-                @vizParamsChanged="handleThermalVizParamsChanged" />
+                :filePath="rasterFilePath"
+                :initialParams="rasterInitialParams"
+                :spotInfo="rasterSpotInfo"
+                :areaStats="rasterAreaStats"
+                :profile="rasterProfile"
+                :profileLoading="rasterProfileLoading"
+                :profileError="rasterProfileError"
+                @close="closeRasterAnalysis"
+                @vizParamsChanged="handleRasterVizParamsChanged"
+                @pickProfile="handlePickProfile"
+                @clearProfile="handleClearProfile"
+                @profileHover="handleProfileHover" />
+            <StockpileVolumePanel
+                :visible="stockpilePanelVisible"
+                :loading="stockpileLoading"
+                :error="stockpileError"
+                :result="stockpileResult"
+                :baseMethod="stockpileBaseMethod"
+                :sensitivity="stockpileSensitivity"
+                :radius="stockpileRadius"
+                :material="stockpileMaterial"
+                :materials="stockpileMaterials"
+                :mode="stockpileMode"
+                :customDensity="stockpileCustomDensity"
+                :customCostPerTon="stockpileCustomCostPerTon"
+                @close="closeStockpileVolume"
+                @detectCenter="detectAtMapCenter"
+                @clickOnMap="startStockpileClickMode"
+                @drawPolygon="startStockpilePolygonDrawing"
+                @clearOverlay="clearStockpileOverlay"
+                @cancelMode="_stopStockpileInteractions"
+                @exportGeoJson="exportStockpileGeoJson"
+                @update:baseMethod="stockpileBaseMethod = $event"
+                @update:sensitivity="stockpileSensitivity = $event"
+                @update:radius="stockpileRadius = $event"
+                @update:material="stockpileMaterial = $event"
+                @update:customDensity="stockpileCustomDensity = $event"
+                @update:customCostPerTon="stockpileCustomCostPerTon = $event" />
         </div>
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
             :basemaps="basemaps"
@@ -61,13 +93,14 @@ import ddb from 'ddb';
 import HybridXYZ from '@/libs/map/olHybridXYZ';
 import olMeasure from './olMeasure';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
-import { transformExtent } from 'ol/proj';
+import { transformExtent, toLonLat } from 'ol/proj';
 import * as flatgeobuf from 'flatgeobuf';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
-import ThermalControls from './ThermalControls.vue';
+import RasterAnalysisControls from './RasterAnalysisControls.vue';
+import StockpileVolumePanel from './StockpileVolumePanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
@@ -78,7 +111,7 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { Control } from 'ol/control';
-import { isPlantHealthCapable, isThermalCapable } from '@/libs/entryTypes';
+import { isPlantHealthCapable, isRasterAnalysisCapable } from '@/libs/entryTypes';
 
 // Mixins
 import mapAlertFlash from '@/composables/useMapAlertFlash';
@@ -86,13 +119,14 @@ import mapBasemap from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
 import mapMeasurements from '@/composables/useMapMeasurements';
 import mapPlantHealth from '@/composables/usePlantHealth';
-import mapThermal from '@/composables/useThermal';
+import mapRasterAnalysis from '@/composables/useRasterAnalysis';
+import mapStockpileVolume from '@/composables/useStockpileVolume';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, PlantHealthPanel, ThermalControls, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
+        Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
     },
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapThermal],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume],
     props: ["uri"],
     data: function () {
         return {
@@ -169,6 +203,15 @@ export default {
         // Generate a unique color based on the entry path and index
         getVectorFileColor: function (entry, index) {
             return getVectorColor(entry.path, index, this.vectorLayerColors);
+        },
+
+        // Returns current map view center as [lon, lat] in WGS84, or null if unavailable.
+        getMapCenterLatLon: function () {
+            if (!this.map) return null;
+            const view = this.map.getView();
+            const center = view && view.getCenter();
+            if (!center) return null;
+            return toLonLat(center);
         },
 
         // Override tooltip fallback label for SingleMap (uses layer.entry)
@@ -295,9 +338,9 @@ export default {
                         this.closePlantHealth();
                     } else {
 
-                        // If thermal panel is open, close it since they share the same files and it can be confusing to have both open at the same time
-                        if (this.thermalVisible)
-                            this.closeThermal();
+                        // If raster analysis panel is open, close it since they share the same files and it can be confusing to have both open at the same time
+                        if (this.rasterPanelVisible)
+                            this.closeRasterAnalysis();
 
                         this.openPlantHealth(entry.path);
                     }
@@ -305,24 +348,38 @@ export default {
                 controlContainer.appendChild(phBtn);
             }
 
-            // Thermal button (for thermal images)
-            if (isThermalCapable(entry)) {
+            // Raster analysis button (thermal images / DEMs / value rasters)
+            if (isRasterAnalysisCapable(entry)) {
                 const thBtn = document.createElement('button');
-                thBtn.title = 'Thermal';
-                thBtn.innerHTML = '<i class="fa-solid fa-temperature-high"></i>';
+                thBtn.title = 'Raster Analysis';
+                thBtn.innerHTML = '<i class="fa-solid fa-chart-area"></i>';
                 thBtn.addEventListener('click', () => {
-                    if (this.thermalVisible) {
-                        this.closeThermal();
+                    if (this.rasterPanelVisible) {
+                        this.closeRasterAnalysis();
                     } else {
 
                         // If plant health panel is open, close it since they share the same files and it can be confusing to have both open at the same time
                         if (this.plantHealthVisible)
                             this.closePlantHealth();
 
-                        this.openThermal(entry.path);
+                        this.openRasterAnalysis(entry.path);
                     }
                 });
                 controlContainer.appendChild(thBtn);
+
+                // Stockpile Volume button (available on any single-band / elevation raster)
+                const spBtn = document.createElement('button');
+                spBtn.title = 'Stockpile Volume';
+                spBtn.setAttribute('data-testid', 'stockpile-toolbar-btn');
+                spBtn.innerHTML = '<i class="fa-solid fa-layer-group"></i>';
+                spBtn.addEventListener('click', () => {
+                    if (this.stockpilePanelVisible) {
+                        this.closeStockpileVolume();
+                    } else {
+                        this.openStockpileVolume(entry.path);
+                    }
+                });
+                controlContainer.appendChild(spBtn);
             }
 
             this.map.addControl(new Control({ element: controlContainer }));

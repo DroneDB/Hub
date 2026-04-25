@@ -43,13 +43,13 @@ function isPlantHealthCapable(entry) {
     return false;
 }
 
-function isThermalCapable(entry) {
+function isRasterAnalysisCapable(entry) {
     if (!entry || !entry.properties) return false;
 
-    // Explicit thermal sensor from EXIF detection
+    // Explicit thermal sensor from EXIF detection (always capable)
     if (entry.properties.sensorCategory === 'thermal' && (entry.type === ddb.entry.type.GEORASTER || (entry.type === ddb.entry.type.GEOIMAGE && entry.polygon_geom && /\.tiff?$/i.test(entry.path)))) return true;
 
-    // Single-band GeoRasters (thermal mosaics, processed thermal orthophotos)
+    // Single-band GeoRasters (thermal mosaics, DEMs, value rasters)
     if (entry.type === ddb.entry.type.GEORASTER && countDataBands(entry) === 1) return true;
 
     return false;
@@ -103,7 +103,7 @@ export {
     isThumbnailCandidate,
     isDroneDB,
     isPlantHealthCapable,
-    isThermalCapable,
+    isRasterAnalysisCapable,
     getTypeDisplayName,
     sortEntriesDirectoriesFirst
 };
