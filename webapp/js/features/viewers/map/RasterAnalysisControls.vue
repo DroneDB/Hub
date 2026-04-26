@@ -87,14 +87,22 @@
                     {{ isThermal ? 'Thermal Profile' : 'Value Profile' }}
                 </label>
                 <div class="profile-controls">
-                    <button class="btn btn-secondary btn-sm" @click="requestPickProfile"
+                    <button class="btn btn-sm"
+                        :class="drawingProfile ? 'btn-warning active' : 'btn-secondary'"
+                        @click="onProfileButtonClick"
                         :disabled="profileLoading"
-                        :title="profile ? 'Draw a new profile line' : 'Draw profile line on the map'">
-                        <i :class="profileLoading ? 'fas fa-spinner fa-spin' : 'fas fa-route'"></i>
-                        {{ profile ? 'Redraw' : 'Draw profile' }}
+                        :title="drawingProfile
+                            ? 'Stop drawing and discard the partial profile (Esc)'
+                            : (profile ? 'Discard the current profile and draw a new one'
+                                       : 'Draw a profile line on the map')">
+                        <i :class="profileLoading ? 'fas fa-spinner fa-spin'
+                            : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')"></i>
+                        {{ drawingProfile ? 'Stop drawing' : (profile ? 'Redraw' : 'Draw profile') }}
                     </button>
-                    <button v-if="profile" class="btn btn-link btn-sm" @click="clearProfile" title="Clear profile">
-                        <i class="fas fa-times"></i>
+                    <button v-if="profile && !drawingProfile" class="btn btn-link btn-sm"
+                        @click="clearProfile"
+                        title="Clear the chart and remove the line from the map">
+                        <i class="fas fa-eraser"></i>
                     </button>
                 </div>
                 <div class="profile-error" v-if="profileError">
@@ -109,6 +117,14 @@
 
             <!-- Actions -->
             <div class="section actions">
+                <button class="btn btn-sm"
+                    :class="inspectActive ? 'btn-warning active' : 'btn-secondary'"
+                    @click="toggleInspect"
+                    :title="inspectActive
+                        ? 'Stop inspecting raster values (Esc)'
+                        : 'Hover the map to read raster values'">
+                    <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'"></i>
+                </button>
                 <button class="btn btn-secondary btn-sm" @click="reset">Reset</button>
                 <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView">
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
@@ -171,10 +187,15 @@ export default {
         areaStats: { type: Object, default: null },
         profile: { type: Object, default: null },
         profileLoading: { type: Boolean, default: false },
-        profileError: { type: String, default: null }
+        profileError: { type: String, default: null },
+        // True while the host has an active OL Draw interaction for the profile.
+        drawingProfile: { type: Boolean, default: false },
+        // True while the inspect-value tool is active on the host.
+        inspectActive: { type: Boolean, default: false }
     },
 
-    emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile', 'profileHover'],    data() {
+    emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
+            'profileHover', 'cancelDrawProfile', 'toggleInspectValue'],    data() {
         return {
             rasterInfo: null,
             loadError: false,
@@ -323,6 +344,19 @@ export default {
 
         requestPickProfile() {
             this.$emit('pickProfile');
+        },
+
+        /**
+         * Single button that toggles between starting a draw, redrawing, and
+         * stopping an in-progress draw. Exact behaviour is decided by the host.
+         */
+        onProfileButtonClick() {
+            if (this.drawingProfile) this.$emit('cancelDrawProfile');
+            else this.$emit('pickProfile');
+        },
+
+        toggleInspect() {
+            this.$emit('toggleInspectValue');
         },
 
         clearProfile() {
@@ -574,6 +608,20 @@ export default {
 
 .btn-secondary:hover {
     background: rgba(255,255,255,0.25);
+}
+
+.btn-warning {
+    background: rgba(255, 152, 0, 0.45);
+    color: #fff;
+    border: 1px solid #ff9800;
+}
+
+.btn-warning:hover {
+    background: rgba(255, 152, 0, 0.6);
+}
+
+.btn-warning.active {
+    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5);
 }
 
 .btn-sm {

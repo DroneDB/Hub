@@ -23,6 +23,9 @@ export default {
         openPlantHealth(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path) return;
+            // Mutually-exclusive analysis panels.
+            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
+            if (typeof this.closeStockpileVolume === 'function') this.closeStockpileVolume();
             this.plantHealthFilePath = path;
             this.plantHealthVisible = true;
             if (options) {

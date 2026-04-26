@@ -21,10 +21,14 @@
                 :profile="rasterProfile"
                 :profileLoading="rasterProfileLoading"
                 :profileError="rasterProfileError"
+                :drawingProfile="rasterProfileDrawing"
+                :inspectActive="rasterInspectActive"
                 @close="closeRasterAnalysis"
                 @vizParamsChanged="handleRasterVizParamsChanged"
                 @pickProfile="handlePickProfile"
                 @clearProfile="handleClearProfile"
+                @cancelDrawProfile="cancelRasterProfileDrawing"
+                @toggleInspectValue="toggleRasterInspect"
                 @profileHover="handleProfileHover" />
             <StockpileVolumePanel
                 :visible="stockpilePanelVisible"
@@ -39,6 +43,7 @@
                 :mode="stockpileMode"
                 :customDensity="stockpileCustomDensity"
                 :customCostPerTon="stockpileCustomCostPerTon"
+                :unitPref="currentUnitPref"
                 @close="closeStockpileVolume"
                 @detectCenter="detectAtMapCenter"
                 @clickOnMap="startStockpileClickMode"
@@ -46,6 +51,7 @@
                 @clearOverlay="clearStockpileOverlay"
                 @cancelMode="_stopStockpileInteractions"
                 @exportGeoJson="exportStockpileGeoJson"
+                @saveGeoJson="saveStockpileGeoJson"
                 @update:baseMethod="stockpileBaseMethod = $event"
                 @update:sensitivity="stockpileSensitivity = $event"
                 @update:radius="stockpileRadius = $event"
@@ -147,7 +153,10 @@ export default {
             rasterOpacity: 1.0,
             hasRasters: false,
             measurementListDialogOpen: false,
-            measurementListItems: []
+            measurementListItems: [],
+            // Unit preference shared with sub-panels (volume / area conversions).
+            // Persisted across sessions via localStorage.
+            currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric'
         };
     },
     mounted: async function () {
