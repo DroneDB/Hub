@@ -60,22 +60,24 @@
                     <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'"></i>
                     {{ loading ? 'Working…' : 'Auto-detect' }}
                 </button>
-                <button class="btn btn-secondary btn-sm" @click="$emit('clickOnMap')"
+                <button class="btn btn-secondary btn-sm" :class="{ active: mode === 'click' }"
+                        @click="$emit('clickOnMap')"
                         :disabled="loading" data-testid="stockpile-click-btn"
                         title="Click on the map to detect a pile at that point">
                     <i class="fa-solid fa-crosshairs"></i>
-                    Click on map
+                    {{ mode === 'click' ? 'Click on map…' : 'Click on map' }}
                 </button>
             </div>
             <div class="section actions">
-                <button class="btn btn-secondary btn-sm" @click="$emit('drawPolygon')"
+                <button class="btn btn-secondary btn-sm" :class="{ active: mode === 'draw' }"
+                        @click="$emit('drawPolygon')"
                         :disabled="loading" data-testid="stockpile-draw-btn"
                         title="Draw a polygon around the pile to compute its volume">
                     <i class="fa-solid fa-draw-polygon"></i>
-                    Draw polygon
+                    {{ mode === 'draw' ? 'Drawing…' : 'Draw polygon' }}
                 </button>
                 <button class="btn btn-secondary btn-sm" @click="$emit('clearOverlay')"
-                        :disabled="loading || (!result && !error)" data-testid="stockpile-clear-btn"
+                        :disabled="loading || !canClear" data-testid="stockpile-clear-btn"
                         title="Clear the overlay and result">
                     <i class="fa-solid fa-eraser"></i>
                     Clear
@@ -123,7 +125,7 @@
 
                     <template v-if="typeof result.baseElevation === 'number'">
                         <span class="result-label">Base elevation</span>
-                        <span class="result-value">{{ result.baseElevation.toFixed(2) }} m</span>
+                        <span class="result-value">{{ formatElevation(result.baseElevation) }}</span>
                     </template>
 
                     <template v-if="typeof result.confidence === 'number'">
@@ -148,6 +150,13 @@
                         <i class="fa-solid fa-file-export"></i>
                         Export GeoJSON
                     </button>
+                    <button v-if="canSave" class="btn btn-secondary btn-sm"
+                            @click="$emit('saveGeoJson')" :disabled="loading"
+                            data-testid="stockpile-save-btn"
+                            title="Save the pile contour next to the raster (auto-loaded next time)">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        Save GeoJSON
+                    </button>
                 </div>
             </div>
         </div>
@@ -171,10 +180,16 @@ export default {
         materials: { type: Array, default: () => [] },
         mode: { type: String, default: null }, // 'click' | 'draw' | null
         customDensity: { type: Number, default: 1.5 },
-        customCostPerTon: { type: Number, default: 0 }
+        customCostPerTon: { type: Number, default: 0 },
+        unitPref: {
+            type: String,
+            default: 'metric',
+            validator: (v) => ['metric', 'imperial'].includes(v)
+        },
+        canSave: { type: Boolean, default: true }
     },
     emits: ['close', 'detectCenter', 'clickOnMap', 'drawPolygon', 'clearOverlay',
-        'cancelMode', 'exportGeoJson',
+        'cancelMode', 'exportGeoJson', 'saveGeoJson',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon'],
     data() {
@@ -249,25 +264,47 @@ export default {
                 return this.result && this.result.costEstimate ? this.result.costEstimate : null;
             }
             return { amount: tons * m.costPerTon, currency: m.currency || '' };
-        }
+        },
+        // Clear should be available whenever there is something visible to clear
+        // (a result, a banner error, an active mode, or a saved/just-rendered polygon).
+        canClear() {
+            return Boolean(this.result || this.error || this.mode);
+        },
+        isImperial() { return this.unitPref === 'imperial'; }
     },
     methods: {
         triggerDetectCenter() { this.$emit('detectCenter'); },
+        _fmt(n, digits = 2) {
+            return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
+        },
         formatVolume(v) {
             if (v == null || !isFinite(v)) return '—';
-            return `${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })} m³`;
+            // 1 m³ = 1.30795 yd³
+            return this.isImperial ? `${this._fmt(v * 1.30795)} yd³` : `${this._fmt(v)} m³`;
         },
         formatArea(v) {
             if (v == null || !isFinite(v)) return '—';
-            return `${Number(v).toLocaleString(undefined, { maximumFractionDigits: 2 })} m²`;
+            if (this.isImperial) {
+                // For very large areas use acres; below ~1 acre stay in ft².
+                const acres = v / 4046.8564224;
+                if (acres >= 1) return `${this._fmt(acres)} ac`;
+                return `${this._fmt(v * 10.7639)} ft²`;
+            }
+            if (v >= 10000) return `${this._fmt(v / 10000)} ha`;
+            return `${this._fmt(v)} m²`;
+        },
+        formatElevation(v) {
+            if (v == null || !isFinite(v)) return '—';
+            return this.isImperial ? `${this._fmt(v * 3.28084)} ft` : `${this._fmt(v)} m`;
         },
         formatTons(t) {
             if (t == null || !isFinite(t)) return '—';
-            return `${Number(t).toLocaleString(undefined, { maximumFractionDigits: 2 })} t`;
+            // 1 metric tonne = 1.10231 short tons
+            return this.isImperial ? `${this._fmt(t * 1.10231)} ST` : `${this._fmt(t)} t`;
         },
         formatCost(c) {
             if (!c || !isFinite(c.amount)) return '—';
-            return `${Number(c.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })} ${c.currency || ''}`.trim();
+            return `${this._fmt(c.amount)} ${c.currency || ''}`.trim();
         }
     }
 };
@@ -506,6 +543,12 @@ export default {
 .btn-secondary:hover:not(:disabled) {
     background: rgba(255,255,255,0.2);
 }
+.btn-secondary.active {
+    background: rgba(255, 152, 0, 0.45);
+    color: #fff;
+    border: 1px solid #ff9800;
+    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.35);
+}
 .btn-secondary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -514,6 +557,8 @@ export default {
 .result-actions {
     margin-top: 0.5rem;
     display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
     justify-content: flex-end;
 }
 </style>

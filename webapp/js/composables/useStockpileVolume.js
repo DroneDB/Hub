@@ -16,6 +16,7 @@ import { Polygon } from 'ol/geom';
 import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
+import { saveStockpile, loadStockpile } from '@/libs/map/stockpileStorage';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
 const STOCKPILE_STROKE = '#ff9800';
@@ -84,6 +85,10 @@ export default {
         async openStockpileVolume(file) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path || !this.dataset) return;
+            // Mutually-exclusive panels: ensure other analysis panels are closed.
+            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
+            if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
+
             this.rasterFilePath = path;
             this.stockpilePanelVisible = true;
             this.stockpileError = null;
@@ -96,6 +101,38 @@ export default {
                     console.warn('Could not load stockpile materials', e);
                     this.stockpileMaterials = [];
                 }
+            }
+            // Restore a previously saved stockpile (if any) so the user sees it on the map.
+            this._loadSavedStockpile();
+        },
+
+        async _loadSavedStockpile() {
+            if (!this.rasterFilePath || !this.dataset) return;
+            try {
+                const saved = await loadStockpile(this.dataset, this.rasterFilePath);
+                if (!saved) return;
+                this.stockpileDetectedPolygon = saved.polygon;
+                this._renderStockpilePolygon(saved.polygon);
+                // Re-hydrate the result panel from saved properties so volumes/area
+                // are visible without recomputing.
+                const p = saved.properties || {};
+                if (p.netVolume != null || p.cutVolume != null || p.area2d != null) {
+                    this.stockpileResult = {
+                        netVolume: p.netVolume,
+                        cutVolume: p.cutVolume,
+                        fillVolume: p.fillVolume,
+                        area2d: p.area2d,
+                        area3d: p.area3d,
+                        baseElevation: p.baseElevation,
+                        confidence: p.confidence,
+                        weightEstimate: p.weightEstimate,
+                        costEstimate: p.costEstimate,
+                        _restored: true
+                    };
+                }
+                if (p.material) this.stockpileMaterial = p.material;
+            } catch (e) {
+                console.warn('Could not restore saved stockpile:', e);
             }
         },
 
@@ -208,23 +245,26 @@ export default {
         /**
          * Engage "single click on map" capture: the next map click triggers
          * `autoDetectAndCalculate` at the clicked coordinate.
+         * Acts as a toggle: a second invocation while already in click-mode cancels.
          */
         startStockpileClickMode() {
             if (!this.map) {
                 this.stockpileError = 'Map not available';
                 return;
             }
+            if (this.stockpileMode === 'click') { this._stopStockpileInteractions(); return; }
             this._stopStockpileInteractions();
             this.stockpileMode = 'click';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
             const mapProj = this.map.getView().getProjection();
             this._stockpileClickKey = this.map.once('singleclick', (evt) => {
-                this._stockpileClickKey = null;
-                this._setStockpileCursor('');
-                this.stockpileMode = null;
-                this.stockpileError = null;
                 const [lon, lat] = transform(evt.coordinate, mapProj, 'EPSG:4326');
+                // Tear everything down (cursor, ESC handler, mode flag) BEFORE running
+                // detection so no interactions/listeners linger after the click.
+                this._stockpileClickKey = null;
+                this._stopStockpileInteractions();
+                this.stockpileError = null;
                 this.autoDetectAndCalculate(lon, lat);
             });
             this._stockpileEscKey = (e) => {
@@ -245,6 +285,8 @@ export default {
                 this.stockpileError = 'Map not available';
                 return;
             }
+            // Toggle behaviour: re-clicking while already drawing cancels.
+            if (this.stockpileMode === 'draw') { this._stopStockpileInteractions(); return; }
             this._stopStockpileInteractions();
             this._ensureStockpileLayer();
             this._stockpileSource.clear();
@@ -356,6 +398,60 @@ export default {
         },
 
         /**
+         * Build the property bag persisted alongside the polygon (used by both
+         * Save and Export so the two outputs stay consistent).
+         */
+        _buildStockpileProperties() {
+            const props = { material: this.stockpileMaterial || null };
+            const r = this.stockpileResult;
+            if (r) {
+                if (typeof r.netVolume === 'number') props.netVolume = r.netVolume;
+                if (typeof r.cutVolume === 'number') props.cutVolume = r.cutVolume;
+                if (typeof r.fillVolume === 'number') props.fillVolume = r.fillVolume;
+                if (typeof r.area2d === 'number') props.area2d = r.area2d;
+                if (typeof r.area3d === 'number') props.area3d = r.area3d;
+                if (typeof r.baseElevation === 'number') props.baseElevation = r.baseElevation;
+                if (typeof r.confidence === 'number') props.confidence = r.confidence;
+                if (r.weightEstimate) props.weightEstimate = r.weightEstimate;
+                if (r.costEstimate) props.costEstimate = r.costEstimate;
+            }
+            return props;
+        },
+
+        /**
+         * Persist the current pile contour next to the raster as
+         * `<basename>_stockpile.geojson` so it can be re-displayed later.
+         */
+        async saveStockpileGeoJson() {
+            if (!this.stockpileDetectedPolygon) {
+                this.stockpileError = 'No polygon to save. Detect or draw a stockpile first.';
+                return;
+            }
+            if (!this.dataset || !this.rasterFilePath) {
+                this.stockpileError = 'Dataset is not available.';
+                return;
+            }
+            try {
+                this.stockpileLoading = true;
+                await saveStockpile(this.dataset, this.rasterFilePath,
+                    this.stockpileDetectedPolygon, this._buildStockpileProperties());
+                if (this.$toast && typeof this.$toast.add === 'function') {
+                    this.$toast.add({
+                        severity: 'success',
+                        summary: 'Stockpile saved',
+                        detail: 'GeoJSON written next to the raster.',
+                        life: 2500
+                    });
+                }
+            } catch (e) {
+                console.error('Failed to save stockpile GeoJSON:', e);
+                this.stockpileError = (e && e.message) ? e.message : 'Failed to save stockpile.';
+            } finally {
+                this.stockpileLoading = false;
+            }
+        },
+
+        /**
          * Export the currently displayed pile contour as a GeoJSON Feature
          * (downloaded as a file). Only available when a polygon has been computed.
          */
@@ -364,18 +460,7 @@ export default {
                 this.stockpileError = 'No polygon to export. Detect or draw a stockpile first.';
                 return;
             }
-            const props = {};
-            if (this.stockpileResult) {
-                if (typeof this.stockpileResult.netVolume === 'number') props.netVolume = this.stockpileResult.netVolume;
-                if (typeof this.stockpileResult.cutVolume === 'number') props.cutVolume = this.stockpileResult.cutVolume;
-                if (typeof this.stockpileResult.fillVolume === 'number') props.fillVolume = this.stockpileResult.fillVolume;
-                if (typeof this.stockpileResult.area2d === 'number') props.area2d = this.stockpileResult.area2d;
-                if (typeof this.stockpileResult.area3d === 'number') props.area3d = this.stockpileResult.area3d;
-                if (typeof this.stockpileResult.baseElevation === 'number') props.baseElevation = this.stockpileResult.baseElevation;
-                if (typeof this.stockpileResult.confidence === 'number') props.confidence = this.stockpileResult.confidence;
-            }
-            props.material = this.stockpileMaterial || null;
-            props.exportedAt = new Date().toISOString();
+            const props = { ...this._buildStockpileProperties(), exportedAt: new Date().toISOString() };
 
             const feature = {
                 type: 'FeatureCollection',
