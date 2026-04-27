@@ -710,14 +710,14 @@ export default {
         },
 
         /**
-         * Required by mapMeasurements mixin — returns the entry used for measurement export path.
+         * Required by mapMeasurements mixin - returns the entry used for measurement export path.
          */
         getActiveMeasurementEntry: function() {
             return this.entry;
         },
 
         /**
-         * Required by mapMeasurements mixin — (re)initializes measurementStorage if needed.
+         * Required by mapMeasurements mixin - (re)initializes measurementStorage if needed.
          */
         initMeasurementStorage: async function() {
             await this.loadMeasurementsForOrthophoto();

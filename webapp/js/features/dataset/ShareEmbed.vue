@@ -38,7 +38,7 @@
                 </template>
                 <template v-else>
                     <PrimeMessage severity="info" :closable="false">
-                        <strong>Not supported</strong> — This file cannot be streamed directly into QGIS (download it instead).
+                        <strong>Not supported</strong> - This file cannot be streamed directly into QGIS (download it instead).
                     </PrimeMessage>
                 </template>
             </div>
@@ -49,7 +49,7 @@
                 </div>
                 <div v-else>
                     <PrimeMessage v-if="!url" severity="info" :closable="false">
-                        <strong>Not supported</strong> — This file does not support this type of sharing.
+                        <strong>Not supported</strong> - This file does not support this type of sharing.
                     </PrimeMessage>
                     <template v-else>
                         <template v-if="shareMode === 'embed'">

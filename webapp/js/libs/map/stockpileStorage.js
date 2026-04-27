@@ -2,11 +2,11 @@
  * Persistent storage for stockpile volume polygons.
  *
  * Mirrors the MeasurementStorage pattern: a single GeoJSON file is written
- * next to the source raster (`<basename>_stockpile.geojson`) so it can be
+ * next to the source raster (`<basename>_measurements.geojson`) so it can be
  * auto-loaded the next time the dataset is opened.
  */
 
-const SUFFIX = '_stockpile.geojson';
+const SUFFIX = '_measurements.geojson';
 
 /**
  * Build the storage path for a given raster file path.

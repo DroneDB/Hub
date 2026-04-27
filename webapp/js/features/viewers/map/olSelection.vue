@@ -26,17 +26,17 @@ class SelectionControl extends Control {
 
         // Rectangle selection button
         const btnRectangle = document.createElement('button');
-        btnRectangle.title = 'Rectangle Selection — Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.';
+        btnRectangle.title = 'Rectangle Selection - Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.';
         btnRectangle.innerHTML = '<img src="' + rootPath("/images/rectangle-selection.svg") + '"/>';
 
         // Polygon selection button
         const btnPolygon = document.createElement('button');
-        btnPolygon.title = 'Polygon Selection — Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.';
+        btnPolygon.title = 'Polygon Selection - Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.';
         btnPolygon.innerHTML = '<img src="' + rootPath("/images/polygon-selection.svg") + '"/>';
 
         // Clear selection button (hidden by default, shown when there's an active selection)
         const btnClear = document.createElement('button');
-        btnClear.title = 'Clear Selection — Deselect all selected features.';
+        btnClear.title = 'Clear Selection - Deselect all selected features.';
         btnClear.innerHTML = '<img src="' + rootPath("/images/clear-selection.svg") + '"/>';
         btnClear.style.display = 'none';
 
@@ -190,7 +190,7 @@ class SelectionControl extends Control {
         this.draw.on('drawend', (e) => {
             const polygon = e.feature.getGeometry();
 
-            // Notify caller about the completed selection (additive — no clear)
+            // Notify caller about the completed selection (additive - no clear)
             this.onSelectionComplete(polygon);
 
             // Clear the drawn geometry after a tick (feature is added to source after drawend)

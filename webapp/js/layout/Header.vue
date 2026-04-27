@@ -205,7 +205,7 @@ export default {
         userMenuItems: function () {
             const items = [];
 
-            items.push({ label: this.username + (this.isAdmin && this.username !== 'admin' ? ' — admin' : ''), disabled: true, class: 'user-menu-header' });
+            items.push({ label: this.username + (this.isAdmin && this.username !== 'admin' ? ' - admin' : ''), disabled: true, class: 'user-menu-header' });
             items.push({ separator: true });
 
             if (this.fileUploads)

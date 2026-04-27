@@ -4,7 +4,7 @@
             <label class="channel-label" :style="{ color: ch.color }">{{ ch.label }}</label>
             <select v-model="selected[ch.id]" @change="emitChange" class="channel-select">
                 <option v-for="b in bands" :key="b.index" :value="b.index">
-                    {{ b.index }} — {{ b.name }}
+                    {{ b.index }} - {{ b.name }}
                 </option>
             </select>
         </div>

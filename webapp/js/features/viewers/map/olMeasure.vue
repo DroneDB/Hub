@@ -34,22 +34,22 @@ class MeasureControls extends Control {
         const unitPref = localStorage.getItem("measureUnitPref") || "metric";
 
         const btnPoint = document.createElement('button');
-        btnPoint.title = 'Point Annotation — Click on the map to place an annotation.';
+        btnPoint.title = 'Point Annotation - Click on the map to place an annotation.';
         btnPoint.innerHTML = '<img src="' + rootPath("/images/measure-point.svg") + '"/>';
         const btnLength = document.createElement('button');
-        btnLength.title = 'Measure Length — Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.';
+        btnLength.title = 'Measure Length - Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.';
         btnLength.innerHTML = '<img src="' + rootPath("/images/measure-length.svg") + '"/>';
         const btnArea = document.createElement('button');
-        btnArea.title = 'Measure Area — Click on the map to draw a polygon. Double-click to finish and calculate the area. Press ESC to cancel.';
+        btnArea.title = 'Measure Area - Click on the map to draw a polygon. Double-click to finish and calculate the area. Press ESC to cancel.';
         btnArea.innerHTML = '<img src="' + rootPath("/images/measure-area.svg") + '"/>';
         const btnErase = document.createElement('button');
-        btnErase.title = 'Erase Measurement — Click on a measurement to delete it.';
+        btnErase.title = 'Erase Measurement - Click on a measurement to delete it.';
         btnErase.innerHTML = '<img src="' + rootPath("/images/measure-erase.svg") + '"/>';
         const btnEdit = document.createElement('button');
-        btnEdit.title = 'Edit/Move Measurements — Click and drag measurement points to reposition them.';
+        btnEdit.title = 'Edit/Move Measurements - Click and drag measurement points to reposition them.';
         btnEdit.innerHTML = '<img src="' + rootPath("/images/edit.svg") + '"/>';
         const btnStop = document.createElement('button');
-        btnStop.title = 'Stop Measuring — Cancel the current measurement. Shortcut: ESC';
+        btnStop.title = 'Stop Measuring - Cancel the current measurement. Shortcut: ESC';
         btnStop.innerHTML = '<img src="' + rootPath("/images/measure-stop.svg") + '"/>';
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
 
@@ -64,27 +64,27 @@ class MeasureControls extends Control {
 
         // Save/Load/Clear buttons
         const btnSave = document.createElement('button');
-        btnSave.title = 'Save Measurements — Save all current measurements to the dataset.';
+        btnSave.title = 'Save Measurements - Save all current measurements to the dataset.';
         btnSave.innerHTML = '<img src="' + rootPath("/images/save.svg") + '"/>';
         btnSave.style.display = 'none';
 
         const btnClear = document.createElement('button');
-        btnClear.title = 'Clear All Measurements — Remove all measurements from the map.';
+        btnClear.title = 'Clear All Measurements - Remove all measurements from the map.';
         btnClear.innerHTML = '<img src="' + rootPath("/images/eraser.svg") + '"/>';
         btnClear.style.display = 'none';
 
         const btnExport = document.createElement('button');
-        btnExport.title = 'Export Measurements — Download measurements as a GeoJSON file.';
+        btnExport.title = 'Export Measurements - Download measurements as a GeoJSON file.';
         btnExport.innerHTML = '<img src="' + rootPath("/images/download.svg") + '"/>';
         btnExport.style.display = 'none';
 
         const btnDelete = document.createElement('button');
-        btnDelete.title = 'Delete Saved Measurements — Permanently delete saved measurements from the dataset.';
+        btnDelete.title = 'Delete Saved Measurements - Permanently delete saved measurements from the dataset.';
         btnDelete.innerHTML = '<img src="' + rootPath("/images/trash.svg") + '"/>';
         btnDelete.style.display = 'none';
 
         const btnList = document.createElement('button');
-        btnList.title = 'Measurement List — View and manage all measurements.';
+        btnList.title = 'Measurement List - View and manage all measurements.';
         btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem"></i>';
         btnList.style.display = 'none';
 

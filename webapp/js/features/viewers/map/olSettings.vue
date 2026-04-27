@@ -6,7 +6,7 @@ import { rootPath } from '@/dynamic/pathutils';
 import { Control } from 'ol/control';
 
 /**
- * Map settings control — a single button that opens the MapSettingsDialog.
+ * Map settings control - a single button that opens the MapSettingsDialog.
  */
 class SettingsControl extends Control {
     /**
@@ -17,7 +17,7 @@ class SettingsControl extends Control {
         const options = opt_options || {};
 
         const btn = document.createElement('button');
-        btn.title = 'Map Settings — Change basemap, units, and display options.';
+        btn.title = 'Map Settings - Change basemap, units, and display options.';
         btn.innerHTML = '<img src="' + rootPath("/images/settings.svg") + '"/>';
 
         const element = document.createElement('div');

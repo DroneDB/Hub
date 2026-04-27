@@ -33,7 +33,7 @@
             <div class="section" v-if="materials && materials.length">
                 <label class="section-label">Material (optional)</label>
                 <select v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
-                    <option :value="null">— none —</option>
+                    <option :value="null">- none -</option>
                     <option v-for="m in materials" :key="m.slug" :value="m.slug">
                         {{ m.name }} ({{ m.densityTonPerM3 }} t/m³)
                     </option>
@@ -278,12 +278,12 @@ export default {
             return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
         },
         formatVolume(v) {
-            if (v == null || !isFinite(v)) return '—';
+            if (v == null || !isFinite(v)) return '-';
             // 1 m³ = 1.30795 yd³
             return this.isImperial ? `${this._fmt(v * 1.30795)} yd³` : `${this._fmt(v)} m³`;
         },
         formatArea(v) {
-            if (v == null || !isFinite(v)) return '—';
+            if (v == null || !isFinite(v)) return '-';
             if (this.isImperial) {
                 // For very large areas use acres; below ~1 acre stay in ft².
                 const acres = v / 4046.8564224;
@@ -294,16 +294,16 @@ export default {
             return `${this._fmt(v)} m²`;
         },
         formatElevation(v) {
-            if (v == null || !isFinite(v)) return '—';
+            if (v == null || !isFinite(v)) return '-';
             return this.isImperial ? `${this._fmt(v * 3.28084)} ft` : `${this._fmt(v)} m`;
         },
         formatTons(t) {
-            if (t == null || !isFinite(t)) return '—';
+            if (t == null || !isFinite(t)) return '-';
             // 1 metric tonne = 1.10231 short tons
             return this.isImperial ? `${this._fmt(t * 1.10231)} ST` : `${this._fmt(t)} t`;
         },
         formatCost(c) {
-            if (!c || !isFinite(c.amount)) return '—';
+            if (!c || !isFinite(c.amount)) return '-';
             return `${this._fmt(c.amount)} ${c.currency || ''}`.trim();
         }
     }

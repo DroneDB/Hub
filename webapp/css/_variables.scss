@@ -1,5 +1,5 @@
 // ============================================================
-// DroneDB Hub — Design Tokens
+// DroneDB Hub - Design Tokens
 // ============================================================
 //
 // Centralized palette AND dimensional scale.
@@ -19,7 +19,7 @@
 // ── DOCUMENTED EXCEPTIONS ──────────────────────────────────
 //
 // 1. app.scss: html { font-size: 16px }
-//    Root font-size definition — required to establish rem base.
+//    Root font-size definition - required to establish rem base.
 //
 // 2. Loader.vue: spinner animation border widths (1.25rem)
 //    Use rem now; the spinner scales with the component's
@@ -106,18 +106,18 @@
     --ddb-border-width: 0.0625rem;
 
     // ── Spacing (Bootstrap 5 scale) ────────────────────────
-    --ddb-spacing-xs: 0.25rem;   // 4px  — Bootstrap m-1/p-1
-    --ddb-spacing-sm: 0.5rem;    // 8px  — Bootstrap m-2/p-2
-    --ddb-spacing-md: 0.75rem;   // 12px — between p-2 and p-3
-    --ddb-spacing-lg: 1rem;      // 16px — Bootstrap m-3/p-3
-    --ddb-spacing-xl: 1.5rem;    // 24px — Bootstrap m-4/p-4
-    --ddb-spacing-2xl: 3rem;     // 48px — Bootstrap m-5/p-5
+    --ddb-spacing-xs: 0.25rem;   // 4px  - Bootstrap m-1/p-1
+    --ddb-spacing-sm: 0.5rem;    // 8px  - Bootstrap m-2/p-2
+    --ddb-spacing-md: 0.75rem;   // 12px - between p-2 and p-3
+    --ddb-spacing-lg: 1rem;      // 16px - Bootstrap m-3/p-3
+    --ddb-spacing-xl: 1.5rem;    // 24px - Bootstrap m-4/p-4
+    --ddb-spacing-2xl: 3rem;     // 48px - Bootstrap m-5/p-5
 
     // ── Font Size (strict scale) ───────────────────────────
-    --ddb-font-size-sm: 0.75rem;   // 12px — small/captions
-    --ddb-font-size-base: 1rem;    // 16px — body text
-    --ddb-font-size-lg: 1.5rem;    // 24px — headings
-    --ddb-font-size-xl: 3rem;      // 48px — display/hero
+    --ddb-font-size-sm: 0.75rem;   // 12px - small/captions
+    --ddb-font-size-base: 1rem;    // 16px - body text
+    --ddb-font-size-lg: 1.5rem;    // 24px - headings
+    --ddb-font-size-xl: 3rem;      // 48px - display/hero
 
     // ── Border Radius ──────────────────────────────────────
     --ddb-radius-sm: 0.25rem;    // Bootstrap rounded-1

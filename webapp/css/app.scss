@@ -1,10 +1,10 @@
 // ============================================================
-// Global Styles — DroneDB Hub
+// Global Styles - DroneDB Hub
 // ============================================================
 //
 // CONVENTIONS:
 // - All dimensions on the Bootstrap scale: 0, 0.25, 0.5, 0.75, 1, 1.5, 3 rem
-// - No magic numbers — every value is a --ddb-* token or a Bootstrap class
+// - No magic numbers - every value is a --ddb-* token or a Bootstrap class
 // - All spacing via Bootstrap utility classes (m-*, p-*, gap-*)
 //   Steps: 0=0, 1=0.25rem, 2=0.5rem, 3=1rem, 4=1.5rem, 5=3rem
 // - Borders via Bootstrap utility classes (.border, .border-top, etc.)
@@ -79,7 +79,7 @@ body {
 }
 
 // ============================================================
-// Badge styles removed — use PrimeVue Tag component:
+// Badge styles removed - use PrimeVue Tag component:
 // <Tag severity="warning" value="Owner" />
 // ============================================================
 
@@ -94,14 +94,14 @@ body {
 .small { font-size: var(--ddb-font-size-sm); }
 
 // ============================================================
-// Fluid helper — use Bootstrap w-100 instead
+// Fluid helper - use Bootstrap w-100 instead
 // ============================================================
 
 // ============================================================
 // Semantic UI Layout Compatibility
-// Grid system removed — use Bootstrap row/col-* classes
-// Alignment utilities removed — use Bootstrap text-start/center/end
-// Float utilities removed — use Bootstrap float-start/float-end
+// Grid system removed - use Bootstrap row/col-* classes
+// Alignment utilities removed - use Bootstrap text-start/center/end
+// Float utilities removed - use Bootstrap float-start/float-end
 // ============================================================
 
 // --- Table ---

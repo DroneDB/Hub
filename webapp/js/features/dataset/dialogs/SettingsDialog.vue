@@ -269,7 +269,7 @@ export default {
                     try {
                         await this.dataset.deleteObj(candidate);
                     } catch (e) {
-                        // Ignore 404 errors — file doesn't exist
+                        // Ignore 404 errors - file doesn't exist
                     }
                 }
 

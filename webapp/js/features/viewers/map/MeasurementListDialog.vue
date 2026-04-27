@@ -15,12 +15,12 @@
                 </thead>
                 <tbody>
                     <tr v-for="(m, index) in measurements" :key="index">
-                        <td>{{ m.name || '—' }}</td>
+                        <td>{{ m.name || '-' }}</td>
                         <td>
                             <i :class="typeIcon(m.type)" style="margin-right: 0.25rem"></i>
                             {{ typeLabel(m.type) }}
                         </td>
-                        <td>{{ m.value || '—' }}</td>
+                        <td>{{ m.value || '-' }}</td>
                         <td>
                             <button class="btn-delete-measurement" @click="confirmDelete(m)" title="Delete">
                                 <i class="fa-solid fa-trash"></i>

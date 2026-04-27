@@ -65,7 +65,7 @@ export default {
         dialogStyle() {
             const style = {};
             if (this.sizeClass) {
-                // Size managed by CSS class — no inline dimensions
+                // Size managed by CSS class - no inline dimensions
                 style.width = 'auto';
                 return style;
             }

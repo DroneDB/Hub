@@ -20,7 +20,7 @@
                 <label class="section-label">{{ rangeLabel }}</label>
                 <div class="temp-range" :class="{ 'thermal': isThermal }">
                     <span>{{ formatValue(rasterInfo.valueMin) }}</span>
-                    <span>—</span>
+                    <span>-</span>
                     <span>{{ formatValue(rasterInfo.valueMax) }}</span>
                 </div>
             </div>

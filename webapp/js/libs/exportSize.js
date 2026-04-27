@@ -45,7 +45,7 @@ export function bytesPerPixel(dataType) {
  * Accepts a raster info object as returned by the server (rasterInfo or thermalInfo).
  *
  * Missing bandCount defaults to 1 (typical for thermal rasters).
- * Missing dataType defaults to Float32 (4 bytes/pixel) — conservative.
+ * Missing dataType defaults to Float32 (4 bytes/pixel) - conservative.
  *
  * @param {Object} info - Raster info object ({width, height, bandCount, dataType}).
  * @returns {number} Estimated output size in bytes, or 0 when input is invalid.

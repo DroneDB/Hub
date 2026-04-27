@@ -223,7 +223,7 @@ export default {
         const tools = [
             {
                 id: 'select-features',
-                title: "Select Features — Hold CTRL and click on a feature to select/deselect it. Hold CTRL+click multiple features to multi-select.",
+                title: "Select Features - Hold CTRL and click on a feature to select/deselect it. Hold CTRL+click multiple features to multi-select.",
                 icon: "fa-solid fa-arrow-pointer",
                 exclusiveGroup: "select",
                 onSelect: () => {
@@ -236,7 +236,7 @@ export default {
             },
             {
                 id: 'reset-view',
-                title: "Reset View — Zoom to fit all features. Shortcut: H",
+                title: "Reset View - Zoom to fit all features. Shortcut: H",
                 icon: "fa-solid fa-house",
                 onClick: () => {
                     this.resetToInitialView();
@@ -247,7 +247,7 @@ export default {
         if (supportsFullScreen()) {
             tools.push({
                 id: 'fullscreen',
-                title: "Fullscreen — Toggle fullscreen mode. Shortcut: F11",
+                title: "Fullscreen - Toggle fullscreen mode. Shortcut: F11",
                 icon: "fa-solid fa-expand",
                 onClick: () => {
                     if (isFullScreenCurrently()) {
@@ -990,7 +990,7 @@ export default {
                                             speedDisplay = (speed * 3.6).toFixed(1);
                                             speedUnit = 'km/h';
                                         }
-                                        label += ` — ${speedDisplay} ${speedUnit}`;
+                                        label += ` - ${speedDisplay} ${speedUnit}`;
                                     }
                                 }
                             } else {
@@ -1947,14 +1947,14 @@ export default {
         },
 
         /**
-         * Required by mapMeasurements mixin — returns the entry used for measurement export path.
+         * Required by mapMeasurements mixin - returns the entry used for measurement export path.
          */
         getActiveMeasurementEntry: function() {
             return this.currentOrthophotoEntry;
         },
 
         /**
-         * Required by mapMeasurements mixin — (re)initializes measurementStorage if needed.
+         * Required by mapMeasurements mixin - (re)initializes measurementStorage if needed.
          */
         initMeasurementStorage: async function() {
             await this.loadMeasurementsForOrthophotos();

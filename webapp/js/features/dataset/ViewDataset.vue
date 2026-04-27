@@ -404,7 +404,7 @@ export default {
         BuildManager.on('buildError', this.handleBuildErrorNotification);
         BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
-        // Event bus listeners — saved as named refs for cleanup
+        // Event bus listeners - saved as named refs for cleanup
         this._onOpenSettings = () => {
             this.showSettings = true;
         };

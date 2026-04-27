@@ -229,7 +229,7 @@ module.exports = class Dataset {
             throw err;
         }
 
-        // Preflight passed — initiate native browser download
+        // Preflight passed - initiate native browser download
         if (url.length < 2000) {
             window.location.href = url;
         } else {
