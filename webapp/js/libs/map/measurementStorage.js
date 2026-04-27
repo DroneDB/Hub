@@ -33,28 +33,66 @@ export class MeasurementStorage {
     }
 
     /**
-     * Save measurements as GeoJSON file
-     * @param {Object} geojsonData - GeoJSON FeatureCollection
-     * @returns {Promise<Object>} Server response
+     * Save measurements as GeoJSON file.
+     *
+     * Foreign feature types (stockpiles or anything written by other DroneDB
+     * subsystems into the same file) are preserved verbatim - we only replace
+     * features whose `measurementType` is one of the regular 2D types managed
+     * by olMeasure.
+     *
+     * @param {Object} geojsonData - GeoJSON FeatureCollection from olMeasure.
+     * @returns {Promise<{path: string, fileName: string}>} Storage path info.
      */
     async save(geojsonData) {
         try {
-            // Update timestamp
-            if (geojsonData.metadata) {
-                geojsonData.metadata.modifiedAt = new Date().toISOString();
+            const ownedTypes = new Set(['point', 'length', 'area']);
+            // Read the existing file (if any) and keep all foreign features.
+            let foreign = [];
+            try {
+                const prev = await this.dataset.getFileContents(this.measurementPath);
+                if (prev && (typeof prev !== 'string' || prev.trim())) {
+                    const parsed = JSON.parse(prev);
+                    if (parsed && Array.isArray(parsed.features)) {
+                        foreign = parsed.features.filter(f => {
+                            const t = f && f.properties && f.properties.measurementType;
+                            return !t || !ownedTypes.has(t);
+                        });
+                    }
+                }
+            } catch (e) {
+                // 404 / missing / unreadable: nothing to preserve.
+                if (!(e && (e.status === 404 || /not found/i.test(String(e.message || ''))))) {
+                    console.warn('Existing measurements file unreadable; will overwrite:', e);
+                }
             }
 
-            const content = JSON.stringify(geojsonData, null, 2);
+            const merged = {
+                ...geojsonData,
+                metadata: {
+                    ...(geojsonData.metadata || {}),
+                    modifiedAt: new Date().toISOString()
+                },
+                features: [...(geojsonData.features || []), ...foreign]
+            };
+
+            const content = JSON.stringify(merged, null, 2);
             const blob = new Blob([content], { type: 'application/geo+json' });
 
-            const result = await this.dataset.writeObj(this.measurementPath, blob);
+            await this.dataset.writeObj(this.measurementPath, blob);
 
-            console.log(`Measurements saved to: ${this.measurementPath}`);
-            return result;
+            console.log(`Measurements saved to: ${this.measurementPath} (${merged.features.length} feature(s), ${foreign.length} preserved)`);
+            return { path: this.measurementPath, fileName: this._fileName() };
         } catch (error) {
             console.error('Failed to save measurements:', error);
             throw new Error(`Failed to save measurements: ${error.message}`);
         }
+    }
+
+    /** Just the file name component of the storage path (for toasts). */
+    _fileName() {
+        const p = this.measurementPath || '';
+        const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+        return idx >= 0 ? p.substring(idx + 1) : p;
     }
 
     /**

@@ -23,11 +23,17 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
 
     // Only copy safe properties (not circular references)
     // Includes GeoJSON styling conventions: stroke, stroke-width, stroke-opacity, fill, fill-opacity
+    // and stockpile-specific metadata so saved stockpile features round-trip.
     const safeProperties = [
         'tooltipText', 'createdAt', 'measurementType',
         'name', 'description',
         'stroke', 'stroke-width', 'stroke-opacity',
-        'fill', 'fill-opacity'
+        'fill', 'fill-opacity',
+        // Stockpile metadata
+        'id', 'title', 'notes', 'material', 'materialDensity',
+        'netVolume', 'cutVolume', 'fillVolume',
+        'area2d', 'area3d', 'baseElevation', 'confidence',
+        'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
     ];
     safeProperties.forEach(prop => {
         const value = feature.get(prop);
@@ -44,10 +50,19 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
     }));
 
     // Determine measurement type and calculate values
-    let measurementType;
+    let measurementType = feature.get('measurementType');
     let calculatedValues = {};
 
-    if (geometryType === 'Polygon') {
+    if (measurementType === 'stockpile') {
+        // Stockpile features carry their own metrics; don't recompute geometry-derived values.
+    } else if (measurementType === 'profile') {
+        // Raster profile: keep the type and the saved tooltip; reuse length
+        // calculations so we still record the polyline length for export.
+        if (geometryType === 'LineString') {
+            const length = getLength(geometry);
+            calculatedValues = calculateLengthValues(length, unitPref);
+        }
+    } else if (geometryType === 'Polygon') {
         measurementType = 'area';
         const area = getArea(geometry);
         calculatedValues = calculateAreaValues(area, unitPref);
@@ -65,7 +80,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
             longitude: Math.round(lon * 1000000) / 1000000
         };
     } else {
-        measurementType = 'unknown';
+        measurementType = measurementType || 'unknown';
     }
 
     // Build properties
@@ -86,6 +101,20 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         fill: feature.get('fill') || null,
         'fill-opacity': feature.get('fill-opacity') || null
     };
+
+    // Stockpile features: persist all metadata fields without overwriting calculated values.
+    if (measurementType === 'stockpile') {
+        const stockpileFields = [
+            'id', 'title', 'notes', 'material', 'materialDensity',
+            'netVolume', 'cutVolume', 'fillVolume',
+            'area2d', 'area3d', 'baseElevation', 'confidence',
+            'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
+        ];
+        stockpileFields.forEach(k => {
+            const v = feature.get(k);
+            if (v !== undefined && v !== null) properties[k] = v;
+        });
+    }
 
     // Remove null properties for cleaner GeoJSON
     Object.keys(properties).forEach(key => {
@@ -124,6 +153,19 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     // Restore name and description
     if (props.name) feature.set('name', props.name);
     if (props.description) feature.set('description', props.description);
+
+    // Restore stockpile-specific metadata so the panel can re-hydrate.
+    if (props.measurementType === 'stockpile') {
+        const stockpileFields = [
+            'id', 'title', 'notes', 'material', 'materialDensity',
+            'netVolume', 'cutVolume', 'fillVolume',
+            'area2d', 'area3d', 'baseElevation', 'confidence',
+            'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
+        ];
+        stockpileFields.forEach(k => {
+            if (props[k] !== undefined && props[k] !== null) feature.set(k, props[k]);
+        });
+    }
 
     // Restore GeoJSON styling properties
     if (props.stroke) feature.set('stroke', props.stroke);
@@ -195,10 +237,14 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') 
         },
         metadata: {
             version: '1.0',
+            kind: 'measurements',
             orthophotoFile: orthophotoPath,
             createdAt: new Date().toISOString(),
             modifiedAt: new Date().toISOString(),
-            application: 'Registry-Orthophoto',
+            // Standardized identifier across all DroneDB-Registry-written
+            // measurement files. Older values ("Registry-Orthophoto",
+            // "Registry-Stockpile") are still accepted by the importer.
+            application: 'DroneDB Registry',
             unitPreference: unitPref
         },
         features: features
@@ -206,7 +252,11 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') 
                 // Only export actual measurement features (not temporary draw features)
                 const geom = f.getGeometry();
                 const hasType = f.get('measurementType');
-                return geom && (geom instanceof Polygon || geom instanceof LineString || (geom instanceof Point && hasType === 'point'));
+                return geom && (
+                    geom instanceof Polygon
+                    || geom instanceof LineString
+                    || (geom instanceof Point && hasType === 'point')
+                );
             })
             .map(f => featureToGeoJSON(f, unitPref))
     };

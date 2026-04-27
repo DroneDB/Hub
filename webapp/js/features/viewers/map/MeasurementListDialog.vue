@@ -77,6 +77,8 @@ export default {
                 case 'point': return 'Point';
                 case 'length': return 'Length';
                 case 'area': return 'Area';
+                case 'stockpile': return 'Stockpile';
+                case 'profile': return 'Profile';
                 default: return type || 'Unknown';
             }
         },
@@ -85,6 +87,8 @@ export default {
                 case 'point': return 'fa-solid fa-map-pin';
                 case 'length': return 'fa-solid fa-ruler';
                 case 'area': return 'fa-solid fa-draw-polygon';
+                case 'stockpile': return 'fa-solid fa-layer-group';
+                case 'profile': return 'fa-solid fa-route';
                 default: return 'fa-solid fa-question';
             }
         },

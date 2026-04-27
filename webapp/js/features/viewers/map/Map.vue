@@ -47,6 +47,8 @@
                 :customDensity="stockpileCustomDensity"
                 :customCostPerTon="stockpileCustomCostPerTon"
                 :unitPref="currentUnitPref"
+                :title="stockpileTitle"
+                :notes="stockpileNotes"
                 @close="closeStockpileVolume"
                 @detectCenter="detectAtMapCenter"
                 @clickOnMap="startStockpileClickMode"
@@ -60,7 +62,9 @@
                 @update:radius="stockpileRadius = $event"
                 @update:material="stockpileMaterial = $event"
                 @update:customDensity="stockpileCustomDensity = $event"
-                @update:customCostPerTon="stockpileCustomCostPerTon = $event" />
+                @update:customCostPerTon="stockpileCustomCostPerTon = $event"
+                @update:title="stockpileTitle = $event"
+                @update:notes="stockpileNotes = $event" />
         </div>
         <MapDialogs
             :alertDialogOpen="alertDialogOpen"

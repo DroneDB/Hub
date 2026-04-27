@@ -6,6 +6,7 @@ import { Feature } from 'ol';
 import { Point } from 'ol/geom';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
+import { getLength as olGetLength } from 'ol/sphere';
 
 /**
  * Mixin for Raster Analysis panel (thermal + DEM + generic value rasters).
@@ -44,7 +45,10 @@ export default {
             _rasterInspectKeyHandler: null,
             _rasterInspectTooltipEl: null,
             _rasterInspectAbort: null,
-            _rasterInspectThrottle: null
+            _rasterInspectThrottle: null,
+            _rasterInspectClickKey: null,
+            _rasterDimsCache: null,
+            _lastProfileMeasurementFeature: null
         };
     },
     methods: {
@@ -155,10 +159,12 @@ export default {
             // Profile drawing is mutually exclusive with the inspect tool.
             if (this.rasterInspectActive) this._stopRasterInspect();
 
-            // Cancel any ongoing draw + clear previous line
+            // Cancel any ongoing draw + clear previous line, chart, and any error.
             this._stopRasterProfileDrawing();
             this._ensureRasterProfileLayer();
             this._rasterProfileSource.clear();
+            this.rasterProfile = null;
+            this.rasterProfileError = null;
 
             const profileStyle = new Style({
                 stroke: new Stroke({
@@ -184,8 +190,12 @@ export default {
 
             const onKey = (e) => {
                 if (e.key === 'Escape' || e.keyCode === 27) {
+                    // ESC must abort the in-progress geometry AND fully exit
+                    // drawing mode, then discard whatever was drawn so far.
                     this._stopRasterProfileDrawing();
                     this._clearRasterProfileLine();
+                    this.rasterProfile = null;
+                    this.rasterProfileError = null;
                 }
             };
             this._rasterProfileKeyHandler = onKey;
@@ -208,10 +218,28 @@ export default {
                 const lineGeo = geom.clone().transform(mapProj, 'EPSG:4326');
                 const coords = lineGeo.getCoordinates();
 
-                // Stop the interaction; keep the drawn line visible until cleared.
-                this._stopRasterProfileDrawing();
+                // Synchronously suspend the Draw interaction so the upcoming
+                // pointer events can NOT start a new feature, and flip the UI
+                // flag right away so the panel button immediately shows
+                // "Redraw" instead of staying in "Stop drawing" mode.
+                if (this._rasterProfileDraw) {
+                    try { this._rasterProfileDraw.setActive(false); } catch (e) { /* noop */ }
+                }
+                this.rasterProfileDrawing = false;
+
+                // Defer the actual interaction removal to the next tick so OL
+                // finishes processing the drawend event before we mutate the
+                // interaction stack.
+                setTimeout(() => {
+                    this._stopRasterProfileDrawing();
+                }, 0);
 
                 if (Array.isArray(coords) && coords.length >= 2) {
+                    // Push the line into the shared measurements list so it
+                    // appears in the Measurement List dialog (alongside
+                    // point/length/area/stockpile entries) and can be saved
+                    // and re-loaded with the rest of the measurements.
+                    this._addProfileToMeasurementsList(evt.feature, coords);
                     this.queryRasterProfile(coords);
                 }
             });
@@ -251,6 +279,48 @@ export default {
         _clearRasterProfileLine() {
             if (this._rasterProfileSource) this._rasterProfileSource.clear();
             this._rasterProfileHoverFeature = null;
+        },
+
+        /**
+         * Push the just-drawn profile line into the shared measurements layer
+         * (`this.measureControls.source`) so it appears in the Measurement List
+         * dialog and can be saved/exported alongside regular point/length/area
+         * measurements. The original feature stays in the analysis overlay
+         * (used for the hover marker on the profile chart).
+         */
+        _addProfileToMeasurementsList(originalFeature, lonLatCoords) {
+            const controls = this.measureControls;
+            if (!controls || !controls.source) return null;
+            try {
+                const geom = originalFeature.getGeometry().clone();
+                const feature = new Feature({ geometry: geom });
+                // Compute length in meters for the tooltip.
+                let lengthM = 0;
+                try {
+                    // OL sphere getLength expects a geometry in EPSG:3857; the
+                    // cloned geometry already is.
+                    lengthM = olGetLength(geom);
+                } catch (e) { /* noop */ }
+                const lengthLabel = lengthM >= 1000
+                    ? `${(lengthM / 1000).toFixed(2)} km`
+                    : `${lengthM.toFixed(1)} m`;
+                feature.set('measurementType', 'profile');
+                feature.set('createdAt', new Date().toISOString());
+                feature.set('stroke', '#ff9800');
+                feature.set('stroke-width', 3);
+                feature.set('tooltipText', `Profile: ${lengthLabel}`);
+                feature.set('rasterFilePath', this.rasterFilePath);
+                feature.setStyle(controls.createFeatureStyle(feature));
+                controls.source.addFeature(feature);
+                if (typeof controls.updateButtonsVisibility === 'function') {
+                    controls.updateButtonsVisibility(true, false);
+                }
+                this._lastProfileMeasurementFeature = feature;
+                return feature;
+            } catch (e) {
+                console.warn('[RasterAnalysis] Failed to add profile to measurements list:', e);
+                return null;
+            }
         },
 
         handleClearProfile() {
@@ -337,20 +407,18 @@ export default {
             });
             document.body.appendChild(this._rasterInspectTooltipEl);
 
-            const mapProj = this.map.getView().getProjection();
-            const onMove = (evt) => {
+            // Single-click handler: compute pixel coordinates from lon/lat
+            // using the raster tile layer's extent + the raster's own
+            // dimensions, then call getRasterPointValue (one server call per
+            // click - no hover spam).
+            const onClick = (evt) => {
                 if (!this._rasterInspectTooltipEl) return;
                 const px = evt.originalEvent;
                 this._rasterInspectTooltipEl.style.left = (px.clientX + 12) + 'px';
                 this._rasterInspectTooltipEl.style.top = (px.clientY + 12) + 'px';
-                if (this._rasterInspectThrottle) return;
-                const [lon, lat] = transform(evt.coordinate, mapProj, 'EPSG:4326');
-                this._rasterInspectThrottle = setTimeout(() => {
-                    this._rasterInspectThrottle = null;
-                }, 120);
-                this._fetchInspectValue(lon, lat);
+                this._fetchInspectValueAtMapCoord(evt.coordinate);
             };
-            this._rasterInspectMoveKey = this.map.on('pointermove', onMove);
+            this._rasterInspectClickKey = this.map.on('singleclick', onClick);
 
             this._rasterInspectKeyHandler = (e) => {
                 if (e.key === 'Escape' || e.keyCode === 27) this._stopRasterInspect();
@@ -358,11 +426,88 @@ export default {
             window.addEventListener('keydown', this._rasterInspectKeyHandler);
         },
 
-        async _fetchInspectValue(lon, lat) {
+        /**
+         * Locate the OpenLayers tile layer that renders `this.rasterFilePath`.
+         * Falls back to scanning all map layers because Map.vue / SingleMap.vue
+         * may store the raster layers either directly on the map or grouped
+         * under `this.rasterLayer` (a LayerGroup).
+         */
+        _findRasterTileLayer() {
+            if (!this.map || !this.rasterFilePath) return null;
+            let found = null;
+            const visit = (layer) => {
+                if (found) return;
+                if (!layer) return;
+                if (typeof layer.getLayers === 'function') {
+                    layer.getLayers().forEach(visit);
+                    return;
+                }
+                if (layer.entryPath === this.rasterFilePath) found = layer;
+            };
+            this.map.getLayers().forEach(visit);
+            return found;
+        },
+
+        async _ensureRasterDimsCache() {
+            if (this._rasterDimsCache && this._rasterDimsCache.path === this.rasterFilePath) {
+                return this._rasterDimsCache;
+            }
+            try {
+                const info = await this.dataset.getRasterValueInfo(this.rasterFilePath);
+                if (!info || !info.width || !info.height) return null;
+                this._rasterDimsCache = {
+                    path: this.rasterFilePath,
+                    width: Number(info.width),
+                    height: Number(info.height),
+                    unit: info.unit || '',
+                    isThermal: !!info.isThermal
+                };
+                return this._rasterDimsCache;
+            } catch (e) {
+                console.warn('[RasterAnalysis] Failed to load raster dimensions:', e);
+                return null;
+            }
+        },
+
+        async _fetchInspectValueAtMapCoord(mapCoord) {
             if (!this.rasterFilePath || !this.dataset) return;
             try {
-                const info = await this.dataset.getRasterPointValue(this.rasterFilePath, lon, lat);
+                const tileLayer = this._findRasterTileLayer();
+                const extent = tileLayer && tileLayer.getExtent ? tileLayer.getExtent() : null;
+                if (!extent) {
+                    if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
+                    return;
+                }
+                const dims = await this._ensureRasterDimsCache();
+                if (!dims) {
+                    if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
+                    return;
+                }
+                const [mx, my] = mapCoord;
+                const [x0, y0, x1, y1] = extent;
+                if (mx < x0 || mx > x1 || my < y0 || my > y1) {
+                    if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
+                    return;
+                }
+                // Pixel index: linear in extent. Y axis inverted (image origin
+                // is top-left, map origin is bottom-left).
+                const px = Math.max(0, Math.min(dims.width - 1,
+                    Math.floor((mx - x0) / (x1 - x0) * dims.width)));
+                const py = Math.max(0, Math.min(dims.height - 1,
+                    Math.floor((y1 - my) / (y1 - y0) * dims.height)));
+
+                const result = await this.dataset.getRasterPointValue(
+                    this.rasterFilePath, px, py);
                 if (!this.rasterInspectActive || !this._rasterInspectTooltipEl) return;
+                if (!result || result.value == null || !isFinite(result.value)) {
+                    this._rasterInspectTooltipEl.style.display = 'none';
+                    return;
+                }
+                const info = {
+                    value: result.value,
+                    unit: result.unit || dims.unit || '',
+                    isThermal: !!(result.isThermal || dims.isThermal)
+                };
                 this.rasterInspectValue = info;
                 const txt = this._formatInspectValue(info);
                 if (txt) {
@@ -373,6 +518,10 @@ export default {
                 }
             } catch (e) {
                 if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
+                if (!this._rasterInspectErrorLogged) {
+                    this._rasterInspectErrorLogged = true;
+                    console.warn('[RasterAnalysis] inspect-value query failed:', e);
+                }
             }
         },
 
@@ -390,10 +539,15 @@ export default {
         _stopRasterInspect() {
             this.rasterInspectActive = false;
             this.rasterInspectValue = null;
+            this._rasterInspectErrorLogged = false;
             if (this._rasterInspectMoveKey) {
                 try { unByKey(this._rasterInspectMoveKey); } catch (e) { /* noop */ }
             }
             this._rasterInspectMoveKey = null;
+            if (this._rasterInspectClickKey) {
+                try { unByKey(this._rasterInspectClickKey); } catch (e) { /* noop */ }
+            }
+            this._rasterInspectClickKey = null;
             if (this._rasterInspectKeyHandler) {
                 window.removeEventListener('keydown', this._rasterInspectKeyHandler);
                 this._rasterInspectKeyHandler = null;

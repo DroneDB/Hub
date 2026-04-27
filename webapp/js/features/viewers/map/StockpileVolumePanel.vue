@@ -9,7 +9,12 @@
 
         <div class="panel-body">
             <div class="section">
-                <label class="section-label">Base Plane Method</label>
+                <label class="section-label">
+                    Base Plane Method
+                    <i class="fas fa-info-circle base-method-info"
+                       :title="baseMethodTooltip"
+                       data-testid="stockpile-base-method-info"></i>
+                </label>
                 <select v-model="localBaseMethod" class="panel-select" data-testid="stockpile-base-method">
                     <option value="lowest_perimeter">Lowest perimeter</option>
                     <option value="average_perimeter">Average perimeter</option>
@@ -104,13 +109,23 @@
             </div>
 
             <div class="section result" v-if="result" data-testid="stockpile-result">
+                <label class="section-label">Identification</label>
+                <input type="text" v-model="localTitle" class="panel-input"
+                       placeholder="Title (e.g. North pile)" maxlength="120"
+                       data-testid="stockpile-title" />
+                <textarea v-model="localNotes" class="panel-input panel-textarea"
+                          rows="2" placeholder="Notes (optional)" maxlength="500"
+                          data-testid="stockpile-notes"></textarea>
+
                 <label class="section-label">Result</label>
                 <div class="result-grid">
                     <span class="result-label">Cut volume</span>
                     <span class="result-value">{{ formatVolume(result.cutVolume) }}</span>
 
-                    <span class="result-label">Fill volume</span>
-                    <span class="result-value">{{ formatVolume(result.fillVolume) }}</span>
+                    <template v-if="showFillRow">
+                        <span class="result-label">Fill volume</span>
+                        <span class="result-value">{{ formatVolume(result.fillVolume) }}</span>
+                    </template>
 
                     <span class="result-label highlight">Net volume</span>
                     <span class="result-value highlight" data-testid="stockpile-net-volume">{{ formatVolume(result.netVolume) }}</span>
@@ -142,6 +157,10 @@
                         <span class="result-label">Est. cost</span>
                         <span class="result-value" data-testid="stockpile-cost">{{ formatCost(derivedCost) }}</span>
                     </template>
+                </div>
+                <div v-if="!showFillRow" class="fill-hint" data-testid="stockpile-fill-hint">
+                    <i class="fas fa-info-circle"></i>
+                    Fill volume is not applicable for the selected base plane method.
                 </div>
                 <div class="result-actions">
                     <button class="btn btn-secondary btn-sm" @click="$emit('exportGeoJson')"
@@ -186,12 +205,15 @@ export default {
             default: 'metric',
             validator: (v) => ['metric', 'imperial'].includes(v)
         },
-        canSave: { type: Boolean, default: true }
+        canSave: { type: Boolean, default: true },
+        title: { type: String, default: '' },
+        notes: { type: String, default: '' }
     },
     emits: ['close', 'detectCenter', 'clickOnMap', 'drawPolygon', 'clearOverlay',
         'cancelMode', 'exportGeoJson', 'saveGeoJson',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
-        'update:customDensity', 'update:customCostPerTon'],
+        'update:customDensity', 'update:customCostPerTon',
+        'update:title', 'update:notes'],
     data() {
         return { customSlug: CUSTOM_SLUG };
     },
@@ -219,6 +241,14 @@ export default {
         localCustomCostPerTon: {
             get() { return this.customCostPerTon; },
             set(v) { this.$emit('update:customCostPerTon', Number(v)); }
+        },
+        localTitle: {
+            get() { return this.title; },
+            set(v) { this.$emit('update:title', v); }
+        },
+        localNotes: {
+            get() { return this.notes; },
+            set(v) { this.$emit('update:notes', v); }
         },
         // Resolves the active material parameters: predefined slug, custom inputs, or null.
         effectiveMaterial() {
@@ -270,7 +300,29 @@ export default {
         canClear() {
             return Boolean(this.result || this.error || this.mode);
         },
-        isImperial() { return this.unitPref === 'imperial'; }
+        isImperial() { return this.unitPref === 'imperial'; },
+        // Hide the Fill volume row when the chosen base plane method makes it
+        // structurally zero (lowest_perimeter is always 0 by construction;
+        // flat with elevation 0 typically yields 0 for absolute-elevation DSMs).
+        // For average_perimeter / best_fit / non-zero flat results, show it.
+        showFillRow() {
+            if (!this.result) return true;
+            const fill = Number(this.result.fillVolume);
+            const m = this.baseMethod;
+            if (m === 'lowest_perimeter') return false;
+            if (m === 'flat' && (!isFinite(fill) || fill === 0)) return false;
+            return true;
+        },
+        baseMethodTooltip() {
+            return [
+                'Defines the reference surface used to compute Cut and Fill volumes:',
+                '',
+                '• Lowest perimeter — base = the lowest elevation along the polygon boundary. Best for isolated piles on uneven ground; Fill is always 0.',
+                '• Average perimeter — base = the mean elevation along the boundary. A balanced choice when the surrounding terrain is roughly level.',
+                '• Best-fit plane — fits a tilted plane through the perimeter elevations. Useful when the ground around the pile slopes.',
+                '• Flat (elevation = 0) — base is the absolute reference 0 m. Use only when your DSM is already a height-above-ground (DTM-subtracted) raster.'
+            ].join('\n');
+        }
     },
     methods: {
         triggerDetectCenter() { this.$emit('detectCenter'); },
@@ -379,6 +431,34 @@ export default {
     letter-spacing: 0;
 }
 
+.base-method-info {
+    margin-left: 0.35rem;
+    color: #ffb74d;
+    cursor: help;
+    opacity: 0.85;
+    font-size: 0.85rem;
+}
+
+.base-method-info:hover {
+    opacity: 1;
+}
+
+.fill-hint {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.5rem;
+    background: rgba(255,255,255,0.06);
+    border-left: 2px solid rgba(255, 183, 77, 0.6);
+    color: #ccc;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    border-radius: 0.2rem;
+}
+
+.fill-hint i {
+    color: #ffb74d;
+    margin-right: 0.25rem;
+}
+
 .panel-select, .panel-input, .panel-range {
     width: 100%;
     box-sizing: border-box;
@@ -395,6 +475,13 @@ export default {
     height: 1.4rem;
     background: transparent;
     border: 0;
+}
+
+.panel-textarea {
+    resize: vertical;
+    min-height: 2.4rem;
+    margin-top: 0.25rem;
+    font-family: inherit;
 }
 
 .panel-select:focus, .panel-input:focus {

@@ -16,7 +16,7 @@ import { Polygon } from 'ol/geom';
 import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
-import { saveStockpile, loadStockpile } from '@/libs/map/stockpileStorage';
+import { saveStockpile, loadStockpile, getStockpileFileName } from '@/libs/map/stockpileStorage';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
 const STOCKPILE_STROKE = '#ff9800';
@@ -72,6 +72,9 @@ export default {
             stockpileResult: null,
             stockpileDetectedPolygon: null,
             stockpileMode: null, // 'click' | 'draw' | null
+            // User-editable identification of the saved pile.
+            stockpileTitle: '',
+            stockpileNotes: '',
             // Non-reactive OL refs (mutated directly).
             _stockpileLayer: null,
             _stockpileSource: null,
@@ -94,6 +97,8 @@ export default {
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
+            this.stockpileTitle = '';
+            this.stockpileNotes = '';
             if (this.stockpileMaterials.length === 0) {
                 try {
                     this.stockpileMaterials = await this.dataset.getStockpileMaterials();
@@ -112,7 +117,13 @@ export default {
                 const saved = await loadStockpile(this.dataset, this.rasterFilePath);
                 if (!saved) return;
                 this.stockpileDetectedPolygon = saved.polygon;
-                this._renderStockpilePolygon(saved.polygon);
+                // The polygon may already be rendered by the regular measurements
+                // layer (when persisted with measurementType==='stockpile' it is
+                // imported via measureControls.importFromGeoJSON at dataset load).
+                // Render in our dedicated overlay only as a fallback.
+                if (!this._isStockpileInMeasureSource(saved.properties && saved.properties.id)) {
+                    this._renderStockpilePolygon(saved.polygon);
+                }
                 // Re-hydrate the result panel from saved properties so volumes/area
                 // are visible without recomputing.
                 const p = saved.properties || {};
@@ -131,9 +142,22 @@ export default {
                     };
                 }
                 if (p.material) this.stockpileMaterial = p.material;
+                if (p.title) this.stockpileTitle = p.title;
+                if (p.notes) this.stockpileNotes = p.notes;
             } catch (e) {
                 console.warn('Could not restore saved stockpile:', e);
             }
+        },
+
+        /**
+         * Returns true if a feature with the given id is already present in the
+         * shared measurements OL source - in which case our dedicated overlay
+         * does not need to render the polygon a second time.
+         */
+        _isStockpileInMeasureSource(id) {
+            if (!id || !this.measureControls || !this.measureControls.source) return false;
+            const features = this.measureControls.source.getFeatures();
+            return features.some(f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
         },
 
         closeStockpileVolume() {
@@ -403,6 +427,20 @@ export default {
          */
         _buildStockpileProperties() {
             const props = { material: this.stockpileMaterial || null };
+            const title = (this.stockpileTitle || '').trim();
+            const notes = (this.stockpileNotes || '').trim();
+            if (title) props.title = title;
+            if (notes) props.notes = notes;
+            // Resolve material density (preferred sources: predefined entry,
+            // custom inline density, or backend-supplied weightEstimate).
+            const mat = (this.stockpileMaterials || []).find(m => m && m.slug === this.stockpileMaterial);
+            if (mat && isFinite(mat.densityTonPerM3)) {
+                props.materialDensity = Number(mat.densityTonPerM3);
+            } else if (this.stockpileMaterial === CUSTOM_MATERIAL_SLUG
+                && isFinite(this.stockpileCustomDensity) && this.stockpileCustomDensity > 0) {
+                props.materialDensity = Number(this.stockpileCustomDensity);
+            }
+            if (this.currentUnitPref) props.unitSystem = this.currentUnitPref;
             const r = this.stockpileResult;
             if (r) {
                 if (typeof r.netVolume === 'number') props.netVolume = r.netVolume;
@@ -415,12 +453,29 @@ export default {
                 if (r.weightEstimate) props.weightEstimate = r.weightEstimate;
                 if (r.costEstimate) props.costEstimate = r.costEstimate;
             }
+            // tooltipText is what the Measurement List dialog shows in the
+            // "Value" column; build a compact human description here so the
+            // saved feature looks meaningful when re-imported.
+            props.tooltipText = this._formatStockpileTooltip(props);
+            // The user-visible name in the list (preferred over a generic label).
+            if (title) props.name = title;
             return props;
         },
 
+        _formatStockpileTooltip(p) {
+            const parts = [];
+            if (p.title) parts.push(p.title);
+            if (typeof p.netVolume === 'number') parts.push(`${p.netVolume.toFixed(1)} m³`);
+            if (p.material && p.material !== CUSTOM_MATERIAL_SLUG) parts.push(p.material);
+            if (p.materialDensity) parts.push(`${p.materialDensity} t/m³`);
+            return parts.join(' — ') || 'Stockpile';
+        },
+
         /**
-         * Persist the current pile contour next to the raster as
-         * `<basename>_stockpile.geojson` so it can be re-displayed later.
+         * Persist the current pile contour into the shared measurements file.
+         * The saved feature is also adopted into the regular OL measurements
+         * layer (so it shows up in the Measurement List dialog like any other
+         * measurement) and removed from the dedicated overlay.
          */
         async saveStockpileGeoJson() {
             if (!this.stockpileDetectedPolygon) {
@@ -433,14 +488,32 @@ export default {
             }
             try {
                 this.stockpileLoading = true;
-                await saveStockpile(this.dataset, this.rasterFilePath,
+                const saved = await saveStockpile(this.dataset, this.rasterFilePath,
                     this.stockpileDetectedPolygon, this._buildStockpileProperties());
-                if (this.$toast && typeof this.$toast.add === 'function') {
+                // Mirror the saved feature into the measurements OL source so it
+                // is rendered with the regular tooltip system AND appears in the
+                // Measurement List dialog. Skip if it is already there.
+                if (saved && saved.feature) {
+                    this._adoptStockpileIntoMeasurementLayer(saved.feature);
+                }
+                // Clear our dedicated overlay - the polygon is now tracked by olMeasure.
+                this._clearStockpileOverlay();
+                // Mark persisted state on the host so the "saved" badge / delete-saved
+                // button visibility on olMeasure stays in sync.
+                this.hasSavedMeasurements = true;
+                if (this.measureControls && typeof this.measureControls.updateButtonsVisibility === 'function') {
+                    this.measureControls.updateButtonsVisibility(
+                        this.measureControls.hasMeasurements(), true);
+                }
+                const fileName = (saved && saved.fileName) || getStockpileFileName(this.rasterFilePath);
+                if (typeof this.showFlash === 'function') {
+                    this.showFlash(`Stockpile saved to "${fileName}"`, 'positive', 'fa-regular fa-circle-check');
+                } else if (this.$toast && typeof this.$toast.add === 'function') {
                     this.$toast.add({
                         severity: 'success',
                         summary: 'Stockpile saved',
-                        detail: 'GeoJSON written next to the raster.',
-                        life: 2500
+                        detail: `GeoJSON written to "${fileName}"`,
+                        life: 3000
                     });
                 }
             } catch (e) {
@@ -449,6 +522,26 @@ export default {
             } finally {
                 this.stockpileLoading = false;
             }
+        },
+
+        /**
+         * Build a minimal one-feature FeatureCollection from a saved stockpile
+         * Feature and import it into the regular measurements layer via
+         * `measureControls.importFromGeoJSON()`. Idempotent: if a feature with
+         * the same id is already present we do nothing.
+         */
+        _adoptStockpileIntoMeasurementLayer(savedFeature) {
+            if (!savedFeature || !this.measureControls
+                || typeof this.measureControls.importFromGeoJSON !== 'function') return;
+            const id = savedFeature.properties && savedFeature.properties.id;
+            if (id && this._isStockpileInMeasureSource(id)) return;
+            const fc = {
+                type: 'FeatureCollection',
+                metadata: { application: 'DroneDB Registry', kind: 'measurements' },
+                features: [savedFeature]
+            };
+            try { this.measureControls.importFromGeoJSON(fc); }
+            catch (e) { console.warn('Could not adopt stockpile into measurement layer:', e); }
         },
 
         /**

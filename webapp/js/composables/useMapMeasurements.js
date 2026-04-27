@@ -70,12 +70,15 @@ export default {
                     return;
                 }
 
-                await this.measurementStorage.save(geojson);
+                const result = await this.measurementStorage.save(geojson);
                 this.hasSavedMeasurements = true;
                 this.measureControls.updateButtonsVisibility(true, true);
 
-                console.log(`Saved ${geojson.features.length} measurements`);
-                this.showFlash(`Saved ${geojson.features.length} measurement(s)`, 'positive', 'fa-regular fa-circle-check');
+                const fileName = (result && result.fileName) || 'measurements.geojson';
+                console.log(`Saved ${geojson.features.length} measurements to ${fileName}`);
+                this.showFlash(
+                    `Saved ${geojson.features.length} measurement(s) to "${fileName}"`,
+                    'positive', 'fa-regular fa-circle-check');
             } catch (e) {
                 console.error('Error saving measurements:', e);
                 this.showAlert('Error', `Failed to save measurements: ${e.message}`);

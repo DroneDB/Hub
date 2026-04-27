@@ -122,8 +122,16 @@
                     @click="toggleInspect"
                     :title="inspectActive
                         ? 'Stop inspecting raster values (Esc)'
-                        : 'Hover the map to read raster values'">
+                        : 'Click on the map to read the raster value'">
                     <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'"></i>
+                </button>
+                <button v-if="supports3D" class="btn btn-sm"
+                    :class="view3D ? 'btn-primary active' : 'btn-secondary'"
+                    @click="toggle3DView"
+                    :title="view3D ? 'Switch back to 2D map view' : 'Show this raster as a 3D heightmap'"
+                    data-testid="raster-3d-toggle">
+                    <i class="fas fa-cube"></i>
+                    {{ view3D ? '2D' : '3D' }}
                 </button>
                 <button class="btn btn-secondary btn-sm" @click="reset">Reset</button>
                 <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView">
@@ -191,11 +199,15 @@ export default {
         // True while the host has an active OL Draw interaction for the profile.
         drawingProfile: { type: Boolean, default: false },
         // True while the inspect-value tool is active on the host.
-        inspectActive: { type: Boolean, default: false }
+        inspectActive: { type: Boolean, default: false },
+        // True if the host can render a 3D heightmap for this raster.
+        supports3D: { type: Boolean, default: false },
+        // True while the host is showing the 3D view instead of the 2D map.
+        view3D: { type: Boolean, default: false }
     },
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
-            'profileHover', 'cancelDrawProfile', 'toggleInspectValue'],    data() {
+            'profileHover', 'cancelDrawProfile', 'toggleInspectValue', 'toggle3DView'],    data() {
         return {
             rasterInfo: null,
             loadError: false,
@@ -357,6 +369,10 @@ export default {
 
         toggleInspect() {
             this.$emit('toggleInspectValue');
+        },
+
+        toggle3DView() {
+            this.$emit('toggle3DView');
         },
 
         clearProfile() {
