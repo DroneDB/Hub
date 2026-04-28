@@ -16,7 +16,7 @@ import { Polygon } from 'ol/geom';
 import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
-import { saveStockpile, loadStockpile, getStockpileFileName } from '@/libs/map/stockpileStorage';
+import { buildStockpileFeature, loadStockpile } from '@/libs/map/stockpileStorage';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
 const STOCKPILE_STROKE = '#ff9800';
@@ -81,8 +81,23 @@ export default {
             _stockpileDraw: null,
             _stockpileClickKey: null,
             _stockpileEscKey: null,
-            _stockpilePrevCursor: ''
+            _stockpilePrevCursor: '',
+            // Id of the current draft stockpile feature in the shared
+            // measurement layer. Tracks the polygon that has been auto-adopted
+            // as a regular measurement so it can be re-styled / replaced when
+            // the user re-detects, and removed when leaving the panel without
+            // ever saving via the toolbar.
+            _draftStockpileFeatureId: null
         };
+    },
+    watch: {
+        // Keep the in-memory draft feature's properties in sync with what the
+        // user types in the panel so the toolbar Save button captures the
+        // latest title / notes / material without an extra "Apply" click.
+        stockpileTitle() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
+        stockpileNotes() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
+        stockpileMaterial() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
+        stockpileCustomDensity() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); }
     },
     methods: {
         async openStockpileVolume(file) {
@@ -114,7 +129,10 @@ export default {
         async _loadSavedStockpile() {
             if (!this.rasterFilePath || !this.dataset) return;
             try {
-                const saved = await loadStockpile(this.dataset, this.rasterFilePath);
+                // Skip stockpiles the user has just removed via the Measurement
+                // List dialog (deletion is in-memory until the next save).
+                const saved = await loadStockpile(this.dataset, this.rasterFilePath,
+                    this.deletedMeasurementIds);
                 if (!saved) return;
                 this.stockpileDetectedPolygon = saved.polygon;
                 // The polygon may already be rendered by the regular measurements
@@ -167,14 +185,27 @@ export default {
             this.stockpileDetectedPolygon = null;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
+            // Forget the draft id so the next session can adopt a fresh
+            // polygon. The feature itself stays in the measurements layer
+            // until the user persists or removes it via the toolbar.
+            this._draftStockpileFeatureId = null;
         },
 
         clearStockpileOverlay() {
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
+            // Reset the loading flag so an in-flight detection that is taking
+            // too long no longer blocks the panel - the request itself will
+            // still complete in the background but its result will be ignored
+            // because _draftStockpileFeatureId is cleared below.
+            this.stockpileLoading = false;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
+            // Also remove the draft polygon (and its floating label/tooltip)
+            // from the shared measurement layer if it was already adopted,
+            // otherwise the label stays orphaned on the map.
+            this._removeDraftStockpileFromMeasureSource();
         },
 
         /**
@@ -189,6 +220,13 @@ export default {
             }
             this.stockpileLoading = true;
             this.stockpileError = null;
+            // Each new detection is an independent pile - detach from the
+            // previous draft and reset the identification fields so the
+            // previously-typed title/notes don't bleed into the next adopted
+            // feature (and the watcher doesn't overwrite the previous pile).
+            this._draftStockpileFeatureId = null;
+            this.stockpileTitle = '';
+            this.stockpileNotes = '';
             try {
                 const detection = await this.dataset.detectStockpile(this.rasterFilePath, lat, lon, {
                     radius: this.stockpileRadius,
@@ -210,7 +248,7 @@ export default {
                     confidence: detection.confidence,
                     estimatedFromDetection: detection.estimatedVolume
                 };
-                this._renderStockpilePolygon(detection.polygon);
+                this._adoptDraftStockpile(detection.polygon);
             } catch (e) {
                 console.error('Stockpile detection/calculation failed:', e);
                 this.stockpileError = friendlyStockpileError(e && e.message,
@@ -232,6 +270,13 @@ export default {
             }
             this.stockpileLoading = true;
             this.stockpileError = null;
+            // Each new polygon is an independent pile - detach from the
+            // previous draft and reset the identification fields so the
+            // previously-typed title/notes don't bleed into the next adopted
+            // feature (and the watcher doesn't overwrite the previous pile).
+            this._draftStockpileFeatureId = null;
+            this.stockpileTitle = '';
+            this.stockpileNotes = '';
             try {
                 const volume = await this.dataset.calculateStockpileVolume(
                     this.rasterFilePath,
@@ -244,7 +289,7 @@ export default {
                 );
                 this.stockpileResult = volume;
                 this.stockpileDetectedPolygon = polygonGeoJson;
-                this._renderStockpilePolygon(polygonGeoJson);
+                this._adoptDraftStockpile(polygonGeoJson);
             } catch (e) {
                 console.error('Stockpile calculation failed:', e);
                 this.stockpileError = friendlyStockpileError(e && e.message,
@@ -281,6 +326,7 @@ export default {
             this.stockpileMode = 'click';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
+            this._acquireStockpileToolLock();
             const mapProj = this.map.getView().getProjection();
             this._stockpileClickKey = this.map.once('singleclick', (evt) => {
                 const [lon, lat] = transform(evt.coordinate, mapProj, 'EPSG:4326');
@@ -317,6 +363,7 @@ export default {
             this.stockpileMode = 'draw';
             this.stockpileError = null;
             this._setStockpileCursor('crosshair');
+            this._acquireStockpileToolLock();
 
             const mapProj = this.map.getView().getProjection();
             const draw = new Draw({
@@ -329,14 +376,42 @@ export default {
 
             draw.on('drawend', (evt) => {
                 this.stockpileError = null;
-                // Don't call _stopStockpileInteractions here: drawend already finalised
-                // the sketch into a real feature; calling abortDrawing afterwards would
-                // re-clear the source. Just remove the interaction + listeners.
-                this._teardownStockpileDraw();
+                // Update UI state synchronously so the panel button highlight
+                // and tool lock release immediately, but defer interaction
+                // removal: OL Draw is still in the middle of finalising the
+                // sketch when drawend fires, and removing the interaction
+                // synchronously can leave the next pointer event (e.g. the
+                // user clicking the "Click on map" button) routed back to a
+                // half-alive Draw that starts a new polygon.
                 this.stockpileMode = null;
-                this._setStockpileCursor('');
-                const geom = evt.feature.getGeometry().clone().transform(mapProj, 'EPSG:4326');
+                const mapProjForEnd = this.map.getView().getProjection();
+                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, 'EPSG:4326');
                 const coords = geom.getCoordinates();
+                // Detach the live reference synchronously so a quick
+                // user re-click on Draw / Click does not get clobbered by
+                // the deferred teardown below, and capture the specific
+                // interaction locally so we only remove THIS one.
+                const finishedDraw = draw;
+                if (this._stockpileDraw === finishedDraw) {
+                    this._stockpileDraw = null;
+                }
+                if (this._stockpileDrawTeardownTimer) {
+                    clearTimeout(this._stockpileDrawTeardownTimer);
+                    this._stockpileDrawTeardownTimer = null;
+                }
+                this._stockpileDrawTeardownTimer = setTimeout(() => {
+                    this._stockpileDrawTeardownTimer = null;
+                    if (this.map) {
+                        try { finishedDraw.abortDrawing(); } catch (e) { /* noop */ }
+                        try { this.map.removeInteraction(finishedDraw); } catch (e) { /* noop */ }
+                    }
+                    if (this._stockpileEscKey) {
+                        window.removeEventListener('keydown', this._stockpileEscKey);
+                        this._stockpileEscKey = null;
+                    }
+                    this._setStockpileCursor('');
+                    this._releaseStockpileToolLock();
+                }, 0);
                 if (!coords || !coords[0] || coords[0].length < 3) {
                     this.stockpileError = 'A polygon with at least 3 vertices is required.';
                     return;
@@ -385,6 +460,12 @@ export default {
         },
 
         _stopStockpileInteractions() {
+            // Cancel any pending deferred Draw teardown so it cannot fire
+            // later and remove a freshly-installed interaction.
+            if (this._stockpileDrawTeardownTimer) {
+                clearTimeout(this._stockpileDrawTeardownTimer);
+                this._stockpileDrawTeardownTimer = null;
+            }
             this._teardownStockpileDraw();
             if (this._stockpileClickKey) {
                 try { unByKey(this._stockpileClickKey); } catch (e) { /* noop */ }
@@ -392,6 +473,28 @@ export default {
             }
             this.stockpileMode = null;
             this._setStockpileCursor('');
+            this._releaseStockpileToolLock();
+        },
+
+        /**
+         * Acquire / release a single lock on the measurement toolbar so the
+         * user can't start a regular measurement while a stockpile click or
+         * polygon draw is active. The flag prevents accidental double-locking
+         * when the same panel triggers both click and draw modes back to back.
+         */
+        _acquireStockpileToolLock() {
+            if (this._stockpileToolLockHeld) return;
+            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                try { this.measureControls.setToolsDisabled(true); } catch (e) { /* noop */ }
+                this._stockpileToolLockHeld = true;
+            }
+        },
+        _releaseStockpileToolLock() {
+            if (!this._stockpileToolLockHeld) return;
+            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
+            }
+            this._stockpileToolLockHeld = false;
         },
 
         _teardownStockpileDraw() {
@@ -472,76 +575,85 @@ export default {
         },
 
         /**
-         * Persist the current pile contour into the shared measurements file.
-         * The saved feature is also adopted into the regular OL measurements
-         * layer (so it shows up in the Measurement List dialog like any other
-         * measurement) and removed from the dedicated overlay.
+         * Adopt the just-computed stockpile polygon into the shared OL
+         * measurements layer as if it had been drawn with the regular tools.
+         * The user can then persist it using the toolbar Save button (the
+         * dedicated "Save GeoJSON" panel button has been removed).
+         *
+         * Each detection produces an independent feature so the user can mark
+         * multiple stockpiles one after another within the same session. The
+         * id of the latest adopted feature is tracked so the "Clear" button
+         * can undo just the most recent one.
          */
-        async saveStockpileGeoJson() {
-            if (!this.stockpileDetectedPolygon) {
-                this.stockpileError = 'No polygon to save. Detect or draw a stockpile first.';
-                return;
-            }
-            if (!this.dataset || !this.rasterFilePath) {
-                this.stockpileError = 'Dataset is not available.';
-                return;
-            }
+        _adoptDraftStockpile(polygon) {
+            if (!polygon || polygon.type !== 'Polygon') return;
+            if (!this.measureControls
+                || typeof this.measureControls.importFromGeoJSON !== 'function') return;
+
+            const props = this._buildStockpileProperties();
+            const feature = buildStockpileFeature(polygon, props);
+            const fc = {
+                type: 'FeatureCollection',
+                metadata: { application: 'DroneDB Registry', kind: 'measurements' },
+                features: [feature]
+            };
             try {
-                this.stockpileLoading = true;
-                const saved = await saveStockpile(this.dataset, this.rasterFilePath,
-                    this.stockpileDetectedPolygon, this._buildStockpileProperties());
-                // Mirror the saved feature into the measurements OL source so it
-                // is rendered with the regular tooltip system AND appears in the
-                // Measurement List dialog. Skip if it is already there.
-                if (saved && saved.feature) {
-                    this._adoptStockpileIntoMeasurementLayer(saved.feature);
-                }
-                // Clear our dedicated overlay - the polygon is now tracked by olMeasure.
+                this.measureControls.importFromGeoJSON(fc);
+                this._draftStockpileFeatureId = feature.properties.id;
+                // Drop our temporary draw overlay - the polygon now lives in
+                // the regular measurements layer.
                 this._clearStockpileOverlay();
-                // Mark persisted state on the host so the "saved" badge / delete-saved
-                // button visibility on olMeasure stays in sync.
-                this.hasSavedMeasurements = true;
-                if (this.measureControls && typeof this.measureControls.updateButtonsVisibility === 'function') {
+                if (typeof this.measureControls.updateButtonsVisibility === 'function') {
                     this.measureControls.updateButtonsVisibility(
-                        this.measureControls.hasMeasurements(), true);
-                }
-                const fileName = (saved && saved.fileName) || getStockpileFileName(this.rasterFilePath);
-                if (typeof this.showFlash === 'function') {
-                    this.showFlash(`Stockpile saved to "${fileName}"`, 'positive', 'fa-regular fa-circle-check');
-                } else if (this.$toast && typeof this.$toast.add === 'function') {
-                    this.$toast.add({
-                        severity: 'success',
-                        summary: 'Stockpile saved',
-                        detail: `GeoJSON written to "${fileName}"`,
-                        life: 3000
-                    });
+                        this.measureControls.hasMeasurements(),
+                        !!this.hasSavedMeasurements);
                 }
             } catch (e) {
-                console.error('Failed to save stockpile GeoJSON:', e);
-                this.stockpileError = (e && e.message) ? e.message : 'Failed to save stockpile.';
-            } finally {
-                this.stockpileLoading = false;
+                console.warn('Could not adopt stockpile into measurement layer:', e);
             }
         },
 
         /**
-         * Build a minimal one-feature FeatureCollection from a saved stockpile
-         * Feature and import it into the regular measurements layer via
-         * `measureControls.importFromGeoJSON()`. Idempotent: if a feature with
-         * the same id is already present we do nothing.
+         * Remove the draft stockpile feature (if previously adopted) from the
+         * shared measurement layer. Uses deleteMeasurement so the floating
+         * volume label (OL Overlay + DOM) is cleaned up too.
          */
-        _adoptStockpileIntoMeasurementLayer(savedFeature) {
-            if (!savedFeature || !this.measureControls
-                || typeof this.measureControls.importFromGeoJSON !== 'function') return;
-            const id = savedFeature.properties && savedFeature.properties.id;
-            if (id && this._isStockpileInMeasureSource(id)) return;
-            const fc = {
-                type: 'FeatureCollection',
-                metadata: { application: 'DroneDB Registry', kind: 'measurements' },
-                features: [savedFeature]
-            };
-            try { this.measureControls.importFromGeoJSON(fc); }
-            catch (e) { console.warn('Could not adopt stockpile into measurement layer:', e); }
+        _removeDraftStockpileFromMeasureSource() {
+            const id = this._draftStockpileFeatureId;
+            if (!id || !this.measureControls || !this.measureControls.source) return;
+            const feature = this.measureControls.source.getFeatures().find(
+                f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+            if (!feature) return;
+            try {
+                this.measureControls.deleteMeasurement(feature);
+            } catch (e) {
+                try { this.measureControls.source.removeFeature(feature); } catch (_) { /* noop */ }
+            }
+            this._draftStockpileFeatureId = null;
+        },
+
+        /**
+         * Patch the in-place properties of the current draft feature when the
+         * user edits title / notes / material in the panel. Avoids rebuilding
+         * the geometry and keeps the same feature id so the toolbar Save
+         * captures the latest values.
+         */
+        _patchDraftStockpileProps() {
+            const id = this._draftStockpileFeatureId;
+            if (!id || !this.measureControls || !this.measureControls.source) return;
+            const feature = this.measureControls.source.getFeatures().find(
+                f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+            if (!feature) return;
+            const props = this._buildStockpileProperties();
+            // Don't touch geometry/style props that were set at build time.
+            const updatable = ['name', 'title', 'notes', 'material', 'materialDensity',
+                'tooltipText', 'unitSystem', 'netVolume', 'cutVolume', 'fillVolume',
+                'area2d', 'area3d', 'baseElevation', 'confidence', 'weightEstimate', 'costEstimate'];
+            updatable.forEach(k => {
+                if (props[k] !== undefined) feature.set(k, props[k]);
+                else feature.unset && feature.unset(k);
+            });
+            feature.changed();
         },
 
         /**

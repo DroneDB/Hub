@@ -86,28 +86,22 @@ function buildEmptyFC(rasterPath) {
 }
 
 /**
- * Persist a stockpile polygon + computed metrics by APPENDING a Feature to the
- * shared measurements file. Existing features (regular measurements and prior
- * stockpiles) are preserved.
+ * Build a GeoJSON Feature for a stockpile polygon ready to be inserted into
+ * the shared measurements FeatureCollection. Used both by `saveStockpile`
+ * (persisted file) and by the in-memory adoption flow that puts the just-
+ * computed polygon directly into the OL measurements layer (so the user can
+ * persist it via the regular toolbar Save button instead of a dedicated one).
  *
- * @returns {Promise<{path: string, fileName: string, feature: Object}>}
+ * @param {Object} polygon - GeoJSON Polygon geometry (WGS84).
+ * @param {Object} [properties] - Property bag (material, notes, volumes, ...).
+ * @returns {Object} GeoJSON Feature.
  */
-export async function saveStockpile(dataset, rasterPath, polygon, properties = {}) {
-    const path = getStockpilePath(rasterPath);
-    if (!path) throw new Error('Cannot derive storage path for stockpile.');
-    if (!polygon || polygon.type !== 'Polygon') throw new Error('A Polygon geometry is required.');
-    if (!dataset || typeof dataset.writeObj !== 'function') {
-        throw new Error('Dataset is not available.');
+export function buildStockpileFeature(polygon, properties = {}) {
+    if (!polygon || polygon.type !== 'Polygon') {
+        throw new Error('A Polygon geometry is required.');
     }
-
-    const fc = (await readExisting(dataset, path)) || buildEmptyFC(rasterPath);
-    fc.metadata = fc.metadata || {};
-    fc.metadata.application = APP_ID;
-    fc.metadata.modifiedAt = new Date().toISOString();
-    if (!fc.metadata.createdAt) fc.metadata.createdAt = fc.metadata.modifiedAt;
-
     const now = new Date().toISOString();
-    const feature = {
+    return {
         type: 'Feature',
         geometry: polygon,
         properties: {
@@ -123,6 +117,29 @@ export async function saveStockpile(dataset, rasterPath, polygon, properties = {
             savedAt: now
         }
     };
+}
+
+/**
+ * Persist a stockpile polygon + computed metrics by APPENDING a Feature to the
+ * shared measurements file. Existing features (regular measurements and prior
+ * stockpiles) are preserved.
+ *
+ * @returns {Promise<{path: string, fileName: string, feature: Object}>}
+ */
+export async function saveStockpile(dataset, rasterPath, polygon, properties = {}) {
+    const path = getStockpilePath(rasterPath);
+    if (!path) throw new Error('Cannot derive storage path for stockpile.');
+    if (!dataset || typeof dataset.writeObj !== 'function') {
+        throw new Error('Dataset is not available.');
+    }
+
+    const fc = (await readExisting(dataset, path)) || buildEmptyFC(rasterPath);
+    fc.metadata = fc.metadata || {};
+    fc.metadata.application = APP_ID;
+    fc.metadata.modifiedAt = new Date().toISOString();
+    if (!fc.metadata.createdAt) fc.metadata.createdAt = fc.metadata.modifiedAt;
+
+    const feature = buildStockpileFeature(polygon, properties);
 
     fc.features.push(feature);
 
@@ -139,28 +156,47 @@ export async function saveStockpile(dataset, rasterPath, polygon, properties = {
  * raster - the polygon itself is rendered by the regular measurements layer
  * (via importFromGeoJSON) when persisted with measurementType === 'stockpile'.
  *
+ * @param {Object} dataset
+ * @param {string} rasterPath
+ * @param {Set<string>|Array<string>} [excludeIds] - Feature IDs to skip while
+ *   walking the file in reverse. Used to avoid re-hydrating piles the user
+ *   has just removed via the Measurement List dialog (the deletion is not
+ *   persisted to disk until the next "Save").
  * @returns {Promise<{polygon: Object, properties: Object}|null>}
  */
-export async function loadStockpile(dataset, rasterPath) {
+export async function loadStockpile(dataset, rasterPath, excludeIds) {
     const path = getStockpilePath(rasterPath);
     if (!path) return null;
     const fc = await readExisting(dataset, path);
     if (!fc || !Array.isArray(fc.features) || fc.features.length === 0) return null;
-    const stockpiles = fc.features.filter(f =>
+    const exclude = excludeIds instanceof Set
+        ? excludeIds
+        : (Array.isArray(excludeIds) ? new Set(excludeIds) : null);
+    const isStockpileFeature = f =>
         f && f.geometry && f.geometry.type === 'Polygon'
-        && f.properties && f.properties.measurementType === 'stockpile'
-    );
-    let feature;
-    if (stockpiles.length > 0) {
-        feature = stockpiles[stockpiles.length - 1];
-    } else if (fc.metadata && fc.metadata.kind === 'stockpile'
+        && f.properties && f.properties.measurementType === 'stockpile';
+    const isExcluded = f => exclude
+        && f.properties && f.properties.id
+        && exclude.has(f.properties.id);
+
+    // Walk in reverse so we pick the most recent non-excluded stockpile.
+    let feature = null;
+    for (let i = fc.features.length - 1; i >= 0; i--) {
+        const f = fc.features[i];
+        if (isStockpileFeature(f) && !isExcluded(f)) {
+            feature = f;
+            break;
+        }
+    }
+    if (!feature
+        && fc.metadata && fc.metadata.kind === 'stockpile'
         && fc.features.length === 1
-        && fc.features[0].geometry && fc.features[0].geometry.type === 'Polygon') {
+        && fc.features[0].geometry && fc.features[0].geometry.type === 'Polygon'
+        && !isExcluded(fc.features[0])) {
         // Legacy file written by previous versions (single untagged polygon).
         feature = fc.features[0];
-    } else {
-        return null;
     }
+    if (!feature) return null;
     return { polygon: feature.geometry, properties: feature.properties || {} };
 }
 

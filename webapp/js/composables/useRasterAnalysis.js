@@ -1,4 +1,5 @@
 import Draw from 'ol/interaction/Draw';
+import Overlay from 'ol/Overlay';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
@@ -47,6 +48,13 @@ export default {
             _rasterInspectAbort: null,
             _rasterInspectThrottle: null,
             _rasterInspectClickKey: null,
+            // VectorLayer / VectorSource that hold the click marker (red dot)
+            // for the inspect-value tool. The dot is anchored to the map
+            // coordinate so it pans/zooms with the map.
+            _rasterInspectLayer: null,
+            _rasterInspectSource: null,
+            // OL Overlay anchoring the value tooltip next to the click marker.
+            _rasterInspectTooltipOverlay: null,
             _rasterDimsCache: null,
             _lastProfileMeasurementFeature: null
         };
@@ -188,6 +196,16 @@ export default {
             this.rasterProfileDrawing = true;
             this.map.addInteraction(draw);
 
+            // Suspend the measurement toolbar while the user is drawing the
+            // profile line so they can't start a different measurement on top.
+            // Tracked by a flag so _stopRasterProfileDrawing() releases at
+            // most one lock no matter how many times it gets called.
+            if (!this._rasterProfileToolLockHeld
+                && this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                this.measureControls.setToolsDisabled(true);
+                this._rasterProfileToolLockHeld = true;
+            }
+
             const onKey = (e) => {
                 if (e.key === 'Escape' || e.keyCode === 27) {
                     // ESC must abort the in-progress geometry AND fully exit
@@ -274,6 +292,11 @@ export default {
                 window.removeEventListener('keydown', this._rasterProfileKeyHandler);
                 this._rasterProfileKeyHandler = null;
             }
+            if (this._rasterProfileToolLockHeld
+                && this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
+                this._rasterProfileToolLockHeld = false;
+            }
         },
 
         _clearRasterProfileLine() {
@@ -327,6 +350,19 @@ export default {
             this.rasterProfile = null;
             this.rasterProfileError = null;
             this._clearRasterProfileLine();
+            // Also remove the profile entry from the shared measurements layer
+            // (so it disappears from the Measurement List dialog).
+            if (this._lastProfileMeasurementFeature && this.measureControls
+                && typeof this.measureControls.deleteMeasurement === 'function') {
+                try {
+                    // Track deletion so re-hydration logic skips it on next open.
+                    const id = this._lastProfileMeasurementFeature.get
+                        && this._lastProfileMeasurementFeature.get('id');
+                    if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
+                    this.measureControls.deleteMeasurement(this._lastProfileMeasurementFeature);
+                } catch (e) { /* noop */ }
+            }
+            this._lastProfileMeasurementFeature = null;
         },
 
         /**
@@ -396,26 +432,44 @@ export default {
             const target = this.map.getTargetElement();
             if (target) target.style.cursor = 'crosshair';
 
+            // Vector layer that holds the click marker (red dot). Anchored to
+            // map coordinate so it pans/zooms with the map (unlike the prior
+            // clientX/Y tooltip).
+            this._rasterInspectSource = new VectorSource();
+            this._rasterInspectLayer = new VectorLayer({
+                source: this._rasterInspectSource,
+                style: new Style({
+                    image: new CircleStyle({
+                        radius: 6,
+                        fill: new Fill({ color: 'rgba(255, 50, 50, 0.85)' }),
+                        stroke: new Stroke({ color: '#ffffff', width: 2 })
+                    })
+                }),
+                zIndex: 2100
+            });
+            this.map.addLayer(this._rasterInspectLayer);
+
             this._rasterInspectTooltipEl = document.createElement('div');
             this._rasterInspectTooltipEl.className = 'raster-inspect-tooltip';
             Object.assign(this._rasterInspectTooltipEl.style, {
-                position: 'fixed', zIndex: 10000, pointerEvents: 'none',
                 background: 'rgba(0,0,0,0.78)', color: '#fff', padding: '4px 8px',
                 borderRadius: '4px', font: '12px/1.2 sans-serif',
-                whiteSpace: 'nowrap', display: 'none',
+                whiteSpace: 'nowrap', display: 'none', pointerEvents: 'none',
                 boxShadow: '0 2px 6px rgba(0,0,0,0.4)'
             });
-            document.body.appendChild(this._rasterInspectTooltipEl);
+            this._rasterInspectTooltipOverlay = new Overlay({
+                element: this._rasterInspectTooltipEl,
+                offset: [10, -10],
+                positioning: 'bottom-left',
+                stopEvent: false
+            });
+            this.map.addOverlay(this._rasterInspectTooltipOverlay);
 
-            // Single-click handler: compute pixel coordinates from lon/lat
-            // using the raster tile layer's extent + the raster's own
-            // dimensions, then call getRasterPointValue (one server call per
-            // click - no hover spam).
+            // Single-click handler: place/move the marker at the clicked map
+            // coordinate, then fetch the value from the server.
             const onClick = (evt) => {
-                if (!this._rasterInspectTooltipEl) return;
-                const px = evt.originalEvent;
-                this._rasterInspectTooltipEl.style.left = (px.clientX + 12) + 'px';
-                this._rasterInspectTooltipEl.style.top = (px.clientY + 12) + 'px';
+                if (!this.rasterInspectActive) return;
+                this._placeInspectMarker(evt.coordinate);
                 this._fetchInspectValueAtMapCoord(evt.coordinate);
             };
             this._rasterInspectClickKey = this.map.on('singleclick', onClick);
@@ -424,6 +478,21 @@ export default {
                 if (e.key === 'Escape' || e.keyCode === 27) this._stopRasterInspect();
             };
             window.addEventListener('keydown', this._rasterInspectKeyHandler);
+        },
+
+        /**
+         * Place (or move) the red click marker on the inspect overlay and
+         * anchor the value tooltip to the same map coordinate.
+         */
+        _placeInspectMarker(mapCoord) {
+            if (!this._rasterInspectSource) return;
+            this._rasterInspectSource.clear();
+            this._rasterInspectSource.addFeature(new Feature({
+                geometry: new Point(mapCoord)
+            }));
+            if (this._rasterInspectTooltipOverlay) {
+                this._rasterInspectTooltipOverlay.setPosition(mapCoord);
+            }
         },
 
         /**
@@ -552,10 +621,16 @@ export default {
                 window.removeEventListener('keydown', this._rasterInspectKeyHandler);
                 this._rasterInspectKeyHandler = null;
             }
-            if (this._rasterInspectTooltipEl) {
-                this._rasterInspectTooltipEl.remove();
-                this._rasterInspectTooltipEl = null;
+            if (this._rasterInspectTooltipOverlay && this.map) {
+                try { this.map.removeOverlay(this._rasterInspectTooltipOverlay); } catch (e) { /* noop */ }
             }
+            this._rasterInspectTooltipOverlay = null;
+            this._rasterInspectTooltipEl = null;
+            if (this._rasterInspectLayer && this.map) {
+                try { this.map.removeLayer(this._rasterInspectLayer); } catch (e) { /* noop */ }
+            }
+            this._rasterInspectLayer = null;
+            this._rasterInspectSource = null;
             if (this._rasterInspectThrottle) {
                 clearTimeout(this._rasterInspectThrottle);
                 this._rasterInspectThrottle = null;

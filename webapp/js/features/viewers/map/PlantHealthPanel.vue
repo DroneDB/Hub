@@ -78,7 +78,7 @@
             </div>
 
             <!-- Histogram -->
-            <div class="section" v-if="histogramData">
+            <div class="section" style="margin-bottom: 1rem" v-if="histogramData">
                 <label class="section-label">Histogram</label>
                 <HistogramChart
                     :data="histogramData"

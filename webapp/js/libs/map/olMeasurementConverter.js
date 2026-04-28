@@ -388,22 +388,40 @@ function createPointPopup(feature, map, source, onEdit) {
     const ddLon = lon.toFixed(6);
     const description = feature.get('description') || '';
 
+    const escapeHtml = (s) => String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const accent = feature.get('stroke') || '#3b82f6';
+    const name = feature.get('name');
+    const headerHtml = name
+        ? `<div class="ol-point-popup-header" style="border-left-color:${escapeHtml(accent)}">
+                <i class="fa-solid fa-location-dot" style="color:${escapeHtml(accent)}"></i>
+                <span class="ol-point-popup-title">${escapeHtml(name)}</span>
+           </div>`
+        : '';
     const descHtml = description
-        ? `<div class="ol-point-popup-description">${description}</div>`
+        ? `<div class="ol-point-popup-description">${escapeHtml(description)}</div>`
         : '';
 
     const popupEl = document.createElement('div');
     popupEl.className = 'ol-point-popup';
     popupEl.innerHTML = `
-        <div class="ol-point-popup-coords">
-            <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
-            <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
-            ${descHtml}
-        </div>
-        <div class="ol-point-popup-actions">
-            <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="icon pencil alternate"></i></button>
-            <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="icon copy outline"></i></button>
-            <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="icon trash"></i></button>
+        ${headerHtml}
+        <div class="ol-point-popup-body">
+            <div class="ol-point-popup-coords">
+                <span class="ol-point-popup-dms" title="Degrees Minutes Seconds">
+                    <i class="fa-solid fa-compass ol-point-popup-coord-icon"></i>${dmsLat} / ${dmsLon}
+                </span>
+                <span class="ol-point-popup-dd" title="Decimal Degrees">
+                    <i class="fa-solid fa-hashtag ol-point-popup-coord-icon"></i>${ddLat} / ${ddLon}
+                </span>
+                ${descHtml}
+            </div>
+            <div class="ol-point-popup-actions">
+                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil"></i></button>
+                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy"></i></button>
+                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="fa-solid fa-trash"></i></button>
+            </div>
         </div>
     `;
 
@@ -432,8 +450,8 @@ function createPointPopup(feature, map, source, onEdit) {
         const text = `${ddLat}, ${ddLon}`;
         navigator.clipboard.writeText(text).then(() => {
             const icon = popupEl.querySelector('.ol-point-popup-copy i');
-            if (icon) { icon.className = 'icon check'; }
-            setTimeout(() => { if (icon) { icon.className = 'icon copy outline'; } }, 1500);
+            if (icon) { icon.className = 'fa-solid fa-check'; }
+            setTimeout(() => { if (icon) { icon.className = 'fa-regular fa-copy'; } }, 1500);
         });
     });
 

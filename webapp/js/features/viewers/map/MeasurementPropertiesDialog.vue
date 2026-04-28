@@ -75,7 +75,21 @@
                 />
             </div>
 
+            <div v-if="isPoint" class="form-group">
+                <label>Coordinates</label>
+                <div class="coords-row">
+                    <code class="coords-text">{{ coordsText }}</code>
+                    <button type="button" class="btn-copy-coords" @click="copyCoordinates" :title="copyTooltip">
+                        <i :class="copyIconClass"></i>
+                    </button>
+                </div>
+            </div>
+
             <div class="buttons">
+                <button v-if="showDelete" class="btn-delete" @click="deleteMeasurement" title="Delete this measurement">
+                    <i class="fa-solid fa-trash"></i>
+                    Delete
+                </button>
                 <button class="btn-cancel" @click="cancel">Cancel</button>
                 <button class="btn-save" @click="save">Save</button>
             </div>
@@ -85,6 +99,7 @@
 
 <script>
 import Window from '@/components/Window.vue';
+import { toLonLat } from 'ol/proj';
 
 export default {
     components: {
@@ -98,9 +113,16 @@ export default {
         geometryType: {
             type: String,
             default: 'LineString'
+        },
+        // When true the dialog renders a Delete button that emits onDelete.
+        // Used by the non-edit-mode double-click flow which doubles as a
+        // "detail" dialog with the option to remove the measurement.
+        showDelete: {
+            type: Boolean,
+            default: false
         }
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'onSave', 'onDelete'],
     data() {
         return {
             colorPalette: [
@@ -113,6 +135,7 @@ export default {
                 '#00cccc', // Cyan
                 '#333333'  // Dark gray
             ],
+            coordsCopied: false,
             formData: {
                 name: '',
                 description: '',
@@ -130,6 +153,35 @@ export default {
         },
         showFill() {
             return this.geometryType === 'Polygon';
+        },
+        isPoint() {
+            return this.geometryType === 'Point';
+        },
+        pointCoordinates() {
+            if (!this.isPoint || !this.feature) return null;
+            const geom = this.feature.getGeometry && this.feature.getGeometry();
+            if (!geom) return null;
+            // Try to get lon/lat (WGS84). The geometry coords are in map
+            // projection; rely on the feature's stored 'coordinates' meta
+            // when available, otherwise convert via toLonLat dynamically.
+            try {
+                const c = geom.getCoordinates();
+                const [lon, lat] = toLonLat(c);
+                return { lon, lat };
+            } catch (e) {
+                return null;
+            }
+        },
+        coordsText() {
+            const c = this.pointCoordinates;
+            if (!c) return '';
+            return `${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}`;
+        },
+        copyIconClass() {
+            return this.coordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy';
+        },
+        copyTooltip() {
+            return this.coordsCopied ? 'Copied!' : 'Copy coordinates';
         }
     },
     mounted() {
@@ -149,8 +201,34 @@ export default {
             this.$emit('onSave', { ...this.formData });
             this.$emit('onClose');
         },
+        deleteMeasurement() {
+            this.$emit('onDelete');
+            this.$emit('onClose');
+        },
         cancel() {
             this.$emit('onClose');
+        },
+        copyCoordinates() {
+            const text = this.coordsText;
+            if (!text) return;
+            const done = () => {
+                this.coordsCopied = true;
+                setTimeout(() => { this.coordsCopied = false; }, 1500);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done).catch(() => { /* noop */ });
+            } else {
+                // Legacy fallback
+                try {
+                    const ta = document.createElement('textarea');
+                    ta.value = text;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    done();
+                } catch (e) { /* noop */ }
+            }
         }
     }
 };
@@ -260,5 +338,47 @@ export default {
 .btn-save:hover {
     background-color: var(--ddb-success);
     filter: brightness(0.9);
+}
+
+.btn-delete {
+    background-color: var(--ddb-danger);
+    color: var(--ddb-text-on-color);
+    margin-right: auto;
+}
+
+.btn-delete:hover {
+    background-color: var(--ddb-danger);
+    filter: brightness(0.9);
+}
+
+.coords-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    padding: var(--ddb-spacing-sm);
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    background-color: var(--ddb-background-soft, rgba(0, 0, 0, 0.03));
+}
+
+.coords-text {
+    flex: 1;
+    font-size: var(--ddb-font-size-sm);
+    color: var(--ddb-text);
+    word-break: break-all;
+}
+
+.btn-copy-coords {
+    background: transparent;
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    color: var(--ddb-text);
+    transition: background-color 0.15s ease;
+}
+
+.btn-copy-coords:hover {
+    background-color: var(--ddb-border-separator);
 }
 </style>

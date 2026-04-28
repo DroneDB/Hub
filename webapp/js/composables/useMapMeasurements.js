@@ -16,7 +16,13 @@ export default {
             measurementStorage: null,
             hasSavedMeasurements: false,
             clearMeasurementsDialogOpen: false,
-            deleteSavedMeasurementsDialogOpen: false
+            deleteSavedMeasurementsDialogOpen: false,
+            // Tracks IDs of measurements deleted in the current session via the
+            // Measurement List dialog. Used to filter persisted features (e.g.
+            // stockpiles) that would otherwise be re-hydrated from the saved
+            // GeoJSON file. Reset whenever the file is rewritten (save) or
+            // wiped (delete-saved/clear-all).
+            deletedMeasurementIds: new Set()
         };
     },
     methods: {
@@ -25,6 +31,9 @@ export default {
          */
         onClearAllMeasurements() {
             this.measureControls.updateButtonsVisibility(false, this.hasSavedMeasurements);
+            // In-memory state was reset; the saved file (if any) is unchanged,
+            // so deletion tracking can be cleared as well.
+            if (this.deletedMeasurementIds) this.deletedMeasurementIds.clear();
         },
 
         /**
@@ -74,6 +83,10 @@ export default {
                 this.hasSavedMeasurements = true;
                 this.measureControls.updateButtonsVisibility(true, true);
 
+                // The persisted file now mirrors the in-memory state, so any
+                // previously "logically deleted" IDs are no longer relevant.
+                if (this.deletedMeasurementIds) this.deletedMeasurementIds.clear();
+
                 const fileName = (result && result.fileName) || 'measurements.geojson';
                 console.log(`Saved ${geojson.features.length} measurements to ${fileName}`);
                 this.showFlash(
@@ -118,6 +131,7 @@ export default {
             try {
                 await this.measurementStorage.delete();
                 this.hasSavedMeasurements = false;
+                if (this.deletedMeasurementIds) this.deletedMeasurementIds.clear();
 
                 this.measureControls.clearAllMeasurements();
                 this.measureControls.updateButtonsVisibility(
@@ -167,6 +181,11 @@ export default {
          */
         handleDeleteMeasurementFromList(item) {
             if (!this.measureControls || !item.feature) return;
+            // Track the ID so persisted re-hydration logic (e.g. the Stockpile
+            // panel restoring the last saved pile) can filter it out until the
+            // next save/delete-saved.
+            const id = item.feature.get('id');
+            if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
             this.measureControls.deleteMeasurement(item.feature);
             // Refresh the list
             this.measurementListItems = this.measureControls.getMeasurementsList();

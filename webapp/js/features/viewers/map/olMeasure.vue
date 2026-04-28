@@ -132,8 +132,16 @@ class MeasureControls extends Control {
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
         this.onListOpen = options.onListOpen || (() => { });
+        // Notified whenever a feature is removed from the measurement source
+        // (eraser tool, deleteMeasurement, etc.). Consumers use this to keep
+        // the deletedMeasurementIds tracking in sync so persisted features
+        // (stockpiles) don't get re-hydrated from the saved GeoJSON file.
+        this.onMeasurementDeleted = options.onMeasurementDeleted || (() => { });
 
         this.source = new VectorSource();
+        this.source.on('removefeature', (evt) => {
+            try { this.onMeasurementDeleted(evt.feature); } catch (e) { /* noop */ }
+        });
         this.vector = new VectorLayer({
             source: this.source,
             style: (feature) => this.createFeatureStyle(feature),
@@ -149,7 +157,16 @@ class MeasureControls extends Control {
         this.btnExport = btnExport;
         this.btnDelete = btnDelete;
         this.btnList = btnList;
+        this.btnPoint = btnPoint;
+        this.btnLength = btnLength;
+        this.btnArea = btnArea;
+        this.btnErase = btnErase;
         this.separator = separator;
+
+        // Reentrant counter for setToolsDisabled() so multiple panels (e.g.
+        // raster profile + stockpile drawing) can suspend the toolbar at the
+        // same time without one releasing it for the other.
+        this._disableLockCount = 0;
 
         // Store keyboard listener reference
         this.keyboardListener = null;
@@ -179,7 +196,104 @@ class MeasureControls extends Control {
         // Initialize button visibility when control is added to map
         if (map) {
             this.updateButtonsVisibility(this.hasMeasurements(), false);
+            // Detail dialog: outside edit mode, double-clicking on a measurement
+            // opens the properties dialog with a Delete button. We only act on
+            // hits against our own vector layer; misses fall through so the
+            // native DoubleClickZoom interaction still zooms the map.
+            this._detailDblClickKey = map.on('dblclick', (evt) => {
+                if (this.isEditMode || this.selectedTool) return;
+                const feature = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
+                    if (layer === this.vector && f.get('measurementType')) return f;
+                    return null;
+                }, { hitTolerance: 5 });
+                if (feature) {
+                    evt.stopPropagation();
+                    if (evt.preventDefault) evt.preventDefault();
+                    this.openPropertiesDialog(feature, { showDelete: true });
+                    return true;
+                }
+            });
+
+            // Hover highlight: visually flag the measurement under the cursor
+            // (the same one that a double-click would target) and switch the
+            // pointer to "pointer". Skipped while drawing/editing so it does
+            // not fight with the active interaction's own cursor handling.
+            this._hoverPointerKey = map.on('pointermove', (evt) => {
+                if (this.isEditMode || this.selectedTool || evt.dragging) return;
+                const hit = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
+                    if (layer === this.vector && f.get('measurementType')) return f;
+                    return null;
+                }, { hitTolerance: 5 });
+                this._setHoveredFeature(hit || null);
+                const target = map.getTargetElement();
+                // Only override the cursor when nothing else has claimed it
+                // (e.g. the raster Inspect tool's crosshair must win).
+                if (target && (target.style.cursor === '' || target.style.cursor === 'pointer')) {
+                    target.style.cursor = hit ? 'pointer' : '';
+                }
+            });
+        } else {
+            if (this._detailDblClickKey) {
+                try { unByKey(this._detailDblClickKey); } catch (e) { /* noop */ }
+                this._detailDblClickKey = null;
+            }
+            if (this._hoverPointerKey) {
+                try { unByKey(this._hoverPointerKey); } catch (e) { /* noop */ }
+                this._hoverPointerKey = null;
+            }
+            this._setHoveredFeature(null);
         }
+    }
+
+    /**
+     * Update the currently-hovered measurement feature so the style function
+     * picks up the highlighted look. The hover flag lives on the JS instance
+     * (not as a feature property) to avoid leaking into persisted GeoJSON.
+     */
+    _setHoveredFeature(feature) {
+        if (this._hoveredFeature === feature) return;
+        const previous = this._hoveredFeature;
+        this._hoveredFeature = feature || null;
+        if (previous) {
+            previous._hovered = false;
+            try { previous.changed(); } catch (e) { /* noop */ }
+        }
+        if (feature) {
+            feature._hovered = true;
+            try { feature.changed(); } catch (e) { /* noop */ }
+        }
+    }
+
+    /**
+     * Suspend / resume the measurement toolbar while an external tool (e.g.
+     * raster profile drawing or stockpile polygon drawing) is active.
+     *
+     * Uses a reentrant lock counter so multiple panels can request the
+     * toolbar to be disabled concurrently and only the last release actually
+     * re-enables it. On the first lock we also deselect the active tool and
+     * leave edit mode so the user can't draw two things at once.
+     *
+     * @param {boolean} disabled
+     */
+    setToolsDisabled(disabled) {
+        if (disabled) {
+            this._disableLockCount++;
+            if (this._disableLockCount > 1) return; // already suspended
+            try { this.deselectCurrent && this.deselectCurrent(); } catch (e) { /* noop */ }
+            try { if (this.isEditMode && this.disableEditMode) this.disableEditMode(); } catch (e) { /* noop */ }
+        } else {
+            if (this._disableLockCount === 0) return;
+            this._disableLockCount--;
+            if (this._disableLockCount > 0) return; // still held by another caller
+        }
+        const buttons = [this.btnPoint, this.btnLength, this.btnArea, this.btnErase, this.btnEdit];
+        const isOff = this._disableLockCount === 0;
+        buttons.forEach(btn => {
+            if (!btn) return;
+            btn.disabled = !isOff;
+            btn.style.opacity = isOff ? '' : '0.4';
+            btn.style.cursor = isOff ? '' : 'not-allowed';
+        });
     }
 
     handlePointLocation() {
@@ -363,6 +477,17 @@ class MeasureControls extends Control {
         const fillColor = feature.get('fill') || defaultStroke;
         const fillOpacity = feature.get('fill-opacity') !== undefined ? feature.get('fill-opacity') : 0.2;
 
+        // Hover state: thicker stroke, slightly more opaque fill, larger
+        // anchor circle so the user gets a clear visual cue that the feature
+        // is the target of a double-click (which opens the detail dialog).
+        // The flag is set on the OL Feature instance directly (not via
+        // get/set) so it never bleeds into the persisted GeoJSON properties.
+        const hovered = feature._hovered === true;
+        const hoverStrokeBoost = hovered ? 2 : 0;
+        const hoverFillBoost = hovered ? 0.15 : 0;
+        const effectiveStrokeWidth = strokeWidth + hoverStrokeBoost;
+        const effectiveFillOpacity = Math.min(1, fillOpacity + hoverFillBoost);
+
         // Convert hex color to rgba if needed
         const hexToRgba = (hex, opacity) => {
             const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -376,7 +501,7 @@ class MeasureControls extends Control {
         };
 
         const strokeRgba = hexToRgba(strokeColor, strokeOpacity);
-        const fillRgba = hexToRgba(fillColor, fillOpacity);
+        const fillRgba = hexToRgba(fillColor, effectiveFillOpacity);
 
         return new Style({
             fill: new Fill({
@@ -384,13 +509,14 @@ class MeasureControls extends Control {
             }),
             stroke: new Stroke({
                 color: strokeRgba,
-                width: strokeWidth,
+                width: effectiveStrokeWidth,
             }),
             image: new CircleStyle({
-                radius: 7,
+                radius: hovered ? 9 : 7,
                 fill: new Fill({
                     color: strokeColor,
                 }),
+                stroke: hovered ? new Stroke({ color: '#ffffff', width: 2 }) : null,
             }),
         });
     }
@@ -513,6 +639,9 @@ class MeasureControls extends Control {
 
         this.isEditMode = true;
         this.btnEdit.classList.add('active');
+        // Drop any hover highlight - the edit interaction has its own visual
+        // language for selected/active features.
+        this._setHoveredFeature && this._setHoveredFeature(null);
 
         // Create Modify interaction for vertex editing
         this.modifyInteraction = new Modify({
@@ -888,7 +1017,7 @@ class MeasureControls extends Control {
 
         const popupEl = document.createElement('div');
         popupEl.className = 'ol-point-popup';
-        popupEl.innerHTML = this.buildPointPopupHTML(dmsLat, dmsLon, ddLat, ddLon, description);
+        popupEl.innerHTML = this.buildPointPopupHTML(feature, dmsLat, dmsLon, ddLat, ddLon, description);
 
         const popupOverlay = new Overlay({
             element: popupEl,
@@ -921,69 +1050,65 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Build the inner HTML for a point popup
+     * Build the inner HTML for a point popup. Shows only the point title
+     * (when set) and coordinates - editing/copying/deleting is reachable via
+     * the double-click detail dialog so the popup stays visually quiet.
      */
-    buildPointPopupHTML(dmsLat, dmsLon, ddLat, ddLon, description) {
+    buildPointPopupHTML(feature, dmsLat, dmsLon, ddLat, ddLon, description) {
+        const escapeHtml = (s) => String(s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+        const accent = (feature && feature.get && feature.get('stroke')) || '#3b82f6';
+        const name = feature && feature.get && feature.get('name');
+        const headerHtml = name
+            ? `<div class="ol-point-popup-header" style="border-left-color:${escapeHtml(accent)}">
+                    <i class="fa-solid fa-location-dot" style="color:${escapeHtml(accent)}"></i>
+                    <span class="ol-point-popup-title">${escapeHtml(name)}</span>
+               </div>`
+            : '';
         const descHtml = description
-            ? `<div class="ol-point-popup-description">${description}</div>`
+            ? `<div class="ol-point-popup-description">${escapeHtml(description)}</div>`
             : '';
         return `
-            <div class="ol-point-popup-coords">
-                <span class="ol-point-popup-dms">${dmsLat} / ${dmsLon}</span>
-                <span class="ol-point-popup-dd">${ddLat} / ${ddLon}</span>
-                ${descHtml}
-            </div>
-            <div class="ol-point-popup-actions">
-                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil"></i></button>
-                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy"></i></button>
-                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="fa-solid fa-trash"></i></button>
+            ${headerHtml}
+            <div class="ol-point-popup-body">
+                <div class="ol-point-popup-coords">
+                    <span class="ol-point-popup-dms" title="Degrees Minutes Seconds">
+                        <i class="fa-solid fa-compass ol-point-popup-coord-icon"></i>${dmsLat} / ${dmsLon}
+                    </span>
+                    <span class="ol-point-popup-dd" title="Decimal Degrees">
+                        <i class="fa-solid fa-hashtag ol-point-popup-coord-icon"></i>${ddLat} / ${ddLon}
+                    </span>
+                    ${descHtml}
+                </div>
             </div>
         `;
     }
 
     /**
-     * Attach event handlers to a point popup element
+     * No-op kept for backward compatibility: the simplified popup has no
+     * interactive buttons, so nothing to wire. Editing happens via the
+     * double-click detail dialog instead.
      */
-    attachPointPopupHandlers(popupEl, feature, map, ddLat, ddLon) {
-        const self = this;
-
-        // Edit handler
-        popupEl.querySelector('.ol-point-popup-edit').addEventListener('click', (e) => {
-            e.preventDefault();
-            self.openPointAnnotationDialog(feature, map, true);
-        });
-
-        // Copy handler
-        popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
-            e.preventDefault();
-            const text = `${ddLat}, ${ddLon}`;
-            navigator.clipboard.writeText(text).then(() => {
-                const icon = popupEl.querySelector('.ol-point-popup-copy i');
-                if (icon) { icon.className = 'fa-solid fa-check'; }
-                setTimeout(() => { if (icon) { icon.className = 'fa-regular fa-copy'; } }, 1500);
-            });
-        });
-
-        // Delete handler
-        popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
-            e.preventDefault();
-            const overlay = feature.get('measureTooltip');
-            if (overlay) map.removeOverlay(overlay);
-            if (popupEl.parentNode) popupEl.parentNode.removeChild(popupEl);
-            self.source.removeFeature(feature);
-            self.updateButtonsVisibility(self.hasMeasurements(), false);
-        });
+    attachPointPopupHandlers(/* popupEl, feature, map, ddLat, ddLon */) {
+        /* intentionally empty */
     }
 
     /**
-     * Open properties dialog for a feature
+     * Open properties dialog for a feature.
+     * @param {ol.Feature} feature - The measurement feature to edit.
+     * @param {Object} [options]
+     * @param {boolean} [options.showDelete] - Render a Delete button in the
+     *   dialog. Used by the non-edit-mode "detail" double-click flow.
      */
-    openPropertiesDialog(feature) {
+    openPropertiesDialog(feature, options) {
         // Close any existing dialog
         this.closePropertiesDialog();
 
         const geometry = feature.getGeometry();
         const geometryType = geometry ? geometry.getType() : 'LineString';
+        const showDelete = !!(options && options.showDelete);
 
         // Create Vue 3 app instance
         this._dialogContainer = document.createElement('div');
@@ -991,6 +1116,7 @@ class MeasureControls extends Control {
         this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
             feature: feature,
             geometryType: geometryType,
+            showDelete: showDelete,
             onOnSave: (properties) => {
                 // Update feature properties
                 Object.keys(properties).forEach(key => {
@@ -1002,6 +1128,9 @@ class MeasureControls extends Control {
 
                 // Trigger re-render for style changes
                 feature.changed();
+            },
+            onOnDelete: () => {
+                this.deleteMeasurement(feature);
             },
             onOnClose: () => {
                 this.closePropertiesDialog();
@@ -1041,12 +1170,20 @@ class MeasureControls extends Control {
         if (this.isEditMode) {
             this.disableEditMode();
         }
+        // Clear any hover highlight: while drawing the user gets a different
+        // visual affordance and the highlighted feature stays orphaned otherwise.
+        this._setHoveredFeature && this._setHoveredFeature(null);
 
         const removeHandlers = () => {
             if (!this.loaded) return;
 
             this.helpTooltipElement.classList.add('hidden');
             map.removeInteraction(this.draw);
+            // CRITICAL: null the reference so the dblclick / pointermove
+            // guards in setMap() know no Draw is active anymore. Without
+            // this, hover highlight + double-click stay disabled forever
+            // after the first measurement is drawn.
+            this.draw = null;
             unByKey(this.pointerMoveListener);
             if (this._contextMenuHandler) {
                 map.getViewport().removeEventListener('contextmenu', this._contextMenuHandler, true);
@@ -1221,11 +1358,12 @@ class MeasureControls extends Control {
                             hitTolerance: 4
                         }), f => {
                             if (f.get('measureTooltipElement') !== undefined) {
-                                const tooltipElem = f.get('measureTooltipElement');
-                                if (tooltipElem && tooltipElem.parentNode) {
-                                    tooltipElem.parentNode.removeChild(tooltipElem);
-                                }
-                                self.source.removeFeature(f);
+                                // Use deleteMeasurement so the OL Overlay
+                                // (the floating label) is removed too. The
+                                // previous inline cleanup only removed the
+                                // DOM element, leaving the overlay anchor
+                                // dangling on the map.
+                                self.deleteMeasurement(f);
                             }
                         });
 

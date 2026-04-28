@@ -74,10 +74,10 @@
                     {{ mode === 'draw' ? 'Drawing…' : 'Draw polygon' }}
                 </button>
                 <button class="btn btn-secondary btn-sm" @click="$emit('clearOverlay')"
-                        :disabled="loading || !canClear" data-testid="stockpile-clear-btn"
-                        title="Clear the overlay and result">
+                        :disabled="!canClear" data-testid="stockpile-clear-btn"
+                        title="Clear the overlay, exit any active mode and reset the panel">
                     <i class="fa-solid fa-eraser"></i>
-                    Clear
+                    Clear last
                 </button>
             </div>
 
@@ -161,13 +161,6 @@
                         <i class="fa-solid fa-file-export"></i>
                         Export GeoJSON
                     </button>
-                    <button v-if="canSave" class="btn btn-secondary btn-sm"
-                            @click="$emit('saveGeoJson')" :disabled="loading"
-                            data-testid="stockpile-save-btn"
-                            title="Save the pile contour next to the raster (auto-loaded next time)">
-                        <i class="fa-solid fa-floppy-disk"></i>
-                        Save GeoJSON
-                    </button>
                 </div>
             </div>
         </div>
@@ -202,7 +195,7 @@ export default {
         notes: { type: String, default: '' }
     },
     emits: ['close', 'clickOnMap', 'drawPolygon', 'clearOverlay',
-        'cancelMode', 'exportGeoJson', 'saveGeoJson',
+        'cancelMode', 'exportGeoJson',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
         'update:title', 'update:notes'],
@@ -288,9 +281,10 @@ export default {
             return { amount: tons * m.costPerTon, currency: m.currency || '' };
         },
         // Clear should be available whenever there is something visible to clear
-        // (a result, a banner error, an active mode, or a saved/just-rendered polygon).
+        // (a result, a banner error, an active mode, or a loading request the
+        // user wants to abandon).
         canClear() {
-            return Boolean(this.result || this.error || this.mode);
+            return Boolean(this.result || this.error || this.mode || this.loading);
         },
         isImperial() { return this.unitPref === 'imperial'; },
         // Hide the Fill volume row when the chosen base plane method makes it
