@@ -320,7 +320,10 @@ function createStaticTooltip(feature, text, map) {
 
     // Create tooltip element
     const measureTooltipElement = document.createElement('div');
-    measureTooltipElement.className = 'ol-tooltip ol-tooltip-static';
+    // ol-tooltip-hidden makes the label invisible until the host toggles the
+    // class off on hover - this keeps the map readable when many measurements
+    // (especially many contour LineStrings) are present at once.
+    measureTooltipElement.className = 'ol-tooltip ol-tooltip-static ol-tooltip-hidden';
 
     // Build tooltip content with optional name
     let tooltipContent = '';

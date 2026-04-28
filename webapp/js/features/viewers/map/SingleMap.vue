@@ -29,7 +29,17 @@
                 @clearProfile="handleClearProfile"
                 @cancelDrawProfile="cancelRasterProfileDrawing"
                 @toggleInspectValue="toggleRasterInspect"
-                @profileHover="handleProfileHover" />
+                @profileHover="handleProfileHover"
+                @openContourDialog="openContourDialog" />
+            <ContourOptionsDialog
+                v-model:visible="contourDialogVisible"
+                :loading="contourLoading"
+                :unit="contourUnit"
+                :rasterMin="contourRasterMin"
+                :rasterMax="contourRasterMax"
+                :initialOptions="contourLastOptions"
+                @generate="generateContourLines"
+                @cancel="closeContourDialog" />
             <StockpileVolumePanel
                 :visible="stockpilePanelVisible"
                 :loading="stockpileLoading"
@@ -52,7 +62,6 @@
                 @clearOverlay="clearStockpileOverlay"
                 @cancelMode="_stopStockpileInteractions"
                 @exportGeoJson="exportStockpileGeoJson"
-                @saveGeoJson="saveStockpileGeoJson"
                 @update:baseMethod="stockpileBaseMethod = $event"
                 @update:sensitivity="stockpileSensitivity = $event"
                 @update:radius="stockpileRadius = $event"
@@ -109,6 +118,7 @@ import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
+import ContourOptionsDialog from './ContourOptionsDialog.vue';
 import StockpileVolumePanel from './StockpileVolumePanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
@@ -120,7 +130,6 @@ import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullS
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { Control } from 'ol/control';
-import { isPlantHealthCapable, isRasterAnalysisCapable } from '@/libs/entryTypes';
 
 // Mixins
 import mapAlertFlash from '@/composables/useMapAlertFlash';
@@ -130,12 +139,14 @@ import mapMeasurements from '@/composables/useMapMeasurements';
 import mapPlantHealth from '@/composables/usePlantHealth';
 import mapRasterAnalysis from '@/composables/useRasterAnalysis';
 import mapStockpileVolume from '@/composables/useStockpileVolume';
+import mapContourLines from '@/composables/useContourLines';
+import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
+        Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
     },
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     props: ["uri"],
     data: function () {
         return {
@@ -277,6 +288,11 @@ export default {
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
                 onListOpen: () => { this.openMeasurementListDialog(); },
+                onMeasurementDeleted: (feature) => {
+                    if (!feature || !this.deletedMeasurementIds) return;
+                    const id = feature.get && feature.get('id');
+                    if (id) this.deletedMeasurementIds.add(id);
+                },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
             });
@@ -340,59 +356,12 @@ export default {
                 controlContainer.appendChild(fsBtn);
             }
 
-            // Plant Health button (for raster files with georeference)
-            if (isPlantHealthCapable(entry)) {
-                const phBtn = document.createElement('button');
-                phBtn.title = 'Plant Health';
-                phBtn.innerHTML = '<i class="fa-solid fa-leaf"></i>';
-                phBtn.addEventListener('click', () => {
-                    if (this.plantHealthVisible) {
-                        this.closePlantHealth();
-                    } else {
-
-                        // If raster analysis panel is open, close it since they share the same files and it can be confusing to have both open at the same time
-                        if (this.rasterPanelVisible)
-                            this.closeRasterAnalysis();
-
-                        this.openPlantHealth(entry.path);
-                    }
-                });
-                controlContainer.appendChild(phBtn);
-            }
-
-            // Raster analysis button (thermal images / DEMs / value rasters)
-            if (isRasterAnalysisCapable(entry)) {
-                const thBtn = document.createElement('button');
-                thBtn.title = 'Raster Analysis';
-                thBtn.innerHTML = '<i class="fa-solid fa-chart-area"></i>';
-                thBtn.addEventListener('click', () => {
-                    if (this.rasterPanelVisible) {
-                        this.closeRasterAnalysis();
-                    } else {
-
-                        // If plant health panel is open, close it since they share the same files and it can be confusing to have both open at the same time
-                        if (this.plantHealthVisible)
-                            this.closePlantHealth();
-
-                        this.openRasterAnalysis(entry.path);
-                    }
-                });
-                controlContainer.appendChild(thBtn);
-
-                // Stockpile Volume button (available on any single-band / elevation raster)
-                const spBtn = document.createElement('button');
-                spBtn.title = 'Stockpile Volume';
-                spBtn.setAttribute('data-testid', 'stockpile-toolbar-btn');
-                spBtn.innerHTML = '<i class="fa-solid fa-layer-group"></i>';
-                spBtn.addEventListener('click', () => {
-                    if (this.stockpilePanelVisible) {
-                        this.closeStockpileVolume();
-                    } else {
-                        this.openStockpileVolume(entry.path);
-                    }
-                });
-                controlContainer.appendChild(spBtn);
-            }
+            // Plant Health / Raster Analysis / Stockpile Volume buttons -
+            // delegated to the shared `useMapAnalysisButtons` composable so
+            // SingleMap and Map render an identical button cluster.
+            this.appendAnalysisButtonsToContainer(
+                controlContainer,
+                predicate => (predicate(entry) ? entry.path : null));
 
             this.map.addControl(new Control({ element: controlContainer }));
 

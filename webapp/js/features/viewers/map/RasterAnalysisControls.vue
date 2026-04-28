@@ -86,25 +86,6 @@
                 <label class="section-label">
                     {{ isThermal ? 'Thermal Profile' : 'Value Profile' }}
                 </label>
-                <div class="profile-controls">
-                    <button class="btn btn-sm"
-                        :class="drawingProfile ? 'btn-warning active' : 'btn-secondary'"
-                        @click="onProfileButtonClick"
-                        :disabled="profileLoading"
-                        :title="drawingProfile
-                            ? 'Stop drawing and discard the partial profile (Esc)'
-                            : (profile ? 'Discard the current profile and draw a new one'
-                                       : 'Draw a profile line on the map')">
-                        <i :class="profileLoading ? 'fas fa-spinner fa-spin'
-                            : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')"></i>
-                        {{ drawingProfile ? 'Stop drawing' : (profile ? 'Redraw' : 'Draw profile') }}
-                    </button>
-                    <button v-if="profile && !drawingProfile" class="btn btn-link btn-sm"
-                        @click="clearProfile"
-                        title="Clear the chart and remove the line from the map">
-                        <i class="fas fa-eraser"></i>
-                    </button>
-                </div>
                 <div class="profile-error" v-if="profileError">
                     <i class="fas fa-exclamation-triangle"></i> {{ profileError }}
                 </div>
@@ -114,38 +95,72 @@
                     :is-thermal="isThermal"
                     @hover="onProfileHover" />
             </div>
-
-            <!-- Actions -->
-            <div class="section actions">
-                <button class="btn btn-sm"
+            <!-- Actions: two rows so each button has room for a short label -->
+            <div class="section actions actions-grid">
+                <button class="btn btn-sm action-btn"
+                        :class="drawingProfile ? 'btn-warning active' : 'btn-secondary'"
+                        @click="onProfileButtonClick"
+                        :disabled="profileLoading"
+                        :title="drawingProfile
+                              ? 'Stop drawing and discard the partial profile (Esc)'
+                              : (profile ? 'Discard the current profile and draw a new one'
+                                         : 'Draw a profile line on the map')">
+                  <i :class="profileLoading ? 'fas fa-spinner fa-spin'
+                              : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')"></i>
+                  {{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}
+                </button>
+                <button v-if="profile && !drawingProfile" class="btn btn-link btn-sm action-btn"
+                        @click="clearProfile"
+                        title="Clear the chart and remove the line from the map">
+                  <i class="fas fa-eraser"></i>
+                </button>
+                <button class="btn btn-sm action-btn"
                     :class="inspectActive ? 'btn-warning active' : 'btn-secondary'"
                     @click="toggleInspect"
                     :title="inspectActive
                         ? 'Stop inspecting raster values (Esc)'
                         : 'Click on the map to read the raster value'">
                     <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'"></i>
+                    <span class="action-label">Inspect</span>
                 </button>
-                <button v-if="supports3D" class="btn btn-sm"
+                <button v-if="supports3D" class="btn btn-sm action-btn"
                     :class="view3D ? 'btn-primary active' : 'btn-secondary'"
                     @click="toggle3DView"
                     :title="view3D ? 'Switch back to 2D map view' : 'Show this raster as a 3D heightmap'"
                     data-testid="raster-3d-toggle">
                     <i class="fas fa-cube"></i>
-                    {{ view3D ? '2D' : '3D' }}
+                    <span class="action-label">{{ view3D ? '2D View' : '3D View' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm" @click="reset">Reset</button>
-                <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView">
+                <button v-if="!isThermal && !loadError" class="btn btn-secondary btn-sm action-btn"
+                    @click="onGenerateContoursClick"
+                    title="Generate contour lines from this elevation raster"
+                    data-testid="raster-contours-btn">
+                    <i class="fas fa-layer-group"></i>
+                    <span class="action-label">Contours</span>
+                </button>
+                <button class="btn btn-secondary btn-sm action-btn" @click="reset"
+                    title="Reset all visualization parameters to their defaults">
+                    <i class="fas fa-rotate-left"></i>
+                    <span class="action-label">Reset</span>
+                </button>
+                <button class="btn btn-sm action-btn"
+                    :class="originalView ? 'btn-primary' : 'btn-secondary'"
+                    @click="toggleOriginalView"
+                    :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'">
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
                 <button v-if="!isExportTooLarge"
-                        class="btn btn-secondary btn-sm"
+                        class="btn btn-secondary btn-sm action-btn"
                         @click="exportGeoTiff"
                         :disabled="exporting"
-                        title="Export GeoTIFF">
+                        title="Export the current view as a GeoTIFF file">
                     <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+                    <span class="action-label">Export</span>
                 </button>
-                <span v-else class="export-limit-hint" :title="exportLimitTooltip">
+                <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
                     <i class="fas fa-download"></i>
+                    <span class="action-label">Export</span>
                 </span>
             </div>
         </div>
@@ -207,7 +222,8 @@ export default {
     },
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
-            'profileHover', 'cancelDrawProfile', 'toggleInspectValue', 'toggle3DView'],    data() {
+            'profileHover', 'cancelDrawProfile', 'toggleInspectValue', 'toggle3DView',
+            'openContourDialog'],    data() {
         return {
             rasterInfo: null,
             loadError: false,
@@ -373,6 +389,12 @@ export default {
 
         toggle3DView() {
             this.$emit('toggle3DView');
+        },
+
+        onGenerateContoursClick() {
+            // Forward the raster info upward so the host's contour composable
+            // can pre-fill the dialog with min/max/unit hints.
+            this.$emit('openContourDialog', this.rasterInfo);
         },
 
         clearProfile() {
@@ -598,6 +620,37 @@ export default {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
+}
+
+/* Two-row grid so each action button has room to display its short label
+   without overflowing the panel width. */
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.3rem;
+    min-height: 2.6rem;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.action-btn .action-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.action-btn i {
+    font-size: 0.95rem;
 }
 
 .btn {

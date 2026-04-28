@@ -79,6 +79,7 @@ export default {
                 case 'area': return 'Area';
                 case 'stockpile': return 'Stockpile';
                 case 'profile': return 'Profile';
+                case 'contour': return 'Contour';
                 default: return type || 'Unknown';
             }
         },
@@ -89,6 +90,7 @@ export default {
                 case 'area': return 'fa-solid fa-draw-polygon';
                 case 'stockpile': return 'fa-solid fa-layer-group';
                 case 'profile': return 'fa-solid fa-route';
+                case 'contour': return 'fa-solid fa-map-pin';
                 default: return 'fa-solid fa-question';
             }
         },

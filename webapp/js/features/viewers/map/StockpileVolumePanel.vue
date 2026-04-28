@@ -59,25 +59,25 @@
             </div>
 
             <div class="section actions">
-                <button class="btn btn-primary btn-sm" :class="{ active: mode === 'click' }"
+                <button class="btn btn-primary btn-sm action-btn" :class="{ active: mode === 'click' }"
                         @click="$emit('clickOnMap')"
                         :disabled="loading" data-testid="stockpile-click-btn"
                         title="Click on the map to detect a pile at that point">
                     <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'"></i>
-                    {{ mode === 'click' ? 'Click on map…' : 'Click on map' }}
+                    <span class="action-label">{{ mode === 'click' ? 'Click map…' : 'Click map' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm" :class="{ active: mode === 'draw' }"
+                <button class="btn btn-secondary btn-sm action-btn" :class="{ active: mode === 'draw' }"
                         @click="$emit('drawPolygon')"
                         :disabled="loading" data-testid="stockpile-draw-btn"
                         title="Draw a polygon around the pile to compute its volume">
                     <i class="fa-solid fa-draw-polygon"></i>
-                    {{ mode === 'draw' ? 'Drawing…' : 'Draw polygon' }}
+                    <span class="action-label">{{ mode === 'draw' ? 'Drawing…' : 'Draw' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm" @click="$emit('clearOverlay')"
+                <button class="btn btn-secondary btn-sm action-btn" @click="$emit('clearOverlay')"
                         :disabled="!canClear" data-testid="stockpile-clear-btn"
                         title="Clear the overlay, exit any active mode and reset the panel">
                     <i class="fa-solid fa-eraser"></i>
-                    Clear last
+                    <span class="action-label">Clear</span>
                 </button>
             </div>
 
@@ -480,9 +480,33 @@ export default {
 }
 
 .actions {
-    display: flex;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
     margin-top: 0.5rem;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.3rem;
+    min-height: 2.6rem;
+    text-align: center;
+    line-height: 1.1;
+    width: 100%;
+}
+
+.action-btn .action-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.action-btn i {
+    font-size: 0.95rem;
 }
 
 .btn {
@@ -508,7 +532,7 @@ export default {
 }
 
 .btn-sm {
-    flex: 1;
+    box-sizing: border-box;
 }
 
 .section.error {

@@ -161,6 +161,45 @@ module.exports = class Dataset {
         return this.registry.postRequest(`${this.baseApi}/stockpile/detect`, body);
     }
 
+    /**
+     * Generate contour lines (GeoJSON FeatureCollection of LineStrings with an
+     * `elev` property) from a DEM/DSM/DTM raster.
+     *
+     * Either `interval` or `count` must be supplied. When both are set,
+     * `interval` wins.
+     *
+     * @param {string} path Dataset-relative path of the raster
+     * @param {Object} options
+     * @param {number} [options.interval] Vertical interval between levels (raster units)
+     * @param {number} [options.count] Target number of contour levels
+     * @param {number} [options.baseOffset=0] Reference base elevation
+     * @param {number} [options.minElev] Drop contours below this elevation
+     * @param {number} [options.maxElev] Drop contours above this elevation
+     * @param {number} [options.simplifyTolerance=0] Simplification tolerance in raster CRS units
+     * @param {number} [options.bandIndex=1] 1-based raster band index
+     */
+    async generateContours(path, {
+        interval = null,
+        count = null,
+        baseOffset = 0,
+        minElev = null,
+        maxElev = null,
+        simplifyTolerance = 0,
+        bandIndex = 1,
+    } = {}) {
+        const body = {
+            path,
+            interval,
+            count,
+            baseOffset,
+            minElev,
+            maxElev,
+            simplifyTolerance,
+            bandIndex,
+        };
+        return this.registry.postRequest(`${this.baseApi}/contours`, body);
+    }
+
     async checkMaskedFileExists(path) {
         return this.registry.postRequest(`${this.baseApi}/mask-borders/check`, { path });
     }

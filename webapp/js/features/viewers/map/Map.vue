@@ -32,7 +32,17 @@
                 @clearProfile="handleClearProfile"
                 @cancelDrawProfile="cancelRasterProfileDrawing"
                 @toggleInspectValue="toggleRasterInspect"
-                @profileHover="handleProfileHover" />
+                @profileHover="handleProfileHover"
+                @openContourDialog="openContourDialog" />
+            <ContourOptionsDialog
+                v-model:visible="contourDialogVisible"
+                :loading="contourLoading"
+                :unit="contourUnit"
+                :rasterMin="contourRasterMin"
+                :rasterMax="contourRasterMax"
+                :initialOptions="contourLastOptions"
+                @generate="generateContourLines"
+                @cancel="closeContourDialog" />
             <StockpileVolumePanel
                 :visible="stockpilePanelVisible"
                 :loading="stockpileLoading"
@@ -55,7 +65,6 @@
                 @clearOverlay="clearStockpileOverlay"
                 @cancelMode="_stopStockpileInteractions"
                 @exportGeoJson="exportStockpileGeoJson"
-                @saveGeoJson="saveStockpileGeoJson"
                 @update:baseMethod="stockpileBaseMethod = $event"
                 @update:sensitivity="stockpileSensitivity = $event"
                 @update:radius="stockpileRadius = $event"
@@ -156,6 +165,7 @@ import Toolbar from '@/components/Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
+import ContourOptionsDialog from './ContourOptionsDialog.vue';
 import StockpileVolumePanel from './StockpileVolumePanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import Keyboard from '@/libs/keyboard';
@@ -172,7 +182,6 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
-import { isPlantHealthCapable, isRasterAnalysisCapable } from '@/libs/entryTypes';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -184,15 +193,17 @@ import mapMeasurements from '@/composables/useMapMeasurements';
 import mapPlantHealth from '@/composables/usePlantHealth';
 import mapRasterAnalysis from '@/composables/useRasterAnalysis';
 import mapStockpileVolume from '@/composables/useStockpileVolume';
+import mapContourLines from '@/composables/useContourLines';
+import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
 import emitter from '@/libs/eventBus';
 
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, RasterAnalysisControls, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
+        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
     },
     emits: ['scrollTo', 'openItem'],
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume],
+    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -301,56 +312,9 @@ export default {
             }
         });
 
-        tools.push({ id: 'separator' });
-        tools.push({
-            id: 'plant-health',
-            title: 'Plant Health - Open multispectral visualization panel',
-            icon: 'fa-solid fa-leaf',
-            onClick: () => {
-                if (this.plantHealthVisible) {
-                    this.closePlantHealth();
-                } else {
-
-                    // If raster analysis panel is open, close it since they share the same files and it can be confusing to have both open at the same time
-                    if (this.rasterPanelVisible)
-                        this.closeRasterAnalysis();
-
-                    const rasterFile = this.files.find(f => f.entry && isPlantHealthCapable(f.entry));
-                    if (rasterFile) this.openPlantHealth(rasterFile);
-                }
-            }
-        });
-        tools.push({
-            id: 'raster-analysis',
-            title: 'Raster Analysis - Open value / thermal analysis panel',
-            icon: 'fa-solid fa-chart-area',
-            onClick: () => {
-                if (this.rasterPanelVisible) {
-                    this.closeRasterAnalysis();
-                } else {
-
-                    // If plant health panel is open, close it since they share the same files and it can be confusing to have both open at the same time
-                    if (this.plantHealthVisible)
-                        this.closePlantHealth();
-
-                    const rasterFile = this.files.find(f => f.entry && isRasterAnalysisCapable(f.entry));
-                    if (rasterFile) this.openRasterAnalysis(rasterFile);
-                }
-            }
-        });
-        tools.push({
-            id: 'stockpile-volume',
-            title: 'Stockpile Volume - Auto-detect and measure stockpiles on DEM/DSM/DTM',
-            icon: 'fa-solid fa-layer-group',
-            onClick: () => {
-                if (this.stockpilePanelVisible) {
-                    this.closeStockpileVolume();
-                } else {
-                    const rasterFile = this.files.find(f => f.entry && isRasterAnalysisCapable(f.entry));
-                    if (rasterFile) this.openStockpileVolume(rasterFile);
-                }
-            }
-        });
+        // Plant Health / Raster Analysis / Stockpile Volume have moved out of
+        // the toolbar and onto the map (rendered by `useMapAnalysisButtons`),
+        // matching SingleMap.vue's button placement.
 
 
         return {
@@ -878,6 +842,11 @@ export default {
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
                 onListOpen: () => { this.openMeasurementListDialog(); },
+                onMeasurementDeleted: (feature) => {
+                    if (!feature || !this.deletedMeasurementIds) return;
+                    const id = feature.get && feature.get('id');
+                    if (id) this.deletedMeasurementIds.add(id);
+                },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
             }); this.map = new Map({
@@ -1045,6 +1014,15 @@ export default {
                 onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
             });
             this.map.addControl(this.settingsControl);
+
+            // Plant Health / Raster Analysis / Stockpile Volume on-map buttons,
+            // shared with SingleMap.vue via `useMapAnalysisButtons`. We pick the
+            // first capable file so the buttons map to a valid entry whenever
+            // any of the workspace files qualifies.
+            this.addAnalysisButtonsControl(predicate => {
+                const f = (this.files || []).find(x => x.entry && predicate(x.entry));
+                return f || null;
+            });
 
             // Apply flight path visibility preference
             this.flightPathLayer.setVisible(this.showFlightPath);

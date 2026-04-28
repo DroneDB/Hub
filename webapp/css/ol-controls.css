@@ -53,6 +53,18 @@
     right: 0.5rem;
 }
 
+/* On-map analysis buttons (Plant Health / Raster Analysis / Stockpile),
+   shared by Map.vue and SingleMap.vue. In Map.vue they're a standalone
+   control just below the measure control; SingleMap appends them to its
+   existing top-right cluster so this rule only matters when used solo. */
+.ol-map-analysis-buttons {
+    top: 17.5rem;
+    right: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
 .ol-tooltip-static:before {
     border-top-color: var(--ddb-measure-color);
 }
@@ -73,6 +85,13 @@
     background-color: var(--ddb-measure-color);
     color: black;
     border: var(--ddb-border-width) solid white;
+}
+
+/* Persistent measurement labels are hidden by default and revealed only
+   while the user hovers the corresponding feature. Keeps the map legible
+   when many measurements (especially contour LineStrings) overlap. */
+.ol-tooltip-hidden {
+    display: none !important;
 }
 
 .ol-tooltip {

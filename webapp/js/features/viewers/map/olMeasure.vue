@@ -257,10 +257,20 @@ class MeasureControls extends Control {
         if (previous) {
             previous._hovered = false;
             try { previous.changed(); } catch (e) { /* noop */ }
+            // Re-hide the persistent tooltip label that was revealed on hover.
+            const prevTip = previous.get && previous.get('measureTooltipElement');
+            if (prevTip && prevTip.classList) {
+                prevTip.classList.add('ol-tooltip-hidden');
+            }
         }
         if (feature) {
             feature._hovered = true;
             try { feature.changed(); } catch (e) { /* noop */ }
+            // Reveal the persistent tooltip label only for the hovered feature.
+            const tip = feature.get && feature.get('measureTooltipElement');
+            if (tip && tip.classList) {
+                tip.classList.remove('ol-tooltip-hidden');
+            }
         }
     }
 
