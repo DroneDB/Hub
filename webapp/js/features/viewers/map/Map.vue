@@ -50,7 +50,6 @@
                 :title="stockpileTitle"
                 :notes="stockpileNotes"
                 @close="closeStockpileVolume"
-                @detectCenter="detectAtMapCenter"
                 @clickOnMap="startStockpileClickMode"
                 @drawPolygon="startStockpilePolygonDrawing"
                 @clearOverlay="clearStockpileOverlay"

@@ -59,21 +59,13 @@
             </div>
 
             <div class="section actions">
-                <button class="btn btn-primary btn-sm" @click="triggerDetectCenter"
-                        :disabled="loading" data-testid="stockpile-detect-btn"
-                        :title="'Auto-detect the pile under the current map center'">
-                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles'"></i>
-                    {{ loading ? 'Working…' : 'Auto-detect' }}
-                </button>
-                <button class="btn btn-secondary btn-sm" :class="{ active: mode === 'click' }"
+                <button class="btn btn-primary btn-sm" :class="{ active: mode === 'click' }"
                         @click="$emit('clickOnMap')"
                         :disabled="loading" data-testid="stockpile-click-btn"
                         title="Click on the map to detect a pile at that point">
-                    <i class="fa-solid fa-crosshairs"></i>
+                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'"></i>
                     {{ mode === 'click' ? 'Click on map…' : 'Click on map' }}
                 </button>
-            </div>
-            <div class="section actions">
                 <button class="btn btn-secondary btn-sm" :class="{ active: mode === 'draw' }"
                         @click="$emit('drawPolygon')"
                         :disabled="loading" data-testid="stockpile-draw-btn"
@@ -209,7 +201,7 @@ export default {
         title: { type: String, default: '' },
         notes: { type: String, default: '' }
     },
-    emits: ['close', 'detectCenter', 'clickOnMap', 'drawPolygon', 'clearOverlay',
+    emits: ['close', 'clickOnMap', 'drawPolygon', 'clearOverlay',
         'cancelMode', 'exportGeoJson', 'saveGeoJson',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
@@ -325,7 +317,6 @@ export default {
         }
     },
     methods: {
-        triggerDetectCenter() { this.$emit('detectCenter'); },
         _fmt(n, digits = 2) {
             return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
         },
