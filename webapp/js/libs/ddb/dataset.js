@@ -139,11 +139,7 @@ module.exports = class Dataset {
         return this.registry.postRequest(`${this.baseApi}/raster-profile`, body);
     }
 
-    async getStockpileMaterials() {
-        return this.registry.getRequest(`${this.baseApi}/stockpile/materials`);
-    }
-
-    async calculateStockpileVolume(path, polygonGeoJson, { baseMethod = 'lowest_perimeter', flatElevation = 0, material = null } = {}) {
+    async calculateStockpileVolume(path, polygonGeoJson, { baseMethod = 'lowest_perimeter', flatElevation = 0 } = {}) {
         const body = {
             path,
             polygon: typeof polygonGeoJson === 'string'
@@ -151,7 +147,6 @@ module.exports = class Dataset {
                 : JSON.stringify(polygonGeoJson),
             baseMethod,
             flatElevation,
-            material,
         };
         return this.registry.postRequest(`${this.baseApi}/stockpile/calculate`, body);
     }

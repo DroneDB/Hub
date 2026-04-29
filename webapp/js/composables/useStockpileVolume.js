@@ -17,6 +17,12 @@ import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import { buildStockpileFeature, loadStockpile } from '@/libs/map/stockpileStorage';
+import {
+    STOCKPILE_MATERIALS,
+    CUSTOM_MATERIAL_SLUG as SHARED_CUSTOM_MATERIAL_SLUG,
+    findStockpileMaterialBySlug,
+    computeMaterialEstimate
+} from '@/libs/stockpileMaterials';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
 const STOCKPILE_STROKE = '#ff9800';
@@ -53,8 +59,28 @@ function friendlyStockpileError(raw, fallback) {
     return fallback;
 }
 
-// Reserved slug for inline-custom material entries (density+cost typed in the panel).
-export const CUSTOM_MATERIAL_SLUG = '__custom__';
+// Re-exported here so existing imports of `CUSTOM_MATERIAL_SLUG` from this
+// composable keep working. The single source of truth lives in
+// `@/libs/stockpileMaterials`.
+export const CUSTOM_MATERIAL_SLUG = SHARED_CUSTOM_MATERIAL_SLUG;
+
+// Resolve the active material descriptor for the current panel state.
+// Returns null when no material is selected, or when the inline custom
+// entry has invalid density.
+function resolveSelectedMaterial(slug, customDensity, customCostPerTon) {
+    if (!slug) return null;
+    if (slug === CUSTOM_MATERIAL_SLUG) {
+        const d = Number(customDensity);
+        if (!isFinite(d) || d <= 0) return null;
+        return {
+            slug: CUSTOM_MATERIAL_SLUG,
+            densityTonPerM3: d,
+            costPerTon: Math.max(0, Number(customCostPerTon) || 0),
+            currency: 'USD'
+        };
+    }
+    return findStockpileMaterialBySlug(slug);
+}
 
 export default {
     data() {
@@ -64,7 +90,8 @@ export default {
             stockpileSensitivity: 0.5,
             stockpileRadius: 50,
             stockpileMaterial: null,
-            stockpileMaterials: [],
+            // Materials catalog is bundled with the SPA; no network call.
+            stockpileMaterials: STOCKPILE_MATERIALS,
             stockpileCustomDensity: 1.5,    // t/m³
             stockpileCustomCostPerTon: 0,   // currency unit per ton
             stockpileLoading: false,
@@ -114,14 +141,6 @@ export default {
             this.stockpileDetectedPolygon = null;
             this.stockpileTitle = '';
             this.stockpileNotes = '';
-            if (this.stockpileMaterials.length === 0) {
-                try {
-                    this.stockpileMaterials = await this.dataset.getStockpileMaterials();
-                } catch (e) {
-                    console.warn('Could not load stockpile materials', e);
-                    this.stockpileMaterials = [];
-                }
-            }
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
             this._loadSavedStockpile();
         },
@@ -239,12 +258,18 @@ export default {
                     detection.polygon,
                     {
                         baseMethod: this.stockpileBaseMethod,
-                        flatElevation: 0,
-                        material: this.stockpileMaterial
+                        flatElevation: 0
                     }
                 );
+                const material = resolveSelectedMaterial(
+                    this.stockpileMaterial,
+                    this.stockpileCustomDensity,
+                    this.stockpileCustomCostPerTon
+                );
+                const estimate = computeMaterialEstimate(volume, material);
                 this.stockpileResult = {
                     ...volume,
+                    ...(estimate || {}),
                     confidence: detection.confidence,
                     estimatedFromDetection: detection.estimatedVolume
                 };
@@ -283,11 +308,16 @@ export default {
                     polygonGeoJson,
                     {
                         baseMethod: this.stockpileBaseMethod,
-                        flatElevation: 0,
-                        material: this.stockpileMaterial
+                        flatElevation: 0
                     }
                 );
-                this.stockpileResult = volume;
+                const material = resolveSelectedMaterial(
+                    this.stockpileMaterial,
+                    this.stockpileCustomDensity,
+                    this.stockpileCustomCostPerTon
+                );
+                const estimate = computeMaterialEstimate(volume, material);
+                this.stockpileResult = { ...volume, ...(estimate || {}) };
                 this.stockpileDetectedPolygon = polygonGeoJson;
                 this._adoptDraftStockpile(polygonGeoJson);
             } catch (e) {
