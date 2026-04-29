@@ -23,7 +23,15 @@
 
             <!-- Formula Selection -->
             <div class="section">
-                <label class="section-label">Formula</label>
+                <label class="section-label">
+                    Formula
+                    <button type="button" class="info-icon-btn"
+                            @click="showFormulasInfo = true"
+                            title="Learn more about each vegetation index"
+                            data-testid="plant-health-formulas-info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
+                </label>
                 <select v-model="selectedFormula" @change="onFormulaChange" class="panel-select">
                     <option value="">None (bands only)</option>
                     <option v-for="f in availableFormulas" :key="f.id" :value="f.id"
@@ -101,23 +109,35 @@
             </div>
 
             <!-- Reset / Toggle / Copy Link / Export -->
-            <div class="section actions">
-                <button class="btn btn-secondary btn-sm" @click="reset">Reset</button>
-                <button class="btn btn-sm" :class="originalView ? 'btn-primary' : 'btn-secondary'" @click="toggleOriginalView" :title="originalView ? 'Showing original - click to apply processing' : 'Showing processed - click to show original'">
-                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+            <div class="section actions actions-grid">
+                <button class="btn btn-secondary btn-sm action-btn" @click="reset"
+                        title="Reset visualization parameters to defaults">
+                    <i class="fas fa-rotate-left"></i>
+                    <span class="action-label">Reset</span>
                 </button>
-                <button class="btn btn-secondary btn-sm" @click="copyLink" title="Copy shareable link">
+                <button class="btn btn-sm action-btn"
+                        :class="originalView ? 'btn-primary' : 'btn-secondary'"
+                        @click="toggleOriginalView"
+                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'">
+                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
+                </button>
+                <button class="btn btn-secondary btn-sm action-btn" @click="copyLink"
+                        title="Copy a shareable link with the current settings">
                     <i class="fas fa-link"></i>
+                    <span class="action-label">Copy Link</span>
                 </button>
                 <button v-if="!isExportTooLarge"
-                        class="btn btn-secondary btn-sm"
+                        class="btn btn-secondary btn-sm action-btn"
                         @click="exportGeoTiff"
                         :disabled="exporting"
-                        title="Export GeoTIFF">
+                        title="Export the current view as a GeoTIFF file">
                     <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+                    <span class="action-label">Export</span>
                 </button>
-                <span v-else class="export-limit-hint" :title="exportLimitTooltip">
+                <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
                     <i class="fas fa-download"></i>
+                    <span class="action-label">Export</span>
                 </span>
             </div>
         </div>
@@ -125,6 +145,9 @@
         <div class="panel-body loading" v-else>
             <i class="fas fa-spinner fa-spin"></i> Loading raster info...
         </div>
+
+        <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
+                                   :formulas="availableFormulas" />
     </div>
 </template>
 
@@ -132,13 +155,14 @@
 import HistogramChart from '@/components/HistogramChart.vue';
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
 import BandSelector from '@/components/BandSelector.vue';
+import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import clipboardCopy from 'clipboard-copy';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 
 export default {
-    components: { HistogramChart, ColormapDropdown, BandSelector },
+    components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -161,7 +185,8 @@ export default {
             availableFormulas: [],
             availableColormaps: ['rdylgn', 'discrete_ndvi', 'spectral', 'viridis', 'plasma', 'inferno', 'magma', 'grayscale', 'ironbow', 'rainbow', 'bugn', 'whitehot', 'blackhot', 'arctic', 'lava'],
             exporting: false,
-            originalView: false
+            originalView: false,
+            showFormulasInfo: false
         };
     },
 
@@ -534,6 +559,22 @@ export default {
     letter-spacing: 0.03em;
 }
 
+.info-icon-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    margin-left: 0.35rem;
+    color: #4caf50;
+    cursor: pointer;
+    opacity: 0.85;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.info-icon-btn:hover {
+    opacity: 1;
+}
+
 .sensor-badge {
     display: inline-block;
     background: rgba(76, 175, 80, 0.25);
@@ -598,6 +639,42 @@ export default {
     display: flex;
     gap: 0.5rem;
     margin-top: 0.5rem;
+}
+
+/* Two-row grid so each action button has room to display its short label
+   without overflowing the panel width. Mirrors RasterAnalysisControls. */
+.actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+}
+
+.action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.3rem;
+    min-height: 2.6rem;
+    text-align: center;
+    line-height: 1.1;
+}
+
+.action-btn .action-label {
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.action-btn i {
+    font-size: 0.95rem;
+}
+
+.export-limit-hint {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .btn {

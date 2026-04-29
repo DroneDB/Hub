@@ -119,7 +119,7 @@ export default {
         },
 
         /**
-         * Default implementation – override in component if needed.
+         * Default implementation - override in component if needed.
          * @param {Object} layer - The OL vector layer
          * @returns {string}
          */

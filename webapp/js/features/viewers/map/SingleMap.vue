@@ -55,7 +55,7 @@
                 :customCostPerTon="stockpileCustomCostPerTon"
                 :unitPref="currentUnitPref"
                 :title="stockpileTitle"
-                :notes="stockpileNotes"
+                :description="stockpileDescription"
                 @close="closeStockpileVolume"
                 @clickOnMap="startStockpileClickMode"
                 @drawPolygon="startStockpilePolygonDrawing"
@@ -69,7 +69,7 @@
                 @update:customDensity="stockpileCustomDensity = $event"
                 @update:customCostPerTon="stockpileCustomCostPerTon = $event"
                 @update:title="stockpileTitle = $event"
-                @update:notes="stockpileNotes = $event" />
+                @update:description="stockpileDescription = $event" />
         </div>
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
             :basemaps="basemaps"
@@ -292,6 +292,9 @@ export default {
                     if (!feature || !this.deletedMeasurementIds) return;
                     const id = feature.get && feature.get('id');
                     if (id) this.deletedMeasurementIds.add(id);
+                    if (typeof this._onStockpileFeatureRemoved === 'function') {
+                        this._onStockpileFeatureRemoved(feature);
+                    }
                 },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete

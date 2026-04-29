@@ -11,9 +11,12 @@
             <div class="section">
                 <label class="section-label">
                     Base Plane Method
-                    <i class="fas fa-info-circle base-method-info"
-                       :title="baseMethodTooltip"
-                       data-testid="stockpile-base-method-info"></i>
+                    <button type="button" class="info-icon-btn"
+                            @click="showBaseMethodsInfo = true"
+                            :title="baseMethodTooltip"
+                            data-testid="stockpile-base-method-info">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
                 </label>
                 <select v-model="localBaseMethod" class="panel-select" data-testid="stockpile-base-method">
                     <option value="lowest_perimeter">Lowest perimeter</option>
@@ -105,9 +108,9 @@
                 <input type="text" v-model="localTitle" class="panel-input"
                        placeholder="Title (e.g. North pile)" maxlength="120"
                        data-testid="stockpile-title" />
-                <textarea v-model="localNotes" class="panel-input panel-textarea"
-                          rows="2" placeholder="Notes (optional)" maxlength="500"
-                          data-testid="stockpile-notes"></textarea>
+                <textarea v-model="localDescription" class="panel-input panel-textarea"
+                          rows="2" placeholder="Description (optional)" maxlength="500"
+                          data-testid="stockpile-description"></textarea>
 
                 <label class="section-label">Result</label>
                 <div class="result-grid">
@@ -164,14 +167,18 @@
                 </div>
             </div>
         </div>
+        <StockpileBaseMethodsDialog v-model:visible="showBaseMethodsInfo" />
     </div>
 </template>
 
 <script>
+import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
+
 const CUSTOM_SLUG = '__custom__';
 
 export default {
     name: 'StockpileVolumePanel',
+    components: { StockpileBaseMethodsDialog },
     props: {
         visible: { type: Boolean, default: false },
         loading: { type: Boolean, default: false },
@@ -192,15 +199,15 @@ export default {
         },
         canSave: { type: Boolean, default: true },
         title: { type: String, default: '' },
-        notes: { type: String, default: '' }
+        description: { type: String, default: '' }
     },
     emits: ['close', 'clickOnMap', 'drawPolygon', 'clearOverlay',
         'cancelMode', 'exportGeoJson',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
-        'update:title', 'update:notes'],
+        'update:title', 'update:description'],
     data() {
-        return { customSlug: CUSTOM_SLUG };
+        return { customSlug: CUSTOM_SLUG, showBaseMethodsInfo: false };
     },
     computed: {
         localBaseMethod: {
@@ -231,9 +238,9 @@ export default {
             get() { return this.title; },
             set(v) { this.$emit('update:title', v); }
         },
-        localNotes: {
-            get() { return this.notes; },
-            set(v) { this.$emit('update:notes', v); }
+        localDescription: {
+            get() { return this.description; },
+            set(v) { this.$emit('update:description', v); }
         },
         // Resolves the active material parameters: predefined slug, custom inputs, or null.
         effectiveMaterial() {
@@ -303,10 +310,10 @@ export default {
             return [
                 'Defines the reference surface used to compute Cut and Fill volumes:',
                 '',
-                '• Lowest perimeter — base = the lowest elevation along the polygon boundary. Best for isolated piles on uneven ground; Fill is always 0.',
-                '• Average perimeter — base = the mean elevation along the boundary. A balanced choice when the surrounding terrain is roughly level.',
-                '• Best-fit plane — fits a tilted plane through the perimeter elevations. Useful when the ground around the pile slopes.',
-                '• Flat (elevation = 0) — base is the absolute reference 0 m. Use only when your DSM is already a height-above-ground (DTM-subtracted) raster.'
+                '- Lowest perimeter: base = the lowest elevation along the polygon boundary. Best for isolated piles on uneven ground; Fill is always 0.',
+                '- Average perimeter: base = the mean elevation along the boundary. A balanced choice when the surrounding terrain is roughly level.',
+                '- Best-fit plane: fits a tilted plane through the perimeter elevations. Useful when the ground around the pile slopes.',
+                '- Flat (elevation = 0): base is the absolute reference 0 m. Use only when your DSM is already a height-above-ground (DTM-subtracted) raster.'
             ].join('\n');
         }
     },
@@ -416,15 +423,19 @@ export default {
     letter-spacing: 0;
 }
 
-.base-method-info {
+.info-icon-btn {
+    background: none;
+    border: none;
+    padding: 0;
     margin-left: 0.35rem;
     color: #ffb74d;
-    cursor: help;
+    cursor: pointer;
     opacity: 0.85;
     font-size: 0.85rem;
+    line-height: 1;
 }
 
-.base-method-info:hover {
+.info-icon-btn:hover {
     opacity: 1;
 }
 

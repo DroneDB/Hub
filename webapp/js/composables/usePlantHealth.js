@@ -16,7 +16,18 @@ export default {
             plantHealthVisible: false,
             plantHealthFilePath: null,
             plantHealthInitialParams: null,
-            currentVizParams: {}
+            // Latest viz params emitted by the currently-open analysis panel.
+            // Kept for backwards compatibility with consumers that still read
+            // it directly; the canonical store is `vizParamsByPath` below.
+            currentVizParams: {},
+            // Per-file viz-params cache. Each Plant Health / Raster Analysis
+            // panel writes its current params here when the user changes the
+            // colormap, formula, or rescale, and reads them back on reopen so
+            // switching between mutually-exclusive analysis panels doesn't
+            // drop styling. The cache is also consulted by
+            // `refreshRasterLayers` so any layer with a remembered viz state
+            // stays styled even when no panel is currently open.
+            vizParamsByPath: {}
         };
     },
     methods: {
@@ -28,8 +39,19 @@ export default {
             if (typeof this.closeStockpileVolume === 'function') this.closeStockpileVolume();
             this.plantHealthFilePath = path;
             this.plantHealthVisible = true;
+            // Restore previously-applied viz params for this file so the
+            // panel UI (formula / colormap / rescale) reflects the live
+            // styling of the layer instead of resetting to defaults.
+            const cached = this.vizParamsByPath && this.vizParamsByPath[path];
             if (options) {
                 this.plantHealthInitialParams = options;
+            } else if (cached && Object.keys(cached).length) {
+                this.plantHealthInitialParams = { ...cached };
+            } else {
+                this.plantHealthInitialParams = null;
+            }
+            if (cached && Object.keys(cached).length) {
+                this.currentVizParams = { ...cached };
             }
         },
 
@@ -37,12 +59,27 @@ export default {
             this.plantHealthVisible = false;
             this.plantHealthFilePath = null;
             this.plantHealthInitialParams = null;
+            // Note: `vizParamsByPath` is intentionally preserved so the next
+            // panel that opens (or the next refreshRasterLayers tick) can
+            // restore the styling. `currentVizParams` is reset only because
+            // it represents the "active panel emitting" state, which no
+            // longer applies once the panel is closed.
             this.currentVizParams = {};
             this.refreshRasterLayers();
         },
 
         handleVizParamsChanged(params) {
             this.currentVizParams = params;
+            const path = this.plantHealthFilePath;
+            if (path) {
+                if (params && Object.keys(params).length) {
+                    this.vizParamsByPath = { ...this.vizParamsByPath, [path]: { ...params } };
+                } else if (this.vizParamsByPath[path]) {
+                    const next = { ...this.vizParamsByPath };
+                    delete next[path];
+                    this.vizParamsByPath = next;
+                }
+            }
             this.refreshRasterLayers();
         },
 
@@ -56,13 +93,13 @@ export default {
                 const source = layer.getSource();
                 if (!source) return;
 
-                // Apply vizParams to the file that has plant health or raster analysis open
-                let vizParams = {};
-                if (this.plantHealthFilePath && layerPath === this.plantHealthFilePath) {
-                    vizParams = this.currentVizParams;
-                } else if (this.rasterFilePath && layerPath === this.rasterFilePath) {
-                    vizParams = this.currentVizParams;
-                }
+                // Apply viz params from the per-file cache so layers stay
+                // styled across panel switches and panel close. The active
+                // panel's `currentVizParams` is mirrored into the cache by
+                // its `handle*VizParamsChanged` hook, so reading the cache
+                // is sufficient.
+                const cached = this.vizParamsByPath && this.vizParamsByPath[layerPath];
+                const vizParams = cached && Object.keys(cached).length ? cached : {};
 
                 const url = this._getLayerUrl(layer);
                 if (!url) return;

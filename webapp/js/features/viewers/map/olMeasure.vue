@@ -24,6 +24,13 @@ import Lara from '@primevue/themes/lara';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from './PointAnnotationDialog.vue';
 
+// Cursor shown over a measurement while the eraser tool is active. We use
+// the same static asset as the toolbar button (file URL, not an inline SVG
+// data URL) because data-URL cursors are unreliable: some browsers fail to
+// load them and others re-normalize the value on read-back, breaking any
+// equality check used to detect ownership of the cursor.
+const ERASE_HOVER_CURSOR = `url('${rootPath('/images/measure-erase.svg')}') 12 12, crosshair`;
+
 class MeasureControls extends Control {
     /**
      * @param {Object} [opt_options] Control options.
@@ -216,21 +223,38 @@ class MeasureControls extends Control {
 
             // Hover highlight: visually flag the measurement under the cursor
             // (the same one that a double-click would target) and switch the
-            // pointer to "pointer". Skipped while drawing/editing so it does
-            // not fight with the active interaction's own cursor handling.
+            // pointer to a context-appropriate cursor. Allowed in two modes:
+            //   - no tool selected -> hand cursor ("open in detail dialog")
+            //   - eraser tool active -> trash cursor ("click to delete")
+            // Drawing tools (point/length/area) manage their own crosshair
+            // and would fight this handler, so we skip those.
             this._hoverPointerKey = map.on('pointermove', (evt) => {
-                if (this.isEditMode || this.selectedTool || evt.dragging) return;
+                if (evt.dragging || this.isEditMode) return;
+                const tool = this.selectedTool;
+                if (tool && tool !== 'erase') return;
                 const hit = map.forEachFeatureAtPixel(evt.pixel, (f, layer) => {
                     if (layer === this.vector && f.get('measurementType')) return f;
                     return null;
                 }, { hitTolerance: 5 });
                 this._setHoveredFeature(hit || null);
                 const target = map.getTargetElement();
-                // Only override the cursor when nothing else has claimed it
-                // (e.g. the raster Inspect tool's crosshair must win).
-                if (target && (target.style.cursor === '' || target.style.cursor === 'pointer')) {
-                    target.style.cursor = hit ? 'pointer' : '';
+                if (!target) return;
+                // Cursor ownership: we only manage the cursor when nothing
+                // external has overridden it since our last write. Tracking a
+                // single "last value we set" instance flag is more robust
+                // than an allow-list of expected strings, because browsers
+                // may re-normalize complex values (notably url() cursors)
+                // when reading them back from `style.cursor`.
+                const lastManaged = this._currentManagedCursor;
+                if (lastManaged !== undefined && target.style.cursor !== lastManaged) {
+                    // Someone else (e.g. raster Inspect tool) owns the cursor now.
+                    return;
                 }
+                const next = tool === 'erase'
+                    ? (hit ? ERASE_HOVER_CURSOR : 'crosshair')
+                    : (hit ? 'pointer' : '');
+                target.style.cursor = next;
+                this._currentManagedCursor = next;
             });
         } else {
             if (this._detailDblClickKey) {
@@ -448,6 +472,13 @@ class MeasureControls extends Control {
      * @param {ol.Feature} feature - The feature to remove
      */
     deleteMeasurement(feature) {
+        // Clear the hovered-feature reference if we're about to remove it,
+        // otherwise the next pointermove sees a stale pointer to a feature
+        // no longer in the layer (no visual issue today, but avoids latent
+        // bugs and lets _setHoveredFeature short-circuit cleanly).
+        if (this._hoveredFeature === feature) {
+            this._setHoveredFeature(null);
+        }
         const map = this.getMap();
         const tooltipOverlay = feature.get('measureTooltip');
         if (tooltipOverlay && map) {
@@ -1183,6 +1214,14 @@ class MeasureControls extends Control {
         // Clear any hover highlight: while drawing the user gets a different
         // visual affordance and the highlighted feature stays orphaned otherwise.
         this._setHoveredFeature && this._setHoveredFeature(null);
+        // Force a fresh cursor write on the next pointermove. Otherwise the
+        // ownership check would compare against a stale managed value and
+        // refuse to write the appropriate cursor for the new tool.
+        this._currentManagedCursor = undefined;
+        if (map) {
+            const target = map.getTargetElement();
+            if (target) target.style.cursor = '';
+        }
 
         const removeHandlers = () => {
             if (!this.loaded) return;
@@ -1361,23 +1400,53 @@ class MeasureControls extends Control {
                     }, 10);
                 } else if (tool === 'erase') {
                     setTimeout(() => {
-                        // Delete the feature and everything it touches
+                        // Delete every measurement that contains the click
+                        // coordinate. We use direct geometry intersection
+                        // instead of pixel-based hit detection because:
+                        //   - it is independent of map render order (the
+                        //     temporary Point sketch sitting on top of a
+                        //     line/polygon would otherwise mask it),
+                        //   - line geometries don't have area, so we widen
+                        //     the hit-test by buffering the coordinate to a
+                        //     small bounding box (~6 pixels worth) and
+                        //     checking extent intersection for them,
+                        //   - it deterministically targets only the shared
+                        //     measurement source, regardless of what other
+                        //     overlay layers happen to be at the same pixel.
                         const coords = feat.getGeometry().getCoordinates();
-                        map.forEachFeatureAtPixel(map.getPixelFromCoordinate(coords, {
-                            layerFilter: l => l === self.source,
-                            hitTolerance: 4
-                        }), f => {
-                            if (f.get('measureTooltipElement') !== undefined) {
-                                // Use deleteMeasurement so the OL Overlay
-                                // (the floating label) is removed too. The
-                                // previous inline cleanup only removed the
-                                // DOM element, leaving the overlay anchor
-                                // dangling on the map.
-                                self.deleteMeasurement(f);
+                        const view = map.getView();
+                        const resolution = view.getResolution() || 1;
+                        const tolerance = resolution * 6; // ~6 CSS pixels at current zoom
+                        const hitBox = [
+                            coords[0] - tolerance, coords[1] - tolerance,
+                            coords[0] + tolerance, coords[1] + tolerance
+                        ];
+                        const toDelete = [];
+                        self.source.forEachFeature((f) => {
+                            if (f === feat) return;
+                            if (!f.get('measurementType')) return;
+                            const g = f.getGeometry();
+                            if (!g) return;
+                            // Polygons/Points: precise containment test.
+                            // Lines: extent test against the buffered click.
+                            if (g instanceof Polygon || g instanceof Point) {
+                                if (g.intersectsCoordinate(coords)
+                                    || g.intersectsExtent(hitBox)) {
+                                    toDelete.push(f);
+                                }
+                            } else if (g instanceof LineString) {
+                                if (g.intersectsExtent(hitBox)) {
+                                    toDelete.push(f);
+                                }
+                            } else if (typeof g.intersectsExtent === 'function'
+                                && g.intersectsExtent(hitBox)) {
+                                toDelete.push(f);
                             }
                         });
+                        toDelete.forEach((f) => self.deleteMeasurement(f));
 
-                        self.source.removeFeature(feat);
+                        // Remove the transient erase-click point itself.
+                        try { self.source.removeFeature(feat); } catch (e) { /* noop */ }
 
                         // Update button visibility after erase
                         self.updateButtonsVisibility(self.hasMeasurements(), false);

@@ -93,7 +93,7 @@ function buildEmptyFC(rasterPath) {
  * persist it via the regular toolbar Save button instead of a dedicated one).
  *
  * @param {Object} polygon - GeoJSON Polygon geometry (WGS84).
- * @param {Object} [properties] - Property bag (material, notes, volumes, ...).
+ * @param {Object} [properties] - Property bag (material, description, volumes, ...).
  * @returns {Object} GeoJSON Feature.
  */
 export function buildStockpileFeature(polygon, properties = {}) {

@@ -36,12 +36,24 @@ export default {
             // True while the inspect-value tool is active (hover-over-raster tooltip).
             rasterInspectActive: false,
             rasterInspectValue: null,
-            // Internal handles for the profile drawing overlay (non-reactive
+            // Internal handles for the profile drawing flow (non-reactive
             // refs are tolerated here because OL objects mutate frequently).
+            // The drawn profile line itself lives in `measureControls.source`
+            // (the shared measurement layer) so it inherits hover, edit,
+            // erase, save, export, and import for free. Only the ephemeral
+            // chart-hover dot keeps its own dedicated overlay layer.
             _rasterProfileDraw: null,
-            _rasterProfileLayer: null,
-            _rasterProfileSource: null,
+            _rasterProfileHoverLayer: null,
+            _rasterProfileHoverSource: null,
             _rasterProfileHoverFeature: null,
+            // The currently-active profile feature inside measureControls.source.
+            // When this feature is removed (eraser tool, list-dialog delete,
+            // clear-all, panel "Clear" button, etc.) the chart and hover dot
+            // are reset by the `removefeature` watcher set up below.
+            _currentProfileFeature: null,
+            _rasterProfileSourceRemoveKey: null,
+            _rasterProfileKeyHandler: null,
+            _rasterProfileToolLockHeld: false,
             _rasterInspectMoveKey: null,
             _rasterInspectKeyHandler: null,
             _rasterInspectTooltipEl: null,
@@ -55,8 +67,7 @@ export default {
             _rasterInspectSource: null,
             // OL Overlay anchoring the value tooltip next to the click marker.
             _rasterInspectTooltipOverlay: null,
-            _rasterDimsCache: null,
-            _lastProfileMeasurementFeature: null
+            _rasterDimsCache: null
         };
     },
     methods: {
@@ -68,8 +79,20 @@ export default {
             if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
             this.rasterFilePath = path;
             this.rasterPanelVisible = true;
+            // Restore previously-applied viz params for this file so the
+            // panel UI (colormap / rescale) reflects the live styling of
+            // the layer instead of resetting to defaults when switching
+            // back from another analysis panel.
+            const cached = this.vizParamsByPath && this.vizParamsByPath[path];
             if (options) {
                 this.rasterInitialParams = options;
+            } else if (cached && Object.keys(cached).length) {
+                this.rasterInitialParams = { ...cached };
+            } else {
+                this.rasterInitialParams = null;
+            }
+            if (cached && Object.keys(cached).length) {
+                this.currentVizParams = { ...cached };
             }
         },
 
@@ -83,14 +106,33 @@ export default {
             this.rasterProfileLoading = false;
             this.rasterProfileError = null;
             this._stopRasterProfileDrawing();
-            this._clearRasterProfileLine();
+            this._removeRasterProfileHoverMarker();
+            this._tearDownRasterProfileMeasurementWatcher();
+            // Note: we intentionally do NOT delete previously-drawn profile
+            // features from `measureControls.source` here. They are regular
+            // measurements now and must persist across panel open/close
+            // (just like length/area/point measurements would).
+            this._currentProfileFeature = null;
             this._stopRasterInspect();
-            // Reset vizParams on raster layers
+            // Reset transient "active panel emitting" state. The per-file
+            // cache (`vizParamsByPath`, defined in usePlantHealth) is kept
+            // so reopening this file later reuses the colormap/rescale.
+            this.currentVizParams = {};
             this.refreshRasterLayers();
         },
 
         handleRasterVizParamsChanged(params) {
             this.currentVizParams = params;
+            const path = this.rasterFilePath;
+            if (path) {
+                if (params && Object.keys(params).length) {
+                    this.vizParamsByPath = { ...this.vizParamsByPath, [path]: { ...params } };
+                } else if (this.vizParamsByPath && this.vizParamsByPath[path]) {
+                    const next = { ...this.vizParamsByPath };
+                    delete next[path];
+                    this.vizParamsByPath = next;
+                }
+            }
             this.refreshRasterLayers();
         },
 
@@ -145,9 +187,12 @@ export default {
 
         /**
          * Triggered when the user clicks "Draw profile" in the panel.
-         * Engages an OpenLayers polyline Draw interaction on `this.map`,
-         * draws the line in an overlay layer, and on completion samples
-         * the raster along the polyline via `queryRasterProfile`.
+         * Engages an OpenLayers polyline Draw interaction wired directly to
+         * the shared measurement source, so the resulting line is a regular
+         * measurement (visible in the Measurement List dialog, eraseable
+         * with the toolbar eraser, savable, exportable, editable). On
+         * completion the polyline is sampled against the raster via
+         * `queryRasterProfile` to populate the chart in the panel.
          */
         handlePickProfile() {
             this.startRasterProfileDrawing();
@@ -158,23 +203,33 @@ export default {
                 console.warn('[RasterAnalysis] No map instance; cannot start profile drawing.');
                 return;
             }
+            if (!this.measureControls || !this.measureControls.source) {
+                console.warn('[RasterAnalysis] measureControls is required for profile drawing.');
+                return;
+            }
             // Toggle: a second click cancels the in-progress draw cleanly.
             if (this.rasterProfileDrawing) {
-                this._stopRasterProfileDrawing();
-                this._clearRasterProfileLine();
+                this.cancelRasterProfileDrawing();
                 return;
             }
             // Profile drawing is mutually exclusive with the inspect tool.
             if (this.rasterInspectActive) this._stopRasterInspect();
 
-            // Cancel any ongoing draw + clear previous line, chart, and any error.
-            this._stopRasterProfileDrawing();
-            this._ensureRasterProfileLayer();
-            this._rasterProfileSource.clear();
+            // Replace any previously-drawn profile so the panel always
+            // reflects exactly one active profile/chart pair. Past profiles
+            // can still be re-created via "Redraw"; if the user wants to
+            // keep both, they can persist them via the measurements toolbar.
+            this._removeCurrentProfileFeature();
             this.rasterProfile = null;
             this.rasterProfileError = null;
+            this._removeRasterProfileHoverMarker();
 
-            const profileStyle = new Style({
+            // The dashed orange style is applied only to the in-progress
+            // sketch by OL design: once `drawend` fires, the persisted
+            // feature is rendered by the measurement layer's style function
+            // (which respects the `stroke` / `stroke-width` properties we
+            // set below and inherits hover highlight automatically).
+            const sketchStyle = new Style({
                 stroke: new Stroke({
                     color: '#ff9800',
                     width: 3,
@@ -188,9 +243,9 @@ export default {
             });
 
             const draw = new Draw({
-                source: this._rasterProfileSource,
+                source: this.measureControls.source,
                 type: 'LineString',
-                style: profileStyle
+                style: sketchStyle
             });
             this._rasterProfileDraw = draw;
             this.rasterProfileDrawing = true;
@@ -201,7 +256,7 @@ export default {
             // Tracked by a flag so _stopRasterProfileDrawing() releases at
             // most one lock no matter how many times it gets called.
             if (!this._rasterProfileToolLockHeld
-                && this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                && typeof this.measureControls.setToolsDisabled === 'function') {
                 this.measureControls.setToolsDisabled(true);
                 this._rasterProfileToolLockHeld = true;
             }
@@ -209,32 +264,60 @@ export default {
             const onKey = (e) => {
                 if (e.key === 'Escape' || e.keyCode === 27) {
                     // ESC must abort the in-progress geometry AND fully exit
-                    // drawing mode, then discard whatever was drawn so far.
-                    this._stopRasterProfileDrawing();
-                    this._clearRasterProfileLine();
-                    this.rasterProfile = null;
-                    this.rasterProfileError = null;
+                    // drawing mode. The sketch is not yet committed to the
+                    // source so there is nothing to clean up there.
+                    this.cancelRasterProfileDrawing();
                 }
             };
             this._rasterProfileKeyHandler = onKey;
             window.addEventListener('keydown', onKey);
 
             draw.on('drawend', (evt) => {
-                // Persist a static style on the finished feature so the line
-                // remains visible while the chart is shown.
-                evt.feature.setStyle(new Style({
-                    stroke: new Stroke({ color: '#ff9800', width: 3 }),
-                    image: new CircleStyle({
-                        radius: 4,
-                        fill: new Fill({ color: '#ff9800' }),
-                        stroke: new Stroke({ color: '#ffffff', width: 1.5 })
-                    })
-                }));
-
-                const geom = evt.feature.getGeometry();
+                const feature = evt.feature;
+                const geom = feature.getGeometry();
                 const mapProj = this.map.getView().getProjection();
                 const lineGeo = geom.clone().transform(mapProj, 'EPSG:4326');
                 const coords = lineGeo.getCoordinates();
+
+                // Drop degenerate profiles (the user double-clicked without
+                // placing real vertices). The feature is in the measurement
+                // source already, so we have to remove it explicitly here.
+                if (!Array.isArray(coords) || coords.length < 2) {
+                    try { this.measureControls.source.removeFeature(feature); }
+                    catch (e) { /* noop */ }
+                    this.cancelRasterProfileDrawing();
+                    return;
+                }
+
+                // Persist measurement metadata so the shared list, save/load,
+                // export, edit, and erase tools all treat the profile like a
+                // first-class measurement.
+                let lengthM = 0;
+                try { lengthM = olGetLength(geom); } catch (e) { /* noop */ }
+                const lengthLabel = lengthM >= 1000
+                    ? `${(lengthM / 1000).toFixed(2)} km`
+                    : `${lengthM.toFixed(1)} m`;
+                feature.set('measurementType', 'profile');
+                feature.set('createdAt', new Date().toISOString());
+                feature.set('stroke', '#ff9800');
+                feature.set('stroke-width', 3);
+                feature.set('tooltipText', `Profile: ${lengthLabel}`);
+                if (this.rasterFilePath) feature.set('rasterFilePath', this.rasterFilePath);
+
+                this._currentProfileFeature = feature;
+                this._setupRasterProfileMeasurementWatcher();
+
+                // Floating tooltip on the line (matches length/area). Hidden
+                // by default; revealed on hover by olMeasure's hover handler.
+                this._createProfileStaticTooltip(feature);
+
+                if (typeof this.measureControls.updateButtonsVisibility === 'function') {
+                    this.measureControls.updateButtonsVisibility(
+                        typeof this.measureControls.hasMeasurements === 'function'
+                            ? this.measureControls.hasMeasurements()
+                            : true,
+                        false);
+                }
 
                 // Synchronously suspend the Draw interaction so the upcoming
                 // pointer events can NOT start a new feature, and flip the UI
@@ -248,41 +331,33 @@ export default {
                 // Defer the actual interaction removal to the next tick so OL
                 // finishes processing the drawend event before we mutate the
                 // interaction stack.
-                setTimeout(() => {
-                    this._stopRasterProfileDrawing();
-                }, 0);
+                setTimeout(() => { this._stopRasterProfileDrawing(); }, 0);
 
-                if (Array.isArray(coords) && coords.length >= 2) {
-                    // Push the line into the shared measurements list so it
-                    // appears in the Measurement List dialog (alongside
-                    // point/length/area/stockpile entries) and can be saved
-                    // and re-loaded with the rest of the measurements.
-                    this._addProfileToMeasurementsList(evt.feature, coords);
-                    this.queryRasterProfile(coords);
-                }
+                this.queryRasterProfile(coords);
             });
         },
 
-        _ensureRasterProfileLayer() {
-            if (this._rasterProfileLayer) return;
-            this._rasterProfileSource = new VectorSource();
-            this._rasterProfileLayer = new VectorLayer({
-                source: this._rasterProfileSource,
+        _ensureRasterProfileHoverLayer() {
+            if (this._rasterProfileHoverLayer) return;
+            this._rasterProfileHoverSource = new VectorSource();
+            this._rasterProfileHoverLayer = new VectorLayer({
+                source: this._rasterProfileHoverSource,
                 style: new Style({
-                    stroke: new Stroke({ color: '#ff9800', width: 3 }),
                     image: new CircleStyle({
-                        radius: 4,
-                        fill: new Fill({ color: '#ff9800' }),
-                        stroke: new Stroke({ color: '#ffffff', width: 1.5 })
+                        radius: 6,
+                        fill: new Fill({ color: '#ff5722' }),
+                        stroke: new Stroke({ color: '#ffffff', width: 2 })
                     })
                 })
             });
-            this._rasterProfileLayer.setZIndex(2000);
-            this.map.addLayer(this._rasterProfileLayer);
+            // Above the measurement layer so the hover dot is always visible.
+            this._rasterProfileHoverLayer.setZIndex(2100);
+            this.map.addLayer(this._rasterProfileHoverLayer);
         },
 
         _stopRasterProfileDrawing() {
             if (this._rasterProfileDraw && this.map) {
+                try { this._rasterProfileDraw.setActive(false); } catch (e) { /* noop */ }
                 try { this._rasterProfileDraw.abortDrawing(); } catch (e) { /* noop */ }
                 try { this.map.removeInteraction(this._rasterProfileDraw); } catch (e) { /* noop */ }
             }
@@ -299,79 +374,98 @@ export default {
             }
         },
 
-        _clearRasterProfileLine() {
-            if (this._rasterProfileSource) this._rasterProfileSource.clear();
-            this._rasterProfileHoverFeature = null;
+        /**
+         * Build a static, hover-revealed tooltip overlay for a finalized
+         * profile feature. Mirrors the format used by length/area
+         * measurements in olMeasure.vue and `createStaticTooltip` in
+         * olMeasurementConverter.js so the visual style stays consistent.
+         */
+        _createProfileStaticTooltip(feature) {
+            if (!this.map || !feature) return;
+            const geom = feature.getGeometry();
+            if (!geom) return;
+            const tooltipText = feature.get('tooltipText') || '';
+            const name = feature.get('name');
+            const el = document.createElement('div');
+            el.className = 'ol-tooltip ol-tooltip-static ol-tooltip-hidden';
+            let content = '';
+            if (name) content += `<div class="ol-tooltip-name">${name}</div>`;
+            content += `<div class="ol-tooltip-value">${tooltipText}</div>`;
+            el.innerHTML = content;
+            const overlay = new Overlay({
+                element: el,
+                offset: [0, -7],
+                positioning: 'bottom-center',
+                stopEvent: false,
+                insertFirst: false
+            });
+            overlay.setPosition(geom.getLastCoordinate());
+            this.map.addOverlay(overlay);
+            feature.set('measureTooltipElement', el);
+            feature.set('measureTooltip', overlay);
         },
 
         /**
-         * Push the just-drawn profile line into the shared measurements layer
-         * (`this.measureControls.source`) so it appears in the Measurement List
-         * dialog and can be saved/exported alongside regular point/length/area
-         * measurements. The original feature stays in the analysis overlay
-         * (used for the hover marker on the profile chart).
+         * Listen for `removefeature` on the shared measurement source so the
+         * chart, hover dot, and tracked feature reference are cleared
+         * whenever the profile is removed externally - eraser tool,
+         * Measurement List "delete", "Clear All", or our own "Clear" button.
+         * Single source of truth, no double-bookkeeping.
          */
-        _addProfileToMeasurementsList(originalFeature, lonLatCoords) {
-            const controls = this.measureControls;
-            if (!controls || !controls.source) return null;
-            try {
-                const geom = originalFeature.getGeometry().clone();
-                const feature = new Feature({ geometry: geom });
-                // Compute length in meters for the tooltip.
-                let lengthM = 0;
-                try {
-                    // OL sphere getLength expects a geometry in EPSG:3857; the
-                    // cloned geometry already is.
-                    lengthM = olGetLength(geom);
-                } catch (e) { /* noop */ }
-                const lengthLabel = lengthM >= 1000
-                    ? `${(lengthM / 1000).toFixed(2)} km`
-                    : `${lengthM.toFixed(1)} m`;
-                feature.set('measurementType', 'profile');
-                feature.set('createdAt', new Date().toISOString());
-                feature.set('stroke', '#ff9800');
-                feature.set('stroke-width', 3);
-                feature.set('tooltipText', `Profile: ${lengthLabel}`);
-                feature.set('rasterFilePath', this.rasterFilePath);
-                feature.setStyle(controls.createFeatureStyle(feature));
-                controls.source.addFeature(feature);
-                if (typeof controls.updateButtonsVisibility === 'function') {
-                    controls.updateButtonsVisibility(true, false);
+        _setupRasterProfileMeasurementWatcher() {
+            if (this._rasterProfileSourceRemoveKey) return;
+            if (!this.measureControls || !this.measureControls.source) return;
+            this._rasterProfileSourceRemoveKey = this.measureControls.source.on(
+                'removefeature',
+                (evt) => {
+                    if (evt.feature && evt.feature === this._currentProfileFeature) {
+                        this._currentProfileFeature = null;
+                        this.rasterProfile = null;
+                        this.rasterProfileError = null;
+                        this._removeRasterProfileHoverMarker();
+                    }
                 }
-                this._lastProfileMeasurementFeature = feature;
-                return feature;
-            } catch (e) {
-                console.warn('[RasterAnalysis] Failed to add profile to measurements list:', e);
-                return null;
+            );
+        },
+
+        _tearDownRasterProfileMeasurementWatcher() {
+            if (this._rasterProfileSourceRemoveKey) {
+                try { unByKey(this._rasterProfileSourceRemoveKey); } catch (e) { /* noop */ }
+                this._rasterProfileSourceRemoveKey = null;
             }
+        },
+
+        _removeCurrentProfileFeature() {
+            if (!this._currentProfileFeature) return;
+            try {
+                if (this.measureControls && typeof this.measureControls.deleteMeasurement === 'function') {
+                    this.measureControls.deleteMeasurement(this._currentProfileFeature);
+                }
+            } catch (e) { /* noop */ }
+            // The removefeature watcher (if installed) will null out
+            // _currentProfileFeature; null defensively in case it isn't.
+            this._currentProfileFeature = null;
         },
 
         handleClearProfile() {
+            // Single path: removing the feature from the measurement source
+            // triggers _setupRasterProfileMeasurementWatcher which resets
+            // the chart, error, and hover dot. We only need the side-effect
+            // here for the case when no profile feature exists yet.
+            this._removeCurrentProfileFeature();
             this.rasterProfile = null;
             this.rasterProfileError = null;
-            this._clearRasterProfileLine();
-            // Also remove the profile entry from the shared measurements layer
-            // (so it disappears from the Measurement List dialog).
-            if (this._lastProfileMeasurementFeature && this.measureControls
-                && typeof this.measureControls.deleteMeasurement === 'function') {
-                try {
-                    // Track deletion so re-hydration logic skips it on next open.
-                    const id = this._lastProfileMeasurementFeature.get
-                        && this._lastProfileMeasurementFeature.get('id');
-                    if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
-                    this.measureControls.deleteMeasurement(this._lastProfileMeasurementFeature);
-                } catch (e) { /* noop */ }
-            }
-            this._lastProfileMeasurementFeature = null;
+            this._removeRasterProfileHoverMarker();
         },
 
         /**
-         * Cancel an in-progress draw and remove any partial line.
-         * Wired to the panel's "Stop drawing" button + ESC key.
+         * Cancel an in-progress draw. Wired to the panel's "Stop drawing"
+         * button + ESC key. The sketch feature is not yet committed to the
+         * measurement source by OL when we abort, so there is no measurement
+         * cleanup to do here.
          */
         cancelRasterProfileDrawing() {
             this._stopRasterProfileDrawing();
-            this._clearRasterProfileLine();
         },
 
         /**
@@ -387,29 +481,27 @@ export default {
             }
         },
 
+        _removeRasterProfileHoverMarker() {
+            if (this._rasterProfileHoverFeature && this._rasterProfileHoverSource) {
+                try { this._rasterProfileHoverSource.removeFeature(this._rasterProfileHoverFeature); }
+                catch (e) { /* noop */ }
+            }
+            this._rasterProfileHoverFeature = null;
+        },
+
         _renderRasterProfileHoverMarker(sample) {
-            if (!this.map || !this._rasterProfileSource) return;
+            if (!this.map) return;
             const valid = sample && typeof sample.lon === 'number' && typeof sample.lat === 'number';
             if (!valid) {
-                if (this._rasterProfileHoverFeature) {
-                    try { this._rasterProfileSource.removeFeature(this._rasterProfileHoverFeature); }
-                    catch (e) { /* noop */ }
-                    this._rasterProfileHoverFeature = null;
-                }
+                this._removeRasterProfileHoverMarker();
                 return;
             }
+            this._ensureRasterProfileHoverLayer();
             const mapProj = this.map.getView().getProjection();
             const coord = transform([sample.lon, sample.lat], 'EPSG:4326', mapProj);
             if (!this._rasterProfileHoverFeature) {
                 this._rasterProfileHoverFeature = new Feature({ geometry: new Point(coord) });
-                this._rasterProfileHoverFeature.setStyle(new Style({
-                    image: new CircleStyle({
-                        radius: 6,
-                        fill: new Fill({ color: '#ff5722' }),
-                        stroke: new Stroke({ color: '#ffffff', width: 2 })
-                    })
-                }));
-                this._rasterProfileSource.addFeature(this._rasterProfileHoverFeature);
+                this._rasterProfileHoverSource.addFeature(this._rasterProfileHoverFeature);
             } else {
                 this._rasterProfileHoverFeature.getGeometry().setCoordinates(coord);
             }

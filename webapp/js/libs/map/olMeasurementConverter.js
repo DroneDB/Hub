@@ -30,7 +30,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         'stroke', 'stroke-width', 'stroke-opacity',
         'fill', 'fill-opacity',
         // Stockpile metadata
-        'id', 'title', 'notes', 'material', 'materialDensity',
+        'id', 'title', 'material', 'materialDensity',
         'netVolume', 'cutVolume', 'fillVolume',
         'area2d', 'area3d', 'baseElevation', 'confidence',
         'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
@@ -105,7 +105,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
     // Stockpile features: persist all metadata fields without overwriting calculated values.
     if (measurementType === 'stockpile') {
         const stockpileFields = [
-            'id', 'title', 'notes', 'material', 'materialDensity',
+            'id', 'title', 'material', 'materialDensity',
             'netVolume', 'cutVolume', 'fillVolume',
             'area2d', 'area3d', 'baseElevation', 'confidence',
             'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
@@ -157,7 +157,7 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     // Restore stockpile-specific metadata so the panel can re-hydrate.
     if (props.measurementType === 'stockpile') {
         const stockpileFields = [
-            'id', 'title', 'notes', 'material', 'materialDensity',
+            'id', 'title', 'material', 'materialDensity',
             'netVolume', 'cutVolume', 'fillVolume',
             'area2d', 'area3d', 'baseElevation', 'confidence',
             'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
@@ -165,6 +165,13 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
         stockpileFields.forEach(k => {
             if (props[k] !== undefined && props[k] !== null) feature.set(k, props[k]);
         });
+        // Backwards compatibility: stockpiles persisted before the
+        // notes->description rename used a `notes` property. Mirror it
+        // into `description` so the panel surfaces the value, and so the
+        // next round-trip drops the legacy key.
+        if (!props.description && props.notes) {
+            feature.set('description', props.notes);
+        }
     }
 
     // Restore GeoJSON styling properties

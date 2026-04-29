@@ -101,7 +101,7 @@ export default {
             stockpileMode: null, // 'click' | 'draw' | null
             // User-editable identification of the saved pile.
             stockpileTitle: '',
-            stockpileNotes: '',
+            stockpileDescription: '',
             // Non-reactive OL refs (mutated directly).
             _stockpileLayer: null,
             _stockpileSource: null,
@@ -122,7 +122,7 @@ export default {
         // user types in the panel so the toolbar Save button captures the
         // latest title / notes / material without an extra "Apply" click.
         stockpileTitle() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileNotes() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
+        stockpileDescription() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
         stockpileMaterial() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
         stockpileCustomDensity() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); }
     },
@@ -140,7 +140,7 @@ export default {
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
             this.stockpileTitle = '';
-            this.stockpileNotes = '';
+            this.stockpileDescription = '';
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
             this._loadSavedStockpile();
         },
@@ -180,7 +180,14 @@ export default {
                 }
                 if (p.material) this.stockpileMaterial = p.material;
                 if (p.title) this.stockpileTitle = p.title;
-                if (p.notes) this.stockpileNotes = p.notes;
+                // `description` is the canonical key; `notes` is read for
+                // backwards compatibility with stockpiles saved before the
+                // rename and migrated into `description` on next save.
+                if (p.description) {
+                    this.stockpileDescription = p.description;
+                } else if (p.notes) {
+                    this.stockpileDescription = p.notes;
+                }
             } catch (e) {
                 console.warn('Could not restore saved stockpile:', e);
             }
@@ -195,6 +202,28 @@ export default {
             if (!id || !this.measureControls || !this.measureControls.source) return false;
             const features = this.measureControls.source.getFeatures();
             return features.some(f => f.get('measurementType') === 'stockpile' && f.get('id') === id);
+        },
+
+        /**
+         * Hook invoked by olMeasure (via Map.vue / SingleMap.vue) whenever a
+         * feature is removed from the shared measurement source. When the
+         * removed feature is the current stockpile draft (eraser tool, edit
+         * dialog Delete button, list-dialog delete, ...), reset the panel so
+         * the result fields, polygon reference and identification inputs no
+         * longer point to a feature that is gone from the map.
+         */
+        _onStockpileFeatureRemoved(feature) {
+            if (!feature || !feature.get) return;
+            if (feature.get('measurementType') !== 'stockpile') return;
+            const id = feature.get('id');
+            if (!id || id !== this._draftStockpileFeatureId) return;
+            this.stockpileResult = null;
+            this.stockpileDetectedPolygon = null;
+            this.stockpileError = null;
+            this.stockpileTitle = '';
+            this.stockpileDescription = '';
+            this._draftStockpileFeatureId = null;
+            this._clearStockpileOverlay();
         },
 
         closeStockpileVolume() {
@@ -241,11 +270,11 @@ export default {
             this.stockpileError = null;
             // Each new detection is an independent pile - detach from the
             // previous draft and reset the identification fields so the
-            // previously-typed title/notes don't bleed into the next adopted
+            // previously-typed title/description don't bleed into the next adopted
             // feature (and the watcher doesn't overwrite the previous pile).
             this._draftStockpileFeatureId = null;
             this.stockpileTitle = '';
-            this.stockpileNotes = '';
+            this.stockpileDescription = '';
             try {
                 const detection = await this.dataset.detectStockpile(this.rasterFilePath, lat, lon, {
                     radius: this.stockpileRadius,
@@ -297,11 +326,11 @@ export default {
             this.stockpileError = null;
             // Each new polygon is an independent pile - detach from the
             // previous draft and reset the identification fields so the
-            // previously-typed title/notes don't bleed into the next adopted
+            // previously-typed title/description don't bleed into the next adopted
             // feature (and the watcher doesn't overwrite the previous pile).
             this._draftStockpileFeatureId = null;
             this.stockpileTitle = '';
-            this.stockpileNotes = '';
+            this.stockpileDescription = '';
             try {
                 const volume = await this.dataset.calculateStockpileVolume(
                     this.rasterFilePath,
@@ -561,9 +590,9 @@ export default {
         _buildStockpileProperties() {
             const props = { material: this.stockpileMaterial || null };
             const title = (this.stockpileTitle || '').trim();
-            const notes = (this.stockpileNotes || '').trim();
+            const description = (this.stockpileDescription || '').trim();
             if (title) props.title = title;
-            if (notes) props.notes = notes;
+            if (description) props.description = description;
             // Resolve material density (preferred sources: predefined entry,
             // custom inline density, or backend-supplied weightEstimate).
             const mat = (this.stockpileMaterials || []).find(m => m && m.slug === this.stockpileMaterial);
@@ -601,7 +630,7 @@ export default {
             if (typeof p.netVolume === 'number') parts.push(`${p.netVolume.toFixed(1)} m³`);
             if (p.material && p.material !== CUSTOM_MATERIAL_SLUG) parts.push(p.material);
             if (p.materialDensity) parts.push(`${p.materialDensity} t/m³`);
-            return parts.join(' — ') || 'Stockpile';
+            return parts.join(' - ') || 'Stockpile';
         },
 
         /**
@@ -676,7 +705,7 @@ export default {
             if (!feature) return;
             const props = this._buildStockpileProperties();
             // Don't touch geometry/style props that were set at build time.
-            const updatable = ['name', 'title', 'notes', 'material', 'materialDensity',
+            const updatable = ['name', 'title', 'description', 'material', 'materialDensity',
                 'tooltipText', 'unitSystem', 'netVolume', 'cutVolume', 'fillVolume',
                 'area2d', 'area3d', 'baseElevation', 'confidence', 'weightEstimate', 'costEstimate'];
             updatable.forEach(k => {

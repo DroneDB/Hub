@@ -8,7 +8,7 @@
             :closable="!loading"
             :closeOnEscape="!loading">
 
-        <!-- Full-dialog loading overlay – teleported above the PrimeVue dialog z-index -->
+        <!-- Full-dialog loading overlay - teleported above the PrimeVue dialog z-index -->
         <Teleport to="body">
             <div v-if="loading && visible" class="contour-gen-overlay">
                 <div class="contour-gen-spinner">
@@ -220,7 +220,7 @@ export default {
 </script>
 
 <style>
-/* Global (not scoped) — the Teleport overlay renders outside this component's root */
+/* Global (not scoped) - the Teleport overlay renders outside this component's root */
 .contour-gen-overlay {
     position: fixed;
     inset: 0;
