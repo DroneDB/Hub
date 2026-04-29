@@ -10,7 +10,7 @@
                         <th>Name</th>
                         <th>Type</th>
                         <th>Value</th>
-                        <th style="width: 3rem"></th>
+                        <th style="width: 6rem"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -22,6 +22,9 @@
                         </td>
                         <td>{{ m.value || '-' }}</td>
                         <td>
+                            <button class="btn-edit-measurement" @click="$emit('editMeasurement', m)" title="Edit">
+                                <i class="fa-solid fa-pencil"></i>
+                            </button>
                             <button class="btn-delete-measurement" @click="confirmDelete(m)" title="Delete">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
@@ -50,7 +53,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 export default {
     components: { Window, Button, ConfirmDialog },
-    emits: ['onClose', 'deleteMeasurement'],
+    emits: ['onClose', 'deleteMeasurement', 'editMeasurement'],
     props: {
         measurements: {
             type: Array,
@@ -157,5 +160,20 @@ export default {
 
 .btn-delete-measurement:hover {
     background-color: rgba(220, 53, 69, 0.1);
+}
+
+.btn-edit-measurement {
+    background: none;
+    border: none;
+    color: var(--ddb-text, #495057);
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.85rem;
+    margin-right: 0.25rem;
+}
+
+.btn-edit-measurement:hover {
+    background-color: rgba(0, 0, 0, 0.06);
 }
 </style>

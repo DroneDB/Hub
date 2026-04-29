@@ -91,7 +91,8 @@
         <MeasurementListDialog v-if="measurementListDialogOpen"
             :measurements="measurementListItems"
             @onClose="measurementListDialogOpen = false"
-            @deleteMeasurement="handleDeleteMeasurementFromList" />
+            @deleteMeasurement="handleDeleteMeasurementFromList"
+            @editMeasurement="handleEditMeasurementFromList" />
         <Toast position="bottom-left" />
     </div>
 </template>

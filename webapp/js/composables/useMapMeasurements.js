@@ -192,6 +192,22 @@ export default {
             if (this.measurementListItems.length === 0) {
                 this.measurementListDialogOpen = false;
             }
+        },
+
+        /**
+         * Edit a measurement from the list dialog: close the list and open the
+         * properties dialog for the selected feature. Point annotations have a
+         * dedicated dialog flow (color + description) so route those there.
+         */
+        handleEditMeasurementFromList(item) {
+            if (!this.measureControls || !item || !item.feature) return;
+            this.measurementListDialogOpen = false;
+            const feature = item.feature;
+            if (feature.get('measurementType') === 'point') {
+                this.measureControls.openPointAnnotationDialog(feature, this.measureControls.getMap(), true);
+            } else {
+                this.measureControls.openPropertiesDialog(feature, { showDelete: true });
+            }
         }
     }
 };

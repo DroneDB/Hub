@@ -185,15 +185,18 @@ export default {
         }
     },
     mounted() {
-        // Load existing properties from feature
+        // Load existing properties from feature. Use `!== undefined` checks for
+        // numeric properties so a legitimate `0` value is preserved (would be
+        // overridden by the `||` fallback otherwise).
         if (this.feature) {
-            this.formData.name = this.feature.get('name') || '';
-            this.formData.description = this.feature.get('description') || '';
-            this.formData.stroke = this.feature.get('stroke') || '#ffcc33';
-            this.formData['stroke-width'] = this.feature.get('stroke-width') || 2;
-            this.formData['stroke-opacity'] = this.feature.get('stroke-opacity') || 1;
-            this.formData.fill = this.feature.get('fill') || '#ffcc33';
-            this.formData['fill-opacity'] = this.feature.get('fill-opacity') || 0.2;
+            const get = (k) => this.feature.get(k);
+            this.formData.name = get('name') || '';
+            this.formData.description = get('description') || '';
+            this.formData.stroke = get('stroke') || '#ffcc33';
+            this.formData['stroke-width'] = get('stroke-width') !== undefined ? get('stroke-width') : 2;
+            this.formData['stroke-opacity'] = get('stroke-opacity') !== undefined ? get('stroke-opacity') : 1;
+            this.formData.fill = get('fill') || '#ffcc33';
+            this.formData['fill-opacity'] = get('fill-opacity') !== undefined ? get('fill-opacity') : 0.2;
         }
     },
     methods: {

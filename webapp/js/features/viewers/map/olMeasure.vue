@@ -1167,8 +1167,13 @@ class MeasureControls extends Control {
                 // Update tooltip with new name
                 updateFeatureTooltip(feature);
 
-                // Trigger re-render for style changes
+                // Trigger re-render for style changes. We invalidate both the
+                // feature and the vector layer: setting the same value via
+                // feature.set() is a no-op for OL (no propertychange fires),
+                // so when only fill-opacity moves while fill stays at the
+                // default color the layer can otherwise miss the redraw.
                 feature.changed();
+                if (this.vector) this.vector.changed();
             },
             onOnDelete: () => {
                 this.deleteMeasurement(feature);

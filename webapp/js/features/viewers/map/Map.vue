@@ -91,7 +91,8 @@
         <MeasurementListDialog v-if="measurementListDialogOpen"
             :measurements="measurementListItems"
             @onClose="measurementListDialogOpen = false"
-            @deleteMeasurement="handleDeleteMeasurementFromList" />
+            @deleteMeasurement="handleDeleteMeasurementFromList"
+            @editMeasurement="handleEditMeasurementFromList" />
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
             :basemaps="basemaps"
             :selectedBasemap="selectedBasemap"
