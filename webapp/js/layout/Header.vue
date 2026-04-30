@@ -4,7 +4,7 @@
             <img v-if="appLogo" :src="appLogo">
             <template v-else>
                 <i class="app-icon" :class="appIcon" />
-                <div class="app-name">{{ appName }}</div>
+                <div v-if="appName" class="app-name">{{ appName }}</div>
             </template>
         </a>
 
@@ -186,7 +186,12 @@ export default {
         },
 
         appLogo: function () {
-            return HubOptions.appLogo;
+            // Fall back to the bundled logo-banner so a Hub with no
+            // HubOptions (or HubOptions removed from appsettings.json) still
+            // shows the default DroneDB banner instead of nothing.
+            return HubOptions.appLogo !== undefined
+                ? HubOptions.appLogo
+                : "/images/logo-banner.svg";
         },
         appIcon: function () {
             return (HubOptions.appIcon === "dronedb" || HubOptions.appIcon === undefined) ?
@@ -194,7 +199,10 @@ export default {
                 `icon ${HubOptions.appIcon}`;
         },
         appName: function () {
-            return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+            // No hardcoded fallback: when AppName is not configured the
+            // logo banner alone is shown (the banner already carries the
+            // wordmark).
+            return HubOptions.appName !== undefined ? HubOptions.appName : null;
         },
         downloadConfirmMessage: function () {
             if (this.selectedFiles.length > 0) {
