@@ -46,7 +46,6 @@ window.addEventListener('load', function () {
             try {
                 await reg.refreshToken();
                 reg.setAutoRefreshToken();
-                await reg.loadFeatures();
             } catch (e) {
                 console.log(e.message);
                 if (e.status === 401) {
@@ -55,6 +54,16 @@ window.addEventListener('load', function () {
             }
         } else {
             reg.clearCredentials();
+        }
+
+        // Always load features (the endpoint is anonymous): this populates
+        // feature flags AND applies Hub branding (window.HubOptions, page
+        // title, favicon links) so the Login page renders the configured
+        // logo / app name as well.
+        try {
+            await reg.loadFeatures();
+        } catch (e) {
+            console.log(e.message);
         }
 
         const app = createApp({
