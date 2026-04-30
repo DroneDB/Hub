@@ -3,7 +3,8 @@
         <a :href="homeUrl" class="logo">
             <img v-if="appLogo" :src="appLogo">
             <template v-else>
-                <i class="app-icon" :class="appIcon" />
+                <img v-if="appIconUrl" class="app-icon-img" :src="appIconUrl">
+                <i v-else class="app-icon" :class="appIcon" />
                 <div v-if="appName" class="app-name">{{ appName }}</div>
             </template>
         </a>
@@ -186,17 +187,30 @@ export default {
         },
 
         appLogo: function () {
-            // Fall back to the bundled logo-banner so a Hub with no
-            // HubOptions (or HubOptions removed from appsettings.json) still
-            // shows the default DroneDB banner instead of nothing.
-            return HubOptions.appLogo !== undefined
-                ? HubOptions.appLogo
-                : "/images/logo-banner.svg";
+            // Honour an explicit AppLogo when configured.
+            if (HubOptions.appLogo !== undefined) return HubOptions.appLogo;
+
+            // Otherwise, fall back to the bundled logo-banner ONLY when no
+            // other branding is configured. If the operator has set AppIcon
+            // and/or AppName, render those via the v-else template instead.
+            if (HubOptions.appIcon === undefined && HubOptions.appName === undefined) {
+                return "/images/logo-banner.svg";
+            }
+            return null;
         },
         appIcon: function () {
             return (HubOptions.appIcon === "dronedb" || HubOptions.appIcon === undefined) ?
                 "icon-dronedb" :
                 `icon ${HubOptions.appIcon}`;
+        },
+        appIconUrl: function () {
+            // When AppIcon is a URL or absolute/relative path (starts with
+            // "/", "http://", "https://" or "data:"), render it as an <img>
+            // instead of treating it as a CSS icon class.
+            const v = HubOptions.appIcon;
+            if (typeof v !== "string") return null;
+            if (/^(https?:|data:|\/)/.test(v)) return v;
+            return null;
         },
         appName: function () {
             // No hardcoded fallback: when AppName is not configured the
@@ -452,6 +466,7 @@ export default {
     .logo {
         display: flex;
         align-items: center;
+        text-decoration: none;
 
         &>img {
             height: 2rem;
@@ -459,6 +474,11 @@ export default {
 
         .app-icon {
             font-size: var(--ddb-font-size-lg);
+        }
+
+        .app-icon-img {
+            height: 2rem;
+            margin-right: 0.5rem;
         }
 
         .app-name {

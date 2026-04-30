@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg id="svg2399" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 383.64 51.43">
+<svg id="svg2399" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 383.64 51.43">
   <defs>
     <style>
       .st0 {
@@ -30,17 +30,16 @@
         fill: #00bbe0;
       }
     </style>
-    <linearGradient id="Sfumatura_senza_nome" data-name="Sfumatura senza nome" x1="-373.8" y1="281.85" x2="-344" y2="265.76" gradientTransform="translate(1275.6 756.48) scale(2.62 -2.62)" gradientUnits="userSpaceOnUse">
+    <linearGradient id="Sfumatura_senza_nome" x1="-373.8" y1="281.85" x2="-344" y2="265.76" gradientTransform="translate(1275.6 756.48) scale(2.62 -2.62)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#00bbe0"/>
       <stop offset="1" stop-color="#0025e0"/>
     </linearGradient>
-    <linearGradient id="Sfumatura_senza_nome_2" data-name="Sfumatura senza nome 2" x1="-369.7" y1="289.43" x2="-339.91" y2="273.34" gradientTransform="translate(1275.6 756.48) scale(2.62 -2.62)" gradientUnits="userSpaceOnUse">
+    <linearGradient id="Sfumatura_senza_nome_2" x1="-369.7" y1="289.43" x2="-339.91" y2="273.34" gradientTransform="translate(1275.6 756.48) scale(2.62 -2.62)" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#00bbe0"/>
       <stop offset="1" stop-color="#0025e0"/>
     </linearGradient>
-  </defs>
-  <sodipodi:namedview id="base" bordercolor="#666666" borderopacity="1.0" fit-margin-bottom="5" fit-margin-left="5" fit-margin-right="5" fit-margin-top="5" inkscape:current-layer="layer1" inkscape:cx="-1.036378" inkscape:cy="-48.856135" inkscape:document-rotation="0" inkscape:document-units="mm" inkscape:pageopacity="0.0" inkscape:pageshadow="2" inkscape:window-height="1005" inkscape:window-maximized="1" inkscape:window-width="1920" inkscape:window-x="0" inkscape:window-y="37" inkscape:zoom="0.89812355" pagecolor="#ffffff" showgrid="false" units="px"/>
-  <g id="layer1" inkscape:groupmode="layer" inkscape:label="Layer 1">
+  </defs>  
+  <g id="layer1">
     <g id="g2369">
       <g id="g1606">
         <g id="text1604">
