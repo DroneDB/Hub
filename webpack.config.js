@@ -6,6 +6,7 @@ const TerserPlugin = require('terser-webpack-plugin');
 const webpack = require('webpack');
 const path = require('path');
 
+const pkg = require('./package.json');
 const isProduction = process.env.NODE_ENV === 'production';
 
 module.exports = {
@@ -137,6 +138,7 @@ module.exports = {
             __VUE_PROD_DEVTOOLS__: false,
             __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
             __APP_PRODUCTION__: JSON.stringify(isProduction),
+            __HUB_VERSION__: JSON.stringify(pkg.version),
         }),
         new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
             resource.request = resource.request.replace(/polyfills\/node\//, `polyfills\/web\/`);

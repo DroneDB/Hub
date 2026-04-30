@@ -27,6 +27,11 @@ import { createAppRouter } from './router';
 
 import reg from '@/libs/api/sharedRegistry';
 import { queryParams, inIframe } from '@/libs/utils';
+import {
+    checkAndHandleUpdate,
+    consumePendingUpdateNotice
+} from '@/libs/hubUpdateChecker';
+import HubUpdateNoticeDialog from '@/components/HubUpdateNoticeDialog.vue';
 
 /* global __APP_PRODUCTION__ */
 const isProduction = typeof __APP_PRODUCTION__ !== 'undefined' ? __APP_PRODUCTION__ : true;
@@ -60,14 +65,57 @@ window.addEventListener('load', function () {
         // feature flags AND applies Hub branding (window.HubOptions, page
         // title, favicon links) so the Login page renders the configured
         // logo / app name as well.
+        let features = null;
         try {
-            await reg.loadFeatures();
+            features = await reg.loadFeatures();
         } catch (e) {
             console.log(e.message);
         }
 
+        // Detect a server-side Hub upgrade/downgrade. If the version on the
+        // server differs from the bundle's __HUB_VERSION__, persist a notice
+        // and force a hard reload (server already sets Cache-Control: no-cache
+        // on index.html, so the new build is fetched). Skipped in embed mode
+        // and in development.
+        if (
+            checkAndHandleUpdate(features ? features.hubVersion : null, {
+                isEmbed: embed,
+                isProduction
+            })
+        ) {
+            // A reload is in progress: stop the bootstrap to avoid mounting
+            // the SPA against a soon-to-be-replaced document.
+            return;
+        }
+
+        // If the previous session triggered a reload because of an update,
+        // surface a one-shot dialog now (versions match again at this point).
+        const updateNotice = consumePendingUpdateNotice();
+
         const app = createApp({
-            template: '<router-view name="header" /><router-view name="content" />'
+            components: { HubUpdateNoticeDialog },
+            data() {
+                return {
+                    hubUpdateNotice: updateNotice,
+                    hubVersion: features ? features.hubVersion : null,
+                    registryVersion: features ? features.registryVersion : null,
+                    ddbVersion: features ? features.ddbVersion : null
+                };
+            },
+            methods: {
+                onHubUpdateDismissed() {
+                    this.hubUpdateNotice = null;
+                }
+            },
+            template:
+                '<router-view name="header" />' +
+                '<router-view name="content" />' +
+                '<HubUpdateNoticeDialog v-if="hubUpdateNotice"' +
+                '   :notice="hubUpdateNotice"' +
+                '   :hub-version="hubVersion"' +
+                '   :registry-version="registryVersion"' +
+                '   :ddb-version="ddbVersion"' +
+                '   @close="onHubUpdateDismissed" />'
         });
 
         app.use(router);
