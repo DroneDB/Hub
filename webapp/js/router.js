@@ -20,23 +20,28 @@ const Markdown = () => import(/* webpackChunkName: "markdown" */ '@/features/vie
 import Header from '@/layout/Header.vue';
 
 export function createAppRouter(embed = false) {
-    const hdr = embed ? null : Header;
+    // Build the named-views map. In embed mode we OMIT the `header` key
+    // entirely instead of setting it to null: vue-router 4.6+ treats any
+    // non-null object value as a route component and tries to access
+    // `__vccOpts` on it, which throws on null and breaks navigation
+    // (TypeError: Cannot read properties of null (reading '__vccOpts')).
+    const viewsFor = (content) => embed ? { content } : { content, header: Header };
 
     const routes = [
-        { path: '/r/:org/:ds', name: 'ViewDataset', components: { content: ViewDataset, header: hdr }, meta: { title: 'View Dataset' } },
-        { path: '/r/:org/:ds/view/:encodedPath/map', name: 'SingleMap', components: { content: SingleMap, header: hdr }, meta: { title: 'Map' } },
-        { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: 'PointCloud', components: { content: Potree, header: hdr }, meta: { title: 'Point Cloud' } },
-        { path: '/r/:org/:ds/view/:encodedPath/markdown', name: 'Markdown', components: { content: Markdown, header: hdr }, meta: { title: 'Markdown' } },
-        { path: '/r/:org/:ds/view/:encodedPath/model', name: 'Model', components: { content: Nexus, header: hdr }, meta: { title: 'Model' } },
-        { path: '/r/:org/:ds/view/:encodedPath/panorama', name: 'Panorama', components: { content: Panorama, header: hdr }, meta: { title: 'Panorama' } },
-        { path: '/login', name: 'Login', components: { content: Login, header: hdr }, meta: { title: 'Login' } },
-        { path: '/r/:org', name: 'Datasets', components: { content: Datasets, header: hdr }, meta: { title: 'Datasets' } },
-        { path: '/r', name: 'Organizations', components: { content: Organizations, header: hdr }, meta: { title: 'Organizations' } },
-        { path: '/upload', name: 'Upload', components: { content: Upload, header: hdr }, meta: { title: 'Upload' } },
-        { path: '/admin/users', name: 'Users', components: { content: Users, header: hdr }, meta: { title: 'Users' } },
-        { path: '/account', name: 'Account', components: { content: Account, header: hdr }, meta: { title: 'Account' } },
-        { path: '/', name: 'LoginHome', components: { content: Login, header: hdr }, meta: { title: 'Login' } },
-        { path: '/:pathMatch(.*)*', name: 'NotFound', components: { content: NotFound, header: hdr }, meta: { title: 'Not Found' } }
+        { path: '/r/:org/:ds', name: 'ViewDataset', components: viewsFor(ViewDataset), meta: { title: 'View Dataset' } },
+        { path: '/r/:org/:ds/view/:encodedPath/map', name: 'SingleMap', components: viewsFor(SingleMap), meta: { title: 'Map' } },
+        { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: 'PointCloud', components: viewsFor(Potree), meta: { title: 'Point Cloud' } },
+        { path: '/r/:org/:ds/view/:encodedPath/markdown', name: 'Markdown', components: viewsFor(Markdown), meta: { title: 'Markdown' } },
+        { path: '/r/:org/:ds/view/:encodedPath/model', name: 'Model', components: viewsFor(Nexus), meta: { title: 'Model' } },
+        { path: '/r/:org/:ds/view/:encodedPath/panorama', name: 'Panorama', components: viewsFor(Panorama), meta: { title: 'Panorama' } },
+        { path: '/login', name: 'Login', components: viewsFor(Login), meta: { title: 'Login' } },
+        { path: '/r/:org', name: 'Datasets', components: viewsFor(Datasets), meta: { title: 'Datasets' } },
+        { path: '/r', name: 'Organizations', components: viewsFor(Organizations), meta: { title: 'Organizations' } },
+        { path: '/upload', name: 'Upload', components: viewsFor(Upload), meta: { title: 'Upload' } },
+        { path: '/admin/users', name: 'Users', components: viewsFor(Users), meta: { title: 'Users' } },
+        { path: '/account', name: 'Account', components: viewsFor(Account), meta: { title: 'Account' } },
+        { path: '/', name: 'LoginHome', components: viewsFor(Login), meta: { title: 'Login' } },
+        { path: '/:pathMatch(.*)*', name: 'NotFound', components: viewsFor(NotFound), meta: { title: 'Not Found' } }
     ];
 
     const router = createRouter({
