@@ -43,13 +43,13 @@
         }
     </style>
     <script>
-        window.HubOptions = {
+        // HubOptions is populated at runtime by hubBranding.js after /sys/features
+        // resolves. We seed it with safe defaults here so legacy components reading
+        // window.HubOptions before bootstrap completes don't crash.
+        window.HubOptions = Object.freeze({
             appLogo: "/images/logo-banner.svg",
-            // Set to false for self-hosted instances to hide the registration link
             showRegistrationLink: true
-            // #HUB OPTIONS#
-        };
-        if (Object.freeze) Object.freeze(window.HubOptions);
+        });
     </script>
 </head>
 

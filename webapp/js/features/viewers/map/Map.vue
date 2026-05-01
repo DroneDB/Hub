@@ -108,7 +108,7 @@
                 <span class="image-popup-title">{{ imagePopupFileName }}</span>
                 <div class="image-popup-actions">
                     <a :href="imagePopupOpenUrl" target="_blank" class="image-popup-btn" title="Open in new tab">
-                        <i style="margin: 0; height: auto" class="icon external alternate"></i>
+                        <i style="margin: 0; height: auto" class="fa-solid fa-image"></i>
                     </a>
                     <a :href="imagePopupDownloadUrl" download class="image-popup-btn" title="Download">
                         <i style="margin: 0; height: auto" class="fa-solid fa-download"></i>

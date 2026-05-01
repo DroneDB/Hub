@@ -14,6 +14,7 @@
 
 const Organization = require('./organization');
 const { DEFAULT_REGISTRY } = require('./constants');
+const { applyHubBranding } = require('../hubBranding');
 
 let refreshTimers = {};
 
@@ -385,6 +386,15 @@ module.exports = class Registry {
             console.error('Failed to load features:', e);
             this._features = {};
         }
+
+        // Apply Hub branding (window.HubOptions, document title, favicon links).
+        // The features endpoint is anonymous, so this works pre-login too.
+        try {
+            applyHubBranding(this._features ? this._features.hubOptions : null);
+        } catch (e) {
+            console.error('Failed to apply Hub branding:', e);
+        }
+
         return this._features;
     }
 

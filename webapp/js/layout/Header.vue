@@ -3,8 +3,9 @@
         <a :href="homeUrl" class="logo">
             <img v-if="appLogo" :src="appLogo">
             <template v-else>
-                <i class="app-icon" :class="appIcon" />
-                <div class="app-name">{{ appName }}</div>
+                <img v-if="appIconUrl" class="app-icon-img" :src="appIconUrl">
+                <i v-else class="app-icon" :class="appIcon" />
+                <div v-if="appName" class="app-name">{{ appName }}</div>
             </template>
         </a>
 
@@ -186,15 +187,36 @@ export default {
         },
 
         appLogo: function () {
-            return HubOptions.appLogo;
+            // Honour an explicit AppLogo when configured.
+            if (HubOptions.appLogo !== undefined) return HubOptions.appLogo;
+
+            // Otherwise, fall back to the bundled logo-banner ONLY when no
+            // other branding is configured. If the operator has set AppIcon
+            // and/or AppName, render those via the v-else template instead.
+            if (HubOptions.appIcon === undefined && HubOptions.appName === undefined) {
+                return "/images/logo-banner.svg";
+            }
+            return null;
         },
         appIcon: function () {
             return (HubOptions.appIcon === "dronedb" || HubOptions.appIcon === undefined) ?
                 "icon-dronedb" :
                 `icon ${HubOptions.appIcon}`;
         },
+        appIconUrl: function () {
+            // When AppIcon is a URL or absolute/relative path (starts with
+            // "/", "http://", "https://" or "data:"), render it as an <img>
+            // instead of treating it as a CSS icon class.
+            const v = HubOptions.appIcon;
+            if (typeof v !== "string") return null;
+            if (/^(https?:|data:|\/)/.test(v)) return v;
+            return null;
+        },
         appName: function () {
-            return HubOptions.appName !== undefined ? HubOptions.appName : "DroneDB";
+            // No hardcoded fallback: when AppName is not configured the
+            // logo banner alone is shown (the banner already carries the
+            // wordmark).
+            return HubOptions.appName !== undefined ? HubOptions.appName : null;
         },
         downloadConfirmMessage: function () {
             if (this.selectedFiles.length > 0) {
@@ -444,6 +466,7 @@ export default {
     .logo {
         display: flex;
         align-items: center;
+        text-decoration: none;
 
         &>img {
             height: 2rem;
@@ -451,6 +474,11 @@ export default {
 
         .app-icon {
             font-size: var(--ddb-font-size-lg);
+        }
+
+        .app-icon-img {
+            height: 2rem;
+            margin-right: 0.5rem;
         }
 
         .app-name {
