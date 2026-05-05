@@ -116,7 +116,7 @@ export default {
             this.needsAuth = (await dataset.getVisibility()) === ddb.Visibility.PRIVATE;
             const entry = dataset.Entry(this.file.entry);
 
-            if (entry.type === ddb.entry.type.POINTCLOUD) this.buildUrl = await entry.getEpt();
+            if (entry.type === ddb.entry.type.POINTCLOUD) this.buildUrl = await entry.getCopc();
             else if (entry.type === ddb.entry.type.GEORASTER) this.buildUrl = await entry.getCog();
             else if (entry.type === ddb.entry.type.VECTOR) this.buildUrl = await entry.getVector();
 

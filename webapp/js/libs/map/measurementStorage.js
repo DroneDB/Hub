@@ -33,19 +33,37 @@ export class MeasurementStorage {
     }
 
     /**
+     * Default set of measurement types considered "owned" by olMeasure (2D map
+     * viewer). When saving, features with these `measurementType` values are
+     * replaced by the incoming GeoJSON; all others are preserved verbatim
+     * (e.g. stockpiles or 3D viewer measurements).
+     */
+    static OL_MEASURE_OWNED_TYPES = Object.freeze(['point', 'length', 'area']);
+
+    /**
+     * Set of measurement types considered "owned" by the Potree (3D point
+     * cloud) viewer.
+     */
+    static POTREE_OWNED_TYPES = Object.freeze(['point', 'distance', 'area', 'height', 'circle', 'angle', 'annotation']);
+
+    /**
      * Save measurements as GeoJSON file.
      *
-     * Foreign feature types (stockpiles or anything written by other DroneDB
-     * subsystems into the same file) are preserved verbatim - we only replace
-     * features whose `measurementType` is one of the regular 2D types managed
-     * by olMeasure.
+     * Foreign feature types (anything written by other DroneDB subsystems
+     * into the same file) are preserved verbatim - we only replace features
+     * whose `measurementType` is in `ownedTypes`. Defaults to the 2D
+     * olMeasure types for backward compatibility; callers from the 3D
+     * Potree viewer must pass `POTREE_OWNED_TYPES`.
      *
-     * @param {Object} geojsonData - GeoJSON FeatureCollection from olMeasure.
+     * @param {Object} geojsonData - GeoJSON FeatureCollection from the caller.
+     * @param {Object} [options]
+     * @param {Iterable<string>} [options.ownedTypes] - measurementType values
+     *   the caller fully owns and intends to overwrite.
      * @returns {Promise<{path: string, fileName: string}>} Storage path info.
      */
-    async save(geojsonData) {
+    async save(geojsonData, options = {}) {
         try {
-            const ownedTypes = new Set(['point', 'length', 'area']);
+            const ownedTypes = new Set(options.ownedTypes || MeasurementStorage.OL_MEASURE_OWNED_TYPES);
             // Read the existing file (if any) and keep all foreign features.
             let foreign = [];
             try {

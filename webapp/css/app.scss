@@ -321,3 +321,7 @@ body:fullscreen {
 .p-dialog-header {
     cursor: move;
 }
+
+#sidebar_header, #potree_version_number {
+    display: none !important;
+}

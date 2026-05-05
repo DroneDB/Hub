@@ -886,7 +886,7 @@ export default {
 
                 this.loading = true;
 
-                await loadResources("/potree/build/potree/potree.isolated.min.css");
+                await loadResources("/potree/build/potree/potree.css");
                 await loadResources("/potree/libs/jquery-ui/jquery-ui.min.css");
                 await loadResources("/potree/libs/spectrum/spectrum.css");
                 await loadResources("/potree/libs/jstree/themes/mixed/style.css");
@@ -902,6 +902,7 @@ export default {
                 await loadResources("/potree/libs/i18next/i18next.js");
                 await loadResources("/potree/libs/jstree/jstree.js");
                 await loadResources("/potree/build/potree/potree.js");
+                await loadResources("/potree/libs/copc/index.js");
                 await loadResources("/potree/libs/plasio/js/laslaz.js");
 
                 await this.loadViewer();
@@ -1011,14 +1012,14 @@ export default {
         addPointCloud: async function (entry) {
             return new Promise(async (resolve, reject) => {
                 try {
-                    const eptUrl = await entry.getEpt();
+                    const copcUrl = await entry.getCopc();
                     const basename = ddb.pathutils.basename(entry.path);
 
                     // Load coordinate system
-                    this.coordinateSystem = await this.getCoordinateSystem(eptUrl);
+                    this.coordinateSystem = await this.getCoordinateSystem(copcUrl);
                     console.log('Coordinate system:', this.coordinateSystem);
 
-                    Potree.loadPointCloud(eptUrl, basename, e => {
+                    Potree.loadPointCloud(copcUrl, basename, e => {
                         if (e.type == "loading_failed") {
                             reject(new Error(`Unable to load ${entry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
                             return;
@@ -1036,21 +1037,30 @@ export default {
         },
 
         /**
-         * Load the coordinate system from EPT
+         * Load the coordinate system from a COPC file by reading its header via copc.js
          */
-        getCoordinateSystem: async function(eptUrl) {
+        getCoordinateSystem: async function(copcUrl) {
             try {
-                const response = await fetch(eptUrl);
-                const eptJson = await response.json();
+                const { Copc, Getter } = window.Copc;
+                const getter = Getter.http(copcUrl);
+                const copc = await Copc.create(getter);
+
+                // copc.header has scale/offset; copc.info has cube/gpsTimeRange; wkt comes from copc.wkt
+                const header = copc.header || {};
+                const info = copc.info || {};
+                const cube = info.cube; // [minX, minY, minZ, maxX, maxY, maxZ]
+                const bounds = cube
+                    ? { minx: cube[0], miny: cube[1], minz: cube[2], maxx: cube[3], maxy: cube[4], maxz: cube[5] }
+                    : null;
 
                 return {
-                    srs: eptJson.srs || eptJson.srs?.wkt || null,
-                    scale: eptJson.scale || [1, 1, 1],
-                    offset: eptJson.offset || [0, 0, 0],
-                    bounds: eptJson.bounds || eptJson.boundsConforming
+                    srs: copc.wkt || null,
+                    scale: header.scale ? [header.scale[0], header.scale[1], header.scale[2]] : [1, 1, 1],
+                    offset: header.offset ? [header.offset[0], header.offset[1], header.offset[2]] : [0, 0, 0],
+                    bounds: bounds
                 };
             } catch (e) {
-                console.warn('Could not load coordinate system:', e);
+                console.warn('Could not load coordinate system from COPC:', e);
                 // Fallback
                 return {
                     srs: null,
@@ -1147,7 +1157,9 @@ export default {
                     this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
                 }
 
-                await this.measurementStorage.save(geojson);
+                await this.measurementStorage.save(geojson, {
+                    ownedTypes: MeasurementStorage.POTREE_OWNED_TYPES
+                });
 
                 this.hasSavedMeasurements = true;
 
@@ -1375,14 +1387,21 @@ export default {
         activateDeleteTool: function() {
             if (!this.viewer || !this.viewer.renderer) return;
 
+            // Cancel any active Potree insertion (ruler, profile, clipping, etc.)
+            this.viewer.dispatchEvent({ type: 'cancel_insertions' });
+
             this.deleteToolActive = true;
             const renderer = this.viewer.renderer;
 
             // Change cursor to indicate delete mode
             renderer.domElement.style.cursor = 'crosshair';
 
-            // Create click handler
+            // Deactivate when any other Potree tool starts
             const self = this;
+            this.cancelInsertionsHandler = () => self.deactivateDeleteTool();
+            this.viewer.addEventListener('cancel_insertions', this.cancelInsertionsHandler);
+
+            // Create click handler
             this.deleteClickHandler = (event) => {
                 // Prevent if right-click
                 if (event.button !== 0) return;
@@ -1434,6 +1453,12 @@ export default {
             if (this.deleteKeyHandler) {
                 document.removeEventListener('keydown', this.deleteKeyHandler);
                 this.deleteKeyHandler = null;
+            }
+
+            // Remove cancel_insertions listener
+            if (this.cancelInsertionsHandler) {
+                this.viewer.removeEventListener('cancel_insertions', this.cancelInsertionsHandler);
+                this.cancelInsertionsHandler = null;
             }
 
             // Reset Potree toolbar icon state

@@ -10,8 +10,8 @@ import BuildManager from '@/libs/build/buildManager';
 
 // Mapping between viewer type and required output file
 const VIEW_OUTPUT_FILES = {
-    'pointcloud': 'ept/ept.json',
-    'map-pointcloud': 'ept/ept.json',
+    'pointcloud': 'copc/cloud.copc.laz',
+    'map-pointcloud': 'copc/cloud.copc.laz',
     'map-georaster': 'cog/cog.tif',
     'map-vector': 'vec/vector.fgb',
     'model': 'nxs/model.nxz',

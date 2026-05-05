@@ -16,11 +16,11 @@ class Entry {
         return url;
     }
 
-    async getEpt() {
-        const eptUrl = this.buildUrl("ept/ept.json");
+    async getCopc() {
+        const copcUrl = this.buildUrl("copc/cloud.copc.laz");
 
-        if (await this.dataset.registry.headRequest(eptUrl)) return eptUrl;
-        else throw new Error(`Il file EPT non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+        if (await this.dataset.registry.headRequest(copcUrl)) return copcUrl;
+        else throw new Error(`Il file COPC non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
     }
 
     async getCog() {
