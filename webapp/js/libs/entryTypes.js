@@ -8,6 +8,7 @@ const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
 const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
 const THUMBNAIL_CANDIDATE_TYPES = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER];
+const VIDEO_TYPES = [ddb.entry.type.VIDEO, ddb.entry.type.GEOVIDEO];
 
 // Helper functions
 function hasDedicatedViewer(type) {
@@ -20,6 +21,10 @@ function isMapViewable(type) {
 
 function isPanoramaType(type) {
     return PANORAMA_TYPES.includes(type);
+}
+
+function isVideoType(type) {
+    return VIDEO_TYPES.includes(type);
 }
 
 function isThumbnailCandidate(type) {
@@ -96,10 +101,12 @@ export {
     MAP_VIEWABLE_TYPES,
     PANORAMA_TYPES,
     THUMBNAIL_CANDIDATE_TYPES,
+    VIDEO_TYPES,
     TYPE_DISPLAY_NAMES,
     hasDedicatedViewer,
     isMapViewable,
     isPanoramaType,
+    isVideoType,
     isThumbnailCandidate,
     isDroneDB,
     isPlantHealthCapable,

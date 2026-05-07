@@ -213,6 +213,8 @@
                 <i class="fa-solid fa-arrows-up-down me-1"></i>{{ lightboxCurrentEntry.altitude }} m
             </div>
         </div>
+        <VideoLightbox :visible="videoLightboxVisible" :src="videoLightboxSrc" :entry="videoLightboxEntry"
+            @close="closeVideoLightbox" />
     </div>
 </template>
 
@@ -250,6 +252,7 @@ import TextEditorDialog from './dialogs/TextEditorDialog.vue';
 import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
 import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
 import FsLightbox from 'fslightbox-vue';
+import VideoLightbox from './VideoLightbox.vue';
 
 import emitter from '@/libs/eventBus';
 import icons from '@/libs/icons';
@@ -310,7 +313,8 @@ export default {
         TextEditorDialog,
         PdfViewerDialog,
         MergeMultispectralDialog,
-        FsLightbox
+        FsLightbox,
+        VideoLightbox
     },
     data: function () {
         const mobile = isMobile();
@@ -397,6 +401,11 @@ export default {
             lightboxCurrentSlide: 1,
             lightboxKey: 0,
 
+            // Video lightbox
+            videoLightboxVisible: false,
+            videoLightboxSrc: '',
+            videoLightboxEntry: null,
+
             // Helper references for mixins
             icons: icons,
             pathutils: pathutils,
@@ -441,7 +450,11 @@ export default {
         // Single rich move handler shared by Explorer / TableView / TreeNode.
         // Lives in useFileOperations mixin (this.handleMoveItem). The dnd mixin
         // dispatches `moveItem` on the event bus; we route every emission to it.
-        this._onMoveItemBus = (sourceItem, destItem) => this.handleMoveItem(sourceItem, destItem);
+        this._onMoveItemBus = (payload) => {
+            // Payload shape: { source, dest } (mitt forwards only one arg).
+            if (!payload) return;
+            this.handleMoveItem(payload.source, payload.dest);
+        };
 
         emitter.on('openSettings', this._onOpenSettings);
         emitter.on('downloadLimitReached', this._onDownloadLimitReached);
@@ -726,6 +739,8 @@ export default {
                 const entryType = node.entry.type;
                 if (entryType === ddb.entry.type.IMAGE || entryType === ddb.entry.type.GEOIMAGE) {
                     this.openImageLightbox(node);
+                } else if (entryType === ddb.entry.type.VIDEO || entryType === ddb.entry.type.GEOVIDEO) {
+                    this.openVideoLightbox(node);
                 } else {
                     shell.openItem(node.path);
                 }
@@ -797,6 +812,20 @@ export default {
         handleLightboxClose: function () {
             this.lightboxOpen = false;
         },
+
+        openVideoLightbox: function (node) {
+            const [_, p] = ddb.utils.datasetPathFromUri(node.path);
+            this.videoLightboxSrc = this.dataset.downloadUrl(p, { inline: true });
+            this.videoLightboxEntry = { ...node.entry, path: p };
+            this.videoLightboxVisible = true;
+        },
+
+        closeVideoLightbox: function () {
+            this.videoLightboxVisible = false;
+            this.videoLightboxSrc = '';
+            this.videoLightboxEntry = null;
+        },
+
 
         openLightboxDirectLink: function () {
             const idx = this.lightboxCurrentSlide - 1;

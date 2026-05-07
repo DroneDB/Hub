@@ -28,8 +28,10 @@
                 </div>
             </div>
             <template v-else>
-                <div v-for="(f, idx) in files" :key="'E,' + f.path" draggable @dragstart="startDrag($event, f)"
-                    @drop="onDrop($event, f)" @dragenter.prevent @dragover.prevent>
+                <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="true" @dragstart="startDrag($event, f)"
+                    @drop="onDrop($event, f)" @dragenter="itemDragEnter($event, f)"
+                    @dragover="itemDragOver($event, f)" @dragleave="itemDragLeave($event, f)"
+                    :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }">
                     <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
                         :lazyLoad="true" :dataset="dataset" />
                 </div>
@@ -331,6 +333,13 @@ export default {
         background-color: var(--ddb-bg-hover);
         box-shadow: inset 0 0 var(--ddb-spacing-sm) var(--ddb-spacing-xs) var(--ddb-text-muted);
         cursor: copy;
+    }
+
+    > div.drop-target {
+        outline: 2px dashed var(--ddb-color-primary, #1976d2);
+        outline-offset: -2px;
+        background-color: var(--ddb-bg-hover);
+        border-radius: var(--ddb-radius-sm, 4px);
     }
 }
 
