@@ -23,6 +23,7 @@ import { defineAsyncComponent } from 'vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import { clone } from '@/libs/utils';
+import { startInternalDrag, isInternalDrag, emitMove } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
 const { pathutils } = ddb;
@@ -134,7 +135,7 @@ export default {
             if (this.selected) {
                 this.selected = false;
                 console.log(`node '${this.node.entry.path}' calling moveItem to '${destItem.entry.path}'`);
-                emitter.emit('moveItem', this.node, destItem);
+                emitMove(this.node, destItem);
             }
         };
         emitter.on('moveItemInit', this._onMoveItemInit);
@@ -167,19 +168,20 @@ export default {
 
             evt.stopPropagation();
 
-            evt.dataTransfer.dropEffect = 'move';
-            evt.dataTransfer.effectAllowed = 'move';
-            var data = JSON.stringify(clone(item));
-            evt.dataTransfer.setData('item', data);
+            startInternalDrag(evt, item);
 
             this.selected = true;
             console.log(`drag start '${item.entry.path}'`);
         },
 
         onDrop(evt, item) {
-            const sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
-            console.log(`dropping '${sourceItem.entry.path}' onto '${item.entry.path}'`);
+            if (!isInternalDrag(evt)) return;
+            evt.stopPropagation();
 
+            // Broadcast: every TreeNode that has selected=true (including the
+            // dragged one, which set selected=true in startDrag) self-emits a
+            // moveItem with itself as source and `item` as destination.
+            // This preserves multi-selection drag in the tree view.
             emitter.emit('moveItemInit', item);
         },
 

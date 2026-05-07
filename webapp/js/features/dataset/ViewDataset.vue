@@ -16,7 +16,8 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                    @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
             </div>
             </template>
             <template #second>
@@ -34,7 +35,8 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                        @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                 </template>
                 <template v-slot:map>
                     <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
@@ -49,9 +51,10 @@
                                 @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                                 @transferSelectedItems="openTransferItemsDialog"
                                 @setAsCover="setAsCover"
-                                @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                                @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -71,10 +74,11 @@
                                 @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                                 @transferSelectedItems="openTransferItemsDialog"
                                 @setAsCover="setAsCover"
-                                @moveItem="handleMoveItem" @openProperties="handleExplorerOpenProperties"
+                                @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" />
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -125,7 +129,7 @@
             confirmText="Replace"
             confirmButtonClass="danger"
             @onClose="handleSetCoverClose" />
-        <RenameDialog v-if="renameDialogOpen" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
+        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
             title="Mask Borders"
@@ -133,9 +137,19 @@
             confirmText="Overwrite"
             confirmButtonClass="danger"
             @onClose="handleMaskBordersConfirm" />
-        <NewFolderDialog v-if="createFolderDialogOpen" @onClose="handleNewFolderClose"></NewFolderDialog>
+        <NewFolderDialog v-if="createFolderDialogOpen" :busy="isBusy" @onClose="handleNewFolderClose"></NewFolderDialog>
         <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
             :sourceOrg="dataset.org" :sourceDs="dataset.ds"></TransferDialog>
+        <PasteConflictDialog v-if="pasteConflictDialogOpen"
+            :items="pasteConflictData ? pasteConflictData.items : []"
+            @resolve="handlePasteConflictResolve" />
+        <PasteResultDialog v-if="pasteResultDialogOpen"
+            :mode="pasteResultData ? pasteResultData.mode : 'copy'"
+            :succeeded="pasteResultData ? pasteResultData.succeeded : []"
+            :failed="pasteResultData ? pasteResultData.failed : {}"
+            :skipped="pasteResultData ? pasteResultData.skipped : []"
+            @onClose="handlePasteResultClose" />
+        <ClipboardPanel v-if="dataset" />
         <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
             {{ errorMessage }}
         </Alert>
@@ -214,6 +228,9 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
 import NewFolderDialog from './dialogs/NewFolderDialog.vue';
 import TransferDialog from './dialogs/TransferDialog.vue';
+import PasteConflictDialog from './dialogs/PasteConflictDialog.vue';
+import PasteResultDialog from './dialogs/PasteResultDialog.vue';
+import ClipboardPanel from '@/components/ClipboardPanel.vue';
 import Message from '@/components/Message.vue';
 import FileBrowser from './explorer/FileBrowser.vue';
 import Map from '@/features/viewers/map/Map.vue';
@@ -281,6 +298,9 @@ export default {
         RenameDialog,
         NewFolderDialog,
         TransferDialog,
+        PasteConflictDialog,
+        PasteResultDialog,
+        ClipboardPanel,
         Alert,
         Loader,
         Toast,
@@ -418,41 +438,15 @@ export default {
             this.uploadDialogOpen = true;
         };
 
-        this._onMoveItem = async (sourceItem, destItem) => {
-
-            if (sourceItem.entry.type == ddb.entry.type.DRONEDB) {
-                console.log("Cannot move root");
-                return;
-            }
-
-            var destPath = "";
-            var sourceItemName = pathutils.basename(sourceItem.entry.path);
-
-            // Folder magics: if dest is file let's use its parent.
-            if (ddb.entry.isDirectory(destItem.entry))
-                destPath = destItem.entry.type == ddb.entry.type.DRONEDB ? sourceItemName : pathutils.join(destItem.entry.path, sourceItemName);
-            else {
-                var destParentFolder = pathutils.getParentFolder(destItem.entry.path);
-                destPath = destParentFolder == null ? sourceItemName : pathutils.join(destParentFolder, sourceItemName);
-            }
-
-            if (destPath.startsWith(sourceItem.entry.path)) {
-                console.log("Cannot move a file onto itself");
-                return;
-            }
-
-            console.log(`Moving ${sourceItem.entry.path} -> ${destPath}`);
-
-            this.isBusy = true;
-            await this.renameFile(sourceItem, destPath);
-            this.isBusy = false;
-
-        };
+        // Single rich move handler shared by Explorer / TableView / TreeNode.
+        // Lives in useFileOperations mixin (this.handleMoveItem). The dnd mixin
+        // dispatches `moveItem` on the event bus; we route every emission to it.
+        this._onMoveItemBus = (sourceItem, destItem) => this.handleMoveItem(sourceItem, destItem);
 
         emitter.on('openSettings', this._onOpenSettings);
         emitter.on('downloadLimitReached', this._onDownloadLimitReached);
         emitter.on('uploadItems', this._onUploadItems);
-        emitter.on('moveItem', this._onMoveItem);
+        emitter.on('moveItem', this._onMoveItemBus);
     },
     beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
@@ -470,7 +464,7 @@ export default {
         emitter.off('openSettings', this._onOpenSettings);
         emitter.off('downloadLimitReached', this._onDownloadLimitReached);
         emitter.off('uploadItems', this._onUploadItems);
-        emitter.off('moveItem', this._onMoveItem);
+        emitter.off('moveItem', this._onMoveItemBus);
 
         // Cleanup BuildManager
         BuildManager.cleanup();
@@ -530,17 +524,39 @@ export default {
     methods: {
         // Handle Delete key press to delete selected files
         handleKeyDown(e) {
-            // Only handle Delete key
-            if (e.key !== 'Delete') return;
-
-            // Don't trigger if we're in an input field or dialog is open
+            // Don't trigger if we're in an input field or content-editable
             const tagName = e.target.tagName.toLowerCase();
             if (tagName === 'input' || tagName === 'textarea' || e.target.isContentEditable) return;
 
             // Don't trigger if any dialog is already open
-            if (this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
+            const anyDialogOpen = this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
                 this.createFolderDialogOpen || this.transferDialogOpen || this.showProperties ||
-                this.showSettings || this.textEditorDialogOpen) return;
+                this.showSettings || this.textEditorDialogOpen ||
+                this.pasteConflictDialogOpen || this.pasteResultDialogOpen;
+            if (anyDialogOpen) return;
+
+            // Clipboard shortcuts: Ctrl/Cmd + C / X / V
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                const k = e.key.toLowerCase();
+                if (k === 'c' && this.selectedFiles.length > 0) {
+                    e.preventDefault();
+                    this.clipboardCopySelected();
+                    return;
+                }
+                if (k === 'x' && this.canWrite && this.selectedFiles.length > 0) {
+                    e.preventDefault();
+                    this.clipboardCutSelected();
+                    return;
+                }
+                if (k === 'v' && this.canWrite) {
+                    e.preventDefault();
+                    this.clipboardPaste();
+                    return;
+                }
+            }
+
+            // Delete key
+            if (e.key !== 'Delete') return;
 
             // Check if we have selected files and can write
             if (this.canWrite && this.selectedFiles.length > 0) {
@@ -548,6 +564,18 @@ export default {
                 this.selectedUsingFileBrowserList = false;
                 this.deleteDialogOpen = true;
             }
+        },
+
+        handlePasteConflictResolve(mode) {
+            this.pasteConflictDialogOpen = false;
+            const data = this.pasteConflictData;
+            this.pasteConflictData = null;
+            if (data && typeof data.resolve === 'function') data.resolve(mode);
+        },
+
+        handlePasteResultClose() {
+            this.pasteResultDialogOpen = false;
+            this.pasteResultData = null;
         },
 
         // View mode switching

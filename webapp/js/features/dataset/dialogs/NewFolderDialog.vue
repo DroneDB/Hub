@@ -1,12 +1,12 @@
 <template>
-    <Window title="Create folder" id="newFolder" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window title="Create folder" id="newFolder" @onClose="onWindowClose" modal maxWidth="70%" fixedSize>
 
-        <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close"
-            v-model="newFolderPath" :invalid="!newFolderPath" placeholder="Folder name" />
+        <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close('close')"
+            v-model="newFolderPath" :invalid="!newFolderPath" :disabled="busy" placeholder="Folder name" />
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" severity="secondary" label="Close" />
-            <Button @click="createFolder" :disabled="!newFolderPath" severity="primary" label="Create folder" />
+            <Button @click="close('close')" :disabled="busy" severity="secondary" label="Close" />
+            <Button @click="createFolder" :disabled="!newFolderPath || busy" :loading="busy" severity="primary" label="Create folder" />
         </div>
     </Window>
 </template>
@@ -21,7 +21,9 @@ export default {
         Window, Button, InputText
     },
 
-    props: [],
+    props: {
+        busy: { type: Boolean, default: false }
+    },
     emits: ['onClose'],
 
     data: function () {
@@ -36,10 +38,17 @@ export default {
         });
     },
     methods: {
+        onWindowClose: function () {
+            // Block close while a folder creation is in progress
+            if (this.busy) return;
+            this.close('close');
+        },
         close: function (buttonId) {
+            if (this.busy && buttonId !== 'createFolder') return;
             this.$emit('onClose', buttonId);
         },
         createFolder: function () {
+            if (this.busy) return;
             if (this.newFolderPath) {
                 this.$emit('onClose', "createFolder", this.newFolderPath);
             }

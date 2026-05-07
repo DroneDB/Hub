@@ -1,8 +1,8 @@
 <template>
-    <Window title="Rename" id="rename" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window title="Rename" id="rename" @onClose="onWindowClose" modal maxWidth="70%" fixedSize>
 
-        <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close"
-            v-model="renameText" :invalid="renameText == null || renameText.length == 0" fluid />
+        <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close('close')"
+            v-model="renameText" :invalid="renameText == null || renameText.length == 0" :disabled="busy" fluid />
 
         <!-- Checkbox to also rename the measurements file -->
         <div v-if="hasMeasurementsFile" class="measurements-rename-option">
@@ -10,6 +10,7 @@
                 <Checkbox
                     v-model="renameMeasurements"
                     :binary="true"
+                    :disabled="busy"
                     inputId="renameMeasurementsCheckbox" />
                 <label for="renameMeasurementsCheckbox">
                     Also rename associated measurements file
@@ -22,8 +23,8 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" severity="secondary" label="Close" />
-            <Button @click="rename" :disabled="!renameText || renameText === file.label" severity="primary" label="Rename" />
+            <Button @click="close('close')" :disabled="busy" severity="secondary" label="Close" />
+            <Button @click="rename" :disabled="!renameText || renameText === file.label || busy" :loading="busy" severity="primary" label="Rename" />
         </div>
     </Window>
 </template>
@@ -41,7 +42,10 @@ export default {
         Window, Button, InputText, Checkbox
     },
 
-    props: ["file"],
+    props: {
+        file: { type: Object, required: true },
+        busy: { type: Boolean, default: false }
+    },
     emits: ['onClose'],
 
     data: function () {
@@ -101,9 +105,15 @@ export default {
             }
         },
         close: function (buttonId) {
+            if (this.busy && buttonId !== 'rename' && buttonId !== 'renameddb') return;
             this.$emit('onClose', buttonId);
         },
+        onWindowClose: function () {
+            if (this.busy) return;
+            this.close('close');
+        },
         async rename() {
+            if (this.busy) return;
             if (!this.renameText) return;
 
             // Check file type

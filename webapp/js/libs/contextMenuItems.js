@@ -7,6 +7,7 @@ import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHe
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import clipboard from '@/composables/useClipboard';
 
 /**
  * Context object interface:
@@ -226,6 +227,53 @@ function transferItem(ctx) {
     };
 }
 
+function copyClipboardItem(ctx) {
+    return {
+        label: 'Copy',
+        icon: 'fa-solid fa-copy',
+        accelerator: 'CmdOrCtrl+C',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
+        },
+        click: () => ctx.emit('copySelectedItems')
+    };
+}
+
+function cutClipboardItem(ctx) {
+    return {
+        label: 'Cut',
+        icon: 'fa-solid fa-scissors',
+        accelerator: 'CmdOrCtrl+X',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
+        },
+        click: () => ctx.emit('cutSelectedItems')
+    };
+}
+
+function pasteClipboardItem(ctx) {
+    return {
+        label: 'Paste',
+        icon: 'fa-solid fa-paste',
+        accelerator: 'CmdOrCtrl+V',
+        isVisible: () => ctx.canWrite && !clipboard.isEmpty.value,
+        click: () => ctx.emit('pasteFromClipboard')
+    };
+}
+
+function clipboardSeparator(ctx) {
+    return {
+        type: 'separator',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            const hasSel = sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
+            return hasSel || (ctx.canWrite && !clipboard.isEmpty.value);
+        }
+    };
+}
+
 function setThumbnailItem(ctx) {
     return {
         label: 'Set as Dataset Thumbnail',
@@ -365,7 +413,11 @@ function buildActionMenuItems(ctx) {
         mergeMultispectralItem(ctx),
         maskBordersItem(ctx),
         transferItem(ctx),
-        setThumbnailItem(ctx)
+        setThumbnailItem(ctx),
+        clipboardSeparator(ctx),
+        copyClipboardItem(ctx),
+        cutClipboardItem(ctx),
+        pasteClipboardItem(ctx)
     ];
 }
 
@@ -420,6 +472,10 @@ export {
     selectAllNoneItem,
     createFolderItem,
     selectionSeparator,
+    copyClipboardItem,
+    cutClipboardItem,
+    pasteClipboardItem,
+    clipboardSeparator,
     // Grouped builders
     buildViewerMenuItems,
     buildActionMenuItems,

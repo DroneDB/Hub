@@ -113,16 +113,71 @@ export function isInternalDrag(evt) {
 }
 
 import emitter from '@/libs/eventBus';
+import { clone } from '@/libs/utils';
+import ddb from 'ddb';
+const { entry: ddbEntry, pathutils } = ddb;
 
 /**
- * Mixin providing drag-and-drop upload support for file browser components.
- * Handles dragenter/dragleave with a counter to prevent flickering,
- * the drop handler for OS file uploads, and delegates internal drags properly.
+ * Build a synthetic directory entry representing a destination folder
+ * (used when the user drops on the empty area of a view, so the move target
+ * is the currently displayed folder).
+ *
+ * @param {string|null} currentPath
+ * @returns {{entry: {path: string, type: number}}}
+ */
+export function syntheticFolderItem(currentPath) {
+    if (!currentPath) {
+        return { entry: { path: '', type: ddbEntry.type.DRONEDB } };
+    }
+    return { entry: { path: currentPath, type: ddbEntry.type.DIRECTORY } };
+}
+
+/**
+ * Emit a `moveItem` event on the global event bus for an internal drag-drop.
+ *
+ * Centralized here to keep a single source of truth for source/destination
+ * resolution. Multi-selection is supported: every currently-selected file in
+ * `extraSourceItems` is also moved (deduplicated against the primary source).
+ *
+ * @param {object} sourceItem - dragged item (file/node from the file browser)
+ * @param {object} destItem - destination item (folder or any file; the handler
+ *                            will use the parent folder if it is not a directory)
+ * @param {object[]} [extraSourceItems=[]] - additional items selected at the
+ *                            time of drop (multi-selection drag).
+ */
+export function emitMove(sourceItem, destItem, extraSourceItems = []) {
+    emitter.emit('moveItem', sourceItem, destItem);
+    for (const sel of extraSourceItems) {
+        if (sel.entry.path === sourceItem.entry.path) continue;
+        emitter.emit('moveItem', sel, destItem);
+    }
+}
+
+/**
+ * Common dragstart handler: serializes the dragged item on dataTransfer so
+ * that any drop target in the app can read it back.
+ */
+export function startInternalDrag(evt, item) {
+    evt.dataTransfer.dropEffect = 'move';
+    evt.dataTransfer.effectAllowed = 'move';
+    evt.dataTransfer.setData('item', JSON.stringify(clone(item)));
+}
+
+/**
+ * Mixin providing drag-and-drop support for file browser components.
+ *
+ * Responsibilities:
+ *  - dragenter/dragleave counter to prevent flickering of the `dropping` flag
+ *  - OS file upload drop handler (delegates to the upload pipeline)
+ *  - internal drop handler: resolves source/destination and emits `moveItem`
+ *    on the global event bus (a single rich handler in ViewDataset processes
+ *    every move regardless of which view fired it -> DRY/SRP).
  *
  * Components using this mixin must have:
- * - `dropping` in data
- * - `canWrite` prop
- * - `currentPath` prop
+ *  - `dropping` in data
+ *  - `canWrite` prop
+ *  - `currentPath` prop
+ *  - (optional) a `selectedFiles` computed for multi-selection drag.
  */
 export const dragDropMixin = {
     data() {
@@ -144,13 +199,83 @@ export const dragDropMixin = {
             }
         },
 
-        async explorerDropHandler(ev) {
-            ev.preventDefault();
+        /**
+         * Standard handler for dragstart on a file/folder item.
+         * Use as `@dragstart="startDrag($event, file)"`.
+         */
+        startDrag(evt, item) {
+            startInternalDrag(evt, item);
+        },
 
+        /**
+         * Standard handler for drop on a specific file/folder item.
+         * Use as `@drop="onDrop($event, file)"`.
+         *
+         * - If the drop comes from the OS, delegates to the OS upload handler.
+         * - Otherwise emits `moveItem` for the dragged item (and every other
+         *   currently-selected item in the same view) targeting `destItem`.
+         *   The rich handler (ViewDataset.handleMoveItem) decides whether to
+         *   move into `destItem` itself (when it's a folder) or into its
+         *   parent folder (when it's a file).
+         */
+        onDrop(evt, destItem) {
+            this.dropping = false;
+            this.dragEnterCount = 0;
+
+            if (!isInternalDrag(evt)) {
+                // OS drop -> upload pipeline
+                this.explorerDropHandler(evt);
+                return;
+            }
+
+            evt.stopPropagation();
+
+            if (!this.canWrite) return;
+
+            let sourceItem;
+            try {
+                sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
+            } catch {
+                return;
+            }
+            if (!sourceItem || !sourceItem.entry) return;
+
+            const extras = Array.isArray(this.selectedFiles) ? this.selectedFiles : [];
+            emitMove(sourceItem, destItem, extras);
+        },
+
+        /**
+         * Drop handler bound to the empty area of the view (background drop).
+         * - Internal drag -> move into the currently displayed folder.
+         * - OS drag       -> upload into the currently displayed folder.
+         */
+        async explorerDropHandler(ev) {
+            // Internal drag dropped on the background = move to currentPath.
+            if (isInternalDrag(ev)) {
+                ev.preventDefault();
+                this.dragEnterCount = 0;
+                this.dropping = false;
+
+                if (!this.canWrite) return;
+
+                let sourceItem;
+                try {
+                    sourceItem = JSON.parse(ev.dataTransfer.getData('item'));
+                } catch {
+                    return;
+                }
+                if (!sourceItem || !sourceItem.entry) return;
+
+                const destItem = syntheticFolderItem(this.currentPath);
+                const extras = Array.isArray(this.selectedFiles) ? this.selectedFiles : [];
+                emitMove(sourceItem, destItem, extras);
+                return;
+            }
+
+            ev.preventDefault();
             this.dragEnterCount = 0;
             this.dropping = false;
 
-            // Check if user has write permission
             if (!this.canWrite) return;
 
             const files = await getFilesFromDrop(ev);

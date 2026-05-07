@@ -45,7 +45,7 @@ import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import { clone } from '@/libs/utils';
 import Window from '@/components/Window.vue';
-import { isInternalDrag, dragDropMixin } from '@/libs/dragDropUtils';
+import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHelpers';
@@ -64,7 +64,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'moveItem', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral'],
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         const self = this;
@@ -184,48 +184,7 @@ export default {
             emitter.emit("folderOpened", pathutils.getTree(itm.path));
         },
 
-        startDrag: (evt, item) => {
-            evt.dataTransfer.dropEffect = 'move';
-            evt.dataTransfer.effectAllowed = 'move';
-
-            evt.dataTransfer.setData('item', JSON.stringify(clone(item)));
-        },
-
-        onDrop(evt, item) {
-            this.dropping = false;
-
-            // If this is a drop from the OS (not an internal drag), delegate to upload handler
-            if (!isInternalDrag(evt)) {
-                this.explorerDropHandler(evt);
-                return;
-            }
-
-            // Check if user has write permission
-            if (!this.canWrite) return;
-
-            if (entry.isDirectory(item.entry)) {
-                const destFolder = item.entry.path;
-                const sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
-                this.drop(sourceItem, destFolder);
-
-                this.selectedFiles.forEach(selItem => {
-                    if (selItem.entry.path == sourceItem.entry.path) return;
-                    this.drop(selItem, destFolder);
-                });
-            }
-        },
-
-        drop(sourceItem, destFolder) {
-
-            if (entry.isDirectory(sourceItem.entry) && (destFolder + '/').startsWith(sourceItem.entry.path + '/')) {
-                console.log("Cannot copy a folder on itself or one of its descendants");
-                return;
-            }
-
-            const destPath = pathutils.join(destFolder, pathutils.basename(sourceItem.entry.path));
-
-            this.$emit('moveItem', sourceItem, destPath);
-        },
+        // startDrag, onDrop and explorerDropHandler are inherited from dragDropMixin.
 
         onTabActivated: function () {
             this.$nextTick(() => {

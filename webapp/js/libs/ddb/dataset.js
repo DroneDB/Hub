@@ -342,7 +342,18 @@ module.exports = class Dataset {
         return this.registry.putFormData(`${this.baseApi}/obj`, formData);
     }
 
-    async transferObj(sourcePath, destOrgSlug, destDsSlug, destPath = "", overwrite = false) {
+    async copyObj(source, dest, overwrite = false) {
+        if (!source) throw new Error("Invalid source path");
+        if (!dest) throw new Error("Invalid destination path");
+
+        const formData = new FormData();
+        formData.append('source', source);
+        formData.append('dest', dest);
+        formData.append('overwrite', overwrite);
+        return this.registry.postFormData(`${this.baseApi}/obj/copy`, formData);
+    }
+
+    async transferObj(sourcePath, destOrgSlug, destDsSlug, destPath = "", overwrite = false, keepSource = false) {
         if (!sourcePath) throw new Error("Invalid source path");
         if (!destOrgSlug) throw new Error("Invalid destination organization");
         if (!destDsSlug) throw new Error("Invalid destination dataset");
@@ -353,6 +364,7 @@ module.exports = class Dataset {
         formData.append('destDsSlug', destDsSlug);
         formData.append('destPath', destPath);
         formData.append('overwrite', overwrite);
+        formData.append('keepSource', keepSource);
         return this.registry.postFormData(`${this.baseApi}/transfer`, formData);
     }
 
