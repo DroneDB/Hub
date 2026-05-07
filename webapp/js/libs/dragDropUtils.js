@@ -146,10 +146,11 @@ export function syntheticFolderItem(currentPath) {
  *                            time of drop (multi-selection drag).
  */
 export function emitMove(sourceItem, destItem, extraSourceItems = []) {
-    emitter.emit('moveItem', sourceItem, destItem);
+    // mitt only forwards a single payload, so wrap source/dest in an object.
+    emitter.emit('moveItem', { source: sourceItem, dest: destItem });
     for (const sel of extraSourceItems) {
         if (sel.entry.path === sourceItem.entry.path) continue;
-        emitter.emit('moveItem', sel, destItem);
+        emitter.emit('moveItem', { source: sel, dest: destItem });
     }
 }
 
@@ -182,7 +183,10 @@ export function startInternalDrag(evt, item) {
 export const dragDropMixin = {
     data() {
         return {
-            dragEnterCount: 0
+            dragEnterCount: 0,
+            // Path of the item currently hovered as a drop target during an
+            // internal drag. Bound to `:class="{ 'drop-target': dropTargetPath === f.entry.path }"`.
+            dropTargetPath: null
         };
     },
     methods: {
@@ -208,6 +212,43 @@ export const dragDropMixin = {
         },
 
         /**
+         * Per-item dragenter on a potential drop target. Highlights the target
+         * only when it's a folder and not the dragged item itself.
+         * Use as `@dragenter="itemDragEnter($event, file)"`.
+         */
+        itemDragEnter(evt, item) {
+            if (!isInternalDrag(evt)) return;
+            // Only folders are valid per-item targets; files just delegate to bg.
+            if (!item || !item.entry || !ddbEntry.isDirectory(item.entry)) return;
+            evt.preventDefault();
+            evt.stopPropagation();
+            this.dropTargetPath = item.entry.path;
+        },
+
+        /**
+         * Per-item dragover. Required for the browser to accept the drop.
+         */
+        itemDragOver(evt, item) {
+            if (!isInternalDrag(evt)) return;
+            if (!item || !item.entry || !ddbEntry.isDirectory(item.entry)) return;
+            evt.preventDefault();
+            evt.stopPropagation();
+            if (this.dropTargetPath !== item.entry.path) {
+                this.dropTargetPath = item.entry.path;
+            }
+        },
+
+        /**
+         * Per-item dragleave: clear the highlight if we're leaving this item.
+         */
+        itemDragLeave(evt, item) {
+            if (!item || !item.entry) return;
+            if (this.dropTargetPath === item.entry.path) {
+                this.dropTargetPath = null;
+            }
+        },
+
+        /**
          * Standard handler for drop on a specific file/folder item.
          * Use as `@drop="onDrop($event, file)"`.
          *
@@ -221,6 +262,7 @@ export const dragDropMixin = {
         onDrop(evt, destItem) {
             this.dropping = false;
             this.dragEnterCount = 0;
+            this.dropTargetPath = null;
 
             if (!isInternalDrag(evt)) {
                 // OS drop -> upload pipeline
@@ -255,6 +297,7 @@ export const dragDropMixin = {
                 ev.preventDefault();
                 this.dragEnterCount = 0;
                 this.dropping = false;
+                this.dropTargetPath = null;
 
                 if (!this.canWrite) return;
 
@@ -275,6 +318,7 @@ export const dragDropMixin = {
             ev.preventDefault();
             this.dragEnterCount = 0;
             this.dropping = false;
+            this.dropTargetPath = null;
 
             if (!this.canWrite) return;
 
