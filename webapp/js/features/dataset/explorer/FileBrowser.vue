@@ -11,7 +11,7 @@
             </div>
         </div>
         <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
-            :getChildren="getChildren" />
+            :getChildren="getChildren" :canWrite="canWrite" />
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>

@@ -165,85 +165,92 @@ export function startInternalDrag(evt, item) {
 }
 
 /**
- * Mixin providing drag-and-drop support for file browser components.
+ * Per-item drag-and-drop mixin.
  *
- * Responsibilities:
- *  - dragenter/dragleave counter to prevent flickering of the `dropping` flag
- *  - OS file upload drop handler (delegates to the upload pipeline)
- *  - internal drop handler: resolves source/destination and emits `moveItem`
- *    on the global event bus (a single rich handler in ViewDataset processes
- *    every move regardless of which view fired it -> DRY/SRP).
+ * Provides the handlers attached to each individual file/folder element in a
+ * file browser view (Explorer thumbnails, TreeNode entries, future TableView
+ * rows). Centralizes:
+ *  - dragstart serialization on `dataTransfer`
+ *  - drop-target highlight (via `dropTargetPath` + a per-target enter counter
+ *    to avoid flicker when the pointer crosses internal child elements)
+ *  - drop dispatch: OS file drops are forwarded to `explorerDropHandler` (if
+ *    the host component provides one), internal drags emit a `moveItem` event.
  *
- * Components using this mixin must have:
- *  - `dropping` in data
- *  - `canWrite` prop
- *  - `currentPath` prop
- *  - (optional) a `selectedFiles` computed for multi-selection drag.
+ * The host component is expected to expose:
+ *  - `canWrite` (prop or computed)
+ *  - optionally `selectedFiles` (computed array, for multi-selection drag)
+ *  - optionally `explorerDropHandler` (for OS-file uploads on per-item drop)
  */
-export const dragDropMixin = {
+export const itemDnDMixin = {
     data() {
         return {
-            dragEnterCount: 0,
             // Path of the item currently hovered as a drop target during an
             // internal drag. Bound to `:class="{ 'drop-target': dropTargetPath === f.entry.path }"`.
-            dropTargetPath: null
+            dropTargetPath: null,
+            // Per-target enter counter (keyed by entry path) used to avoid
+            // flicker when the pointer transitions to a nested child element
+            // (which fires a synthetic dragleave on the parent).
+            _dropEnterCounts: Object.create(null)
         };
     },
     methods: {
-        explorerDragEnter(evt) {
-            this.dragEnterCount++;
-            this.dropping = true;
-        },
-
-        explorerDragLeave(evt) {
-            this.dragEnterCount--;
-            if (this.dragEnterCount <= 0) {
-                this.dragEnterCount = 0;
-                this.dropping = false;
-            }
-        },
-
         /**
          * Standard handler for dragstart on a file/folder item.
          * Use as `@dragstart="startDrag($event, file)"`.
          */
         startDrag(evt, item) {
+            if (!this.canWrite) { evt.preventDefault(); return; }
             startInternalDrag(evt, item);
         },
 
         /**
-         * Per-item dragenter on a potential drop target. Highlights the target
-         * only when it's a folder and not the dragged item itself.
+         * Per-item dragenter on a potential drop target. Always accepts the
+         * drop for internal drags (so the browser fires `drop`), but only
+         * highlights the target when it's a folder. Dropping on a file means
+         * "move into the file's parent folder" (handled in `handleMoveItem`).
          * Use as `@dragenter="itemDragEnter($event, file)"`.
          */
         itemDragEnter(evt, item) {
+            if (!this.canWrite) return;
             if (!isInternalDrag(evt)) return;
-            // Only folders are valid per-item targets; files just delegate to bg.
-            if (!item || !item.entry || !ddbEntry.isDirectory(item.entry)) return;
+            if (!item || !item.entry) return;
             evt.preventDefault();
             evt.stopPropagation();
-            this.dropTargetPath = item.entry.path;
+            if (!ddbEntry.isDirectory(item.entry)) return;
+            const key = item.entry.path;
+            this._dropEnterCounts[key] = (this._dropEnterCounts[key] || 0) + 1;
+            this.dropTargetPath = key;
         },
 
         /**
          * Per-item dragover. Required for the browser to accept the drop.
          */
         itemDragOver(evt, item) {
+            if (!this.canWrite) return;
             if (!isInternalDrag(evt)) return;
-            if (!item || !item.entry || !ddbEntry.isDirectory(item.entry)) return;
+            if (!item || !item.entry) return;
             evt.preventDefault();
             evt.stopPropagation();
+            if (!ddbEntry.isDirectory(item.entry)) return;
             if (this.dropTargetPath !== item.entry.path) {
                 this.dropTargetPath = item.entry.path;
             }
         },
 
         /**
-         * Per-item dragleave: clear the highlight if we're leaving this item.
+         * Per-item dragleave: clear the highlight only when the pointer truly
+         * leaves the target (counter reaches zero). Crossing into a nested
+         * child element fires a synthetic dragleave that we must ignore.
          */
         itemDragLeave(evt, item) {
             if (!item || !item.entry) return;
-            if (this.dropTargetPath === item.entry.path) {
+            const key = item.entry.path;
+            if (this._dropEnterCounts[key]) {
+                this._dropEnterCounts[key]--;
+                if (this._dropEnterCounts[key] > 0) return;
+                delete this._dropEnterCounts[key];
+            }
+            if (this.dropTargetPath === key) {
                 this.dropTargetPath = null;
             }
         },
@@ -252,25 +259,31 @@ export const dragDropMixin = {
          * Standard handler for drop on a specific file/folder item.
          * Use as `@drop="onDrop($event, file)"`.
          *
-         * - If the drop comes from the OS, delegates to the OS upload handler.
+         * - If the drop comes from the OS, delegates to the OS upload handler
+         *   (when the host exposes one).
          * - Otherwise emits `moveItem` for the dragged item (and every other
          *   currently-selected item in the same view) targeting `destItem`.
-         *   The rich handler (ViewDataset.handleMoveItem) decides whether to
-         *   move into `destItem` itself (when it's a folder) or into its
-         *   parent folder (when it's a file).
          */
         onDrop(evt, destItem) {
-            this.dropping = false;
-            this.dragEnterCount = 0;
             this.dropTargetPath = null;
+            this._dropEnterCounts = Object.create(null);
+            // Container-level state owned by dragDropMixin: reset defensively
+            // so the `dropping` overlay doesn't stay stuck after a per-item drop.
+            if ('dragEnterCount' in this) this.dragEnterCount = 0;
+            if ('dropping' in this) this.dropping = false;
 
             if (!isInternalDrag(evt)) {
-                // OS drop -> upload pipeline
-                this.explorerDropHandler(evt);
+                if (typeof this.explorerDropHandler === 'function') {
+                    this.explorerDropHandler(evt);
+                }
                 return;
             }
 
-            evt.stopPropagation();
+            // Mark the event as handled so a parent container with
+            // `explorerDropHandler` (e.g. TreeView around TreeNodes) doesn't
+            // double-process the drop, but still resets its own `dropping`
+            // overlay state via the bubbled @drop listener.
+            evt._ddbHandled = true;
 
             if (!this.canWrite) return;
 
@@ -284,6 +297,42 @@ export const dragDropMixin = {
 
             const extras = Array.isArray(this.selectedFiles) ? this.selectedFiles : [];
             emitMove(sourceItem, destItem, extras);
+        }
+    }
+};
+
+/**
+ * Mixin providing drag-and-drop support for file browser components.
+ *
+ * Composes `itemDnDMixin` (per-item handlers) with the container-level
+ * handlers (background drop area + dropping flag + OS upload pipeline).
+ *
+ * Components using this mixin must have:
+ *  - `dropping` in data
+ *  - `canWrite` prop
+ *  - `currentPath` prop
+ *  - (optional) a `selectedFiles` computed for multi-selection drag.
+ */
+export const dragDropMixin = {
+    mixins: [itemDnDMixin],
+    data() {
+        return {
+            dragEnterCount: 0
+        };
+    },
+    methods: {
+        explorerDragEnter(evt) {
+            if (!this.canWrite) return;
+            this.dragEnterCount++;
+            this.dropping = true;
+        },
+
+        explorerDragLeave(evt) {
+            this.dragEnterCount--;
+            if (this.dragEnterCount <= 0) {
+                this.dragEnterCount = 0;
+                this.dropping = false;
+            }
         },
 
         /**
@@ -292,12 +341,21 @@ export const dragDropMixin = {
          * - OS drag       -> upload into the currently displayed folder.
          */
         async explorerDropHandler(ev) {
+            // Always reset container drop overlay state on any drop bubbled
+            // up from a child target (per-item TreeNode/Thumbnail/row).
+            this.dragEnterCount = 0;
+            this.dropping = false;
+
+            // Drop already fully handled by a per-item target inside this
+            // container -> just reset the overlay (already done above) and
+            // bail out so we don't fire a duplicate `moveItem`.
+            if (ev._ddbHandled) return;
+
             // Internal drag dropped on the background = move to currentPath.
             if (isInternalDrag(ev)) {
                 ev.preventDefault();
-                this.dragEnterCount = 0;
-                this.dropping = false;
                 this.dropTargetPath = null;
+                this._dropEnterCounts = Object.create(null);
 
                 if (!this.canWrite) return;
 
@@ -316,9 +374,8 @@ export const dragDropMixin = {
             }
 
             ev.preventDefault();
-            this.dragEnterCount = 0;
-            this.dropping = false;
             this.dropTargetPath = null;
+            this._dropEnterCounts = Object.create(null);
 
             if (!this.canWrite) return;
 

@@ -1,9 +1,14 @@
 <template>
     <div class="tree-node">
-        <div class="entry" :draggable="true" @dragstart="startDrag($event, node)" @drop="onDrop($event, node)"
-            @dragover="onDragOver($event)" @dragenter="onDragEnter($event)" @dragleave="onDragLeave($event)"
+        <div class="entry"
+            :draggable="!node.root && canWrite"
+            @dragstart="onDragStart($event, node)"
+            @drop="onItemDrop($event, node)"
+            @dragover="itemDragOver($event, node)"
+            @dragenter="itemDragEnter($event, node)"
+            @dragleave="itemDragLeave($event, node)"
             @click="onClick" @dblclick="handleOpenDblClick" @contextmenu="onRightClick"
-            :class="{ selected: selected, 'drop-target': isDropTarget }">
+            :class="{ selected: selected, 'drop-target': dropTargetPath === node.entry.path }">
             <i class="fa-solid fa-circle-notch fa-spin" v-if="loading" />
             <i class="icon" @click="handleOpenCaret" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
                 v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
@@ -13,7 +18,7 @@
             <div class="text">{{ node.label }}</div>
         </div>        <div class="children" v-show="expanded">
             <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" :node="node" ref="nodes"
-                :getChildren="getChildren" @selected="(n, btn) => $emit('selected', n, btn)"
+                :getChildren="getChildren" :canWrite="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
                 @opened="(n, sender) => $emit('opened', n, sender)" />
         </div>
     </div>
@@ -24,13 +29,14 @@ import { defineAsyncComponent } from 'vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import { clone } from '@/libs/utils';
-import { startInternalDrag, isInternalDrag, emitMove } from '@/libs/dragDropUtils';
+import { startInternalDrag, isInternalDrag, emitMove, itemDnDMixin } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
     emits: ['opened', 'selected'],
+    mixins: [itemDnDMixin],
     props: {
         node: {
             type: Object
@@ -38,6 +44,11 @@ export default {
         getChildren: {
             type: Function,
             required: true
+        },
+        // Used by itemDnDMixin to gate internal drop dispatching.
+        canWrite: {
+            type: Boolean,
+            default: true
         }
     },
     components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
@@ -48,7 +59,6 @@ export default {
             loadedChildren: false,
             selected: false,
             expanded: false,
-            isDropTarget: false,
         }
     },
     computed: {
@@ -58,7 +68,6 @@ export default {
         empty: function () {
             return this.children.length === 0;
         }
-
     },
     mounted: async function () {
         if (this.node.expanded) {
@@ -142,7 +151,6 @@ export default {
             this.selected = false;
             // Skip if this node is the primary dataTransfer source (already moved by emitMove).
             if (primaryPath != null && this.node.entry.path === primaryPath) return;
-            console.log(`node '${this.node.entry.path}' calling moveItem to '${destItem.entry.path}'`);
             emitMove(this.node, destItem);
         };
         emitter.on('moveItemInit', this._onMoveItemInit);
@@ -171,59 +179,39 @@ export default {
             return this._handleOpen(e, "caret");
         },
 
-        startDrag(evt, item) {
-
+        /**
+         * Drag start on a TreeNode entry. Stop propagation so a parent
+         * TreeNode does not also try to start a drag, mark this node as
+         * (multi-)selected, then delegate dataTransfer setup to the shared
+         * helper.
+         */
+        onDragStart(evt, item) {
             evt.stopPropagation();
-
             startInternalDrag(evt, item);
-
             this.selected = true;
-            console.log(`drag start '${item.entry.path}'`);
         },
 
-        onDragEnter(evt) {
-            if (!isInternalDrag(evt)) return;
-            if (!ddb.entry.isDirectory(this.node.entry)) return;
-            evt.preventDefault();
-            evt.stopPropagation();
-            this.isDropTarget = true;
-        },
-
-        onDragOver(evt) {
-            if (!isInternalDrag(evt)) return;
-            if (!ddb.entry.isDirectory(this.node.entry)) return;
-            evt.preventDefault();
-            evt.stopPropagation();
-        },
-
-        onDragLeave(evt) {
-            this.isDropTarget = false;
-        },
-
-        onDrop(evt, item) {
-            this.isDropTarget = false;
-            if (!isInternalDrag(evt)) return;
-            evt.stopPropagation();
-
-            // Read the dragged source from dataTransfer. This works for both
-            // in-tree drags (TreeNode -> TreeNode) and cross-component drags
-            // (Explorer/FileBrowser -> TreeNode), since startInternalDrag is
-            // used in every drag origin.
-            let sourceItem;
-            try {
-                sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
-            } catch {
-                return;
+        /**
+         * Drop on a TreeNode entry. Reuses the mixin's `onDrop` (validates
+         * internal drag, gates on canWrite, emits `moveItem`) and additionally
+         * notifies other selected TreeNodes via the `moveItemInit` bus event
+         * so the multi-selection drag in the tree continues to work.
+         */
+        onItemDrop(evt, item) {
+            // Capture source path before mixin clears state.
+            let primaryPath = null;
+            if (isInternalDrag(evt)) {
+                try {
+                    const src = JSON.parse(evt.dataTransfer.getData('item'));
+                    primaryPath = src && src.entry ? src.entry.path : null;
+                } catch { /* ignore */ }
             }
-            if (!sourceItem || !sourceItem.entry) return;
 
-            emitMove(sourceItem, item);
+            this.onDrop(evt, item);
 
-            // Multi-selection in tree: every other selected TreeNode (set by
-            // its own startDrag or click) self-emits a moveItem with itself
-            // as source and `item` as destination. Skip the primary source
-            // to avoid a duplicate.
-            emitter.emit('moveItemInit', { destItem: item, primaryPath: sourceItem.entry.path });
+            if (primaryPath != null) {
+                emitter.emit('moveItemInit', { destItem: item, primaryPath });
+            }
         },
 
         sortChildren: function () {

@@ -250,23 +250,45 @@ export default {
                     if (file) self.startDrag(e, file);
                 },
                 onDrop(e) {
-                    e.stopPropagation();
                     const row = e.target.closest('tr');
                     if (!row) return;
                     const idx = row.rowIndex - 1;
                     const file = self.sortedFiles[idx];
                     if (file) self.onDrop(e, file);
                 },
-                onDragenter(e) { e.preventDefault(); },
-                onDragover(e) { e.preventDefault(); },
-                onMousedown(e) { e.preventDefault(); },
-                draggable: true
+                onDragenter(e) {
+                    const row = e.target.closest('tr');
+                    if (!row) return;
+                    const idx = row.rowIndex - 1;
+                    const file = self.sortedFiles[idx];
+                    if (file) self.itemDragEnter(e, file);
+                    else e.preventDefault();
+                },
+                onDragover(e) {
+                    const row = e.target.closest('tr');
+                    if (!row) { e.preventDefault(); return; }
+                    const idx = row.rowIndex - 1;
+                    const file = self.sortedFiles[idx];
+                    if (file) self.itemDragOver(e, file);
+                    else e.preventDefault();
+                },
+                onDragleave(e) {
+                    const row = e.target.closest('tr');
+                    if (!row) return;
+                    const idx = row.rowIndex - 1;
+                    const file = self.sortedFiles[idx];
+                    if (file) self.itemDragLeave(e, file);
+                },
+                draggable: this.canWrite
             };
         }
     },
     methods: {
         rowClass(data) {
-            return data.selected ? 'row-selected' : '';
+            const classes = [];
+            if (data.selected) classes.push('row-selected');
+            if (data.entry && this.dropTargetPath === data.entry.path) classes.push('drop-target');
+            return classes.join(' ');
         },
 
         onRowClick(event) {
@@ -506,6 +528,12 @@ export default {
         &:hover {
             background-color: var(--ddb-selected-active-bg) !important;
         }
+    }
+
+    tr.drop-target > td {
+        outline: 2px dashed var(--ddb-color-primary, #1976d2);
+        outline-offset: -2px;
+        background-color: var(--ddb-bg-hover) !important;
     }
 
     .icon-column i.icon {

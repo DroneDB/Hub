@@ -77,7 +77,19 @@ export default {
             this.isBusy = false;
         },
 
-        async renameFile(file, newPath) {
+        /**
+         * Rename or move a file/folder.
+         *
+         * @param {object} file - the source item (with `.entry`)
+         * @param {string} newPath - the destination full path
+         * @param {object} [options]
+         * @param {'rename'|'move'} [options.action='rename'] - controls the
+         *        result toast and whether the build pipeline is re-triggered.
+         *        DroneDB indexes builds by file hash, so a pure move never
+         *        changes buildability and must NOT trigger build callbacks.
+         */
+        async renameFile(file, newPath, options = {}) {
+            const action = options.action === 'move' ? 'move' : 'rename';
             try {
                 var oldPath = file.entry.path;
                 var updatedEntry = await this.dataset.moveObj(oldPath, newPath);
@@ -107,15 +119,21 @@ export default {
 
                 this.sortFiles();
 
-                // If the file became buildable after rename, notify build manager
-                if (BuildManager.isBuildableType(newItem.entry.type)) {
+                // Only re-trigger build pipeline on rename (extension may have changed,
+                // making the file buildable). On move the hash is unchanged, so any
+                // existing build artifacts still apply and no notification is needed.
+                if (action === 'rename' && BuildManager.isBuildableType(newItem.entry.type)) {
                     BuildManager.onFilesAdded(this.dataset, [newItem.entry]);
                 }
 
-                this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File renamed successfully`, life: 3000 });
+                if (action === 'move') {
+                    this.$toast.add({ severity: 'success', summary: 'Moved', detail: `File moved successfully`, life: 3000 });
+                } else {
+                    this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File renamed successfully`, life: 3000 });
+                }
 
             } catch (e) {
-                this.showError(e, "Rename file");
+                this.showError(e, action === 'move' ? "Move file" : "Rename file");
             }
         },
 
@@ -191,7 +209,7 @@ export default {
             if (!sourceItem || !sourceItem.entry || !destItem || !destItem.entry) return;
 
             if (sourceItem.entry.type === ddb.entry.type.DRONEDB) {
-                console.log("Cannot move root");
+                this.$toast.add({ severity: 'warn', summary: 'Move', detail: 'Cannot move dataset root', life: 3000 });
                 return;
             }
 
@@ -210,22 +228,30 @@ export default {
             }
 
             if (destPath === sourceItem.entry.path) {
-                console.log("Source and destination are the same; ignoring move.");
+                this.$toast.add({
+                    severity: 'info',
+                    summary: 'Move',
+                    detail: 'Item is already in this folder',
+                    life: 2500
+                });
                 return;
             }
 
             // Block move into self or descendant for directories
             if (ddb.entry.isDirectory(sourceItem.entry)
                 && (destPath + '/').startsWith(sourceItem.entry.path + '/')) {
-                console.log("Cannot move a folder onto itself or one of its descendants");
+                this.$toast.add({
+                    severity: 'warn',
+                    summary: 'Move',
+                    detail: 'Cannot move a folder onto itself or one of its descendants',
+                    life: 3500
+                });
                 return;
             }
 
-            console.log(`Moving ${sourceItem.entry.path} -> ${destPath}`);
-
             this.isBusy = true;
             try {
-                await this.renameFile(sourceItem, destPath);
+                await this.renameFile(sourceItem, destPath, { action: 'move' });
             } finally {
                 this.isBusy = false;
             }

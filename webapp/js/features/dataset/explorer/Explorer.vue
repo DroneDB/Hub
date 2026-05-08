@@ -28,7 +28,7 @@
                 </div>
             </div>
             <template v-else>
-                <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="true" @dragstart="startDrag($event, f)"
+                <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="canWrite" @dragstart="startDrag($event, f)"
                     @drop="onDrop($event, f)" @dragenter="itemDragEnter($event, f)"
                     @dragover="itemDragOver($event, f)" @dragleave="itemDragLeave($event, f)"
                     :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }">

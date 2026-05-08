@@ -1,7 +1,13 @@
 <template>
-    <div class="tree-view" ref="treeView">
-        <TreeNode v-for="(node, index) in nodes" :node="node" :key="node.path + ',' + index" ref="treeNodes" @selected="handleSelection"
-            @opened="handleOpen" :getChildren="getChildren" />
+    <div class="tree-view" ref="treeView"
+        :class="{ dropping }"
+        @drop="explorerDropHandler($event)"
+        @dragenter="explorerDragEnter($event)"
+        @dragleave="explorerDragLeave($event)"
+        @dragover.prevent>
+        <TreeNode v-for="(node, index) in nodes" :node="node" :key="node.path + ',' + index" ref="treeNodes"
+            :canWrite="canWrite"
+            @selected="handleSelection" @opened="handleOpen" :getChildren="getChildren" />
     </div>
 </template>
 
@@ -9,6 +15,7 @@
 import TreeNode from './TreeNode.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
+import { dragDropMixin } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
@@ -16,6 +23,7 @@ export default {
     components: {
         TreeNode
     },
+    mixins: [dragDropMixin],
     emits: ['opened', 'selectionChanged'],
     props: {
         nodes: {
@@ -25,7 +33,23 @@ export default {
         getChildren: {
             type: Function,
             required: true
+        },
+        // dragDropMixin contract
+        canWrite: {
+            type: Boolean,
+            default: false
+        },
+        // currentPath = null means "dataset root": dropping on the empty
+        // area of the tree moves the source into the dataset root.
+        currentPath: {
+            type: String,
+            default: null
         }
+    },
+    data() {
+        return {
+            dropping: false
+        };
     },
 
     mounted: function () {
@@ -107,5 +131,11 @@ export default {
     user-select: none;
     overflow-x: scroll;
     height: 100%;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+
+    &.dropping {
+        background-color: var(--ddb-bg-hover);
+        box-shadow: inset 0 0 var(--ddb-spacing-sm) var(--ddb-spacing-xs) var(--ddb-text-muted);
+    }
 }
 </style>
