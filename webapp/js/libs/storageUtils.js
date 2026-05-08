@@ -91,8 +91,8 @@ export function getOrgPagePreferences() {
     return null;
 }
 
-export function saveOrgPagePreferences(itemsPerPage, ownedOnly) {
-    const prefs = { itemsPerPage, ownedOnly };
+export function saveOrgPagePreferences(itemsPerPage, ownedOnly, currentPage = 1, scrollTop = 0) {
+    const prefs = { itemsPerPage, ownedOnly, currentPage, scrollTop };
     try {
         localStorage.setItem(ORG_PAGE_PREFS_KEY, JSON.stringify(prefs));
     } catch (e) {

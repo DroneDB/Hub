@@ -57,7 +57,7 @@
         </div>
 
         <!-- Data loaded -->
-        <div v-else class="org-cards-area">
+        <div v-else ref="cardsArea" class="org-cards-area">
             <div v-if="paginatedOrganizations.length === 0" class="text-center p-4">
                 <h3>No organizations found</h3>
                 <p v-if="searchQuery">Try adjusting your search criteria.</p>
@@ -184,13 +184,24 @@ export default {
 
             showAll: prefs?.ownedOnly === false,
             searchQuery: '',
-            currentPage: 1,
+            currentPage: prefs?.currentPage || 1,
             itemsPerPage: prefs?.itemsPerPage || 10
         }
     },
     mounted: async function () {
         setTitle("Organizations");
         await this.fetchOrganizations();
+        const prefs = getOrgPagePreferences();
+        if (prefs?.scrollTop) {
+            this.$nextTick(() => {
+                if (this.$refs.cardsArea) {
+                    this.$refs.cardsArea.scrollTop = prefs.scrollTop;
+                }
+            });
+        }
+    },
+    beforeUnmount() {
+        this.savePreferences();
     },
     watch: {
         showAll: async function () {
@@ -250,7 +261,7 @@ export default {
         },
 
         savePreferences() {
-            saveOrgPagePreferences(this.itemsPerPage, !this.showAll);
+            saveOrgPagePreferences(this.itemsPerPage, !this.showAll, this.currentPage, this.$refs.cardsArea?.scrollTop ?? 0);
         },
 
         onPageChange(event) {
