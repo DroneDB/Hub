@@ -17,7 +17,7 @@ const STORAGE_KEY = 'ddb:hub:clipboard';
 const state = reactive({
     mode: null,            // 'copy' | 'cut' | null
     source: null,          // { orgSlug, dsSlug, basePath }
-    items: [],             // [{ path, type, size? }]
+    items: [],             // [{ path, type, size?, entry? }] — `entry` is the full source entry (deep-copy) used to repopulate the destination after paste without an extra server round-trip.
     capturedAt: null       // ISO string
 });
 
@@ -57,11 +57,25 @@ watch(
 function normalizeItems(items) {
     return items
         .filter(f => f && f.entry && f.entry.path)
-        .map(f => ({
-            path: f.entry.path,
-            type: f.entry.type,
-            size: f.entry.size || 0
-        }));
+        .map(f => {
+            // Deep-copy the full source entry so we can reuse it (hash,
+            // properties, geometries, meta, ...) when materializing the
+            // destination entries after a paste. The hash in DroneDB is
+            // content-based (SHA256), so it remains valid for the copied/moved
+            // file at the new path.
+            let entryCopy = null;
+            try {
+                entryCopy = JSON.parse(JSON.stringify(f.entry));
+            } catch (e) {
+                entryCopy = null;
+            }
+            return {
+                path: f.entry.path,
+                type: f.entry.type,
+                size: f.entry.size || 0,
+                entry: entryCopy
+            };
+        });
 }
 
 function setClipboard(mode, source, items) {

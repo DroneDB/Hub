@@ -410,14 +410,29 @@ export default {
 
             // Inject newly created destination entries into the current folder view
             // and into the treeview (FileBrowser/TreeNode).
-            // Build minimal fileBrowser items from the original clipboard entries
-            // (we know type + path; full metadata will be picked up on next navigation).
+            // Reuse the original source entry (preserved in the clipboard) so the
+            // newly injected entries carry hash + properties + geometries. The
+            // DroneDB hash is content-based, so it stays valid after copy/move.
+            // When the source entry is missing (legacy clipboard from sessionStorage
+            // pre-fix), fall back to a server `listOne` to populate it.
             if (result.succeeded.length > 0) {
                 const itemByPath = new Map(items.map(it => [it.path, it]));
                 const allNewItems = result.succeeded.map(s => {
                     const original = itemByPath.get(s.source);
-                    const type = original ? original.type : ddb.entry.type.GENERIC;
-                    const entry = { path: s.dest, type, size: original ? original.size : 0 };
+                    const sourceEntry = original && original.entry ? original.entry : null;
+                    const type = sourceEntry ? sourceEntry.type
+                        : (original ? original.type : ddb.entry.type.GENERIC);
+
+                    let entry;
+                    if (sourceEntry) {
+                        // Deep-copy so we don't mutate the clipboard entry (copy mode
+                        // keeps the clipboard alive after paste).
+                        entry = JSON.parse(JSON.stringify(sourceEntry));
+                        entry.path = s.dest;
+                    } else {
+                        entry = { path: s.dest, type, size: original ? original.size : 0 };
+                    }
+
                     return {
                         icon: icons.getForType(type, s.dest),
                         label: pathutils.basename(s.dest),
@@ -428,6 +443,28 @@ export default {
                         isExpandable: ddb.entry.isDirectory(entry)
                     };
                 });
+
+                // Fallback: for non-directory entries that ended up without a hash
+                // (legacy clipboard items), fetch the entry from the server so the
+                // viewer can build the `Entry` object on open. Run in parallel and
+                // tolerate failures (the next folder navigation will refresh anyway).
+                const needsFetch = allNewItems.filter(it =>
+                    !it.entry.hash && !ddb.entry.isDirectory(it.entry)
+                );
+                if (needsFetch.length > 0) {
+                    await Promise.all(needsFetch.map(async (it) => {
+                        try {
+                            const fetched = await this.dataset.listOne(it.entry.path);
+                            if (fetched) {
+                                it.entry = fetched;
+                                it.empty = ddb.entry.isDirectory(fetched);
+                                it.isExpandable = ddb.entry.isDirectory(fetched);
+                            }
+                        } catch (e) {
+                            console.warn(`Could not fetch entry for pasted item ${it.entry.path}:`, e);
+                        }
+                    }));
+                }
 
                 // Items that land in the currently viewed folder: update content view
                 const currentFolderItems = allNewItems.filter(it =>
