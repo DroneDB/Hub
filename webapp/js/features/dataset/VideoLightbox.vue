@@ -55,6 +55,9 @@ export default {
             if (v) {
                 this.$nextTick(() => {
                     if (this.$refs.overlay) this.$refs.overlay.focus();
+                    if (this.$refs.videoEl) {
+                        this.$refs.videoEl.play().catch(() => { /* autoplay blocked by browser */ });
+                    }
                 });
             } else {
                 if (this.$refs.videoEl) {
