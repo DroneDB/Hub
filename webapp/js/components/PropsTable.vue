@@ -1,16 +1,16 @@
 <template>
     <div class="props-table-wrapper">
         <!-- Array at root level: render each item as a sub-table -->
-        <ul v-if="Array.isArray(tObj)" class="props-array-list">
-            <li v-for="(item, index) in tObj" :key="index">
-                <PropsTable :obj="item" />
-            </li>
-        </ul>
+        <div v-if="Array.isArray(tObj)" class="props-array-list">
+            <div v-for="(item, index) in tObj" :key="index">
+                <PropsTable :obj="item" :depth="depth" :maxDepth="maxDepth" />
+            </div>
+        </div>
 
         <!-- Object: render as DataTable -->
         <DataTable v-else-if="tObj !== null && typeof tObj === 'object'"
             :value="rows"
-            size="small"            
+            size="small"
             class="props-datatable">
             <Column field="displayKey" header="Property" style="white-space: nowrap; width: 40%;" />
             <Column header="Value">
@@ -31,7 +31,18 @@
                     <div v-else-if="typeof data.rawValue === 'number'">
                         {{ data.rawValue.toLocaleString() }}
                     </div>
-                    <PropsTable v-else-if="data.rawValue !== null && data.rawValue !== undefined" :obj="data.rawValue" />
+                    <!-- Object/array beyond max depth: show drill-down button -->
+                    <Button v-else-if="shouldCollapse(data.rawValue)"
+                        :label="collapsedLabel(data.rawValue)"
+                        icon="fa-solid fa-arrow-up-right-from-square"
+                        size="small"
+                        severity="secondary"
+                        style="cursor: pointer"
+                        @click="openDrillDown(data.displayKey, data.rawValue)" />
+                    <PropsTable v-else-if="data.rawValue !== null && data.rawValue !== undefined"
+                        :obj="data.rawValue"
+                        :depth="depth + 1"
+                        :maxDepth="maxDepth" />
                     <span v-else>-</span>
                 </template>
             </Column>
@@ -46,6 +57,21 @@
         <div v-else>
             {{ tObj !== undefined && tObj !== null ? tObj : '-' }}
         </div>
+
+        <!-- Drill-down dialog: only mounted from the top-level instance to avoid stacking -->
+        <Dialog v-if="depth === 0"
+            v-model:visible="drillDownVisible"
+            :header="drillDownTitle"
+            modal
+            dismissable-mask
+            :style="{ width: '75vw', maxWidth: '1100px' }"
+            :contentStyle="{ maxHeight: '75vh', overflow: 'auto' }">
+            <PropsTable v-if="drillDownVisible"
+                :obj="drillDownData"
+                :depth="0"
+                :maxDepth="Infinity"
+                :preserveOrder="preserveOrder" />
+        </Dialog>
     </div>
 </template>
 
@@ -53,12 +79,16 @@
 import { clone, sortObjectKeys } from '@/libs/utils';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import Button from 'primevue/button';
+import Dialog from 'primevue/dialog';
 
 export default {
     name: 'PropsTable',
     components: {
         DataTable,
         Column,
+        Button,
+        Dialog,
         PropsTable: () => import('./PropsTable.vue')
     },
     props: {
@@ -69,12 +99,36 @@ export default {
         preserveOrder: {
             type: Boolean,
             default: false
+        },
+        depth: {
+            type: Number,
+            default: 0
+        },
+        maxDepth: {
+            type: Number,
+            default: 2
         }
     },
     data() {
         return {
-            tObj: null
+            tObj: null,
+            drillDownVisible: false,
+            drillDownTitle: '',
+            drillDownData: null
         };
+    },
+    // Root instance exposes a drill-down opener that any nested PropsTable can
+    // call via inject, regardless of how deep PrimeVue cells nest the tree.
+    provide() {
+        if (this.depth === 0) {
+            return {
+                propsTableOpenDrillDown: (title, value) => this.openDrillDownRoot(title, value)
+            };
+        }
+        return {};
+    },
+    inject: {
+        propsTableOpenDrillDown: { default: null }
     },
     created() {
         this.processObject();
@@ -157,6 +211,49 @@ export default {
             } catch (e) {
                 return false;
             }
+        },
+
+        // True if the value is an object/array that should be collapsed
+        // behind a drill-down button (nested too deep or too large).
+        shouldCollapse(value) {
+            if (value === null || value === undefined) return false;
+            if (typeof value !== 'object') return false;
+            if (!isFinite(this.maxDepth)) return false;
+            const nextDepth = this.depth + 1;
+            if (nextDepth < this.maxDepth) return false;
+
+            // Trivial containers stay inline
+            if (Array.isArray(value)) {
+                if (value.length === 0) return false;
+                if (value.length <= 3 && value.every(v => v === null || typeof v !== 'object')) return false;
+                return true;
+            }
+            const keys = Object.keys(value);
+            if (keys.length === 0) return false;
+            if (keys.length <= 3 && keys.every(k => value[k] === null || typeof value[k] !== 'object')) return false;
+            return true;
+        },
+
+        collapsedLabel(value) {
+            if (Array.isArray(value)) {
+                return `View ${value.length} item${value.length === 1 ? '' : 's'}\u2026`;
+            }
+            const n = Object.keys(value).length;
+            return `View ${n} propert${n === 1 ? 'y' : 'ies'}\u2026`;
+        },
+
+        openDrillDown(title, value) {
+            if (typeof this.propsTableOpenDrillDown === 'function') {
+                this.propsTableOpenDrillDown(title, value);
+            } else {
+                this.openDrillDownRoot(title, value);
+            }
+        },
+
+        openDrillDownRoot(title, value) {
+            this.drillDownTitle = title || 'Details';
+            this.drillDownData = value;
+            this.drillDownVisible = true;
         }
     }
 };
@@ -165,6 +262,10 @@ export default {
 <style scoped>
 .props-table-wrapper {
     width: 100%;
+}
+
+.p-button-label {
+    cursor: pointer !important;
 }
 
 .props-array-list {
