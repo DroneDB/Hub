@@ -102,8 +102,9 @@
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import bbox from '@turf/bbox';
-import { Tile as TileLayer, Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
-import { Vector as VectorSource } from 'ol/source';
+import { Tile as TileLayer, Vector as VectorLayer, VectorTile as VectorTileLayer, Group as LayerGroup } from 'ol/layer';
+import { Vector as VectorSource, VectorTile as VectorTileSource } from 'ol/source';
+import MVT from 'ol/format/MVT';
 import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
 import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
 import { bbox as bboxStrategy } from 'ol/loadingstrategy';
@@ -113,7 +114,6 @@ import HybridXYZ from '@/libs/map/olHybridXYZ';
 import olMeasure from './olMeasure';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import { transformExtent, toLonLat } from 'ol/proj';
-import * as flatgeobuf from 'flatgeobuf';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import OpacityControl from './OpacityControl.vue';
@@ -487,12 +487,8 @@ export default {
         // Load vector layer for the entry
         loadVectorLayer: async function (entry) {
             try {
-
-                // Get the vector URL using getVector method
-                let vectorUrl = await this.dataset.Entry(entry).getVector();
-
-                // Create a vector source for streaming features
-                const vectorSource = new VectorSource();
+                // Resolve the MVT URL template for the entry
+                const mvtTemplate = this.dataset.Entry(entry).getMvtUrlTemplate();
 
                 // Get a unique color for this vector file
                 const vectorFileIndex = 0; // Only one vector layer in SingleMap
@@ -531,14 +527,11 @@ export default {
                     })
                 };
 
-                // Create the vector layer with styling based on geometry type
-                // Style function compatible with RenderFeature (uses getType() instead of getGeometry().getType())
+                // Style function compatible with RenderFeature emitted by MVT
                 const vectorStyleFunction = (feature) => {
-                    // For RenderFeature, use getType() directly instead of getGeometry().getType()
                     const geometryType = feature.getType ? feature.getType() : (feature.getGeometry ? feature.getGeometry().getType() : 'Point');
                     const properties = feature.getProperties();
 
-                    // Get appropriate base style based on geometry
                     let style;
                     if (geometryType.includes('Point')) {
                         style = vectorStyles.point.clone();
@@ -550,31 +543,20 @@ export default {
                         style = vectorStyles.point.clone();
                     }
 
-                    // Add label for features when zoomed in close enough
                     const zoom = this.map ? this.map.getView().getZoom() : 0;
-
-                    if (zoom >= 16) { // Only show labels when zoomed in
-                        // Try to find a good label property
+                    if (zoom >= 16) {
                         let label = extractFeatureDisplayName(properties, null);
-
                         if (label && label !== 'Unknown feature') {
-                            // Define text style for the label
                             const textStyle = new Text({
                                 text: label,
                                 font: 'bold 0.75rem Arial, Helvetica, sans-serif',
-                                fill: new Fill({
-                                    color: '#000'
-                                }),
-                                stroke: new Stroke({
-                                    color: '#fff',
-                                    width: 3
-                                }),
-                                offsetY: -15, // For points, place above the point
+                                fill: new Fill({ color: '#000' }),
+                                stroke: new Stroke({ color: '#fff', width: 3 }),
+                                offsetY: -15,
                                 textAlign: 'center',
                                 overflow: true,
-                                maxAngle: 45  // Maximum angle for curved labels (e.g. on lines)
+                                maxAngle: 45
                             });
-
                             style.setText(textStyle);
                         }
                     }
@@ -582,50 +564,44 @@ export default {
                     return style;
                 };
 
-                // Create the vector layer with bbox loading strategy for efficient streaming
-                const vectorLayer = new VectorLayer({
-                    source: vectorSource,
+                // Build the VectorTileSource backed by the MVT pyramid
+                const vectorTileSource = new VectorTileSource({
+                    format: new MVT(),
+                    url: mvtTemplate,
+                    minZoom: 0,
+                    maxZoom: 18,
+                    overlaps: false
+                });
+
+                const vectorLayer = new VectorTileLayer({
+                    source: vectorTileSource,
+                    declutter: true,
                     style: vectorStyleFunction
                 });
 
-                // Use FlatGeobuf's createLoader with bbox strategy for spatial queries
-                // This loads only features within the current view extent
-                const loader = flatgeobuf.ol.createLoader(
-                    vectorSource,
-                    vectorUrl,
-                    'EPSG:4326',  // Source projection - FlatGeobuf uses WGS84
-                    bboxStrategy, // Use bbox strategy for spatial queries (requires spatial index in FGB)
-                    true          // Clear existing features when loading new ones
-                );
-
-                // Set the loader on the vector source
-                vectorSource.setLoader(loader);
-
-                // Add entry reference to layer
                 vectorLayer.entry = entry;
-
-                // Add layer to the map
                 this.map.addLayer(vectorLayer);
-
-                // Store vector layer for later reference
                 this.vectorLayers.push(vectorLayer);
+                vectorLayer.vectorSource = vectorTileSource;
 
-                // Add event listener to zoom to all features when source changes
-                vectorSource.on('change', () => {
-                    // Only trigger if we have features and loading is done
-                    if (vectorSource.getFeatures().length > 0 && vectorSource.getState() === 'ready') {
-                        // Zoom to the extent of the vector features
-                        const vectorExtent = vectorSource.getExtent();
-                        if (!isEmptyExtent(vectorExtent)) {
-                            // Save initial extent if not already set
-                            if (!this.initialExtent) {
-                                this.initialExtent = vectorExtent.slice(); // Clone the extent array
-                            }
-                            this.map.getView().fit(vectorExtent, {
+                // Fit the view to the dataset bounding box on first tile load
+                let firstLoadFired = false;
+                vectorTileSource.on('tileloadend', () => {
+                    if (firstLoadFired) return;
+                    firstLoadFired = true;
+                    // Use entry bbox if available (ol expects EPSG:3857 extent on the map)
+                    if (entry.polygon_geom && entry.polygon_geom.coordinates) {
+                        try {
+                            const rawExtent = bbox(entry.polygon_geom);
+                            const ext3857 = transformExtent(rawExtent, 'EPSG:4326', 'EPSG:3857');
+                            if (!this.initialExtent) this.initialExtent = ext3857.slice();
+                            this.map.getView().fit(ext3857, {
                                 padding: [40, 40, 40, 40],
                                 duration: 500,
                                 minResolution: 0.5
                             });
+                        } catch (e) {
+                            console.warn('Unable to compute vector extent from entry geometry:', e);
                         }
                     }
                 });

@@ -135,8 +135,9 @@
 <script>
 import 'ol/ol.css';
 import { Map, View } from 'ol';
-import { Tile as TileLayer, Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
-import { Vector as VectorSource, Cluster } from 'ol/source';
+import { Tile as TileLayer, Vector as VectorLayer, VectorTile as VectorTileLayer, Group as LayerGroup } from 'ol/layer';
+import { Vector as VectorSource, VectorTile as VectorTileSource, Cluster } from 'ol/source';
+import MVT from 'ol/format/MVT';
 import { defaults as defaultControls, Control } from 'ol/control';
 import Collection from 'ol/Collection';
 import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent, getCenter as getExtentCenter, buffer as extentBuffer } from 'ol/extent';
@@ -175,7 +176,6 @@ import { rootPath } from '@/dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { isMobile } from '@/libs/responsive';
 import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
-import * as flatgeobuf from 'flatgeobuf';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
@@ -1403,35 +1403,26 @@ export default {
                         return;
                     }
 
-                    // Handle vector files using streaming approach
+                    // Handle vector files using the precomputed MVT tile pyramid
                     const loadVectorFile = async () => {
                         try {
-                            // Create a proper Entry object using the dataset
-                            let vectorUrl = '';
+                            // Resolve the MVT URL template via the dataset's Entry
+                            let mvtTemplate = '';
 
                             if (this.dataset) {
-                                // Create the Entry object using the dataset
                                 const entry = this.dataset.Entry(f.entry);
-                                // Get the vector URL using getVector method
-                                vectorUrl = await entry.getVector();
+                                mvtTemplate = entry.getMvtUrlTemplate();
                             } else {
                                 console.warn('Dataset not available, using fallback URL construction');
-                                // Fallback in case dataset is not available
                                 const hashMatch = f.path.match(/\/r\/([^\/]+)\/([^\/]+)\/([^\/]+)/);
-
                                 if (hashMatch && hashMatch.length >= 4) {
-                                    // Use the same URL pattern that getVector() would use
                                     const hash = hashMatch[3];
                                     const baseApi = f.path.split('/r/')[0];
-                                    vectorUrl = `${baseApi}/build/${hash}/vec/vector.fgb`;
+                                    mvtTemplate = `${baseApi}/mvt/${hash}/{z}/{x}/{y}.pbf`;
                                 } else {
-                                    // Fallback in case the path structure is different
-                                    vectorUrl = `${f.path}/vector.fgb`;
+                                    mvtTemplate = `${f.path}/mvt/{z}/{x}/{y}.pbf`;
                                 }
                             }
-
-                            // Create a vector source that will stream features based on the current view
-                            const vectorSource = new VectorSource();
 
                             // Get a unique color for this vector file
                             const vectorFileIndex = this.vectorLayers.length;
@@ -1501,10 +1492,8 @@ export default {
                                 })
                             };
 
-                            // Create the vector layer with styling based on geometry type
-                            // Style function compatible with RenderFeature (uses getType() instead of getGeometry().getType())
+                            // Style function compatible with RenderFeature emitted by MVT (uses getType())
                             const vectorStyleFunction = (feature) => {
-                                // For RenderFeature, use getType() directly instead of getGeometry().getType()
                                 const geometryType = feature.getType ? feature.getType() : (feature.getGeometry ? feature.getGeometry().getType() : 'Point');
                                 const isSelected = f.selected;
                                 const properties = feature.getProperties();
@@ -1534,31 +1523,20 @@ export default {
                                 }
 
                                 // Add label for features when zoomed in close enough
-                                // Only add labels at higher zoom levels to prevent clutter
                                 const zoom = this.map ? this.map.getView().getZoom() : 0;
-
-                                if (zoom >= 16) { // Only show labels when zoomed in
-                                    // Try to find a good label property
+                                if (zoom >= 16) {
                                     let label = extractFeatureDisplayName(properties, null);
-
                                     if (label && label !== 'Unknown feature') {
-                                        // Define text style for the label
                                         const textStyle = new Text({
                                             text: label,
                                             font: 'bold 0.75rem Arial, Helvetica, sans-serif',
-                                            fill: new Fill({
-                                                color: '#000'
-                                            }),
-                                            stroke: new Stroke({
-                                                color: '#fff',
-                                                width: 3
-                                            }),
-                                            offsetY: -15, // For points, place above the point
+                                            fill: new Fill({ color: '#000' }),
+                                            stroke: new Stroke({ color: '#fff', width: 3 }),
+                                            offsetY: -15,
                                             textAlign: 'center',
                                             overflow: true,
-                                            maxAngle: 45  // Maximum angle for curved labels (e.g. on lines)
+                                            maxAngle: 45
                                         });
-
                                         style.setText(textStyle);
                                     }
                                 }
@@ -1566,24 +1544,20 @@ export default {
                                 return style;
                             };
 
-                            // Create the vector layer with bbox loading strategy for efficient streaming
-                            const vectorLayer = new VectorLayer({
-                                source: vectorSource,
-                                style: vectorStyleFunction
+                            // Build the VectorTileSource backed by the MVT pyramid served at /mvt/{hash}/{z}/{x}/{y}.pbf
+                            const vectorTileSource = new VectorTileSource({
+                                format: new MVT(),
+                                url: mvtTemplate,
+                                minZoom: 0,
+                                maxZoom: 18,
+                                overlaps: false
                             });
 
-                            // Use FlatGeobuf's createLoader with bbox strategy for spatial queries
-                            // This loads only features within the current view extent
-                            const loader = flatgeobuf.ol.createLoader(
-                                vectorSource,
-                                vectorUrl,
-                                'EPSG:4326',  // Source projection - FlatGeobuf uses WGS84
-                                bboxStrategy, // Use bbox strategy for spatial queries (requires spatial index in FGB)
-                                true          // Clear existing features when loading new ones
-                            );
-
-                            // Set the loader on the vector source
-                            vectorSource.setLoader(loader);
+                            const vectorLayer = new VectorTileLayer({
+                                source: vectorTileSource,
+                                declutter: true,
+                                style: vectorStyleFunction
+                            });
 
                             // Add file reference to layer for selection handling
                             vectorLayer.file = f;
@@ -1594,13 +1568,15 @@ export default {
                             // Store vector layer for later reference
                             this.vectorLayers.push(vectorLayer);
 
-                            // Add event listener to zoom to all features when source changes
-                            // This helps with requirement #5 - calculate initial map position
+                            // Expose the underlying source for any legacy code paths that expect it
+                            vectorLayer.vectorSource = vectorTileSource;
+
+                            // Refresh the map extent when tiles finish loading the first time
                             if (!this._vectorSourceListenerKeys) this._vectorSourceListenerKeys = [];
-                            this._vectorSourceListenerKeys.push(vectorSource.on('change', () => {
-                                // Only trigger if we have features and loading is done
-                                if (vectorSource.getFeatures().length > 0 && vectorSource.getState() === 'ready') {
-                                    // Trigger a map extent update to include these features
+                            let firstLoadFired = false;
+                            this._vectorSourceListenerKeys.push(vectorTileSource.on('tileloadend', () => {
+                                if (!firstLoadFired) {
+                                    firstLoadFired = true;
                                     this.zoomToFilesExtent();
                                 }
                             }));
