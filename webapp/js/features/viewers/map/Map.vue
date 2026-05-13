@@ -154,6 +154,7 @@ import { fromExtent } from 'ol/geom/Polygon';
 import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
+import { markRaw } from 'vue';
 
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
@@ -1298,16 +1299,23 @@ export default {
                 extendExtent(ext, layer.getExtent());
             });
 
-            // Include vector layers' extent
-            this.vectorLayers.forEach(layer => {
-                const source = layer.getSource();
-                if (source && source.getExtent) {
-                    const vectorExtent = source.getExtent();
-                    if (!isEmptyExtent(vectorExtent)) {
-                        extendExtent(ext, vectorExtent);
+            // Include vector layers' extent computed from file metadata
+            // (VectorTileSource.getExtent() only returns the extent of currently
+            // loaded tiles, not the underlying data bbox, so we use polygon_geom
+            // from the entry metadata instead).
+            if (this.files && this.files.length) {
+                this.files.forEach(f => {
+                    if (!f.entry) return;
+                    if (f.entry.type !== ddb.entry.type.VECTOR) return;
+                    if (f.entry.polygon_geom) {
+                        const vExt = transformExtent(bbox(f.entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                        if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
+                    } else if (f.entry.point_geom) {
+                        const vExt = transformExtent(bbox(f.entry.point_geom), 'EPSG:4326', 'EPSG:3857');
+                        if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
                     }
-                }
-            });
+                });
+            }
 
             return ext;
         },
@@ -1553,11 +1561,11 @@ export default {
                                 overlaps: false
                             });
 
-                            const vectorLayer = new VectorTileLayer({
+                            const vectorLayer = markRaw(new VectorTileLayer({
                                 source: vectorTileSource,
                                 declutter: true,
                                 style: vectorStyleFunction
-                            });
+                            }));
 
                             // Add file reference to layer for selection handling
                             vectorLayer.file = f;
