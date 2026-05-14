@@ -114,8 +114,8 @@ import HybridXYZ from '@/libs/map/olHybridXYZ';
 import olMeasure from './olMeasure';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import { transformExtent, toLonLat } from 'ol/proj';
-import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer } from '@/composables/useMvtLayer';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
@@ -494,89 +494,16 @@ export default {
                 const vectorFileIndex = 0; // Only one vector layer in SingleMap
                 const vectorColor = this.getVectorFileColor(entry, vectorFileIndex);
 
-                // Create a vector style based on the color
-                const vectorStyles = {
-                    point: new Style({
-                        image: new CircleStyle({
-                            radius: 5,
-                            fill: new Fill({
-                                color: vectorColor
-                            }),
-                            stroke: new Stroke({
-                                color: 'rgba(255, 255, 255, 0.8)',
-                                width: 1.5
-                            })
-                        })
-                    }),
-
-                    line: new Style({
-                        stroke: new Stroke({
-                            color: vectorColor,
-                            width: 3
-                        })
-                    }),
-
-                    polygon: new Style({
-                        fill: new Fill({
-                            color: vectorColor.replace('0.8', '0.3') // More transparent for fill
-                        }),
-                        stroke: new Stroke({
-                            color: vectorColor,
-                            width: 2
-                        })
-                    })
-                };
-
-                // Style function compatible with RenderFeature emitted by MVT
-                const vectorStyleFunction = (feature) => {
-                    const geometryType = feature.getType ? feature.getType() : (feature.getGeometry ? feature.getGeometry().getType() : 'Point');
-                    const properties = feature.getProperties();
-
-                    let style;
-                    if (geometryType.includes('Point')) {
-                        style = vectorStyles.point.clone();
-                    } else if (geometryType.includes('LineString')) {
-                        style = vectorStyles.line.clone();
-                    } else if (geometryType.includes('Polygon')) {
-                        style = vectorStyles.polygon.clone();
-                    } else {
-                        style = vectorStyles.point.clone();
-                    }
-
-                    const zoom = this.map ? this.map.getView().getZoom() : 0;
-                    if (zoom >= 16) {
-                        let label = extractFeatureDisplayName(properties, null);
-                        if (label && label !== 'Unknown feature') {
-                            const textStyle = new Text({
-                                text: label,
-                                font: 'bold 0.75rem Arial, Helvetica, sans-serif',
-                                fill: new Fill({ color: '#000' }),
-                                stroke: new Stroke({ color: '#fff', width: 3 }),
-                                offsetY: -15,
-                                textAlign: 'center',
-                                overflow: true,
-                                maxAngle: 45
-                            });
-                            style.setText(textStyle);
-                        }
-                    }
-
-                    return style;
-                };
-
-                // Build the VectorTileSource backed by the MVT pyramid
-                const vectorTileSource = new VectorTileSource({
-                    format: new MVT(),
-                    url: mvtTemplate,
-                    minZoom: 0,
-                    maxZoom: 18,
-                    overlaps: false
+                const vectorStyles = createMvtVectorStyles(vectorColor);
+                const vectorStyleFunction = createMvtStyleFunction({
+                    styles: vectorStyles,
+                    getZoom: () => (this.map ? this.map.getView().getZoom() : 0)
                 });
 
-                const vectorLayer = new VectorTileLayer({
-                    source: vectorTileSource,
-                    declutter: true,
-                    style: vectorStyleFunction
+                // Build the VectorTileSource backed by the MVT pyramid
+                const { layer: vectorLayer, source: vectorTileSource } = createMvtVectorLayer({
+                    urlTemplate: mvtTemplate,
+                    styleFunction: vectorStyleFunction
                 });
 
                 vectorLayer.entry = entry;
