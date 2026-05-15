@@ -177,13 +177,13 @@ import { rootPath } from '@/dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { isMobile } from '@/libs/responsive';
 import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
+import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
-import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer } from '@/composables/useMvtLayer';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -1435,19 +1435,137 @@ export default {
                             // Get a unique color for this vector file
                             const vectorFileIndex = this.vectorLayers.length;
                             const vectorColor = this.getVectorFileColor(f, vectorFileIndex);
-                            const vectorStyles = createMvtVectorStyles(vectorColor);
-                            const vectorStyleFunction = createMvtStyleFunction({
-                                styles: vectorStyles,
-                                getZoom: () => (this.map ? this.map.getView().getZoom() : 0),
-                                isSelected: () => f.selected
-                            });
+                            const vectorSelectedColor = 'rgba(255, 158, 103, 0.8)'; // Orange for selected state
+                            // Create a vector style based on the unique color
+                            const vectorStyles = {
+                                point: new Style({
+                                    image: new CircleStyle({
+                                        radius: 5,
+                                        fill: new Fill({
+                                            color: vectorColor
+                                        }),
+                                        stroke: new Stroke({
+                                            color: 'rgba(255, 255, 255, 0.8)',
+                                            width: 1.5
+                                        })
+                                    })
+                                }),
+
+                                line: new Style({
+                                    stroke: new Stroke({
+                                        color: vectorColor,
+                                        width: 3
+                                    })
+                                }),
+
+                                polygon: new Style({
+                                    fill: new Fill({
+                                        color: vectorColor.replace('0.8', '0.3') // More transparent for fill
+                                    }),
+                                    stroke: new Stroke({
+                                        color: vectorColor,
+                                        width: 2
+                                    })
+                                }),
+
+                                // Selected styles
+                                pointSelected: new Style({
+                                    image: new CircleStyle({
+                                        radius: 6, // Slightly larger when selected
+                                        fill: new Fill({
+                                            color: vectorSelectedColor
+                                        }),
+                                        stroke: new Stroke({
+                                            color: 'rgba(255, 255, 255, 0.8)',
+                                            width: 2
+                                        })
+                                    })
+                                }),
+
+                                lineSelected: new Style({
+                                    stroke: new Stroke({
+                                        color: vectorSelectedColor,
+                                        width: 4 // Slightly thicker when selected
+                                    })
+                                }),
+
+                                polygonSelected: new Style({
+                                    fill: new Fill({
+                                        color: vectorSelectedColor.replace('0.8', '0.3') // More transparent for fill
+                                    }),
+                                    stroke: new Stroke({
+                                        color: vectorSelectedColor,
+                                        width: 3 // Slightly thicker when selected
+                                    })
+                                })
+                            };
+
+                            // Style function compatible with RenderFeature emitted by MVT (uses getType())
+                            const vectorStyleFunction = (feature) => {
+                                const geometryType = feature.getType ? feature.getType() : (feature.getGeometry ? feature.getGeometry().getType() : 'Point');
+                                const isSelected = f.selected;
+                                const properties = feature.getProperties();
+
+                                // Get appropriate base style based on geometry and selection
+                                let style;
+                                if (isSelected) {
+                                    if (geometryType.includes('Point')) {
+                                        style = vectorStyles.pointSelected.clone();
+                                    } else if (geometryType.includes('LineString')) {
+                                        style = vectorStyles.lineSelected.clone();
+                                    } else if (geometryType.includes('Polygon')) {
+                                        style = vectorStyles.polygonSelected.clone();
+                                    } else {
+                                        style = vectorStyles.pointSelected.clone();
+                                    }
+                                } else {
+                                    if (geometryType.includes('Point')) {
+                                        style = vectorStyles.point.clone();
+                                    } else if (geometryType.includes('LineString')) {
+                                        style = vectorStyles.line.clone();
+                                    } else if (geometryType.includes('Polygon')) {
+                                        style = vectorStyles.polygon.clone();
+                                    } else {
+                                        style = vectorStyles.point.clone();
+                                    }
+                                }
+
+                                // Add label for features when zoomed in close enough
+                                const zoom = this.map ? this.map.getView().getZoom() : 0;
+                                if (zoom >= 16) {
+                                    let label = extractFeatureDisplayName(properties, null);
+                                    if (label && label !== 'Unknown feature') {
+                                        const textStyle = new Text({
+                                            text: label,
+                                            font: 'bold 0.75rem Arial, Helvetica, sans-serif',
+                                            fill: new Fill({ color: '#000' }),
+                                            stroke: new Stroke({ color: '#fff', width: 3 }),
+                                            offsetY: -15,
+                                            textAlign: 'center',
+                                            overflow: true,
+                                            maxAngle: 45
+                                        });
+                                        style.setText(textStyle);
+                                    }
+                                }
+
+                                return style;
+                            };
 
                             // Build the VectorTileSource backed by the MVT pyramid served at /mvt/{hash}/{z}/{x}/{y}.pbf
-                            const { layer: vectorLayer, source: vectorTileSource } = createMvtVectorLayer({
-                                urlTemplate: mvtTemplate,
-                                styleFunction: vectorStyleFunction,
-                                useMarkRaw: true
+                            const vectorTileSource = new VectorTileSource({
+                                format: new MVT(),
+                                url: mvtTemplate,
+                                minZoom: 0,
+                                maxZoom: 18,
+                                overlaps: false
                             });
+
+                            const vectorLayer = markRaw(new VectorTileLayer({
+                                source: vectorTileSource,
+                                declutter: true,
+                                style: vectorStyleFunction
+                            }));
 
                             // Add file reference to layer for selection handling
                             vectorLayer.file = f;
