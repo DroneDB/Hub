@@ -42,6 +42,15 @@ class Entry {
         if (await this.dataset.registry.headRequest(vectorUrl)) return vectorUrl;
         else throw new Error(`Il file vettoriale non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
     }
+
+    /**
+     * Returns the OpenLayers-compatible URL template for the MVT tile pyramid
+     * served by Registry's MvtController at /orgs/{org}/ds/{ds}/mvt/{hash}/{z}/{x}/{y}.pbf.
+     * The {z}/{x}/{y} placeholders are kept verbatim for ol/source/VectorTile.
+     */
+    getMvtUrlTemplate() {
+        return `${this.dataset.baseApi}/mvt/${this.hash}/{z}/{x}/{y}.pbf`;
+    }
 }
 
 module.exports = {

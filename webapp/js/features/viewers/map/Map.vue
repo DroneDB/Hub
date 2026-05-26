@@ -135,8 +135,9 @@
 <script>
 import 'ol/ol.css';
 import { Map, View } from 'ol';
-import { Tile as TileLayer, Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
-import { Vector as VectorSource, Cluster } from 'ol/source';
+import { Tile as TileLayer, Vector as VectorLayer, VectorTile as VectorTileLayer, Group as LayerGroup } from 'ol/layer';
+import { Vector as VectorSource, VectorTile as VectorTileSource, Cluster } from 'ol/source';
+import MVT from 'ol/format/MVT';
 import { defaults as defaultControls, Control } from 'ol/control';
 import Collection from 'ol/Collection';
 import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent, getCenter as getExtentCenter, buffer as extentBuffer } from 'ol/extent';
@@ -153,6 +154,7 @@ import { fromExtent } from 'ol/geom/Polygon';
 import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
+import { markRaw } from 'vue';
 
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
@@ -175,14 +177,13 @@ import { rootPath } from '@/dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { isMobile } from '@/libs/responsive';
 import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
-import * as flatgeobuf from 'flatgeobuf';
-import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
+import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer } from '@/composables/useMvtLayer';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -1298,16 +1299,23 @@ export default {
                 extendExtent(ext, layer.getExtent());
             });
 
-            // Include vector layers' extent
-            this.vectorLayers.forEach(layer => {
-                const source = layer.getSource();
-                if (source && source.getExtent) {
-                    const vectorExtent = source.getExtent();
-                    if (!isEmptyExtent(vectorExtent)) {
-                        extendExtent(ext, vectorExtent);
+            // Include vector layers' extent computed from file metadata
+            // (VectorTileSource.getExtent() only returns the extent of currently
+            // loaded tiles, not the underlying data bbox, so we use polygon_geom
+            // from the entry metadata instead).
+            if (this.files && this.files.length) {
+                this.files.forEach(f => {
+                    if (!f.entry) return;
+                    if (f.entry.type !== ddb.entry.type.VECTOR) return;
+                    if (f.entry.polygon_geom) {
+                        const vExt = transformExtent(bbox(f.entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                        if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
+                    } else if (f.entry.point_geom) {
+                        const vExt = transformExtent(bbox(f.entry.point_geom), 'EPSG:4326', 'EPSG:3857');
+                        if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
                     }
-                }
-            });
+                });
+            }
 
             return ext;
         },
@@ -1403,187 +1411,43 @@ export default {
                         return;
                     }
 
-                    // Handle vector files using streaming approach
+                    // Handle vector files using the precomputed MVT tile pyramid
                     const loadVectorFile = async () => {
                         try {
-                            // Create a proper Entry object using the dataset
-                            let vectorUrl = '';
+                            // Resolve the MVT URL template via the dataset's Entry
+                            let mvtTemplate = '';
 
                             if (this.dataset) {
-                                // Create the Entry object using the dataset
                                 const entry = this.dataset.Entry(f.entry);
-                                // Get the vector URL using getVector method
-                                vectorUrl = await entry.getVector();
+                                mvtTemplate = entry.getMvtUrlTemplate();
                             } else {
                                 console.warn('Dataset not available, using fallback URL construction');
-                                // Fallback in case dataset is not available
                                 const hashMatch = f.path.match(/\/r\/([^\/]+)\/([^\/]+)\/([^\/]+)/);
-
                                 if (hashMatch && hashMatch.length >= 4) {
-                                    // Use the same URL pattern that getVector() would use
                                     const hash = hashMatch[3];
                                     const baseApi = f.path.split('/r/')[0];
-                                    vectorUrl = `${baseApi}/build/${hash}/vec/vector.fgb`;
+                                    mvtTemplate = `${baseApi}/mvt/${hash}/{z}/{x}/{y}.pbf`;
                                 } else {
-                                    // Fallback in case the path structure is different
-                                    vectorUrl = `${f.path}/vector.fgb`;
+                                    mvtTemplate = `${f.path}/mvt/{z}/{x}/{y}.pbf`;
                                 }
                             }
-
-                            // Create a vector source that will stream features based on the current view
-                            const vectorSource = new VectorSource();
 
                             // Get a unique color for this vector file
                             const vectorFileIndex = this.vectorLayers.length;
                             const vectorColor = this.getVectorFileColor(f, vectorFileIndex);
-                            const vectorSelectedColor = 'rgba(255, 158, 103, 0.8)'; // Orange for selected state
-                            // Create a vector style based on the unique color
-                            const vectorStyles = {
-                                point: new Style({
-                                    image: new CircleStyle({
-                                        radius: 5,
-                                        fill: new Fill({
-                                            color: vectorColor
-                                        }),
-                                        stroke: new Stroke({
-                                            color: 'rgba(255, 255, 255, 0.8)',
-                                            width: 1.5
-                                        })
-                                    })
-                                }),
-
-                                line: new Style({
-                                    stroke: new Stroke({
-                                        color: vectorColor,
-                                        width: 3
-                                    })
-                                }),
-
-                                polygon: new Style({
-                                    fill: new Fill({
-                                        color: vectorColor.replace('0.8', '0.3') // More transparent for fill
-                                    }),
-                                    stroke: new Stroke({
-                                        color: vectorColor,
-                                        width: 2
-                                    })
-                                }),
-
-                                // Selected styles
-                                pointSelected: new Style({
-                                    image: new CircleStyle({
-                                        radius: 6, // Slightly larger when selected
-                                        fill: new Fill({
-                                            color: vectorSelectedColor
-                                        }),
-                                        stroke: new Stroke({
-                                            color: 'rgba(255, 255, 255, 0.8)',
-                                            width: 2
-                                        })
-                                    })
-                                }),
-
-                                lineSelected: new Style({
-                                    stroke: new Stroke({
-                                        color: vectorSelectedColor,
-                                        width: 4 // Slightly thicker when selected
-                                    })
-                                }),
-
-                                polygonSelected: new Style({
-                                    fill: new Fill({
-                                        color: vectorSelectedColor.replace('0.8', '0.3') // More transparent for fill
-                                    }),
-                                    stroke: new Stroke({
-                                        color: vectorSelectedColor,
-                                        width: 3 // Slightly thicker when selected
-                                    })
-                                })
-                            };
-
-                            // Create the vector layer with styling based on geometry type
-                            // Style function compatible with RenderFeature (uses getType() instead of getGeometry().getType())
-                            const vectorStyleFunction = (feature) => {
-                                // For RenderFeature, use getType() directly instead of getGeometry().getType()
-                                const geometryType = feature.getType ? feature.getType() : (feature.getGeometry ? feature.getGeometry().getType() : 'Point');
-                                const isSelected = f.selected;
-                                const properties = feature.getProperties();
-
-                                // Get appropriate base style based on geometry and selection
-                                let style;
-                                if (isSelected) {
-                                    if (geometryType.includes('Point')) {
-                                        style = vectorStyles.pointSelected.clone();
-                                    } else if (geometryType.includes('LineString')) {
-                                        style = vectorStyles.lineSelected.clone();
-                                    } else if (geometryType.includes('Polygon')) {
-                                        style = vectorStyles.polygonSelected.clone();
-                                    } else {
-                                        style = vectorStyles.pointSelected.clone();
-                                    }
-                                } else {
-                                    if (geometryType.includes('Point')) {
-                                        style = vectorStyles.point.clone();
-                                    } else if (geometryType.includes('LineString')) {
-                                        style = vectorStyles.line.clone();
-                                    } else if (geometryType.includes('Polygon')) {
-                                        style = vectorStyles.polygon.clone();
-                                    } else {
-                                        style = vectorStyles.point.clone();
-                                    }
-                                }
-
-                                // Add label for features when zoomed in close enough
-                                // Only add labels at higher zoom levels to prevent clutter
-                                const zoom = this.map ? this.map.getView().getZoom() : 0;
-
-                                if (zoom >= 16) { // Only show labels when zoomed in
-                                    // Try to find a good label property
-                                    let label = extractFeatureDisplayName(properties, null);
-
-                                    if (label && label !== 'Unknown feature') {
-                                        // Define text style for the label
-                                        const textStyle = new Text({
-                                            text: label,
-                                            font: 'bold 0.75rem Arial, Helvetica, sans-serif',
-                                            fill: new Fill({
-                                                color: '#000'
-                                            }),
-                                            stroke: new Stroke({
-                                                color: '#fff',
-                                                width: 3
-                                            }),
-                                            offsetY: -15, // For points, place above the point
-                                            textAlign: 'center',
-                                            overflow: true,
-                                            maxAngle: 45  // Maximum angle for curved labels (e.g. on lines)
-                                        });
-
-                                        style.setText(textStyle);
-                                    }
-                                }
-
-                                return style;
-                            };
-
-                            // Create the vector layer with bbox loading strategy for efficient streaming
-                            const vectorLayer = new VectorLayer({
-                                source: vectorSource,
-                                style: vectorStyleFunction
+                            const vectorStyles = createMvtVectorStyles(vectorColor);
+                            const vectorStyleFunction = createMvtStyleFunction({
+                                styles: vectorStyles,
+                                getZoom: () => (this.map ? this.map.getView().getZoom() : 0),
+                                isSelected: () => f.selected
                             });
 
-                            // Use FlatGeobuf's createLoader with bbox strategy for spatial queries
-                            // This loads only features within the current view extent
-                            const loader = flatgeobuf.ol.createLoader(
-                                vectorSource,
-                                vectorUrl,
-                                'EPSG:4326',  // Source projection - FlatGeobuf uses WGS84
-                                bboxStrategy, // Use bbox strategy for spatial queries (requires spatial index in FGB)
-                                true          // Clear existing features when loading new ones
-                            );
-
-                            // Set the loader on the vector source
-                            vectorSource.setLoader(loader);
+                            // Build the VectorTileSource backed by the MVT pyramid served at /mvt/{hash}/{z}/{x}/{y}.pbf
+                            const { layer: vectorLayer, source: vectorTileSource } = createMvtVectorLayer({
+                                urlTemplate: mvtTemplate,
+                                styleFunction: vectorStyleFunction,
+                                useMarkRaw: true
+                            });
 
                             // Add file reference to layer for selection handling
                             vectorLayer.file = f;
@@ -1594,13 +1458,15 @@ export default {
                             // Store vector layer for later reference
                             this.vectorLayers.push(vectorLayer);
 
-                            // Add event listener to zoom to all features when source changes
-                            // This helps with requirement #5 - calculate initial map position
+                            // Expose the underlying source for any legacy code paths that expect it
+                            vectorLayer.vectorSource = vectorTileSource;
+
+                            // Refresh the map extent when tiles finish loading the first time
                             if (!this._vectorSourceListenerKeys) this._vectorSourceListenerKeys = [];
-                            this._vectorSourceListenerKeys.push(vectorSource.on('change', () => {
-                                // Only trigger if we have features and loading is done
-                                if (vectorSource.getFeatures().length > 0 && vectorSource.getState() === 'ready') {
-                                    // Trigger a map extent update to include these features
+                            let firstLoadFired = false;
+                            this._vectorSourceListenerKeys.push(vectorTileSource.on('tileloadend', () => {
+                                if (!firstLoadFired) {
+                                    firstLoadFired = true;
                                     this.zoomToFilesExtent();
                                 }
                             }));
