@@ -38,17 +38,22 @@ export default {
 
         /**
          * Display tooltip with feature info at the given pixel.
+         * @param {import('ol/Feature').default|import('ol/render/Feature').default} feature
+         * @param {number[]} pixel
+         * @param {import('ol/layer/BaseVector').default|null} [layer=null] - Layer hint from
+         *   forEachFeatureAtPixel. When provided it is used directly so that
+         *   findVectorLayerForFeature (which is incompatible with VectorTile sources) is skipped.
          */
-        showFeatureTooltip(feature, pixel) {
+        showFeatureTooltip(feature, pixel, layer = null) {
             if (!this.tooltipElement || !this.tooltipOverlay) return;
 
             const properties = feature.getProperties();
             let content = extractFeatureDisplayName(properties);
 
             if (content === 'Unknown feature') {
-                const layer = findVectorLayerForFeature(feature, this.vectorLayers);
-                if (layer) {
-                    content = this.getLayerDisplayName(layer) || 'Unknown layer';
+                const resolvedLayer = layer || findVectorLayerForFeature(feature, this.vectorLayers);
+                if (resolvedLayer) {
+                    content = this.getLayerDisplayName(resolvedLayer) || 'Unknown layer';
                 }
             }
 
@@ -75,16 +80,20 @@ export default {
 
         /**
          * Open a dialog showing all properties of a feature.
+         * @param {import('ol/Feature').default|import('ol/render/Feature').default} feature
+         * @param {import('ol/layer/BaseVector').default|null} [layer=null] - Layer hint from
+         *   forEachFeatureAtPixel. When provided it is used directly, avoiding the
+         *   getFeatures() call that crashes on VectorTile sources.
          */
-        showFeaturePropertiesDialog(feature) {
+        showFeaturePropertiesDialog(feature, layer = null) {
             const properties = { ...(feature.getProperties() || {}) };
             delete properties.geometry;
 
             let title = 'Feature Properties';
-            const layer = findVectorLayerForFeature(feature, this.vectorLayers);
+            const resolvedLayer = layer || findVectorLayerForFeature(feature, this.vectorLayers);
 
-            if (layer) {
-                const fileName = this.getLayerDisplayName(layer) || '';
+            if (resolvedLayer) {
+                const fileName = this.getLayerDisplayName(resolvedLayer) || '';
                 if (fileName) {
                     title = `${fileName} - Feature Properties`;
                 }
