@@ -7,101 +7,49 @@
         }">
             <olMeasure ref="measure" />
             <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
-            <PlantHealthPanel
-                :visible="plantHealthVisible"
-                :dataset="dataset"
-                :filePath="plantHealthFilePath"
-                :initialParams="plantHealthInitialParams"
-                @close="closePlantHealth"
+            <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :filePath="plantHealthFilePath"
+                :initialParams="plantHealthInitialParams" @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
-            <RasterAnalysisControls
-                :visible="rasterPanelVisible"
-                :dataset="dataset"
-                :filePath="rasterFilePath"
-                :initialParams="rasterInitialParams"
-                :spotInfo="rasterSpotInfo"
-                :areaStats="rasterAreaStats"
-                :profile="rasterProfile"
-                :profileLoading="rasterProfileLoading"
-                :profileError="rasterProfileError"
-                :drawingProfile="rasterProfileDrawing"
-                :inspectActive="rasterInspectActive"
-                @close="closeRasterAnalysis"
-                @vizParamsChanged="handleRasterVizParamsChanged"
-                @pickProfile="handlePickProfile"
-                @clearProfile="handleClearProfile"
-                @cancelDrawProfile="cancelRasterProfileDrawing"
-                @toggleInspectValue="toggleRasterInspect"
-                @profileHover="handleProfileHover"
+            <RasterAnalysisControls :visible="rasterPanelVisible" :dataset="dataset" :filePath="rasterFilePath"
+                :initialParams="rasterInitialParams" :spotInfo="rasterSpotInfo" :areaStats="rasterAreaStats"
+                :profile="rasterProfile" :profileLoading="rasterProfileLoading" :profileError="rasterProfileError"
+                :drawingProfile="rasterProfileDrawing" :inspectActive="rasterInspectActive" @close="closeRasterAnalysis"
+                @vizParamsChanged="handleRasterVizParamsChanged" @pickProfile="handlePickProfile"
+                @clearProfile="handleClearProfile" @cancelDrawProfile="cancelRasterProfileDrawing"
+                @toggleInspectValue="toggleRasterInspect" @profileHover="handleProfileHover"
                 @openContourDialog="openContourDialog" />
-            <ContourOptionsDialog
-                v-model:visible="contourDialogVisible"
-                :loading="contourLoading"
-                :unit="contourUnit"
-                :rasterMin="contourRasterMin"
-                :rasterMax="contourRasterMax"
-                :initialOptions="contourLastOptions"
-                @generate="generateContourLines"
-                @cancel="closeContourDialog" />
-            <StockpileVolumePanel
-                :visible="stockpilePanelVisible"
-                :loading="stockpileLoading"
-                :error="stockpileError"
-                :result="stockpileResult"
-                :baseMethod="stockpileBaseMethod"
-                :sensitivity="stockpileSensitivity"
-                :radius="stockpileRadius"
-                :material="stockpileMaterial"
-                :materials="stockpileMaterials"
-                :mode="stockpileMode"
-                :customDensity="stockpileCustomDensity"
-                :customCostPerTon="stockpileCustomCostPerTon"
-                :unitPref="currentUnitPref"
-                :title="stockpileTitle"
-                :description="stockpileDescription"
-                @close="closeStockpileVolume"
-                @clickOnMap="startStockpileClickMode"
-                @drawPolygon="startStockpilePolygonDrawing"
-                @clearOverlay="clearStockpileOverlay"
-                @cancelMode="_stopStockpileInteractions"
-                @exportGeoJson="exportStockpileGeoJson"
-                @update:baseMethod="stockpileBaseMethod = $event"
-                @update:sensitivity="stockpileSensitivity = $event"
-                @update:radius="stockpileRadius = $event"
-                @update:material="stockpileMaterial = $event"
+            <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
+                :rasterMin="contourRasterMin" :rasterMax="contourRasterMax" :initialOptions="contourLastOptions"
+                @generate="generateContourLines" @cancel="closeContourDialog" />
+            <StockpileVolumePanel :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
+                :result="stockpileResult" :baseMethod="stockpileBaseMethod" :sensitivity="stockpileSensitivity"
+                :radius="stockpileRadius" :material="stockpileMaterial" :materials="stockpileMaterials"
+                :mode="stockpileMode" :customDensity="stockpileCustomDensity"
+                :customCostPerTon="stockpileCustomCostPerTon" :unitPref="currentUnitPref" :title="stockpileTitle"
+                :description="stockpileDescription" @close="closeStockpileVolume" @clickOnMap="startStockpileClickMode"
+                @drawPolygon="startStockpilePolygonDrawing" @clearOverlay="clearStockpileOverlay"
+                @cancelMode="_stopStockpileInteractions" @exportGeoJson="exportStockpileGeoJson"
+                @update:baseMethod="stockpileBaseMethod = $event" @update:sensitivity="stockpileSensitivity = $event"
+                @update:radius="stockpileRadius = $event" @update:material="stockpileMaterial = $event"
                 @update:customDensity="stockpileCustomDensity = $event"
-                @update:customCostPerTon="stockpileCustomCostPerTon = $event"
-                @update:title="stockpileTitle = $event"
+                @update:customCostPerTon="stockpileCustomCostPerTon = $event" @update:title="stockpileTitle = $event"
                 @update:description="stockpileDescription = $event" />
         </div>
-        <MapDialogs
-            :alertDialogOpen="alertDialogOpen"
-            :alertTitle="alertTitle"
-            :alertMessage="alertMessage"
+        <MapDialogs :alertDialogOpen="alertDialogOpen" :alertTitle="alertTitle" :alertMessage="alertMessage"
             :clearMeasurementsDialogOpen="clearMeasurementsDialogOpen"
-            :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen"
-            @alertClose="handleAlertDialogClose"
+            :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen" @alertClose="handleAlertDialogClose"
             @clearMeasurementsClose="handleClearMeasurementsDialogClose"
             @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
-        <ChangeUnitsDialog v-if="changeUnitsDialogOpen"
-            :targetUnit="changeUnitsTargetUnit"
-            :measurementsCount="changeUnitsMeasurementsCount"
-            @onClose="handleChangeUnitsDialogClose">
+        <ChangeUnitsDialog v-if="changeUnitsDialogOpen" :targetUnit="changeUnitsTargetUnit"
+            :measurementsCount="changeUnitsMeasurementsCount" @onClose="handleChangeUnitsDialogClose">
         </ChangeUnitsDialog>
-        <MeasurementListDialog v-if="measurementListDialogOpen"
-            :measurements="measurementListItems"
-            @onClose="measurementListDialogOpen = false"
-            @deleteMeasurement="handleDeleteMeasurementFromList"
+        <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
+            @onClose="measurementListDialogOpen = false" @deleteMeasurement="handleDeleteMeasurementFromList"
             @editMeasurement="handleEditMeasurementFromList" />
-        <MapSettingsDialog v-if="mapSettingsDialogOpen"
-            :basemaps="basemaps"
-            :selectedBasemap="selectedBasemap"
-            :unitPref="currentUnitPref"
-            :customBasemapConfig="customBasemapConfig"
-            @onClose="mapSettingsDialogOpen = false"
-            @basemapChanged="handleBasemapChanged"
-            @unitsChanged="handleUnitsChanged"
-            @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
+        <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selectedBasemap="selectedBasemap"
+            :unitPref="currentUnitPref" :customBasemapConfig="customBasemapConfig"
+            @onClose="mapSettingsDialogOpen = false" @basemapChanged="handleBasemapChanged"
+            @unitsChanged="handleUnitsChanged" @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
         </MapSettingsDialog>
         <div ref="imagePopup" class="image-popup" v-show="imagePopupVisible">
             <div class="image-popup-header">
@@ -119,13 +67,18 @@
                 </div>
             </div>
             <div class="image-popup-body">
-                <div v-if="imagePopupLoading" class="image-popup-loading"><i class="fa-solid fa-circle-notch fa-spin"></i></div>
-                <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail" :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded" @error="onImagePopupLoaded" />
+                <div v-if="imagePopupLoading" class="image-popup-loading"><i
+                        class="fa-solid fa-circle-notch fa-spin"></i></div>
+                <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail"
+                    :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded"
+                    @error="onImagePopupLoaded" />
             </div>
             <div class="image-popup-footer" v-if="imagePopupCoords">
                 <span class="image-popup-coords" :title="imagePopupCoords">{{ imagePopupCoords }}</span>
-                <button class="image-popup-btn image-popup-copy" @click="copyCoordinates" :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
-                    <i style="margin: 0" :class="imagePopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
+                <button class="image-popup-btn image-popup-copy" @click="copyCoordinates"
+                    :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
+                    <i style="margin: 0"
+                        :class="imagePopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
                 </button>
             </div>
         </div>
@@ -183,7 +136,7 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
-import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer } from '@/composables/useMvtLayer';
+import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 
@@ -915,12 +868,14 @@ export default {
 
                 if (hitVector) {
                     let hoveredFeature = null;
+                    let hoveredLayer = null;
 
                     // Find the first vector feature at this pixel
                     this.map.forEachFeatureAtPixel(e.pixel,
                         (feature, layer) => {
                             if (this.vectorLayers.includes(layer) && !hoveredFeature) {
                                 hoveredFeature = feature;
+                                hoveredLayer = layer;
                                 return true; // Stop looking after finding the first feature
                             }
                             return false;
@@ -930,7 +885,7 @@ export default {
 
                     if (hoveredFeature) {
                         // Show tooltip for this feature
-                        this.showFeatureTooltip(hoveredFeature, e.pixel);
+                        this.showFeatureTooltip(hoveredFeature, e.pixel, hoveredLayer);
                     } else {
                         this.hideFeatureTooltip();
                     }
@@ -994,12 +949,14 @@ export default {
 
                 // Check if we clicked on a vector feature
                 let dblClickedFeature = null;
+                let dblClickedLayer = null;
 
                 // First try to find a vector feature at this pixel
                 this.map.forEachFeatureAtPixel(e.pixel,
                     (feature, layer) => {
                         if (this.vectorLayers.includes(layer) && !dblClickedFeature) {
                             dblClickedFeature = feature;
+                            dblClickedLayer = layer;
                             // Prevent further processing
                             e.stopPropagation();
                             return true; // Stop looking for more features
@@ -1010,7 +967,7 @@ export default {
                 });
 
                 if (dblClickedFeature) {
-                    this.showFeaturePropertiesDialog(dblClickedFeature);
+                    this.showFeaturePropertiesDialog(dblClickedFeature, dblClickedLayer);
                 }
             }));
 
@@ -1353,6 +1310,8 @@ export default {
 
             let flightPath = [];
 
+            let vectorFilePromises = [];
+
             // Create features, add them to map
             this.files.forEach(f => {
                 if (!f.entry) return;
@@ -1417,20 +1376,26 @@ export default {
                             // Resolve the MVT URL template via the dataset's Entry
                             let mvtTemplate = '';
 
-                            if (this.dataset) {
-                                const entry = this.dataset.Entry(f.entry);
-                                mvtTemplate = entry.getMvtUrlTemplate();
-                            } else {
-                                console.warn('Dataset not available, using fallback URL construction');
-                                const hashMatch = f.path.match(/\/r\/([^\/]+)\/([^\/]+)\/([^\/]+)/);
-                                if (hashMatch && hashMatch.length >= 4) {
-                                    const hash = hashMatch[3];
-                                    const baseApi = f.path.split('/r/')[0];
-                                    mvtTemplate = `${baseApi}/mvt/${hash}/{z}/{x}/{y}.pbf`;
-                                } else {
-                                    mvtTemplate = `${f.path}/mvt/{z}/{x}/{y}.pbf`;
-                                }
+                            if (!this.dataset)
+                                throw new Error('Dataset not found for vector file');
+
+                            const entry = this.dataset.Entry(f.entry);
+                            mvtTemplate = entry.getMvtUrlTemplate();
+
+                            // Always fetch metadata: maxZoom is needed for VectorTileSource
+                            // (avoids 404 on non-existent high-zoom tiles); bounds is the zoom
+                            // fallback when the C++ indexer left polygon_geom/point_geom unset.
+                            const { maxZoom: mvtMaxZoom, bounds: mvtBounds } = await fetchMvtMetadata(entry);
+                            if (mvtBounds && !f.entry.polygon_geom && !f.entry.point_geom) {
+                                const [minX, minY, maxX, maxY] = mvtBounds;
+                                // Inject as GeoJSON Polygon so getSelectedFilesExtent() → bbox()
+                                // can consume it directly (bbox handles both Feature and Geometry).
+                                f.entry.polygon_geom = {
+                                    type: 'Polygon',
+                                    coordinates: [[[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]]]
+                                };
                             }
+
 
                             // Get a unique color for this vector file
                             const vectorFileIndex = this.vectorLayers.length;
@@ -1446,7 +1411,8 @@ export default {
                             const { layer: vectorLayer, source: vectorTileSource } = createMvtVectorLayer({
                                 urlTemplate: mvtTemplate,
                                 styleFunction: vectorStyleFunction,
-                                useMarkRaw: true
+                                useMarkRaw: true,
+                                maxZoom: mvtMaxZoom
                             });
 
                             // Add file reference to layer for selection handling
@@ -1461,23 +1427,17 @@ export default {
                             // Expose the underlying source for any legacy code paths that expect it
                             vectorLayer.vectorSource = vectorTileSource;
 
-                            // Refresh the map extent when tiles finish loading the first time
-                            if (!this._vectorSourceListenerKeys) this._vectorSourceListenerKeys = [];
-                            let firstLoadFired = false;
-                            this._vectorSourceListenerKeys.push(vectorTileSource.on('tileloadend', () => {
-                                if (!firstLoadFired) {
-                                    firstLoadFired = true;
-                                    this.zoomToFilesExtent();
-                                }
-                            }));
+                            // Do NOT zoom here: zoom is deferred to after all vector files have
+                            // loaded so that getSelectedFilesExtent() sees all extents at once.
 
                         } catch (error) {
                             console.error('Error loading vector file:', error);
                         }
                     };
 
-                    // Start loading the vector file asynchronously
-                    loadVectorFile();
+                    // Start loading the vector file asynchronously; collect the
+                    // Promise so we can zoom once after ALL files are ready.
+                    vectorFilePromises.push(loadVectorFile());
                 }
             });
 
@@ -1511,9 +1471,9 @@ export default {
                         const dLat = (coords2[1] - coords1[1]) * Math.PI / 180;
                         const dLon = (coords2[0] - coords1[0]) * Math.PI / 180;
                         const a = Math.sin(dLat / 2) ** 2 +
-                                  Math.cos(coords1[1] * Math.PI / 180) *
-                                  Math.cos(coords2[1] * Math.PI / 180) *
-                                  Math.sin(dLon / 2) ** 2;
+                            Math.cos(coords1[1] * Math.PI / 180) *
+                            Math.cos(coords2[1] * Math.PI / 180) *
+                            Math.sin(dLon / 2) ** 2;
                         const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
                         const dt = fp.captureTime - prev.captureTime;
@@ -1551,7 +1511,11 @@ export default {
                 this.flightPathFeatures.addFeature(pathFeat);
             }
 
-            this.zoomToFilesExtent();
+            // Zoom once after all vector file metadata has been fetched.
+            // Using Promise.all ensures the extent covers ALL vector files;
+            // for datasets with no vector files vectorFilePromises is empty and
+            // Promise.all([]) resolves immediately as a microtask.
+            Promise.all(vectorFilePromises).then(() => this.zoomToFilesExtent());
             this.updateRastersOpacity();
 
             // Load measurements for orthophotos if available
@@ -1718,7 +1682,7 @@ export default {
          * Get the current folder being viewed based on the files' paths
          * @returns {string} Current folder path or empty string for root
          */
-        getCurrentFolder: function() {
+        getCurrentFolder: function () {
             if (!this.files || this.files.length === 0) return '';
 
             // Find the first file with a valid path
@@ -1733,7 +1697,7 @@ export default {
         /**
          * Load measurements for orthophoto and point cloud files
          */
-        loadMeasurementsForOrthophotos: async function() {
+        loadMeasurementsForOrthophotos: async function () {
             if (!this.dataset || !this.measureControls) {
                 console.log('Cannot load measurements: dataset or measureControls not available');
                 return;
@@ -1802,14 +1766,14 @@ export default {
         /**
          * Required by mapMeasurements mixin - returns the entry used for measurement export path.
          */
-        getActiveMeasurementEntry: function() {
+        getActiveMeasurementEntry: function () {
             return this.currentOrthophotoEntry;
         },
 
         /**
          * Required by mapMeasurements mixin - (re)initializes measurementStorage if needed.
          */
-        initMeasurementStorage: async function() {
+        initMeasurementStorage: async function () {
             await this.loadMeasurementsForOrthophotos();
 
             // If still no storage (no orthophoto/point cloud), create a standalone measurements file
@@ -1825,7 +1789,7 @@ export default {
         /**
          * Handle units change request - show confirmation dialog
          */
-        onUnitsChangeRequested: function(newUnit, oldUnit) {
+        onUnitsChangeRequested: function (newUnit, oldUnit) {
             this.changeUnitsTargetUnit = newUnit;
             this.changeUnitsPreviousUnit = oldUnit;
             this.changeUnitsMeasurementsCount = this.measureControls.getMeasurementsCount();
@@ -1835,7 +1799,7 @@ export default {
         /**
          * Handle change units dialog close
          */
-        handleChangeUnitsDialogClose: async function(result) {
+        handleChangeUnitsDialogClose: async function (result) {
             this.changeUnitsDialogOpen = false;
             if (result === 'confirm') {
                 // Apply the unit change
@@ -1849,7 +1813,7 @@ export default {
         /**
          * Handle basemap change from settings dialog
          */
-        handleBasemapChanged: function(basemap) {
+        handleBasemapChanged: function (basemap) {
             this.selectedBasemap = basemap;
             this.updateBasemap();
         },
@@ -1857,7 +1821,7 @@ export default {
         /**
          * Handle custom basemap configuration change from settings dialog
          */
-        handleCustomBasemapConfigChanged: function(config) {
+        handleCustomBasemapConfigChanged: function (config) {
             saveCustomBasemapConfig(config);
             this.customBasemapConfig = config;
             if (this.selectedBasemap === 'custom') {
@@ -1868,7 +1832,7 @@ export default {
         /**
          * Handle units change from settings dialog
          */
-        handleUnitsChanged: function(newUnit, oldUnit) {
+        handleUnitsChanged: function (newUnit, oldUnit) {
             // If there are measurements, show confirmation dialog
             if (this.measureControls && this.measureControls.hasMeasurements()) {
                 this.onUnitsChangeRequested(newUnit, oldUnit);

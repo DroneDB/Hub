@@ -51,6 +51,13 @@ class Entry {
     getMvtUrlTemplate() {
         return `${this.dataset.baseApi}/mvt/${this.hash}/{z}/{x}/{y}.pbf`;
     }
+
+    /**
+     * Returns the URL for the TileJSON metadata served alongside the MVT pyramid.
+     */
+    getMvtMetadataUrl() {
+        return `${this.dataset.baseApi}/mvt/${this.hash}/metadata.json`;
+    }
 }
 
 module.exports = {

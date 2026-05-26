@@ -115,7 +115,7 @@ import olMeasure from './olMeasure';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import { transformExtent, toLonLat } from 'ol/proj';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
-import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer } from '@/composables/useMvtLayer';
+import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
 import OpacityControl from './OpacityControl.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
@@ -401,12 +401,14 @@ export default {
 
                 if (hit) {
                     let hoveredFeature = null;
+                    let hoveredLayer = null;
 
                     // Find the first vector feature at this pixel
                     this.map.forEachFeatureAtPixel(e.pixel,
                         (feature, layer) => {
                             if (this.vectorLayers.includes(layer) && !hoveredFeature) {
                                 hoveredFeature = feature;
+                                hoveredLayer = layer;
                                 return true; // Stop looking after finding the first feature
                             }
                             return false;
@@ -416,7 +418,7 @@ export default {
 
                     if (hoveredFeature) {
                         // Show tooltip for this feature
-                        this.showFeatureTooltip(hoveredFeature, e.pixel);
+                        this.showFeatureTooltip(hoveredFeature, e.pixel, hoveredLayer);
                     } else {
                         this.hideFeatureTooltip();
                     }
@@ -431,12 +433,14 @@ export default {
 
                 // Check if we clicked on a vector feature
                 let dblClickedFeature = null;
+                let dblClickedLayer = null;
 
                 // First try to find a vector feature at this pixel
                 this.map.forEachFeatureAtPixel(e.pixel,
                     (feature, layer) => {
                         if (this.vectorLayers.includes(layer) && !dblClickedFeature) {
                             dblClickedFeature = feature;
+                            dblClickedLayer = layer;
                             // Prevent further processing
                             e.stopPropagation();
                             return true; // Stop looking for more features
@@ -447,7 +451,7 @@ export default {
                 });
 
                 if (dblClickedFeature) {
-                    this.showFeaturePropertiesDialog(dblClickedFeature);
+                    this.showFeaturePropertiesDialog(dblClickedFeature, dblClickedLayer);
                 }
             });
 
@@ -488,7 +492,12 @@ export default {
         loadVectorLayer: async function (entry) {
             try {
                 // Resolve the MVT URL template for the entry
-                const mvtTemplate = this.dataset.Entry(entry).getMvtUrlTemplate();
+                const ddbEntry = this.dataset.Entry(entry);
+                const mvtTemplate = ddbEntry.getMvtUrlTemplate();
+
+                // Always fetch metadata: maxZoom is needed for VectorTileSource (avoids 404 on
+                // non-existent high-zoom tiles); bounds is the zoom fallback when polygon_geom is absent.
+                const { maxZoom: mvtMaxZoom, bounds: mvtBounds } = await fetchMvtMetadata(ddbEntry);
 
                 // Get a unique color for this vector file
                 const vectorFileIndex = 0; // Only one vector layer in SingleMap
@@ -503,7 +512,8 @@ export default {
                 // Build the VectorTileSource backed by the MVT pyramid
                 const { layer: vectorLayer, source: vectorTileSource } = createMvtVectorLayer({
                     urlTemplate: mvtTemplate,
-                    styleFunction: vectorStyleFunction
+                    styleFunction: vectorStyleFunction,
+                    maxZoom: mvtMaxZoom
                 });
 
                 vectorLayer.entry = entry;
@@ -511,27 +521,25 @@ export default {
                 this.vectorLayers.push(vectorLayer);
                 vectorLayer.vectorSource = vectorTileSource;
 
-                // Fit the view to the dataset bounding box on first tile load
-                let firstLoadFired = false;
-                vectorTileSource.on('tileloadend', () => {
-                    if (firstLoadFired) return;
-                    firstLoadFired = true;
-                    // Use entry bbox if available (ol expects EPSG:3857 extent on the map)
-                    if (entry.polygon_geom && entry.polygon_geom.coordinates) {
-                        try {
-                            const rawExtent = bbox(entry.polygon_geom);
-                            const ext3857 = transformExtent(rawExtent, 'EPSG:4326', 'EPSG:3857');
-                            if (!this.initialExtent) this.initialExtent = ext3857.slice();
-                            this.map.getView().fit(ext3857, {
-                                padding: [40, 40, 40, 40],
-                                duration: 500,
-                                minResolution: 0.5
-                            });
-                        } catch (e) {
-                            console.warn('Unable to compute vector extent from entry geometry:', e);
-                        }
+                // Zoom immediately to the bounds fetched from metadata.
+                // Do NOT wait for tileloadend: if the view starts far from the data
+                // (e.g. Atlantic Ocean at zoom 2), no tiles are ever requested and
+                // tileloadend never fires.
+                // polygon_geom may be a GeoJSON Feature OR Geometry; bbox() handles both.
+                const rawExtent = entry.polygon_geom ? bbox(entry.polygon_geom) : mvtBounds;
+                if (rawExtent) {
+                    try {
+                        const ext3857 = transformExtent(rawExtent, 'EPSG:4326', 'EPSG:3857');
+                        if (!this.initialExtent) this.initialExtent = ext3857.slice();
+                        this.map.getView().fit(ext3857, {
+                            padding: [40, 40, 40, 40],
+                            duration: 500,
+                            minResolution: 0.5
+                        });
+                    } catch (e) {
+                        console.warn('Unable to compute vector extent from entry geometry:', e);
                     }
-                });
+                }
 
             } catch (error) {
                 console.error('Error loading vector file:', error);

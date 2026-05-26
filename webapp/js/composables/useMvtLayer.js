@@ -102,14 +102,18 @@ export function createMvtStyleFunction({ styles, getZoom, isSelected, labelMinZo
 /**
  * Build a VectorTileLayer + VectorTileSource backed by the given MVT URL template.
  *
+ * @param {number} [opts.maxZoom=18]  Maximum zoom at which tiles are requested.
+ *                                     Set to the pyramid's actual maxzoom so OL
+ *                                     uses tile overzoom instead of requesting
+ *                                     non-existent high-zoom tiles.
  * @returns {{ layer: VectorTileLayer, source: VectorTileSource }}
  */
-export function createMvtVectorLayer({ urlTemplate, styleFunction, useMarkRaw = false }) {
+export function createMvtVectorLayer({ urlTemplate, styleFunction, useMarkRaw = false, maxZoom = 18 }) {
     const source = new VectorTileSource({
         format: new MVT(),
         url: urlTemplate,
         minZoom: 0,
-        maxZoom: 18,
+        maxZoom,
         overlaps: false
     });
 
@@ -121,4 +125,27 @@ export function createMvtVectorLayer({ urlTemplate, styleFunction, useMarkRaw = 
 
     const layer = useMarkRaw ? markRaw(layerInstance) : layerInstance;
     return { layer, source };
+}
+
+/**
+ * Fetch TileJSON metadata from the MVT endpoint served by Registry.
+ *
+ * @param {object} ddbEntry  A ddb.Entry instance (must expose getMvtMetadataUrl()).
+ * @returns {Promise<{ maxZoom: number, bounds: number[]|null }>}
+ *   - maxZoom: the tile pyramid's maxzoom (defaults to 18 on error / missing field)
+ *   - bounds:  [minLon, minLat, maxLon, maxLat] in WGS84, or null when unavailable
+ */
+export async function fetchMvtMetadata(ddbEntry) {
+    try {
+        const resp = await fetch(ddbEntry.getMvtMetadataUrl());
+        if (!resp.ok) return { maxZoom: 18, bounds: null };
+        const meta = await resp.json();
+        return {
+            maxZoom: meta.maxzoom != null ? meta.maxzoom : 18,
+            bounds: meta.bounds ? meta.bounds.split(',').map(Number) : null
+        };
+    } catch (err) {
+        console.warn('Could not fetch MVT metadata:', err);
+        return { maxZoom: 18, bounds: null };
+    }
 }

@@ -44,6 +44,10 @@ export function findVectorLayerForFeature(feature, vectorLayers) {
     for (let i = 0; i < vectorLayers.length; i++) {
         const layer = vectorLayers[i];
         const source = layer.getSource();
+        // VectorTileSource (used by MVT layers) does not expose getFeatures().
+        // Skip these sources to avoid TypeError; the caller should prefer passing
+        // the layer hint directly from forEachFeatureAtPixel when available.
+        if (typeof source.getFeatures !== 'function') continue;
         if (source.getFeatures().some(f => f === feature)) {
             return layer;
         }
