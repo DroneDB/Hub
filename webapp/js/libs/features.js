@@ -8,5 +8,6 @@ export const Features = {
     STORAGE_LIMITER: 'storageLimiter',
     PASSWORD_POLICY: 'passwordPolicy',
     DATASET_THUMBNAIL_CANDIDATES: 'datasetThumbnailCandidates',
-    MAX_EXPORT_SIZE_BYTES: 'maxExportSizeBytes'
+    MAX_EXPORT_SIZE_BYTES: 'maxExportSizeBytes',
+    DISABLE_ANONYMOUS_BULK_DOWNLOADS: 'disableAnonymousBulkDownloads'
 };

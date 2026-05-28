@@ -16,7 +16,7 @@
                 <i class="fa-solid fa-sitemap"></i>
             </Button>
             <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
-                :title="selectedFiles.length > 0 ? `Download ${selectedFiles.length} file${selectedFiles.length !== 1 ? 's' : ''}` : 'Download'" :disabled="isDownloading">
+                :title="downloadTitle" :disabled="isDownloading || downloadBlocked">
                 <i class="fa-solid fa-download"></i>
                 <span v-if="selectedFiles.length > 0" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
@@ -87,7 +87,7 @@
 </template>
 
 <script>
-import { utils } from 'ddb';
+import ddb, { utils } from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Alert from '@/components/Alert';
@@ -227,6 +227,25 @@ export default {
                 return `Are you sure you want to download ${this.selectedFiles.length} selected file${this.selectedFiles.length !== 1 ? 's' : ''}?`;
             }
             return 'Are you sure you want to download the entire dataset?';
+        },
+        downloadIsBulk: function () {
+            // Whole-dataset download or multi-file selection is always bulk.
+            if (this.selectedFiles.length !== 1) return true;
+            const sel = this.selectedFiles[0];
+            // Single selection counts as bulk only when it is a directory.
+            if (sel && sel.entry) return ddb.entry.isDirectory(sel.entry);
+            // Conservative fallback: treat as bulk when entry metadata is missing.
+            return true;
+        },
+        downloadBlocked: function () {
+            return !this.loggedIn
+                && reg.getFeature(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS)
+                && this.downloadIsBulk;
+        },
+        downloadTitle: function () {
+            if (this.downloadBlocked) return 'Login required to download multiple files or the entire dataset';
+            if (this.selectedFiles.length > 0) return `Download ${this.selectedFiles.length} file${this.selectedFiles.length !== 1 ? 's' : ''}`;
+            return 'Download';
         },
         userMenuItems: function () {
             const items = [];

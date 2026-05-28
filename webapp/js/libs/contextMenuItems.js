@@ -183,11 +183,27 @@ function shareEmbedItem(ctx) {
 }
 
 function downloadItem(ctx) {
+    const isBulkSelection = () => {
+        const sel = ctx.getSelectedEntries();
+        if (sel.length === 0) return false;
+        if (sel.length > 1) return true;
+        // single selection: bulk if it's a directory
+        return ddb.entry.isDirectory(sel[0].entry);
+    };
+    const isBulkBlocked = () =>
+        !reg.isLoggedIn() &&
+        reg.getFeature(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
+        isBulkSelection();
+
     return {
         label: 'Download',
         icon: 'fa-solid fa-download',
         isVisible: () => ctx.getSelectedEntries().length > 0,
-        click: () => ctx.emit('downloadItems', ctx.getSelectedEntries())
+        isEnabled: () => !isBulkBlocked(),
+        click: () => {
+            if (isBulkBlocked()) return;
+            ctx.emit('downloadItems', ctx.getSelectedEntries());
+        }
     };
 }
 
