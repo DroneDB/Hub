@@ -125,7 +125,7 @@ const UrlRow = {
 const LEGACY_MODES = [
     { value: 'link',  label: 'Link' },
     { value: 'embed', label: 'Embed' },
-    { value: 'tms',   label: 'TMS' },
+    { value: 'tms',   label: 'TMS (Tile Map Service)' },
     { value: 'qgis',  label: 'QGIS' }
 ];
 
