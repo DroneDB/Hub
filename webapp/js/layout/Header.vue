@@ -20,6 +20,9 @@
                 <i class="fa-solid fa-download"></i>
                 <span v-if="selectedFiles.length > 0" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
+            <Button v-if="showShare" @click="handleShare" severity="secondary" size="small" text title="Share">
+                <i class="fa-solid fa-share-nodes"></i>
+            </Button>
             <Button v-if="showSettings" @click="handleSettings" severity="secondary" size="small" text title="Settings">
                 <i class="fa-solid fa-wrench"></i>
             </Button>
@@ -117,6 +120,7 @@ export default {
             isAdmin: reg.isAdmin(),
             params: this.$route.params,
             showDownload: !!this.$route.params.ds,
+            showShare: !!this.$route.params.ds && !this.$route.params.encodedPath,
             showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
             showBackToOrg: false,
             orgInfoCache: {},
@@ -290,6 +294,7 @@ export default {
             const { params } = to;
 
             this.showDownload = !!params.ds;
+            this.showShare = !!this.$route.params.ds && !this.$route.params.encodedPath;
             this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
             this.params = params;
@@ -396,6 +401,10 @@ export default {
 
         handleSettings: function () {
             emitter.emit("openSettings");
+        },
+
+        handleShare: function () {
+            emitter.emit("openShareDataset");
         },
 
         onRegLogin: async function (username) {

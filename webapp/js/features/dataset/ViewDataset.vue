@@ -438,6 +438,15 @@ export default {
             this.showSettings = true;
         };
 
+        this._onOpenShareDataset = () => {
+            if (!this.dataset) return;
+            this.handleShareEmbed({
+                path: this.dataset.remoteUri(""),
+                entry: null,
+                scope: 'dataset'
+            });
+        };
+
         this._onDownloadLimitReached = (msg) => {
             this.$toast.add({ severity: 'error', summary: 'Download Limit', detail: msg || 'Download limit reached. Please wait for a download to finish before starting a new one.', life: 5000 });
         };
@@ -457,6 +466,7 @@ export default {
         };
 
         emitter.on('openSettings', this._onOpenSettings);
+        emitter.on('openShareDataset', this._onOpenShareDataset);
         emitter.on('downloadLimitReached', this._onDownloadLimitReached);
         emitter.on('uploadItems', this._onUploadItems);
         emitter.on('moveItem', this._onMoveItemBus);
@@ -475,6 +485,7 @@ export default {
 
         // Cleanup event bus listeners
         emitter.off('openSettings', this._onOpenSettings);
+        emitter.off('openShareDataset', this._onOpenShareDataset);
         emitter.off('downloadLimitReached', this._onDownloadLimitReached);
         emitter.off('uploadItems', this._onUploadItems);
         emitter.off('moveItem', this._onMoveItemBus);
