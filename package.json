@@ -1,6 +1,6 @@
 {
   "name": "hub",
-  "version": "2.1.4",
+  "version": "2.4.0",
   "description": "JS Client Application for Registry",
   "main": "webpack.config.js",
   "scripts": {
