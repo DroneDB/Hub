@@ -90,8 +90,8 @@
                         </div>
                     </div>
                 </template>
-                <template v-slot:buildhistory>
-                    <BuildHistory :dataset="dataset" @buildRetried="handleBuildRetried" @buildRetryError="handleBuildRetryError" />
+                <template v-slot:tasks>
+                    <TaskHistory :dataset="dataset" :canWrite="canWrite" />
                 </template>
                 <template v-if="isMobile" v-slot:properties>
                     <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -246,7 +246,7 @@ import Alert from '@/components/Alert.vue';
 import Loader from '@/components/Loader.vue';
 import Toast from 'primevue/toast';
 import ShareEmbed from './ShareEmbed.vue';
-import BuildHistory from './BuildHistory.vue';
+import TaskHistory from './TaskHistory.vue';
 import FileAvailabilityDialog from './dialogs/FileAvailabilityDialog.vue';
 import TextEditorDialog from './dialogs/TextEditorDialog.vue';
 import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
@@ -308,7 +308,7 @@ export default {
         Loader,
         Toast,
         ShareEmbed,
-        BuildHistory,
+        TaskHistory,
         FileAvailabilityDialog,
         TextEditorDialog,
         PdfViewerDialog,
@@ -348,9 +348,9 @@ export default {
             icon: 'fa-solid fa-map',
             key: 'map'
         }, {
-            label: 'Build History',
-            icon: 'fa-solid fa-clock-rotate-left',
-            key: 'buildhistory'
+            label: 'Tasks',
+            icon: 'fa-solid fa-list-check',
+            key: 'tasks'
         }]);
 
         // Load view mode preference from localStorage

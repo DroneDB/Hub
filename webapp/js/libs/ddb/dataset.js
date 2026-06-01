@@ -455,4 +455,105 @@ module.exports = class Dataset {
         const params = new URLSearchParams({ stopOnError: stopOnError.toString() });
         return this.registry.postRequest(`${this.baseApi}/rescan?${params}`, {});
     }
+
+    // ---- Processing Platform tasks (heavy tools) --------------------------
+
+    /**
+     * Lists the heavy tools available for this dataset (catalog).
+     * @returns {Promise<Array>} Tool descriptors { id, version, title, requiredAccess, producesArtifact, inputSchema }
+     */
+    async getTaskTools() {
+        return this.registry.getRequest(`${this.baseApi}/tasks/tools`);
+    }
+
+    /**
+     * Submits a heavy task.
+     * @param {string} toolId Tool identifier (e.g. "photogrammetry", "raster-export", "build")
+     * @param {Object} options
+     * @param {string} [options.version] Tool version
+     * @param {string} [options.path] Target path
+     * @param {Object} [options.params] Tool-specific parameters
+     * @param {boolean} [options.force] Bypass dedup
+     * @returns {Promise<Object>} { taskId, toolId, version, deduplicated, statusUrl, resultUrl, estimatedOutputBytes }
+     */
+    async submitTask(toolId, { version = undefined, path = undefined, params = {}, force = false } = {}) {
+        if (!toolId) throw new Error('Invalid toolId');
+        return this.registry.postRequest(`${this.baseApi}/tasks`, {
+            toolId, version, path, params, force
+        });
+    }
+
+    /**
+     * Lists tasks for this dataset.
+     * @param {Object} [filter]
+     * @param {string} [filter.toolId]
+     * @param {string} [filter.state]
+     * @param {number} [filter.skip]
+     * @param {number} [filter.take]
+     * @returns {Promise<Array>} Task summaries
+     */
+    async getTasks({ toolId = undefined, state = undefined, skip = 0, take = 50 } = {}) {
+        const q = new URLSearchParams();
+        if (toolId) q.append('toolId', toolId);
+        if (state) q.append('state', state);
+        q.append('skip', String(skip));
+        q.append('take', String(take));
+        return this.registry.getRequest(`${this.baseApi}/tasks?${q}`);
+    }
+
+    /**
+     * Gets the full status of a single task (includes log tail and artifact info).
+     * @param {string} id Task id
+     */
+    async getTask(id) {
+        if (!id) throw new Error('Invalid task id');
+        return this.registry.getRequest(`${this.baseApi}/tasks/${encodeURIComponent(id)}`);
+    }
+
+    /**
+     * Gets incremental log lines for a task beyond the given cursor.
+     * @param {string} id Task id
+     * @param {number} [since] Cursor returned by a previous call
+     * @returns {Promise<Object>} { cursor, lines, truncatedFromTail }
+     */
+    async getTaskLog(id, since = 0) {
+        if (!id) throw new Error('Invalid task id');
+        return this.registry.getRequest(`${this.baseApi}/tasks/${encodeURIComponent(id)}/log?since=${since}`);
+    }
+
+    /**
+     * Cancels (deletes) a running or queued task.
+     * @param {string} id Task id
+     */
+    async cancelTask(id) {
+        if (!id) throw new Error('Invalid task id');
+        return this.registry.deleteRequest(`${this.baseApi}/tasks/${encodeURIComponent(id)}`);
+    }
+
+    /**
+     * Requeues a failed task.
+     * @param {string} id Task id
+     */
+    async retryTask(id) {
+        if (!id) throw new Error('Invalid task id');
+        return this.registry.postRequest(`${this.baseApi}/tasks/${encodeURIComponent(id)}/retry`, {});
+    }
+
+    /**
+     * Clears terminal tasks (Succeeded/Failed/Deleted) from the history.
+     * @param {string} [toolId] Restrict to a single tool
+     */
+    async clearTasks(toolId = undefined) {
+        const q = toolId ? `?toolId=${encodeURIComponent(toolId)}` : '';
+        return this.registry.postRequest(`${this.baseApi}/tasks/clear${q}`, {});
+    }
+
+    /**
+     * Builds the download URL for a completed task's artifact.
+     * @param {string} id Task id
+     * @returns {string}
+     */
+    taskResultUrl(id) {
+        return `${this.baseApi}/tasks/${encodeURIComponent(id)}/result`;
+    }
 };
