@@ -160,8 +160,10 @@ import clipboardCopy from 'clipboard-copy';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
+import useHeavyTask from '@/composables/useHeavyTask';
 
 export default {
+    mixins: [useHeavyTask],
     components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },
     props: {
         visible: { type: Boolean, default: false },
@@ -430,25 +432,30 @@ export default {
 
         async exportGeoTiff() {
             if (!this.filePath || !this.dataset) return;
-            const vizParams = {};
-            if (this.selectedPreset) vizParams.preset = this.selectedPreset;
-            if (this.selectedFormula) vizParams.formula = this.selectedFormula;
-            if (this.customBands && !this.selectedPreset && !this.selectedFormula) vizParams.bands = this.customBands;
-            if (this.selectedFormula && this.selectedColormap) vizParams.colormap = this.selectedColormap;
-            if (this.selectedFormula && this.rescale) vizParams.rescale = this.rescale;
+            const params = { path: this.filePath };
+            if (this.selectedPreset) params.preset = this.selectedPreset;
+            if (this.selectedFormula) params.formula = this.selectedFormula;
+            if (this.customBands && !this.selectedPreset && !this.selectedFormula) params.bands = this.customBands;
+            if (this.selectedFormula && this.selectedColormap) params.colormap = this.selectedColormap;
+            if (this.selectedFormula && this.rescale) params.rescale = this.rescale;
 
-            const url = this.dataset.exportUrl(this.filePath, vizParams);
             try {
                 this.exporting = true;
-                const resp = await fetch(url, { cache: 'no-store' });
-                if (!resp.ok) throw new Error(`Export failed (HTTP ${resp.status})`);
-                const blob = await resp.blob();
+                // Submit a raster-export heavy task and wait for it to complete.
+                const result = await this.runHeavyTask(this.dataset, 'raster-export', {
+                    path: this.filePath,
+                    params,
+                    notify: false
+                });
+
+                // Download the produced GeoTIFF (auth via Authorization header).
+                const url = this.dataset.taskResultUrl(result.taskId);
+                const blob = await this.dataset.registry.makeRequest(url, 'GET', null, null, 'blob');
                 const blobUrl = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = blobUrl;
-                const disposition = resp.headers.get('content-disposition');
-                const match = disposition && disposition.match(/filename=([^;]+)/);
-                a.download = match ? match[1].trim() : 'export.tif';
+                const baseName = this.filePath.split('/').pop().replace(/\.[^.]+$/, '');
+                a.download = `${baseName || 'export'}_export.tif`;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
