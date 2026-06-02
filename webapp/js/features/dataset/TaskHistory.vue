@@ -131,7 +131,7 @@
         </Dialog>
 
         <!-- Log viewer -->
-        <Dialog v-model:visible="logDialogOpen" modal :header="`Log — ${logTaskTitle}`" :style="{ width: '48rem' }">
+        <Dialog v-model:visible="logDialogOpen" modal :header="`Log - ${logTaskTitle}`" :style="{ width: '48rem' }">
             <pre class="task-log">{{ logText || 'No log output.' }}</pre>
             <template #footer>
                 <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate" @click="refreshLog" />

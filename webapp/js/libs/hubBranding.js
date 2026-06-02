@@ -14,7 +14,7 @@
 const FAVICON_LINK_REL_DATA_KEY = 'hubBrandingInjected';
 
 /**
- * Empty defaults — every getter consumer in the codebase already handles
+ * Empty defaults - every getter consumer in the codebase already handles
  * `=== undefined` fallbacks, so we deliberately avoid populating values
  * we don't have.
  */

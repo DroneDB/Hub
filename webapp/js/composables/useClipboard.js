@@ -1,10 +1,10 @@
 /**
- * Clipboard module — global reactive singleton for Hub Copy/Cut/Paste.
+ * Clipboard module - global reactive singleton for Hub Copy/Cut/Paste.
  *
  * Stores selection captured via Ctrl+C / Ctrl+X / context menu, exposes
  * helpers for paste flow, and persists across page reloads in
  * sessionStorage (key `ddb:hub:clipboard`). Survives refresh, NOT tab close
- * — same UX as Windows Explorer.
+ * - same UX as Windows Explorer.
  *
  * Single Responsibility: clipboard state only. Paste execution lives in
  * usePasteStrategy + useFileOperations.
@@ -17,7 +17,7 @@ const STORAGE_KEY = 'ddb:hub:clipboard';
 const state = reactive({
     mode: null,            // 'copy' | 'cut' | null
     source: null,          // { orgSlug, dsSlug, basePath }
-    items: [],             // [{ path, type, size?, entry? }] — `entry` is the full source entry (deep-copy) used to repopulate the destination after paste without an extra server round-trip.
+    items: [],             // [{ path, type, size?, entry? }] - `entry` is the full source entry (deep-copy) used to repopulate the destination after paste without an extra server round-trip.
     capturedAt: null       // ISO string
 });
 
@@ -34,7 +34,7 @@ try {
         }
     }
 } catch (e) {
-    // ignore — corrupt clipboard, start fresh
+    // ignore - corrupt clipboard, start fresh
 }
 
 // Persist on every mutation
@@ -48,7 +48,7 @@ watch(
                 window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(val));
             }
         } catch (e) {
-            // sessionStorage unavailable / quota — non-fatal
+            // sessionStorage unavailable / quota - non-fatal
         }
     },
     { deep: true }

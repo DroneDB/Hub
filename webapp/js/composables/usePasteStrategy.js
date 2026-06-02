@@ -1,5 +1,5 @@
 /**
- * Paste strategies — Strategy pattern for the 4 (mode × scope) combinations.
+ * Paste strategies - Strategy pattern for the 4 (mode × scope) combinations.
  *
  * Each strategy exposes:
  *   async execute(items, target, dataset, options) -> { succeeded, failed, skipped }

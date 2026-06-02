@@ -20,7 +20,7 @@
 
             <div class="hint-section">
                 <div class="hint-label"><i class="fa-solid fa-terminal"></i> GDAL / OGR</div>
-                <div class="hint-text" v-if="hints.gdal !== '—'">
+                <div class="hint-text" v-if="hints.gdal !== '-'">
                     <code>{{ hints.gdal.replace('<capabilities-url>', url).replace('<landing-url>', url) }}</code>
                 </div>
                 <div class="hint-text" v-else>Not commonly used with this service.</div>
@@ -56,7 +56,7 @@ export default {
         hints() {
             return OGC_USAGE_HINTS[this.service] || {
                 title: this.service,
-                qgis: '', arcgis: '', gdal: '—', notes: ''
+                qgis: '', arcgis: '', gdal: '-', notes: ''
             };
         }
     }

@@ -109,7 +109,7 @@ import { b64encode } from '@/libs/base64';
 import { buildOgcShareUrls, OGC_SHARE_MODES } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
 
-// Inline URL+copy row component (kept private to ShareEmbed — DRY for legacy & OGC rows).
+// Inline URL+copy row component (kept private to ShareEmbed - DRY for legacy & OGC rows).
 const UrlRow = {
     components: { InputText, Button },
     props: ['value', 'copyIcon'],
@@ -136,7 +136,7 @@ export default {
     props: {
         // Legacy: a file-like object { path, entry }. For dataset-level sharing pass
         // { path: <ddb dataset URI>, entry: null, scope: 'dataset' }.
-        // For folder-level sharing, pass the directory entry as usual — scope is auto-detected.
+        // For folder-level sharing, pass the directory entry as usual - scope is auto-detected.
         file: { type: Object, required: true }
     },
     emits: ['onClose'],

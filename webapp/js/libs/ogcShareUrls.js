@@ -331,7 +331,7 @@ export const OGC_USAGE_HINTS = {
     },
 
     ogcApiFeatures: {
-        title: 'OGC API — Features',
+        title: 'OGC API - Features',
         qgis:
             'In QGIS: Layer → Add Layer → Add WFS / OGC API Features Layer → New → paste the OGC API landing URL → Connect → pick a collection → Add.',
         arcgis:
@@ -343,7 +343,7 @@ export const OGC_USAGE_HINTS = {
     },
 
     ogcApiTiles: {
-        title: 'OGC API — Tiles',
+        title: 'OGC API - Tiles',
         qgis:
             'For raster/map tiles, use a client path supported by your QGIS build, or use WMTS/XYZ where available. For .pbf vector tiles, use Layer → Add Layer → Add Vector Tile Layer with the tile URL template.',
         arcgis:

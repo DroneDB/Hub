@@ -3,7 +3,7 @@
  * backed by the precomputed `/mvt/{hash}/{z}/{x}/{y}.pbf` tile pyramid served by Registry.
  *
  * Kept as plain JS helpers (not a Vue mixin) because the surrounding logic in the two
- * components — selection tracking, listener bookkeeping, zoom-to-extent — differs
+ * components - selection tracking, listener bookkeeping, zoom-to-extent - differs
  * enough that a mixin would be more confusing than helpful.
  */
 import { VectorTile as VectorTileLayer } from 'ol/layer';
