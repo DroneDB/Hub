@@ -60,15 +60,6 @@ class MeasureControls extends Control {
         btnStop.innerHTML = '<img src="' + rootPath("/images/measure-stop.svg") + '"/>';
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
 
-        // Separator
-        const separator = document.createElement('div');
-        separator.style.display = 'inline-block';
-        separator.style.width = 'var(--ddb-border-width)';
-        separator.style.height = '1.75rem';
-        separator.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-        separator.style.margin = '0 0.25rem';
-        separator.style.verticalAlign = 'middle';
-
         // Save/Load/Clear buttons
         const btnSave = document.createElement('button');
         btnSave.title = 'Save Measurements - Save all current measurements to the dataset.';
@@ -95,20 +86,30 @@ class MeasureControls extends Control {
         btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem"></i>';
         btnList.style.display = 'none';
 
+        // First toolbar: drawing tools (always visible)
+        const toolbar1 = document.createElement('div');
+        toolbar1.className = 'ol-control';
+        toolbar1.appendChild(btnPoint);
+        toolbar1.appendChild(btnLength);
+        toolbar1.appendChild(btnArea);
+        toolbar1.appendChild(btnErase);
+        toolbar1.appendChild(btnEdit);
+        toolbar1.appendChild(btnStop);
+
+        // Second toolbar: save/manage tools (hidden until there are measurements)
+        const toolbar2 = document.createElement('div');
+        toolbar2.className = 'ol-control';
+        toolbar2.style.display = 'none';
+        toolbar2.appendChild(btnList);
+        toolbar2.appendChild(btnSave);
+        toolbar2.appendChild(btnClear);
+        toolbar2.appendChild(btnExport);
+        toolbar2.appendChild(btnDelete);
+
         const element = document.createElement('div');
-        element.className = 'ol-measure-control ol-unselectable ol-control';
-        element.appendChild(btnPoint);
-        element.appendChild(btnLength);
-        element.appendChild(btnArea);
-        element.appendChild(btnErase);
-        element.appendChild(btnEdit);
-        element.appendChild(btnStop);
-        element.appendChild(separator);
-        element.appendChild(btnList);
-        element.appendChild(btnSave);
-        element.appendChild(btnClear);
-        element.appendChild(btnExport);
-        element.appendChild(btnDelete);
+        element.className = 'ol-measure-control ol-unselectable';
+        element.appendChild(toolbar1);
+        element.appendChild(toolbar2);
 
         super({
             element: element,
@@ -168,7 +169,7 @@ class MeasureControls extends Control {
         this.btnLength = btnLength;
         this.btnArea = btnArea;
         this.btnErase = btnErase;
-        this.separator = separator;
+        this.toolbar2 = toolbar2;
 
         // Reentrant counter for setToolsDisabled() so multiple panels (e.g.
         // raster profile + stockpile drawing) can suspend the toolbar at the
@@ -430,7 +431,7 @@ class MeasureControls extends Control {
         // Only show Delete button if user has delete permission
         const canShowDelete = this.canDelete;
         const displaySave = (hasMeasurements && canShowSave) ? 'block' : 'none';
-        this.separator.style.display = hasMeasurements ? 'block' : 'none';
+        this.toolbar2.style.display = hasMeasurements ? 'block' : 'none';
         this.btnList.style.display = hasMeasurements ? 'block' : 'none';
         this.btnSave.style.display = displaySave;
         this.btnClear.style.display = hasMeasurements ? 'block' : 'none';

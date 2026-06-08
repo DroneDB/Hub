@@ -1,6 +1,8 @@
 <template>
     <div class="tree-view" ref="treeView"
+        tabindex="0"
         :class="{ dropping }"
+        @keydown="onKeyDown"
         @drop="explorerDropHandler($event)"
         @dragenter="explorerDragEnter($event)"
         @dragleave="explorerDragLeave($event)"
@@ -48,7 +50,8 @@ export default {
     },
     data() {
         return {
-            dropping: false
+            dropping: false,
+            focusedNode: null
         };
     },
 
@@ -92,6 +95,8 @@ export default {
                 this.rangeStartNode = node;
             }
 
+            this.focusedNode = node;
+
             this.$emit("selectionChanged", this.selectedNodes, this.selectedNodes.length > 0 ? pathutils.getParentFolder(this.selectedNodes[0].node.entry.path) : null);
         },
 
@@ -119,6 +124,107 @@ export default {
             }
 
             return true;
+        },
+
+        // Builds a flat, top-to-bottom ordered list of the currently visible
+        // tree node components, tracking each one's parent so Left-arrow can
+        // walk back up the hierarchy.
+        buildVisibleNodes: function () {
+            const out = [];
+            const walk = (nodes, parent) => {
+                if (!nodes) return;
+                for (const n of nodes) {
+                    out.push({ component: n, parent });
+                    if (n.expanded && n.$refs && n.$refs.nodes) {
+                        walk(n.$refs.nodes, n);
+                    }
+                }
+            };
+            walk(this.$refs.treeNodes, null);
+            return out;
+        },
+
+        // Single-selects a node from keyboard navigation and scrolls it into
+        // view, mirroring the single-selection branch of handleSelection.
+        focusNode: function (node) {
+            if (!node) return;
+
+            this.selectedNodes.forEach(n => n.selected = false);
+            node.selected = true;
+            this.selectedNodes = [node];
+            this.rangeStartNode = node;
+            this.focusedNode = node;
+
+            if (node.$el && typeof node.$el.scrollIntoView === 'function') {
+                node.$el.scrollIntoView({ block: 'nearest' });
+            }
+
+            this.$emit("selectionChanged", this.selectedNodes, pathutils.getParentFolder(node.node.entry.path));
+        },
+
+        onKeyDown: function (e) {
+            // Don't hijack typing (e.g. inline rename) or shortcut combos.
+            const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'].indexOf(e.key) === -1) return;
+
+            const visible = this.buildVisibleNodes();
+            if (visible.length === 0) return;
+
+            const index = this.focusedNode
+                ? visible.findIndex(v => v.component === this.focusedNode)
+                : -1;
+            const current = index >= 0 ? visible[index] : null;
+
+            switch (e.key) {
+                case 'ArrowDown': {
+                    e.preventDefault();
+                    const next = index < 0 ? visible[0] : visible[Math.min(index + 1, visible.length - 1)];
+                    this.focusNode(next.component);
+                    break;
+                }
+                case 'ArrowUp': {
+                    e.preventDefault();
+                    const prev = index <= 0 ? visible[0] : visible[index - 1];
+                    this.focusNode(prev.component);
+                    break;
+                }
+                case 'ArrowRight': {
+                    e.preventDefault();
+                    const node = current ? current.component : visible[0].component;
+                    if (!current) {
+                        this.focusNode(node);
+                        break;
+                    }
+                    if (node.isExpandable) {
+                        if (!node.expanded) {
+                            node.expand();
+                        } else {
+                            const refreshed = this.buildVisibleNodes();
+                            const i = refreshed.findIndex(v => v.component === node);
+                            if (i >= 0 && i + 1 < refreshed.length && refreshed[i + 1].parent === node) {
+                                this.focusNode(refreshed[i + 1].component);
+                            }
+                        }
+                    }
+                    break;
+                }
+                case 'ArrowLeft': {
+                    e.preventDefault();
+                    if (!current) {
+                        this.focusNode(visible[0].component);
+                        break;
+                    }
+                    const node = current.component;
+                    if (node.expanded && node.isExpandable) {
+                        node.expanded = false;
+                    } else if (current.parent) {
+                        this.focusNode(current.parent);
+                    }
+                    break;
+                }
+            }
         }
     }
 }
@@ -131,6 +237,7 @@ export default {
     user-select: none;
     overflow-x: scroll;
     height: 100%;
+    outline: none;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
 
     &.dropping {

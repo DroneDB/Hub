@@ -33,14 +33,77 @@
     box-shadow: inset 0 0 0 0.25rem rgba(255, 255, 255, 0.5);
 }
 
+/* ---------------------------------------------------------------------------
+   Toolbar zones
+   ---------------------------------------------------------------------------
+   Controls are grouped into left/right anchored flex columns instead of being
+   individually absolute-positioned. This guarantees they stack with a fixed
+   gap and never overlap, regardless of how many buttons each control holds or
+   how short the viewport is. Each zone is itself transparent to pointer events
+   so only the actual controls capture clicks; the gaps fall through to the map.
+*/
+.ol-zone {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1;
+    pointer-events: none;
+    max-height: calc(100% - 1rem);
+}
+
+.ol-zone > .ol-control {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    margin: 0 !important;
+    pointer-events: auto;
+}
+
+/* Top-left sits below the default OpenLayers zoom control. */
+.ol-zone-top-left {
+    top: 6.25rem;
+    left: 0.5rem;
+    align-items: flex-start;
+}
+
+.ol-zone-bottom-left {
+    bottom: 0.5rem;
+    left: 0.5rem;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+}
+
+.ol-zone-top-right {
+    top: 0.5rem;
+    right: 0.5rem;
+    align-items: flex-end;
+}
+
 .ol-selection {
     top: 6.25rem;
     left: 0.5rem;
 }
 
 .ol-measure-control {
+    position: absolute;
     top: 13.25rem;
-    right: 0.5rem;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    z-index: 1;
+}
+
+.ol-measure-control > .ol-control {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    margin: 0 !important;
 }
 
 .ol-settings {

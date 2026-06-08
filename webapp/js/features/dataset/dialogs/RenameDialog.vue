@@ -1,5 +1,5 @@
 <template>
-    <Window title="Rename" id="rename" @onClose="onWindowClose" modal maxWidth="70%" fixedSize>
+    <Window title="Rename" id="rename" @onClose="onWindowClose" @show="focusInput" modal maxWidth="70%" fixedSize>
 
         <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close('close')"
             v-model="renameText" :invalid="renameText == null || renameText.length == 0" :disabled="busy" fluid />
@@ -59,20 +59,28 @@ export default {
     mounted: function () {
         this.renameText = this.file.label;
 
-        this.$nextTick(() => {
-            const inputEl = this.$refs.renameInput.$el;
-            inputEl.focus();
-            inputEl.select();
-            const dotIdx = this.renameText.indexOf(".");
-            if (dotIdx !== -1) {
-                inputEl.selectionEnd = dotIdx;
-            }
-        });
+        // Initial best-effort focus; the authoritative focus happens on the
+        // dialog's "show" event (focusInput), once the enter transition has
+        // completed and PrimeVue's own focus handling can no longer steal it.
+        this.focusInput();
 
         // Check if measurements file exists
         this.checkForMeasurementsFile();
     },
     methods: {
+        focusInput() {
+            this.$nextTick(() => {
+                const input = this.$refs.renameInput;
+                if (!input || !input.$el) return;
+                const inputEl = input.$el;
+                inputEl.focus();
+                inputEl.select();
+                const dotIdx = this.renameText ? this.renameText.indexOf(".") : -1;
+                if (dotIdx !== -1) {
+                    inputEl.selectionEnd = dotIdx;
+                }
+            });
+        },
         async checkForMeasurementsFile() {
             // Check only for point clouds
             if (this.file.entry.type !== ddb.entry.type.POINTCLOUD) {

@@ -979,6 +979,13 @@ export default {
             });
             this.map.addControl(this.settingsControl);
 
+            // Group the controls into left/right toolbar zones so they stack
+            // without overlapping (instead of each being absolute-positioned).
+            this.createControlZones();
+            this.moveControlToZone(this.selectionControl, this._zoneTopLeft);
+            this.moveControlToZone(this.measureControls, this._zoneTopRight);
+            this.moveControlToZone(this.settingsControl, this._zoneBottomLeft);
+
             // Plant Health / Raster Analysis / Stockpile Volume on-map buttons,
             // shared with SingleMap.vue via `useMapAnalysisButtons`. We pick the
             // first capable file so the buttons map to a valid entry whenever
@@ -986,7 +993,7 @@ export default {
             this.addAnalysisButtonsControl(predicate => {
                 const f = (this.files || []).find(x => x.entry && predicate(x.entry));
                 return f || null;
-            });
+            }, this._zoneTopRight);
 
             // Apply flight path visibility preference
             this.flightPathLayer.setVisible(this.showFlightPath);
@@ -1075,88 +1082,54 @@ export default {
                     // Close any open image popup
                     this.closeImagePopup();
 
-                    // Remove all
-                    this.outlineFeatures.forEachFeature(outline => {
-                        this.outlineFeatures.removeFeature(outline);
-
-                        // Deselect style
-                        if (outline.feat.get('features')) {
-                            outline.feat.get('features').forEach(f => {
-                                f.style = this.showDirectionIndicators ? 'direction' : 'shot';
-                            });
-                        }
-
-                        delete (outline.feat.outline);
-                    });
+                    // Clear any previously displayed raster footprints
                     this.clearLayerGroup(this.footprintRastersLayer);
-                    this.topLayers.setVisible(true);
 
-                    // Add selected
+                    // Handle the topmost clicked feature
                     let stop = false;
                     this.map.forEachFeatureAtPixel(e.pixel, feat => {
                         if (stop) return;
+                        stop = true;
 
-                        if (!feat.outline) {
-                            let outline = null;
+                        // Extent features (orthophoto footprints) no longer trigger
+                        // a selection highlight: the yellow outline mode was removed.
+                        if (!feat.get('features')) return;
 
-                            if (feat.get('features')) {
-                                // Geoimage (point cluster)
-                                const file = feat.get('features')[0].file;
-                                if (file.entry.polygon_geom) {
-                                    const coords = coordAll(file.entry.polygon_geom);
-                                    outline = new Feature(new Polygon([coords]));
-                                    outline.getGeometry().transform('EPSG:4326', 'EPSG:3857');
-                                }
+                        // Geoimage (point cluster)
+                        const file = feat.get('features')[0].file;
 
-                                // Clicked on panorama
-                                if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(file.entry.type) !== -1) {
-                                    // Open panorama view
-                                    this.$emit('openItem', file, 'panorama');
-                                    return;
-                                }
-
-                                // Clicked on geoimage - show image popup
-                                if (file.entry.type === ddb.entry.type.GEOIMAGE) {
-                                    this.showImagePopup(file, e.coordinate);
-                                }
-
-                                // Nothing else to do
-                                if (!outline) return;
-
-                                // Set style
-                                feat.get('features').forEach(f => {
-                                    f.style = this.showDirectionIndicators ? 'direction-outlined' : 'shot-outlined';
-                                });
-
-                                // Add geoprojected raster footprint
-                                const rasterFootprint = new TileLayer({
-                                    extent: outline.getGeometry().getExtent(),
-                                    source: new HybridXYZ({
-                                        url: file.path,
-                                        tileSize: 256,
-                                        transition: 200,
-                                        minZoom: 14,
-                                        maxZoom: 22
-                                        // TODO: get min/max zoom somehow?
-                                    })
-                                });
-                                // tileLayer.file = f;
-                                this.footprintRastersLayer.getLayers().push(rasterFootprint);
-                            } else {
-                                // Extent
-                                outline = feat;
-                            }
-
-                            this.outlineFeatures.addFeature(outline);
-
-                            // Add reference to self (for deletion later)
-                            outline.feat = feat;
-                            feat.outline = outline;
-
-                            this.topLayers.setVisible(false);
-
-                            stop = true;
+                        // Clicked on panorama
+                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(file.entry.type) !== -1) {
+                            // Open panorama view
+                            this.$emit('openItem', file, 'panorama');
+                            return;
                         }
+
+                        // Clicked on geoimage - show image popup
+                        if (file.entry.type === ddb.entry.type.GEOIMAGE) {
+                            this.showImagePopup(file, e.coordinate);
+                        }
+
+                        // Without a footprint geometry there is nothing left to draw
+                        if (!file.entry.polygon_geom) return;
+
+                        const coords = coordAll(file.entry.polygon_geom);
+                        const footprintGeom = new Polygon([coords]);
+                        footprintGeom.transform('EPSG:4326', 'EPSG:3857');
+
+                        // Add geoprojected raster footprint
+                        const rasterFootprint = new TileLayer({
+                            extent: footprintGeom.getExtent(),
+                            source: new HybridXYZ({
+                                url: file.path,
+                                tileSize: 256,
+                                transition: 200,
+                                minZoom: 14,
+                                maxZoom: 22
+                                // TODO: get min/max zoom somehow?
+                            })
+                        });
+                        this.footprintRastersLayer.getLayers().push(rasterFootprint);
                     }, {
                         layerFilter: layer => {
                             return layer.getVisible() &&

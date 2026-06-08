@@ -2,7 +2,7 @@
     <Dialog :visible="true" :header="title" :modal="modal" :closable="closable"
         :draggable="!fixedPosition" :style="dialogStyle" :contentStyle="contentStyle"
         :dismissableMask="closeModalOnClick" :closeOnEscape="closable"
-        :pt="dialogPt" @update:visible="handleClose">
+        :pt="dialogPt" @update:visible="handleClose" @show="$emit('show')">
         <slot />
     </Dialog>
 </template>
@@ -14,7 +14,7 @@ export default {
     components: {
         Dialog
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'show'],
     props: {
         title: {
             type: String,

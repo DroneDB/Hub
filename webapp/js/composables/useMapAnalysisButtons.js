@@ -31,6 +31,35 @@ function makeButton(title, iconClass, onClick, testId = null) {
 export default {
     methods: {
         /**
+         * Creates the left/right toolbar zone containers inside the map's
+         * stop-event overlay container and stores references on the instance
+         * (`_zoneTopLeft`, `_zoneTopRight`, `_zoneBottomLeft`). Controls are
+         * re-parented into these flex columns so they stack without ever
+         * overlapping. Safe to call once after the OL Map has been created.
+         */
+        createControlZones() {
+            if (!this.map) return;
+            const stop = this.map.getOverlayContainerStopEvent();
+            const make = (cls) => {
+                const el = document.createElement('div');
+                el.className = 'ol-zone ' + cls;
+                stop.appendChild(el);
+                return el;
+            };
+            this._zoneTopLeft = make('ol-zone-top-left');
+            this._zoneTopRight = make('ol-zone-top-right');
+            this._zoneBottomLeft = make('ol-zone-bottom-left');
+        },
+
+        /**
+         * Moves an already-added OL control's root element into a toolbar
+         * zone. Used for controls constructed before the zones exist.
+         */
+        moveControlToZone(control, zone) {
+            if (control && control.element && zone) zone.appendChild(control.element);
+        },
+
+        /**
          * Append the analysis buttons (Plant Health / Raster Analysis /
          * Stockpile Volume) to an existing OL controls container. Use this
          * when the host already builds a container with other buttons (e.g.
@@ -73,16 +102,19 @@ export default {
          * top-right cluster.
          *
          * @param {Function} getEntry - see appendAnalysisButtonsToContainer
+         * @param {HTMLElement} [target] - optional zone container the control
+         *   should render into (left/right toolbar zone). When omitted the
+         *   control falls back to OpenLayers' default overlay container.
          * @returns {Control|null} The created control, or null if no buttons
          *   apply (in which case the container is not added to the map).
          */
-        addAnalysisButtonsControl(getEntry) {
+        addAnalysisButtonsControl(getEntry, target = null) {
             if (!this.map) return null;
             const container = document.createElement('div');
             container.className = 'ol-map-analysis-buttons ol-unselectable ol-control';
             this.appendAnalysisButtonsToContainer(container, getEntry);
             if (!container.children.length) return null;
-            const ctrl = new Control({ element: container });
+            const ctrl = new Control(target ? { element: container, target } : { element: container });
             this.map.addControl(ctrl);
             this._analysisButtonsControl = ctrl;
             return ctrl;

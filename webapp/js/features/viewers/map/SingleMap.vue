@@ -314,11 +314,17 @@ export default {
             });
             this.map.addControl(this.measureControls);
 
+            // Group controls into left/right toolbar zones so they stack
+            // without overlapping (instead of each being absolute-positioned).
+            this.createControlZones();
+            this.moveControlToZone(this.measureControls, this._zoneTopRight);
+
             // Add settings control (gear button)
             this.settingsControl = new olSettings.Control({
                 onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
             });
             this.map.addControl(this.settingsControl);
+            this.moveControlToZone(this.settingsControl, this._zoneBottomLeft);
 
             // Add map utility controls (Reset View, Fullscreen, Back to Dataset) in top-right
             const controlContainer = document.createElement('div');
@@ -367,7 +373,10 @@ export default {
                 controlContainer,
                 predicate => (predicate(entry) ? entry.path : null));
 
-            this.map.addControl(new Control({ element: controlContainer }));
+            // Keep the utility cluster above the measure control within the
+            // top-right zone (it used to sit at the very top of the map).
+            controlContainer.style.order = '-1';
+            this.map.addControl(new Control({ element: controlContainer, target: this._zoneTopRight }));
 
             // Setup tooltip overlay for vector features
             this.setupTooltipOverlay();
