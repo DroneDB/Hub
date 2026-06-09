@@ -64129,7 +64129,7 @@ void main() {
 						let attribute = geometry.attributes[attributeName];
 
 						// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-						// DDB PATCH — COPC HEIGHT PROFILE BUG FIX — DO NOT REMOVE
+						// DDB PATCH - COPC HEIGHT PROFILE BUG FIX - DO NOT REMOVE
 						// Potree upstream issues: #1396, #1417, #1553 (STILL OPEN as of 2026-06)
 						//
 						// ROOT CAUSE: the COPC/LAS1.4 merge (PR #1381, Potree 1.8.2) changed the
@@ -64145,7 +64145,7 @@ void main() {
 						// WE ARE COPC-ONLY (EPT removed in the EPT→COPC migration).
 						// No conditional needed.
 						//
-						// ⚠️  IF YOU EVER RE-VENDOR POTREE (unlikely — we'll likely move to a
+						// ⚠️  IF YOU EVER RE-VENDOR POTREE (unlikely - we'll likely move to a
 						//     different renderer) YOU MUST RE-APPLY THIS PATCH MANUALLY.
 						//     The upstream bug is still unpatched. Search for "DDB PATCH" in the
 						//     new bundle and restore this change.
@@ -85074,7 +85074,7 @@ ENDSEC
 					if ( source.mimeType === 'image/png' ) {
 
 						// Inspect the PNG 'IHDR' chunk to determine whether the image could have an
-						// alpha channel. This check is conservative — the image could have an alpha
+						// alpha channel. This check is conservative - the image could have an alpha
 						// channel with all values == 1, and the indexed type (colorType == 3) only
 						// sometimes contains alpha.
 						//

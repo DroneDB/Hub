@@ -421,7 +421,7 @@ function maskBordersItem(ctx) {
 function extractItem(ctx) {
     return {
         label: 'Extract',
-        icon: 'fa-solid fa-box-open',
+        icon: 'fa-solid fa-box',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return ctx.canWrite && sel.length === 1 && isArchiveFile(sel[0].entry);

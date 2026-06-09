@@ -558,33 +558,64 @@ export default {
 
         async revealExtractedFiles(destPath) {
             try {
-                const folder = (destPath != null && destPath.length > 0) ? destPath : null;
-                const normalizedCurrent = (this.currentPath != null && this.currentPath.length > 0)
+                const destFolder  = (destPath != null && destPath.length > 0) ? destPath : null;
+                const currentFolder = (this.currentPath != null && this.currentPath.length > 0)
                     ? this.currentPath : null;
 
-                // Only the destination folder's listing is affected by the extraction.
-                if (folder !== normalizedCurrent) return;
-
-                const entries = await this.dataset.list(folder);
-                const items = [];
-                for (const entry of entries) {
-                    if (this.fileBrowserFiles.some(f => f.entry.path === entry.path)) continue;
-                    const item = {
+                // ── 1. Refresh the main file view (Explorer / TableView) ──────────────────
+                // We always re-fetch the CURRENT folder (not just the destination). This
+                // handles every case:
+                //   • destination === current  → new files appear in the grid.
+                //   • destination is a child of current → the new sub-folder appears.
+                //   • overwrite case          → stale entries are replaced with fresh ones.
+                const currentEntries = await this.dataset.list(currentFolder || undefined) || [];
+                const currentItems = currentEntries.map(entry => {
+                    const isDir = this.ddb.entry.isDirectory(entry);
+                    return {
                         icon: this.icons.getForType(entry.type),
                         label: this.pathutils.basename(entry.path),
                         path: this.dataset.remoteUri(entry.path),
                         entry,
-                        isExpandable: this.ddb.entry.isDirectory(entry),
+                        isExpandable: isDir,
                         selected: false
                     };
-                    this.fileBrowserFiles.push(item);
-                    items.push(item);
+                });
+
+                // Full replacement so stale entries (old metadata, missing new files) are
+                // gone. sortFiles() reassigns the property, which triggers Vue reactivity.
+                this.fileBrowserFiles = currentItems;
+                this.sortFiles();
+
+                // ── 2. Refresh the sidebar tree ───────────────────────────────────────────
+                // Emit addItems for the current folder's fresh items so the tree merges them
+                // into the matching already-expanded node.
+                if (currentItems.length > 0) {
+                    emitter.emit('addItems', currentItems);
+                    this.BuildManager.onFilesAdded(this.dataset, currentItems.map(i => i.entry));
                 }
 
-                if (items.length > 0) {
-                    this.sortFiles();
-                    emitter.emit('addItems', items);
-                    this.BuildManager.onFilesAdded(this.dataset, items.map(i => i.entry));
+                // If the destination is a DIFFERENT folder (e.g. a sub-folder), also fetch
+                // its children so the tree is ready when the user expands it.
+                if (destFolder !== null && destFolder !== currentFolder) {
+                    try {
+                        const destEntries = await this.dataset.list(destFolder) || [];
+                        const destItems = destEntries.map(entry => {
+                            const isDir = this.ddb.entry.isDirectory(entry);
+                            return {
+                                icon: this.icons.getForType(entry.type),
+                                label: this.pathutils.basename(entry.path),
+                                path: this.dataset.remoteUri(entry.path),
+                                entry,
+                                isExpandable: isDir,
+                                selected: false
+                            };
+                        });
+                        if (destItems.length > 0) {
+                            emitter.emit('addItems', destItems);
+                        }
+                    } catch (_) {
+                        // best-effort - tree node will reload lazily on expansion
+                    }
                 }
             } catch (e) {
                 console.warn('Could not refresh file browser after extract:', e);

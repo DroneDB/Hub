@@ -2,8 +2,8 @@
  * useTaskFormatting
  *
  * Options-API mixin with the shared presentation helpers for Processing Platform
- * tasks (spec §B.3). The authoritative task metadata — the available tools, their
- * titles, result file extensions and the task state machine — is published by the
+ * tasks (spec §B.3). The authoritative task metadata - the available tools, their
+ * titles, result file extensions and the task state machine - is published by the
  * server in the `/sys/features` payload (loaded once at app bootstrap) and read
  * here, so the server stays the single source of truth (no hardcoded catalogs).
  *
