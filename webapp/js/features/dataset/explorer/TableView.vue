@@ -118,7 +118,7 @@ export default {
     components: {
         Toolbar, ContextMenu, Breadcrumb, DataTable, Column
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     data: function () {
         const self = this;

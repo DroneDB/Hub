@@ -39,6 +39,10 @@ export default {
             mergeMultispectralDialogOpen: false,
             mergeMultispectralFiles: [],
 
+            // Extract archive dialog
+            extractDialogOpen: false,
+            extractFile: null,
+
             // Mask borders dialog
             maskBordersConfirmOpen: false,
             maskBordersEntry: null,
@@ -517,6 +521,73 @@ export default {
                 } catch (e) {
                     console.warn('Could not refresh file browser after merge:', e);
                 }
+            }
+        },
+
+        // Extract Archive Dialog
+        openExtractDialog(file) {
+            if (!file) return;
+            this.extractFile = file;
+            this.extractDialogOpen = true;
+        },
+
+        async handleExtractClose(action, result) {
+            this.extractDialogOpen = false;
+            this.extractFile = null;
+
+            if (action !== 'extracted' || !result) return;
+
+            this.$toast.add({
+                severity: 'success',
+                summary: 'Extract Completed',
+                detail: `Archive extracted to ${result.destPath && result.destPath.length > 0 ? result.destPath : 'root folder'}`,
+                life: 5000
+            });
+
+            // Reveal the newly extracted entries in the current folder view.
+            await this.revealExtractedFiles(result.destPath);
+
+            // If the source archive was deleted, drop it from the browser.
+            if (result.deletedArchive && result.archivePath) {
+                this.fileBrowserFiles = this.fileBrowserFiles.filter(
+                    f => f.entry.path !== result.archivePath
+                );
+                emitter.emit('deleteEntries', [result.archivePath]);
+            }
+        },
+
+        async revealExtractedFiles(destPath) {
+            try {
+                const folder = (destPath != null && destPath.length > 0) ? destPath : null;
+                const normalizedCurrent = (this.currentPath != null && this.currentPath.length > 0)
+                    ? this.currentPath : null;
+
+                // Only the destination folder's listing is affected by the extraction.
+                if (folder !== normalizedCurrent) return;
+
+                const entries = await this.dataset.list(folder);
+                const items = [];
+                for (const entry of entries) {
+                    if (this.fileBrowserFiles.some(f => f.entry.path === entry.path)) continue;
+                    const item = {
+                        icon: this.icons.getForType(entry.type),
+                        label: this.pathutils.basename(entry.path),
+                        path: this.dataset.remoteUri(entry.path),
+                        entry,
+                        isExpandable: this.ddb.entry.isDirectory(entry),
+                        selected: false
+                    };
+                    this.fileBrowserFiles.push(item);
+                    items.push(item);
+                }
+
+                if (items.length > 0) {
+                    this.sortFiles();
+                    emitter.emit('addItems', items);
+                    this.BuildManager.onFilesAdded(this.dataset, items.map(i => i.entry));
+                }
+            } catch (e) {
+                console.warn('Could not refresh file browser after extract:', e);
             }
         },
 

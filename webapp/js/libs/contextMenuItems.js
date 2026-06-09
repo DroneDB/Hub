@@ -1,7 +1,7 @@
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable } from '@/libs/entryTypes';
+import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
@@ -418,6 +418,18 @@ function maskBordersItem(ctx) {
     };
 }
 
+function extractItem(ctx) {
+    return {
+        label: 'Extract',
+        icon: 'fa-solid fa-box-open',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite && sel.length === 1 && isArchiveFile(sel[0].entry);
+        },
+        click: () => ctx.emit('extractItem', ctx.getSelectedEntries()[0])
+    };
+}
+
 function buildActionMenuItems(ctx) {
     return [
         editItem(ctx),
@@ -428,6 +440,7 @@ function buildActionMenuItems(ctx) {
         buildItem(ctx),
         mergeMultispectralItem(ctx),
         maskBordersItem(ctx),
+        extractItem(ctx),
         transferItem(ctx),
         setThumbnailItem(ctx),
         clipboardSeparator(ctx),
@@ -483,6 +496,7 @@ export {
     transferItem,
     setThumbnailItem,
     mergeMultispectralItem,
+    extractItem,
     deleteItem,
     deleteSeparator,
     selectAllNoneItem,

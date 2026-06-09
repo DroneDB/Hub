@@ -35,6 +35,16 @@ function isDroneDB(type) {
     return type === ddb.entry.type.DRONEDB;
 }
 
+// Returns true when the entry is a (supported) compressed archive file.
+// Mirrors the formats handled by the backend SharpCompress extractor.
+const ARCHIVE_EXTENSION_RE = /\.(zip|rar|7z|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|xz)$/i;
+
+function isArchiveFile(entry) {
+    if (!entry || !entry.path) return false;
+    if (ddb.entry.isDirectory(entry)) return false;
+    return ARCHIVE_EXTENSION_RE.test(entry.path);
+}
+
 // Returns the number of data bands, excluding alpha bands
 function countDataBands(entry) {
     if (!entry || !Array.isArray(entry.properties?.bands)) return 0;
@@ -112,5 +122,6 @@ export {
     isPlantHealthCapable,
     isRasterAnalysisCapable,
     getTypeDisplayName,
-    sortEntriesDirectoriesFirst
+    sortEntriesDirectoriesFirst,
+    isArchiveFile
 };

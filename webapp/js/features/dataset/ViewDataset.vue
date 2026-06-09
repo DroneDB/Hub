@@ -16,7 +16,7 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
                     @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
             </div>
             </template>
@@ -35,7 +35,7 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
                         @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                 </template>
                 <template v-slot:map>
@@ -53,7 +53,7 @@
                                 @setAsCover="setAsCover"
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -77,7 +77,7 @@
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders"
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -131,6 +131,7 @@
             @onClose="handleSetCoverClose" />
         <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
+        <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
             title="Mask Borders"
             :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
@@ -251,6 +252,7 @@ import FileAvailabilityDialog from './dialogs/FileAvailabilityDialog.vue';
 import TextEditorDialog from './dialogs/TextEditorDialog.vue';
 import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
 import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
+import ExtractDialog from './dialogs/ExtractDialog.vue';
 import FsLightbox from 'fslightbox-vue';
 import VideoLightbox from './VideoLightbox.vue';
 
@@ -315,6 +317,7 @@ export default {
         TextEditorDialog,
         PdfViewerDialog,
         MergeMultispectralDialog,
+        ExtractDialog,
         FsLightbox,
         VideoLightbox
     },
