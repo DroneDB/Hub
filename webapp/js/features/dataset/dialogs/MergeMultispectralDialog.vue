@@ -108,9 +108,11 @@ import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
+import useHeavyTask from '@/composables/useHeavyTask';
 
 export default {
     components: { Window, Button, InputText, Checkbox },
+    mixins: [useHeavyTask],
     props: {
         files: { type: Array, required: true },
         dataset: { type: Object, required: true }
@@ -309,7 +311,11 @@ export default {
                 const paths = this.orderedFiles.map(f => f.entry.path);
                 let outputPath = this.outputName.trim();
 
-                await this.dataset.mergeMultispectral(paths, outputPath);
+                // Offloaded to the merge-multispectral heavy task (progress visible in
+                // the Tasks tab). Awaits completion so the file listing can refresh.
+                await this.runHeavyTask(this.dataset, 'merge-multispectral', {
+                    params: { paths, outputPath }, force: true, notify: false
+                });
 
                 const sourceNames = paths.map(p => p.split('/').pop());
                 this.$emit('onClose', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });

@@ -16,88 +16,11 @@
         </div>
 
         <div class="content">
-            <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" stripedRows>
-                <Column header="State" style="width: 6rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
-                <Column header="Tool" style="width: 25%;"><template #body><Skeleton width="80%" /></template></Column>
-                <Column header="Progress" style="width: 20%;"><template #body><Skeleton width="90%" /></template></Column>
-                <Column header="Created" style="width: 18%;"><template #body><Skeleton width="70%" /></template></Column>
-                <Column header="Duration" style="width: 10%;"><template #body><Skeleton width="60%" /></template></Column>
-                <Column header="Actions" style="width: 15%;"><template #body><Skeleton width="90%" /></template></Column>
-            </DataTable>
-
-            <div v-else-if="filteredTasks.length === 0">
-                <PrimeMessage severity="info" :closable="false">
-                    <strong>No tasks found</strong>
-                    <p>No processing tasks have been run for this dataset yet.</p>
-                </PrimeMessage>
-            </div>
-
-            <DataTable v-else :value="filteredTasks" stripedRows rowHover paginator :rows="pageSize"
-                sortField="createdAt" :sortOrder="-1" :pt="{ table: { style: 'min-width: 50rem' } }">
-                <Column field="state" header="State" :sortable="true" style="width: 7rem;">
-                    <template #body="slotProps">
-                        <Tag :severity="getTagSeverity(slotProps.data.state)"
-                            :pt="{ root: { title: slotProps.data.state } }">
-                            <i :class="getStateIcon(slotProps.data.state)" style="font-size: 1rem;"></i>
-                        </Tag>
-                    </template>
-                </Column>
-                <Column field="toolId" header="Tool" :sortable="true" style="width: 25%;">
-                    <template #body="slotProps">
-                        <div :title="slotProps.data.path || ''">
-                            <strong>{{ toolTitle(slotProps.data.toolId) }}</strong>
-                            <span class="muted"> v{{ slotProps.data.version }}</span>
-                            <br>
-                            <small class="path-details">{{ slotProps.data.path || 'Whole dataset' }}</small>
-                        </div>
-                    </template>
-                </Column>
-                <Column header="Progress" style="width: 22%;">
-                    <template #body="slotProps">
-                        <div v-if="isActive(slotProps.data.state)">
-                            <ProgressBar :value="slotProps.data.progressPercent || 0" :showValue="true" style="height: 1rem;" />
-                            <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
-                        </div>
-                        <div v-else-if="slotProps.data.state === 'Failed'" class="error-text" :title="slotProps.data.errorType">
-                            <i class="fa-solid fa-triangle-exclamation"></i> {{ slotProps.data.errorType || 'Failed' }}
-                        </div>
-                        <div v-else class="muted">-</div>
-                    </template>
-                </Column>
-                <Column field="createdAt" header="Created" :sortable="true" style="width: 16%;">
-                    <template #body="slotProps">
-                        <div class="date-time">
-                            <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
-                            <small class="relative-time">{{ getRelativeTime(slotProps.data.createdAt) }}</small>
-                        </div>
-                    </template>
-                </Column>
-                <Column header="Duration" style="width: 9rem;">
-                    <template #body="slotProps">
-                        <div v-if="isActive(slotProps.data.state)" class="duration running" title="Running time">
-                            <i class="fa-solid fa-stopwatch"></i> {{ runningTime(slotProps.data) }}
-                        </div>
-                        <div v-else-if="taskDuration(slotProps.data)" class="duration" title="Total duration">
-                            {{ taskDuration(slotProps.data) }}
-                        </div>
-                        <div v-else class="muted">-</div>
-                    </template>
-                </Column>
-                <Column header="Actions" style="width: 16rem;">
-                    <template #body="slotProps">
-                        <div class="d-flex gap-1 flex-wrap">
-                            <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log"
-                                @click="openLog(slotProps.data)" />
-                            <Button v-if="canDownload(slotProps.data)" size="small" icon="fa-solid fa-download"
-                                label="Result" @click="downloadResult(slotProps.data)" />
-                            <Button v-if="isActive(slotProps.data.state)" size="small" severity="warn"
-                                icon="fa-solid fa-stop" title="Cancel" @click="cancelTask(slotProps.data)" />
-                            <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
-                                icon="fa-solid fa-rotate-right" title="Retry" @click="retryTask(slotProps.data)" />
-                        </div>
-                    </template>
-                </Column>
-            </DataTable>
+            <TasksTable :tasks="filteredTasks" :tools="tools" :loading="loading" :rows="pageSize"
+                :downloading-task-id="downloadingTaskId"
+                empty-message="No processing tasks have been run for this dataset yet."
+                @view-log="openLog" @download-result="downloadResult"
+                @cancel="cancelTask" @retry="retryTask" />
         </div>
 
         <!-- Photogrammetry launcher -->
@@ -131,13 +54,8 @@
         </Dialog>
 
         <!-- Log viewer -->
-        <Dialog v-model:visible="logDialogOpen" modal :header="`Log - ${logTaskTitle}`" :style="{ width: '48rem' }">
-            <pre class="task-log">{{ logText || 'No log output.' }}</pre>
-            <template #footer>
-                <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate" @click="refreshLog" />
-                <Button label="Close" @click="logDialogOpen = false" />
-            </template>
-        </Dialog>
+        <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
+            @refresh="refreshLog" />
 
         <ConfirmDialog v-if="clearDialogOpen"
             title="Clear Concluded Tasks"
@@ -151,27 +69,22 @@
 
 <script>
 import useHeavyTask from '@/composables/useHeavyTask';
+import useTaskFormatting from '@/composables/useTaskFormatting';
+import emitter from '@/libs/eventBus';
+import TasksTable from '@/features/tasks/TasksTable.vue';
+import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
-import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
-import Tag from 'primevue/tag';
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
-import Skeleton from 'primevue/skeleton';
 import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
-import ProgressBar from 'primevue/progressbar';
-
-const TERMINAL_STATES = ['Succeeded', 'Failed', 'Deleted'];
 
 export default {
-    mixins: [useHeavyTask],
+    mixins: [useHeavyTask, useTaskFormatting],
 
     components: {
-        ConfirmDialog, Button, PrimeMessage, Select, Tag, DataTable, Column, Skeleton,
-        Dialog, InputText, Textarea, ProgressBar
+        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, TasksTable, TaskLogDialog
     },
 
     props: {
@@ -189,10 +102,8 @@ export default {
             selectedState: '',
             selectedTool: '',
             pageSize: 20,
-            skeletonRows: Array.from({ length: 8 }, (_, i) => ({ id: i })),
             _refreshTimer: null,
-            now: Date.now(),
-            _clockTimer: null,
+            downloadingTaskId: null,
 
             photogrammetryDialogOpen: false,
             photogrammetryNodes: [],
@@ -203,22 +114,13 @@ export default {
             logTask: null,
             logText: '',
 
-            clearDialogOpen: false,
-
-            stateOptions: [
-                { label: 'All States', value: '' },
-                { label: 'Succeeded', value: 'Succeeded' },
-                { label: 'Failed', value: 'Failed' },
-                { label: 'Processing', value: 'Processing' },
-                { label: 'Enqueued', value: 'Enqueued' },
-                { label: 'Scheduled', value: 'Scheduled' }
-            ]
+            clearDialogOpen: false
         };
     },
 
     computed: {
         concludedCount() {
-            return this.tasks.filter(t => TERMINAL_STATES.includes(t.state)).length;
+            return this.tasks.filter(t => !this.isActive(t.state)).length;
         },
         hasActiveTasks() {
             return this.tasks.some(t => this.isActive(t.state));
@@ -232,13 +134,13 @@ export default {
             this.tasks.forEach(t => {
                 if (t.toolId && !seen.has(t.toolId)) {
                     seen.add(t.toolId);
-                    opts.push({ label: this.toolTitle(t.toolId), value: t.toolId });
+                    opts.push({ label: this.toolTitle(t.toolId, this.tools), value: t.toolId });
                 }
             });
             return opts;
         },
         logTaskTitle() {
-            return this.logTask ? this.toolTitle(this.logTask.toolId) : '';
+            return this.logTask ? this.toolTitle(this.logTask.toolId, this.tools) : '';
         }
     },
 
@@ -246,12 +148,12 @@ export default {
         await this.loadTools();
         await this.loadTasks();
         this.scheduleAutoRefresh();
-        this._clockTimer = setInterval(() => { this.now = Date.now(); }, 1000);
     },
 
     beforeUnmount() {
         if (this._refreshTimer) clearTimeout(this._refreshTimer);
-        if (this._clockTimer) clearInterval(this._clockTimer);
+        // Clear the global flag so the download button re-enables when leaving the dataset.
+        emitter.emit('setActiveBulkDownload', false);
     },
 
     methods: {
@@ -297,20 +199,14 @@ export default {
             if (this.selectedState) filtered = filtered.filter(t => t.state === this.selectedState);
             if (this.selectedTool) filtered = filtered.filter(t => t.toolId === this.selectedTool);
             this.filteredTasks = filtered;
+
+            // Broadcast whether there is an active (queued/running) bulk-download task so
+            // Header.vue and ViewDataset.vue can disable the download button globally.
+            const hasActiveBulkDownload = this.tasks.some(
+                t => t.toolId === 'bulk-download' && this.isActive(t.state));
+            emitter.emit('setActiveBulkDownload', hasActiveBulkDownload);
         },
 
-        isActive(state) {
-            return !TERMINAL_STATES.includes(state);
-        },
-
-        canDownload(task) {
-            return task.state === 'Succeeded' && this.tools.some(t => t.id === task.toolId && t.producesArtifact);
-        },
-
-        toolTitle(toolId) {
-            const tool = this.tools.find(t => t.id === toolId);
-            return tool ? tool.title : (toolId || 'Task');
-        },
 
         // ---- photogrammetry launcher ----
 
@@ -380,6 +276,8 @@ export default {
         },
 
         async downloadResult(task) {
+            if (this.downloadingTaskId) return; // guard against repeated clicks
+            this.downloadingTaskId = task.taskId;
             const url = this.dataset.taskResultUrl(task.taskId);
             try {
                 // Fetch with auth (Authorization header) then trigger a native download.
@@ -394,13 +292,9 @@ export default {
                 URL.revokeObjectURL(blobUrl);
             } catch (e) {
                 this._toast('error', 'Download failed', e.message);
+            } finally {
+                this.downloadingTaskId = null;
             }
-        },
-
-        resultFileName(task) {
-            const ext = task.toolId === 'photogrammetry' ? 'zip'
-                : (task.toolId === 'raster-export' ? 'tif' : 'bin');
-            return `${task.toolId || 'task'}_${task.taskId}.${ext}`;
         },
 
         async openLog(task) {
@@ -438,81 +332,7 @@ export default {
             }
         },
 
-        // ---- formatting ----
-
-        getTagSeverity(state) {
-            switch (state) {
-                case 'Succeeded': return 'success';
-                case 'Failed': return 'danger';
-                case 'Processing': return 'warn';
-                case 'Enqueued':
-                case 'Scheduled':
-                case 'Reused': return 'info';
-                case 'Deleted': return 'secondary';
-                default: return 'secondary';
-            }
-        },
-
-        getStateIcon(state) {
-            switch (state) {
-                case 'Succeeded': return 'fa-solid fa-check';
-                case 'Failed': return 'fa-solid fa-xmark';
-                case 'Processing': return 'fa-solid fa-gear fa-spin';
-                case 'Deleted': return 'fa-solid fa-ban';
-                default: return 'fa-regular fa-clock';
-            }
-        },
-
-        formatDateTime(dateString) {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            return new Intl.DateTimeFormat(undefined, {
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }).format(date);
-        },
-
-        getRelativeTime(dateString) {
-            if (!dateString) return '';
-            const diffMs = Date.now() - new Date(dateString).getTime();
-            const minutes = Math.floor(diffMs / 60000);
-            const hours = Math.floor(diffMs / 3600000);
-            const days = Math.floor(diffMs / 86400000);
-            if (minutes < 1) return 'Just now';
-            if (minutes < 60) return `${minutes} minutes ago`;
-            if (hours < 24) return `${hours} hours ago`;
-            if (days < 30) return `${days} days ago`;
-            return 'Over a month ago';
-        },
-
-        // Elapsed time for a task still in flight.
-        runningTime(task) {
-            const start = task.startedAt || task.createdAt;
-            if (!start) return '';
-            // `now` is reactive (ticks every second) so this updates live.
-            return this.formatDurationMs(this.now - new Date(start).getTime());
-        },
-
-        // Total length of a concluded task.
-        taskDuration(task) {
-            if (!task.finishedAt) return '';
-            const start = task.startedAt || task.createdAt;
-            if (!start) return '';
-            const ms = new Date(task.finishedAt).getTime() - new Date(start).getTime();
-            if (ms < 0) return '';
-            return this.formatDurationMs(ms);
-        },
-
-        formatDurationMs(ms) {
-            if (ms == null || ms < 0) return '';
-            const totalSeconds = Math.floor(ms / 1000);
-            const seconds = totalSeconds % 60;
-            const minutes = Math.floor(totalSeconds / 60) % 60;
-            const hours = Math.floor(totalSeconds / 3600);
-            if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-            if (minutes > 0) return `${minutes}m ${seconds}s`;
-            return `${seconds}s`;
-        }
+        // ---- formatting helpers are provided by the useTaskFormatting mixin ----
     }
 };
 </script>

@@ -277,9 +277,11 @@ import { OpenItemDefaults } from '@/libs/openItemDefaults';
 import dialogManager from '@/composables/useDialogManager';
 import fileOperations from '@/composables/useFileOperations';
 import buildEvents from '@/composables/useBuildEvents';
+import useHeavyTask from '@/composables/useHeavyTask';
+import { Features } from '@/libs/features';
 
 export default {
-    mixins: [dialogManager, fileOperations, buildEvents],
+    mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask],
     components: {
         Header,
         Message,
@@ -371,6 +373,11 @@ export default {
             viewMode: savedViewMode, // 'grid' or 'table'
             selectedDetailFile: null, // For DetailPanel in table view
             rootDatasetEntry: null, // Root dataset entry with permissions
+
+            // True while a bulk-download task (ZIP compression) is active for this
+            // dataset. Set via the global event bus by TaskHistory; disables all
+            // download triggers so the server cannot receive concurrent requests.
+            activeBulkDownload: false,
 
             // File availability dialog
             showAvailabilityDialog: false,
@@ -470,6 +477,11 @@ export default {
         emitter.on('downloadLimitReached', this._onDownloadLimitReached);
         emitter.on('uploadItems', this._onUploadItems);
         emitter.on('moveItem', this._onMoveItemBus);
+
+        this._onSetActiveBulkDownload = (active) => {
+            this.activeBulkDownload = !!active;
+        };
+        emitter.on('setActiveBulkDownload', this._onSetActiveBulkDownload);
     },
     beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
@@ -489,6 +501,7 @@ export default {
         emitter.off('downloadLimitReached', this._onDownloadLimitReached);
         emitter.off('uploadItems', this._onUploadItems);
         emitter.off('moveItem', this._onMoveItemBus);
+        emitter.off('setActiveBulkDownload', this._onSetActiveBulkDownload);
 
         // Cleanup BuildManager
         BuildManager.cleanup();
@@ -984,6 +997,16 @@ export default {
         handleDownloadItems: async function (files) {
             if (!files || files.length === 0) return;
 
+            // Block any download trigger while a bulk-download task is active.
+            if (this.activeBulkDownload) {
+                this.$toast.add({
+                    severity: 'warn', summary: 'Download in progress',
+                    detail: 'A download archive is already being prepared. Please wait for it to complete.',
+                    life: 5000
+                });
+                return;
+            }
+
             const paths = files.map(f => {
                 // Files from Explorer/TableView have f.entry.path
                 // Files from FileBrowser have f.entry.path too (they are tree nodes)
@@ -993,6 +1016,13 @@ export default {
                 return path;
             });
 
+            // Authenticated selections over the configured size threshold are
+            // offloaded to the async bulk-download task (spec §A.4.1).
+            if (reg.isLoggedIn() && this.selectionExceedsAsyncThreshold(files)) {
+                await this.startAsyncDownload(paths);
+                return;
+            }
+
             try {
                 await this.dataset.downloadWithCheck(paths);
             } catch (e) {
@@ -1001,6 +1031,44 @@ export default {
                 } else {
                     this.showError(e.message || e, "Download Error");
                 }
+            }
+        },
+
+        // Total selection size vs the async threshold. Unknown sizes (e.g. folders)
+        // force the async path for safety (spec §7.3).
+        selectionExceedsAsyncThreshold: function (files) {
+            const threshold = reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES);
+            if (!threshold || threshold <= 0) return false;
+
+            let total = 0;
+            for (const f of files) {
+                const size = f.entry && typeof f.entry.size === 'number' ? f.entry.size : null;
+                if (size == null) return true; // unknown size → async for safety
+                total += size;
+            }
+            return total > threshold;
+        },
+
+        startAsyncDownload: async function (paths) {
+            if (this.activeBulkDownload) return; // safety guard (should already be blocked)
+            try {
+                const params = {};
+                if (paths && paths.length) params.paths = paths;
+
+                const result = await this.runHeavyTask(this.dataset, 'bulk-download', { params, notify: false });
+
+                const url = this.dataset.taskResultUrl(result.taskId);
+                const blob = await this.dataset.registry.makeRequest(url, 'GET', null, null, 'blob');
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `${this.dataset.ds}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            } catch (e) {
+                this.showError(e.message || e, "Download Error");
             }
         },
 

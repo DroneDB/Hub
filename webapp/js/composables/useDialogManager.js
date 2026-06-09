@@ -346,9 +346,17 @@ export default {
             this.isBusy = true;
 
             try {
-                const result = await this.dataset.rescan(false);
-                this.rescanResultData = result;
-                this.rescanResultDialogOpen = true;
+                // Offloaded to the rescan-index heavy task; progress and per-entry
+                // counts are visible in the dataset Tasks tab.
+                await this.dataset.submitTask('rescan-index', {
+                    params: { stopOnError: false }, force: true
+                });
+                this.$toast.add({
+                    severity: 'info',
+                    summary: 'Rescan Started',
+                    detail: 'The dataset index rescan is running. Check the Tasks tab for progress.',
+                    life: 6000
+                });
             } catch (e) {
                 this.showError(e.message, 'Rescan Error');
             } finally {

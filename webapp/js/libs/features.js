@@ -9,5 +9,6 @@ export const Features = {
     PASSWORD_POLICY: 'passwordPolicy',
     DATASET_THUMBNAIL_CANDIDATES: 'datasetThumbnailCandidates',
     MAX_EXPORT_SIZE_BYTES: 'maxExportSizeBytes',
-    DISABLE_ANONYMOUS_BULK_DOWNLOADS: 'disableAnonymousBulkDownloads'
+    DISABLE_ANONYMOUS_BULK_DOWNLOADS: 'disableAnonymousBulkDownloads',
+    BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES: 'bulkDownloadAsyncThresholdBytes'
 };

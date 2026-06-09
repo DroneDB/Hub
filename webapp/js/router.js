@@ -11,6 +11,7 @@ const Upload = () => import(/* webpackChunkName: "upload" */ '@/features/upload/
 const NotFound = () => import(/* webpackChunkName: "notfound" */ '@/layout/NotFound.vue');
 const Account = () => import(/* webpackChunkName: "account" */ '@/features/account/Account.vue');
 const Users = () => import(/* webpackChunkName: "admin" */ '@/features/admin/Users.vue');
+const AdminTasks = () => import(/* webpackChunkName: "admin" */ '@/features/admin/Tasks.vue');
 const Potree = () => import(/* webpackChunkName: "pointcloud" */ '@/features/viewers/pointcloud/Potree.vue');
 const Nexus = () => import(/* webpackChunkName: "model" */ '@/features/viewers/model/Nexus.vue');
 const Panorama = () => import(/* webpackChunkName: "panorama" */ '@/features/viewers/panorama/Panorama.vue');
@@ -39,6 +40,7 @@ export function createAppRouter(embed = false) {
         { path: '/r', name: 'Organizations', components: viewsFor(Organizations), meta: { title: 'Organizations' } },
         { path: '/upload', name: 'Upload', components: viewsFor(Upload), meta: { title: 'Upload' } },
         { path: '/admin/users', name: 'Users', components: viewsFor(Users), meta: { title: 'Users' } },
+        { path: '/admin/tasks', name: 'AdminTasks', components: viewsFor(AdminTasks), meta: { title: 'Tasks' } },
         { path: '/account', name: 'Account', components: viewsFor(Account), meta: { title: 'Account' } },
         { path: '/', name: 'LoginHome', components: viewsFor(Login), meta: { title: 'Login' } },
         { path: '/:pathMatch(.*)*', name: 'NotFound', components: viewsFor(NotFound), meta: { title: 'Not Found' } }

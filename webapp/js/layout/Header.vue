@@ -16,7 +16,7 @@
                 <i class="fa-solid fa-sitemap"></i>
             </Button>
             <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
-                :title="downloadTitle" :disabled="isDownloading || downloadBlocked">
+                :title="downloadTitle" :disabled="isDownloading || downloadBlocked || activeBulkDownload">
                 <i class="fa-solid fa-download"></i>
                 <span v-if="selectedFiles.length > 0" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
@@ -100,6 +100,7 @@ import Button from 'primevue/button';
 import Menu from 'primevue/menu';
 import ProgressBar from 'primevue/progressbar';
 import PrimeMessage from 'primevue/message';
+import useHeavyTask from '@/composables/useHeavyTask';
 
 export default {
     components: {
@@ -110,6 +111,7 @@ export default {
         ProgressBar,
         PrimeMessage
     },
+    mixins: [useHeavyTask],
     data: function () {
 
         const loggedIn = reg.isLoggedIn();
@@ -126,6 +128,7 @@ export default {
             orgInfoCache: {},
             selectedFiles: [],
             isDownloading: false,
+            activeBulkDownload: false,
             downloadConfirmOpen: false,
             storageInfo: null,
             storageInfoDialogOpen: false,
@@ -243,6 +246,7 @@ export default {
                 && this.downloadIsBulk;
         },
         downloadTitle: function () {
+            if (this.activeBulkDownload) return 'A download archive is being prepared. Please wait for it to complete.';
             if (this.downloadBlocked) return 'Login required to download multiple files or the entire dataset';
             if (this.selectedFiles.length > 0) return `Download ${this.selectedFiles.length} file${this.selectedFiles.length !== 1 ? 's' : ''}`;
             return 'Download';
@@ -270,7 +274,7 @@ export default {
                 }
             }
 
-            if ((this.accountManagement && this.loggedIn) || (this.usersManagement && this.isAdmin)) {
+            if ((this.accountManagement && this.loggedIn) || (this.usersManagement && this.isAdmin) || this.isAdmin) {
                 items.push({ separator: true });
             }
             if (this.accountManagement && this.loggedIn) {
@@ -278,6 +282,9 @@ export default {
             }
             if (this.usersManagement && this.isAdmin) {
                 items.push({ label: 'Manage Users', icon: 'fa-solid fa-users fixed-icon', command: () => this.manageUsers() });
+            }
+            if (this.isAdmin) {
+                items.push({ label: 'Tasks', icon: 'fa-solid fa-list-check fixed-icon', command: () => this.adminTasks() });
             }
 
             items.push({ separator: true });
@@ -304,6 +311,11 @@ export default {
         };
         emitter.on('setSelectedFiles', this._onSetSelectedFiles);
 
+        this._onSetActiveBulkDownload = (active) => {
+            this.activeBulkDownload = !!active;
+        };
+        emitter.on('setActiveBulkDownload', this._onSetActiveBulkDownload);
+
         this.refreshStorageInfo();
         this.checkUserManagement();
         this.updateBackToOrgVisibility();
@@ -327,6 +339,7 @@ export default {
         emitter.off('addItems', this._onAddItems);
         emitter.off('deleteEntries', this._onDeleteEntries);
         emitter.off('setSelectedFiles', this._onSetSelectedFiles);
+        emitter.off('setActiveBulkDownload', this._onSetActiveBulkDownload);
     },
     methods: {
         handleStorageInfoDialogClose: function () {
@@ -380,6 +393,9 @@ export default {
         manageUsers: function () {
             this.$router.push({ name: "Users" });
         },
+        adminTasks: function () {
+            this.$router.push({ name: "AdminTasks" });
+        },
         manageAccount: function () {
             this.$router.push({ name: "Account" });
         },
@@ -392,20 +408,29 @@ export default {
 
             if (action !== 'confirm') return;
             if (this.isDownloading) return;
+            if (this.activeBulkDownload) return;
+
+            const { org, ds } = this.params;
+            const dataset = reg.Organization(org).Dataset(ds);
+
+            const paths = this.selectedFiles.length > 0
+                ? this.selectedFiles.map(f => {
+                    const { path } = utils.parseUri(f.path);
+                    return path;
+                })
+                : undefined;
+
+            // Authenticated bulk downloads (whole dataset or selection over the
+            // threshold) are offloaded to the async bulk-download task. Anonymous
+            // users and small/single selections keep the legacy direct streaming.
+            if (this.loggedIn && this.shouldUseAsyncDownload()) {
+                await this.startAsyncDownload(dataset, paths);
+                return;
+            }
 
             this.isDownloading = true;
 
             try {
-                const { org, ds } = this.params;
-                const dataset = reg.Organization(org).Dataset(ds);
-
-                const paths = this.selectedFiles.length > 0
-                    ? this.selectedFiles.map(f => {
-                        const { path } = utils.parseUri(f.path);
-                        return path;
-                    })
-                    : undefined;
-
                 await dataset.downloadWithCheck(paths);
             } catch (err) {
                 if (err.status === 429) {
@@ -413,6 +438,51 @@ export default {
                 } else {
                     alert(err.message || err);
                 }
+            } finally {
+                this.isDownloading = false;
+            }
+        },
+
+        // Decide whether an authenticated download should go through the async
+        // bulk-download task (spec §A.4.1). Whole-dataset always async; a selection
+        // is async when its total size exceeds the configured threshold (or when a
+        // size is unknown, async is used for safety - spec §7.3).
+        shouldUseAsyncDownload: function () {
+            if (this.selectedFiles.length === 0) return true; // whole dataset
+
+            const threshold = reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES);
+            if (!threshold || threshold <= 0) return false;
+
+            let total = 0;
+            for (const f of this.selectedFiles) {
+                const size = f.entry && typeof f.entry.size === 'number' ? f.entry.size : null;
+                if (size == null) return true; // unknown size → async for safety
+                total += size;
+            }
+            return total > threshold;
+        },
+
+        startAsyncDownload: async function (dataset, paths) {
+            this.isDownloading = true;
+            try {
+                const params = {};
+                if (paths && paths.length) params.paths = paths;
+
+                const result = await this.runHeavyTask(dataset, 'bulk-download', { params, notify: false });
+
+                // Fetch the produced archive with auth, then trigger a native download.
+                const url = dataset.taskResultUrl(result.taskId);
+                const blob = await reg.makeRequest(url, 'GET', null, null, 'blob');
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `${this.params.ds}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            } catch (err) {
+                alert((err && err.message) || err);
             } finally {
                 this.isDownloading = false;
             }

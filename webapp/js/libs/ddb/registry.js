@@ -897,6 +897,26 @@ module.exports = class Registry {
         return await this.getRequest('/users/detailed');
     }
 
+    /**
+     * Lists all tasks across all users and datasets (admin only, spec §B.4).
+     * @param {Object} [filter]
+     * @param {string} [filter.toolId]
+     * @param {string} [filter.state]
+     * @param {string} [filter.userId]
+     * @param {number} [filter.skip]
+     * @param {number} [filter.take]
+     * @returns {Promise<Object>} { items, total, skip, take }
+     */
+    async adminTasks({ toolId, state, userId, skip = 0, take = 50 } = {}) {
+        const q = new URLSearchParams();
+        if (toolId) q.append('toolId', toolId);
+        if (state) q.append('state', state);
+        if (userId) q.append('userId', userId);
+        q.append('skip', String(skip));
+        q.append('take', String(take));
+        return this.getRequest(`/sys/tasks?${q}`);
+    }
+
     // User update method (email and roles)
     async updateUser(userName, email, roles) {
         return await this.putRequest(`/users/${encodeURIComponent(userName)}`, {
