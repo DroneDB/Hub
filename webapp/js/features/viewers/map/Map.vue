@@ -6,7 +6,8 @@
             'cursor-crosshair': selectPolygon
         }">
             <olMeasure ref="measure" />
-            <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
+            <OpacityControl v-if="rasterLayerList.length <= 1" v-model="rasterOpacity" :visible="hasRasters" />
+            <RasterLayerOpacityPanel v-else v-model:layers="rasterLayerList" @reorder="handleRasterLayerReorder" />
             <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :filePath="plantHealthFilePath"
                 :initialParams="plantHealthInitialParams" @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
@@ -130,6 +131,7 @@ import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
 import Toolbar from '@/components/Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
+import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
 import ContourOptionsDialog from './ContourOptionsDialog.vue';
@@ -167,7 +169,7 @@ import emitter from '@/libs/eventBus';
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
+        Map, Toolbar, olMeasure, OpacityControl, RasterLayerOpacityPanel, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     emits: ['scrollTo', 'openItem'],
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
@@ -320,6 +322,7 @@ export default {
             imagePopupOverlay: null,
             rasterOpacity: 1.0,
             hasRasters: false,
+            rasterLayerList: [],
             measurementListDialogOpen: false,
             measurementListItems: []
         };
@@ -371,6 +374,12 @@ export default {
     watch: {
         rasterOpacity: function () {
             this.updateRastersOpacity();
+        },
+        rasterLayerList: {
+            deep: true,
+            handler: function () {
+                this.updateRastersOpacity();
+            }
         },
         files: {
             deep: true,
@@ -1505,6 +1514,7 @@ export default {
             // for datasets with no vector files vectorFilePromises is empty and
             // Promise.all([]) resolves immediately as a microtask.
             Promise.all(vectorFilePromises).then(() => this.zoomToFilesExtent());
+            this.syncRasterLayers();
             this.updateRastersOpacity();
 
             // Load measurements for orthophotos if available
@@ -1637,11 +1647,63 @@ export default {
                 const hasSelection = this.files.some(f => f.selected);
                 this.selectionControl.setClearButtonVisible(hasSelection);
             }
+        }, syncRasterLayers: function () {
+            const newList = [];
+            this.rasterLayer.getLayers().forEach(olLayer => {
+                if (!olLayer.file) return;
+                const name = this.getLayerDisplayName(olLayer) ||
+                    (olLayer.file.entry && olLayer.file.entry.path
+                        ? olLayer.file.entry.path.split('/').pop()
+                        : '');
+                const path = (olLayer.file.entry && olLayer.file.entry.path) || name;
+                // Preserve existing opacity for this layer if already tracked
+                const existing = this.rasterLayerList.find(r => r.path === path);
+                newList.push({
+                    name,
+                    path,
+                    // markRaw prevents Vue from wrapping the OL layer in a reactive
+                    // proxy (which would break identity checks and hurt performance).
+                    olLayer: markRaw(olLayer),
+                    opacity: existing ? existing.opacity : 1.0
+                });
+            });
+            // Reverse so that rasterLayerList[0] = topmost OL layer (rendered last)
+            // matching the standard layer-panel convention (top of list = on top).
+            this.rasterLayerList = newList.reverse();
+        }, handleRasterLayerReorder: function ({ fromIndex, toIndex }) {
+            // Reorder in the reactive list
+            const updated = [...this.rasterLayerList];
+            const [moved] = updated.splice(fromIndex, 1);
+            updated.splice(toIndex, 0, moved);
+            this.rasterLayerList = updated;
+
+            // Sync the OL LayerGroup collection.
+            // rasterLayerList[0] = top (OL: last), rasterLayerList[N-1] = bottom (OL: first).
+            // So the OL collection must be the reverse of rasterLayerList.
+            const olLayers = this.rasterLayer.getLayers();
+            const count = olLayers.getLength();
+            for (let i = 0; i < count; i++) olLayers.pop();
+            for (let i = updated.length - 1; i >= 0; i--) {
+                olLayers.push(updated[i].olLayer);
+            }
         }, updateRastersOpacity: function () {
+            const usePerLayer = this.rasterLayerList.length > 1;
             const baseOpacity = this.rasterOpacity;
+
             this.rasterLayer.getLayers().forEach(layer => {
-                if (layer.file.selected) layer.setOpacity(baseOpacity * 0.8);
-                else layer.setOpacity(baseOpacity);
+                let opacity;
+                if (usePerLayer) {
+                    // Match by path: OL layers stored in reactive data are proxied,
+                    // so direct object identity comparison is unreliable.
+                    const path = layer.file && layer.file.entry ? layer.file.entry.path : null;
+                    const entry = this.rasterLayerList.find(r => r.path === path);
+                    opacity = entry ? entry.opacity : 1.0;
+                } else {
+                    opacity = baseOpacity;
+                }
+                // Dim selected layers slightly
+                if (layer.file && layer.file.selected) opacity *= 0.8;
+                layer.setOpacity(opacity);
             });
             this.hasRasters = this.rasterLayer.getLayers().getLength() > 0;
 

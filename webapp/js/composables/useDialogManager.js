@@ -39,6 +39,10 @@ export default {
             mergeMultispectralDialogOpen: false,
             mergeMultispectralFiles: [],
 
+            // Align GeoRaster dialog
+            alignDialogOpen: false,
+            alignSourceEntry: null,
+
             // Extract archive dialog
             extractDialogOpen: false,
             extractFile: null,
@@ -521,6 +525,53 @@ export default {
                 } catch (e) {
                     console.warn('Could not refresh file browser after merge:', e);
                 }
+            }
+        },
+
+        // Align GeoRaster Dialog
+        openAlignDialog(entry) {
+            if (!entry) return;
+            this.alignSourceEntry = entry;
+            this.alignDialogOpen = true;
+        },
+
+        async handleAlignClose(action, result) {
+            this.alignDialogOpen = false;
+            this.alignSourceEntry = null;
+
+            if (action !== 'aligned' || !result || !result.outputPath) return;
+
+            this.$toast.add({
+                severity: 'success',
+                summary: 'Alignment complete',
+                detail: `Output saved as ${result.outputPath}`,
+                life: 6000
+            });
+
+            try {
+                // Add the aligned output to the file browser (if it belongs to the current folder).
+                const entry = await this.dataset.listOne(result.outputPath);
+                const entryParentPath = this.pathutils.getParentFolder(entry.path);
+                const normalizedCurrentPath = (this.currentPath != null && this.currentPath.length > 0) ? this.currentPath : null;
+
+                if (entryParentPath === normalizedCurrentPath) {
+                    if (!this.fileBrowserFiles.some(f => f.entry.path === entry.path)) {
+                        const item = {
+                            icon: this.icons.getForType(entry.type, entry.path),
+                            label: this.pathutils.basename(entry.path),
+                            path: this.dataset.remoteUri(entry.path),
+                            entry: entry,
+                            isExpandable: this.ddb.entry.isDirectory(entry),
+                            selected: false
+                        };
+                        this.fileBrowserFiles.push(item);
+                        emitter.emit('addItems', [item]);
+                    }
+                }
+
+                this.sortFiles();
+            } catch (e) {
+                console.warn('Could not refresh file browser after align:', e);
             }
         },
 

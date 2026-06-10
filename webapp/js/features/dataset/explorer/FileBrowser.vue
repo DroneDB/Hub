@@ -11,7 +11,7 @@
             </div>
         </div>
         <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
-            :getChildren="getChildren" :canWrite="canWrite" />
+            :getChildren="getChildren" :canWrite="canWrite" ref="treeView" />
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
@@ -42,6 +42,7 @@ export default {
         TreeView, ContextMenu, InputText, InputIcon, IconField
     },
     emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {
             type: Function,
@@ -66,6 +67,7 @@ export default {
             },
             get canWrite() { return self.canWrite; },
             get dataset() { return self.dataset; },
+            get showBuildConfirm() { return self.showBuildConfirm; },
             emit: (event, ...args) => {
                 // For FileBrowser, some actions need to emit selectionChanged first
                 const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
@@ -285,6 +287,50 @@ export default {
             }
 
             this.loading = false;
+        },
+
+        /**
+         * Refresh the tree and then navigate back to targetPath (the path
+         * relative to the dataset root, e.g. "folderA/folderB"). Expands the
+         * tree level by level; if a folder along the way no longer exists, it
+         * stops at the closest existing parent. When targetPath is null/empty
+         * it navigates to the dataset root.
+         */
+        refreshAndNavigate: async function (targetPath) {
+            await this.refreshNodes();
+            await this.$nextTick();
+
+            const rootTreeNodes = this.$refs.treeView?.$refs?.treeNodes;
+            if (!rootTreeNodes || !rootTreeNodes.length) return;
+
+            // The single root node represents the dataset root directory.
+            let currentNode = rootTreeNodes[0];
+
+            // Ensure the root is expanded and its children are mounted.
+            if (currentNode.isExpandable) {
+                await currentNode.expand();
+                await this.$nextTick();
+            }
+
+            const segments = targetPath ? targetPath.split('/').filter(Boolean) : [];
+
+            for (const segment of segments) {
+                const children = (currentNode.$refs && currentNode.$refs.nodes) || [];
+                const next = children.find(
+                    c => c.node && c.node.entry && pathutils.basename(c.node.entry.path) === segment
+                );
+
+                // Folder no longer exists: stop at the closest existing parent.
+                if (!next) break;
+
+                if (next.isExpandable) {
+                    await next.expand();
+                    await this.$nextTick();
+                }
+                currentNode = next;
+            }
+
+            await this.handleSelectionChanged([currentNode]);
         },
 
         handleSelectionChanged: async function (selectedNodes) {

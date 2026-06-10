@@ -25,20 +25,15 @@ export default {
     computed: {
         menuModel: function () {
             return this.items
-                .filter(itm => typeof itm.isVisible === 'undefined' || itm.isVisible())
-                .map(item => {
-                    if (item.type === 'separator') {
-                        return { separator: true };
+                .filter(itm => {
+                    if (itm.items) {
+                        // Sub-menu: visible if at least one child is visible
+                        return itm.items.some(child => typeof child.isVisible === 'undefined' || child.isVisible());
                     }
-                    return {
-                        label: item.label,
-                        icon: item.icon,
-                        disabled: item.isEnabled !== undefined ? !item.isEnabled() : false,
-                        command: () => {
-                            if (item.click) item.click();
-                        }
-                    };
-                });
+                    return typeof itm.isVisible === 'undefined' || itm.isVisible();
+                })
+                .map(item => this.mapItem(item))
+                .filter(Boolean);
         }
     },
 
@@ -55,6 +50,32 @@ export default {
     },
 
     methods: {
+        mapItem: function (item) {
+            if (item.type === 'separator') {
+                return { separator: true };
+            }
+            if (item.items) {
+                const children = item.items
+                    .filter(child => typeof child.isVisible === 'undefined' || child.isVisible())
+                    .map(child => this.mapItem(child))
+                    .filter(Boolean);
+                if (children.length === 0) return null;
+                return {
+                    label: item.label,
+                    icon: item.icon,
+                    items: children
+                };
+            }
+            return {
+                label: item.label,
+                icon: item.icon,
+                disabled: item.isEnabled !== undefined ? !item.isEnabled() : false,
+                command: () => {
+                    if (item.click) item.click();
+                }
+            };
+        },
+
         openContextMenu: function (e) {
             e.preventDefault();
             e.stopPropagation();

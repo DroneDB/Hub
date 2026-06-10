@@ -3,7 +3,7 @@ const { pathutils } = ddb;
 
 import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -222,7 +222,14 @@ function buildItem(ctx) {
             const sel = ctx.getSelectedEntries();
             if (sel.length !== 1) return;
             try {
-                await buildFile(ctx.dataset, sel[0]);
+                const alreadyBuilt = await isFileBuilt(ctx.dataset, sel[0]);
+                if (alreadyBuilt && ctx.showBuildConfirm) {
+                    ctx.showBuildConfirm(sel[0], async () => {
+                        await buildFile(ctx.dataset, sel[0]);
+                    });
+                } else {
+                    await buildFile(ctx.dataset, sel[0]);
+                }
             } catch (error) {
                 ctx.emit('buildError', { file: sel[0], error: error.message });
             }
@@ -237,6 +244,10 @@ function transferItem(ctx) {
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return reg.isLoggedIn() && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
+        },
+        isEnabled: () => {
+            const sel = ctx.getSelectedEntries();
+            return !sel.some(f => hasActiveBuild(ctx.dataset, f));
         },
         accelerator: 'CmdOrCtrl+T',
         click: () => ctx.emit('transferSelectedItems')
@@ -418,6 +429,21 @@ function maskBordersItem(ctx) {
     };
 }
 
+function alignGeoRasterItem(ctx) {
+    return {
+        label: 'Align to Reference...',
+        icon: 'fa-solid fa-crosshairs',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite &&
+                sel.length === 1 &&
+                sel[0].entry.type === ddb.entry.type.GEORASTER &&
+                /\.tiff?$/i.test(sel[0].entry.path);
+        },
+        click: () => ctx.emit('alignGeoRaster', ctx.getSelectedEntries()[0])
+    };
+}
+
 function extractItem(ctx) {
     return {
         label: 'Extract',
@@ -430,20 +456,40 @@ function extractItem(ctx) {
     };
 }
 
+function toolsItem(ctx) {
+    return {
+        label: 'Tools',
+        icon: 'fa-solid fa-wrench',
+        items: [
+            mergeMultispectralItem(ctx),
+            maskBordersItem(ctx),
+            alignGeoRasterItem(ctx),
+            extractItem(ctx)
+        ]
+    };
+}
+
 function buildActionMenuItems(ctx) {
+    const shareDownloadVisible = () => ctx.getSelectedEntries().length > 0;
     return [
         editItem(ctx),
-        renameItem(ctx),
         propertiesItem(ctx),
+        {
+            type: 'separator',
+            isVisible: shareDownloadVisible
+        },
         shareEmbedItem(ctx),
         downloadItem(ctx),
+        {
+            type: 'separator',
+            isVisible: shareDownloadVisible
+        },
         buildItem(ctx),
-        mergeMultispectralItem(ctx),
-        maskBordersItem(ctx),
-        extractItem(ctx),
+        toolsItem(ctx),
         transferItem(ctx),
         setThumbnailItem(ctx),
         clipboardSeparator(ctx),
+        renameItem(ctx),
         copyClipboardItem(ctx),
         cutClipboardItem(ctx),
         pasteClipboardItem(ctx)
@@ -493,9 +539,11 @@ export {
     shareEmbedItem,
     downloadItem,
     buildItem,
+    toolsItem,
     transferItem,
     setThumbnailItem,
     mergeMultispectralItem,
+    alignGeoRasterItem,
     extractItem,
     deleteItem,
     deleteSeparator,

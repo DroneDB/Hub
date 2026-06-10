@@ -5,7 +5,7 @@
             mobileCollapsed>
             <template #first>
             <div class="sidebar">
-                <FileBrowser v-show="!isMobile" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
+                <FileBrowser v-show="!isMobile" ref="fileBrowser" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
                     @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                     @openProperties="handleFileBrowserOpenProperties"
                     @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
@@ -16,7 +16,7 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                     @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
             </div>
             </template>
@@ -35,7 +35,7 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                         @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                 </template>
                 <template v-slot:map>
@@ -53,7 +53,7 @@
                                 @setAsCover="setAsCover"
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -77,7 +77,7 @@
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @extractItem="openExtractDialog"
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -123,6 +123,9 @@
         <RescanConfirmDialog v-if="rescanConfirmDialogOpen"
             @onClose="handleRescanConfirmClose">
         </RescanConfirmDialog>
+        <BuildConfirmDialog v-if="buildConfirmDialogOpen"
+            @confirm="handleBuildConfirmOk"
+            @cancel="buildConfirmDialogOpen = false" />
         <ConfirmDialog v-if="setCoverDialogOpen"
             title="Replace Dataset Cover"
             message="A dataset cover already exists. Do you want to replace it? This action is irreversible."
@@ -131,6 +134,7 @@
             @onClose="handleSetCoverClose" />
         <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
+        <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
         <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
             title="Mask Borders"
@@ -227,6 +231,7 @@ import DeleteDialog from './dialogs/DeleteDialog.vue';
 import DeleteResultDialog from './dialogs/DeleteResultDialog.vue';
 import RescanResultDialog from './dialogs/RescanResultDialog.vue';
 import RescanConfirmDialog from './dialogs/RescanConfirmDialog.vue';
+import BuildConfirmDialog from './dialogs/BuildConfirmDialog.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import RenameDialog from './dialogs/RenameDialog.vue';
 import NewFolderDialog from './dialogs/NewFolderDialog.vue';
@@ -252,6 +257,7 @@ import FileAvailabilityDialog from './dialogs/FileAvailabilityDialog.vue';
 import TextEditorDialog from './dialogs/TextEditorDialog.vue';
 import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
 import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
+import AlignDialog from './dialogs/AlignDialog.vue';
 import ExtractDialog from './dialogs/ExtractDialog.vue';
 import FsLightbox from 'fslightbox-vue';
 import VideoLightbox from './VideoLightbox.vue';
@@ -285,6 +291,11 @@ import { Features } from '@/libs/features';
 
 export default {
     mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask],
+    provide: function () {
+        return {
+            showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm)
+        };
+    },
     components: {
         Header,
         Message,
@@ -302,6 +313,7 @@ export default {
         DeleteResultDialog,
         RescanResultDialog,
         RescanConfirmDialog,
+        BuildConfirmDialog,
         ConfirmDialog,
         RenameDialog,
         NewFolderDialog,
@@ -318,6 +330,7 @@ export default {
         TextEditorDialog,
         PdfViewerDialog,
         MergeMultispectralDialog,
+        AlignDialog,
         ExtractDialog,
         FsLightbox,
         VideoLightbox
@@ -398,6 +411,10 @@ export default {
             textEditorDialogOpen: false,
             textEditorEntry: null,
             textEditorReadonly: false,
+
+            // Build confirm dialog
+            buildConfirmDialogOpen: false,
+            _buildConfirmCallback: null,
 
             // PDF viewer dialog
             pdfViewerOpen: false,
@@ -630,6 +647,25 @@ export default {
 
         toggleViewMode() {
             this.switchViewMode(this.viewMode === 'grid' ? 'table' : 'grid');
+        },
+
+        handleRefresh() {
+            if (this.$refs.fileBrowser) {
+                this.$refs.fileBrowser.refreshAndNavigate(this.currentPath);
+            }
+        },
+
+        showBuildConfirm(file, onConfirm) {
+            this._buildConfirmCallback = onConfirm;
+            this.buildConfirmDialogOpen = true;
+        },
+
+        handleBuildConfirmOk() {
+            this.buildConfirmDialogOpen = false;
+            if (typeof this._buildConfirmCallback === 'function') {
+                this._buildConfirmCallback();
+                this._buildConfirmCallback = null;
+            }
         },
 
         handleTableSelectionChanged(file) {
@@ -1231,6 +1267,15 @@ export default {
             // Add spacer and view mode toggle button
             this.explorerTools.push({
                 id: 'spacer'
+            });
+
+            this.explorerTools.push({
+                id: 'refresh',
+                title: "Refresh",
+                icon: "fa-solid fa-rotate-right",
+                onClick: () => {
+                    this.handleRefresh();
+                }
             });
 
             // Show only the button to switch to the opposite view

@@ -115,6 +115,10 @@ module.exports = class Dataset {
         return this.registry.postRequest(`${this.baseApi}/merge-multispectral`, { paths, outputPath });
     }
 
+    async validateAlignRaster(sourcePath, referencePath) {
+        return this.registry.postRequest(`${this.baseApi}/align/validate`, { sourcePath, referencePath });
+    }
+
     async getRasterValueInfo(path) {
         return this.registry.getRequest(`${this.baseApi}/raster-value-info?path=${encodeURIComponent(path)}`);
     }

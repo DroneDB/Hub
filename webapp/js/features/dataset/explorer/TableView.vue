@@ -120,12 +120,14 @@ export default {
     },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
+    inject: { showBuildConfirm: { default: null } },
     data: function () {
         const self = this;
         const ctx = {
             getSelectedEntries: () => self.selectedFiles,
             get canWrite() { return self.canWrite; },
             get dataset() { return self.dataset; },
+            get showBuildConfirm() { return self.showBuildConfirm; },
             emit: (...args) => self.$emit(...args),
             onSelectAllNone: () => {
                 if (self.selectedFiles.length === self.files.length) {
