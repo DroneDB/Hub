@@ -48,7 +48,8 @@ export default {
             this.isBusy = true;
 
             try {
-                const paths = this.contextMenuFiles.map(file => file.entry.path);
+                const selected = this.contextMenuFiles.slice();
+                const paths = selected.map(file => file.entry.path);
 
                 // Use batch delete endpoint
                 const response = await this.dataset.deleteObjs(paths);
@@ -59,7 +60,22 @@ export default {
                         item => !response.deleted.includes(item.entry.path)
                     );
                     emitter.emit('deleteEntries', response.deleted);
-                    this.$toast.add({ severity: 'success', summary: 'Deleted', detail: `${response.deleted.length} file${response.deleted.length > 1 ? 's' : ''} deleted successfully`, life: 3000 });
+
+                    // Distinguish folders from files in the message instead of always
+                    // saying "file": the deleted paths map back to the original selection,
+                    // which carries each entry's type.
+                    const deletedSet = new Set(response.deleted);
+                    const folderCount = selected.filter(
+                        f => deletedSet.has(f.entry.path) && ddb.entry.isDirectory(f.entry)
+                    ).length;
+                    const fileCount = response.deleted.length - folderCount;
+                    const parts = [];
+                    if (fileCount > 0) parts.push(`${fileCount} file${fileCount > 1 ? 's' : ''}`);
+                    if (folderCount > 0) parts.push(`${folderCount} folder${folderCount > 1 ? 's' : ''}`);
+                    const what = parts.length > 0
+                        ? parts.join(' and ')
+                        : `${response.deleted.length} item${response.deleted.length > 1 ? 's' : ''}`;
+                    this.$toast.add({ severity: 'success', summary: 'Deleted', detail: `${what} deleted successfully`, life: 3000 });
                 }
 
                 // Show result dialog only if there are failures

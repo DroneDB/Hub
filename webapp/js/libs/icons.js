@@ -1,4 +1,5 @@
 import { entry } from 'ddb';
+import { isArchivePath } from '@/libs/entryTypes';
 
 const typeIconMap = {
     [entry.type.DIRECTORY]: "fa-regular fa-folder",
@@ -33,6 +34,9 @@ export default {
     getForType: function (entryType, path) {
         // Check extension-based overrides for GENERIC type
         if (entryType === entry.type.GENERIC && path) {
+            // Archives are indexed as generic files but we can extract them, so show
+            // a distinct archive icon (their default action is "Extract").
+            if (isArchivePath(path)) return 'fa-regular fa-file-zipper';
             const ext = getExtension(path);
             if (extensionIconMap[ext]) return extensionIconMap[ext];
         }

@@ -39,10 +39,15 @@ function isDroneDB(type) {
 // Mirrors the formats handled by the backend SharpCompress extractor.
 const ARCHIVE_EXTENSION_RE = /\.(zip|rar|7z|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|xz)$/i;
 
+// True when a path looks like a supported archive (extension-based, no entry needed).
+function isArchivePath(path) {
+    return !!path && ARCHIVE_EXTENSION_RE.test(path);
+}
+
 function isArchiveFile(entry) {
     if (!entry || !entry.path) return false;
     if (ddb.entry.isDirectory(entry)) return false;
-    return ARCHIVE_EXTENSION_RE.test(entry.path);
+    return isArchivePath(entry.path);
 }
 
 // Returns the number of data bands, excluding alpha bands
@@ -123,5 +128,6 @@ export {
     isRasterAnalysisCapable,
     getTypeDisplayName,
     sortEntriesDirectoriesFirst,
-    isArchiveFile
+    isArchiveFile,
+    isArchivePath
 };
