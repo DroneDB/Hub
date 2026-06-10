@@ -83,7 +83,9 @@ export function measureToGeoJSON(measure, coordinateSystem) {
         closed: measure.closed,
 
         // Save local coordinates for easier re-import
-        localCoordinates: measure.points.map(p => [p.position.x, p.position.y, p.position.z])
+        localCoordinates: measure.points.map(p => [p.position.x, p.position.y, p.position.z]),
+        // Group assignment (optional)
+        groupId: measure.groupId || null
     };
 
     // Add calculated values if available
@@ -148,6 +150,11 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
         measure.color = new THREE.Color(props.color);
     }
 
+    // Restore group assignment
+    if (props.groupId) {
+        measure.groupId = props.groupId;
+    }
+
     // Restore stroke and fill properties
     measure.strokeWidth = props['stroke-width'] || 2;
     measure.strokeOpacity = props['stroke-opacity'] ?? 1;
@@ -194,7 +201,7 @@ export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
  * @param {Object} coordinateSystem - Coordinate system
  * @returns {Object} GeoJSON FeatureCollection
  */
-export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
+export function exportMeasurements(viewer, pointCloudPath, coordinateSystem, groups = []) {
     const measurements = viewer.scene.measurements || [];
 
     // Collect all features from measurements
@@ -222,12 +229,13 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem) {
             }
         },
         metadata: {
-            version: '1.0',
+            version: groups && groups.length > 0 ? '1.1' : '1.0',
             pointCloudFile: pointCloudPath,
             createdAt: new Date().toISOString(),
             modifiedAt: new Date().toISOString(),
             application: 'Registry-Potree',
-            coordinateSystem: coordinateSystem // Save original system for reference
+            coordinateSystem: coordinateSystem, // Save original system for reference
+            ...(groups && groups.length > 0 ? { groups } : {})
         },
         features: features
     };

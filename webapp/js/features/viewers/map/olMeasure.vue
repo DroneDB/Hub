@@ -445,7 +445,7 @@ class MeasureControls extends Control {
 
     /**
      * Get a list of all measurements with their details
-     * @returns {Array} Array of { name, type, value, feature }
+     * @returns {Array} Array of { name, type, value, feature, groupId }
      */
     getMeasurementsList() {
         const features = this.source.getFeatures();
@@ -464,8 +464,45 @@ class MeasureControls extends Control {
                     const tooltipText = f.get('tooltipText') || '';
                     value = tooltipText.replace(/<[^>]*>/g, '');
                 }
-                return { name, type, value, feature: f };
+                return { name, type, value, feature: f, groupId: f.get('groupId') || '' };
             });
+    }
+
+    /**
+     * Assign a measurement feature to a group
+     * @param {ol.Feature} feature - The feature to assign
+     * @param {string} groupId - Group ID, or empty string to ungroup
+     */
+    setMeasurementGroupId(feature, groupId) {
+        if (!feature) return;
+        if (groupId) {
+            feature.set('groupId', groupId);
+        } else {
+            feature.unset('groupId');
+        }
+    }
+
+    /**
+     * Toggle visibility of all features belonging to a group
+     * @param {string} groupId - Group ID
+     * @param {boolean} visible - Whether the group should be visible
+     */
+    setGroupVisibility(groupId, visible) {
+        const features = this.source.getFeatures();
+        features.forEach(f => {
+            if (f.get('groupId') === groupId) {
+                if (visible) {
+                    f.setStyle(undefined); // Reset to default style
+                } else {
+                    f.setStyle([]); // Empty style = invisible
+                }
+                // Also toggle tooltip overlay
+                const tooltip = f.get('measureTooltip');
+                if (tooltip) {
+                    tooltip.getElement().style.display = visible ? '' : 'none';
+                }
+            }
+        });
     }
 
     /**
@@ -593,8 +630,8 @@ class MeasureControls extends Control {
     /**
      * Export measurements to GeoJSON
      */
-    exportToGeoJSON(orthophotoPath) {
-        return exportMeasurements(this.source, orthophotoPath, this.unitPref);
+    exportToGeoJSON(orthophotoPath, groups = []) {
+        return exportMeasurements(this.source, orthophotoPath, this.unitPref, groups);
     }
 
     /**
@@ -1151,6 +1188,7 @@ class MeasureControls extends Control {
         const geometry = feature.getGeometry();
         const geometryType = geometry ? geometry.getType() : 'LineString';
         const showDelete = !!(options && options.showDelete);
+        const groups = (options && options.groups) || [];
 
         // Create Vue 3 app instance
         this._dialogContainer = document.createElement('div');
@@ -1159,6 +1197,7 @@ class MeasureControls extends Control {
             feature: feature,
             geometryType: geometryType,
             showDelete: showDelete,
+            groups: groups,
             onOnSave: (properties) => {
                 // Update feature properties
                 Object.keys(properties).forEach(key => {

@@ -85,6 +85,14 @@
                 </div>
             </div>
 
+            <div v-if="groups && groups.length > 0" class="form-group">
+                <label for="mp-group">Group</label>
+                <select id="mp-group" v-model="formData.groupId" class="group-dropdown">
+                    <option value="">None (Ungrouped)</option>
+                    <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                </select>
+            </div>
+
             <div class="buttons">
                 <button v-if="showDelete" class="btn-delete" @click="deleteMeasurement" title="Delete this measurement">
                     <i class="fa-solid fa-trash"></i>
@@ -120,6 +128,11 @@ export default {
         showDelete: {
             type: Boolean,
             default: false
+        },
+        // Available groups for the group assignment dropdown
+        groups: {
+            type: Array,
+            default: () => []
         }
     },
     emits: ['onClose', 'onSave', 'onDelete'],
@@ -143,7 +156,8 @@ export default {
                 'stroke-width': 2,
                 'stroke-opacity': 1,
                 fill: '#ffcc33',
-                'fill-opacity': 0.2
+                'fill-opacity': 0.2,
+                groupId: ''
             }
         };
     },
@@ -197,6 +211,7 @@ export default {
             this.formData['stroke-opacity'] = get('stroke-opacity') !== undefined ? get('stroke-opacity') : 1;
             this.formData.fill = get('fill') || '#ffcc33';
             this.formData['fill-opacity'] = get('fill-opacity') !== undefined ? get('fill-opacity') : 0.2;
+            this.formData.groupId = get('groupId') || '';
         }
     },
     methods: {
@@ -383,5 +398,17 @@ export default {
 
 .btn-copy-coords:hover {
     background-color: var(--ddb-border-separator);
+}
+
+.group-dropdown {
+    width: 100%;
+    padding: var(--ddb-spacing-sm);
+    border: var(--ddb-border-width) solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    font-size: var(--ddb-font-size-base);
+    background: var(--surface-0, #fff);
+    color: var(--ddb-text);
+    cursor: pointer;
+    box-sizing: border-box;
 }
 </style>

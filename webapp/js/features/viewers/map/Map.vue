@@ -44,8 +44,19 @@
             :measurementsCount="changeUnitsMeasurementsCount" @onClose="handleChangeUnitsDialogClose">
         </ChangeUnitsDialog>
         <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
-            @onClose="measurementListDialogOpen = false" @deleteMeasurement="handleDeleteMeasurementFromList"
-            @editMeasurement="handleEditMeasurementFromList" />
+            :groups="measurementGroups"
+            @onClose="measurementListDialogOpen = false"
+            @deleteMeasurement="handleDeleteMeasurementFromList"
+            @editMeasurement="handleEditMeasurementFromList"
+            @createGroup="openCreateGroupDialog"
+            @renameGroup="openRenameGroupDialog"
+            @deleteGroup="deleteGroup"
+            @toggleGroupVisibility="toggleGroupVisibility"
+            @moveMeasurementToGroup="moveMeasurementToGroup" />
+        <MeasurementGroupDialog v-if="measurementGroupDialogOpen"
+            :group="pendingGroupForRename"
+            @onClose="measurementGroupDialogOpen = false"
+            @onSave="handleGroupDialogSave" />
         <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selectedBasemap="selectedBasemap"
             :unitPref="currentUnitPref" :customBasemapConfig="customBasemapConfig"
             @onClose="mapSettingsDialogOpen = false" @basemapChanged="handleBasemapChanged"
@@ -134,6 +145,7 @@ import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
+import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
 import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
@@ -155,7 +167,7 @@ import emitter from '@/libs/eventBus';
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog
+        Map, Toolbar, olMeasure, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     emits: ['scrollTo', 'openItem'],
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
@@ -285,6 +297,10 @@ export default {
             showFlightPath: savedFlightPath,
             showDirectionIndicators: savedDirectionIndicators,
             currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric',
+
+            // Measurement group dialog
+            measurementGroupDialogOpen: false,
+            pendingGroupForRename: null,
 
             // Change units dialog
             changeUnitsDialogOpen: false,
@@ -1692,7 +1708,8 @@ export default {
                 try {
                     const geojson = await this.measurementStorage.load();
                     if (geojson && geojson.features && geojson.features.length > 0) {
-                        this.measureControls.importFromGeoJSON(geojson);
+                        const result = this.measureControls.importFromGeoJSON(geojson);
+                        if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
                         this.hasSavedMeasurements = true;
                         this.measureControls.updateButtonsVisibility(true, true);
                         console.log(`Loaded ${geojson.features.length} standalone measurements`);
@@ -1719,7 +1736,8 @@ export default {
 
                 if (geojson && geojson.features && geojson.features.length > 0) {
                     // Import measurements
-                    this.measureControls.importFromGeoJSON(geojson);
+                    const result = this.measureControls.importFromGeoJSON(geojson);
+                    if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
                     this.hasSavedMeasurements = true;
 
                     // Update button visibility
@@ -1814,6 +1832,28 @@ export default {
                 this.measureControls.applyUnitsChange(newUnit);
                 this.currentUnitPref = newUnit;
             }
+        },
+
+        // ── Group dialog helpers ─────────────────────────────────────────
+
+        openCreateGroupDialog() {
+            this.pendingGroupForRename = null;
+            this.measurementGroupDialogOpen = true;
+        },
+
+        openRenameGroupDialog(group) {
+            this.pendingGroupForRename = group;
+            this.measurementGroupDialogOpen = true;
+        },
+
+        handleGroupDialogSave(groupData) {
+            if (this.pendingGroupForRename) {
+                this.renameGroup(this.pendingGroupForRename, groupData);
+            } else {
+                this.createGroup(groupData);
+            }
+            this.pendingGroupForRename = null;
+            this.measurementGroupDialogOpen = false;
         }
     }
 }

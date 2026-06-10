@@ -29,6 +29,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         'name', 'description',
         'stroke', 'stroke-width', 'stroke-opacity',
         'fill', 'fill-opacity',
+        'groupId',
         // Stockpile metadata
         'id', 'title', 'material', 'materialDensity',
         'netVolume', 'cutVolume', 'fillVolume',
@@ -99,7 +100,9 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         'stroke-width': feature.get('stroke-width') || null,
         'stroke-opacity': feature.get('stroke-opacity') || null,
         fill: feature.get('fill') || null,
-        'fill-opacity': feature.get('fill-opacity') || null
+        'fill-opacity': feature.get('fill-opacity') || null,
+        // Group assignment
+        groupId: feature.get('groupId') || null
     };
 
     // Stockpile features: persist all metadata fields without overwriting calculated values.
@@ -180,6 +183,8 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     if (props['stroke-opacity']) feature.set('stroke-opacity', props['stroke-opacity']);
     if (props.fill) feature.set('fill', props.fill);
     if (props['fill-opacity']) feature.set('fill-opacity', props['fill-opacity']);
+    // Restore group assignment
+    if (props.groupId) feature.set('groupId', props.groupId);
 
     // Calculate and format the tooltip text
     let tooltipText = props.tooltipText;
@@ -229,9 +234,10 @@ export function updateFeatureTooltip(feature) {
  * @param {ol.source.Vector} source - OpenLayers vector source
  * @param {string} orthophotoPath - Orthophoto file path
  * @param {string} unitPref - Unit preference
+ * @param {Array} [groups] - Measurement groups (optional, for serialization)
  * @returns {Object} GeoJSON FeatureCollection
  */
-export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') {
+export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', groups = []) {
     const features = source.getFeatures();
 
     const geojson = {
@@ -243,7 +249,7 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') 
             }
         },
         metadata: {
-            version: '1.0',
+            version: groups && groups.length > 0 ? '1.1' : '1.0',
             kind: 'measurements',
             orthophotoFile: orthophotoPath,
             createdAt: new Date().toISOString(),
@@ -252,7 +258,9 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric') 
             // measurement files. Older values ("Registry-Orthophoto",
             // "Registry-Stockpile") are still accepted by the importer.
             application: 'DroneDB Registry',
-            unitPreference: unitPref
+            unitPreference: unitPref,
+            // Serialize groups only when they exist (retrocompat: omit when empty)
+            ...(groups && groups.length > 0 ? { groups } : {})
         },
         features: features
             .filter(f => {
@@ -312,7 +320,12 @@ export function importMeasurements(geojson, source, formatArea, formatLength, ma
     });
 
     console.log(`Imported ${imported.length} measurements`);
-    return imported;
+
+    // Return imported features AND groups from metadata (for group state restoration)
+    return {
+        features: imported,
+        groups: (geojson.metadata && Array.isArray(geojson.metadata.groups)) ? geojson.metadata.groups : []
+    };
 }
 
 /**

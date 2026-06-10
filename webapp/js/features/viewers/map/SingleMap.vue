@@ -90,9 +90,19 @@
             @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen"
             :measurements="measurementListItems"
+            :groups="measurementGroups"
             @onClose="measurementListDialogOpen = false"
             @deleteMeasurement="handleDeleteMeasurementFromList"
-            @editMeasurement="handleEditMeasurementFromList" />
+            @editMeasurement="handleEditMeasurementFromList"
+            @createGroup="openCreateGroupDialog"
+            @renameGroup="openRenameGroupDialog"
+            @deleteGroup="deleteGroup"
+            @toggleGroupVisibility="toggleGroupVisibility"
+            @moveMeasurementToGroup="moveMeasurementToGroup" />
+        <MeasurementGroupDialog v-if="measurementGroupDialogOpen"
+            :group="pendingGroupForRename"
+            @onClose="measurementGroupDialogOpen = false"
+            @onSave="handleGroupDialogSave" />
         <Toast position="bottom-left" />
     </div>
 </template>
@@ -124,6 +134,7 @@ import StockpileVolumePanel from './StockpileVolumePanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
+import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import olSettings from './olSettings';
 import Toast from 'primevue/toast';
 import Keyboard from '@/libs/keyboard';
@@ -145,7 +156,7 @@ import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, Toast
+        Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog, Toast
     },
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     props: ["uri"],
@@ -169,6 +180,9 @@ export default {
             hasRasters: false,
             measurementListDialogOpen: false,
             measurementListItems: [],
+            // Group dialog
+            measurementGroupDialogOpen: false,
+            pendingGroupForRename: null,
             // Unit preference shared with sub-panels (volume / area conversions).
             // Persisted across sessions via localStorage.
             currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric'
@@ -588,7 +602,8 @@ export default {
 
                 if (geojson && geojson.features && geojson.features.length > 0) {
                     // Import measurements
-                    this.measureControls.importFromGeoJSON(geojson);
+                    const result = this.measureControls.importFromGeoJSON(geojson);
+                    if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
                     this.hasSavedMeasurements = true;
 
                     // Update button visibility
@@ -630,6 +645,28 @@ export default {
             if (this.selectedBasemap === 'custom') {
                 this.updateBasemap();
             }
+        },
+
+        // ── Group dialog helpers ─────────────────────────────────────────
+
+        openCreateGroupDialog() {
+            this.pendingGroupForRename = null;
+            this.measurementGroupDialogOpen = true;
+        },
+
+        openRenameGroupDialog(group) {
+            this.pendingGroupForRename = group;
+            this.measurementGroupDialogOpen = true;
+        },
+
+        handleGroupDialogSave(groupData) {
+            if (this.pendingGroupForRename) {
+                this.renameGroup(this.pendingGroupForRename, groupData);
+            } else {
+                this.createGroup(groupData);
+            }
+            this.pendingGroupForRename = null;
+            this.measurementGroupDialogOpen = false;
         }
     }
 }

@@ -17,6 +17,8 @@ export default {
             hasSavedMeasurements: false,
             clearMeasurementsDialogOpen: false,
             deleteSavedMeasurementsDialogOpen: false,
+            // Measurement groups (array of { id, name, color, visible, collapsed })
+            measurementGroups: [],
             // Tracks IDs of measurements deleted in the current session via the
             // Measurement List dialog. Used to filter persisted features (e.g.
             // stockpiles) that would otherwise be re-hydrated from the saved
@@ -72,7 +74,7 @@ export default {
             }
 
             try {
-                const geojson = this.measureControls.exportToGeoJSON(activeEntry.path);
+                const geojson = this.measureControls.exportToGeoJSON(activeEntry.path, this.measurementGroups);
 
                 if (!geojson.features || geojson.features.length === 0) {
                     this.showAlert('Warning', 'No measurements to save');
@@ -206,7 +208,93 @@ export default {
             if (feature.get('measurementType') === 'point') {
                 this.measureControls.openPointAnnotationDialog(feature, this.measureControls.getMap(), true);
             } else {
-                this.measureControls.openPropertiesDialog(feature, { showDelete: true });
+                this.measureControls.openPropertiesDialog(feature, { showDelete: true, groups: this.measurementGroups });
+            }
+        },
+
+        // ── Group management ────────────────────────────────────────────
+
+        /**
+         * Create a new group
+         * @param {{ name: string, color: string }} groupData
+         */
+        createGroup(groupData) {
+            const id = 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+            this.measurementGroups = [
+                ...this.measurementGroups,
+                { id, name: groupData.name, color: groupData.color || '#3388ff', visible: true, collapsed: false }
+            ];
+            this.measurementListItems = this.measureControls ? this.measureControls.getMeasurementsList() : [];
+        },
+
+        /**
+         * Rename an existing group
+         * @param {{ id: string }} group
+         * @param {{ name: string, color: string }} groupData
+         */
+        renameGroup(group, groupData) {
+            this.measurementGroups = this.measurementGroups.map(g =>
+                g.id === group.id ? { ...g, name: groupData.name, color: groupData.color || g.color } : g
+            );
+        },
+
+        /**
+         * Delete a group and all its measurements
+         * @param {{ id: string }} group
+         */
+        deleteGroup(group) {
+            if (!this.measureControls) return;
+            // Delete all features belonging to this group
+            const items = this.measureControls.getMeasurementsList();
+            items.filter(m => m.groupId === group.id).forEach(m => {
+                const id = m.feature.get('id');
+                if (id && this.deletedMeasurementIds) this.deletedMeasurementIds.add(id);
+                this.measureControls.deleteMeasurement(m.feature);
+            });
+            // Remove the group itself
+            this.measurementGroups = this.measurementGroups.filter(g => g.id !== group.id);
+            // Refresh list
+            this.measurementListItems = this.measureControls.getMeasurementsList();
+            if (this.measurementListItems.length === 0) {
+                this.measurementListDialogOpen = false;
+            }
+        },
+
+        /**
+         * Toggle visibility of a group
+         * @param {string} groupId
+         */
+        toggleGroupVisibility(groupId) {
+            const group = this.measurementGroups.find(g => g.id === groupId);
+            if (!group) return;
+            const newVisible = !group.visible;
+            this.measurementGroups = this.measurementGroups.map(g =>
+                g.id === groupId ? { ...g, visible: newVisible } : g
+            );
+            if (this.measureControls && typeof this.measureControls.setGroupVisibility === 'function') {
+                this.measureControls.setGroupVisibility(groupId, newVisible);
+            }
+        },
+
+        /**
+         * Move a measurement to a different group (or ungroup it)
+         * @param {{ feature: ol.Feature }} item - Measurement item from the list
+         * @param {string} groupId - Target group ID, or '' to ungroup
+         */
+        moveMeasurementToGroup(item, groupId) {
+            if (!this.measureControls || !item.feature) return;
+            this.measureControls.setMeasurementGroupId(item.feature, groupId);
+            // Refresh list
+            this.measurementListItems = this.measureControls.getMeasurementsList();
+        },
+
+        /**
+         * Called after loading measurements from storage: restore groups from GeoJSON metadata.
+         * @param {Array} groups - Groups array from geojson.metadata.groups
+         */
+        restoreGroupsFromMetadata(groups) {
+            if (Array.isArray(groups) && groups.length > 0) {
+                this.measurementGroups = groups;
             }
         }
     }
