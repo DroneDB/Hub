@@ -92,13 +92,9 @@ export default {
         }
     },
     mounted: function () {
-        this.$nextTick(() => {
-            this.$refs.txtUsername.$el.querySelector('input').focus();
-
-            // Load password policy from features
-            this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
-            this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
-        });
+        // Load password policy from features
+        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+        this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
         close: function () {

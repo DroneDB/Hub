@@ -24,6 +24,9 @@
                             aria-label="Browse folders" />
                     </div>
                     <small v-if="destPathError" class="dest-error">{{ destPathError }}</small>
+                    <small v-else-if="destPathChecking" class="help-text"><i class="fa-solid fa-circle-notch fa-spin"></i> Checking destination…</small>
+                    <small v-else-if="destPathExists === true" class="dest-exists"><i class="fa-solid fa-folder-open"></i> This folder already exists; extracted files will be added to it.</small>
+                    <small v-else-if="destPathExists === false" class="dest-create"><i class="fa-solid fa-folder-plus"></i> This folder will be created.</small>
                     <small v-else class="help-text">Destination folder (leave empty for the dataset root).</small>
                 </div>
 
@@ -98,6 +101,8 @@ export default {
             statusMessage: '',
             errorMessage: null,
             destPathError: null,
+            destPathExists: null,    // null = unknown/root, true = exists, false = will be created
+            destPathChecking: false,
             folderPickerOpen: false
         };
     },
@@ -113,11 +118,17 @@ export default {
         const path = this.file && this.file.entry ? this.file.entry.path : '';
         this.destPath = pathutils.getParentFolder(path) || '';
         this.validateDestPath();
+        this.checkDestExistence();
+    },
+
+    beforeUnmount() {
+        if (this._destCheckTimer) clearTimeout(this._destCheckTimer);
     },
 
     methods: {
         onDestPathInput() {
             this.validateDestPath();
+            this.scheduleDestCheck();
         },
 
         // Client-side guard mirroring the server-side checks
@@ -161,6 +172,47 @@ export default {
             if (action === 'select') {
                 this.destPath = path || '';
                 this.validateDestPath();
+                this.checkDestExistence();
+            }
+        },
+
+        scheduleDestCheck() {
+            this.destPathExists = null;
+            if (this._destCheckTimer) clearTimeout(this._destCheckTimer);
+            this._destCheckTimer = setTimeout(() => this.checkDestExistence(), 400);
+        },
+
+        // Tells the user whether the destination already exists or will be created,
+        // before they hit Extract. Mirrors the server-side guard that rejects a
+        // destination occupied by a non-folder entry.
+        async checkDestExistence() {
+            const raw = (this.destPath || '').trim();
+            if (raw === '' || this.destPathError) {
+                this.destPathExists = null;
+                this.destPathChecking = false;
+                return;
+            }
+            this.destPathChecking = true;
+            const norm = (p) => (p || '').replace(/\/+$/, '');
+            try {
+                const parent = pathutils.getParentFolder(raw) || '';
+                const entries = await this.dataset.list(parent.length ? parent : undefined);
+                // Ignore stale responses if the user kept typing.
+                if (norm(raw) !== norm(this.destPath)) return;
+                const match = (entries || []).find(e => norm(e.path) === norm(raw));
+                if (!match) {
+                    this.destPathExists = false;
+                } else if (ddb.entry.isDirectory(match)) {
+                    this.destPathExists = true;
+                } else {
+                    this.destPathExists = null;
+                    this.destPathError = 'A file with this name already exists.';
+                }
+            } catch (e) {
+                // Parent folder doesn't exist yet (or listing failed): it will be created.
+                if (norm(raw) === norm(this.destPath)) this.destPathExists = false;
+            } finally {
+                if (norm(raw) === norm(this.destPath)) this.destPathChecking = false;
             }
         },
 
@@ -247,6 +299,16 @@ export default {
 
 .help-text {
     color: var(--p-text-muted-color, #888);
+    font-size: 0.8rem;
+}
+
+.dest-exists {
+    color: var(--p-text-muted-color, #888);
+    font-size: 0.8rem;
+}
+
+.dest-create {
+    color: var(--p-primary-color, #3b82f6);
     font-size: 0.8rem;
 }
 

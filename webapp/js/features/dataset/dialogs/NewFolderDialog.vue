@@ -31,12 +31,6 @@ export default {
             newFolderPath: null
         };
     },
-    mounted: function () {
-        this.$nextTick(() => {
-            const el = this.$refs.newFolderInput?.$el || this.$refs.newFolderInput;
-            if (el && el.focus) el.focus();
-        });
-    },
     methods: {
         onWindowClose: function () {
             // Block close while a folder creation is in progress

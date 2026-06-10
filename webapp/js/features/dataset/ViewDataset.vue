@@ -274,6 +274,7 @@ import { coordAll } from '@turf/meta';
 const { pathutils, utils } = ddb;
 
 import { OpenItemDefaults } from '@/libs/openItemDefaults';
+import { isArchiveFile } from '@/libs/entryTypes';
 
 // Import mixins
 import dialogManager from '@/composables/useDialogManager';
@@ -712,6 +713,13 @@ export default {
 
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
+
+            // Archives are indexed as generic files but we can extract them. When the
+            // user can write, make "Extract" the default action (matches the context menu).
+            if (!view && this.canWrite && isArchiveFile(node.entry)) {
+                this.openExtractDialog(node);
+                return;
+            }
 
             // Check if file should open as text
             if (!view && shouldOpenAsText(node.entry)) {

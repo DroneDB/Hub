@@ -68,15 +68,8 @@ export default {
         };
     },
     mounted: function () {
-        this.$nextTick(() => {
-            const el = this.$refs.oldPwd?.$el;
-            if (el) {
-                const input = el.querySelector('input');
-                if (input) input.focus();
-            }
-            this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
-            this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
-        });
+        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+        this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
         close: function (buttonId) {

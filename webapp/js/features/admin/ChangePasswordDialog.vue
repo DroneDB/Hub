@@ -71,9 +71,6 @@ export default {
             confirmPassword: ""
         };
     },
-    mounted: function () {
-        this.$nextTick(() => this.$refs.txtCurrentPassword.$el.querySelector('input').focus());
-    },
     methods: {
         close: function () {
             this.$emit('onClose');

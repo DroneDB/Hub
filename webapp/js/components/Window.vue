@@ -2,8 +2,10 @@
     <Dialog :visible="true" :header="title" :modal="modal" :closable="closable"
         :draggable="!fixedPosition" :style="dialogStyle" :contentStyle="contentStyle"
         :dismissableMask="closeModalOnClick" :closeOnEscape="closable"
-        :pt="dialogPt" @update:visible="handleClose" @show="$emit('show')">
-        <slot />
+        :pt="dialogPt" @update:visible="handleClose" @show="handleShow">
+        <div ref="contentRoot" style="display: contents;">
+            <slot />
+        </div>
     </Dialog>
 </template>
 
@@ -60,6 +62,10 @@ export default {
             type: String,
             default: null
         },
+        autofocus: {
+            type: Boolean,
+            default: true
+        },
     },
     computed: {
         dialogStyle() {
@@ -111,6 +117,36 @@ export default {
             if (!visible) {
                 this.$emit("onClose");
             }
+        },
+        handleShow() {
+            this.$emit('show');
+            if (!this.autofocus) return;
+            // PrimeVue's Dialog focuses the element carrying the `autofocus`
+            // attribute once the enter transition completes (onAfterEnter), and its
+            // FocusTrap does the same on bind; without such an element it falls back
+            // to the close button. This @show hook fires at the START of the
+            // transition, so focusing here would just get overridden. Instead we tag
+            // the primary field with `autofocus` and let the framework focus it at the
+            // right time. An element can opt in explicitly via `data-autofocus`;
+            // otherwise the first enabled text input / textarea / select is used.
+            // Opt out per-dialog with :autofocus="false".
+            const root = this.$refs.contentRoot;
+            if (!root || typeof root.querySelector !== 'function') return;
+            const fieldSelector = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])';
+            const explicit = root.querySelector('[data-autofocus]');
+            let target;
+            if (explicit) {
+                target = (explicit.matches && explicit.matches(fieldSelector))
+                    ? explicit
+                    : (explicit.querySelector(fieldSelector) || explicit);
+            } else {
+                target = root.querySelector(fieldSelector);
+            }
+            if (!target) return;
+            if (target.setAttribute) target.setAttribute('autofocus', '');
+            // Focus immediately too (preventScroll avoids a mid-animation jump); the
+            // attribute keeps PrimeVue's post-transition focus on the same element.
+            if (typeof target.focus === 'function') target.focus({ preventScroll: true });
         }
     }
 }

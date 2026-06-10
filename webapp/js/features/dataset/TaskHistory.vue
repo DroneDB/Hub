@@ -59,9 +59,9 @@
 
         <ConfirmDialog v-if="clearDialogOpen"
             title="Clear Concluded Tasks"
-            :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be removed from the history.`"
+            :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`"
             confirmText="Clear" cancelText="Cancel" confirmButtonClass="danger"
-            warningTitle="Warning" warningMessage="This action cannot be undone."
+            warningTitle="Warning" warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
             @onClose="handleClearDialogClose">
         </ConfirmDialog>
     </div>

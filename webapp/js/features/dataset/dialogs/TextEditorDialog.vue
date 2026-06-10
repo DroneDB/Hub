@@ -1,6 +1,6 @@
 <template>
     <div class="text-editor-wrapper">
-        <Window :title="windowTitle" id="textEditorDialog" @onClose="close" modal width="80%" height="80%">
+        <Window :title="windowTitle" id="textEditorDialog" @onClose="close" :autofocus="false" modal width="80%" height="80%">
             <div class="text-editor-dialog">
                 <Message bindTo="error" />
 

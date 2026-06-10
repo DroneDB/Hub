@@ -55,8 +55,6 @@ export default {
         };
     },
     mounted: function () {
-        this.$nextTick(() => this.$refs.name.$el.querySelector('input').focus());
-
         if (this.mode == 'edit') {
 
             this.title = "Edit " + this.model.slug;

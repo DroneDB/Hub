@@ -149,7 +149,7 @@ export default {
                 }
 
                 var item = {
-                    icon: this.icons.getForType(itemEntry.type),
+                    icon: this.icons.getForType(itemEntry.type, itemEntry.path),
                     label: itemLabel,
                     path: this.dataset.remoteUri(itemPath),
                     entry: itemEntry,
@@ -496,7 +496,7 @@ export default {
                     if (entryParentPath === normalizedCurrentPath) {
                         if (!this.fileBrowserFiles.some(f => f.entry.path === entry.path)) {
                             const item = {
-                                icon: this.icons.getForType(entry.type),
+                                icon: this.icons.getForType(entry.type, entry.path),
                                 label: this.pathutils.basename(entry.path),
                                 path: this.dataset.remoteUri(entry.path),
                                 entry: entry,
@@ -572,7 +572,7 @@ export default {
                 const currentItems = currentEntries.map(entry => {
                     const isDir = this.ddb.entry.isDirectory(entry);
                     return {
-                        icon: this.icons.getForType(entry.type),
+                        icon: this.icons.getForType(entry.type, entry.path),
                         label: this.pathutils.basename(entry.path),
                         path: this.dataset.remoteUri(entry.path),
                         entry,
@@ -602,7 +602,7 @@ export default {
                         const destItems = destEntries.map(entry => {
                             const isDir = this.ddb.entry.isDirectory(entry);
                             return {
-                                icon: this.icons.getForType(entry.type),
+                                icon: this.icons.getForType(entry.type, entry.path),
                                 label: this.pathutils.basename(entry.path),
                                 path: this.dataset.remoteUri(entry.path),
                                 entry,

@@ -17,7 +17,7 @@
                 <div class="my-3">
                     <label class="d-block mb-1 fw-semibold">Destination Organization</label>
                     <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label"
-                        optionValue="value" placeholder="Select organization" class="w-100" />
+                        optionValue="value" placeholder="Select organization" class="w-100" data-autofocus />
                 </div>
 
                 <!-- Destination Dataset -->
