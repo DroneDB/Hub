@@ -72475,6 +72475,9 @@ void main() {
 				x: [],
 				y: [],
 				z: [],
+				r: [],
+				g: [],
+				b: [],
 				minX:  Number.MAX_VALUE,
 				minY:  Number.MAX_VALUE,
 				minZ:  Number.MAX_VALUE,
@@ -72495,24 +72498,28 @@ void main() {
 				const poCoordX  = pCoords[ ((pIx * 3) + 0) ];
 				const poCoordY  = pCoords[ ((pIx * 3) + 1) ];
 				const poCoordZ  = pCoords[ ((pIx * 3) + 2) ];
-				// const poColorR  = pColor[ ((pIx * 4) + 0) ];
-				// const poColorG  = pColor[ ((pIx * 4) + 1) ];
-				// const poColorB  = pColor[ ((pIx * 4) + 2) ];
-				// const poColorA  = pColor[ ((pIx * 4) + 3) ];
+				const poColorR  = pColor ? pColor[ ((pIx * 4) + 0) ] : undefined;
+				const poColorG  = pColor ? pColor[ ((pIx * 4) + 1) ] : undefined;
+				const poColorB  = pColor ? pColor[ ((pIx * 4) + 2) ] : undefined;
+
+				pointsXYZ.r.push(poColorR);
+				pointsXYZ.g.push(poColorG);
+				pointsXYZ.b.push(poColorB);
 
 				if (flatten === true) {
 
+					// Item 1 fix: in 2D mode, X = mileage, Y = elevation (quota), Z = 0 (XY plane)
 					pointsXYZ.x.push(poMileage);
-					pointsXYZ.y.push(0);
-					pointsXYZ.z.push(poCoordZ);
+					pointsXYZ.y.push(poCoordZ);
+					pointsXYZ.z.push(0);
 
 					// Get boundaries X
 					if (pointsXYZ.maxX < poMileage) pointsXYZ.maxX = poMileage;
 					if (pointsXYZ.minX > poMileage) pointsXYZ.minX = poMileage;
 
-					// Get boundaries Z
-					if (pointsXYZ.maxZ < poCoordZ) pointsXYZ.maxZ = poCoordZ;
-					if (pointsXYZ.minZ > poCoordZ) pointsXYZ.minZ = poCoordZ;
+					// Get boundaries Y (quota)
+					if (pointsXYZ.maxY < poCoordZ) pointsXYZ.maxY = poCoordZ;
+					if (pointsXYZ.minY > poCoordZ) pointsXYZ.minY = poCoordZ;
 
 				} else {
 
@@ -72537,9 +72544,9 @@ void main() {
 			}
 
 			if (flatten === true) {
-				// Set boundaries Y
-				pointsXYZ.maxY = 0;
-				pointsXYZ.minY = 0;
+				// In 2D mode Z is always 0 (flat plane)
+				pointsXYZ.maxZ = 0;
+				pointsXYZ.minZ = 0;
 			}
 
 			pointsXYZ.numPoints = points.numPoints;
@@ -72547,9 +72554,9 @@ void main() {
 			return pointsXYZ;
 		}
 
-		static plotPCloudPoint(x, y, z) {
+		static plotPCloudPoint(x, y, z, r, g, b) {
 
-			const dxfSection = `0
+			let dxfSection = `0
 POINT
 8
 layer_pointCloud
@@ -72560,6 +72567,14 @@ ${y}
 30
 ${z}
 `;
+
+			// Item 3: true color (group code 420, requires AC1015+)
+			if (r !== undefined && g !== undefined && b !== undefined) {
+				const trueColor = ((r & 0xff) << 16) | ((g & 0xff) << 8) | (b & 0xff);
+				dxfSection += `420
+${trueColor}
+`;
+			}
 
 			return dxfSection;
 		}
@@ -72577,7 +72592,7 @@ HEADER
 9
 $ACADVER
 1
-AC1006
+AC1015
 9
 $INSBASE
 10
@@ -72613,7 +72628,7 @@ ENTITIES
 `;
 
 			for (let i = 0; i < pCloud.numPoints; i++) {
-				dxfBody += DXFProfileExporter.plotPCloudPoint(pCloud.x[i], pCloud.y[i], pCloud.z[i]);
+				dxfBody += DXFProfileExporter.plotPCloudPoint(pCloud.x[i], pCloud.y[i], pCloud.z[i], pCloud.r[i], pCloud.g[i], pCloud.b[i]);
 			}
 
 			dxfBody += `0
