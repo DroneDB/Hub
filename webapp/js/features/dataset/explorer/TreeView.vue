@@ -240,6 +240,10 @@ export default {
     outline: none;
     transition: background-color 0.15s ease, box-shadow 0.15s ease;
 
+    &:focus-visible {
+        box-shadow: inset 0 0 0 2px rgba(var(--ddb-primary-rgb), 0.5);
+    }
+
     &.dropping {
         background-color: var(--ddb-bg-hover);
         box-shadow: inset 0 0 var(--ddb-spacing-sm) var(--ddb-spacing-xs) var(--ddb-text-muted);
