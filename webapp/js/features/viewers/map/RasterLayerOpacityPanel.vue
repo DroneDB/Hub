@@ -12,6 +12,12 @@
                 :title="'Opacity: ' + Math.round(layer.opacity * 100) + '%'"
             />
             <span class="opacity-value">{{ Math.round(layer.opacity * 100) }}%</span>
+            <button v-if="layer.plantHealthCapable" class="ph-btn"
+                    :class="{ active: activePlantHealthPath === layer.path }"
+                    title="Plant Health"
+                    @click.stop="$emit('plant-health', layer.path)">
+                <i class="fa-solid fa-leaf"></i>
+            </button>
             <div class="order-buttons">
                 <button
                     class="order-btn"
@@ -38,9 +44,13 @@ export default {
         layers: {
             type: Array,
             default: () => []
+        },
+        activePlantHealthPath: {
+            type: String,
+            default: null
         }
     },
-    emits: ['update:layers', 'reorder'],
+    emits: ['update:layers', 'reorder', 'plant-health'],
     methods: {
         truncate(name) {
             if (!name) return '';
@@ -86,8 +96,7 @@ export default {
 }
 
 .raster-label {
-    min-width: 6rem;
-    max-width: 10rem;
+    width: 10rem;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -137,5 +146,26 @@ export default {
 .order-btn--hidden {
     display: none;
     pointer-events: none;
+}
+
+.ph-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    padding: 0 0.15rem;
+    font-size: var(--ddb-font-size-base);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+
+.ph-btn:hover {
+    color: #fff;
+}
+
+.ph-btn.active {
+    color: #7bc67e;
 }
 </style>

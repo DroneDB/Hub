@@ -48,6 +48,7 @@ export default {
             };
             this._zoneTopLeft = make('ol-zone-top-left');
             this._zoneTopRight = make('ol-zone-top-right');
+            this._zoneTopCenter = make('ol-zone-top-center');
             this._zoneBottomLeft = make('ol-zone-bottom-left');
         },
 
@@ -70,54 +71,59 @@ export default {
          *   entry the panel should open for, or null if no capable entry
          *   exists in the current view.
          */
-        appendAnalysisButtonsToContainer(container, getEntry) {
-            const phEntry = getEntry(isPlantHealthCapable);
-            if (phEntry) {
-                container.appendChild(makeButton(
-                    'Plant Health',
-                    'fa-solid fa-leaf',
-                    () => this._toggleAnalysisPanel('plantHealth', phEntry),
-                    'plant-health-toolbar-btn'));
+        appendAnalysisButtonsToContainer(container, getEntry, options = {}) {
+            // Plant Health is skipped here when the host view renders per-layer
+            // buttons in the opacity panel instead (Map.vue passes skipPlantHealth:true).
+            // SingleMap.vue does NOT pass this option, so the button appears there.
+            if (!options.skipPlantHealth) {
+                const phEntry = getEntry(isPlantHealthCapable);
+                if (phEntry) {
+                    container.appendChild(makeButton(
+                        'Plant Health',
+                        'fa-solid fa-leaf',
+                        () => this._toggleAnalysisPanel('plantHealth', phEntry),
+                        'plant-health-toolbar-btn'));
+                }
             }
 
             const raEntry = getEntry(isRasterAnalysisCapable);
             if (raEntry) {
-                container.appendChild(makeButton(
+                this._raBtn = makeButton(
                     'Raster Analysis',
                     'fa-solid fa-chart-area',
-                    () => this._toggleAnalysisPanel('rasterAnalysis', raEntry),
-                    'raster-analysis-toolbar-btn'));
+                    () => this._toggleAnalysisPanel('rasterAnalysis', this._raEntry),
+                    'raster-analysis-toolbar-btn');
+                this._raEntry = raEntry;
+                container.appendChild(this._raBtn);
 
-                container.appendChild(makeButton(
+                this._stockpileBtn = makeButton(
                     'Stockpile Volume',
                     'fa-solid fa-layer-group',
-                    () => this._toggleAnalysisPanel('stockpile', raEntry),
-                    'stockpile-toolbar-btn'));
+                    () => this._toggleAnalysisPanel('stockpile', this._raEntry),
+                    'stockpile-toolbar-btn');
+                container.appendChild(this._stockpileBtn);
             }
         },
 
         /**
-         * Build a standalone OL Control with the analysis buttons and add it
-         * to the map. Used by Map.vue, which does not have a pre-existing
-         * top-right cluster.
-         *
-         * @param {Function} getEntry - see appendAnalysisButtonsToContainer
-         * @param {HTMLElement} [target] - optional zone container the control
-         *   should render into (left/right toolbar zone). When omitted the
-         *   control falls back to OpenLayers' default overlay container.
-         * @returns {Control|null} The created control, or null if no buttons
-         *   apply (in which case the container is not added to the map).
+         * Enable/disable Raster Analysis and Stockpile Volume toolbar buttons
+         * based on the number of active georaster layers.  Both tools require
+         * exactly one raster to be meaningful.  Called from syncRasterLayers().
          */
-        addAnalysisButtonsControl(getEntry, target = null) {
-            if (!this.map) return null;
-            const container = document.createElement('div');
-            container.className = 'ol-map-analysis-buttons ol-unselectable ol-control';
-            this.appendAnalysisButtonsToContainer(container, getEntry);
-            if (!container.children.length) return null;
-            const ctrl = new Control(target ? { element: container, target } : { element: container });
-            this.map.addControl(ctrl);
-            this._analysisButtonsControl = ctrl;
-            return ctrl;
+        updateAnalysisButtonsForRasterCount(count) {
+            const multiMsg = 'Requires a single georaster layer. Remove other layers or open the file individually.';
+            if (this._raBtn) {
+                this._raBtn.disabled = count > 1;
+                this._raBtn.title = count > 1
+                    ? `Raster Analysis — ${multiMsg}`
+                    : 'Raster Analysis';
+            }
+            if (this._stockpileBtn) {
+                this._stockpileBtn.disabled = count > 1;
+                this._stockpileBtn.title = count > 1
+                    ? `Stockpile Volume — ${multiMsg}`
+                    : 'Stockpile Volume';
+            }
         },
 
         /**

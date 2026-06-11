@@ -3,6 +3,10 @@
         <i class="fa-solid fa-adjust"></i>
         <input type="range" min="0" max="1" step="0.05" :value="modelValue" @input="$emit('update:modelValue', parseFloat($event.target.value))" title="Layer opacity">
         <span class="opacity-value">{{ Math.round(modelValue * 100) }}%</span>
+        <button v-if="showPlantHealthBtn" class="ph-btn" :class="{ active: plantHealthActive }"
+                title="Plant Health" @click.stop="$emit('plant-health')">
+            <i class="fa-solid fa-leaf"></i>
+        </button>
     </div>
 </template>
 
@@ -16,8 +20,17 @@ export default {
         visible: {
             type: Boolean,
             default: true
+        },
+        showPlantHealthBtn: {
+            type: Boolean,
+            default: false
+        },
+        plantHealthActive: {
+            type: Boolean,
+            default: false
         }
-    }
+    },
+    emits: ['update:modelValue', 'plant-health']
 };
 </script>
 
@@ -54,5 +67,25 @@ export default {
     min-width: 2rem;
     text-align: right;
     font-variant-numeric: tabular-nums;
+}
+
+.ph-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    padding: 0 0.15rem;
+    font-size: var(--ddb-font-size-base);
+    display: flex;
+    align-items: center;
+    transition: color 0.15s;
+}
+
+.ph-btn:hover {
+    color: #fff;
+}
+
+.ph-btn.active {
+    color: #7bc67e;
 }
 </style>

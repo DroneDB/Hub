@@ -349,7 +349,7 @@ export default {
             backBtn.title = 'Back to Dataset';
             backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
             backBtn.addEventListener('click', () => {
-                this.$router.push({ name: 'ViewDataset', params: this.$route.params });
+                this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
             });
             controlContainer.appendChild(backBtn);
 

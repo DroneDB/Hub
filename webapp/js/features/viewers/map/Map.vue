@@ -1,13 +1,19 @@
 <template>
     <div id="map" @mouseover="setMouseInside(true)" @mouseleave="setMouseInside(false)">
-        <Toolbar :tools="tools" ref="toolbar" />
         <div ref="map-container" class="map-container" :class="{
             'cursor-pointer': selectSingle,
             'cursor-crosshair': selectPolygon
         }">
             <olMeasure ref="measure" />
-            <OpacityControl v-if="rasterLayerList.length <= 1" v-model="rasterOpacity" :visible="hasRasters" />
-            <RasterLayerOpacityPanel v-else v-model:layers="rasterLayerList" @reorder="handleRasterLayerReorder" />
+            <OpacityControl v-if="rasterLayerList.length <= 1 && !splitMode" v-model="rasterOpacity" :visible="hasRasters"
+                :showPlantHealthBtn="rasterLayerList.length === 1 && !!rasterLayerList[0]?.plantHealthCapable"
+                :plantHealthActive="plantHealthVisible"
+                @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" />
+            <RasterLayerOpacityPanel v-else-if="!splitMode" v-model:layers="rasterLayerList"
+                :activePlantHealthPath="plantHealthVisible ? plantHealthFilePath : null"
+                @reorder="handleRasterLayerReorder"
+                @plant-health="handleLayerPlantHealth" />
+            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" @update:positions="onSplitPositionsChange" />
             <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :filePath="plantHealthFilePath"
                 :initialParams="plantHealthInitialParams" @close="closePlantHealth"
                 @vizParamsChanged="handleVizParamsChanged" />
@@ -129,7 +135,6 @@ import olSelection from './olSelection';
 import olSettings from './olSettings';
 import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
-import Toolbar from '@/components/Toolbar.vue';
 import OpacityControl from './OpacityControl.vue';
 import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
@@ -151,8 +156,11 @@ import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
 import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
+import { isPlantHealthCapable } from '@/libs/entryTypes';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
+import { getRenderPixel } from 'ol/render';
+import RasterSplitOverlay from './RasterSplitOverlay.vue';
 
 // Mixins
 import mapAlertFlash from '@/composables/useMapAlertFlash';
@@ -169,7 +177,7 @@ import emitter from '@/libs/eventBus';
 
 export default {
     components: {
-        Map, Toolbar, olMeasure, OpacityControl, RasterLayerOpacityPanel, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
+        Map, olMeasure, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     emits: ['scrollTo', 'openItem'],
     mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
@@ -203,91 +211,7 @@ export default {
         const savedDirectionIndicators = localStorage.getItem('showDirectionIndicators') === 'true';
         const savedFlightPath = localStorage.getItem('showFlightPath') !== 'false';
 
-        const tools = [
-            {
-                id: 'select-features',
-                title: "Select Features - Hold CTRL and click on a feature to select/deselect it. Hold CTRL+click multiple features to multi-select.",
-                icon: "fa-solid fa-arrow-pointer",
-                exclusiveGroup: "select",
-                onSelect: () => {
-                    this.selectSingle = true;
-                    if (this.selectionControl) this.selectionControl.deactivate();
-                },
-                onDeselect: () => {
-                    this.selectSingle = false;
-                }
-            },
-            {
-                id: 'reset-view',
-                title: "Reset View - Zoom to fit all features. Shortcut: H",
-                icon: "fa-solid fa-house",
-                onClick: () => {
-                    this.resetToInitialView();
-                }
-            }
-        ];
-
-        if (supportsFullScreen()) {
-            tools.push({
-                id: 'fullscreen',
-                title: "Fullscreen - Toggle fullscreen mode. Shortcut: F11",
-                icon: "fa-solid fa-expand",
-                onClick: () => {
-                    if (isFullScreenCurrently()) {
-                        exitFullScreen();
-                    } else {
-                        requestFullScreen(this.$el);
-                        setTimeout(() => {
-                            this.map.updateSize();
-                        }, 500);
-                    }
-                }
-            });
-        }
-
-        tools.push({ id: 'separator' });
-        tools.push({
-            id: 'toggle-direction',
-            title: 'Show direction and speed indicators',
-            icon: 'fa-solid fa-location-arrow',
-            selected: savedDirectionIndicators,
-            onSelect: () => {
-                this.showDirectionIndicators = true;
-                localStorage.setItem('showDirectionIndicators', 'true');
-                this.applyDirectionStyles();
-            },
-            onDeselect: () => {
-                this.showDirectionIndicators = false;
-                localStorage.setItem('showDirectionIndicators', 'false');
-                this.applyDirectionStyles();
-            }
-        });
-        tools.push({
-            id: 'toggle-flight-path',
-            title: 'Show drone flight path',
-            icon: 'fa-solid fa-signs-post',
-            selected: savedFlightPath,
-            onSelect: () => {
-                this.showFlightPath = true;
-                localStorage.setItem('showFlightPath', 'true');
-                if (this.flightPathLayer) this.flightPathLayer.setVisible(true);
-                if (this.markerLayer) this.markerLayer.setVisible(true);
-            },
-            onDeselect: () => {
-                this.showFlightPath = false;
-                localStorage.setItem('showFlightPath', 'false');
-                if (this.flightPathLayer) this.flightPathLayer.setVisible(false);
-                if (this.markerLayer) this.markerLayer.setVisible(false);
-            }
-        });
-
-        // Plant Health / Raster Analysis / Stockpile Volume have moved out of
-        // the toolbar and onto the map (rendered by `useMapAnalysisButtons`),
-        // matching SingleMap.vue's button placement.
-
-
         return {
-            tools,
             selectSingle: false,
             selectPolygon: false,
             initialExtent: null,
@@ -323,6 +247,8 @@ export default {
             rasterOpacity: 1.0,
             hasRasters: false,
             rasterLayerList: [],
+            splitMode: false,
+            splitPositions: [],
             measurementListDialogOpen: false,
             measurementListItems: []
         };
@@ -370,6 +296,9 @@ export default {
             });
             this.vectorLayers = [];
         }
+
+        // Clean up split-screen clip listeners
+        this._detachSplitClip();
     },
     watch: {
         rasterOpacity: function () {
@@ -406,6 +335,12 @@ export default {
                     }
                 }, 5);
             }
+        }
+    },
+    computed: {
+        // Names of each band in display order (left → right), mirroring rasterLayerList order.
+        splitBands: function () {
+            return this.rasterLayerList.map(r => r.name);
         }
     },
     methods: {
@@ -799,7 +734,7 @@ export default {
             this.selectionControl = new olSelection.Control({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
                 onActivated: () => {
-                    this.$refs.toolbar.deselectNonToggle();
+                    this.selectSingle = false;
                     this.measureControls.deselectCurrent();
                 },
                 onDeactivated: () => {
@@ -869,7 +804,8 @@ export default {
                 // Check if pointer is over UI controls - hide tooltip if so
                 const domElement = document.elementFromPoint(e.pixel[0], e.pixel[1]);
                 if (domElement && (
-                    domElement.closest('.toolbar') ||
+                    domElement.closest('.ol-map-display-buttons') ||
+                    domElement.closest('.ol-map-buttons') ||
                     domElement.closest('.ol-measure-control') ||
                     domElement.closest('.ol-selection') ||
                     domElement.closest('.ol-zoom') ||
@@ -1004,21 +940,82 @@ export default {
             });
             this.map.addControl(this.settingsControl);
 
-            // Group the controls into left/right toolbar zones so they stack
-            // without overlapping (instead of each being absolute-positioned).
+            // Group the controls into toolbar zones so they stack without overlapping.
             this.createControlZones();
             this.moveControlToZone(this.selectionControl, this._zoneTopLeft);
             this.moveControlToZone(this.measureControls, this._zoneTopRight);
             this.moveControlToZone(this.settingsControl, this._zoneBottomLeft);
 
-            // Plant Health / Raster Analysis / Stockpile Volume on-map buttons,
-            // shared with SingleMap.vue via `useMapAnalysisButtons`. We pick the
-            // first capable file so the buttons map to a valid entry whenever
-            // any of the workspace files qualifies.
-            this.addAnalysisButtonsControl(predicate => {
+            // Utility cluster top-right: Reset View + Fullscreen + analysis buttons.
+            // Matches the SingleMap.vue pattern (appendAnalysisButtonsToContainer).
+            const utilContainer = document.createElement('div');
+            utilContainer.className = 'ol-map-buttons ol-unselectable ol-control';
+
+            const resetBtn = document.createElement('button');
+            resetBtn.title = 'Reset View (H)';
+            resetBtn.innerHTML = '<i class="fa-solid fa-house"></i>';
+            resetBtn.addEventListener('click', () => { this.resetToInitialView(); });
+            utilContainer.appendChild(resetBtn);
+
+            if (supportsFullScreen()) {
+                const fsBtn = document.createElement('button');
+                fsBtn.title = 'Fullscreen (F11)';
+                fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+                fsBtn.addEventListener('click', () => {
+                    if (isFullScreenCurrently()) { exitFullScreen(); }
+                    else { requestFullScreen(this.$el); setTimeout(() => { this.map.updateSize(); }, 500); }
+                });
+                utilContainer.appendChild(fsBtn);
+            }
+
+            this.appendAnalysisButtonsToContainer(utilContainer, predicate => {
                 const f = (this.files || []).find(x => x.entry && predicate(x.entry));
                 return f || null;
-            }, this._zoneTopRight);
+            }, { skipPlantHealth: true });
+            utilContainer.style.order = '-1';
+            this.map.addControl(new Control({ element: utilContainer, target: this._zoneTopRight }));
+
+            // Display options cluster (top-center): direction, flight path, split-compare.
+            const displayContainer = document.createElement('div');
+            displayContainer.className = 'ol-map-display-buttons ol-unselectable ol-control';
+
+            const dirBtn = document.createElement('button');
+            dirBtn.title = 'Show direction and speed indicators';
+            dirBtn.innerHTML = '<i class="fa-solid fa-location-arrow"></i>';
+            if (this.showDirectionIndicators) dirBtn.classList.add('active');
+            dirBtn.addEventListener('click', () => {
+                this.showDirectionIndicators = !this.showDirectionIndicators;
+                localStorage.setItem('showDirectionIndicators', String(this.showDirectionIndicators));
+                this.applyDirectionStyles();
+                dirBtn.classList.toggle('active', this.showDirectionIndicators);
+            });
+            displayContainer.appendChild(dirBtn);
+
+            const flightBtn = document.createElement('button');
+            flightBtn.title = 'Show drone flight path';
+            flightBtn.innerHTML = '<i class="fa-solid fa-signs-post"></i>';
+            if (this.showFlightPath) flightBtn.classList.add('active');
+            flightBtn.addEventListener('click', () => {
+                this.showFlightPath = !this.showFlightPath;
+                localStorage.setItem('showFlightPath', String(this.showFlightPath));
+                if (this.flightPathLayer) this.flightPathLayer.setVisible(this.showFlightPath);
+                if (this.markerLayer) this.markerLayer.setVisible(this.showFlightPath);
+                flightBtn.classList.toggle('active', this.showFlightPath);
+            });
+            displayContainer.appendChild(flightBtn);
+
+            const splitBtn = document.createElement('button');
+            splitBtn.title = 'Need at least 2 georasters to compare';
+            splitBtn.innerHTML = '<i class="fa-solid fa-table-columns"></i>';
+            splitBtn.disabled = true;
+            splitBtn.addEventListener('click', () => {
+                if (this.splitMode) this.exitSplitMode();
+                else this.enterSplitMode();
+            });
+            displayContainer.appendChild(splitBtn);
+            this._splitBtn = splitBtn;
+
+            this.map.addControl(new Control({ element: displayContainer, target: this._zoneTopCenter }));
 
             // Apply flight path visibility preference
             this.flightPathLayer.setVisible(this.showFlightPath);
@@ -1551,7 +1548,8 @@ export default {
 
         handleKeyDown: function (e) {
             if (Keyboard.isCtrlPressed() && this.mouseInside) {
-                this.$refs.toolbar.selectTool('select-features');
+                this.selectSingle = true;
+                if (this.selectionControl) this.selectionControl.deactivate();
             }
             // H key for reset view
             if (e.keyCode === 72 && this.mouseInside) {
@@ -1561,8 +1559,7 @@ export default {
         handleKeyUp: function (e) {
             // ESC
             if (e.keyCode === 27) {
-                // Only deselect non-toggle tools (preserve flight path, direction indicators, etc.)
-                this.$refs.toolbar.deselectNonToggle();
+                this.selectSingle = false;
                 this.measureControls.deselectCurrent();
                 if (this.selectionControl) {
                     this.selectionControl.deactivate();
@@ -1570,7 +1567,7 @@ export default {
             }
 
             if (!Keyboard.isCtrlPressed() && this.mouseInside) {
-                this.$refs.toolbar.deselectTool('select-features');
+                this.selectSingle = false;
             }
         },
         handlePolygonSelection: function (polygon) {
@@ -1664,12 +1661,30 @@ export default {
                     // markRaw prevents Vue from wrapping the OL layer in a reactive
                     // proxy (which would break identity checks and hurt performance).
                     olLayer: markRaw(olLayer),
-                    opacity: existing ? existing.opacity : 1.0
+                    opacity: existing ? existing.opacity : 1.0,
+                    // Flag for the per-row Plant Health button in the opacity panel.
+                    plantHealthCapable: isPlantHealthCapable(olLayer.file?.entry)
                 });
             });
             // Reverse so that rasterLayerList[0] = topmost OL layer (rendered last)
             // matching the standard layer-panel convention (top of list = on top).
             this.rasterLayerList = newList.reverse();
+
+            // Update analysis toolbar buttons (Raster Analysis / Stockpile Volume
+            // require exactly one georaster).
+            this.updateAnalysisButtonsForRasterCount(newList.length);
+
+            // Enable / disable the split-compare toolbar button based on layer count.
+            // If already in split mode and layers dropped below 2, auto-exit.
+            this.$nextTick(() => this.updateSplitToolState());
+        }, handleLayerPlantHealth: function (path) {
+            // Toggle Plant Health panel for a specific georaster layer.
+            // Clicking the same layer's button again closes the panel.
+            if (this.plantHealthVisible && this.plantHealthFilePath === path) {
+                this.closePlantHealth();
+            } else {
+                this.openPlantHealth(path);
+            }
         }, handleRasterLayerReorder: function ({ fromIndex, toIndex }) {
             // Reorder in the reactive list
             const updated = [...this.rasterLayerList];
@@ -1687,6 +1702,13 @@ export default {
                 olLayers.push(updated[i].olLayer);
             }
         }, updateRastersOpacity: function () {
+            // In split mode every raster is shown at full opacity (the canvas clip handles separation)
+            if (this.splitMode) {
+                this.rasterLayer.getLayers().forEach(layer => layer.setOpacity(1));
+                this.hasRasters = this.rasterLayer.getLayers().getLength() > 0;
+                return;
+            }
+
             const usePerLayer = this.rasterLayerList.length > 1;
             const baseOpacity = this.rasterOpacity;
 
@@ -1916,6 +1938,105 @@ export default {
             }
             this.pendingGroupForRename = null;
             this.measurementGroupDialogOpen = false;
+        },
+
+        // ── Split-screen georaster comparison ─────────────────────────────
+
+        /**
+         * Enable / disable the split-compare toolbar button depending on how
+         * many georaster layers are currently loaded. If the mode is active and
+         * the count drops below 2, auto-deselects the button (which triggers
+         * exitSplitMode via onDeselect).
+         */
+        updateSplitToolState: function () {
+            if (!this._splitBtn) return;
+            const canCompare = this.rasterLayerList.length >= 2;
+            this._splitBtn.disabled = !canCompare;
+            this._splitBtn.title = canCompare
+                ? 'Compare georasters side by side'
+                : 'Need at least 2 georasters to compare';
+            if (this.splitMode && !canCompare) {
+                this.exitSplitMode();
+            }
+        },
+
+        enterSplitMode: function () {
+            const n = this.rasterLayerList.length;
+            if (n < 2) return;
+            this.splitMode = true;
+            // Equidistant starting positions (N-1 dividers)
+            this.splitPositions = Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
+            this._attachSplitClip();
+            this.updateRastersOpacity();
+            this.map.render();
+            if (this._splitBtn) this._splitBtn.classList.add('active');
+        },
+
+        exitSplitMode: function () {
+            this._detachSplitClip();
+            this.splitMode = false;
+            this.splitPositions = [];
+            this.updateRastersOpacity();
+            this.map.render();
+            if (this._splitBtn) this._splitBtn.classList.remove('active');
+        },
+
+        /**
+         * Attach prerender / postrender canvas-clip listeners to each raster
+         * layer so that band i is only visible in its horizontal strip.
+         * Band i spans from positions[i-1] (or 0) to positions[i] (or 1).
+         * rasterLayerList[0] = leftmost band.
+         */
+        _attachSplitClip: function () {
+            this._detachSplitClip();
+            this._splitListenerKeys = [];
+            const positions = this.splitPositions;
+            const mapRef = this.map;
+
+            this.rasterLayerList.forEach((rasterEntry, i) => {
+                const olLayer = rasterEntry.olLayer;
+                const leftFrac = i === 0 ? 0 : positions[i - 1];
+                const rightFrac = i === this.rasterLayerList.length - 1 ? 1 : positions[i];
+
+                const preKey = olLayer.on('prerender', (event) => {
+                    const ctx = event.context;
+                    const size = mapRef.getSize();
+                    const w = size[0];
+                    const h = size[1];
+                    const tl = getRenderPixel(event, [w * leftFrac, 0]);
+                    const tr = getRenderPixel(event, [w * rightFrac, 0]);
+                    const br = getRenderPixel(event, [w * rightFrac, h]);
+                    const bl = getRenderPixel(event, [w * leftFrac, h]);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.moveTo(tl[0], tl[1]);
+                    ctx.lineTo(tr[0], tr[1]);
+                    ctx.lineTo(br[0], br[1]);
+                    ctx.lineTo(bl[0], bl[1]);
+                    ctx.closePath();
+                    ctx.clip();
+                });
+
+                const postKey = olLayer.on('postrender', (event) => {
+                    event.context.restore();
+                });
+
+                this._splitListenerKeys.push(preKey, postKey);
+            });
+        },
+
+        _detachSplitClip: function () {
+            if (this._splitListenerKeys && this._splitListenerKeys.length) {
+                this._splitListenerKeys.forEach(k => unByKey(k));
+            }
+            this._splitListenerKeys = [];
+        },
+
+        onSplitPositionsChange: function (newPositions) {
+            this.splitPositions = newPositions;
+            // Re-attach listeners with updated captured fractions
+            this._attachSplitClip();
+            this.map.render();
         }
     }
 }

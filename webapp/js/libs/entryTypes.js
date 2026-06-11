@@ -96,8 +96,10 @@ function getTypeDisplayName(type) {
     return TYPE_DISPLAY_NAMES[type] || 'Unknown';
 }
 
-// Sort entries with directories first, then by name
-function sortEntriesDirectoriesFirst(entries, getPath) {
+// Sort entries with directories first, then by name.
+// Pass descending=true to sort Z→A within each group (dirs stay first).
+function sortEntriesDirectoriesFirst(entries, getPath, descending = false) {
+    const mult = descending ? -1 : 1;
     return [...entries].sort((a, b) => {
         const aDir = ddb.entry.isDirectory(a);
         const bDir = ddb.entry.isDirectory(b);
@@ -107,7 +109,7 @@ function sortEntriesDirectoriesFirst(entries, getPath) {
 
         const aName = getPath ? getPath(a).toLowerCase() : a.path.toLowerCase();
         const bName = getPath ? getPath(b).toLowerCase() : b.path.toLowerCase();
-        return aName > bName ? 1 : -1;
+        return (aName > bName ? 1 : -1) * mult;
     });
 }
 

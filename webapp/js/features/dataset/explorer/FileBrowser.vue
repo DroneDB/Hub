@@ -2,13 +2,20 @@
     <div class="file-browser">
         <ContextMenu :items="contextMenu" />
         <div id="search-box">
-            <IconField style="width: 100%;">
+            <IconField style="flex: 1; min-width: 0;">
                 <InputIcon class="fa-solid fa-magnifying-glass" />
                 <InputText v-model="filterRaw" @keyup.enter="search()" placeholder="Search files" style="width: 100%;" />
             </IconField>
             <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" v-on:click="clearSearch()">
                 <i class="fa-solid fa-xmark"></i>
             </div>
+            <Button
+                :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
+                :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
+                severity="secondary" text size="small"
+                @click="toggleSortDirection"
+                style="flex-shrink: 0;"
+            />
         </div>
         <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
             :getChildren="getChildren" :canWrite="canWrite" ref="treeView" />
@@ -28,6 +35,7 @@ import ContextMenu from '@/components/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
+import Button from 'primevue/button';
 import env from '@/dynamic/env';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
@@ -39,7 +47,7 @@ const { pathutils } = ddb;
 
 export default {
     components: {
-        TreeView, ContextMenu, InputText, InputIcon, IconField
+        TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
     emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
     inject: { showBuildConfirm: { default: null } },
@@ -129,6 +137,7 @@ export default {
             filter: null,
             searchStaticPaths: null,
             noResults: false,
+            sortDescending: localStorage.getItem('sortDescending') === 'true',
         };
     },
     watch: {
@@ -136,7 +145,14 @@ export default {
             this.filter = newVal;
             if ((newVal == null || newVal.length === 0) && this.searchStaticPaths == null) return;
             this.search();
-        }, 500)
+        }, 500),
+        sortDescending: function () {
+            if (this.searchStaticPaths != null) {
+                this.search();
+            } else {
+                this.refreshNodes();
+            }
+        }
     },
     mounted: async function () {
         await this.refreshNodes();
@@ -144,6 +160,12 @@ export default {
     beforeUnmount: function () {
     },
     methods: {
+
+        toggleSortDirection: function () {
+            this.sortDescending = !this.sortDescending;
+            localStorage.setItem('sortDescending', this.sortDescending);
+            // Watcher handles the refresh
+        },
 
         clearSearch: async function () {
             this.filter = null;
@@ -173,7 +195,8 @@ export default {
 
                 var res = sortEntriesDirectoriesFirst(
                     entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path)
+                    e => pathutils.basename(e.path),
+                    this.sortDescending
                 )
                     .map(entry => {
                         const base = pathutils.basename(entry.path);
@@ -225,7 +248,8 @@ export default {
 
                 var res = sortEntriesDirectoriesFirst(
                     entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path)
+                    e => pathutils.basename(e.path),
+                    this.sortDescending
                 )
                     .map(entry => {
                         const base = pathutils.basename(entry.path);
@@ -406,6 +430,8 @@ export default {
     padding: 0.5rem;
     border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     display: flex;
+    align-items: center;
+    gap: 0.25rem;
     width: 100%;
 
     .box {

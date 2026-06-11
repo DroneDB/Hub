@@ -83,6 +83,14 @@
     align-items: flex-end;
 }
 
+.ol-zone-top-center {
+    top: 0.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    align-items: center;
+    flex-direction: row;
+}
+
 .ol-selection {
     top: 6.25rem;
     left: 0.5rem;
@@ -117,16 +125,11 @@
     right: 0.5rem;
 }
 
-/* On-map analysis buttons (Plant Health / Raster Analysis / Stockpile),
-   shared by Map.vue and SingleMap.vue. In Map.vue they're a standalone
-   control just below the measure control; SingleMap appends them to its
-   existing top-right cluster so this rule only matters when used solo. */
-.ol-map-analysis-buttons {
-    top: 17.5rem;
-    right: 0.5rem;
+/* On-map display options (Direction · Flight path · Split compare),
+   shown as a horizontal row at the top-center of the map. */
+.ol-map-display-buttons {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    flex-direction: row;
 }
 
 .ol-tooltip-static:before {
