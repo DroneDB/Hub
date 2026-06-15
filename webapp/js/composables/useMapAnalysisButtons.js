@@ -115,13 +115,13 @@ export default {
             if (this._raBtn) {
                 this._raBtn.disabled = count > 1;
                 this._raBtn.title = count > 1
-                    ? `Raster Analysis — ${multiMsg}`
+                    ? `Raster Analysis - ${multiMsg}`
                     : 'Raster Analysis';
             }
             if (this._stockpileBtn) {
                 this._stockpileBtn.disabled = count > 1;
                 this._stockpileBtn.title = count > 1
-                    ? `Stockpile Volume — ${multiMsg}`
+                    ? `Stockpile Volume - ${multiMsg}`
                     : 'Stockpile Volume';
             }
         },

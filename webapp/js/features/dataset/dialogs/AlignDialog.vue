@@ -43,7 +43,7 @@
                     {{ validationResult.warnings.join('; ') }}
                 </div>
                 <div v-else class="result-msg ok">
-                    Compatible — Overlap: {{ fmt(validationResult.summary && validationResult.summary.overlapPercent, 1) }}%,
+                    Compatible - Overlap: {{ fmt(validationResult.summary && validationResult.summary.overlapPercent, 1) }}%,
                     GSD {{ fmt(validationResult.summary && validationResult.summary.sourceGsdM, 3) }} m
                 </div>
             </div>
@@ -66,12 +66,12 @@
 
             <!-- Align result (parsed from log tail) -->
             <div v-if="alignResult" class="result-msg ok">
-                Aligned — tx={{ fmt(alignResult.tx, 3) }} m,
+                Aligned - tx={{ fmt(alignResult.tx, 3) }} m,
                 ty={{ fmt(alignResult.ty, 3) }} m,
                 θ={{ fmt(alignResult.thetaDeg, 3) }}°,
                 s={{ fmt(alignResult.scale, 5) }},
                 conf={{ fmt(alignResult.confidence, 2) }}
-                <span v-if="alignResult.warning"> — {{ alignResult.warning }}</span>
+                <span v-if="alignResult.warning"> - {{ alignResult.warning }}</span>
             </div>
 
             <!-- Error -->
@@ -164,7 +164,7 @@ export default {
 
     methods: {
         fmt(v, digits) {
-            return typeof v === 'number' ? v.toFixed(digits) : '—';
+            return typeof v === 'number' ? v.toFixed(digits) : '-';
         },
 
         taskIcon(state) {
