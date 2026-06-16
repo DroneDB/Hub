@@ -43,8 +43,7 @@ export function clone(obj) {
     try {
         return JSON.parse(JSON.stringify(obj));
     } catch (e) {
-        console.error(e);
-        debugger;
+        console.error('Clone failed:', e);
         return undefined;
     }
 }

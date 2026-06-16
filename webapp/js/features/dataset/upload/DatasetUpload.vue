@@ -48,7 +48,7 @@
         </div>
 
         <div class="upload-body">
-            <RecycleScroller
+            <VirtualScroller
                 class="file-list-scroller"
                 :items="filteredFiles"
                 :item-size="48"
@@ -56,7 +56,7 @@
                 v-slot="{ item }"
             >
                 <FileUploadRow :file="item" @retry="retryFile" />
-            </RecycleScroller>
+            </VirtualScroller>
         </div>
 
         <div class="upload-footer">
@@ -120,6 +120,7 @@
 <script>
 import Message from '@/components/Message.vue';
 import FileUploadRow from './FileUploadRow.vue';
+import VirtualScroller from '@/components/VirtualScroller.vue';
 import Button from 'primevue/button';
 import ddb from 'ddb';
 import { bytesToSize } from '@/libs/utils';
@@ -136,10 +137,11 @@ export default {
     components: {
         Message,
         FileUploadRow,
+        VirtualScroller,
         Button
     },
     props: ['organization', 'dataset', 'path', 'filesToUpload'],
-    emits: ['onClose', 'update:waitingForFiles'],
+    emits: ['onClose', 'onUpload', 'update:closable', 'update:waitingForFiles'],
     data: function () {
         return {
             error: null,

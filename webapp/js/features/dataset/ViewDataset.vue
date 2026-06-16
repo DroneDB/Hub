@@ -338,7 +338,7 @@ export default {
     data: function () {
         const mobile = isMobile();
 
-        var mainTabs = [];
+        let mainTabs = [];
 
         if (mobile) {
             mainTabs.unshift({

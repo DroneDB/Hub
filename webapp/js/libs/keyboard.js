@@ -1,6 +1,24 @@
-let shiftPressed = false;
-let ctrlPressed = false;
-let metaPressed = false;
+/**
+ * Keyboard state module.
+ *
+ * Exports:
+ *   - `keyboardState`  (reactive): { shiftPressed, ctrlPressed, metaPressed }
+ *   - Default export   (legacy API): onKeyDown, onKeyUp, onShortcut, off*, isShiftPressed(), etc.
+ *
+ * The reactive state can be imported in composition-API components:
+ *   import { keyboardState } from '@/libs/keyboard';
+ *   // keyboardState.shiftPressed is reactive
+ *
+ * The legacy API is kept for backward compatibility with Options API components.
+ */
+import { reactive } from 'vue';
+
+// Reactive state — usable in Vue templates and composables
+const keyboardState = reactive({
+    shiftPressed: false,
+    ctrlPressed: false,
+    metaPressed: false
+});
 
 let keyDownListeners = [];
 let keyUpListeners = [];
@@ -32,29 +50,31 @@ const api = {
     },
 
     isShiftPressed: function () {
-        return shiftPressed;
+        return keyboardState.shiftPressed;
     },
 
     isCtrlPressed: function () {
-        return ctrlPressed;
+        return keyboardState.ctrlPressed;
     },
 
     isMetaPressed: function () {
-        return metaPressed;
+        return keyboardState.metaPressed;
     },
 
     isModifierPressed: function () {
-        return shiftPressed || ctrlPressed || metaPressed;
+        return keyboardState.shiftPressed || keyboardState.ctrlPressed || keyboardState.metaPressed;
     },
 
     resetModifiers: function () {
-        shiftPressed = ctrlPressed = metaPressed = false;
+        keyboardState.shiftPressed = false;
+        keyboardState.ctrlPressed = false;
+        keyboardState.metaPressed = false;
     },
 
     updateState: function (e) {
-        shiftPressed = e.shiftKey;
-        ctrlPressed = e.ctrlKey;
-        metaPressed = e.metaKey;
+        keyboardState.shiftPressed = e.shiftKey;
+        keyboardState.ctrlPressed = e.ctrlKey;
+        keyboardState.metaPressed = e.metaKey;
     }
 };
 

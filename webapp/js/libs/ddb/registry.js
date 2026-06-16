@@ -31,10 +31,10 @@ function parseJwt(token) {
     try {
         const parts = token.split('.');
         if (parts.length !== 3) return {};
-        var base64Url = parts[1];
+        const base64Url = parts[1];
         if (!base64Url) return {};
-        var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        var jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
         return JSON.parse(jsonPayload);
@@ -272,7 +272,8 @@ module.exports = class Registry {
         if (typeof window !== "undefined") {
             if (window.location.origin === this.url) {
                 const expiresDate = new Date(expires * 1000).toUTCString();
-                document.cookie = `jwtToken=${token};expires=${expiresDate};path=/`;
+                const isSecure = window.location.protocol === 'https:';
+                document.cookie = `jwtToken=${token};expires=${expiresDate};path=/;SameSite=Strict${isSecure ? ';Secure' : ''}`;
             }
         }
     }
@@ -594,10 +595,21 @@ module.exports = class Registry {
 
             let response;
             try {
-                response = await fetch(`${this.url}${endpoint}`, options);
+                // Add timeout to fetch requests (5 minutes default)
+                const controller = new AbortController();
+                const timeoutMs = 300000;
+                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+                try {
+                    response = await fetch(`${this.url}${endpoint}`, { ...options, signal: controller.signal });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
             } catch (fetchError) {
                 // Only network errors (connection refused, DNS failure, etc.) reach here
                 // fetch() throws TypeError for network failures in standard implementations
+                if (fetchError.name === 'AbortError')
+                    throwError(`Request timed out after ${timeoutMs / 1000}s`, 0, { originalError: fetchError });
+
                 throwError(`Network error: ${fetchError.message}`, 0, { originalError: fetchError });
             }
 

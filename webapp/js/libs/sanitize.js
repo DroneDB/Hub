@@ -12,6 +12,6 @@ export function sanitizeHtml(dirty) {
                        'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'span', 'div',
                        'hr', 'dl', 'dt', 'dd', 'sup', 'sub'],
         ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'title', 'class', 'id',
-                       'width', 'height', 'style'],
+                       'width', 'height'],
     });
 }

@@ -20,8 +20,7 @@ import { definePreset } from '@primevue/themes';
 import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
 import DialogService from 'primevue/dialogservice';
-import { RecycleScroller } from 'vue-virtual-scroller';
-import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+import VirtualScroller from '@/components/VirtualScroller.vue';
 
 import { createAppRouter } from './router';
 
@@ -38,7 +37,7 @@ const isProduction = typeof __APP_PRODUCTION__ !== 'undefined' ? __APP_PRODUCTIO
 
 window.addEventListener('load', function () {
 
-    var params = queryParams(window.location);
+    const params = queryParams(window.location);
 
     // Hide header if ?embed=1 is in URL
     const embed = !!params.embed || inIframe();
@@ -176,15 +175,23 @@ window.addEventListener('load', function () {
         app.config.globalProperties.$embed = params.embed ? true : false;
 
         // Global component registration
-        app.component('RecycleScroller', RecycleScroller);
+        app.component('VirtualScroller', VirtualScroller);
 
         app.config.errorHandler = function (err, vm, info) {
             // Catch unauthorized error globally
             if (err.message === "Unauthorized") {
                 router.push({ name: "Login" }).catch(() => { });
-            } else {
+                return;
+            }
+
+            // Log error with context
+            console.error(`Vue error in ${info}:`, err);
+
+            // In development, re-throw for debugging
+            if (!isProduction) {
                 throw err;
             }
+            // In production, don't re-throw to avoid complete white screen
         };
 
         app.mount("#app");

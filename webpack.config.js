@@ -114,16 +114,41 @@ module.exports = {
         splitChunks: {
             chunks: 'all',
             cacheGroups: {
-                vendor: {
-                    test: /[\\/]node_modules[\\/]/,
-                    name: 'vendors',
+                vue: {
+                    test: /[\\/]node_modules[\\/](vue|vue-router|@tanstack)[\\/]/,
+                    name: 'vendor-vue',
                     chunks: 'all',
+                    priority: 20
+                },
+                primevue: {
+                    test: /[\\/]node_modules[\\/](primevue|@primevue)[\\/]/,
+                    name: 'vendor-primevue',
+                    chunks: 'all',
+                    priority: 20
+                },
+                chartjs: {
+                    test: /[\\/]node_modules[\\/]chart\.js[\\/]/,
+                    name: 'vendor-chartjs',
+                    chunks: 'all',
+                    priority: 15
+                },
+                codemirror: {
+                    test: /[\\/]node_modules[\\/]@codemirror[\\/]/,
+                    name: 'vendor-codemirror',
+                    chunks: 'all',
+                    priority: 15
                 },
                 openlayers: {
                     test: /[\\/]node_modules[\\/]ol[\\/]/,
-                    name: 'openlayers',
+                    name: 'vendor-openlayers',
                     chunks: 'all',
                     priority: 10,
+                },
+                defaultVendors: {
+                    test: /[\\/]node_modules[\\/]/,
+                    name: 'vendor-default',
+                    chunks: 'all',
+                    priority: -10
                 },
             },
         },
