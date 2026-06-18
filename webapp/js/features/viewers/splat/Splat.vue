@@ -26,7 +26,7 @@
 
             <!-- LOD streaming badge (only when serving a paged .rad) -->
             <div v-if="loaded && streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
-                <i class="fa-solid fa-tower-broadcast" />
+                <i class="fa-solid fa-tower-broadcast m-0" />
             </div>
 
             <!-- Bottom-left buttons -->
@@ -39,11 +39,40 @@
                 </button>
             </div>
 
+            <!-- Left-edge camera rail: jump between saved cameras, toggle the auto-orbit,
+                 save the current view as a camera, and persist all cameras to the dataset. -->
+            <div v-if="loaded" class="camera-rail">
+                <div v-if="cameras.length" class="rail-cameras">
+                    <button v-for="(cam, i) in cameras" :key="cam.id" class="rail-btn cam"
+                        :class="{ active: i === activeCameraIndex }"
+                        :title="cam.name || `Camera ${i + 1}`"
+                        @click="animateToCamera(i)">{{ i + 1 }}</button>
+                </div>
+                <div v-if="cameras.length" class="rail-sep"></div>
+                <button class="rail-btn" :class="{ active: isOrbiting }"
+                    :title="isOrbiting ? 'Stop orbit' : 'Start orbit'" @click="toggleOrbit">
+                    <i :class="isOrbiting ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
+                </button>
+                <button v-if="cameras.length" class="rail-btn" :class="{ active: isTouring }"
+                    :title="isTouring ? 'Stop cycling' : 'Start cycling'" @click="toggleTour">
+                    <i class="fa-solid fa-camera-rotate" />
+                </button>
+                <button v-if="canWrite" class="rail-btn" title="Save current view as a camera"
+                    @click="addCurrentCamera">
+                    <i class="fa-solid fa-camera" />
+                </button>
+                <button v-if="canWrite" class="rail-btn" :class="{ dirty: camerasDirty }"
+                    :disabled="!camerasDirty" title="Save cameras to dataset" @click="saveCameras">
+                    <i class="fa-solid fa-floppy-disk" />
+                </button>
+            </div>
+
             <!-- Navigation controls recap (bottom-right). Doubles as press-and-hold
                  touch/mouse buttons that drive the same movement as the keyboard. -->
             <div v-if="loaded" class="nav-controls" :class="{ touch: isTouch }">
                 <div class="nav-grid">
                     <button v-for="k in navKeys" :key="k.code" class="nav-key"
+                        :class="{ active: pressed[k.code] }"
                         :title="`${k.label} (${k.letter})`"
                         @pointerdown.prevent="pressDir(k.code, $event)"
                         @pointerup="releaseDir(k.code)"
@@ -62,7 +91,7 @@
             <div class="settings-content">
                 <div class="form-group">
                     <label class="checkbox-row">
-                        <input type="checkbox" v-model="flipped" @change="applyOrientation" />
+                        <input type="checkbox" v-model="flipped" @change="onFlipChange" />
                         <span>Flip up axis</span>
                     </label>
                     <small>Toggle if the scene appears upside down.</small>
@@ -80,10 +109,25 @@
                     /></div>
                 </div>
 
+                <div class="form-group">
+                    <div class="calib-header">
+                        <label>Ground plane calibration</label>
+                        <button type="button" class="calib-reset" @click="resetCalibration">Reset</button>
+                    </div>
+                    <small>Drag until vertical lines (walls, doors) look vertical.</small>
+                    <div class="calib-row">
+                        <label>Roll: {{ tiltRoll.toFixed(1) }}&deg;</label>
+                        <input class="w-100" type="range" v-model.number="tiltRoll"
+                            min="-45" max="45" step="0.5" @input="updateSceneUp" />
+                    </div>
+                    <div class="calib-row">
+                        <label>Pitch: {{ tiltPitch.toFixed(1) }}&deg;</label>
+                        <input class="w-100" type="range" v-model.number="tiltPitch"
+                            min="-45" max="45" step="0.5" @input="updateSceneUp" />
+                    </div>
+                </div>
+
                 <div class="settings-actions">
-                    <Button label="Reset view" icon="fa-solid fa-house" @click="resetView" text />
-                    <Button label="Save current view" icon="fa-solid fa-camera" @click="saveCurrentView" text :disabled="!canWrite" />
-                    <Button label="Manage cameras" icon="fa-solid fa-sliders" @click="toggleCameraManager" text />
                     <Button label="Close" severity="secondary" @click="toggleSettings" text />
                 </div>
             </div>
@@ -95,7 +139,7 @@
             :canWrite="canWrite"
             :dirty="camerasDirty"
             :activeIndex="activeCameraIndex"
-            @goto="setCamera"
+            @goto="animateToCamera"
             @add-current="addCurrentCamera"
             @update-current="updateCameraToCurrent"
             @delete="deleteCamera"
@@ -144,6 +188,14 @@ export default {
             pointScale: 1.0,
             isTouch: false,        // pointer-capable touch device (enlarges the nav overlay)
             navKeys: NAV_KEYS,
+            // Reactive highlight state for the on-screen WASDEQ keys (true while held).
+            pressed: { KeyW: false, KeyA: false, KeyS: false, KeyD: false, KeyE: false, KeyQ: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false },
+            // Reactive mirror of the running animation mode (null | 'tour' | 'orbit' | 'transition').
+            animMode: null,
+            // Ground-plane calibration (degrees), persisted in the cameras sidecar. Tilts the
+            // camera's "up" so a scene reconstructed off-gravity (e.g. COLMAP/3DGS) reads level.
+            tiltRoll: 0,
+            tiltPitch: 0,
             // Dataset permissions, populated by TabViewLoader before @loaded fires.
             canWrite: false,
             canDelete: false,
@@ -159,6 +211,12 @@ export default {
             if (this.activeCameraIndex === null) return null;
             const c = this.cameras[this.activeCameraIndex];
             return c ? (c.name || `Camera ${this.activeCameraIndex + 1}`) : null;
+        },
+        isOrbiting: function () {
+            return this.animMode === 'orbit';
+        },
+        isTouring: function () {
+            return this.animMode === 'tour';
         }
     },
     // three.js / Spark objects are stored as plain (non-reactive) instance fields.
@@ -191,7 +249,10 @@ export default {
         // Stable bound handlers so they can be removed on unmount.
         this.onKeyDownBound = this.onKeyDown.bind(this);
         this.onKeyUpBound = this.onKeyUp.bind(this);
-        this.onWindowBlurBound = () => { this.activeKeys.clear(); };
+        this.onWindowBlurBound = () => {
+            this.activeKeys.clear();
+            for (const k in this.pressed) this.pressed[k] = false;
+        };
         this.onUserInteractBound = () => this.onUserInteract();
         // FPS click-drag rotation state (non-reactive: touched every animation frame).
         this.yaw = 0;
@@ -205,6 +266,9 @@ export default {
         this.onCanvasMouseUpBound = this.onCanvasMouseUp.bind(this);
         // Accumulated velocity for smooth WASD acceleration (THREE.Vector3, lazy init).
         this.flyVelocity = null;
+        // Scene "up" vector the camera locks roll to. Defaults to world +Y; the ground-plane
+        // calibration tilts it so off-gravity reconstructions render level (THREE.Vector3, lazy).
+        this.sceneUp = null;
     },
     mounted: function () {
         this.isTouch = (typeof window !== 'undefined') &&
@@ -298,6 +362,12 @@ export default {
             const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
             camera.position.set(0, 0, 4);
             this.camera = camera;
+
+            // Establish the scene-up vector (the axis the camera locks roll to) from any
+            // calibration loaded from the sidecar, BEFORE framing so lookAt uses the right up.
+            this.sceneUp = new THREE.Vector3(0, 1, 0);
+            this.computeSceneUp();
+            camera.up.copy(this.sceneUp);
 
             // SparkRenderer drives the splat sorting/rendering inside the three.js scene.
             // When streaming a paged .rad, foveation concentrates the splat budget toward the
@@ -419,6 +489,43 @@ export default {
             }
         },
 
+        // The flip toggles the mesh 180deg about X; mark orientation dirty so it persists.
+        onFlipChange: function () {
+            this.applyOrientation();
+            this.camerasDirty = true;
+        },
+
+        // Recompute the scene-up vector from the calibration angles (degrees): pitch tilts it
+        // forward/back (about world X), roll tilts it left/right (about world Z). Both 0 = world +Y.
+        computeSceneUp: function () {
+            const THREE = this.three;
+            if (!THREE) return;
+            if (!this.sceneUp) this.sceneUp = new THREE.Vector3(0, 1, 0);
+            const up = new THREE.Vector3(0, 1, 0);
+            up.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(this.tiltPitch));
+            up.applyAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(this.tiltRoll));
+            up.normalize();
+            this.sceneUp.copy(up);
+        },
+
+        // Live ground-plane calibration: stop any animation, recompute scene-up from the sliders
+        // and rebuild the orientation so the current look direction is re-leveled (roll re-locked
+        // to the new up). Marks the sidecar dirty so the calibration can be saved to the dataset.
+        updateSceneUp: function () {
+            if (!this.camera || !this.three) return;
+            this.stopAnimation();         // syncs yaw/pitch from the current view (old up)
+            this.computeSceneUp();        // new scene-up
+            this.camera.up.copy(this.sceneUp);
+            this.applyYawPitch();         // same yaw/pitch, new up -> re-levels the horizon
+            this.camerasDirty = true;
+        },
+
+        resetCalibration: function () {
+            this.tiltRoll = 0;
+            this.tiltPitch = 0;
+            this.updateSceneUp();
+        },
+
         updatePointScale: function () {
             const mesh = this.splatMesh;
             if (!mesh) return;
@@ -489,6 +596,7 @@ export default {
             camera.updateProjectionMatrix();
 
             camera.position.set(center.x, center.y, center.z + dist);
+            if (this.sceneUp) camera.up.copy(this.sceneUp);
             camera.lookAt(center);
             if (controls) {
                 controls.target.copy(center);
@@ -532,7 +640,12 @@ export default {
         syncYawPitch: function () {
             const THREE = this.three;
             if (!THREE || !this.camera) return;
-            const eu = new THREE.Euler().setFromQuaternion(this.camera.quaternion, 'YXZ');
+            // Decompose the orientation in the scene-up aligned frame, so yaw/pitch are measured
+            // about the (possibly calibrated) scene up rather than world Y.
+            const align = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0), this.sceneUp || new THREE.Vector3(0, 1, 0));
+            const local = align.invert().multiply(this.camera.quaternion);
+            const eu = new THREE.Euler().setFromQuaternion(local, 'YXZ');
             this.yaw = eu.y;
             this.pitch = eu.x;
         },
@@ -543,7 +656,13 @@ export default {
         applyYawPitch: function () {
             const THREE = this.three;
             if (!THREE || !this.camera || !this.controls) return;
-            this.camera.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
+            // Build the orientation in the scene-up aligned frame: yaw about scene-up, pitch about
+            // the local right, roll locked to zero. This keeps the horizon level (no roll) even
+            // when the scene-up is tilted by the ground-plane calibration.
+            const align = new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0), this.sceneUp || new THREE.Vector3(0, 1, 0));
+            const local = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
+            this.camera.quaternion.copy(align).multiply(local);
             const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
             this.controls.target.copy(this.camera.position).addScaledVector(forward, this.lookDist);
         },
@@ -597,7 +716,15 @@ export default {
             if (!this.flyVelocity) this.flyVelocity = new THREE.Vector3();
 
             const keys = this.activeKeys;
-            const anyKey = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].some(k => keys.has(k));
+            // Arrow keys map to WASD directions: Up->W (forward), Down->S (backward),
+            // Left->A (left), Right->D (right).
+            const hasForward = keys.has('KeyW') || keys.has('ArrowUp');
+            const hasBackward = keys.has('KeyS') || keys.has('ArrowDown');
+            const hasLeft = keys.has('KeyA') || keys.has('ArrowLeft');
+            const hasRight = keys.has('KeyD') || keys.has('ArrowRight');
+            const hasUp = keys.has('KeyE');
+            const hasDown = keys.has('KeyQ');
+            const anyKey = hasForward || hasBackward || hasLeft || hasRight || hasUp || hasDown;
 
             if (anyKey) {
                 const fast = keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('Shift');
@@ -606,18 +733,18 @@ export default {
 
                 const forward = new THREE.Vector3();
                 camera.getWorldDirection(forward);
-                const worldUp = new THREE.Vector3(0, 1, 0);
+                const worldUp = this.sceneUp ? this.sceneUp.clone() : new THREE.Vector3(0, 1, 0);
                 const right = new THREE.Vector3().crossVectors(forward, worldUp);
                 if (right.lengthSq() < 1e-8) right.set(1, 0, 0); // looking straight up/down
                 right.normalize();
 
                 const targetVel = new THREE.Vector3();
-                if (keys.has('KeyW')) targetVel.add(forward);
-                if (keys.has('KeyS')) targetVel.addScaledVector(forward, -1);
-                if (keys.has('KeyD')) targetVel.add(right);
-                if (keys.has('KeyA')) targetVel.addScaledVector(right, -1);
-                if (keys.has('KeyE')) targetVel.add(worldUp);
-                if (keys.has('KeyQ')) targetVel.addScaledVector(worldUp, -1);
+                if (hasForward) targetVel.add(forward);
+                if (hasBackward) targetVel.addScaledVector(forward, -1);
+                if (hasRight) targetVel.add(right);
+                if (hasLeft) targetVel.addScaledVector(right, -1);
+                if (hasUp) targetVel.add(worldUp);
+                if (hasDown) targetVel.addScaledVector(worldUp, -1);
                 if (targetVel.lengthSq() > 0) targetVel.normalize().multiplyScalar(maxSpeed);
 
                 // Exponential ramp toward target velocity.
@@ -650,8 +777,9 @@ export default {
             if (tag === 'input' || tag === 'textarea' || (t && t.isContentEditable)) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
-            if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE'].includes(e.code)) {
+            if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
                 this.activeKeys.add(e.code);
+                this.pressed[e.code] = true;
                 this.onUserInteract();
                 e.preventDefault();
                 return;
@@ -663,7 +791,7 @@ export default {
             // Number keys 0-9 jump to the matching preset.
             if (/^Digit[0-9]$/.test(e.code)) {
                 const idx = parseInt(e.code.slice(5), 10);
-                if (idx < this.cameras.length) { this.setCamera(idx); e.preventDefault(); }
+                if (idx < this.cameras.length) { this.animateToCamera(idx); e.preventDefault(); }
                 return;
             }
             // "-"/"+" cycle through presets; "P" resumes the default presentation.
@@ -674,6 +802,7 @@ export default {
 
         onKeyUp: function (e) {
             this.activeKeys.delete(e.code);
+            if (Object.prototype.hasOwnProperty.call(this.pressed, e.code)) this.pressed[e.code] = false;
         },
 
         // Any explicit navigation cancels the running presentation and deselects the preset.
@@ -688,11 +817,13 @@ export default {
                 try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
             }
             this.activeKeys.add(code);
+            if (Object.prototype.hasOwnProperty.call(this.pressed, code)) this.pressed[code] = true;
             this.onUserInteract();
         },
 
         releaseDir: function (code) {
             this.activeKeys.delete(code);
+            if (Object.prototype.hasOwnProperty.call(this.pressed, code)) this.pressed[code] = false;
         },
 
         // ------------------------------------------------------------------
@@ -711,6 +842,13 @@ export default {
                 const list = Array.isArray(data) ? data
                     : (data && Array.isArray(data.cameras) ? data.cameras : []);
                 this.cameras = list.map((c, i) => this.normalizeCamera(c, i)).filter(Boolean);
+                // Restore persisted orientation / ground-plane calibration (best-effort).
+                const o = data && data.orientation;
+                if (o) {
+                    if (typeof o.flipped === 'boolean') this.flipped = o.flipped;
+                    if (typeof o.tiltRoll === 'number') this.tiltRoll = o.tiltRoll;
+                    if (typeof o.tiltPitch === 'number') this.tiltPitch = o.tiltPitch;
+                }
             } catch (e) {
                 // A missing sidecar (404) is the common case: start with no presets.
                 this.cameras = [];
@@ -801,16 +939,42 @@ export default {
             this.syncYawPitch();
         },
 
+        // Smoothly fly to a saved camera with an ease-in-out transition (accelerate, cruise,
+        // decelerate). Replaces any running presentation; cancels on user navigation (drag/WASD).
+        animateToCamera: function (index) {
+            const c = this.cameras[index];
+            if (!c || !this.camera || !this.controls) return;
+            if (this.flyVelocity) this.flyVelocity.set(0, 0, 0);
+            this.activeKeys.clear();
+            this.controls.autoRotate = false;
+            this.animState = {
+                mode: 'transition',
+                elapsed: 0,
+                moveDur: 1.2,
+                from: this.capturePose(),
+                to: this.cameraPose(c),
+                targetIndex: index
+            };
+            this.animMode = 'transition';
+            this.animating = true;
+            this.activeCameraIndex = null;
+        },
+
+        // Ease-in-out cubic: slow start, fast middle, slow finish.
+        easeInOutCubic: function (u) {
+            return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+        },
+
         nextCamera: function () {
             if (!this.cameras.length) return;
             const cur = this.activeCameraIndex === null ? -1 : this.activeCameraIndex;
-            this.setCamera((cur + 1) % this.cameras.length);
+            this.animateToCamera((cur + 1) % this.cameras.length);
         },
 
         prevCamera: function () {
             if (!this.cameras.length) return;
             const cur = this.activeCameraIndex === null ? 0 : this.activeCameraIndex;
-            this.setCamera((cur + this.cameras.length - 1) % this.cameras.length);
+            this.animateToCamera((cur + this.cameras.length - 1) % this.cameras.length);
         },
 
         // Adds the current view as a new preset (kept in memory until saved).
@@ -819,12 +983,6 @@ export default {
             this.cameras.push(this.buildCameraFromCurrent());
             this.camerasDirty = true;
             this.activeCameraIndex = this.cameras.length - 1;
-        },
-
-        // Settings shortcut: capture the current view and persist immediately.
-        saveCurrentView: function () {
-            this.addCurrentCamera();
-            this.saveCameras();
         },
 
         updateCameraToCurrent: function (index) {
@@ -875,6 +1033,11 @@ export default {
             try {
                 const payload = {
                     version: 1,
+                    orientation: {
+                        flipped: this.flipped,
+                        tiltRoll: this.tiltRoll,
+                        tiltPitch: this.tiltPitch
+                    },
                     cameras: this.cameras.map(c => ({
                         id: c.id,
                         name: c.name,
@@ -913,10 +1076,12 @@ export default {
                     from: this.capturePose(),
                     to: this.cameraPose(this.cameras[0])
                 };
+                this.animMode = 'tour';
             } else {
                 this.animState = { mode: 'orbit' };
                 this.controls.autoRotate = true;
                 this.controls.autoRotateSpeed = 0.2;
+                this.animMode = 'orbit';
             }
             this.animating = true;
         },
@@ -925,13 +1090,46 @@ export default {
             if (this.controls) this.controls.autoRotate = false;
             this.animating = false;
             this.animState = null;
+            this.animMode = null;
             // Resync yaw/pitch so FPS drag continues from the correct camera angle.
             this.syncYawPitch();
         },
 
+        // Toggle a slow auto-orbit around the current look target (about the calibrated up).
+        toggleOrbit: function () {
+            if (!this.camera || !this.controls) return;
+            if (this.animMode === 'orbit') { this.stopAnimation(); return; }
+            if (this.flyVelocity) this.flyVelocity.set(0, 0, 0);
+            this.activeKeys.clear();
+            this.activeCameraIndex = null;
+            this.animState = { mode: 'orbit' };
+            this.animMode = 'orbit';
+            this.controls.autoRotate = true;
+            this.controls.autoRotateSpeed = 0.5;
+            this.animating = true;
+        },
+
+        // Toggle cycling through saved camera presets (same as pressing P).
+        toggleTour: function () {
+            if (this.animMode === 'tour') { this.stopAnimation(); return; }
+            this.startDefaultAnimation();
+        },
+
         updateDefaultAnimation: function (dt) {
             const st = this.animState;
-            if (!st || st.mode !== 'tour') return; // orbit is handled by controls.autoRotate
+            if (!st) return;
+            if (st.mode === 'transition') {
+                st.elapsed += dt;
+                const u = st.moveDur > 0 ? Math.min(st.elapsed / st.moveDur, 1) : 1;
+                this.applyPoseLerp(st.from, st.to, this.easeInOutCubic(u));
+                if (u >= 1) {
+                    const idx = st.targetIndex;
+                    this.stopAnimation();
+                    this.activeCameraIndex = idx; // show which preset we landed on
+                }
+                return;
+            }
+            if (st.mode !== 'tour') return; // orbit is handled by controls.autoRotate
 
             st.elapsed += dt;
             if (st.phase === 'move') {
@@ -959,7 +1157,7 @@ export default {
         resetView: function () {
             this.stopAnimation();
             this.activeKeys.clear();
-            if (this.cameras.length) { this.setCamera(0); return; }
+            if (this.cameras.length) { this.animateToCamera(0); return; }
             const camera = this.camera;
             const controls = this.controls;
             if (camera && this.initialCameraPos) {
@@ -970,6 +1168,7 @@ export default {
                 controls.update();
             }
             this.activeCameraIndex = null;
+            this.syncYawPitch();
         },
 
         toggleSettings: function () {
@@ -1131,6 +1330,72 @@ export default {
     background: rgba(0, 0, 0, 0.75);
 }
 
+/* Left-edge camera rail (vertically centered): jump between saved cameras,
+   toggle the auto-orbit, save the current view, and persist to the dataset. */
+#splat .camera-rail {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    max-height: 82%;
+    overflow-y: auto;
+    padding: 0.35rem 0.3rem;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 0 var(--ddb-border-radius, 6px) var(--ddb-border-radius, 6px) 0;
+    user-select: none;
+}
+
+#splat .camera-rail .rail-cameras {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+#splat .rail-btn {
+    width: 2.1rem;
+    height: 2.1rem;
+    flex: 0 0 auto;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--ddb-border-radius, 6px);
+    background: rgba(0, 0, 0, 0.5);
+    color: var(--ddb-text-on-dark);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+#splat .rail-btn:hover:not(:disabled) {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+#splat .rail-btn.active {
+    background: rgba(40, 110, 190, 0.85);
+    border-color: rgba(120, 180, 255, 0.9);
+}
+
+#splat .rail-btn.dirty {
+    border-color: rgba(240, 180, 60, 0.9);
+}
+
+#splat .rail-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#splat .camera-rail .rail-sep {
+    width: 70%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.25);
+    margin: 0.1rem 0;
+}
+
 /* Immersive navigation recap / touch pad (bottom-right). */
 #splat .nav-controls {
     position: absolute;
@@ -1166,8 +1431,10 @@ export default {
     background: rgba(0, 0, 0, 0.6);
 }
 
-#splat .nav-key:active {
+#splat .nav-key:active,
+#splat .nav-key.active {
     background: rgba(40, 110, 190, 0.8);
+    border-color: rgba(120, 180, 255, 0.9);
 }
 
 #splat .nav-key .letter {
@@ -1188,9 +1455,8 @@ export default {
 
 #splat .settings-actions {
     display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.15rem;
+    justify-content: flex-end;
+    gap: 0.3rem;
     margin-top: var(--ddb-spacing-sm, 0.5rem);
 }
 
@@ -1209,6 +1475,30 @@ export default {
     display: block;
     color: var(--ddb-text-muted, #999);
     margin-top: 0.15rem;
+}
+
+#splat .settings-content .calib-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+#splat .settings-content .calib-reset {
+    border: none;
+    background: transparent;
+    color: var(--ddb-primary, #2a6fb0);
+    cursor: pointer;
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+    padding: 0;
+}
+
+#splat .settings-content .calib-row {
+    margin-top: 0.4rem;
+}
+
+#splat .settings-content .calib-row label {
+    display: block;
+    font-size: var(--ddb-font-size-sm, 0.8rem);
 }
 
 #splat .w-100 {
