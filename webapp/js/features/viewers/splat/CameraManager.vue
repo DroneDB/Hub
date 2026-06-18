@@ -1,5 +1,5 @@
 <template>
-    <Window title="Camera views" id="splat-cameras" @onClose="$emit('close')" fixedSize sizeClass="dialog-sm">
+    <Window title="Camera views" id="splat-cameras" @onClose="$emit('close')" fixedSize sizeClass="dialog-md">
         <div class="cameras-manager">
             <p v-if="!cameras.length" class="empty">
                 No camera views yet. Move to a viewpoint and add it below.
