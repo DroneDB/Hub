@@ -13,7 +13,8 @@ module.exports = {
             entryType === entry.type.IMAGE ||
             entryType === entry.type.POINTCLOUD ||
             entryType === entry.type.PANORAMA ||
-            entryType === entry.type.GEOPANORAMA;
+            entryType === entry.type.GEOPANORAMA ||
+            entryType === entry.type.GAUSSIAN_SPLAT;
     },
 
     fetch: function (uri, thumbSize = 256) {

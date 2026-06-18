@@ -36,6 +36,56 @@ class Entry {
         else throw new Error(`Il modello 3D non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
     }
 
+    async getGsplat() {
+        const spzUrl = this.buildUrl("gsplat/model.spz");
+        if (await this.dataset.registry.headRequest(spzUrl)) return spzUrl;
+        else throw new Error(`Il Gaussian Splat non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+    }
+
+    /**
+     * Returns the URL of the optional level-of-detail artifact (gsplat/model.rad) when present,
+     * or null otherwise. The .rad enables progressive streaming (Spark `paged: true`) so large
+     * scenes load coarse-first and fetch detail on demand instead of downloading the whole .spz.
+     * It is optional: a dataset built without build-lod has no .rad, so callers must tolerate null
+     * and fall back to getGsplat().
+     */
+    async getGsplatLod() {
+        const radUrl = this.buildUrl("gsplat/model.rad");
+        if (await this.dataset.registry.headRequest(radUrl)) return radUrl;
+        return null;
+    }
+
+    /**
+     * Returns the parsed local-space bounding box ({min:[x,y,z], max:[x,y,z]}) written at build
+     * time (gsplat/bounds.json), or null when absent. The viewer uses it to frame the camera
+     * deterministically - essential for the paged .rad path, where the streamed mesh has no
+     * resident splats (and thus no computable bounds) when it first initializes.
+     */
+    async getGsplatBounds() {
+        const boundsUrl = this.buildUrl("gsplat/bounds.json");
+        if (!(await this.dataset.registry.headRequest(boundsUrl))) return null;
+        try {
+            const resp = await fetch(boundsUrl);
+            if (!resp.ok) return null;
+            const b = await resp.json();
+            if (b && Array.isArray(b.min) && Array.isArray(b.max)) return b;
+        } catch (e) {
+            // bounds are an optimization; ignore failures and fall back to client-side framing.
+        }
+        return null;
+    }
+
+    /**
+     * Returns the URL of the georeferencing sidecar (gsplat/georef.json) when present,
+     * or null otherwise. The sidecar is optional: a splat without georeferencing renders
+     * in local space, so callers must tolerate a null result.
+     */
+    async getGeoref() {
+        const georefUrl = this.buildUrl("gsplat/georef.json");
+        if (await this.dataset.registry.headRequest(georefUrl)) return georefUrl;
+        return null;
+    }
+
     async getVector() {
         const vectorUrl = this.buildUrl("vec/vector.fgb");
 
@@ -78,6 +128,7 @@ module.exports = {
         PANORAMA: 12,
         GEOPANORAMA: 13,
         VECTOR: 14,
+        GAUSSIAN_SPLAT: 15,
     },
 
     typeToHuman: function (t) {
@@ -112,6 +163,8 @@ module.exports = {
                 return "GeoPanorama";
             case this.type.VECTOR:
                 return "Vector";
+            case this.type.GAUSSIAN_SPLAT:
+                return "GaussianSplat";
             default:
                 return "?";
         }

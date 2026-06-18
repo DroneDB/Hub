@@ -7,7 +7,8 @@ const OpenItemDefaults = {
     [ddb.entry.type.MODEL]: 'model',
     [ddb.entry.type.PANORAMA]: 'panorama',
     [ddb.entry.type.GEOPANORAMA]: 'panorama',
-    [ddb.entry.type.VECTOR]: 'map'
+    [ddb.entry.type.VECTOR]: 'map',
+    [ddb.entry.type.GAUSSIAN_SPLAT]: 'splat'
 }
 
 export { OpenItemDefaults };

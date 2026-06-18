@@ -15,6 +15,9 @@ const VIEW_OUTPUT_FILES = {
     'map-georaster': 'cog/cog.tif',
     'map-vector': 'vec/vector.fgb',
     'model': 'nxs/model.nxz',
+    // Splats prefer the LOD artifact (model.rad) but accept the legacy plain .spz too,
+    // so datasets built before the .rad-only switch keep working (any-of match).
+    'splat': ['gsplat/model.rad', 'gsplat/model.spz'],
     'panorama': null, // Panoramas use the original file
     'markdown': null  // Markdown files use the original file
 };
@@ -24,7 +27,8 @@ const BUILDABLE_TYPES = [
     ddb.entry.type.POINTCLOUD,
     ddb.entry.type.GEORASTER,
     ddb.entry.type.MODEL,
-    ddb.entry.type.VECTOR
+    ddb.entry.type.VECTOR,
+    ddb.entry.type.GAUSSIAN_SPLAT
 ];
 
 /**
@@ -214,8 +218,13 @@ class FileAvailabilityChecker {
      */
     async checkOutputFileAvailability(entryObj, outputFile) {
         try {
-            const url = entryObj.buildUrl(outputFile);
-            return await entryObj.dataset.registry.headRequest(url);
+            // outputFile may be a single path or an any-of list (e.g. splat .rad or .spz).
+            const candidates = Array.isArray(outputFile) ? outputFile : [outputFile];
+            for (const candidate of candidates) {
+                const url = entryObj.buildUrl(candidate);
+                if (await entryObj.dataset.registry.headRequest(url)) return true;
+            }
+            return false;
         } catch (error) {
             return false;
         }

@@ -16,6 +16,7 @@ const typeIconMap = {
     [entry.type.PANORAMA]: "fa-solid fa-globe",
     [entry.type.GEOPANORAMA]: "fa-solid fa-globe",
     [entry.type.VECTOR]: "fa-solid fa-object-ungroup",
+    [entry.type.GAUSSIAN_SPLAT]: "fa-solid fa-spray-can-sparkles",
 };
 
 // Extension-based icon overrides for GENERIC type

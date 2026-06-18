@@ -89,6 +89,20 @@ function openPanoramaItem(ctx) {
     };
 }
 
+function openSplatItem(ctx) {
+    return {
+        label: 'Open Gaussian Splat',
+        icon: 'fa-solid fa-spray-can-sparkles',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GAUSSIAN_SPLAT;
+        },
+        click: () => {
+            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'splat'));
+        }
+    };
+}
+
 function openMarkdownItem(ctx) {
     return {
         label: 'Open Markdown',
@@ -389,6 +403,7 @@ function buildViewerMenuItems(ctx) {
         openPointCloudItem(ctx),
         openModelItem(ctx),
         openPanoramaItem(ctx),
+        openSplatItem(ctx),
         openMarkdownItem(ctx),
         openPdfItem(ctx),
         plantHealthItem(ctx)
