@@ -19,7 +19,8 @@ const BUILDABLE_TYPES = [
     ddb.entry.type.POINTCLOUD,
     ddb.entry.type.GEORASTER,
     ddb.entry.type.MODEL,
-    ddb.entry.type.VECTOR
+    ddb.entry.type.VECTOR,
+    ddb.entry.type.GAUSSIAN_SPLAT
 ];
 
 // Build states according to Hangfire
