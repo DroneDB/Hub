@@ -18,6 +18,13 @@
 </template>
 
 <script>
+/**
+ * ColormapDropdown - Colormap picker with gradient preview swatches.
+ *
+ * Props:
+ *   modelValue - ID of the currently selected colormap.
+ *   colormaps  - Array of { id, name, colors } colormap descriptors.
+ */
 export default {
     props: {
         modelValue: { type: String, default: '' },

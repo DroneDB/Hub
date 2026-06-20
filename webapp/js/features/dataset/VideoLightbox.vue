@@ -61,7 +61,7 @@ export default {
                 });
             } else {
                 if (this.$refs.videoEl) {
-                    try { this.$refs.videoEl.pause(); } catch (_) { /* noop */ }
+                    try { this.$refs.videoEl.pause(); } catch (e) { /* noop */ }
                 }
             }
         }

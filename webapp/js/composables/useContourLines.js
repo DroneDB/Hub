@@ -157,8 +157,8 @@ export default {
                     } else {
                         src.removeFeature(f);
                     }
-                } catch (_) {
-                    try { src.removeFeature(f); } catch (__) { /* noop */ }
+                } catch (e) {
+                    try { src.removeFeature(f); } catch (e) { /* noop */ }
                 }
             }
         },

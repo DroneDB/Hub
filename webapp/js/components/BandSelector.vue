@@ -12,6 +12,16 @@
 </template>
 
 <script>
+/**
+ * BandSelector - RGB channel-to-band selector for multispectral rasters.
+ *
+ * Binds three dropdowns (R, G, B) to band indices and emits an updated
+ * "R:G:B" string via v-model.
+ *
+ * Props:
+ *   modelValue - Current band mapping string (e.g. "1:2:3").
+ *   bands      - Array of { index, name } band descriptors.
+ */
 export default {
     props: {
         modelValue: { type: String, default: '' },

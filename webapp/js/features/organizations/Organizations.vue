@@ -143,6 +143,12 @@ import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Paginator from 'primevue/paginator';
 
+/**
+ * Organizations - Admin panel for managing platform organizations.
+ *
+ * Lists all organizations in a paginated DataTable and provides dialogs
+ * for creating, editing, and deleting organizations.
+ */
 export default {
     components: {
         Message,

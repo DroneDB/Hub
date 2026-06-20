@@ -24,6 +24,16 @@ import Toolbar from 'primevue/toolbar';
 import Button from 'primevue/button';
 import Divider from 'primevue/divider';
 
+/**
+ * Toolbar - Icon-button toolbar with start and end tool groups.
+ *
+ * Builds the toolbar from a declarative `tools` array. Supports separators,
+ * toggle selection state, and disabled state per tool.
+ *
+ * Props:
+ *   tools    - Array of { id, icon, title, disabled, selected } descriptors.
+ *   position - Informational alignment hint; no layout effect.
+ */
 export default {
     components: {
         PvToolbar: Toolbar,

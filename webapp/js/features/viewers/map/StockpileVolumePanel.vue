@@ -176,6 +176,13 @@ import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 
 const CUSTOM_SLUG = '__custom__';
 
+/**
+ * StockpileVolumePanel - Stockpile volume measurement panel.
+ *
+ * Provides auto-detect (click-based) and manual polygon drawing workflows
+ * to calculate stockpile volumes from DEM/DSM rasters via the
+ * useStockpileVolume composable.
+ */
 export default {
     name: 'StockpileVolumePanel',
     components: { StockpileBaseMethodsDialog },

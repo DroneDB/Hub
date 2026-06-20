@@ -8,6 +8,17 @@
 import PrimeMessage from 'primevue/message';
 import { sanitizeHtml } from '@/libs/sanitize';
 
+/**
+ * Message - Conditional dismissible message bound to a parent data property.
+ *
+ * Watches `parentRef[bindTo]` and shows a PrimeVue Message when it is truthy.
+ * Sanitizes content via DOMPurify before rendering.
+ *
+ * Props:
+ *   bindTo    - Name of the parent data key to watch (default: 'message').
+ *   className - Semantic severity class (default: 'warning').
+ *   noDismiss - When true the close button is hidden (default: false).
+ */
 export default {
     components: {
         PrimeMessage

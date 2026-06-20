@@ -686,7 +686,7 @@ export default {
             try {
                 this.measureControls.deleteMeasurement(feature);
             } catch (e) {
-                try { this.measureControls.source.removeFeature(feature); } catch (_) { /* noop */ }
+                try { this.measureControls.source.removeFeature(feature); } catch (e) { /* noop */ }
             }
             this._draftStockpileFeatureId = null;
         },

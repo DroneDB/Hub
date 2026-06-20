@@ -170,6 +170,13 @@ const NAV_KEYS = [
     { code: 'KeyD', letter: 'D', label: 'Right', icon: 'fa-solid fa-arrow-right' }
 ];
 
+/**
+ * Splat - Gaussian splat viewer backed by Spark.js.
+ *
+ * Streams and renders .splat / .ksplat scenes with immersive fly navigation,
+ * persistent camera presets, auto-orbit / preset-tour animation, and
+ * optional GPS geolocation for map integration.
+ */
 export default {
     components: {
         Message, TabViewLoader, Window, Button, CameraManager
@@ -659,9 +666,7 @@ export default {
             tryFrame(0);
         },
 
-        // ------------------------------------------------------------------
-        // Immersive (fly) navigation
-        // ------------------------------------------------------------------
+        // ---- Immersive (fly) navigation ----
 
         // Sync the internal yaw/pitch euler angles from the camera's current quaternion.
         // Must be called after any external change to camera orientation so the next drag
@@ -882,9 +887,7 @@ export default {
             if (Object.prototype.hasOwnProperty.call(this.pressed, code)) this.pressed[code] = false;
         },
 
-        // ------------------------------------------------------------------
-        // Camera presets (loaded from / saved to <basename>_cameras.json)
-        // ------------------------------------------------------------------
+        // ---- Camera presets (loaded from / saved to <basename>_cameras.json) ----
 
         loadCameras: async function () {
             this.cameras = [];
@@ -1110,9 +1113,7 @@ export default {
             }
         },
 
-        // ------------------------------------------------------------------
-        // Default presentation: tour the presets, or slow auto-orbit when none
-        // ------------------------------------------------------------------
+        // ---- Default presentation: tour the presets, or slow auto-orbit when none ----
 
         startDefaultAnimation: function () {
             if (!this.camera || !this.controls) return;

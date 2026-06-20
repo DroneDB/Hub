@@ -9,6 +9,13 @@
 <script>
 import PrimeMessage from 'primevue/message';
 
+/**
+ * Flash - Dismissible inline message banner (wraps PrimeVue Message).
+ *
+ * Props:
+ *   icon  - Optional FontAwesome icon class override.
+ *   color - Semantic color key mapped to PrimeVue severity (default: 'positive').
+ */
 export default {
     components: {
         PrimeMessage

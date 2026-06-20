@@ -107,7 +107,7 @@ export function isInternalDrag(evt) {
     try {
         const data = evt.dataTransfer.getData('item');
         return data && data.length > 0;
-    } catch {
+    } catch (e) {
         return false;
     }
 }
@@ -290,7 +290,7 @@ export const itemDnDMixin = {
             let sourceItem;
             try {
                 sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
-            } catch {
+            } catch (e) {
                 return;
             }
             if (!sourceItem || !sourceItem.entry) return;
@@ -362,7 +362,7 @@ export const dragDropMixin = {
                 let sourceItem;
                 try {
                     sourceItem = JSON.parse(ev.dataTransfer.getData('item'));
-                } catch {
+                } catch (e) {
                     return;
                 }
                 if (!sourceItem || !sourceItem.entry) return;

@@ -175,7 +175,7 @@ export default {
                     const buildState = BuildManager.getBuildState(this.dataset, this.entry.path);
 
                     if (!buildState) {
-                        // Ricarica i build
+                        // Reload builds
                         await BuildManager.loadBuilds(this.dataset);
                         return;
                     }

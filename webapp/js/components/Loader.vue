@@ -9,6 +9,11 @@
 
 <script>
 
+/**
+ * Loader - Full-screen loading spinner overlay.
+ *
+ * No props; mount/unmount to show/hide.
+ */
 export default {
   components: {
 

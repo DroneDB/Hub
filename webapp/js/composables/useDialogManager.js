@@ -664,7 +664,7 @@ export default {
                         if (destItems.length > 0) {
                             emitter.emit('addItems', destItems);
                         }
-                    } catch (_) {
+                    } catch (e) {
                         // best-effort - tree node will reload lazily on expansion
                     }
                 }

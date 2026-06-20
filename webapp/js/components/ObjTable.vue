@@ -44,6 +44,15 @@
 
 <script>
 import { clone, sortObjectKeys } from '@/libs/utils';
+/**
+ * ObjTable - Recursive JSON/object-to-HTML-table renderer (legacy Semantic UI style).
+ *
+ * Handles nested objects and arrays by mounting itself recursively. Formats
+ * known special keys (captureTime, bands, dimensions) for readability.
+ *
+ * Props:
+ *   obj - The value to render (any JSON-compatible type).
+ */
 export default {
     name: 'ObjTable',
     components: {

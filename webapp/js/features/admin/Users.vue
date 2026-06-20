@@ -231,6 +231,12 @@ import IconField from 'primevue/iconfield';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
 
+/**
+ * Users - Admin panel for managing platform users.
+ *
+ * Lists all registered users in a paginated DataTable. Provides dialogs for
+ * adding, editing, and deleting users, and a per-user role management dialog.
+ */
 export default {
     components: {
         Message,

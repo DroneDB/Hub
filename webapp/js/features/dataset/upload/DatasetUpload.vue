@@ -133,6 +133,13 @@ const reg = new Registry(window.location.origin);
 const MAX_RETRIES = 3;
 const SMALL_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
+/**
+ * DatasetUpload - Chunked file upload panel for adding files to a dataset.
+ *
+ * Manages an upload queue with real-time progress, pause/resume/cancel per
+ * file, and automatic retry on transient errors. Integrates with the
+ * Registry chunked-upload API.
+ */
 export default {
     components: {
         Message,

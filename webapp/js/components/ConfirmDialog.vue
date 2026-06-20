@@ -26,6 +26,23 @@ import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import { sanitizeHtml } from '@/libs/sanitize';
 
+/**
+ * ConfirmDialog - Confirmation dialog with configurable confirm/cancel/secondary buttons.
+ *
+ * Optionally shows a warning block above the actions. Sanitizes the message
+ * prop via DOMPurify before rendering.
+ *
+ * Props:
+ *   title                - Dialog title.
+ *   message              - HTML body (sanitized).
+ *   confirmText          - Label for the confirm button (default: 'Ok').
+ *   cancelText           - Label for the cancel button (default: 'Cancel').
+ *   secondaryText        - Optional label for a secondary action button.
+ *   warningMessage       - Optional warning text shown above the buttons.
+ *   warningTitle         - Optional bold title for the warning block.
+ *   confirmButtonClass   - PrimeVue severity for the confirm button (default: 'danger').
+ *   secondaryButtonClass - PrimeVue severity for the secondary button.
+ */
 export default {
     components: {
         Window,

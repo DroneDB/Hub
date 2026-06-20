@@ -15,6 +15,15 @@ import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import { isMobile, isTablet } from '@/libs/responsive';
 
+/**
+ * Panel - Two-pane resizable split layout backed by PrimeVue Splitter.
+ *
+ * Persists pane sizes to localStorage and adapts split direction on mobile.
+ *
+ * Props:
+ *   split  - Orientation: 'vertical' (default) or 'horizontal'.
+ *   amount - Initial size of the first pane as a percentage (default: '50%').
+ */
 export default {
     components: {
         Splitter,

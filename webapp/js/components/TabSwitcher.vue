@@ -32,6 +32,18 @@ import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
 
+/**
+ * TabSwitcher - Multi-tab panel supporting dynamic tab management.
+ *
+ * Tabs can be added/removed at runtime via openTab/closeTab. Supports
+ * icons, labels, closable tabs, and an optional hide-single-tab mode.
+ *
+ * Props:
+ *   tabs       - Initial tab definitions (Array of { key, label, icon }).
+ *   defaultTab - Key of the tab to activate on mount.
+ *   position   - Tab strip position: 'top' (default) or 'bottom'.
+ *   hideSingle - Hide the tab strip when only one tab is present (default: false).
+ */
 export default {
     components: {
         Tabs,

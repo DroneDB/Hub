@@ -50,7 +50,7 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
             );
             return false;
         }
-    } catch (_) {
+    } catch (e) {
         // sessionStorage unavailable (private mode, etc.): proceed without the guard.
     }
 
@@ -62,12 +62,12 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
 
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(notice));
-    } catch (_) {
+    } catch (e) {
         // localStorage unavailable: still reload (notice will be skipped).
     }
     try {
         sessionStorage.setItem(SESSION_GUARD_KEY, serverVersion);
-    } catch (_) {
+    } catch (e) {
         // best-effort
     }
 
@@ -90,9 +90,9 @@ export function consumePendingUpdateNotice() {
         localStorage.removeItem(STORAGE_KEY);
         // Also clear the per-tab loop guard so a future legitimate
         // upgrade can trigger a reload again.
-        try { sessionStorage.removeItem(SESSION_GUARD_KEY); } catch (_) { /* */ }
+        try { sessionStorage.removeItem(SESSION_GUARD_KEY); } catch (e) { /* noop */ }
         return JSON.parse(raw);
-    } catch (_) {
+    } catch (e) {
         return null;
     }
 }

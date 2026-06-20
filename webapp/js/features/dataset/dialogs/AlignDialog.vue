@@ -216,7 +216,7 @@ export default {
                     const line = logTail[i].replace(/^\[\d{2}:\d{2}:\d{2}\] /, '').trim();
                     const j = JSON.parse(line);
                     if (typeof j.success === 'boolean') return j;
-                } catch (_) { /* not JSON, skip */ }
+                } catch (e) { /* not JSON, skip */ }
             }
             return null;
         },

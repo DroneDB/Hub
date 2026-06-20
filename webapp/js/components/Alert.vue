@@ -13,6 +13,14 @@
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
+/**
+ * Alert - Modal alert dialog with a dismissible "Close" button.
+ *
+ * Props:
+ *   title   - Dialog title.
+ *   message - Message text (rarely used; prefer the default slot).
+ *   buttons - Button set to show; supported value: 'ok' (default: ['ok']).
+ */
 export default {
     components: {
         Window,

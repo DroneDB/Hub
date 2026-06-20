@@ -204,7 +204,7 @@ export default {
                 try {
                     const src = JSON.parse(evt.dataTransfer.getData('item'));
                     primaryPath = src && src.entry ? src.entry.path : null;
-                } catch { /* ignore */ }
+                } catch (e) { /* ignore */ }
             }
 
             this.onDrop(evt, item);

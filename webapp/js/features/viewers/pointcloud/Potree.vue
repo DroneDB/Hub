@@ -1222,9 +1222,7 @@ export default {
             // No-op: Toast auto-closes
         },
 
-        // ============================================================================
-        // Undo/Redo System
-        // ============================================================================
+        // ---- Undo/Redo System ----
 
         /**
          * Push a measurement to the undo stack (for deletion operations)
@@ -1366,9 +1364,7 @@ export default {
             return true;
         },
 
-        // ============================================================================
-        // Delete Tool
-        // ============================================================================
+        // ---- Delete Tool ----
 
         /**
          * Toggle the delete measurement tool

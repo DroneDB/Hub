@@ -12,6 +12,21 @@
 <script>
 import Dialog from 'primevue/dialog';
 
+/**
+ * Window - Draggable modal/dialog wrapper around PrimeVue Dialog.
+ *
+ * Provides a consistent look for all modal/non-modal windows in the app.
+ * Supports fixed size, max-width, click-outside dismiss, and Escape close.
+ *
+ * Props:
+ *   title             - Dialog header text.
+ *   fixedSize         - Disables auto-size (content overflows with scroll) (default: false).
+ *   maxWidth          - CSS max-width of the dialog (default: '90%').
+ *   fixedPosition     - Disables dragging (default: false).
+ *   modal             - Whether to show the backdrop (default: false).
+ *   closeModalOnClick - Dismiss when clicking outside (default: false).
+ *   closable          - Show the X close button (default: true).
+ */
 export default {
     components: {
         Dialog

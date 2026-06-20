@@ -162,6 +162,13 @@ import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 import useHeavyTask from '@/composables/useHeavyTask';
 
+/**
+ * PlantHealthPanel - Plant health (NDVI / custom index) analysis panel.
+ *
+ * Renders a live-updating raster overlay computed from configurable band
+ * expressions. Includes band selector, colormap picker, histogram
+ * rescaling, and copy-link functionality.
+ */
 export default {
     mixins: [useHeavyTask],
     components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },

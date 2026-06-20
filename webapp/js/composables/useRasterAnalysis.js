@@ -108,7 +108,7 @@ export default {
             this._stopRasterProfileDrawing();
             this._removeRasterProfileHoverMarker();
             this._tearDownRasterProfileMeasurementWatcher();
-            // Note: we intentionally do NOT delete previously-drawn profile
+            // NOTE: we intentionally do NOT delete previously-drawn profile
             // features from `measureControls.source` here. They are regular
             // measurements now and must persist across panel open/close
             // (just like length/area/point measurements would).

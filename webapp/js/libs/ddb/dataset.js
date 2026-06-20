@@ -259,7 +259,7 @@ module.exports = class Dataset {
                     const json = await response.json();
                     errorMessage = json.error || json.message || errorMessage;
                 }
-            } catch (_) {
+            } catch (e) {
                 // Ignore parse errors, use default message
             }
             const err = new Error(errorMessage);

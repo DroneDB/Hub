@@ -82,6 +82,18 @@ import Column from 'primevue/column';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
 
+/**
+ * PropsTable - Recursive object/array-to-PrimeVue-DataTable renderer.
+ *
+ * Replaces the legacy ObjTable with a PrimeVue-based implementation.
+ * Supports drill-down into nested objects via an inline dialog.
+ * Formats captureTime, bands, dimensions and other well-known keys.
+ *
+ * Props:
+ *   obj      - The value to render (any JSON-compatible type).
+ *   depth    - Current recursion depth (default: 0).
+ *   maxDepth - Maximum drill-down depth before showing raw JSON (default: 3).
+ */
 export default {
     name: 'PropsTable',
     components: {

@@ -110,6 +110,13 @@ import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import useHeavyTask from '@/composables/useHeavyTask';
 
+/**
+ * MergeMultispectralDialog - Dialog for merging multispectral bands into a
+ * composite GeoTIFF via a heavy processing task.
+ *
+ * Validates band availability, exposes merge options, and tracks task
+ * progress via the useHeavyTask composable.
+ */
 export default {
     components: { Window, Button, InputText, Checkbox },
     mixins: [useHeavyTask],

@@ -133,7 +133,7 @@ export default {
                                 logTail = logTail.concat(log.lines).slice(-500);
                             }
                             if (log && typeof log.cursor === 'number') logCursor = log.cursor;
-                        } catch (_) { /* log fetch is best-effort */ }
+                        } catch (e) { /* log fetch is best-effort */ }
 
                         const entry = {
                             taskId,
@@ -153,7 +153,7 @@ export default {
                         this._setHeavyTask(taskId, entry);
 
                         if (typeof options.onProgress === 'function') {
-                            try { options.onProgress(entry); } catch (_) { /* ignore */ }
+                            try { options.onProgress(entry); } catch (e) { /* ignore */ }
                         }
 
                         if (TERMINAL_STATES.includes(status.state)) {

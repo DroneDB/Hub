@@ -289,6 +289,13 @@ import buildEvents from '@/composables/useBuildEvents';
 import useHeavyTask from '@/composables/useHeavyTask';
 import { Features } from '@/libs/features';
 
+/**
+ * ViewDataset - Main dataset page hosting the explorer, map viewer, and
+ * asset-specific viewers (point cloud, 3D, panorama, splat, etc.).
+ *
+ * Orchestrates per-dataset state: file listing, tab management, upload,
+ * build monitoring, settings, and all context-menu operations.
+ */
 export default {
     mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask],
     provide: function () {

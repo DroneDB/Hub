@@ -58,6 +58,16 @@ const RELEASE_BASE = {
     ddb: 'https://github.com/DroneDB/DroneDB/releases/tag/v'
 };
 
+/**
+ * HubUpdateNoticeDialog - Post-update notice shown once after a Hub version upgrade.
+ *
+ * Displays the previous and new versions with links to the GitHub release
+ * notes for Hub, Registry, and DroneDB.
+ *
+ * Props:
+ *   visible - Controls dialog visibility.
+ *   notice  - Update object with { from, to, at } strings.
+ */
 export default {
     name: 'HubUpdateNoticeDialog',
     components: { Dialog, Button },

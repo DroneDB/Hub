@@ -38,6 +38,13 @@ const { pathutils } = ddb;
 
 const MAX_VISIBLE = 5;
 
+/**
+ * ClipboardPanel - Floating panel displaying the current clipboard (cut/copy) state.
+ *
+ * Subscribes to the global clipboard composable and renders a summary of
+ * the queued items with a "clear" action. Hides itself when the clipboard
+ * is empty.
+ */
 export default {
     name: 'ClipboardPanel',
 

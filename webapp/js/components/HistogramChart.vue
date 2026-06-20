@@ -25,6 +25,17 @@
 <script>
 import Chart from 'primevue/chart';
 
+/**
+ * HistogramChart - Interactive bar histogram with draggable min/max rescale handles.
+ *
+ * Renders a Chart.js bar chart and overlays two drag handles for defining
+ * the visible value range. Emits the updated range via v-model.
+ *
+ * Props:
+ *   modelValue - Current range as { min, max } (two-way binding).
+ *   data       - Histogram data array.
+ *   height     - Chart height in pixels (default: 80).
+ */
 export default {
     components: { Chart },
     props: {

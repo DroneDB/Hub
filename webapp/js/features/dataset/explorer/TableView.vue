@@ -113,6 +113,12 @@ import Breadcrumb from 'primevue/breadcrumb';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 
+/**
+ * TableView - Flat-list table view for dataset files.
+ *
+ * Renders dataset entries in a sortable DataTable with multi-selection,
+ * drag-and-drop support, and a context menu for file operations.
+ */
 export default {
     mixins: [dragDropMixin],
     components: {

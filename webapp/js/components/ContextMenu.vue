@@ -8,6 +8,15 @@ import Keyboard from '@/libs/keyboard';
 
 let contextMenus = [];
 
+/**
+ * ContextMenu - Right-click context menu backed by PrimeVue ContextMenu.
+ *
+ * Manages a global stack so only one menu is visible at a time.
+ * Closes on Escape via the Keyboard utility.
+ *
+ * Props:
+ *   items - Array of PrimeVue MenuItem descriptors for the menu model.
+ */
 export default {
     components: {
         PrimeContextMenu
