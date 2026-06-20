@@ -257,6 +257,10 @@ export default {
         // FPS click-drag rotation state (non-reactive: touched every animation frame).
         this.yaw = 0;
         this.pitch = 0;
+        // Target yaw/pitch accumulated by mouse events; the render loop lerps toward
+        // these values every frame (Fix 1: frame-decoupled mouse look).
+        this.targetYaw = 0;
+        this.targetPitch = 0;
         this.mouseDragging = false;
         this.mouseDragX = 0;
         this.mouseDragY = 0;
@@ -345,6 +349,18 @@ export default {
                 /* webpackChunkName: "spark" */ '@sparkjsdev/spark');
 
             this.three = THREE;
+
+            // Pre-allocate reusable THREE temp objects to eliminate per-frame GC pressure
+            // (Fix 2). These are mutated in place by syncYawPitch / applyYawPitch / updateFly.
+            this._t_yAxis    = new THREE.Vector3(0, 1, 0);
+            this._t_negZ     = new THREE.Vector3(0, 0, -1);
+            this._t_alignQ   = new THREE.Quaternion();
+            this._t_localQ   = new THREE.Quaternion();
+            this._t_euler    = new THREE.Euler();
+            this._t_fwd      = new THREE.Vector3();
+            this._t_worldUp  = new THREE.Vector3();
+            this._t_right    = new THREE.Vector3();
+            this._t_targetVel = new THREE.Vector3();
 
             const canvas = this.$refs.canvas;
             const width = canvas.clientWidth || 1;
@@ -443,7 +459,20 @@ export default {
                 // reset our FPS quaternion. Reassert it immediately after, except during
                 // animations that drive the camera direction themselves.
                 if (!this.animating) {
-                    // Normal FPS mode: restore stored yaw/pitch.
+                    // Fix 1: frame-decoupled damped mouse look.
+                    // Lerp yaw/pitch toward the target accumulated by onCanvasMouseMove.
+                    // Runs every frame even when no fresh mouse sample arrived, so frames
+                    // that fall in the input/refresh-rate beat still advance the camera
+                    // rather than freezing it - eliminating visible micro-stutter.
+                    if (this.mouseDragging && dt > 0) {
+                        const a = 1 - Math.exp(-35 * dt);
+                        this.yaw   += (this.targetYaw   - this.yaw)   * a;
+                        this.pitch += (this.targetPitch - this.pitch) * a;
+                    } else {
+                        // Not dragging: snap immediately to avoid floating-point drift.
+                        this.yaw   = this.targetYaw;
+                        this.pitch = this.targetPitch;
+                    }
                     this.applyYawPitch();
                 } else if (this.animState && this.animState.mode === 'orbit') {
                     // Auto-orbit: OrbitControls rotates - track where it put us.
@@ -642,12 +671,20 @@ export default {
             if (!THREE || !this.camera) return;
             // Decompose the orientation in the scene-up aligned frame, so yaw/pitch are measured
             // about the (possibly calibrated) scene up rather than world Y.
-            const align = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 1, 0), this.sceneUp || new THREE.Vector3(0, 1, 0));
-            const local = align.invert().multiply(this.camera.quaternion);
-            const eu = new THREE.Euler().setFromQuaternion(local, 'YXZ');
-            this.yaw = eu.y;
+            // Fix 2: use preallocated temps to avoid per-call allocations.
+            const alignQ = this._t_alignQ || new THREE.Quaternion();
+            alignQ.setFromUnitVectors(
+                this._t_yAxis || new THREE.Vector3(0, 1, 0),
+                this.sceneUp  || this._t_yAxis || new THREE.Vector3(0, 1, 0));
+            const localQ = this._t_localQ || new THREE.Quaternion();
+            localQ.copy(alignQ).invert().multiply(this.camera.quaternion);
+            const eu = this._t_euler || new THREE.Euler();
+            eu.setFromQuaternion(localQ, 'YXZ');
+            this.yaw   = eu.y;
             this.pitch = eu.x;
+            // Fix 1: keep target in sync so the next drag starts from the right angle.
+            this.targetYaw   = this.yaw;
+            this.targetPitch = this.pitch;
         },
 
         // Apply the stored yaw/pitch to the camera quaternion and keep controls.target
@@ -659,11 +696,17 @@ export default {
             // Build the orientation in the scene-up aligned frame: yaw about scene-up, pitch about
             // the local right, roll locked to zero. This keeps the horizon level (no roll) even
             // when the scene-up is tilted by the ground-plane calibration.
-            const align = new THREE.Quaternion().setFromUnitVectors(
-                new THREE.Vector3(0, 1, 0), this.sceneUp || new THREE.Vector3(0, 1, 0));
-            const local = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
-            this.camera.quaternion.copy(align).multiply(local);
-            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
+            // Fix 2: use preallocated temps to avoid per-call allocations.
+            const alignQ = this._t_alignQ || new THREE.Quaternion();
+            alignQ.setFromUnitVectors(
+                this._t_yAxis || new THREE.Vector3(0, 1, 0),
+                this.sceneUp  || this._t_yAxis || new THREE.Vector3(0, 1, 0));
+            const localQ = this._t_localQ || new THREE.Quaternion();
+            const eu = this._t_euler || new THREE.Euler();
+            localQ.setFromEuler(eu.set(this.pitch, this.yaw, 0, 'YXZ'));
+            this.camera.quaternion.copy(alignQ).multiply(localQ);
+            const forward = this._t_fwd || new THREE.Vector3();
+            forward.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
             this.controls.target.copy(this.camera.position).addScaledVector(forward, this.lookDist);
         },
 
@@ -688,14 +731,23 @@ export default {
 
         onCanvasMouseMove: function (e) {
             if (!this.mouseDragging) return;
-            const dx = e.clientX - this.mouseDragX;
-            const dy = e.clientY - this.mouseDragY;
-            this.mouseDragX = e.clientX;
-            this.mouseDragY = e.clientY;
-            this.yaw -= dx * 0.003;
-            this.pitch -= dy * 0.003;
-            this.pitch = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, this.pitch));
-            this.applyYawPitch();
+            // Fix 3: consume all coalesced pointer samples in this delivery so sub-frame
+            // micro-movements are not discarded (helps frames that receive 2+ samples).
+            const events = (e.getCoalescedEvents ? e.getCoalescedEvents() : null);
+            const samples = (events && events.length) ? events : [e];
+            for (const ev of samples) {
+                const dx = ev.clientX - this.mouseDragX;
+                const dy = ev.clientY - this.mouseDragY;
+                this.mouseDragX = ev.clientX;
+                this.mouseDragY = ev.clientY;
+                // Fix 1: accumulate into TARGET; the render loop lerps yaw/pitch toward
+                // these every frame, eliminating the input-rate/refresh-rate beat.
+                this.targetYaw   -= dx * 0.003;
+                this.targetPitch -= dy * 0.003;
+            }
+            this.targetPitch = Math.max(-Math.PI * 0.48, Math.min(Math.PI * 0.48, this.targetPitch));
+            // Do NOT call applyYawPitch() here - the render loop applies it each frame
+            // (Fix 2: remove redundant per-event applyYawPitch call).
         },
 
         onCanvasMouseUp: function () {
@@ -731,14 +783,18 @@ export default {
                 // Top speed scales with scene size so it feels consistent across models.
                 const maxSpeed = this.boundsDiagonal * (fast ? 0.35 : 0.10);
 
-                const forward = new THREE.Vector3();
+                // Fix 2: use preallocated temps to avoid per-frame Vector3 allocations.
+                const forward = this._t_fwd || new THREE.Vector3();
                 camera.getWorldDirection(forward);
-                const worldUp = this.sceneUp ? this.sceneUp.clone() : new THREE.Vector3(0, 1, 0);
-                const right = new THREE.Vector3().crossVectors(forward, worldUp);
+                const worldUp = this._t_worldUp || new THREE.Vector3();
+                worldUp.copy(this.sceneUp || this._t_yAxis || new THREE.Vector3(0, 1, 0));
+                const right = this._t_right || new THREE.Vector3();
+                right.crossVectors(forward, worldUp);
                 if (right.lengthSq() < 1e-8) right.set(1, 0, 0); // looking straight up/down
                 right.normalize();
 
-                const targetVel = new THREE.Vector3();
+                const targetVel = this._t_targetVel || new THREE.Vector3();
+                targetVel.set(0, 0, 0);
                 if (hasForward) targetVel.add(forward);
                 if (hasBackward) targetVel.addScaledVector(forward, -1);
                 if (hasRight) targetVel.add(right);
