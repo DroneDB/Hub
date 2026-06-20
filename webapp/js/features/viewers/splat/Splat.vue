@@ -1108,6 +1108,7 @@ export default {
                 };
                 await this.dataset.writeObj(this.camerasPath, JSON.stringify(payload, null, 2));
                 this.camerasDirty = false;
+                this.$toast.add({ severity: 'success', summary: 'Camera views saved', life: 3000 });
             } catch (e) {
                 this.error = `Failed to save camera views: ${e.message}`;
             }
