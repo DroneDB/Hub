@@ -8,7 +8,7 @@ import { vi } from 'vitest';
 globalThis.__APP_PRODUCTION__ = true;
 
 // Mock __HUB_VERSION__ global
-globalThis.__HUB_VERSION__ = '2.5.1';
+globalThis.__HUB_VERSION__ = '2.5.2';
 
 // Mock window/localStorage for Node environment
 if (typeof window === 'undefined') {
