@@ -3,7 +3,7 @@
         <!-- Array at root level: render each item as a sub-table -->
         <div v-if="Array.isArray(tObj)" class="props-array-list">
             <div v-for="(item, index) in tObj" :key="index">
-                <PropsTable :obj="item" :depth="depth" :maxDepth="maxDepth" />
+                <PropsTable :obj="item" :depth="depth" :maxDepth="maxDepth" :copyableValues="copyableValues" />
             </div>
         </div>
 
@@ -24,9 +24,16 @@
                     <div v-else-if="data.key === 'dimensions' && Array.isArray(data.rawValue)">
                         {{ data.rawValue.join(', ') }}
                     </div>
-                    <div v-else-if="data.rawValue !== null && typeof data.rawValue === 'string'" class="wrap">
+                    <div v-else-if="data.rawValue !== null && typeof data.rawValue === 'string'" class="wrap copyable-row">
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
                         <template v-else>{{ data.rawValue }}</template>
+                        <Button v-if="copyableValues && copyableValues[data.key]"
+                            icon="fa-regular fa-copy"
+                            size="small"
+                            text
+                            class="copy-btn"
+                            title="Copy hash to clipboard"
+                            @click="copyValue(copyableValues[data.key])" />
                     </div>
                     <div v-else-if="typeof data.rawValue === 'number'">
                         {{ data.rawValue.toLocaleString() }}
@@ -42,7 +49,8 @@
                     <PropsTable v-else-if="data.rawValue !== null && data.rawValue !== undefined"
                         :obj="data.rawValue"
                         :depth="depth + 1"
-                        :maxDepth="maxDepth" />
+                        :maxDepth="maxDepth"
+                        :copyableValues="copyableValues" />
                     <span v-else>-</span>
                 </template>
             </Column>
@@ -70,7 +78,8 @@
                 :obj="drillDownData"
                 :depth="0"
                 :maxDepth="Infinity"
-                :preserveOrder="preserveOrder" />
+                :preserveOrder="preserveOrder"
+                :copyableValues="copyableValues" />
         </Dialog>
     </div>
 </template>
@@ -119,6 +128,10 @@ export default {
         maxDepth: {
             type: Number,
             default: 2
+        },
+        copyableValues: {
+            type: Object,
+            default: () => ({}),
         }
     },
     data() {
@@ -266,6 +279,21 @@ export default {
             this.drillDownTitle = title || 'Details';
             this.drillDownData = value;
             this.drillDownVisible = true;
+        },
+
+        // Copy a value to the clipboard and show a toast notification
+        async copyValue(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                this.$toast.add({
+                    severity: 'success',
+                    summary: 'Copied',
+                    detail: 'Hash copied to clipboard',
+                    life: 2000
+                });
+            } catch (e) {
+                console.error('Failed to copy to clipboard:', e);
+            }
         }
     }
 };
@@ -274,6 +302,19 @@ export default {
 <style scoped>
 .props-table-wrapper {
     width: 100%;
+}
+
+.copyable-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 8px;
+}
+
+.copy-btn {
+    flex-shrink: 0;
+    padding: 2px !important;
+    margin-left: 0.5rem !important;
 }
 
 .p-button-label {

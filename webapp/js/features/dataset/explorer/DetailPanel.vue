@@ -35,7 +35,7 @@
             <!-- Properties section -->
             <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
-                <PropsTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" />
+                <PropsTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" :copyableValues="copyableValues" />
             </div>
 
             <!-- Actions section -->
@@ -157,6 +157,10 @@ export default {
         allProperties() {
             if (!this.file) return null;
             return buildAllProperties(this.file);
+        },
+        copyableValues() {
+            if (!this.file || !this.file.entry || !this.file.entry.hash) return {};
+            return { size: this.file.entry.hash };
         }
     },
     watch: {

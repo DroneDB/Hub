@@ -115,9 +115,6 @@ export function buildAllProperties(file) {
     if (!isDirectory(entry) && entry.size) {
         props['size'] = getFileSizeDisplay(entry);
     }
-    if (entry.hash) {
-        props['hash'] = entry.hash;
-    }
     if (entry.mtime) {
         props['modified'] = formatModifiedDate(entry.mtime);
     }
