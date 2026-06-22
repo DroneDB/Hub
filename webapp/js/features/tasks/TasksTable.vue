@@ -1,15 +1,16 @@
 <template>
     <div class="tasks-table">
         <!-- Skeleton while first load is in flight -->
-        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" stripedRows>
-            <Column header="State" style="width: 6rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
+        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" stripedRows
+            :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
+            <Column header="State" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
             <Column header="Tool"><template #body><Skeleton width="80%" /></template></Column>
             <Column v-if="showDataset" header="Dataset"><template #body><Skeleton width="70%" /></template></Column>
             <Column v-if="showOwner" header="Owner"><template #body><Skeleton width="60%" /></template></Column>
             <Column header="Progress"><template #body><Skeleton width="90%" /></template></Column>
             <Column header="Created"><template #body><Skeleton width="70%" /></template></Column>
-            <Column header="Duration"><template #body><Skeleton width="60%" /></template></Column>
-            <Column header="Actions"><template #body><Skeleton width="90%" /></template></Column>
+            <Column header="Duration" style="width: 9rem;"><template #body><Skeleton width="60%" /></template></Column>
+            <Column header="Actions" style="width: 10rem;"><template #body><Skeleton width="90%" /></template></Column>
         </DataTable>
 
         <!-- Empty state -->
@@ -25,8 +26,8 @@
             scrollable scrollHeight="flex"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
             :rowsPerPageOptions="rowsPerPageOptions"
-            @page="onPage" :pt="{ table: { style: 'min-width: 50rem' } }">
-            <Column field="state" header="State" :sortable="!lazy" style="width: 7rem;">
+            @page="onPage" :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
+            <Column field="state" header="State" :sortable="!lazy" style="width: 5rem;">
                 <template #body="slotProps">
                     <Tag :severity="getTagSeverity(slotProps.data.state)"
                         :pt="{ root: { title: slotProps.data.state } }">
@@ -34,27 +35,27 @@
                     </Tag>
                 </template>
             </Column>
-            <Column field="toolId" header="Tool" :sortable="!lazy" style="width: 22%;">
+            <Column field="toolId" header="Tool" :sortable="!lazy">
                 <template #body="slotProps">
                     <div :title="slotProps.data.path || ''">
                         <strong>{{ toolTitle(slotProps.data.toolId, tools) }}</strong>
                         <span class="muted"> v{{ slotProps.data.version }}</span>
                         <br>
-                        <small class="path-details">{{ slotProps.data.path || 'Whole dataset' }}</small>
+                        <small class="path-details">{{ formatPath(slotProps.data.path) }}</small>
                     </div>
                 </template>
             </Column>
-            <Column v-if="showDataset" header="Dataset" style="width: 14%;">
+            <Column v-if="showDataset" header="Dataset">
                 <template #body="slotProps">
                     <span class="dataset-cell">{{ slotProps.data.orgSlug }}/{{ slotProps.data.dsSlug }}</span>
                 </template>
             </Column>
-            <Column v-if="showOwner" header="Owner" style="width: 10%;">
+            <Column v-if="showOwner" header="Owner">
                 <template #body="slotProps">
                     <span class="owner-cell">{{ slotProps.data.owner || slotProps.data.userId || 'System' }}</span>
                 </template>
             </Column>
-            <Column header="Progress" style="width: 18%;">
+            <Column header="Progress">
                 <template #body="slotProps">
                     <div v-if="isActive(slotProps.data.state)">
                         <ProgressBar :value="slotProps.data.progressPercent || 0" :showValue="true" style="height: 1rem;" />
@@ -66,7 +67,7 @@
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column field="createdAt" header="Created" :sortable="!lazy" style="width: 14%;">
+            <Column field="createdAt" header="Created" :sortable="!lazy">
                 <template #body="slotProps">
                     <div class="date-time">
                         <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
@@ -85,7 +86,7 @@
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column header="Actions" style="width: 14rem;">
+            <Column header="Actions" style="width: 10rem;">
                 <template #body="slotProps">
                     <div class="d-flex gap-1 flex-wrap">
                         <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log"
@@ -153,6 +154,21 @@ export default {
     },
 
     methods: {
+        /**
+         * Format a file path for display: truncate long paths with ... and insert
+         * zero-width spaces after slashes so line breaks only occur at "/" boundaries.
+         */
+        formatPath(path) {
+            if (!path) return 'Whole dataset';
+            const parts = path.split('/');
+            if (parts.length <= 4) {
+                return parts.join('/\u200B');
+            }
+            // Keep last 3 segments, truncate the rest with ...
+            const kept = parts.slice(-3);
+            return '.../' + kept.join('/\u200B');
+        },
+
         onPage(event) {
             // Only the admin (lazy) dashboard needs server-side paging.
             if (this.lazy) {
@@ -193,7 +209,6 @@ export default {
 
 .path-details {
     color: var(--ddb-text-muted, #888);
-    word-break: break-all;
 }
 
 .dataset-cell,

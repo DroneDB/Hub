@@ -363,11 +363,6 @@ export default {
     color: var(--ddb-danger, #d9534f);
 }
 
-.path-details {
-    color: var(--ddb-text-muted, #888);
-    word-break: break-all;
-}
-
 .duration {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
