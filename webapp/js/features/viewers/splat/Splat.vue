@@ -1145,12 +1145,16 @@ export default {
         },
 
         stopAnimation: function () {
+            const wasAnimating = this.animating;
             if (this.controls) this.controls.autoRotate = false;
             this.animating = false;
             this.animState = null;
             this.animMode = null;
-            // Resync yaw/pitch so FPS drag continues from the correct camera angle.
-            this.syncYawPitch();
+            // Resync yaw/pitch only when actually leaving an animation.
+            // While updateFly() calls stopAnimation() every frame during keyboard
+            // movement, we must NOT clobber the targetYaw/targetPitch accumulated
+            // by onCanvasMouseMove, or the mouse-drag rotation gets wiped out.
+            if (wasAnimating) this.syncYawPitch();
         },
 
         // Toggle a slow auto-orbit around the current look target (about the calibrated up).
