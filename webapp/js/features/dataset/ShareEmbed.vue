@@ -54,8 +54,12 @@
                             <strong>Not supported</strong> - This file does not support this type of sharing.
                         </PrimeMessage>
                         <template v-else>
-                            <Textarea v-if="shareMode === 'embed'" readonly :modelValue="legacyUrl"
-                                @click="copyToClipboard(legacyUrl)" class="share-textarea" />
+                            <div v-if="shareMode === 'embed'" class="share-embed-row">
+                                <Textarea readonly :modelValue="legacyUrl"
+                                    @click="copyToClipboard(legacyUrl)" class="share-textarea" />
+                                <Button @click="copyToClipboard(legacyUrl)" title="Copy to clipboard"
+                                    :icon="copyIcon" text />
+                            </div>
                             <UrlRow v-else :value="legacyUrl" @copy="copyToClipboard(legacyUrl)" :copyIcon="copyIcon" />
                         </template>
                     </template>
@@ -320,6 +324,7 @@ label { font-weight: bold; }
 .content { min-width: 26.25rem; }
 .auth-note { margin-top: 0.5rem; }
 .share-url-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }
+.share-embed-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }
 .share-textarea {
     width: 100%;
     min-height: 5rem;
