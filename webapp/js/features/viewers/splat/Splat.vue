@@ -623,7 +623,7 @@ export default {
             // the model, which reads as immersive rather than a distant dot in space.
             const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
             const fov = (camera.fov * Math.PI) / 180;
-            const dist = (radius / Math.sin(fov / 2)) * 0.6;
+            const dist = (radius / Math.sin(fov / 2)) * 0.4;
 
             // Keep near/far sensible for the (possibly large) local coordinate range. A small
             // near plane lets splats render even when the camera flies in among them.
