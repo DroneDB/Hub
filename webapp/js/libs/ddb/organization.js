@@ -44,6 +44,16 @@ module.exports = class Organization {
         return await this.registry.postRequest(`/orgs/${this.org}/import/verify`, { sourceType, params });
     }
 
+    // Browse the remote structure of an import source (organizations or datasets) without creating anything.
+    // browseType: 'organizations' | 'datasets'
+    async browseImport(sourceType, params, browseType) {
+        return await this.registry.postRequest(`/orgs/${this.org}/import/browse`, {
+            sourceType,
+            params,
+            browseType
+        });
+    }
+
     // Create an empty dataset and start importing the source into it. Returns { taskId, orgSlug, dsSlug, datasetUrl }.
     async createImport({ sourceType, params, slug, name, visibility }) {
         return await this.registry.postRequest(`/orgs/${this.org}/import`, {

@@ -10,14 +10,70 @@
                     <small v-if="selectedSource" class="text-muted">{{ selectedSource.description }}</small>
                 </div>
 
-                <div v-for="f in selectedSource ? selectedSource.fields : []" :key="f.name" class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">
-                        {{ f.label }}<span v-if="f.required" class="text-danger"> *</span>
-                    </label>
-                    <InputText v-model="params[f.name]" :type="f.type === 'password' ? 'password' : 'text'"
-                        :placeholder="f.placeholder" class="w-100" :disabled="verifying"
-                        @keyup.enter="canVerify && verify()" />
-                </div>
+                <!-- Registry source: enhanced UI with org/dataset browsing -->
+                <template v-if="sourceType === 'registry' && selectedSource">
+                    <div class="mb-3">
+                        <label class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
+                        <InputText v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
+                            :disabled="verifying" @input="onRemoteUrlChange" @keyup.enter="canVerify && verify()" />
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col">
+                            <label class="d-block mb-1 fw-semibold">Username</label>
+                            <InputText v-model="params.username" placeholder="optional" class="w-100"
+                                :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                        </div>
+                        <div class="col">
+                            <label class="d-block mb-1 fw-semibold">Password</label>
+                            <InputText v-model="params.password" type="password" placeholder="optional" class="w-100"
+                                :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="d-block mb-1 fw-semibold">Organization <span class="text-danger">*</span></label>
+                        <div class="d-flex gap-2">
+                            <Select v-if="remoteOrgs !== null" v-model="params.organization"
+                                :options="remoteOrgs" optionLabel="label" optionValue="value"
+                                placeholder="Select an organization" class="flex-grow-1"
+                                :disabled="verifying || browsingOrgs" @change="onRemoteOrgChange" />
+                            <InputText v-else v-model="params.organization" placeholder="organization slug"
+                                class="flex-grow-1" :disabled="verifying || browsingOrgs"
+                                @keyup.enter="canVerify && verify()" />
+                            <Button icon="fa-solid fa-list" severity="secondary" :loading="browsingOrgs"
+                                :disabled="!canBrowseOrgs || browsingOrgs" @click="browseOrgs"
+                                title="Browse organizations" />
+                        </div>
+                        <small v-if="browseOrgsError" class="text-danger">{{ browseOrgsError }}</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="d-block mb-1 fw-semibold">Dataset <span class="text-danger">*</span></label>
+                        <div class="d-flex gap-2">
+                            <Select v-if="remoteDatasets !== null" v-model="params.dataset"
+                                :options="remoteDatasets" optionLabel="label" optionValue="value"
+                                placeholder="Select a dataset" class="flex-grow-1"
+                                :disabled="verifying || browsingDatasets" />
+                            <InputText v-else v-model="params.dataset" placeholder="dataset slug"
+                                class="flex-grow-1" :disabled="verifying || browsingDatasets"
+                                @keyup.enter="canVerify && verify()" />
+                            <Button icon="fa-solid fa-list" severity="secondary" :loading="browsingDatasets"
+                                :disabled="!canBrowseDatasets || browsingDatasets" @click="browseDatasets"
+                                title="Browse datasets" />
+                        </div>
+                        <small v-if="browseDatasetsError" class="text-danger">{{ browseDatasetsError }}</small>
+                    </div>
+                </template>
+
+                <!-- Generic fields for all other source types -->
+                <template v-else>
+                    <div v-for="f in selectedSource ? selectedSource.fields : []" :key="f.name" class="mb-3">
+                        <label class="d-block mb-1 fw-semibold">
+                            {{ f.label }}<span v-if="f.required" class="text-danger"> *</span>
+                        </label>
+                        <InputText v-model="params[f.name]" :type="f.type === 'password' ? 'password' : 'text'"
+                            :placeholder="f.placeholder" class="w-100" :disabled="verifying"
+                            @keyup.enter="canVerify && verify()" />
+                    </div>
+                </template>
 
                 <div class="d-flex gap-2">
                     <Button label="Verify" icon="fa-solid fa-plug" severity="secondary"
@@ -141,6 +197,14 @@ export default {
             verifyResult: null,
             verifyError: null,
 
+            // Remote browse state (registry source only)
+            browsingOrgs: false,
+            browseOrgsError: null,
+            remoteOrgs: null,        // null = not yet browsed; [{label, value}] when loaded
+            browsingDatasets: false,
+            browseDatasetsError: null,
+            remoteDatasets: null,    // null = not yet browsed; [{label, value}] when loaded
+
             name: '',
             slug: '',
             slugEdited: false,
@@ -183,6 +247,12 @@ export default {
     computed: {
         selectedSource() {
             return getImportSource(this.sourceType);
+        },
+        canBrowseOrgs() {
+            return !!(this.params.url || '').trim();
+        },
+        canBrowseDatasets() {
+            return !!(this.params.url || '').trim() && !!(this.params.organization || '').trim();
         },
         canVerify() {
             if (!this.selectedSource) return false;
@@ -247,6 +317,75 @@ export default {
             this.verifyResult = null;
             this.verifyError = null;
             this.slugEdited = false;
+            this._resetBrowseState();
+        },
+
+        // Resets all browse-related state (called on source change and URL edits).
+        _resetBrowseState() {
+            this.remoteOrgs = null;
+            this.remoteDatasets = null;
+            this.browseOrgsError = null;
+            this.browseDatasetsError = null;
+        },
+
+        // Called when the URL field changes: invalidate any previously loaded org/dataset lists.
+        onRemoteUrlChange() {
+            this._resetBrowseState();
+            this.params.organization = '';
+            this.params.dataset = '';
+            this.verifyResult = null;
+        },
+
+        // Called when the user selects an org from the browse dropdown: reset dataset browse.
+        onRemoteOrgChange() {
+            this.remoteDatasets = null;
+            this.browseDatasetsError = null;
+            this.params.dataset = '';
+            this.verifyResult = null;
+        },
+
+        async browseOrgs() {
+            this.browsingOrgs = true;
+            this.browseOrgsError = null;
+            this.remoteOrgs = null;
+            this.remoteDatasets = null;
+            this.params.organization = '';
+            this.params.dataset = '';
+            this.verifyResult = null;
+            try {
+                const res = await this.org.browseImport(this.sourceType, this.params, 'organizations');
+                this.remoteOrgs = (res.items || []).map(o => ({
+                    label: o.name ? `${o.name} (${o.slug})` : o.slug,
+                    value: o.slug
+                }));
+                if (!this.remoteOrgs.length)
+                    this.browseOrgsError = 'No accessible organizations found.';
+            } catch (e) {
+                this.browseOrgsError = e.message || 'Failed to load organizations.';
+            } finally {
+                this.browsingOrgs = false;
+            }
+        },
+
+        async browseDatasets() {
+            this.browsingDatasets = true;
+            this.browseDatasetsError = null;
+            this.remoteDatasets = null;
+            this.params.dataset = '';
+            this.verifyResult = null;
+            try {
+                const res = await this.org.browseImport(this.sourceType, this.params, 'datasets');
+                this.remoteDatasets = (res.items || []).map(d => ({
+                    label: d.name ? `${d.name} (${d.slug})` : d.slug,
+                    value: d.slug
+                }));
+                if (!this.remoteDatasets.length)
+                    this.browseDatasetsError = 'No accessible datasets found in this organization.';
+            } catch (e) {
+                this.browseDatasetsError = e.message || 'Failed to load datasets.';
+            } finally {
+                this.browsingDatasets = false;
+            }
         },
 
         async verify() {
