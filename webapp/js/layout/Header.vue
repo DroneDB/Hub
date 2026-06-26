@@ -18,9 +18,10 @@
             <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
                 :title="downloadTitle" :disabled="isDownloading || downloadBlocked || activeBulkDownload">
                 <i class="fa-solid fa-download"></i>
-                <span v-if="selectedFiles.length > 0" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
+                <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
-            <Button v-if="showShare" @click="handleShare" severity="secondary" size="small" text title="Share">
+            <Button v-if="showShare && (selectedFiles.length === 1 || !params.encodedPath)" @click="handleShare" severity="secondary" size="small" text
+                :title="shareTitle">
                 <i class="fa-solid fa-share-nodes"></i>
             </Button>
             <Button v-if="showSettings" @click="handleSettings" severity="secondary" size="small" text title="Settings">
@@ -83,6 +84,8 @@
             </Button>
             <Menu ref="userMenu" id="user_menu" :model="userMenuItems" :popup="true" />
         </div>
+
+        <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
     </div>
 </template>
 
@@ -92,6 +95,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Alert from '@/components/Alert';
 import ConfirmDialog from '@/components/ConfirmDialog';
+import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { xAuthLogout } from '@/libs/api/xauth';
 import { isMobile } from '@/libs/responsive';
 import { bytesToSize } from '@/libs/utils';
@@ -106,6 +110,7 @@ export default {
     components: {
         Alert,
         ConfirmDialog,
+        ShareEmbed,
         Button,
         Menu,
         ProgressBar,
@@ -122,7 +127,7 @@ export default {
             isAdmin: reg.isAdmin(),
             params: this.$route.params,
             showDownload: !!this.$route.params.ds,
-            showShare: !!this.$route.params.ds && !this.$route.params.encodedPath,
+            showShare: !!this.$route.params.ds,
             showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
             showBackToOrg: false,
             orgInfoCache: {},
@@ -133,7 +138,8 @@ export default {
             storageInfo: null,
             storageInfoDialogOpen: false,
             usersManagement: false,
-            accountManagement: false
+            accountManagement: false,
+            shareFile: null
         }
     },
 
@@ -248,8 +254,13 @@ export default {
         downloadTitle: function () {
             if (this.activeBulkDownload) return 'A download archive is being prepared. Please wait for it to complete.';
             if (this.downloadBlocked) return 'Login required to download multiple files or the entire dataset';
+            if (this.selectedFiles.length === 1) return `Download ${ddb.pathutils.basename(this.selectedFiles[0].path)}`;
             if (this.selectedFiles.length > 0) return `Download ${this.selectedFiles.length} file${this.selectedFiles.length !== 1 ? 's' : ''}`;
             return 'Download';
+        },
+        shareTitle: function () {
+            if (this.selectedFiles.length === 1) return `Share ${ddb.pathutils.basename(this.selectedFiles[0].path)}`;
+            return 'Share';
         },
         userMenuItems: function () {
             const items = [];
@@ -325,7 +336,7 @@ export default {
             const { params } = to;
 
             this.showDownload = !!params.ds;
-            this.showShare = !!this.$route.params.ds && !this.$route.params.encodedPath;
+            this.showShare = !!params.ds;
             this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
             this.params = params;
@@ -493,7 +504,19 @@ export default {
         },
 
         handleShare: function () {
-            emitter.emit("openShareDataset");
+            if (this.selectedFiles.length === 1) {
+                this.shareFile = this.selectedFiles[0];
+            } else {
+                this.shareFile = {
+                    path: `${window.location.protocol}//${window.location.host}/r/${this.params.org}/${this.params.ds}`,
+                    entry: null,
+                    scope: 'dataset'
+                };
+            }
+        },
+
+        handleCloseShareEmbed: function () {
+            this.shareFile = null;
         },
 
         onRegLogin: async function (username) {

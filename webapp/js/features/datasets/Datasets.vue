@@ -66,6 +66,7 @@
                     <div class="org-actions">
                         <div class="d-flex align-items-center gap-2">
                             <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" />
+                            <Button v-if="canCreateDataset" @click.stop="openImportDialog()" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" />
                             <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" />
                         </div>
                         <IconField class="mt-2">
@@ -155,6 +156,9 @@
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs"
             @onClose="handleDatasetClose"></DatasetDialog>
 
+        <ImportDatasetDialog v-if="importDialogOpen" :orgSlug="$route.params.org" :forbiddenSlugs="forbiddenSlugs"
+            @onClose="handleImportClose"></ImportDatasetDialog>
+
         <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel"
             @onClose="handleOrgDialogClose"></OrganizationDialog>
         <OrganizationMembersDialog v-if="membersDialogOpen"
@@ -173,6 +177,7 @@ import { renameDataset, datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences } from '@/libs/storageUtils';
 import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
 import DatasetDialog from './DatasetDialog.vue';
+import ImportDatasetDialog from './ImportDatasetDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import OrganizationDialog from '@/features/organizations/OrganizationDialog.vue';
 import OrganizationMembersDialog from '@/features/organizations/OrganizationMembersDialog.vue';
@@ -200,6 +205,7 @@ export default {
         DeleteDatasetDialog,
         MessageDialog,
         DatasetDialog,
+        ImportDatasetDialog,
         OrganizationDialog,
         OrganizationMembersDialog,
         Button,
@@ -235,6 +241,8 @@ export default {
             dsDialogModel: null,
             dsDialogMode: null,
             dsDialogOpen: false,
+
+            importDialogOpen: false,
 
             orgEditDialogOpen: false,
             orgDialogModel: null,
@@ -571,7 +579,65 @@ export default {
 
         handleNew() {
             this.newDataset();
-        }, async handleDatasetClose(res, newds) {
+        },
+
+        openImportDialog() {
+            this.importDialogOpen = true;
+        },
+
+        // Adds a placeholder row so the importing dataset shows up immediately in the list.
+        addImportingEntry(payload) {
+            if (this.datasets.some(ds => ds.slug === payload.slug)) return;
+            this.datasets.unshift({
+                slug: payload.slug,
+                creationDate: Date.now(),
+                visibility: payload.visibility,
+                entries: 0,
+                size: 0,
+                editing: false,
+                deleting: false,
+                name: payload.name,
+                tagline: '',
+                permissions: { canRead: true, canWrite: true, canDelete: true },
+                thumbError: false,
+                thumbLoaded: false,
+                thumbUrl: '/images/dataset-placeholder.svg',
+                loading: true,
+                isTemporary: true
+            });
+        },
+
+        handleImportClose(action, payload) {
+            const slug = payload && payload.slug;
+
+            if (action === 'started') {
+                // Keep the dialog open and show the new dataset as importing.
+                this.addImportingEntry(payload);
+                return;
+            }
+
+            this.importDialogOpen = false;
+
+            if (action === 'done') {
+                const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === slug);
+                if (payload.success) {
+                    if (index !== -1) {
+                        this.datasets[index] = { ...this.datasets[index], loading: false, isTemporary: false };
+                        this.preloadDatasetThumbnail(this.datasets[index]);
+                    }
+                    this.$toast.add({ severity: 'success', summary: 'Import complete', detail: `Dataset "${slug}" imported successfully`, life: 4000 });
+                } else {
+                    if (index !== -1) {
+                        this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === slug));
+                    }
+                    this.$toast.add({ severity: 'error', summary: 'Import failed', detail: (payload && payload.error) || `Import of "${slug}" failed`, life: 6000 });
+                }
+            } else if (action === 'background') {
+                this.$toast.add({ severity: 'info', summary: 'Import running', detail: `Import of "${slug}" continues in the background`, life: 4000 });
+            }
+        },
+
+        async handleDatasetClose(res, newds) {
             this.dsDialogOpen = false;
 
             if (res == "close") {

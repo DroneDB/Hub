@@ -34,4 +34,21 @@ module.exports = class Organization {
         return await this.registry.postFormData(`/orgs/${this.org}/ds`, formData);
     }
 
+    // Import sources enabled on this server (registered AND allow-listed).
+    async importSources() {
+        return await this.registry.getRequest(`/orgs/${this.org}/import/sources`);
+    }
+
+    // Probe an import source (reachability, estimated size, suggested name/slug) without creating anything.
+    async verifyImport(sourceType, params) {
+        return await this.registry.postRequest(`/orgs/${this.org}/import/verify`, { sourceType, params });
+    }
+
+    // Create an empty dataset and start importing the source into it. Returns { taskId, orgSlug, dsSlug, datasetUrl }.
+    async createImport({ sourceType, params, slug, name, visibility }) {
+        return await this.registry.postRequest(`/orgs/${this.org}/import`, {
+            sourceType, params, slug, name, visibility
+        });
+    }
+
 };
