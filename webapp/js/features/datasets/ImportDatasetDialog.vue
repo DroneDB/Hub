@@ -354,10 +354,12 @@ export default {
             this.verifyResult = null;
             try {
                 const res = await this.org.browseImport(this.sourceType, this.params, 'organizations');
-                this.remoteOrgs = (res.items || []).map(o => ({
-                    label: o.name ? `${o.name} (${o.slug})` : o.slug,
-                    value: o.slug
-                }));
+                this.remoteOrgs = (res.items || [])
+                    .map(o => ({
+                        label: o.name ? `${o.name} (${o.slug})` : o.slug,
+                        value: o.slug
+                    }))
+                    .sort((a, b) => a.label.localeCompare(b.label));
                 if (!this.remoteOrgs.length)
                     this.browseOrgsError = 'No accessible organizations found.';
             } catch (e) {
@@ -375,10 +377,12 @@ export default {
             this.verifyResult = null;
             try {
                 const res = await this.org.browseImport(this.sourceType, this.params, 'datasets');
-                this.remoteDatasets = (res.items || []).map(d => ({
-                    label: d.name ? `${d.name} (${d.slug})` : d.slug,
-                    value: d.slug
-                }));
+                this.remoteDatasets = (res.items || [])
+                    .map(d => ({
+                        label: d.name ? `${d.name} (${d.slug})` : d.slug,
+                        value: d.slug
+                    }))
+                    .sort((a, b) => a.label.localeCompare(b.label));
                 if (!this.remoteDatasets.length)
                     this.browseDatasetsError = 'No accessible datasets found in this organization.';
             } catch (e) {
