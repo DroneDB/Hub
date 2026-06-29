@@ -15,12 +15,12 @@
                 title="Back to organization">
                 <i class="fa-solid fa-sitemap"></i>
             </Button>
-            <Button v-if="showDownload" @click="handleDownload" severity="secondary" size="small" text
+            <Button v-if="showDownload && onFilesTab" @click="handleDownload" severity="secondary" size="small" text
                 :title="downloadTitle" :disabled="isDownloading || downloadBlocked || activeBulkDownload">
                 <i class="fa-solid fa-download"></i>
                 <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
-            <Button v-if="showShare && (selectedFiles.length === 1 || !params.encodedPath)" @click="handleShare" severity="secondary" size="small" text
+            <Button v-if="showShare && onFilesTab && selectedFiles.length === 1" @click="handleShare" severity="secondary" size="small" text
                 :title="shareTitle">
                 <i class="fa-solid fa-share-nodes"></i>
             </Button>
@@ -134,6 +134,7 @@ export default {
             selectedFiles: [],
             isDownloading: false,
             activeBulkDownload: false,
+            activeTab: null,
             downloadConfirmOpen: false,
             storageInfo: null,
             storageInfoDialogOpen: false,
@@ -262,6 +263,12 @@ export default {
             if (this.selectedFiles.length === 1) return `Share ${ddb.pathutils.basename(this.selectedFiles[0].path)}`;
             return 'Share';
         },
+        // Download/Share toolbar actions are only meaningful on the file-listing
+        // tabs (Files explorer, or the mobile FileBrowser). They are hidden on
+        // Map/Tasks/Properties to avoid acting on a stale selection.
+        onFilesTab: function () {
+            return this.activeTab === 'explorer' || this.activeTab === 'filebrowser';
+        },
         userMenuItems: function () {
             const items = [];
 
@@ -296,6 +303,7 @@ export default {
             }
             if (this.isAdmin) {
                 items.push({ label: 'Tasks', icon: 'fa-solid fa-list-check fixed-icon', command: () => this.adminTasks() });
+                items.push({ label: 'Configuration', icon: 'fa-solid fa-gear fixed-icon', command: () => this.adminConfig() });
             }
 
             items.push({ separator: true });
@@ -327,6 +335,11 @@ export default {
         };
         emitter.on('setActiveBulkDownload', this._onSetActiveBulkDownload);
 
+        this._onSetActiveTab = (key) => {
+            this.activeTab = key;
+        };
+        emitter.on('setActiveTab', this._onSetActiveTab);
+
         this.refreshStorageInfo();
         this.checkUserManagement();
         this.updateBackToOrgVisibility();
@@ -338,6 +351,9 @@ export default {
             this.showDownload = !!params.ds;
             this.showShare = !!params.ds;
             this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
+
+            // Reset tab gating; ViewDataset re-broadcasts the active tab on mount.
+            if (!params.ds) this.activeTab = null;
 
             this.params = params;
             this.updateBackToOrgVisibility();
@@ -351,6 +367,7 @@ export default {
         emitter.off('deleteEntries', this._onDeleteEntries);
         emitter.off('setSelectedFiles', this._onSetSelectedFiles);
         emitter.off('setActiveBulkDownload', this._onSetActiveBulkDownload);
+        emitter.off('setActiveTab', this._onSetActiveTab);
     },
     methods: {
         handleStorageInfoDialogClose: function () {
@@ -406,6 +423,9 @@ export default {
         },
         adminTasks: function () {
             this.$router.push({ name: "AdminTasks" });
+        },
+        adminConfig: function () {
+            this.$router.push({ name: "AdminConfig" });
         },
         manageAccount: function () {
             this.$router.push({ name: "Account" });
@@ -479,19 +499,17 @@ export default {
                 const params = {};
                 if (paths && paths.length) params.paths = paths;
 
+                // Inform the user upfront: ZIP creation runs as a background task.
+                this.$toast.add({
+                    severity: 'info', summary: 'Preparing archive',
+                    detail: 'Archive creation started. Open the Tasks tab to download it when ready.',
+                    life: 6000
+                });
+
                 const result = await this.runHeavyTask(dataset, 'bulk-download', { params, notify: false });
 
-                // Fetch the produced archive with auth, then trigger a native download.
-                const url = dataset.taskResultUrl(result.taskId);
-                const blob = await reg.makeRequest(url, 'GET', null, null, 'blob');
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = `${this.params.ds}.zip`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
+                // Trigger the browser download via the authenticated result URL.
+                window.location.href = dataset.taskResultUrl(result.taskId);
             } catch (err) {
                 alert((err && err.message) || err);
             } finally {
