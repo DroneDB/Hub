@@ -22,7 +22,7 @@
             </template>
             <template #second>
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
-                ref="mainTabSwitcher">
+                ref="mainTabSwitcher" @tabChange="handleMainTabChange">
                 <template v-if="isMobile" v-slot:filebrowser>
                     <FileBrowser :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
                         @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
@@ -1098,21 +1098,26 @@ export default {
                 const params = {};
                 if (paths && paths.length) params.paths = paths;
 
+                // Inform the user upfront: ZIP creation runs as a background task.
+                this.$toast.add({
+                    severity: 'info', summary: 'Preparing archive',
+                    detail: 'Archive creation started. Open the Tasks tab to download it when ready.',
+                    life: 6000
+                });
+
                 const result = await this.runHeavyTask(this.dataset, 'bulk-download', { params, notify: false });
 
-                const url = this.dataset.taskResultUrl(result.taskId);
-                const blob = await this.dataset.registry.makeRequest(url, 'GET', null, null, 'blob');
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = `${this.dataset.ds}.zip`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
+                // Trigger the browser download via the authenticated result URL.
+                window.location.href = this.dataset.taskResultUrl(result.taskId);
             } catch (e) {
                 this.showError(e.message || e, "Download Error");
             }
+        },
+
+        // Relay the active main tab to the global toolbar (Header) so it can gate
+        // the Download/Share actions to the Files tab only.
+        handleMainTabChange: function (key) {
+            if (!this.$embed) emitter.emit('setActiveTab', key);
         },
 
         updateExplorerTools: function() {

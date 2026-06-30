@@ -198,24 +198,9 @@ export default {
         },
 
         async downloadResult(task) {
-            if (this.downloadingTaskId) return; // guard against repeated clicks
-            this.downloadingTaskId = task.taskId;
-            try {
-                const url = this.datasetFor(task).taskResultUrl(task.taskId);
-                const blob = await reg.makeRequest(url, 'GET', null, null, 'blob');
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = this.resultFileName(task);
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
-            } catch (e) {
-                this._toast('error', 'Download failed', e.message);
-            } finally {
-                this.downloadingTaskId = null;
-            }
+            // Navigate to the authenticated result URL (cookie auth); the server
+            // sends Content-Disposition: attachment so the browser downloads it.
+            window.location.href = this.datasetFor(task).taskResultUrl(task.taskId);
         },
 
         async openLog(task) {

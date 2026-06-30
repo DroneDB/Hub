@@ -72,6 +72,7 @@ export default {
             default: null
         }
     },
+    emits: ['tabChange'],
     provide() {
         return {
             registerTabChild: this.registerTabChild,
@@ -95,6 +96,8 @@ export default {
             const node = this.getNodeFor(this.activeTab);
             if (node && node.onTabActivated) node.onTabActivated();
         });
+        // Broadcast the initial tab so parents start in a consistent state
+        this.$emit('tabChange', this.activeTab);
     },
     methods: {
         registerTabChild(key, component) {
@@ -139,6 +142,9 @@ export default {
 
                 this.lastTabIndex = this.getActiveTabIndex();
                 this.activeTab = tab.key;
+
+                // Notify parent of the active tab change (e.g. to gate toolbar actions)
+                this.$emit('tabChange', tab.key);
 
                 // The Vue node is not available
                 // until the next tick

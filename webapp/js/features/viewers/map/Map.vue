@@ -100,6 +100,37 @@
                 </button>
             </div>
         </div>
+        <div ref="videoPopup" class="image-popup" v-show="videoPopupVisible">
+            <div class="image-popup-header">
+                <span class="image-popup-title">{{ videoPopupFileName }}</span>
+                <div class="image-popup-actions">
+                    <a :href="videoPopupDownloadUrl" download class="image-popup-btn" title="Download">
+                        <i style="margin: 0; height: auto" class="fa-solid fa-download"></i>
+                    </a>
+                    <button class="image-popup-btn" @click="openVideoFromPopup" title="Play video">
+                        <i style="margin: 0; height: auto" class="fa-solid fa-play"></i>
+                    </button>
+                    <button class="image-popup-btn image-popup-close" @click="closeVideoPopup" title="Close">
+                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="image-popup-body image-popup-video-info">
+                <i class="fa-solid fa-film video-popup-icon"></i>
+                <div class="video-popup-details">
+                    <div v-if="videoPopupResolution" class="video-popup-row">{{ videoPopupResolution }}</div>
+                    <div v-if="videoPopupDate" class="video-popup-row">{{ videoPopupDate }}</div>
+                </div>
+            </div>
+            <div class="image-popup-footer" v-if="videoPopupCoords">
+                <span class="image-popup-coords" :title="videoPopupCoords">{{ videoPopupCoords }}</span>
+                <button class="image-popup-btn image-popup-copy" @click="copyVideoCoordinates"
+                    :title="videoPopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
+                    <i style="margin: 0"
+                        :class="videoPopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -244,6 +275,17 @@ export default {
             imagePopupCoords: '',
             imagePopupCoordsCopied: false,
             imagePopupOverlay: null,
+
+            // Video popup
+            videoPopupVisible: false,
+            videoPopupFileName: '',
+            videoPopupResolution: '',
+            videoPopupDate: '',
+            videoPopupDownloadUrl: '',
+            videoPopupCoords: '',
+            videoPopupCoordsCopied: false,
+            videoPopupOverlay: null,
+            videoPopupFile: null,
             rasterOpacity: 1.0,
             hasRasters: false,
             rasterLayerList: [],
@@ -287,6 +329,12 @@ export default {
         if (this.imagePopupOverlay && this.map) {
             this.map.removeOverlay(this.imagePopupOverlay);
             this.imagePopupOverlay = null;
+        }
+
+        // Clean up video popup overlay
+        if (this.videoPopupOverlay && this.map) {
+            this.map.removeOverlay(this.videoPopupOverlay);
+            this.videoPopupOverlay = null;
         }
 
         // Clean up vector layers
@@ -453,6 +501,95 @@ export default {
                 document.body.removeChild(ta);
                 this.imagePopupCoordsCopied = true;
                 setTimeout(() => { this.imagePopupCoordsCopied = false; }, 2000);
+            });
+        },
+
+        // Show video info popup overlay on the map
+        showVideoPopup: function (file, coordinate) {
+            const pathUtils = ddb.pathutils || ddb.utils;
+            this.videoPopupFileName = pathUtils.basename ? pathUtils.basename(file.entry.path) : file.entry.path.split('/').pop();
+            this.videoPopupFile = file;
+
+            // Resolution
+            const w = file.entry.properties && file.entry.properties.width;
+            const h = file.entry.properties && file.entry.properties.height;
+            this.videoPopupResolution = (w && h) ? `${w} x ${h}` : '';
+
+            // Capture date
+            const ct = file.entry.properties && file.entry.properties.captureTime;
+            this.videoPopupDate = ct ? new Date(ct).toLocaleString() : '';
+
+            // Download URL
+            const [dataset, path] = ddb.utils.datasetPathFromUri(file.path);
+            this.videoPopupDownloadUrl = dataset.downloadUrl(path);
+
+            // Coordinates
+            if (file.entry.point_geom) {
+                const coords = coordAll(file.entry.point_geom)[0];
+                if (coords && coords.length >= 2) {
+                    const lon = coords[0].toFixed(6);
+                    const lat = coords[1].toFixed(6);
+                    this.videoPopupCoords = `${lat}, ${lon}`;
+                } else {
+                    this.videoPopupCoords = '';
+                }
+            } else {
+                this.videoPopupCoords = '';
+            }
+            this.videoPopupCoordsCopied = false;
+
+            this.videoPopupVisible = true;
+
+            this.$nextTick(() => {
+                if (!this.videoPopupOverlay) {
+                    this.videoPopupOverlay = new Overlay({
+                        element: this.$refs.videoPopup,
+                        autoPan: true,
+                        autoPanAnimation: { duration: 250 },
+                        offset: [150, -150],
+                        positioning: 'bottom-left'
+                    });
+                    this.map.addOverlay(this.videoPopupOverlay);
+                }
+                this.videoPopupOverlay.setPosition(coordinate);
+            });
+        },
+
+        // Close video popup
+        closeVideoPopup: function () {
+            this.videoPopupVisible = false;
+            this.videoPopupFile = null;
+            this.videoPopupCoordsCopied = false;
+            if (this.videoPopupOverlay) {
+                this.videoPopupOverlay.setPosition(undefined);
+            }
+        },
+
+        // Play button inside video popup
+        openVideoFromPopup: function () {
+            if (this.videoPopupFile) {
+                this.$emit('openItem', this.videoPopupFile);
+                this.closeVideoPopup();
+            }
+        },
+
+        // Copy coordinates from video popup
+        copyVideoCoordinates: function () {
+            if (!this.videoPopupCoords) return;
+            navigator.clipboard.writeText(this.videoPopupCoords).then(() => {
+                this.videoPopupCoordsCopied = true;
+                setTimeout(() => { this.videoPopupCoordsCopied = false; }, 2000);
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = this.videoPopupCoords;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                this.videoPopupCoordsCopied = true;
+                setTimeout(() => { this.videoPopupCoordsCopied = false; }, 2000);
             });
         },
 
@@ -1104,6 +1241,9 @@ export default {
                     // Close any open image popup
                     this.closeImagePopup();
 
+                    // Close any open video popup
+                    this.closeVideoPopup();
+
                     // Clear any previously displayed raster footprints
                     this.clearLayerGroup(this.footprintRastersLayer);
 
@@ -1130,6 +1270,12 @@ export default {
                         // Clicked on geoimage - show image popup
                         if (file.entry.type === ddb.entry.type.GEOIMAGE) {
                             this.showImagePopup(file, e.coordinate);
+                        }
+
+                        // Clicked on geovideo - show video info popup
+                        if (file.entry.type === ddb.entry.type.GEOVIDEO) {
+                            this.showVideoPopup(file, e.coordinate);
+                            return;
                         }
 
                         // Without a footprint geometry there is nothing left to draw
@@ -1173,6 +1319,31 @@ export default {
                 e.stopPropagation();
                 e.preventDefault();
                 return false;
+            }));
+
+            // Double click on geovideo marker - open video player directly
+            this._olListenerKeys.push(this.map.on('dblclick', e => {
+                if (this.measuring) return;
+                if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
+
+                let handled = false;
+                this.map.forEachFeatureAtPixel(e.pixel, feat => {
+                    if (handled) return;
+                    if (!feat.get('features')) return;
+
+                    const file = feat.get('features')[0].file;
+                    if (file && file.entry.type === ddb.entry.type.GEOVIDEO) {
+                        handled = true;
+                        this.closeVideoPopup();
+                        this.$emit('openItem', file);
+                    }
+                }, {
+                    layerFilter: layer => layer.getVisible() && layer === this.fileLayer
+                });
+
+                if (handled) {
+                    e.preventDefault();
+                }
             }));
 
             this._addItemsHandler = () => {
@@ -1321,6 +1492,14 @@ export default {
                     features.push(feat);
 
                     if (f.entry.type === ddb.entry.type.GEOIMAGE) {
+                        if (f.entry.properties.captureTime) {
+                            flightPath.push({
+                                point,
+                                captureTime: f.entry.properties.captureTime,
+                                feature: feat
+                            });
+                        }
+                    } else if (f.entry.type === ddb.entry.type.GEOVIDEO) {
                         if (f.entry.properties.captureTime) {
                             flightPath.push({
                                 point,
@@ -2176,5 +2355,27 @@ export default {
 
 .image-popup-copy .icon.check {
     color: var(--ddb-success);
+}
+
+.image-popup-video-info {
+    gap: var(--ddb-spacing-sm);
+    min-height: 4rem;
+}
+
+.video-popup-icon {
+    font-size: 1.75rem;
+    color: var(--ddb-text-muted);
+    flex-shrink: 0;
+}
+
+.video-popup-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.video-popup-row {
+    font-size: var(--ddb-font-size-sm);
+    color: var(--ddb-text-secondary);
 }
 </style>
