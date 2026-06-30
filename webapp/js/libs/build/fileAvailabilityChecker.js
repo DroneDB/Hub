@@ -14,7 +14,13 @@ const VIEW_OUTPUT_FILES = {
     'map-pointcloud': 'copc/cloud.copc.laz',
     'map-georaster': 'cog/cog.tif',
     'map-vector': 'vec/vector.fgb',
+    // Models prefer the OGC 3D Tiles artifact (3dtiles/tileset.json) but accept the legacy
+    // Nexus output (nxs/model.nxz) too, so datasets built before 3D Tiles support keep
+    // working (any-of match). The model viewer picks the right renderer per availability.
     'model': 'nxs/model.nxz',
+    // The UnifiedViewer (georeferenced Giro3D scene) needs the 3D Tiles output specifically,
+    // since it cannot render the legacy Nexus mesh.
+    'unified-model': '3dtiles/tileset.json',
     // Splats prefer the LOD artifact (model.rad) but accept the legacy plain .spz too,
     // so datasets built before the .rad-only switch keep working (any-of match).
     'splat': ['gsplat/model.rad', 'gsplat/model.spz'],
@@ -244,6 +250,17 @@ class FileAvailabilityChecker {
                 key = 'map-georaster';
             } else if (entryType === ddb.entry.type.VECTOR) {
                 key = 'map-vector';
+            }
+        } else if (viewType === 'unified') {
+            // The UnifiedViewer renders each type from its build artifact.
+            if (entryType === ddb.entry.type.POINTCLOUD) {
+                key = 'map-pointcloud';
+            } else if (entryType === ddb.entry.type.GEORASTER) {
+                key = 'map-georaster';
+            } else if (entryType === ddb.entry.type.VECTOR) {
+                key = 'map-vector';
+            } else if (entryType === ddb.entry.type.MODEL) {
+                key = 'unified-model';
             }
         }
 

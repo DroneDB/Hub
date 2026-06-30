@@ -17,7 +17,7 @@
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
                     @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                    @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                    @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
             </div>
             </template>
             <template #second>
@@ -36,7 +36,7 @@
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
                         @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                        @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                        @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                 </template>
                 <template v-slot:map>
                     <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
@@ -54,7 +54,7 @@
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -78,7 +78,7 @@
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
                                 @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -273,6 +273,7 @@ import { renameDataset, entryLabel } from '@/libs/api/registryUtils';
 import { b64encode } from '@/libs/base64';
 import BuildManager from '@/libs/build/buildManager';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
+import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { shouldOpenAsText, canOpenAsText, isPdfFile } from '@/libs/textFileUtils';
 
 import ddb from 'ddb';
@@ -1075,6 +1076,35 @@ export default {
                     this.showError(e.message || e, "Download Error");
                 }
             }
+        },
+
+        /**
+         * Handles the downloadBuildArtifact event from context menu.
+         * Double-checks build status (async) then opens the direct download URL.
+         */
+        handleDownloadBuildArtifact: async function (file) {
+            if (!file || !file.entry) return;
+
+            // Async double-check: isFileBuilt does a HEAD request if cache is stale
+            const built = await isFileBuilt(this.dataset, file);
+            if (!built) {
+                this.$toast.add({
+                    severity: 'warn',
+                    summary: 'Not available',
+                    detail: 'This file has not been built yet. Run Build first.',
+                    life: 4000
+                });
+                return;
+            }
+
+            // Open direct download URL — use <a>.click() to avoid popup blockers
+            const url = `${this.dataset.baseApi}/build-artifact?path=${encodeURIComponent(file.entry.path)}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         },
 
         // Total selection size vs the async threshold. Unknown sizes (e.g. folders)

@@ -36,6 +36,19 @@ class Entry {
         else throw new Error(`Il modello 3D non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
     }
 
+    /**
+     * Returns the URL of the OGC 3D Tiles root tileset (3dtiles/tileset.json) when present,
+     * or null otherwise. 3D Tiles are produced for MODEL entries alongside the legacy Nexus
+     * output (dual output), so this artifact is optional: datasets built before 3D Tiles
+     * support (or with Obj2Tiles unavailable) only have nxs/model.nxz. Callers must tolerate
+     * a null result and fall back to getNxz().
+     */
+    async get3DTiles() {
+        const tilesetUrl = this.buildUrl("3dtiles/tileset.json");
+        if (await this.dataset.registry.headRequest(tilesetUrl)) return tilesetUrl;
+        return null;
+    }
+
     async getGsplat() {
         const spzUrl = this.buildUrl("gsplat/model.spz");
         if (await this.dataset.registry.headRequest(spzUrl)) return spzUrl;
