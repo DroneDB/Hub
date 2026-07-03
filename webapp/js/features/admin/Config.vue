@@ -349,6 +349,16 @@ export default {
                             value = Array.isArray(rawValue) ? rawValue :
                                 (typeof rawValue === 'string' ? rawValue.split(',').map(s => s.trim()).filter(Boolean) : []);
                             break;
+                        case 'json':
+                            // Parse the JSON text into an object so it serializes as structured JSON.
+                            try {
+                                value = typeof rawValue === 'string' && rawValue.trim()
+                                    ? JSON.parse(rawValue)
+                                    : null;
+                            } catch {
+                                value = rawValue; // keep raw (invalid) text visible for the admin to fix
+                            }
+                            break;
                         case 'timespan':
                             value = rawValue || null;
                             break;

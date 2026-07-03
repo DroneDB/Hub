@@ -146,7 +146,7 @@ export default {
             const [
                 THREE, controls, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
                 TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
-                XYZ, OSM, olStyle, olProj
+                XYZ, OSM, olStyle, olProj, Globe, GlobeControls, ColorMap, ColorMapMode
             ] = await Promise.all([
                 import(/* webpackChunkName: "giro3d" */ 'three'),
                 import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/MapControls.js'),
@@ -164,7 +164,11 @@ export default {
                 import(/* webpackChunkName: "giro3d" */ 'ol/source/XYZ.js'),
                 import(/* webpackChunkName: "giro3d" */ 'ol/source/OSM.js'),
                 import(/* webpackChunkName: "giro3d" */ 'ol/style.js'),
-                import(/* webpackChunkName: "giro3d" */ 'ol/proj.js')
+                import(/* webpackChunkName: "giro3d" */ 'ol/proj.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/controls/GlobeControls.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMap.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMapMode.js')
             ]);
             return {
                 THREE,
@@ -183,15 +187,23 @@ export default {
                 XYZ: XYZ.default,
                 OSM: OSM.default,
                 olStyle,
-                olProj
+                olProj,
+                Globe: Globe.default,
+                GlobeControls: GlobeControls.default,
+                ColorMap: ColorMap.default,
+                ColorMapMode: ColorMapMode.default
             };
         },
 
         // --- Scene setup -----------------------------------------------------------------
 
         // Creates the Giro3D instance, lighting and navigation controls for the given CRS.
-        setupInstance: function (crs) {
-            const { THREE, Instance, MapControls } = this.libs;
+        // Pass { globe: true } to navigate an ECEF (EPSG:4978) globe with GlobeControls
+        // instead of the flat-map MapControls - used for georeferenced 3D models whose
+        // tileset carries an ECEF transform.
+        setupInstance: function (crs, opts) {
+            const { THREE, Instance, MapControls, GlobeControls } = this.libs;
+            const useGlobe = !!(opts && opts.globe);
 
             const instance = new Instance({
                 target: this.$refs.view,
@@ -201,7 +213,7 @@ export default {
             this.instance = instance;
 
             const camera = instance.view.camera;
-            camera.up.set(0, 0, 1); // Giro3D scenes are Z-up
+            camera.up.set(0, 0, 1); // Giro3D scenes are Z-up (ECEF Z = polar axis)
 
             // Lighting for 3D entities (models / point clouds). Map layers are unlit.
             const ambient = new THREE.AmbientLight(0xffffff, 1.2);
@@ -213,9 +225,22 @@ export default {
             fill.position.set(-1, -1, 1);
             instance.scene.add(fill);
 
-            const controls = new MapControls(camera, instance.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.2;
+            let controls;
+            if (useGlobe) {
+                // GlobeControls navigate around the WGS84 ellipsoid; they must be attached
+                // to the DOM explicitly (unlike three's MapControls).
+                controls = new GlobeControls({
+                    scene: instance.scene,
+                    camera,
+                    domElement: instance.domElement,
+                    enableDamping: true
+                });
+                controls.attach();
+            } else {
+                controls = new MapControls(camera, instance.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.2;
+            }
             instance.view.setControls(controls);
             this.controls = controls;
         },
@@ -247,6 +272,81 @@ export default {
             } catch (e) {
                 // Basemap is optional.
             }
+        },
+
+        // Adds a WGS84 globe (ECEF) with an OSM basemap for georeferenced 3D models, whose
+        // tileset carries an ECEF transform. Best-effort: a globe failure must not prevent the
+        // model from rendering.
+        addGlobeBasemap: function () {
+            try {
+                const { Globe, ColorLayer, TiledImageSource, OSM } = this.libs;
+                const globe = new Globe({});
+                this.instance.add(globe);
+                this.map = globe;
+
+                const basemap = new ColorLayer({
+                    name: 'osm',
+                    source: new TiledImageSource({ source: new OSM() })
+                });
+                globe.addLayer(basemap);
+                this.registerLayer('Globe (OSM)', 'fa-solid fa-earth-europe', () => basemap.visible, v => { basemap.visible = v; });
+            } catch (e) {
+                // Globe basemap is optional.
+            }
+        },
+
+        // A file is treated as georeferenced when it has a WGS84 footprint (populated by the
+        // DroneDB indexer for rasters, vectors and point clouds, and - via a sidecar - for 3D
+        // models). Only georeferenced entries get a basemap / globe underneath them.
+        isGeoreferenced: function (entry) {
+            if (entry.type === ddb.entry.type.GEORASTER) return true;
+            if (entry.properties && entry.properties.georeferenced === false) return false;
+            return ddb.entry.hasGeometry(entry);
+        },
+
+        // Builds a Giro3D Extent (in the given CRS) from a 3D entity bounding box, used to size a
+        // flat basemap under a point cloud that lives in its own metric CRS.
+        extentFromBox: function (box, crs) {
+            const { Extent } = this.libs;
+            return new Extent(crs, box.min.x, box.max.x, box.min.y, box.max.y);
+        },
+
+        // Colorizes a point cloud: prefer the RGB attribute, otherwise fall back to an elevation
+        // ramp so featureless clouds (e.g. an untextured PLY) are not a flat black/white blob.
+        // Best-effort - the default coloring is kept on any failure.
+        colorizePointCloud: function (entity) {
+            try {
+                const attrs = entity.getSupportedAttributes ? entity.getSupportedAttributes() : [];
+                const color = attrs.find(a => a.interpretation === 'color');
+                if (color) {
+                    entity.setActiveAttribute(color.name);
+                    entity.setColoringMode('attribute');
+                    return;
+                }
+                const z = attrs.find(a => a.name === 'Z') || attrs.find(a => a.interpretation === 'unknown');
+                if (z) {
+                    const { ColorMap, ColorMapMode } = this.libs;
+                    const min = (typeof z.min === 'number') ? z.min : 0;
+                    const max = (typeof z.max === 'number' && z.max > min) ? z.max : min + 1;
+                    entity.setAttributeColorMap(z.name, new ColorMap({
+                        colors: this.elevationColorRamp(), min, max, mode: ColorMapMode.Elevation
+                    }));
+                    entity.setActiveAttribute(z.name);
+                    entity.setColoringMode('attribute');
+                }
+            } catch (e) {
+                // Coloring is best-effort; keep the default appearance on failure.
+            }
+        },
+
+        // A perceptual low->high elevation ramp (blue -> cyan -> green -> yellow -> red).
+        elevationColorRamp: function () {
+            const { Color } = this.libs.THREE;
+            return [
+                new Color(0x2c7bb6), new Color(0x00a6ca), new Color(0x00ccbc),
+                new Color(0x90eb9d), new Color(0xffff8c), new Color(0xf9d057),
+                new Color(0xf29e2e), new Color(0xe76818), new Color(0xd7191c)
+            ];
         },
 
         // --- Per-type loaders ------------------------------------------------------------
@@ -301,20 +401,24 @@ export default {
             if (!tilesetUrl)
                 throw new Error(`${entry.path} has no 3D Tiles output (it may still be processing)`);
 
-            this.setupInstance(this.libs.CoordinateSystem.epsg3857);
-
-            // Add a basemap only when the model is georeferenced (otherwise it is a local-space
-            // tileset and a world map would be meaningless).
-            const data = this.computeExtent(entry);
-            if (data) this.addBasemap(data.extent);
+            const georeferenced = this.isGeoreferenced(entry);
+            if (georeferenced) {
+                // Georeferenced tileset: it carries an ECEF transform, so render it on a WGS84
+                // globe (EPSG:4978) with an OSM basemap - the model sits in the right place.
+                this.setupInstance(this.libs.CoordinateSystem.epsg4978, { globe: true });
+                this.addGlobeBasemap();
+            } else {
+                // Local-space tileset (identity transform): a plain scene with no basemap,
+                // since a world map would be meaningless for a non-georeferenced model.
+                this.setupInstance(this.libs.CoordinateSystem.epsg3857);
+            }
 
             const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
             await this.instance.add(tileset);
             this.registerLayer(this.basename(entry.path), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
 
             const box = tileset.getBoundingBox();
-            if (box) this.frameBox(box);
-            else if (data) this.frameExtent(data);
+            if (box) this.frameBox(box, { globe: georeferenced });
         },
 
         loadPointCloud: async function (entry) {
@@ -327,16 +431,25 @@ export default {
             await source.initialize();
             const metadata = await source.getMetadata();
 
-            this.setupInstance(metadata.crs || this.libs.CoordinateSystem.epsg3857);
+            const crs = metadata.crs || this.libs.CoordinateSystem.epsg3857;
+            this.setupInstance(crs);
             if (this.instance.renderingOptions) {
                 this.instance.renderingOptions.enableEDL = true;
             }
 
             const entity = new this.libs.PointCloud({ source });
             await this.instance.add(entity);
+            // Show RGB when present, otherwise colour by elevation so the cloud is never a
+            // flat black/white blob (e.g. an untextured PLY).
+            this.colorizePointCloud(entity);
             this.registerLayer(this.basename(entry.path), 'fa-solid fa-braille', () => entity.visible, v => { entity.visible = v; });
 
             const box = entity.getBoundingBox();
+            // A georeferenced cloud gets an OSM basemap in its own (metric) CRS; Giro3D
+            // reprojects the OSM tiles into that CRS so the ground plane aligns with the cloud.
+            if (box && this.isGeoreferenced(entry)) {
+                this.addBasemap(this.extentFromBox(box, crs));
+            }
             if (box) this.frameBox(box);
         },
 
@@ -365,8 +478,11 @@ export default {
             };
         },
 
-        // Returns [minLon, minLat, maxLon, maxLat] from a GeoJSON geometry.
+        // Returns [minLon, minLat, maxLon, maxLat] from a GeoJSON geometry or Feature.
         geojsonBbox: function (geom) {
+            // DroneDB footprints (polygon_geom / point_geom) are GeoJSON Features, so the
+            // coordinates live under .geometry; a bare geometry is also accepted for safety.
+            const coordinates = geom.geometry ? geom.geometry.coordinates : geom.coordinates;
             let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
             const visit = c => {
                 if (typeof c[0] === 'number') {
@@ -376,7 +492,7 @@ export default {
                     c.forEach(visit);
                 }
             };
-            visit(geom.coordinates);
+            if (coordinates) visit(coordinates);
             return [minx, miny, maxx, maxy];
         },
 
@@ -398,8 +514,9 @@ export default {
             this.instance.notifyChange();
         },
 
-        // Frames the camera on a 3D entity bounding box (point cloud / model).
-        frameBox: function (box) {
+        // Frames the camera on a 3D entity bounding box (point cloud / model). For a globe
+        // scene the camera up follows the local ellipsoid normal so the horizon stays level.
+        frameBox: function (box, opts) {
             const { THREE } = this.libs;
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
@@ -408,10 +525,20 @@ export default {
             this.mercatorScale = 1; // entities use a metric local CRS
 
             const camera = this.instance.view.camera;
-            camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);
             this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.01);
-            this.controls.target.copy(center);
-            this.controls.update();
+
+            if (opts && opts.globe) {
+                // ECEF: the local up is the normalized position; approach along it.
+                const up = center.clone().normalize();
+                camera.up.copy(up);
+                camera.position.copy(center).add(up.clone().multiplyScalar(maxDim * 2.5));
+                camera.lookAt(center);
+            } else {
+                camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);
+                // MapControls exposes a target; GlobeControls does not.
+                if (this.controls.target && this.controls.target.copy) this.controls.target.copy(center);
+            }
+            if (this.controls.update) this.controls.update();
             this.instance.notifyChange();
         },
 

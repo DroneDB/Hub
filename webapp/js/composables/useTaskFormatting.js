@@ -40,6 +40,17 @@ export default {
             return reg.getFeatureValue('taskTools') || [];
         },
 
+        // Tools visible to the current user (not hidden by feature gating).
+        // Use for pickers/menus; keep `taskTools` for historical title lookups.
+        visibleTaskTools() {
+            return this.taskTools.filter(t => !t.hidden);
+        },
+
+        // Tools the current user can actually run (neither hidden nor disabled).
+        accessibleTaskTools() {
+            return this.taskTools.filter(t => !t.hidden && !t.disabled);
+        },
+
         // Authoritative task state machine from the server.
         taskStates() {
             return reg.getFeatureValue('taskStates') || [];

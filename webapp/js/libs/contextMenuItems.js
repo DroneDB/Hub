@@ -79,7 +79,7 @@ function openUnifiedItem(ctx) {
     const T = ddb.entry.type;
     const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL];
     return {
-        label: 'Open in 3D Viewer',
+        label: 'Unified Viewer',
         icon: 'fa-solid fa-earth-europe',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
@@ -269,7 +269,7 @@ function buildItem(ctx) {
 
 function transferItem(ctx) {
     return {
-        label: 'Transfer to Dataset',
+        label: 'Transfer',
         icon: 'fa-solid fa-right-left',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
@@ -409,6 +409,19 @@ function selectionSeparator(ctx) {
 }
 
 /**
+ * Build the Experimental submenu containing experimental viewer features.
+ */
+function experimentalMenuItems(ctx) {
+    return {
+        label: 'Experimental',
+        icon: 'fa-solid fa-flask',
+        items: [
+            openUnifiedItem(ctx)
+        ]
+    };
+}
+
+/**
  * Build the standard viewer context menu items.
  * These are the Open/Open Map/Open Point Cloud/etc items shared across all views.
  */
@@ -418,7 +431,6 @@ function buildViewerMenuItems(ctx) {
         openMapItem(ctx),
         openPointCloudItem(ctx),
         openModelItem(ctx),
-        openUnifiedItem(ctx),
         openPanoramaItem(ctx),
         openSplatItem(ctx),
         openMarkdownItem(ctx),
@@ -517,14 +529,27 @@ function toolsItem(ctx) {
     const copcItem = makeDownloadItem('Download COPC', 'fa-solid fa-cube', ddb.entry.type.POINTCLOUD, ctx);
     const gpkgItem = makeDownloadItem('Download GPKG', 'fa-solid fa-map', ddb.entry.type.VECTOR, ctx);
 
+    const mergeMultispectral = mergeMultispectralItem(ctx);
+    const maskBorders = maskBordersItem(ctx);
+    const alignGeoRaster = alignGeoRasterItem(ctx);
+    const extract = extractItem(ctx);
+    const build = buildItem(ctx);
+    const transfer = transferItem(ctx);
+
     return {
         label: 'Tools',
         icon: 'fa-solid fa-wrench',
         items: [
-            mergeMultispectralItem(ctx),
-            maskBordersItem(ctx),
-            alignGeoRasterItem(ctx),
-            extractItem(ctx),
+            mergeMultispectral,
+            maskBorders,
+            alignGeoRaster,
+            extract,
+            {
+                type: 'separator',
+                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() || extract.isVisible()
+            },
+            build,
+            transfer,
             {
                 type: 'separator',
                 isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible()
@@ -551,9 +576,8 @@ function buildActionMenuItems(ctx) {
             type: 'separator',
             isVisible: shareDownloadVisible
         },
-        buildItem(ctx),
         toolsItem(ctx),
-        transferItem(ctx),
+        experimentalMenuItems(ctx),
         setThumbnailItem(ctx),
         clipboardSeparator(ctx),
         renameItem(ctx),
@@ -626,5 +650,6 @@ export {
     buildViewerMenuItems,
     buildActionMenuItems,
     buildFooterMenuItems,
-    buildStandardContextMenu
+    buildStandardContextMenu,
+    experimentalMenuItems
 };
