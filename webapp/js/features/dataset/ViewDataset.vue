@@ -1097,8 +1097,25 @@ export default {
                 return;
             }
 
-            // Open direct download URL — use <a>.click() to avoid popup blockers
             const url = `${this.dataset.baseApi}/build-artifact?path=${encodeURIComponent(file.entry.path)}`;
+
+            // Preflight: check download slot availability (same pattern as downloadWithCheck)
+            const headers = { 'X-Download-Check': '1' };
+            const authToken = this.dataset.registry.getAuthToken();
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+            const checkResp = await fetch(url, { headers });
+            if (checkResp.status === 429) {
+                this.$toast.add({
+                    severity: 'error',
+                    summary: 'Download Limit',
+                    detail: 'Download limit reached. Please wait for a download to finish before starting a new one.',
+                    life: 5000
+                });
+                return;
+            }
+
+            // Preflight passed — initiate native browser download via <a>.click()
             const a = document.createElement('a');
             a.href = url;
             a.target = '_blank';
