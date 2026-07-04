@@ -30,12 +30,16 @@
         </div>
 
         <!-- Photogrammetry launcher -->
-        <Dialog v-model:visible="photogrammetryDialogOpen" modal header="Run Photogrammetry (NodeODM)"
+        <Dialog v-model:visible="photogrammetryDialogOpen" modal header="Run Photogrammetry (NodeODX)"
             :style="{ width: '52rem' }">
             <div class="mb-3">
                 <label class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
-                <InputText v-model="photogrammetryForm.folder" class="w-100"
-                    placeholder="Leave empty to use the whole dataset" />
+                <div class="d-flex gap-2">
+                    <InputText v-model="photogrammetryForm.folder" class="flex-1"
+                        placeholder="Leave empty to use the whole dataset" />
+                    <Button @click="openImageFolderPicker" icon="fa-regular fa-folder-open"
+                        severity="secondary" title="Browse dataset" />
+                </div>
                 <small class="muted">All images under this folder will be processed.</small>
             </div>
             <div v-if="photogrammetryNodes.length > 1" class="mb-3">
@@ -58,7 +62,7 @@
 
             <!-- Options editor (non-custom presets) -->
             <template v-if="photogrammetryForm.preset !== 'custom'">
-                <OdmOptionsEditor v-if="availableOdmOptions.length > 0"
+                <OdxOptionsEditor v-if="availableOdmOptions.length > 0"
                     v-model="customOptions"
                     :available-options="availableOdmOptions"
                     :preset-options="selectedPreset.options" class="mb-3" />
@@ -90,8 +94,12 @@
 
             <div v-if="!photogrammetryForm.createNewDataset" class="mb-3">
                 <label class="d-block mb-1"><strong>Output folder</strong></label>
-                <InputText v-model="photogrammetryForm.destPath" class="w-100"
-                    placeholder="photogrammetry_output/" />
+                <div class="d-flex gap-2">
+                    <InputText v-model="photogrammetryForm.destPath" class="flex-1"
+                        placeholder="photogrammetry_output/" />
+                    <Button @click="openOutputFolderPicker" icon="fa-regular fa-folder-open"
+                        severity="secondary" title="Browse dataset" />
+                </div>
                 <small class="muted">Extracted files will be placed in this folder.</small>
             </div>
 
@@ -118,7 +126,7 @@
 
         <!-- Log viewer -->
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
-            @refresh="refreshLog" />
+            :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
         <ConfirmDialog v-if="clearDialogOpen"
             title="Clear Concluded Tasks"
@@ -127,6 +135,16 @@
             warningTitle="Warning" warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
             @onClose="handleClearDialogClose">
         </ConfirmDialog>
+
+        <!-- Folder picker for output folder -->
+        <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
+            :initialPath="photogrammetryForm.destPath || ''" title="Select output folder"
+            @onClose="handleOutputFolderPickerClose" />
+
+        <!-- Folder picker for image folder -->
+        <FolderPicker v-if="imageFolderPickerOpen" :dataset="dataset" mode="folder"
+            :initialPath="photogrammetryForm.folder || ''" title="Select image folder"
+            @onClose="handleImageFolderPickerClose" />
     </div>
 </template>
 
@@ -143,7 +161,8 @@ import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
-import OdmOptionsEditor from '@/components/OdmOptionsEditor.vue';
+import OdxOptionsEditor from '@/components/OdxOptionsEditor.vue';
+import FolderPicker from '@/components/FolderPicker.vue';
 
 // Curated processing profiles based on standard OpenDroneMap presets.
 const ODM_PRESETS = [
@@ -201,7 +220,7 @@ export default {
     mixins: [useHeavyTask, useTaskFormatting],
 
     components: {
-        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, TasksTable, TaskLogDialog, OdmOptionsEditor
+        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker
     },
 
     props: {
@@ -249,7 +268,10 @@ export default {
             logTask: null,
             logText: '',
 
-            clearDialogOpen: false
+            clearDialogOpen: false,
+
+            outputFolderPickerOpen: false,
+            imageFolderPickerOpen: false
         };
     },
 
@@ -398,7 +420,7 @@ export default {
             };
             this.photogrammetryDialogOpen = true;
 
-            // Load NodeODM options for the selected node
+            // Load NodeODX options for the selected node
             this.loadOdmOptions();
         },
 
@@ -561,6 +583,32 @@ export default {
                 this._toast('error', 'Clear failed', e.message);
             } finally {
                 this.loading = false;
+            }
+        },
+
+        // ---- output folder picker ----
+
+        openOutputFolderPicker() {
+            this.outputFolderPickerOpen = true;
+        },
+
+        handleOutputFolderPickerClose(result) {
+            this.outputFolderPickerOpen = false;
+            if (result) {
+                this.photogrammetryForm.destPath = result.path;
+            }
+        },
+
+        // ---- image folder picker ----
+
+        openImageFolderPicker() {
+            this.imageFolderPickerOpen = true;
+        },
+
+        handleImageFolderPickerClose(result) {
+            this.imageFolderPickerOpen = false;
+            if (result) {
+                this.photogrammetryForm.folder = result.path;
             }
         },
 

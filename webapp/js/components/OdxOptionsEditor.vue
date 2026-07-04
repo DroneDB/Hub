@@ -1,10 +1,10 @@
 /**
- * OdmOptionsEditor - NodeODM processing options editor.
+ * OdxOptionsEditor - NodeODX processing options editor.
  *
- * Displays all available NodeODM options grouped by category (mirroring WebODM's
+ * Displays all available NodeODX options grouped by category (mirroring WebODM's
  * EditPresetDialog). Supports grouped (accordion) and flat views, search filtering,
  * and expand/collapse all. Each option is rendered with type-appropriate controls
- * (checkbox, select, text input) via OdmOptionRow.
+ * (checkbox, select, text input) via OdxOptionRow.
  *
  * Props:
  *   availableOptions - Array of option objects from API: {name, type, domain, help, value}
@@ -58,7 +58,7 @@
                                 {{ subgroup.name }}
                             </div>
                             <div class="odm-option-subgroup-content">
-                                <OdmOptionRow v-for="opt in getOptions(group, subgroup)" :key="opt.name"
+                                <OdxOptionRow v-for="opt in getOptions(group, subgroup)" :key="opt.name"
                                     :option="opt" @update:value="(val) => onOptionChange(opt.name, val)" />
                             </div>
                         </div>
@@ -75,7 +75,7 @@
                     </div>
                     <div v-show="!collapsedGroups['ungrouped']" class="odm-option-group-content">
                         <div class="odm-option-subgroup-content">
-                            <OdmOptionRow v-for="opt in ungroupedOptions" :key="opt.name" :option="opt"
+                            <OdxOptionRow v-for="opt in ungroupedOptions" :key="opt.name" :option="opt"
                                 @update:value="(val) => onOptionChange(opt.name, val)" />
                         </div>
                     </div>
@@ -85,7 +85,7 @@
             <!-- Flat view -->
             <template v-else>
                 <div class="odm-flat-list">
-                    <OdmOptionRow v-for="opt in allMergedOptions" :key="opt.name" :option="opt"
+                    <OdxOptionRow v-for="opt in allMergedOptions" :key="opt.name" :option="opt"
                         @update:value="(val) => onOptionChange(opt.name, val)" />
                 </div>
             </template>
@@ -94,7 +94,7 @@
 </template>
 
 <script>
-import OdmOptionRow from '@/components/OdmOptionRow.vue';
+import OdxOptionRow from '@/components/OdxOptionRow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 
@@ -269,9 +269,9 @@ const OPTION_GROUP_MAP = {
 };
 
 export default {
-    name: 'OdmOptionsEditor',
+    name: 'OdxOptionsEditor',
 
-    components: { OdmOptionRow, Button, InputText },
+    components: { OdxOptionRow, Button, InputText },
 
     props: {
         availableOptions: { type: Array, required: true },

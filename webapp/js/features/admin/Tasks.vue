@@ -30,7 +30,7 @@
             @cancel="cancelTask" @retry="retryTask" />
 
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
-            @refresh="refreshLog" />
+            :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
     </div>
 </template>
 

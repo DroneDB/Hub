@@ -343,7 +343,7 @@ function setThumbnailItem(ctx) {
             if (!isThumbnailCandidate(type)) return false;
             const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
             if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
-            if (type === ddb.entry.type.GEORASTER) {
+            if (type === ddb.entry.type.GEORASTER || type === ddb.entry.type.GAUSSIAN_SPLAT) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);
                 if (!buildState) return true;
                 return buildState.currentState !== BUILD_STATES.FAILED && !hasActiveBuild(ctx.dataset, file);

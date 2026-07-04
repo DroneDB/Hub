@@ -1,5 +1,5 @@
 /**
- * OdmOptionRow - Single NodeODM processing option row.
+ * OdmOptionRow - Single NodeODX processing option row.
  *
  * Renders the appropriate input control based on option type (bool, enum,
  * string, int, float, json). Shows help tooltip, reset button, and warning
@@ -57,7 +57,7 @@ const warnings = {
 };
 
 export default {
-    name: 'OdmOptionRow',
+    name: 'OdxOptionRow',
 
     components: { Checkbox, Select, InputText, Textarea, Button, Tooltip },
 

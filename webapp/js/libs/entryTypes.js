@@ -7,7 +7,7 @@ const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
 // Type groupings used across the application
 const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR, ddb.entry.type.GEOVIDEO];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
-const THUMBNAIL_CANDIDATE_TYPES = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER];
+const THUMBNAIL_CANDIDATE_TYPES = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER, ddb.entry.type.GAUSSIAN_SPLAT];
 const VIDEO_TYPES = [ddb.entry.type.VIDEO, ddb.entry.type.GEOVIDEO];
 
 // Helper functions
