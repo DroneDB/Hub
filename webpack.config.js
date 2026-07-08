@@ -174,7 +174,11 @@ module.exports = {
         }),
         new CopyPlugin({
             patterns: [
-                { from: 'webapp/public', to: '', globOptions: { ignore: ['**/index.html'] } }
+                { from: 'webapp/public', to: '', globOptions: { ignore: ['**/index.html'] } },
+                // Serve the laz-perf WebAssembly decoder locally (offline-first): the unified
+                // Giro3D viewer configures setLazPerfPath('/wasm') so COPC point clouds decode
+                // without fetching the .wasm from a public CDN.
+                { from: 'node_modules/laz-perf/lib/laz-perf.wasm', to: 'wasm/laz-perf.wasm' }
             ]
         }),
         // CSS extraction for production builds
