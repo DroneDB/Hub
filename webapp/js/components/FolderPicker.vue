@@ -85,6 +85,12 @@
             {{ errorMessage }}
         </PrimeMessage>
 
+        <div class="folder-picker-selected">
+            <span class="folder-picker-selected-label">{{ mode === 'file' ? 'Selected file:' : 'Selected folder:' }}</span>
+            <InputText class="folder-picker-selected-input" v-model="selectedPath"
+                v-on:keyup.enter="onConfirm" :placeholder="selectedPathPlaceholder" />
+        </div>
+
         <div class="folder-picker-new-folder">
             <span class="folder-picker-new-folder-label">New folder:</span>
             <InputText class="folder-picker-new-folder-input" ref="newFolderInput"
@@ -96,9 +102,16 @@
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
             <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="close('confirm')" :disabled="!selectedFile || !canSelect(selectedFile)"
-                severity="primary" label="Confirm" />
+            <Button @click="onConfirm" :disabled="!canConfirm || checkingPath"
+                :loading="checkingPath" severity="primary" label="Confirm" />
         </div>
+
+        <ConfirmDialog v-if="confirmCreateOpen"
+            title="Folder does not exist"
+            :message="createFolderMessage"
+            confirmText="Create" cancelText="Cancel" confirmButtonClass="primary"
+            @onClose="handleCreateConfirmClose">
+        </ConfirmDialog>
     </Window>
 </template>
 
@@ -110,6 +123,7 @@ import Breadcrumb from 'primevue/breadcrumb';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import PrimeMessage from 'primevue/message';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { getTypeDisplayName } from '@/libs/entryTypes';
@@ -138,7 +152,7 @@ const { pathutils, entry } = ddb;
  */
 export default {
     components: {
-        Window, Button, InputText, Breadcrumb, DataTable, Column, PrimeMessage
+        Window, Button, InputText, Breadcrumb, DataTable, Column, PrimeMessage, ConfirmDialog
     },
 
     props: {
@@ -166,18 +180,37 @@ export default {
     data: function () {
         return {
             currentPath: this.normalizePath(this.initialPath),
+            selectedPath: this.normalizePath(this.initialPath),
             files: [],
             selectedFile: null,
             loading: false,
             creatingFolder: false,
+            checkingPath: false,
             newFolderName: '',
             errorMessage: null,
+            confirmCreateOpen: false,
+            pendingCreatePath: '',
             sortColumn: 'name',
             sortDirection: 'asc'
         };
     },
 
     computed: {
+        canConfirm: function () {
+            // File mode needs an explicit path; folder/any allow the dataset root (empty).
+            if (this.mode === 'file') {
+                return !!this.selectedPath && this.selectedPath.trim().length > 0;
+            }
+            return true;
+        },
+        selectedPathPlaceholder: function () {
+            return this.mode === 'file'
+                ? 'Select or type a file path'
+                : 'Select or type a folder path (empty = dataset root)';
+        },
+        createFolderMessage: function () {
+            return `The folder <strong>${this.pendingCreatePath}</strong> does not exist. Do you want to create it?`;
+        },
         breadcrumbs: function () {
             if (!this.currentPath || this.currentPath.length === 0) return null;
 
@@ -283,6 +316,11 @@ export default {
 
         navigateTo: function (path) {
             this.currentPath = this.normalizePath(path);
+            // For folder selection, browsing into a folder makes it the default
+            // selection so the user can simply confirm the folder they're viewing.
+            if (this.mode !== 'file') {
+                this.selectedPath = this.currentPath;
+            }
             this.loadEntries();
         },
 
@@ -303,6 +341,7 @@ export default {
 
             this.selectedFile = file;
             file.selected = true;
+            this.selectedPath = this.normalizePath(file.entry.path);
         },
 
         onRowDblClick: function (event) {
@@ -313,8 +352,83 @@ export default {
             } else if (this.mode === 'file' || this.mode === 'any') {
                 this.selectedFile = file;
                 file.selected = true;
-                this.close('confirm');
+                this.selectedPath = this.normalizePath(file.entry.path);
+                this.emitConfirm(this.selectedPath);
             }
+        },
+
+        // Verifies whether the given dataset-relative path exists (as the right
+        // kind of entry for the current mode). The dataset root always exists.
+        checkPathExists: async function (rawPath) {
+            const normalized = this.normalizePath(rawPath);
+            if (!normalized) return true;
+
+            const slash = normalized.lastIndexOf('/');
+            const parent = slash >= 0 ? normalized.substring(0, slash) : '';
+            const base = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+
+            const entries = await this.dataset.list(parent || null);
+            return entries.some((e) => {
+                if (pathutils.basename(e.path) !== base) return false;
+                const isDir = entry.isDirectory(e);
+                if (this.mode === 'file') return !isDir;
+                if (this.mode === 'folder') return isDir;
+                return true;
+            });
+        },
+
+        // Confirm handler: validates the typed/selected path exists; for folder
+        // modes it offers to create the folder when it is missing.
+        onConfirm: async function () {
+            const normalized = this.normalizePath(this.selectedPath);
+            this.selectedPath = normalized;
+            this.errorMessage = null;
+
+            if (!normalized && this.mode === 'file') {
+                this.errorMessage = 'Please select a file.';
+                return;
+            }
+
+            this.checkingPath = true;
+            try {
+                const exists = await this.checkPathExists(normalized);
+                if (exists) {
+                    this.emitConfirm(normalized);
+                    return;
+                }
+                if (this.mode === 'folder' || this.mode === 'any') {
+                    this.pendingCreatePath = normalized;
+                    this.confirmCreateOpen = true;
+                } else {
+                    this.errorMessage = `The file "${normalized}" does not exist.`;
+                }
+            } catch (e) {
+                this.errorMessage = e.message || 'Failed to verify the path.';
+            } finally {
+                this.checkingPath = false;
+            }
+        },
+
+        handleCreateConfirmClose: async function (buttonId) {
+            this.confirmCreateOpen = false;
+            const path = this.pendingCreatePath;
+            this.pendingCreatePath = '';
+            if (buttonId !== 'confirm' || !path) return;
+
+            this.creatingFolder = true;
+            this.errorMessage = null;
+            try {
+                await this.dataset.createFolder(path);
+                this.emitConfirm(path);
+            } catch (e) {
+                this.errorMessage = e.message || 'Failed to create the folder.';
+            } finally {
+                this.creatingFolder = false;
+            }
+        },
+
+        emitConfirm: function (path) {
+            this.$emit('onClose', { path: this.normalizePath(path), entry: null });
         },
 
         canSelect: function (file) {
@@ -423,8 +537,36 @@ export default {
     flex: 1;
 }
 
+.folder-picker-selected {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.folder-picker-selected-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.folder-picker-selected-input {
+    flex: 1;
+}
+
 .row-disabled {
     opacity: 0.4;
     cursor: not-allowed !important;
+}
+
+/* Highlight the currently selected folder/file row. */
+.folder-picker-body :deep(tr.row-selected),
+.folder-picker-body :deep(tr.row-selected > td) {
+    background-color: var(--ddb-selected-bg, #e8f4ff) !important;
+}
+
+.folder-picker-body :deep(tr.row-selected:hover),
+.folder-picker-body :deep(tr.row-selected:hover > td) {
+    background-color: var(--ddb-selected-active-bg, #d8e8f8) !important;
 }
 </style>
