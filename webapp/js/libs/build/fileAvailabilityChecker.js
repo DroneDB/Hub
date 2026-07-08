@@ -62,6 +62,29 @@ class FileAvailabilityChecker {
             return this.checkNonBuildableFile(dataset, entry, viewType);
         }
 
+        // The unified 3D viewer needs its SPECIFIC artifact (3D Tiles for models, COPC for point
+        // clouds, COG for rasters, MVT/FGB for vectors). A generic "Succeeded" build state is not
+        // enough - e.g. a model can have a legacy Nexus build but no 3D Tiles output - so verify
+        // the exact artifact directly.
+        if (viewType === 'unified') {
+            const outputFile = this.getOutputFile(entry.type, viewType);
+            if (outputFile) {
+                const entryObj = dataset.Entry(entry);
+                const available = await this.checkOutputFileAvailability(entryObj, outputFile);
+                if (available) {
+                    return { available: true, status: 'ready', message: '', title: '', buildState: null, actions: [] };
+                }
+                return {
+                    available: false,
+                    status: 'not-found',
+                    message: `'${this.getFileName(entry.path)}' is not available in the 3D viewer.\n\nThe required output has not been produced yet - this file may need to be (re)built.`,
+                    title: 'Not available in 3D viewer',
+                    buildState: null,
+                    actions: ['close']
+                };
+            }
+        }
+
         // For buildable files, verify build state
         return this.checkBuildableFile(dataset, entry, viewType);
     }

@@ -6,6 +6,10 @@
         <div v-if="loading" class="loading">
             <p>{{ loadingText }}</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
+            <div v-if="progress !== null" class="progress-track">
+                <div class="progress-fill" :style="{ width: Math.round(progress * 100) + '%' }"></div>
+            </div>
+            <p v-if="progress !== null" class="progress-text">{{ Math.round(progress * 100) }}%</p>
         </div>
 
         <div class="container-wrapper">
@@ -72,6 +76,8 @@ export default {
             error: "",
             loading: false,
             loadingText: "Loading 3D viewer...",
+            // Load progress (0..1) shown as a bar while data streams in; null hides the bar.
+            progress: null,
             ready: false,
             activeTool: null,
             measureCount: 0,
@@ -114,9 +120,26 @@ export default {
         handleLoad: async function () {
             this.error = "";
             this.loading = true;
+            this.progress = null;
             try {
-                if (!ddb.entry.hasGeometry(this.entry) && this.entry.type !== ddb.entry.type.MODEL)
-                    throw new Error(`${this.entry.path} cannot be opened in the 3D viewer`);
+                // Only point clouds, orthophotos/rasters, vectors and 3D models are supported.
+                // Gaussian splats have their own dedicated viewer and are not opened here.
+                const T = ddb.entry.type;
+                const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL];
+                if (!supported.includes(this.entry.type))
+                    throw new Error(`'${this.basename(this.entry.path)}' is not supported in the 3D viewer.`);
+                if (!ddb.entry.hasGeometry(this.entry) && this.entry.type !== T.MODEL)
+                    throw new Error(`'${this.basename(this.entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
+
+                // Availability gate: verify the required build artifact exists for this entry type
+                // (3D Tiles for models, COPC for point clouds, COG for rasters, MVT/FGB for vectors)
+                // and show a clear "not available" message instead of an empty scene. Mirrors the
+                // pre-open check in ViewDataset.handleOpenItem so direct-URL opens are covered too.
+                // Loaded dynamically so this lazy chunk does not hard-depend on the dataset chunk.
+                const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
+                const availability = await FileAvailabilityChecker.check(this.dataset, this.entry, 'unified');
+                if (!availability.available)
+                    throw new Error(availability.message || `${this.entry.path} is not available in the 3D viewer.`);
 
                 this.libs = await this.loadLibs();
                 await this.loadPrimary(this.entry);
@@ -125,6 +148,7 @@ export default {
                 this.error = e.message;
             } finally {
                 this.loading = false;
+                this.progress = null;
             }
         },
 
@@ -146,7 +170,7 @@ export default {
             const [
                 THREE, controls, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
                 TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
-                XYZ, OSM, olStyle, olProj, Globe, GlobeControls, ColorMap, ColorMapMode
+                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig
             ] = await Promise.all([
                 import(/* webpackChunkName: "giro3d" */ 'three'),
                 import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/MapControls.js'),
@@ -165,11 +189,16 @@ export default {
                 import(/* webpackChunkName: "giro3d" */ 'ol/source/OSM.js'),
                 import(/* webpackChunkName: "giro3d" */ 'ol/style.js'),
                 import(/* webpackChunkName: "giro3d" */ 'ol/proj.js'),
-                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js'),
-                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/controls/GlobeControls.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMap.js'),
-                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMapMode.js')
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMapMode.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/sources/las/config.js')
             ]);
+
+            // Offline-first: serve the laz-perf WebAssembly decoder from our own origin (webpack
+            // copies it to /wasm/laz-perf.wasm) instead of the public jsDelivr CDN, so COPC point
+            // clouds decode in air-gapped / CSP-restricted deployments too.
+            try { lasConfig.setLazPerfPath('/wasm'); } catch (e) { /* falls back to the CDN default */ }
+
             return {
                 THREE,
                 MapControls: controls.MapControls,
@@ -188,8 +217,6 @@ export default {
                 OSM: OSM.default,
                 olStyle,
                 olProj,
-                Globe: Globe.default,
-                GlobeControls: GlobeControls.default,
                 ColorMap: ColorMap.default,
                 ColorMapMode: ColorMapMode.default
             };
@@ -197,13 +224,11 @@ export default {
 
         // --- Scene setup -----------------------------------------------------------------
 
-        // Creates the Giro3D instance, lighting and navigation controls for the given CRS.
-        // Pass { globe: true } to navigate an ECEF (EPSG:4978) globe with GlobeControls
-        // instead of the flat-map MapControls - used for georeferenced 3D models whose
-        // tileset carries an ECEF transform.
-        setupInstance: function (crs, opts) {
-            const { THREE, Instance, MapControls, GlobeControls } = this.libs;
-            const useGlobe = !!(opts && opts.globe);
+        // Creates the Giro3D instance, lighting and flat-map navigation controls for the given
+        // CRS. Every entry type (raster, vector, point cloud, model) uses a flat scene with
+        // MapControls and an OSM basemap underneath - there is no globe mode.
+        setupInstance: function (crs) {
+            const { THREE, Instance, MapControls } = this.libs;
 
             const instance = new Instance({
                 target: this.$refs.view,
@@ -213,7 +238,7 @@ export default {
             this.instance = instance;
 
             const camera = instance.view.camera;
-            camera.up.set(0, 0, 1); // Giro3D scenes are Z-up (ECEF Z = polar axis)
+            camera.up.set(0, 0, 1); // Giro3D scenes are Z-up
 
             // Lighting for 3D entities (models / point clouds). Map layers are unlit.
             const ambient = new THREE.AmbientLight(0xffffff, 1.2);
@@ -225,22 +250,9 @@ export default {
             fill.position.set(-1, -1, 1);
             instance.scene.add(fill);
 
-            let controls;
-            if (useGlobe) {
-                // GlobeControls navigate around the WGS84 ellipsoid; they must be attached
-                // to the DOM explicitly (unlike three's MapControls).
-                controls = new GlobeControls({
-                    scene: instance.scene,
-                    camera,
-                    domElement: instance.domElement,
-                    enableDamping: true
-                });
-                controls.attach();
-            } else {
-                controls = new MapControls(camera, instance.domElement);
-                controls.enableDamping = true;
-                controls.dampingFactor = 0.2;
-            }
+            const controls = new MapControls(camera, instance.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.2;
             instance.view.setControls(controls);
             this.controls = controls;
         },
@@ -252,18 +264,27 @@ export default {
             }
         },
 
-        // Adds an OpenStreetMap basemap covering the given Giro3D extent. Best-effort: a basemap
-        // failure must never prevent the actual data from showing.
-        addBasemap: function (extent) {
+        // Adds an OpenStreetMap basemap under the data. The map is created with a generous margin
+        // around the data so it reads as a real map with surrounding context, not a rectangle
+        // clipped to the data footprint. `elevation` lifts the flat basemap to the data's ground
+        // level (used for point clouds with real altitudes). Best-effort: a basemap failure must
+        // never prevent the actual data from showing.
+        addBasemap: function (extent, elevation) {
             try {
                 const { Map, ColorLayer, TiledImageSource, OSM } = this.libs;
-                const map = new Map({ extent: extent.withRelativeMargin(0.1) });
+                const map = new Map({ extent: extent.withRelativeMargin(5) });
                 this.instance.add(map);
                 this.map = map;
 
+                // Lift the flat basemap to the data's ground elevation so a point cloud with real
+                // altitudes sits on it instead of floating high above the z=0 plane.
+                if (typeof elevation === 'number' && isFinite(elevation) && map.object3d) {
+                    map.object3d.position.z = elevation;
+                    map.object3d.updateMatrixWorld(true);
+                }
+
                 const basemap = new ColorLayer({
                     name: 'osm',
-                    extent: map.extent,
                     source: new TiledImageSource({ source: new OSM() })
                 });
                 map.addLayer(basemap);
@@ -271,27 +292,6 @@ export default {
                 this.registerLayer('Basemap (OSM)', 'fa-solid fa-map', () => basemap.visible, v => { basemap.visible = v; });
             } catch (e) {
                 // Basemap is optional.
-            }
-        },
-
-        // Adds a WGS84 globe (ECEF) with an OSM basemap for georeferenced 3D models, whose
-        // tileset carries an ECEF transform. Best-effort: a globe failure must not prevent the
-        // model from rendering.
-        addGlobeBasemap: function () {
-            try {
-                const { Globe, ColorLayer, TiledImageSource, OSM } = this.libs;
-                const globe = new Globe({});
-                this.instance.add(globe);
-                this.map = globe;
-
-                const basemap = new ColorLayer({
-                    name: 'osm',
-                    source: new TiledImageSource({ source: new OSM() })
-                });
-                globe.addLayer(basemap);
-                this.registerLayer('Globe (OSM)', 'fa-solid fa-earth-europe', () => basemap.visible, v => { basemap.visible = v; });
-            } catch (e) {
-                // Globe basemap is optional.
             }
         },
 
@@ -397,28 +397,51 @@ export default {
 
         loadModel: async function (entry) {
             this.loadingText = "Loading 3D model...";
-            const tilesetUrl = await this.dataset.Entry(entry).get3DTiles();
-            if (!tilesetUrl)
-                throw new Error(`${entry.path} has no 3D Tiles output (it may still be processing)`);
-
-            const georeferenced = this.isGeoreferenced(entry);
-            if (georeferenced) {
-                // Georeferenced tileset: it carries an ECEF transform, so render it on a WGS84
-                // globe (EPSG:4978) with an OSM basemap - the model sits in the right place.
-                this.setupInstance(this.libs.CoordinateSystem.epsg4978, { globe: true });
-                this.addGlobeBasemap();
-            } else {
-                // Local-space tileset (identity transform): a plain scene with no basemap,
-                // since a world map would be meaningless for a non-georeferenced model.
-                this.setupInstance(this.libs.CoordinateSystem.epsg3857);
+            let tilesetUrl = null;
+            try {
+                tilesetUrl = await this.dataset.Entry(entry).get3DTiles();
+            } catch (e) {
+                // A missing artifact (404) can throw here; treat it as "not produced".
+                tilesetUrl = null;
             }
+            if (!tilesetUrl)
+                throw new Error(`The 3D model '${this.basename(entry.path)}' is not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been produced for this model yet.`);
+
+            // Flat local-space scene (no globe): the DroneDB 3D Tiles output is rendered in its own
+            // frame with MapControls, consistent with every other type.
+            this.setupInstance(this.libs.CoordinateSystem.epsg3857);
 
             const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
-            await this.instance.add(tileset);
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
 
+            // Break giro3d's near/far deadlock for DroneDB tilesets. The Obj2Tiles output has an
+            // empty root tile (geometry lives only in the LOD children), so during the first frames
+            // no tile geometry is visible yet and giro3d's automatic plane computation collapses the
+            // far plane to ~0. That degenerate frustum then culls the very tiles that would populate
+            // it, so nothing ever renders. Reporting an infinite entity distance makes giro3d fall
+            // back to `view.maxFarPlane` for the far plane (see core/MainLoop), giving a stable valid
+            // frustum from the first frame so the tiles survive and render. Must be set before add().
+            tileset.distance.max = Infinity;
+
+            await this.instance.add(tileset);
+
+            // Guard against a degenerate tileset: Obj2Tiles can emit an empty tileset (null content
+            // and children, infinite bounding volume) for some meshes. Such a tileset "loads" but
+            // renders nothing, so surface a clear message instead of an empty scene.
             const box = tileset.getBoundingBox();
-            if (box) this.frameBox(box, { globe: georeferenced });
+            if (!box || !this.isFiniteBox(box))
+                throw new Error(`The 3D model '${this.basename(entry.path)}' is not available in the 3D viewer.\n\nIts 3D Tiles output is empty or invalid and needs to be rebuilt.`);
+
+            this.registerLayer(this.basename(entry.path), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
+            this.frameBox(box);
+            // Keep the loading indicator up until the tileset has actually put geometry on screen.
+            await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
+        },
+
+        // True when a THREE.Box3 is fully finite (no NaN/Infinity) and non-empty.
+        isFiniteBox: function (box) {
+            const v = [box.min.x, box.min.y, box.min.z, box.max.x, box.max.y, box.max.z];
+            return v.every(Number.isFinite) &&
+                box.max.x >= box.min.x && box.max.y >= box.min.y && box.max.z >= box.min.z;
         },
 
         loadPointCloud: async function (entry) {
@@ -428,10 +451,16 @@ export default {
             // The COPC header carries the point cloud CRS: initialise the source first so the
             // instance can be created in that CRS, keeping the cloud at full precision.
             const source = new this.libs.COPCSource({ url: copcUrl });
+            source.addEventListener('progress', () => { this.progress = source.progress; });
             await source.initialize();
             const metadata = await source.getMetadata();
 
             const crs = metadata.crs || this.libs.CoordinateSystem.epsg3857;
+            // Register the cloud's CRS (from the COPC WKT) with proj4/OpenLayers so the OSM basemap
+            // can be reprojected into it. Without this, OpenLayers throws (e.g. "EPSG:2154") on every
+            // basemap tile, flooding the render loop and freezing the controls - the cloud renders
+            // but no longer responds to drag/zoom.
+            const crsRegistered = this.registerCrs(crs);
             this.setupInstance(crs);
             if (this.instance.renderingOptions) {
                 this.instance.renderingOptions.enableEDL = true;
@@ -442,15 +471,44 @@ export default {
             // Show RGB when present, otherwise colour by elevation so the cloud is never a
             // flat black/white blob (e.g. an untextured PLY).
             this.colorizePointCloud(entity);
+            // Use a fixed pixel point size: Giro3D's automatic sizing (0) can collapse to
+            // sub-pixel for sparse or large-extent COPC clouds, rendering them invisible.
+            entity.pointSize = 2;
             this.registerLayer(this.basename(entry.path), 'fa-solid fa-braille', () => entity.visible, v => { entity.visible = v; });
 
             const box = entity.getBoundingBox();
-            // A georeferenced cloud gets an OSM basemap in its own (metric) CRS; Giro3D
-            // reprojects the OSM tiles into that CRS so the ground plane aligns with the cloud.
-            if (box && this.isGeoreferenced(entry)) {
-                this.addBasemap(this.extentFromBox(box, crs));
+            // A georeferenced cloud gets an OSM basemap in its own (metric) CRS, but only when that
+            // CRS is registered - otherwise the reprojection would throw and freeze the controls.
+            // The basemap is lifted to the cloud's minimum elevation so the cloud sits on it.
+            if (box && crsRegistered && this.isGeoreferenced(entry)) {
+                this.addBasemap(this.extentFromBox(box, crs), box.min.z);
             }
             if (box) this.frameBox(box);
+            // Keep the loading indicator until the first points are actually on screen.
+            await this.waitForFirstRender(() => entity.displayedPointCount > 0, 30000);
+            // Re-frame once the data (and basemap) have settled: adding the basemap can otherwise
+            // leave the camera pointed away from the cloud on first load.
+            if (box) this.frameBox(box);
+        },
+
+        // Best-effort registration of a point cloud CRS (read from the COPC WKT) with proj4 and
+        // OpenLayers so the OSM basemap can be reprojected into it. Returns true when the CRS is
+        // usable for reprojection (already known, or successfully registered), false when proj4
+        // cannot parse the definition - in which case the caller skips the basemap rather than
+        // flooding the render loop with reprojection errors.
+        registerCrs: function (crs) {
+            try {
+                const CS = this.libs.CoordinateSystem;
+                if (!crs || crs === CS.epsg3857) return true;
+                if (crs === CS.unknown) return false;
+                const id = crs.id || (crs.srid && crs.srid.toString ? crs.srid.toString() : null);
+                const def = crs.definition;
+                if (!id || !def) return false;
+                CS.register(id, def, { throwIfFailedToRegisterWithProj: true });
+                return true;
+            } catch (e) {
+                return false;
+            }
         },
 
         // --- Helpers ---------------------------------------------------------------------
@@ -514,9 +572,8 @@ export default {
             this.instance.notifyChange();
         },
 
-        // Frames the camera on a 3D entity bounding box (point cloud / model). For a globe
-        // scene the camera up follows the local ellipsoid normal so the horizon stays level.
-        frameBox: function (box, opts) {
+        // Frames the camera on a 3D entity bounding box (point cloud / model).
+        frameBox: function (box) {
             const { THREE } = this.libs;
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
@@ -526,18 +583,13 @@ export default {
 
             const camera = this.instance.view.camera;
             this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.01);
+            // Generous far plane bound relative to the data size. For models this is also the value
+            // giro3d falls back to while the tileset streams in (see loadModel: tileset.distance.max
+            // is forced to Infinity), so it must comfortably contain the whole model.
+            this.instance.view.maxFarPlane = maxDim * 1000;
 
-            if (opts && opts.globe) {
-                // ECEF: the local up is the normalized position; approach along it.
-                const up = center.clone().normalize();
-                camera.up.copy(up);
-                camera.position.copy(center).add(up.clone().multiplyScalar(maxDim * 2.5));
-                camera.lookAt(center);
-            } else {
-                camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);
-                // MapControls exposes a target; GlobeControls does not.
-                if (this.controls.target && this.controls.target.copy) this.controls.target.copy(center);
-            }
+            camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);
+            if (this.controls.target && this.controls.target.copy) this.controls.target.copy(center);
             if (this.controls.update) this.controls.update();
             this.instance.notifyChange();
         },
@@ -561,6 +613,26 @@ export default {
         basename: function (p) {
             const parts = p.split('/');
             return parts[parts.length - 1] || p;
+        },
+
+        // Resolves once the primary data has produced its first meaningful frame (so the loading
+        // indicator stays up until something is actually visible), or after a safety timeout.
+        waitForFirstRender: function (isReady, timeoutMs) {
+            return new Promise((resolve) => {
+                if (!this.instance) { resolve(); return; }
+                let done = false;
+                const finish = () => {
+                    if (done) return;
+                    done = true;
+                    try { this.instance.removeEventListener('update-end', onUpdate); } catch (e) { /* ignore */ }
+                    clearTimeout(timer);
+                    resolve();
+                };
+                const onUpdate = () => { try { if (isReady()) finish(); } catch (e) { finish(); } };
+                const timer = setTimeout(finish, timeoutMs || 30000);
+                this.instance.addEventListener('update-end', onUpdate);
+                this.instance.notifyChange();
+            });
         },
 
         // --- Layer panel -----------------------------------------------------------------
@@ -698,6 +770,26 @@ export default {
 #unified-viewer .loading .fa-circle-notch {
     height: 1.25rem;
     width: 1.25rem;
+}
+
+#unified-viewer .loading .progress-track {
+    width: 12rem;
+    height: 0.4rem;
+    margin: 0.5rem auto 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 0.2rem;
+    overflow: hidden;
+}
+
+#unified-viewer .loading .progress-fill {
+    height: 100%;
+    background: var(--ddb-primary, #2978b4);
+    transition: width 0.2s ease;
+}
+
+#unified-viewer .loading .progress-text {
+    margin: 0.25rem 0 0;
+    font-size: 0.85em;
 }
 
 #unified-viewer .toolbar {
