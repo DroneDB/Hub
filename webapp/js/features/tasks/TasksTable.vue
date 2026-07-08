@@ -20,12 +20,14 @@
         </PrimeMessage>
 
         <!-- Task table -->
-        <DataTable v-else :value="tasks" stripedRows rowHover paginator :rows="rows"
+        <DataTable v-else :value="slicedTasks" stripedRows rowHover
             :lazy="lazy" :totalRecords="lazy ? totalRecords : undefined"
             :sortField="lazy ? undefined : 'createdAt'" :sortOrder="-1"
             scrollable scrollHeight="flex"
+            :paginator="lazy"
             paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-            :rowsPerPageOptions="rowsPerPageOptions"
+            :rows="lazy ? rows : undefined"
+            :rowsPerPageOptions="lazy ? rowsPerPageOptions : undefined"
             @page="onPage" :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
             <Column field="state" header="State" :sortable="!lazy" style="width: 5rem;">
                 <template #body="slotProps">
@@ -142,15 +144,39 @@ export default {
         rowsPerPageOptions: { type: Array, default: () => [10, 25, 50, 100] },
         // Task id whose result download is currently in flight: its Result button is
         // disabled + spinning to prevent repeated clicks overloading the server.
-        downloadingTaskId: { type: String, default: null }
+        downloadingTaskId: { type: String, default: null },
+        // Total number of items (for client-side paginator visibility threshold).
+        totalItems: { type: Number, default: 0 },
+        // Current page offset (0-based), controlled by parent for client-side pagination.
+        currentPageFirst: { type: Number, default: 0 }
     },
 
-    emits: ['view-log', 'download-result', 'cancel', 'retry', 'page'],
+    emits: ['view-log', 'download-result', 'cancel', 'retry', 'page', 'page-reset'],
 
     data() {
         return {
             skeletonRows: Array.from({ length: 8 }, (_, i) => ({ id: i }))
         };
+    },
+
+    computed: {
+        /** Show paginator only when there are 10 or more items. */
+        paginatorVisible() {
+            return this.totalItems >= 10;
+        },
+
+        /** Slice tasks array for client-side pagination. Lazy mode returns full array. */
+        slicedTasks() {
+            if (this.lazy) return this.tasks;
+            return this.tasks.slice(this.currentPageFirst, this.currentPageFirst + this.rows);
+        }
+    },
+
+    watch: {
+        /** Reset to first page when tasks change (e.g. after filter or reload). */
+        tasks() {
+            this.$emit('page-reset');
+        }
     },
 
     methods: {
@@ -214,6 +240,16 @@ export default {
 .dataset-cell,
 .owner-cell {
     word-break: break-all;
+}
+
+.paginator-wrapper {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    background: var(--p-content-background);
+    border-top: 1px solid var(--p-content-border-color);
+    padding: var(--ddb-spacing-xs) 0;
 }
 
 .duration {

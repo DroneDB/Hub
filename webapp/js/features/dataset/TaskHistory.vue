@@ -23,10 +23,20 @@
 
         <div class="content">
             <TasksTable :tasks="filteredTasks" :tools="tools" :loading="loading" :rows="pageSize"
+                :total-items="filteredTasks.length"
+                :current-page-first="currentPageFirst"
                 :downloading-task-id="downloadingTaskId"
                 empty-message="No processing tasks have been run for this dataset yet."
                 @view-log="openLog" @download-result="downloadResult"
-                @cancel="cancelTask" @retry="retryTask" />
+                @cancel="cancelTask" @retry="retryTask"
+                @page-reset="onPageReset" />
+        </div>
+
+        <!-- Standalone paginator (outside scrollable area, hidden when < 10 items) -->
+        <div v-if="filteredTasks.length >= 10" class="paginator-wrapper">
+            <Paginator :rows="pageSize" :totalRecords="filteredTasks.length" :first="currentPageFirst"
+                @page="onPageChange" :rowsPerPageOptions="[10, 20, 25, 50, 100]"
+                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown" />
         </div>
 
         <!-- Photogrammetry launcher -->
@@ -35,17 +45,39 @@
             <div class="mb-3">
                 <label class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
                 <div class="d-flex gap-2">
-                    <InputText v-model="photogrammetryForm.folder" class="flex-1"
-                        placeholder="Leave empty to use the whole dataset" />
+                    <InputText v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
+                        placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
                     <Button @click="openImageFolderPicker" icon="fa-regular fa-folder-open"
                         severity="secondary" title="Browse dataset" />
                 </div>
-                <small class="muted">All images under this folder will be processed.</small>
+                <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
+                <small v-else class="muted">All images under this folder will be processed.</small>
             </div>
-            <div v-if="photogrammetryNodes.length > 1" class="mb-3">
+
+            <!-- Processing node: dropdown when several are configured, details for a single one -->
+            <div class="mb-3">
                 <label class="d-block mb-1"><strong>Processing node</strong></label>
-                <Select v-model="photogrammetryForm.nodeId" :options="photogrammetryNodes"
-                    optionLabel="label" optionValue="value" class="w-100" />
+                <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId"
+                    :options="photogrammetryNodes" optionLabel="label" optionValue="value"
+                    class="w-100" @change="onNodeChanged" />
+                <div v-else-if="photogrammetryNodes.length === 1" class="pg-node-details">
+                    <div><strong>{{ photogrammetryNodes[0].title }}</strong></div>
+                    <div class="muted">ID: {{ photogrammetryNodes[0].id }}</div>
+                </div>
+            </div>
+
+            <!-- Node status (populated by "Check Node") -->
+            <div v-if="nodeStatus" class="mb-3">
+                <PrimeMessage :severity="nodeStatus.reachable ? 'success' : 'error'" :closable="false">
+                    <template v-if="nodeStatus.reachable">
+                        Node reachable - {{ nodeStatus.taskQueueCount }} task(s) queued,
+                        max {{ nodeStatus.maxParallelTasks }} parallel.<span v-if="nodeStatus.engine">
+                        Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
+                    </template>
+                    <template v-else>
+                        Node unreachable: {{ nodeStatus.errorMessage }}
+                    </template>
+                </PrimeMessage>
             </div>
             <div class="mb-3">
                 <label class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
@@ -95,12 +127,13 @@
             <div v-if="!photogrammetryForm.createNewDataset" class="mb-3">
                 <label class="d-block mb-1"><strong>Output folder</strong></label>
                 <div class="d-flex gap-2">
-                    <InputText v-model="photogrammetryForm.destPath" class="flex-1"
-                        placeholder="photogrammetry_output/" />
+                    <InputText v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
+                        placeholder="photogrammetry_output" @input="destPathError = ''" />
                     <Button @click="openOutputFolderPicker" icon="fa-regular fa-folder-open"
                         severity="secondary" title="Browse dataset" />
                 </div>
-                <small class="muted">Extracted files will be placed in this folder.</small>
+                <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
+                <small v-else class="muted">Extracted files will be placed in this folder.</small>
             </div>
 
             <template v-if="photogrammetryForm.createNewDataset">
@@ -120,6 +153,8 @@
 
             <template #footer>
                 <Button label="Cancel" severity="secondary" @click="photogrammetryDialogOpen = false" />
+                <Button label="Check Node" icon="fa-solid fa-heart-pulse" severity="secondary"
+                    :loading="checkingNode" @click="checkNode" />
                 <Button label="Start" icon="fa-solid fa-play" :loading="submitting" @click="submitPhotogrammetry" />
             </template>
         </Dialog>
@@ -134,6 +169,23 @@
             confirmText="Clear" cancelText="Cancel" confirmButtonClass="danger"
             warningTitle="Warning" warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
             @onClose="handleClearDialogClose">
+        </ConfirmDialog>
+
+        <!-- Invalid path error (#5) -->
+        <ConfirmDialog v-if="errorDialogOpen"
+            title="Invalid path"
+            :message="errorDialogMessage"
+            confirmText="OK" cancelText="Close" confirmButtonClass="primary"
+            @onClose="errorDialogOpen = false">
+        </ConfirmDialog>
+
+        <!-- Unreachable node confirmation before starting (#6) -->
+        <ConfirmDialog v-if="unreachableConfirmOpen"
+            title="Processing node unreachable"
+            :message="`The selected processing node did not respond${nodeStatus && nodeStatus.errorMessage ? ` (${nodeStatus.errorMessage})` : ''}.<br/>Do you want to start the task anyway?`"
+            confirmText="Start anyway" cancelText="Cancel" confirmButtonClass="primary"
+            warningTitle="Warning" warningMessage="The task may fail immediately if the node is offline."
+            @onClose="handleUnreachableConfirmClose">
         </ConfirmDialog>
 
         <!-- Folder picker for output folder -->
@@ -161,8 +213,10 @@ import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
+import PrimeMessage from 'primevue/message';
 import OdxOptionsEditor from '@/components/OdxOptionsEditor.vue';
 import FolderPicker from '@/components/FolderPicker.vue';
+import Paginator from 'primevue/paginator';
 
 // Curated processing profiles based on standard OpenDroneMap presets.
 const ODM_PRESETS = [
@@ -220,7 +274,7 @@ export default {
     mixins: [useHeavyTask, useTaskFormatting],
 
     components: {
-        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker
+        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
     },
 
     props: {
@@ -238,6 +292,7 @@ export default {
             selectedState: '',
             selectedTool: '',
             pageSize: 20,
+            currentPageFirst: 0,
             _refreshTimer: null,
             downloadingTaskId: null,
 
@@ -250,12 +305,20 @@ export default {
                 preset: 'default',
                 optionsText: '',
 
-                destPath: 'photogrammetry_output/',
+                destPath: 'photogrammetry_output',
                 createNewDataset: false,
                 newDatasetName: '',
                 newDatasetVisibility: 'PRIVATE'
             },
             optionsError: '',
+            folderPathError: '',
+            destPathError: '',
+            errorDialogOpen: false,
+            errorDialogMessage: '',
+            checkingNode: false,
+            nodeStatus: null,
+            unreachableConfirmOpen: false,
+            _pendingParams: null,
             availableOdmOptions: [],
             customOptions: [],
             visibilityOptions: [
@@ -286,10 +349,11 @@ export default {
         photogrammetryTool() {
             return this.tools.find(t => t.id === 'photogrammetry') || null;
         },
-        // Show the button only when the tool exists and is not hidden by gating.
+        // Show the button only when the tool exists, is not hidden by gating,
+        // the user can write, and at least one NodeODX node is configured.
         showPhotogrammetryButton() {
             const t = this.photogrammetryTool;
-            return t !== null && !t.hidden && this.canWrite;
+            return t !== null && !t.hidden && this.canWrite && this.photogrammetryNodes.length > 0;
         },
         // Render the button greyed out when the tool is gated as disabled.
         photogrammetryGatingDisabled() {
@@ -348,8 +412,14 @@ export default {
         async loadProcessingNodes() {
             try {
                 const nodes = await this.dataset.registry.getRequest('/sys/processingNodes') || [];
-                this.photogrammetryNodes = nodes.map(n => ({ value: n.id, label: n.title }));
-                if (this.photogrammetryNodes.length === 1) {
+                this.photogrammetryNodes = nodes.map(n => ({
+                    value: n.id,
+                    id: n.id,
+                    title: n.title,
+                    label: `${n.title} (${n.id})`
+                }));
+                // Always default to the first node so a selection is present.
+                if (this.photogrammetryNodes.length > 0 && !this.photogrammetryForm.nodeId) {
                     this.photogrammetryForm.nodeId = this.photogrammetryNodes[0].value;
                 }
             } catch (e) {
@@ -391,6 +461,8 @@ export default {
             if (this.selectedState) filtered = filtered.filter(t => t.state === this.selectedState);
             if (this.selectedTool) filtered = filtered.filter(t => t.toolId === this.selectedTool);
             this.filteredTasks = filtered;
+            // Reset to first page when filters change
+            this.currentPageFirst = 0;
 
             // Broadcast whether there is an active (queued/running) bulk-download task so
             // Header.vue and ViewDataset.vue can disable the download button globally.
@@ -404,16 +476,19 @@ export default {
 
         openPhotogrammetryDialog() {
             this.optionsError = '';
+            this.folderPathError = '';
+            this.destPathError = '';
+            this.nodeStatus = null;
             this.customOptions = [];
             this.availableOdmOptions = [];
             this.photogrammetryForm = {
                 folder: '',
-                nodeId: this.photogrammetryNodes.length === 1 ? this.photogrammetryNodes[0].value : undefined,
+                nodeId: this.photogrammetryNodes.length > 0 ? this.photogrammetryNodes[0].value : undefined,
                 name: '',
                 preset: 'default',
                 optionsText: '',
 
-                destPath: 'photogrammetry_output/',
+                destPath: 'photogrammetry_output',
                 createNewDataset: false,
                 newDatasetName: '',
                 newDatasetVisibility: 'PRIVATE'
@@ -436,8 +511,66 @@ export default {
             }
         },
 
-        async submitPhotogrammetry() {
-            this.optionsError = '';
+        // Reload options and clear cached status when the target node changes.
+        onNodeChanged() {
+            this.nodeStatus = null;
+            this.loadOdmOptions();
+        },
+
+        // Validates a dataset-relative path: no leading slash, not rooted, and no
+        // "." / ".." segments. Returns an error message, or null when valid. An
+        // empty path is valid here (the caller decides whether it is required).
+        validateDatasetPath(path, label) {
+            const raw = (path || '').trim();
+            if (!raw) return null;
+            if (raw.startsWith('/') || raw.startsWith('\\')) {
+                return `${label} must not start with "/" or "\\" - use a path relative to the dataset root.`;
+            }
+            // Windows drive letter (C:\) or UNC (\\server)
+            if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith('\\\\')) {
+                return `${label} must not be an absolute path.`;
+            }
+            const segments = raw.split(/[\\/]+/);
+            if (segments.some(s => s === '.' || s === '..')) {
+                return `${label} must not contain "." or ".." segments.`;
+            }
+            return null;
+        },
+
+        // Queries the server for the selected node's availability and queue stats.
+        // Returns the status object (also stored in this.nodeStatus).
+        async checkNode() {
+            const nodeId = this.photogrammetryForm.nodeId
+                || (this.photogrammetryNodes[0] && this.photogrammetryNodes[0].value);
+            if (!nodeId) {
+                this._toast('warn', 'No processing node', 'No NodeODX node is configured.');
+                return null;
+            }
+            this.checkingNode = true;
+            this.nodeStatus = null;
+            try {
+                const status = await this.dataset.registry.getRequest(
+                    `/sys/processingNodes/${encodeURIComponent(nodeId)}/status`);
+                this.nodeStatus = status;
+                if (status.reachable) {
+                    this._toast('success', 'Node reachable',
+                        `${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`);
+                } else {
+                    this._toast('error', 'Node unreachable', status.errorMessage || 'The node did not respond.');
+                }
+                return status;
+            } catch (e) {
+                this.nodeStatus = { reachable: false, errorMessage: e.message };
+                this._toast('error', 'Check failed', e.message);
+                return this.nodeStatus;
+            } finally {
+                this.checkingNode = false;
+            }
+        },
+
+        // Builds the submit params, surfacing option/destination validation errors.
+        // Returns the params object, or null when validation failed.
+        _buildSubmitParams() {
             let options;
             if (this.photogrammetryForm.preset === 'custom') {
                 const text = (this.photogrammetryForm.optionsText || '').trim();
@@ -447,7 +580,7 @@ export default {
                         if (!Array.isArray(options)) throw new Error('Options must be a JSON array');
                     } catch (e) {
                         this.optionsError = `Invalid options: ${e.message}`;
-                        return;
+                        return null;
                     }
                 }
             } else {
@@ -467,37 +600,91 @@ export default {
             if (!this.photogrammetryForm.createNewDataset) {
                 if (!this.photogrammetryForm.destPath || !this.photogrammetryForm.destPath.trim()) {
                     this.optionsError = 'An output folder path is required.';
-                    return;
+                    return null;
                 }
             } else {
                 if (!this.photogrammetryForm.newDatasetName || !this.photogrammetryForm.newDatasetName.trim()) {
                     this.optionsError = 'A new dataset name is required.';
-                    return;
+                    return null;
                 }
                 // Basic kebab-case validation
                 if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(this.photogrammetryForm.newDatasetName)) {
                     this.optionsError = 'Dataset name must be kebab-case (lowercase letters, digits, hyphens).';
+                    return null;
+                }
+            }
+
+            const params = {};
+            if (this.photogrammetryForm.folder) params.folder = this.photogrammetryForm.folder.trim();
+            if (this.photogrammetryForm.nodeId) params.nodeId = this.photogrammetryForm.nodeId;
+            if (this.photogrammetryForm.name) params.name = this.photogrammetryForm.name;
+            if (options) params.options = options;
+
+            params.createNewDataset = this.photogrammetryForm.createNewDataset;
+            if (!this.photogrammetryForm.createNewDataset) {
+                params.destPath = this.photogrammetryForm.destPath.trim();
+            } else {
+                params.newDatasetName = this.photogrammetryForm.newDatasetName;
+                params.newDatasetVisibility = this.photogrammetryForm.newDatasetVisibility;
+            }
+            return params;
+        },
+
+        _showPathError(message) {
+            this.errorDialogMessage = message;
+            this.errorDialogOpen = true;
+        },
+
+        async submitPhotogrammetry() {
+            this.optionsError = '';
+            this.folderPathError = '';
+            this.destPathError = '';
+
+            // #5: clean dataset-relative path validation.
+            const folderErr = this.validateDatasetPath(this.photogrammetryForm.folder, 'Image folder');
+            if (folderErr) {
+                this.folderPathError = folderErr;
+                this._showPathError(folderErr);
+                return;
+            }
+            if (!this.photogrammetryForm.createNewDataset) {
+                const destErr = this.validateDatasetPath(this.photogrammetryForm.destPath, 'Output folder');
+                if (destErr) {
+                    this.destPathError = destErr;
+                    this._showPathError(destErr);
                     return;
                 }
             }
 
+            const params = this._buildSubmitParams();
+            if (!params) return;
+            this._pendingParams = params;
+
+            // #6: pre-flight node check. We never hard-block on a full queue, but we
+            // do ask for confirmation when the node appears unreachable.
+            const status = await this.checkNode();
+            if (status && !status.reachable) {
+                this.unreachableConfirmOpen = true;
+                return;
+            }
+            await this._doSubmit();
+        },
+
+        async handleUnreachableConfirmClose(buttonId) {
+            this.unreachableConfirmOpen = false;
+            if (buttonId === 'confirm') {
+                await this._doSubmit();
+            } else {
+                this._pendingParams = null;
+            }
+        },
+
+        async _doSubmit() {
+            const params = this._pendingParams;
+            if (!params) return;
+
             this.submitting = true;
             try {
-                const params = {};
-                if (this.photogrammetryForm.folder) params.folder = this.photogrammetryForm.folder;
-                if (this.photogrammetryForm.nodeId) params.nodeId = this.photogrammetryForm.nodeId;
-                if (this.photogrammetryForm.name) params.name = this.photogrammetryForm.name;
-                if (options) params.options = options;
-
-                // Output destination params
-                params.createNewDataset = this.photogrammetryForm.createNewDataset;
-                if (!this.photogrammetryForm.createNewDataset) {
-                    params.destPath = this.photogrammetryForm.destPath;
-                } else {
-                    params.newDatasetName = this.photogrammetryForm.newDatasetName;
-                    params.newDatasetVisibility = this.photogrammetryForm.newDatasetVisibility;
-                }
-
                 // Fire-and-track: the mixin polls in the background; the table also
                 // auto-refreshes, so we just need to kick it off and reload.
                 this.runHeavyTask(this.dataset, 'photogrammetry', { params })
@@ -521,6 +708,7 @@ export default {
                 }
             } finally {
                 this.submitting = false;
+                this._pendingParams = null;
             }
         },
 
@@ -613,6 +801,17 @@ export default {
         },
 
         // ---- formatting helpers are provided by the useTaskFormatting mixin ----
+
+        // ---- pagination ----
+
+        onPageChange(event) {
+            this.currentPageFirst = event.first;
+            this.pageSize = event.rows;
+        },
+
+        onPageReset() {
+            this.currentPageFirst = 0;
+        }
     }
 };
 </script>
@@ -635,6 +834,13 @@ export default {
     padding: var(--ddb-spacing-lg);
 }
 
+.paginator-wrapper {
+    flex-shrink: 0;
+    background: var(--p-content-background);
+    border-top: 1px solid var(--p-content-border-color);
+    padding: var(--ddb-spacing-xs) var(--ddb-spacing-lg);
+}
+
 .muted {
     color: var(--ddb-text-muted, #888);
 }
@@ -648,6 +854,14 @@ export default {
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
     background: var(--ddb-bg-secondary, #f8f9fa);
+}
+
+.pg-node-details {
+    border: 1px solid var(--ddb-border, #dee2e6);
+    border-radius: 6px;
+    padding: 0.5rem 0.75rem;
+    background: var(--ddb-bg-secondary, #f8f9fa);
+    font-size: 0.9rem;
 }
 
 .pg-option-chip {
