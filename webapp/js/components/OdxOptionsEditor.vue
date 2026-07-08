@@ -313,14 +313,18 @@ export default {
                 if (userOpt) {
                     merged.value = userOpt.value;
                 }
-                // Interpolate help text
+                // Interpolate help text (NodeODX uses Python printf-style
+                // %(choices)s / %(default)s; also support {choices} / {default})
                 if (typeof merged.help === 'string') {
                     const choices = Array.isArray(merged.domain)
                         ? merged.domain.join(', ')
                         : (merged.domain || '');
+                    const def = merged.defaultValue ?? '';
                     merged.help = merged.help
+                        .replace(/%\(choices\)s/g, choices)
                         .replace(/\{choices\}/g, choices)
-                        .replace(/\{default\}/g, merged.defaultValue ?? '');
+                        .replace(/%\(default\)s/g, def)
+                        .replace(/\{default\}/g, def);
                 }
                 return merged;
             });

@@ -13,9 +13,8 @@
         <div class="odm-option-label">
             <span class="odm-option-name">{{ option.name }}</span>
             <span v-if="domainLabel" class="odm-option-domain">({{ domainLabel }})</span>
-            <Tooltip v-if="interpolatedHelp" :value="interpolatedHelp" position="bottom">
-                <i class="fa-solid fa-circle-info odm-option-help" />
-            </Tooltip>
+            <i v-if="interpolatedHelp" v-tooltip.bottom="interpolatedHelp"
+                class="fa-solid fa-circle-info odm-option-help" />
         </div>
 
         <div class="odm-option-control">
@@ -59,7 +58,9 @@ const warnings = {
 export default {
     name: 'OdxOptionRow',
 
-    components: { Checkbox, Select, InputText, Textarea, Button, Tooltip },
+    components: { Checkbox, Select, InputText, Textarea, Button },
+
+    directives: { tooltip: Tooltip },
 
     props: {
         option: { type: Object, required: true }
@@ -91,8 +92,11 @@ export default {
             const choices = Array.isArray(this.option.domain)
                 ? this.option.domain.join(', ')
                 : (this.option.domain || '');
-            h = h.replace(/\{choices\}/g, choices);
-            h = h.replace(/\{default\}/g, this.option.defaultValue ?? '');
+            const def = this.option.defaultValue ?? '';
+            // NodeODX help uses Python printf-style %(choices)s / %(default)s;
+            // also support {choices} / {default} for robustness.
+            h = h.replace(/%\(choices\)s/g, choices).replace(/\{choices\}/g, choices);
+            h = h.replace(/%\(default\)s/g, def).replace(/\{default\}/g, def);
             return h;
         },
         hasChanged() {
