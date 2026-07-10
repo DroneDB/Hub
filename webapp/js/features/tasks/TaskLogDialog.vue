@@ -3,13 +3,14 @@
         :header="`Log - ${title}`" :style="{ width: '48rem' }" @show="onShow">
         <pre ref="logContainer" class="task-log">{{ logText || 'No log output.' }}</pre>
         <template #footer>
-            <ToggleButton v-if="isActive" v-model="autoRefresh" :style="{ width: '9rem' }"
-                onLabel="Refresh: On" offLabel="Refresh: Off"
-                :checked-icon="'fa-solid fa-arrows-rotate'" :unchecked-icon="'fa-solid fa-arrows-rotate'"
-                :disabled="false" />
-            <ToggleButton v-model="autoScroll" :style="{ width: '8rem' }"
-                onLabel="Scroll: On" offLabel="Scroll: Off"
-                :checked-icon="'fa-solid fa-arrow-down'" :unchecked-icon="'fa-solid fa-arrow-down'" />
+            <div v-if="isActive" class="d-flex align-items-center gap-2" style="min-width: 8rem;">
+                <ToggleSwitch v-model="autoRefresh" />
+                <span class="muted" style="font-size: 0.8rem;">Auto-refresh</span>
+            </div>
+            <div class="d-flex align-items-center gap-2" style="min-width: 7rem;">
+                <ToggleSwitch v-model="autoScroll" />
+                <span class="muted" style="font-size: 0.8rem;">Auto-scroll</span>
+            </div>
             <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
                 @click="$emit('refresh')" />
             <Button label="Close" @click="$emit('update:visible', false)" />
@@ -20,7 +21,7 @@
 <script>
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
-import ToggleButton from 'primevue/togglebutton';
+import ToggleSwitch from 'primevue/toggleswitch';
 
 /**
  * Presentational task log viewer dialog with auto-refresh and auto-scroll.
@@ -35,7 +36,7 @@ import ToggleButton from 'primevue/togglebutton';
 export default {
     name: 'TaskLogDialog',
 
-    components: { Dialog, Button, ToggleButton },
+    components: { Dialog, Button, ToggleSwitch },
 
     props: {
         visible: { type: Boolean, default: false },
@@ -163,9 +164,5 @@ export default {
     font-size: 0.8rem;
     white-space: pre-wrap;
     word-break: break-word;
-}
-
-:deep(.p-togglebutton) {
-    font-size: 0.78rem;
 }
 </style>
