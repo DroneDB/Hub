@@ -3,17 +3,25 @@
         :header="`Log - ${title}`" :style="{ width: '48rem' }" @show="onShow">
         <pre ref="logContainer" class="task-log">{{ logText || 'No log output.' }}</pre>
         <template #footer>
-            <div v-if="isActive" class="d-flex align-items-center gap-2" style="min-width: 8rem;">
-                <ToggleSwitch v-model="autoRefresh" />
-                <span class="muted" style="font-size: 0.8rem;">Auto-refresh</span>
+            <!-- Toggles on the left -->
+            <div class="d-flex align-items-center gap-3">
+                <div v-if="isActive" class="d-flex align-items-center gap-2">
+                    <ToggleSwitch v-model="autoRefresh" />
+                    <span class="muted" style="font-size: 0.8rem;">Auto-refresh</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <ToggleSwitch v-model="autoScroll" />
+                    <span class="muted" style="font-size: 0.8rem;">Auto-scroll</span>
+                </div>
             </div>
-            <div class="d-flex align-items-center gap-2" style="min-width: 7rem;">
-                <ToggleSwitch v-model="autoScroll" />
-                <span class="muted" style="font-size: 0.8rem;">Auto-scroll</span>
+            <!-- Spacer to push buttons to the right -->
+            <div style="flex-grow: 1;"></div>
+            <!-- Buttons on the right -->
+            <div class="d-flex align-items-center gap-2">
+                <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
+                    @click="$emit('refresh')" />
+                <Button label="Close" @click="$emit('update:visible', false)" />
             </div>
-            <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
-                @click="$emit('refresh')" />
-            <Button label="Close" @click="$emit('update:visible', false)" />
         </template>
     </Dialog>
 </template>

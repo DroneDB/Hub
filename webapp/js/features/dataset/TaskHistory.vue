@@ -95,13 +95,17 @@
             <!-- Options editor (non-custom presets) -->
             <template v-if="photogrammetryForm.preset !== 'custom'">
                 <OdxOptionsEditor v-if="availableOdmOptions.length > 0"
+                    ref="odmEditor"
                     v-model="customOptions"
                     :available-options="availableOdmOptions"
                     :preset-options="selectedPreset.options" class="mb-3" />
                 <div v-if="customOptions.length > 0" class="mb-3 pg-preset-tags">
                     <label class="d-block mb-1"><strong>Customized options ({{ customOptions.length }})</strong></label>
                     <div class="d-flex flex-wrap gap-1">
-                        <span v-for="opt in customOptions" :key="opt.name" class="pg-option-chip">
+                        <span v-for="opt in customOptions" :key="opt.name"
+                            class="pg-option-chip pg-option-chip-clickable"
+                            @click="scrollToPresetOption(opt.name)"
+                            title="Click to scroll to option">
                             {{ opt.name }}: {{ opt.value }}
                         </span>
                     </div>
@@ -338,6 +342,11 @@ export default {
         };
     },
 
+    inject: {
+        registerTabChild: { default: null },
+        unregisterTabChild: { default: null }
+    },
+
     computed: {
         concludedCount() {
             return this.tasks.filter(t => !this.isActive(t.state)).length;
@@ -391,9 +400,15 @@ export default {
         await this.loadProcessingNodes();
         await this.loadTasks();
         this.scheduleAutoRefresh();
+
+        // Register with TabSwitcher so onTabActivated() is called on tab switch
+        if (this.registerTabChild) this.registerTabChild('tasks', this);
     },
 
     beforeUnmount() {
+        // Unregister from TabSwitcher
+        if (this.unregisterTabChild) this.unregisterTabChild('tasks');
+
         if (this._refreshTimer) clearTimeout(this._refreshTimer);
         // Clear the global flag so the download button re-enables when leaving the dataset.
         emitter.emit('setActiveBulkDownload', false);
@@ -456,6 +471,11 @@ export default {
             }, delay);
         },
 
+        // Called by TabSwitcher when the Tasks tab is activated. Refreshes the task list.
+        async onTabActivated() {
+            await this.refreshData();
+        },
+
         applyFilters() {
             let filtered = [...this.tasks];
             if (this.selectedState) filtered = filtered.filter(t => t.state === this.selectedState);
@@ -473,6 +493,14 @@ export default {
 
 
         // ---- photogrammetry launcher ----
+
+        // Called from customized-option pill click. Delegates to OdxOptionsEditor.
+        scrollToPresetOption(optionName) {
+            const editor = this.$refs?.odmEditor;
+            if (editor && typeof editor.scrollToOption === 'function') {
+                editor.scrollToOption(optionName);
+            }
+        },
 
         openPhotogrammetryDialog() {
             this.optionsError = '';
@@ -599,7 +627,7 @@ export default {
             // Validate output destination
             if (!this.photogrammetryForm.createNewDataset) {
                 if (!this.photogrammetryForm.destPath || !this.photogrammetryForm.destPath.trim()) {
-                    this.optionsError = 'An output folder path is required.';
+                    this.destPathError = 'An output folder path is required.';
                     return null;
                 }
             } else {
@@ -685,9 +713,17 @@ export default {
 
             this.submitting = true;
             try {
-                // Fire-and-track: the mixin polls in the background; the table also
-                // auto-refreshes, so we just need to kick it off and reload.
-                this.runHeavyTask(this.dataset, 'photogrammetry', { params })
+                // Submit the task on the server first, so loadTasks() can pick it up.
+                const submit = await this.dataset.submitTask('photogrammetry', {
+                    params: params,
+                    force: false,
+                });
+                if (submit && submit.error) {
+                    throw new Error(submit.error);
+                }
+
+                // Start background polling (fire-and-forget).
+                this.trackHeavyTask(this.dataset, submit.taskId, { params })
                     .catch(e => {
                         if (e && e.status === 403) {
                             this._toast('error', 'Not available', e.message || this.photogrammetryDisabledMsg);
@@ -873,6 +909,15 @@ export default {
     font-size: 0.78rem;
     font-family: monospace;
     font-weight: 500;
+}
+
+.pg-option-chip-clickable {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.pg-option-chip-clickable:hover {
+    background-color: var(--ddb-primary-hover, #0060bf);
 }
 
 .duration {
