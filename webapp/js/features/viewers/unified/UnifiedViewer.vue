@@ -413,14 +413,14 @@ export default {
 
             const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
 
-            // Break giro3d's near/far deadlock for DroneDB tilesets. The Obj2Tiles output has an
-            // empty root tile (geometry lives only in the LOD children), so during the first frames
-            // no tile geometry is visible yet and giro3d's automatic plane computation collapses the
-            // far plane to ~0. That degenerate frustum then culls the very tiles that would populate
-            // it, so nothing ever renders. Reporting an infinite entity distance makes giro3d fall
-            // back to `view.maxFarPlane` for the far plane (see core/MainLoop), giving a stable valid
-            // frustum from the first frame so the tiles survive and render. Must be set before add().
-            tileset.distance.max = Infinity;
+            // Enable proper LOD refinement for the DroneDB / Obj2Tiles tilesets. The underlying
+            // 3d-tiles-renderer defaults `loadAncestors` to true, which - for a tileset whose root
+            // is a coarse placeholder over finer child tiles - forces the root to be shown as a
+            // "placeholder leaf" until *all* of its descendants have loaded, while never recursing
+            // to actually load them. The result is a deadlock: the coarse root shows and the finer
+            // LOD tiles are never requested. Disabling it lets the renderer traverse and stream the
+            // LOD hierarchy normally (verified for both octree and standard Obj2Tiles output).
+            tileset.tiles.loadAncestors = false;
 
             await this.instance.add(tileset);
 
