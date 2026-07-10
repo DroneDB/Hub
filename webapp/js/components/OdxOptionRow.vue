@@ -22,7 +22,8 @@
             <Checkbox v-if="option.type === 'bool'" v-model="localValue" :binary="true" />
 
             <!-- Enum: select dropdown -->
-            <Select v-else-if="isEnum" v-model="localValue" :options="enumChoices" class="w-100" />
+            <Select v-else-if="isEnum" v-model="localValue" :options="enumChoices"
+                optionLabel="label" optionValue="value" class="w-100" />
 
             <!-- JSON: textarea with file import -->
             <Textarea v-else-if="option.type === 'json'" v-model="localValue" rows="2"

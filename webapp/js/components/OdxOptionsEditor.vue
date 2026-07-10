@@ -422,6 +422,51 @@ export default {
         getOptions(group, subgroup) {
             return subgroup.options;
         },
+
+        /**
+         * Find and scroll to a specific option row by name.
+         * Expands the containing group first if collapsed.
+         * Applies a brief highlight animation to the row.
+         */
+        scrollToOption(optionName) {
+            // 1. Find group/subgroup for this option
+            const mapping = OPTION_GROUP_MAP[optionName];
+            const groupId = mapping ? mapping.group : 'ungrouped';
+
+            // 2. Expand group if collapsed
+            if (this.collapsedGroups[groupId] !== false) {
+                this.collapsedGroups[groupId] = false;
+            }
+
+            // 3. Wait for DOM update, then find and scroll to the element
+            this.$nextTick(() => {
+                const container = this.$el?.querySelector('.odm-options-content');
+                if (!container) return;
+
+                // Search for the option name element
+                const allNames = container.querySelectorAll('.odm-option-name');
+                let targetEl = null;
+
+                for (const el of allNames) {
+                    if (el.textContent?.trim() === optionName) {
+                        targetEl = el.closest('.odm-option-row');
+                        break;
+                    }
+                }
+
+                if (targetEl) {
+                    // 4. Scroll into view
+                    targetEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+                    // 5. Brief highlight
+                    targetEl.classList.add('odm-option-highlight');
+                    setTimeout(() => {
+                        targetEl.classList.remove('odm-option-highlight');
+                    }, 2000);
+                }
+            });
+        },
+
         onOptionChange(name, value) {
             let customizations = [...this.modelValue];
             const idx = customizations.findIndex(o => o.name === name);
@@ -549,5 +594,12 @@ export default {
 
 .muted {
     color: var(--ddb-text-muted, #888);
+}
+
+/* Brief highlight when scrolled to from pills */
+.odm-option-row.odm-option-highlight {
+    background: var(--ddb-selected-bg, #e8f4ff);
+    border-left: 3px solid var(--ddb-primary, #0070e0);
+    transition: background-color 0.2s ease, border-left 0.2s ease;
 }
 </style>
