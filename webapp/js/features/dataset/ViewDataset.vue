@@ -107,7 +107,7 @@
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
         <SettingsDialog v-if="showSettings" :dataset="dataset" :canWrite="canWrite" @onClose="handleSettingsClose"
             @addMarkdown="handleAddMarkdown" @rescanRequested="handleRescanRequested" />
-        <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath"
+        <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" @importFromUrl="handleUploadImportFromUrl" :path="currentPath"
             :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true">
         </AddToDatasetDialog>
         <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
@@ -136,6 +136,8 @@
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
         <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
         <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
+        <ImportFromUrlDialog v-if="importUrlDialogOpen" @onClose="handleImportUrlClose"
+            :dataset="dataset" :initial-url="importUrlInitial" :initial-folder="currentPath || ''" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
             title="Mask Borders"
             :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
@@ -259,6 +261,7 @@ import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
 import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
 import AlignDialog from './dialogs/AlignDialog.vue';
 import ExtractDialog from './dialogs/ExtractDialog.vue';
+import ImportFromUrlDialog from './dialogs/ImportFromUrlDialog.vue';
 import FsLightbox from 'fslightbox-vue';
 import VideoLightbox from './VideoLightbox.vue';
 
@@ -282,6 +285,7 @@ const { pathutils, utils } = ddb;
 
 import { OpenItemDefaults } from '@/libs/openItemDefaults';
 import { isArchiveFile } from '@/libs/entryTypes';
+import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 
 // Import mixins
 import dialogManager from '@/composables/useDialogManager';
@@ -340,6 +344,7 @@ export default {
         MergeMultispectralDialog,
         AlignDialog,
         ExtractDialog,
+        ImportFromUrlDialog,
         FsLightbox,
         VideoLightbox
     },
@@ -463,6 +468,9 @@ export default {
         // Listen for Delete key to delete selected files
         document.addEventListener('keydown', this.handleKeyDown);
 
+        // Listen for OS paste (files and URL text from clipboard)
+        document.addEventListener('paste', this.handleOsPaste);
+
         // Listen to build state change events
         BuildManager.on('buildStateChanged', this.handleBuildStateNotification);
         BuildManager.on('buildStarted', this.handleBuildStartedNotification);
@@ -507,6 +515,9 @@ export default {
 
         // Remove Delete key listener
         document.removeEventListener('keydown', this.handleKeyDown);
+
+        // Remove OS paste listener
+        document.removeEventListener('paste', this.handleOsPaste);
 
         // Cleanup BuildManager listeners
         BuildManager.off('buildStateChanged', this.handleBuildStateNotification);
@@ -586,7 +597,7 @@ export default {
             // Don't trigger if any dialog is already open
             const anyDialogOpen = this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
                 this.createFolderDialogOpen || this.transferDialogOpen || this.showProperties ||
-                this.showSettings || this.textEditorDialogOpen ||
+                this.showSettings || this.textEditorDialogOpen || this.importUrlDialogOpen ||
                 this.pasteConflictDialogOpen || this.pasteResultDialogOpen;
             if (anyDialogOpen) return;
 
@@ -603,11 +614,9 @@ export default {
                     this.clipboardCutSelected();
                     return;
                 }
-                if (k === 'v' && this.canWrite) {
-                    e.preventDefault();
-                    this.clipboardPaste();
-                    return;
-                }
+                // NOTE: Ctrl+V is handled by the unified handleOsPaste listener so
+                // that OS file paste and URL paste take priority over the internal
+                // Hub clipboard. The keydown branch is intentionally removed here.
             }
 
             // Delete key
@@ -626,6 +635,56 @@ export default {
             const data = this.pasteConflictData;
             this.pasteConflictData = null;
             if (data && typeof data.resolve === 'function') data.resolve(mode);
+        },
+
+        // Unified OS paste handler (Ctrl+V from the OS / file manager).
+        // Priority: (1) OS files -> upload, (2) http(s) URL text -> import, (3) Hub internal clipboard.
+        // NOTE: The 'paste' event fires for Ctrl+V on the document; text in an <input> or
+        // <textarea> is handled by the browser natively and this listener is not reached
+        // because of the target check below.
+        handleOsPaste(e) {
+            // Skip when focus is inside any editable element - the browser handles it.
+            const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+
+            // Skip when any dialog is already open.
+            const anyDialogOpen = this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
+                this.createFolderDialogOpen || this.transferDialogOpen || this.showProperties ||
+                this.showSettings || this.textEditorDialogOpen || this.importUrlDialogOpen ||
+                this.pasteConflictDialogOpen || this.pasteResultDialogOpen;
+            if (anyDialogOpen) return;
+
+            // 1. OS files in clipboard -> upload.
+            if (this.canWrite) {
+                const files = getFilesFromClipboard(e);
+                if (files.length > 0) {
+                    e.preventDefault();
+                    emitter.emit('uploadItems', { files, path: this.currentPath });
+                    return;
+                }
+            }
+
+            // 2. http/https URL text -> import from URL dialog.
+            if (this.canWrite && e.clipboardData) {
+                const text = e.clipboardData.getData('text/plain') || e.clipboardData.getData('text');
+                if (isHttpUrl(text)) {
+                    e.preventDefault();
+                    this.openImportUrlDialog(text.trim());
+                    return;
+                }
+            }
+
+            // 3. Fallback: internal Hub clipboard (copy/cut dataset files).
+            if (this.canWrite) {
+                this.clipboardPaste();
+            }
+        },
+
+        // Called when the user clicks "Import from URL" inside the Upload dialog.
+        handleUploadImportFromUrl() {
+            this.uploadDialogOpen = false;
+            this.filesToUpload = null;
+            this.openImportUrlDialog('');
         },
 
         handlePasteResultClose() {
@@ -1115,7 +1174,7 @@ export default {
                 return;
             }
 
-            // Preflight passed — initiate native browser download via <a>.click()
+            // Preflight passed - initiate native browser download via <a>.click()
             const a = document.createElement('a');
             a.href = url;
             a.target = '_blank';

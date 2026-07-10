@@ -3,7 +3,8 @@
         <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
             @onUpload="onUploaded" @done="done" :filesToUpload="filesToUpload"
             @update:closable="updateClosable" @onClose="close"
-            @update:waitingForFiles="updateWaitingForFiles"></DatasetUpload>
+            @update:waitingForFiles="updateWaitingForFiles"
+            @importFromUrl="$emit('importFromUrl')"></DatasetUpload>
     </Window>
 </template>
 
@@ -19,7 +20,7 @@ export default {
     },
 
     props: ['organization', 'dataset', 'path', 'filesToUpload'],
-    emits: ['onClose'],
+    emits: ['onClose', 'importFromUrl'],
 
     data: function () {
         return {

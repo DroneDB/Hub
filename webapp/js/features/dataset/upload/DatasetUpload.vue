@@ -11,6 +11,7 @@
                     <div class="selection-buttons">
                         <Button severity="info" @click="openFilePicker" icon="fa-solid fa-file" label="Select Files" />
                         <Button severity="secondary" @click="openFolderPicker" icon="fa-solid fa-folder" label="Select Folder" />
+                        <Button severity="secondary" @click="$emit('importFromUrl')" icon="fa-solid fa-link" label="Import from URL" />
                     </div>
                 </div>
             </div>
@@ -148,7 +149,7 @@ export default {
         Button
     },
     props: ['organization', 'dataset', 'path', 'filesToUpload'],
-    emits: ['onClose', 'onUpload', 'update:closable', 'update:waitingForFiles'],
+    emits: ['onClose', 'onUpload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
     data: function () {
         return {
             error: null,
@@ -284,6 +285,20 @@ export default {
             const fileId = file.upload.uuid;
             const fileInfo = this.fileList[fileId];
             const errorMsg = this.parseErrorMessage(message);
+
+            // Respect noRetry flag from server (e.g. extension blocked, quota exceeded)
+            // When noRetry is true, skip auto-retry and disable manual retry as well
+            const responseObj = typeof message === 'object' ? message : null;
+            const noRetry = responseObj && responseObj.noRetry;
+
+            if (noRetry) {
+                this.updateFileStatus(fileId, 'error', 0, errorMsg);
+                this.fileList[fileId].canRetry = false;
+                this.fileList[fileId].dzFile = file;
+                file.status = Dropzone.ERROR;
+                setTimeout(() => this.dz.processQueue(), 500);
+                return;
+            }
 
             // Check if auto-retry is allowed (small files, under max retries)
             const canAutoRetry = file.size < SMALL_FILE_SIZE && fileInfo.retryCount < MAX_RETRIES;

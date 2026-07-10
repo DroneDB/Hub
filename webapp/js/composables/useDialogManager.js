@@ -47,6 +47,10 @@ export default {
             extractDialogOpen: false,
             extractFile: null,
 
+            // Import from URL dialog
+            importUrlDialogOpen: false,
+            importUrlInitial: '',
+
             // Mask borders dialog
             maskBordersConfirmOpen: false,
             maskBordersEntry: null,
@@ -573,6 +577,23 @@ export default {
             } catch (e) {
                 console.warn('Could not refresh file browser after align:', e);
             }
+        },
+
+        // Import from URL Dialog
+        openImportUrlDialog(url = '') {
+            this.importUrlInitial = url || '';
+            this.importUrlDialogOpen = true;
+        },
+
+        async handleImportUrlClose(action, result) {
+            this.importUrlDialogOpen = false;
+            this.importUrlInitial = '';
+
+            if (action !== 'imported') return;
+
+            // Refresh the file browser so the newly imported file appears.
+            const destFolder = (result && result.folder) ? result.folder : null;
+            await this.revealExtractedFiles(destFolder);
         },
 
         // Extract Archive Dialog
