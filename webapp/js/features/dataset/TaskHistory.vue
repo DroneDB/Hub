@@ -192,6 +192,14 @@
             @onClose="handleUnreachableConfirmClose">
         </ConfirmDialog>
 
+        <!-- Cancel task confirmation -->
+        <ConfirmDialog v-if="cancelDialogOpen"
+            title="Cancel Task"
+            :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, tools)}</strong>${cancellingTask.path ? ' (path: ' + cancellingTask.path + ')' : ''} will be stopped.`"
+            confirmText="Cancel Task" cancelText="Don't Cancel" confirmButtonClass="danger"
+            @onClose="handleCancelDialogClose">
+        </ConfirmDialog>
+
         <!-- Folder picker for output folder -->
         <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
             :initialPath="photogrammetryForm.destPath || ''" title="Select output folder"
@@ -336,6 +344,9 @@ export default {
             logText: '',
 
             clearDialogOpen: false,
+
+            cancelDialogOpen: false,
+            cancellingTask: null,
 
             outputFolderPickerOpen: false,
             imageFolderPickerOpen: false
@@ -750,7 +761,19 @@ export default {
 
         // ---- per-task actions ----
 
-        async cancelTask(task) {
+        cancelTask(task) {
+            this.cancellingTask = task;
+            this.cancelDialogOpen = true;
+        },
+
+        async handleCancelDialogClose(buttonId) {
+            this.cancelDialogOpen = false;
+            if (buttonId !== 'confirm' || !this.cancellingTask) {
+                this.cancellingTask = null;
+                return;
+            }
+            const task = this.cancellingTask;
+            this.cancellingTask = null;
             try {
                 await this.dataset.cancelTask(task.taskId);
                 await this.loadTasks();
