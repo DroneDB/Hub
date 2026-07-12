@@ -413,14 +413,18 @@ export default {
 
             const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
 
-            // Enable proper LOD refinement for the DroneDB / Obj2Tiles tilesets. The underlying
-            // 3d-tiles-renderer defaults `loadAncestors` to true, which - for a tileset whose root
-            // is a coarse placeholder over finer child tiles - forces the root to be shown as a
-            // "placeholder leaf" until *all* of its descendants have loaded, while never recursing
-            // to actually load them. The result is a deadlock: the coarse root shows and the finer
-            // LOD tiles are never requested. Disabling it lets the renderer traverse and stream the
-            // LOD hierarchy normally (verified for both octree and standard Obj2Tiles output).
-            tileset.tiles.loadAncestors = false;
+            // Progressive LOD refinement for the DroneDB / Obj2Tiles tilesets. Obj2Tiles emits an
+            // octree of REPLACE tiles: a coarse root.b3dm over successively finer LOD levels down to
+            // the leaves (geometricError 0). With `loadAncestors` enabled the renderer streams that
+            // hierarchy coarse-to-fine - the root and coarse tiles appear within ~1.5s and stay on
+            // screen as a fallback while the finer LOD tiles load, so the model refines progressively
+            // instead of popping in with holes; it also fetches only the LOD levels the current view
+            // needs (and refines further on zoom) rather than every leaf at once. `loadAncestors` is
+            // already the 3d-tiles-renderer default, but it is set explicitly here because the JSDoc
+            // documents the opposite (@default false) and the viewer previously disabled it, which
+            // forced a leaf-only load (all 253 leaves, holes during streaming). Verified in-browser
+            // on brighton-beach: 158 vs 226 tiles, ~1.5s to first paint, no holes.
+            tileset.tiles.loadAncestors = true;
 
             await this.instance.add(tileset);
 
