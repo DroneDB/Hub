@@ -21,6 +21,8 @@ const VIEW_OUTPUT_FILES = {
     // The UnifiedViewer (georeferenced Giro3D scene) needs the 3D Tiles output specifically,
     // since it cannot render the legacy Nexus mesh.
     'unified-model': '3dtiles/tileset.json',
+    // Uploaded OGC 3D Tiles (.3tz) are extracted to the same 3dtiles/ build artifact.
+    'unified-tiles3d': '3dtiles/tileset.json',
     // Splats prefer the LOD artifact (model.rad) but accept the legacy plain .spz too,
     // so datasets built before the .rad-only switch keep working (any-of match).
     'splat': ['gsplat/model.rad', 'gsplat/model.spz'],
@@ -34,7 +36,8 @@ const BUILDABLE_TYPES = [
     ddb.entry.type.GEORASTER,
     ddb.entry.type.MODEL,
     ddb.entry.type.VECTOR,
-    ddb.entry.type.GAUSSIAN_SPLAT
+    ddb.entry.type.GAUSSIAN_SPLAT,
+    ddb.entry.type.TILES3D
 ];
 
 /**
@@ -284,6 +287,8 @@ class FileAvailabilityChecker {
                 key = 'map-vector';
             } else if (entryType === ddb.entry.type.MODEL) {
                 key = 'unified-model';
+            } else if (entryType === ddb.entry.type.TILES3D) {
+                key = 'unified-tiles3d';
             }
         }
 

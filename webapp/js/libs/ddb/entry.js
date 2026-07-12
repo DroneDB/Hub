@@ -142,6 +142,7 @@ module.exports = {
         GEOPANORAMA: 13,
         VECTOR: 14,
         GAUSSIAN_SPLAT: 15,
+        TILES3D: 16,
     },
 
     typeToHuman: function (t) {
@@ -178,6 +179,8 @@ module.exports = {
                 return "Vector";
             case this.type.GAUSSIAN_SPLAT:
                 return "GaussianSplat";
+            case this.type.TILES3D:
+                return "Tiles3D";
             default:
                 return "?";
         }

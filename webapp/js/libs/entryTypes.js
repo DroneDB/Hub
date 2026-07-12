@@ -90,7 +90,8 @@ const TYPE_DISPLAY_NAMES = {
     [ddb.entry.type.PANORAMA]: 'Panorama',
     [ddb.entry.type.GEOPANORAMA]: 'GeoPanorama',
     [ddb.entry.type.VECTOR]: 'Vector',
-    [ddb.entry.type.GAUSSIAN_SPLAT]: 'Gaussian Splat'
+    [ddb.entry.type.GAUSSIAN_SPLAT]: 'Gaussian Splat',
+    [ddb.entry.type.TILES3D]: '3D Tiles'
 };
 
 function getTypeDisplayName(type) {

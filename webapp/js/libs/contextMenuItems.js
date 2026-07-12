@@ -77,7 +77,7 @@ function openModelItem(ctx) {
 
 function openUnifiedItem(ctx) {
     const T = ddb.entry.type;
-    const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL];
+    const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
     return {
         label: 'Unified Viewer',
         icon: 'fa-solid fa-earth-europe',

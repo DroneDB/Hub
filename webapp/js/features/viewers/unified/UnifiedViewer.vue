@@ -99,6 +99,10 @@ export default {
         this.shapes = [];
         this.layerObjects = {};
         this._layerId = 0;
+        // Globe-mode (georeferenced 3D Tiles) state: the Giro3D Globe entity and the
+        // requestAnimationFrame handle driving GlobeControls.update() (see setupGlobe).
+        this._globe = null;
+        this._globeRaf = null;
         // Web Mercator distance correction factor (cos of the scene-centre latitude). 1 for
         // point clouds, which use a metric local CRS.
         this.mercatorScale = 1;
@@ -125,10 +129,10 @@ export default {
                 // Only point clouds, orthophotos/rasters, vectors and 3D models are supported.
                 // Gaussian splats have their own dedicated viewer and are not opened here.
                 const T = ddb.entry.type;
-                const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL];
+                const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
                 if (!supported.includes(this.entry.type))
                     throw new Error(`'${this.basename(this.entry.path)}' is not supported in the 3D viewer.`);
-                if (!ddb.entry.hasGeometry(this.entry) && this.entry.type !== T.MODEL)
+                if (!ddb.entry.hasGeometry(this.entry) && this.entry.type !== T.MODEL && this.entry.type !== T.TILES3D)
                     throw new Error(`'${this.basename(this.entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
 
                 // Availability gate: verify the required build artifact exists for this entry type
@@ -160,6 +164,7 @@ export default {
                 case t.GEORASTER: return this.loadGeoraster(entry);
                 case t.VECTOR: return this.loadVector(entry);
                 case t.MODEL: return this.loadModel(entry);
+                case t.TILES3D: return this.loadTiles3D(entry);
                 default:
                     throw new Error(`${entry.path} is not a supported 3D viewer type`);
             }
@@ -170,7 +175,7 @@ export default {
             const [
                 THREE, controls, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
                 TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
-                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig
+                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe, GlobeControls
             ] = await Promise.all([
                 import(/* webpackChunkName: "giro3d" */ 'three'),
                 import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/MapControls.js'),
@@ -191,7 +196,9 @@ export default {
                 import(/* webpackChunkName: "giro3d" */ 'ol/proj.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMap.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMapMode.js'),
-                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/sources/las/config.js')
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/sources/las/config.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/controls/GlobeControls.js')
             ]);
 
             // Offline-first: serve the laz-perf WebAssembly decoder from our own origin (webpack
@@ -218,7 +225,9 @@ export default {
                 olStyle,
                 olProj,
                 ColorMap: ColorMap.default,
-                ColorMapMode: ColorMapMode.default
+                ColorMapMode: ColorMapMode.default,
+                Globe: Globe.default,
+                GlobeControls: GlobeControls.default
             };
         },
 
@@ -439,6 +448,151 @@ export default {
             this.frameBox(box);
             // Keep the loading indicator up until the tileset has actually put geometry on screen.
             await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
+        },
+
+        // Loads an uploaded OGC 3D Tiles archive (.3tz). The build step extracts it to the
+        // same 3dtiles/ artifact as models, so the tileset URL is resolved the same way.
+        // A georeferenced tileset (ECEF, flagged at index time) is shown on a globe with an
+        // OSM basemap; a local tileset falls back to the flat scene used for models.
+        loadTiles3D: async function (entry) {
+            this.loadingText = "Loading 3D Tiles...";
+
+            let tilesetUrl = null;
+            try {
+                tilesetUrl = await this.dataset.Entry(entry).get3DTiles();
+            } catch (e) {
+                tilesetUrl = null;
+            }
+            if (!tilesetUrl)
+                throw new Error(`The 3D Tiles '${this.basename(entry.path)}' are not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been extracted for this archive yet.`);
+
+            // properties.georeferenced is populated by the DroneDB indexer from the tileset's
+            // root boundingVolume (WGS84 region or ECEF box/sphere). Absent => assume georef.
+            const georeferenced = !(entry.properties && entry.properties.georeferenced === false);
+
+            if (georeferenced) {
+                this.setupGlobe();
+            } else {
+                // Local/engineering tileset: flat scene, like the model path.
+                this.setupInstance(this.libs.CoordinateSystem.epsg3857);
+            }
+
+            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
+            // Stream the LOD hierarchy coarse-to-fine (see loadModel for the rationale).
+            tileset.tiles.loadAncestors = true;
+
+            await this.instance.add(tileset);
+
+            const box = tileset.getBoundingBox();
+            if (!box || !this.isFiniteBox(box))
+                throw new Error(`The 3D Tiles '${this.basename(entry.path)}' are empty or invalid and cannot be displayed.`);
+
+            this.registerLayer(this.basename(entry.path), 'fa-solid fa-cubes', () => tileset.visible, v => { tileset.visible = v; });
+
+            if (georeferenced) {
+                this.frameGlobe(tileset, box);
+            } else {
+                this.frameBox(box);
+            }
+
+            // Keep the loading indicator up until the tileset has put geometry on screen.
+            await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
+
+            // Re-frame once tiles have settled (adding the tileset can move the camera target).
+            if (georeferenced) this.frameGlobe(tileset, box);
+        },
+
+        // Creates a georeferenced ECEF (EPSG:4978) globe scene with an OSM basemap draped on the
+        // WGS84 ellipsoid, plus GlobeControls. Mirrors the giro3d simple-globe example. Unlike
+        // MapControls, GlobeControls must be driven by a manual requestAnimationFrame loop.
+        setupGlobe: function () {
+            const { THREE, Instance, Globe, GlobeControls, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
+
+            const instance = new Instance({
+                target: this.$refs.view,
+                crs: CoordinateSystem.epsg4978,
+                backgroundColor: 0x0b1021
+            });
+            this.instance = instance;
+            this.mercatorScale = 1; // ECEF is metric: measurements need no Mercator correction.
+
+            const camera = instance.view.camera;
+            camera.up.set(0, 0, 1); // Z is the Earth rotation axis in ECEF.
+
+            instance.scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+            const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+            sun.position.set(1, 1, 1);
+            instance.scene.add(sun);
+
+            // OSM basemap on the ellipsoid (best-effort: a basemap failure must not hide the data).
+            try {
+                const globe = new Globe({ backgroundColor: 0x0b1021 });
+                instance.add(globe);
+                this.map = globe;
+                this._globe = globe;
+                globe.addLayer(new ColorLayer({
+                    name: 'osm',
+                    source: new TiledImageSource({ source: new OSM() })
+                }));
+                this.registerLayer('Basemap (OSM)', 'fa-solid fa-earth-europe', () => globe.visible, v => { globe.visible = v; });
+            } catch (e) {
+                // Basemap is optional.
+            }
+
+            const controls = new GlobeControls({
+                scene: (this._globe && this._globe.object3d) || instance.scene,
+                ellipsoid: this._globe ? this._globe.ellipsoid : undefined,
+                camera,
+                domElement: instance.domElement,
+                enableDamping: true
+            });
+            this.controls = controls;
+
+            // GlobeControls require a manual update loop (they are not a giro3d view control).
+            const tick = () => {
+                if (!this.controls) return;
+                try {
+                    this.controls.update();
+                    this.instance.notifyChange();
+                } catch (e) { /* ignore transient errors during teardown */ }
+                this._globeRaf = requestAnimationFrame(tick);
+            };
+            this._globeRaf = requestAnimationFrame(tick);
+        },
+
+        // Frames the camera on a georeferenced tileset. Giro3D's view.goTo computes a proper ECEF
+        // point-of-view from the object's bounding box; a manual radial placement is the fallback.
+        frameGlobe: function (tileset, box) {
+            const { THREE } = this.libs;
+            try {
+                const obj = tileset.object3d || (tileset.tiles && tileset.tiles.group);
+                if (obj) {
+                    const pov = this.instance.view.goTo(obj);
+                    if (pov) {
+                        if (this.controls && this.controls.update) this.controls.update();
+                        this.instance.notifyChange();
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Fall through to manual framing.
+            }
+
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z) || 10;
+            // Local up in ECEF is the radial direction from the Earth centre.
+            const up = center.clone().normalize();
+
+            const camera = this.instance.view.camera;
+            this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.5);
+            this.instance.view.maxFarPlane = Math.max(maxDim * 1000, 5.0e7);
+            camera.position.copy(center).add(up.clone().multiplyScalar(maxDim * 2.5));
+            camera.up.copy(up);
+            camera.lookAt(center);
+            camera.updateMatrixWorld();
+            if (this.controls && this.controls.update) this.controls.update();
+            this.instance.notifyChange();
         },
 
         // True when a THREE.Box3 is fully finite (no NaN/Infinity) and non-empty.
@@ -709,6 +863,10 @@ export default {
         // --- Teardown --------------------------------------------------------------------
 
         disposeViewer: function () {
+            if (this._globeRaf) {
+                cancelAnimationFrame(this._globeRaf);
+                this._globeRaf = null;
+            }
             if (this.abortController) {
                 try { this.abortController.abort(); } catch (e) { /* ignore */ }
                 this.abortController = null;
