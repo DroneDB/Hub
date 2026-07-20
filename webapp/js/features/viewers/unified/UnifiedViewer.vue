@@ -129,11 +129,15 @@ export default {
                 // Only point clouds, orthophotos/rasters, vectors and 3D models are supported.
                 // Gaussian splats have their own dedicated viewer and are not opened here.
                 const T = ddb.entry.type;
+                // Normalize: .3tz files indexed by older ddb versions may appear as Generic.
+                const entry = this.entry.type === T.GENERIC && /\.3tz$/i.test(this.entry.path || '')
+                    ? { ...this.entry, type: T.TILES3D }
+                    : this.entry;
                 const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
-                if (!supported.includes(this.entry.type))
-                    throw new Error(`'${this.basename(this.entry.path)}' is not supported in the 3D viewer.`);
-                if (!ddb.entry.hasGeometry(this.entry) && this.entry.type !== T.MODEL && this.entry.type !== T.TILES3D)
-                    throw new Error(`'${this.basename(this.entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
+                if (!supported.includes(entry.type))
+                    throw new Error(`'${this.basename(entry.path)}' is not supported in the 3D viewer.`);
+                if (!ddb.entry.hasGeometry(entry) && entry.type !== T.MODEL && entry.type !== T.TILES3D)
+                    throw new Error(`'${this.basename(entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
 
                 // Availability gate: verify the required build artifact exists for this entry type
                 // (3D Tiles for models, COPC for point clouds, COG for rasters, MVT/FGB for vectors)
@@ -141,12 +145,12 @@ export default {
                 // pre-open check in ViewDataset.handleOpenItem so direct-URL opens are covered too.
                 // Loaded dynamically so this lazy chunk does not hard-depend on the dataset chunk.
                 const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
-                const availability = await FileAvailabilityChecker.check(this.dataset, this.entry, 'unified');
+                const availability = await FileAvailabilityChecker.check(this.dataset, entry, 'unified');
                 if (!availability.available)
-                    throw new Error(availability.message || `${this.entry.path} is not available in the 3D viewer.`);
+                    throw new Error(availability.message || `${entry.path} is not available in the 3D viewer.`);
 
                 this.libs = await this.loadLibs();
-                await this.loadPrimary(this.entry);
+                await this.loadPrimary(entry);
                 this.ready = true;
             } catch (e) {
                 this.error = e.message;
@@ -420,7 +424,7 @@ export default {
             // frame with MapControls, consistent with every other type.
             this.setupInstance(this.libs.CoordinateSystem.epsg3857);
 
-            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
+            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8, ktx2DecoderPath: '/wasm/basis/' });
 
             // Progressive LOD refinement for the DroneDB / Obj2Tiles tilesets. Obj2Tiles emits an
             // octree of REPLACE tiles: a coarse root.b3dm over successively finer LOD levels down to
@@ -436,6 +440,7 @@ export default {
             tileset.tiles.loadAncestors = true;
 
             await this.instance.add(tileset);
+            this.configureTilesetStreaming(tileset);
 
             // Guard against a degenerate tileset: Obj2Tiles can emit an empty tileset (null content
             // and children, infinite bounding volume) for some meshes. Such a tileset "loads" but
@@ -477,11 +482,12 @@ export default {
                 this.setupInstance(this.libs.CoordinateSystem.epsg3857);
             }
 
-            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8 });
+            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8, ktx2DecoderPath: '/wasm/basis/' });
             // Stream the LOD hierarchy coarse-to-fine (see loadModel for the rationale).
             tileset.tiles.loadAncestors = true;
 
             await this.instance.add(tileset);
+            this.configureTilesetStreaming(tileset);
 
             const box = tileset.getBoundingBox();
             if (!box || !this.isFiniteBox(box))
@@ -500,6 +506,48 @@ export default {
 
             // Re-frame once tiles have settled (adding the tileset can move the camera target).
             if (georeferenced) this.frameGlobe(tileset, box);
+        },
+
+        // Prepares a freshly added Tiles3D entity for robust progressive streaming. Must be called
+        // right AFTER `instance.add(tileset)` (it relies on the shared LRU cache created during add).
+        // Works for any OGC 3D Tiles content the renderer supports - textured meshes (b3dm/glTF),
+        // instanced models (i3dm), composites (cmpt) and point clouds (pnts / glTF POINTS) - from
+        // any producer, not just Obj2Tiles.
+        //
+        // distance.max = Infinity: while the first tiles are still streaming the tileset group is
+        // empty, so giro3d measures its far distance as 0 and collapses the camera far plane onto
+        // the near plane. That zero-depth frustum culls every tile, so nothing loads, the render
+        // loop goes idle and the scene stays blank - a deadlock the tileset never recovers from.
+        // Forcing distance.max = Infinity makes giro3d derive the far plane from view.maxFarPlane
+        // (set by frameBox / frameGlobe) instead, keeping a valid frustum so tiles can stream in.
+        // Tiles3D.preUpdate does not call super.preUpdate(), so the per-frame distance reset does
+        // not run for this entity and a single assignment here persists.
+        //
+        // LRU byte budget: scalability comes from *streaming*, not from a large cache. The renderer
+        // keeps only the view-dependent working set resident and evicts the rest, so a bounded
+        // cache renders tilesets of arbitrary total size as long as individual tiles are reasonably
+        // sized (the 3D Tiles design assumption - well-formed tiles are a few KB to a few MB). The
+        // giro3d default (~410 MB) is too small for high-resolution model tiles, so the shared
+        // cache reports "full" and loading halts before anything is drawn. We size the budget to
+        // the device: enough headroom to stream real-world tilesets smoothly, capped so we never
+        // exhaust memory on constrained machines. A pathological tileset (e.g. hundreds of MB per
+        // tile from uncapped source textures) simply refines only as far as the budget allows -
+        // graceful degradation to a coarser LOD, never a stall or blank scene. Such tilesets should
+        // be rebuilt with a texture-size cap; no client cache can hold gigabytes per tile.
+        configureTilesetStreaming: function (tileset) {
+            if (tileset.distance) tileset.distance.max = Infinity;
+
+            const cache = tileset.tiles && tileset.tiles.lruCache;
+            if (cache) {
+                // deviceMemory is approximate system RAM in GiB (Chromium; undefined elsewhere).
+                // Use ~1/4 of it as a proxy budget, clamped to [0.75, 2] GiB.
+                const deviceMemGb = (typeof navigator !== 'undefined' && navigator.deviceMemory) || 4;
+                const budget = Math.min(2, Math.max(0.75, deviceMemGb * 0.25)) * 1024 * 1024 * 1024;
+                if (!(cache.maxBytesSize >= budget)) {
+                    cache.maxBytesSize = budget;
+                    cache.minBytesSize = Math.round(budget * 0.75);
+                }
+            }
         },
 
         // Creates a georeferenced ECEF (EPSG:4978) globe scene with an OSM basemap draped on the
@@ -741,9 +789,9 @@ export default {
 
             const camera = this.instance.view.camera;
             this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.01);
-            // Generous far plane bound relative to the data size. For models this is also the value
-            // giro3d falls back to while the tileset streams in (see loadModel: tileset.distance.max
-            // is forced to Infinity), so it must comfortably contain the whole model.
+            // Generous far plane bound relative to the data size. For 3D Tiles this is also the value
+            // giro3d uses as the far plane while the tileset streams in (configureTilesetStreaming
+            // forces tileset.distance.max = Infinity), so it must comfortably contain the whole model.
             this.instance.view.maxFarPlane = maxDim * 1000;
 
             camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);

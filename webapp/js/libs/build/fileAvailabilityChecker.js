@@ -60,6 +60,9 @@ class FileAvailabilityChecker {
      * @returns {Promise<AvailabilityResult>}
      */
     async check(dataset, entry, viewType) {
+        // Normalize: .3tz files indexed by older ddb versions may appear as Generic.
+        if (entry.type === ddb.entry.type.GENERIC && /\.3tz$/i.test(entry.path || '')) entry = { ...entry, type: ddb.entry.type.TILES3D };
+
         // For non-buildable files, only check if they exist
         if (!this.isBuildableType(entry.type)) {
             return this.checkNonBuildableFile(dataset, entry, viewType);

@@ -178,7 +178,12 @@ module.exports = {
                 // Serve the laz-perf WebAssembly decoder locally (offline-first): the unified
                 // Giro3D viewer configures setLazPerfPath('/wasm') so COPC point clouds decode
                 // without fetching the .wasm from a public CDN.
-                { from: 'node_modules/laz-perf/lib/laz-perf.wasm', to: 'wasm/laz-perf.wasm' }
+                { from: 'node_modules/laz-perf/lib/laz-perf.wasm', to: 'wasm/laz-perf.wasm' },
+                // Serve the Basis Universal transcoder locally (offline-first): the unified viewer
+                // passes ktx2DecoderPath: '/wasm/basis/' to Tiles3D so KTX2 / KHR_texture_basisu
+                // textures transcode without fetching the transcoder from a public CDN.
+                { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.js', to: 'wasm/basis/basis_transcoder.js' },
+                { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.wasm', to: 'wasm/basis/basis_transcoder.wasm' }
             ]
         }),
         // CSS extraction for production builds

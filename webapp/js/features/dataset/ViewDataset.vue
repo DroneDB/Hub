@@ -806,6 +806,10 @@ export default {
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
 
+            // .3tz files (OGC 3D Tiles archives) indexed by older ddb may appear as Generic.
+            // Fall back to the Unified Viewer by extension so double-click works correctly.
+            if (!view && /\.3tz$/i.test(node.entry.path || '')) view = 'unified';
+
             // Archives are indexed as generic files but we can extract them. When the
             // user can write, make "Extract" the default action (matches the context menu).
             if (!view && this.canWrite && isArchiveFile(node.entry)) {
