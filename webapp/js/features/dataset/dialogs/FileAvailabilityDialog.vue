@@ -223,6 +223,8 @@ export default {
                     return 'warn';
                 case 'failed':
                     return 'error';
+                case 'blocked':
+                    return 'warn';
                 case 'queued':
                     return 'info';
                 case 'not-found':

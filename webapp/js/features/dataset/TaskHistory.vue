@@ -216,6 +216,7 @@
 import useHeavyTask from '@/composables/useHeavyTask';
 import useTaskFormatting from '@/composables/useTaskFormatting';
 import emitter from '@/libs/eventBus';
+import taskMonitor from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -410,7 +411,6 @@ export default {
         await this.loadTools();
         await this.loadProcessingNodes();
         await this.loadTasks();
-        this.scheduleAutoRefresh();
 
         // Register with TabSwitcher so onTabActivated() is called on tab switch
         if (this.registerTabChild) this.registerTabChild('tasks', this);
@@ -420,7 +420,6 @@ export default {
         // Unregister from TabSwitcher
         if (this.unregisterTabChild) this.unregisterTabChild('tasks');
 
-        if (this._refreshTimer) clearTimeout(this._refreshTimer);
         // Clear the global flag so the download button re-enables when leaving the dataset.
         emitter.emit('setActiveBulkDownload', false);
     },
@@ -457,7 +456,8 @@ export default {
         async loadTasks() {
             this.loading = true;
             try {
-                this.tasks = await this.dataset.getTasks({ take: 200 }) || [];
+                // Read from taskMonitor shared store to avoid duplicate DB roundtrips.
+                this.tasks = taskMonitor.getTasks(this.dataset) || [];
                 this.applyFilters();
             } catch (e) {
                 console.error('Failed to load tasks:', e);
@@ -469,22 +469,15 @@ export default {
         },
 
         async refreshData() {
+            // Trigger an immediate fetch from taskMonitor
+            taskMonitor.forceRefresh(this.dataset);
             await this.loadTasks();
-        },
-
-        scheduleAutoRefresh() {
-            if (this._refreshTimer) clearTimeout(this._refreshTimer);
-            // Poll more aggressively while tasks are in flight.
-            const delay = this.hasActiveTasks ? 2500 : 15000;
-            this._refreshTimer = setTimeout(async () => {
-                await this.loadTasks();
-                this.scheduleAutoRefresh();
-            }, delay);
         },
 
         // Called by TabSwitcher when the Tasks tab is activated. Refreshes the task list.
         async onTabActivated() {
-            await this.refreshData();
+            taskMonitor.forceRefresh(this.dataset);
+            await this.loadTasks();
         },
 
         applyFilters() {

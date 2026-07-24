@@ -439,18 +439,7 @@ module.exports = class Dataset {
         const response = await this.registry.postFormData(`${this.baseApi}/build`, formData);
 
         return response === true ? { success: true } : response;
-    }
-
-    async getBuilds(page = 1, pageSize = 50) {
-        const params = new URLSearchParams({
-            page: page.toString(),
-            pageSize: pageSize.toString()
-        });
-
-        return this.registry.getRequest(`${this.baseApi}/builds?${params}`);
-    }
-
-    async clearCompletedBuilds() {
+    }async clearCompletedBuilds() {
         const response = await this.registry.postRequest(`${this.baseApi}/builds/clear`, {});
         return response;
     }
@@ -595,3 +584,4 @@ module.exports = class Dataset {
         return `${this.baseApi}/tasks/${encodeURIComponent(id)}/result`;
     }
 };
+

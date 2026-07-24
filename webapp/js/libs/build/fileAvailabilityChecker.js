@@ -7,6 +7,8 @@
 
 import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
+import taskMonitor from '@/libs/tasks/taskMonitor';
+import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 
 // Mapping between viewer type and required output file
 const VIEW_OUTPUT_FILES = {
@@ -133,18 +135,50 @@ class FileAvailabilityChecker {
      */
     async checkBuildableFile(dataset, entry, viewType) {
         try {
-            // 1. Check build state in BuildManager cache
+            const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
+
+            // 1. Check build state in BuildManager cache. An in-progress build is always
+            // authoritative (nothing fresher can exist), so surface it immediately.
             const buildState = BuildManager.getBuildState(dataset, entry.path);
 
+            if (buildState && activeStates.includes(buildState.currentState))
+                return this.handleExistingBuildState(buildState, entry);
+
+            // 2. If no active build state in cache, query taskMonitor store for one
+            const allTasks = taskMonitor.getTasks(dataset);
+            const buildTasks = allTasks.filter(t => t.toolId === 'build');
+            const currentBuild = buildTasks.find(b => b.path === entry.path);
+
+            if (currentBuild && activeStates.includes(currentBuild.state))
+                return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
+
+            // 2b. No active job found: the list API may already know the build is
+            // deferred because a dependency (companion file or external tool) is missing.
+            // This must be checked BEFORE trusting any terminal (Succeeded/Failed) cached
+            // job below: a build can have succeeded in the past and then become pending
+            // again (e.g. its companion file was later removed), leaving a stale
+            // "Succeeded" job record for the same path. entry.buildStatus reflects the
+            // CURRENT on-disk state, freshly recomputed by the server on every list()
+            // call from ddb.GetPendingBuildInfo(), so it takes priority over job history.
+            if (entry.buildStatus === 'pending') {
+                return {
+                    available: false,
+                    status: 'blocked',
+                    message: `Processing of '${this.getFileName(entry.path)}' is on hold.\n\nMissing: ${formatMissingDeps(entry.buildMissingDependencies)}.`,
+                    title: 'Processing On Hold',
+                    buildState: null,
+                    missingDependencies: entry.buildMissingDependencies || [],
+                    actions: ['cancel', 'retry-build']
+                };
+            }
+
+            // 2c. Not pending: now it's safe to trust a terminal cached build state
+            // (Succeeded/Failed/etc.) found above.
             if (buildState)
                 return this.handleExistingBuildState(buildState, entry);
 
-            // 2. If no build state in cache, query the API
-            const builds = await dataset.getBuilds(1, 200);
-            const currentBuild = builds.find(b => b.path === entry.path);
-
             if (currentBuild)
-                return this.handleExistingBuildState(currentBuild, entry);
+                return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
 
             // 3. No build found - check if output file exists anyway
             const outputFile = this.getOutputFile(entry.type, viewType);

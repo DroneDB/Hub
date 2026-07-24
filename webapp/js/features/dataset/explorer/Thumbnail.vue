@@ -19,8 +19,8 @@
             <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
             <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="!thumbnail && !icon" />
 
-            <!-- Build Status Badges - Only show errors -->
-            <div v-if="!buildLoading && !loading && buildState && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
+            <!-- Build Status Badges: only for non-default states (queued/pending/failed) -->
+            <div v-if="!buildLoading && !loading && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
                 <i class="icon" :class="buildBadgeIcon"></i>
             </div>
         </div>
@@ -33,6 +33,8 @@ import { thumbs, pathutils } from 'ddb';
 import Mouse from '@/libs/mouse';
 import Keyboard from '@/libs/keyboard';
 import BuildManager from '@/libs/build/buildManager';
+import taskMonitor from '@/libs/tasks/taskMonitor';
+import { formatMissingDeps } from '@/libs/build/buildHelpers';
 import ddb from 'ddb';
 
 export default {
@@ -79,37 +81,52 @@ export default {
         }
     },
     computed: {
+        // Effective badge status: the live Hangfire state (once a job exists)
+        // takes priority over the static list-API status. "ready" (built) is
+        // the default and never produces a badge - only queued/pending/failed do.
+        effectiveBuildStatus() {
+            if (this.buildState) {
+                return this.buildState.currentState === 'Failed' ? 'failed' : null;
+            }
+            const status = this.file.entry && this.file.entry.buildStatus;
+            return status === 'pending' || status === 'queued' || status === 'failed' ? status : null;
+        },
         getTitleText() {
             if (this.error) return this.error;
             if (this.buildState) {
                 return `${this.file.path}\nBuild Status: ${this.buildState.currentState}`;
             }
+            if (this.effectiveBuildStatus === 'pending') {
+                return `${this.file.path}\nWaiting for: ${formatMissingDeps(this.file.entry.buildMissingDependencies)}`;
+            }
+            if (this.effectiveBuildStatus === 'queued') {
+                return `${this.file.path}\nQueued for processing`;
+            }
             return this.file.path;
         },
         shouldShowBuildBadge() {
-            if (!this.buildState) return false;
-            const state = this.buildState.currentState;
-            // Only show badges for errors/failures
-            return state === 'Failed';
+            return !!this.effectiveBuildStatus;
         },
         buildBadgeClass() {
-            if (!this.buildState) return '';
-
-            const state = this.buildState.currentState;
-            switch (state) {
-                case 'Failed':
+            switch (this.effectiveBuildStatus) {
+                case 'failed':
                     return 'error';
+                case 'pending':
+                    return 'pending';
+                case 'queued':
+                    return 'queued';
                 default:
                     return '';
             }
         },
         buildBadgeIcon() {
-            if (!this.buildState) return '';
-
-            const state = this.buildState.currentState;
-            switch (state) {
-                case 'Failed':
+            switch (this.effectiveBuildStatus) {
+                case 'failed':
                     return 'fa-solid fa-xmark';
+                case 'pending':
+                    return 'fa-solid fa-triangle-exclamation';
+                case 'queued':
+                    return 'fa-solid fa-clock';
                 default:
                     return '';
             }
@@ -187,36 +204,32 @@ export default {
                         // If build failed or succeeded, continue with thumbnail load
                         this.buildState = buildState;
                     } else {
-                        // No build state found - might be a new file that needs building
-                        // Direct API call to check current builds - no cache
-                        const builds = await this.dataset.getBuilds(1, 200);
-                        const activeBuild = builds.find(build =>
+                        // No build state found in buildManager cache — check taskMonitor store
+                        const tasks = taskMonitor.getTasks(this.dataset);
+                        const buildTasks = tasks.filter(t => t.toolId === 'build');
+                        const activeBuild = buildTasks.find(build =>
                             build.path === this.file.entry.path &&
-                            (build.currentState === 'Processing' ||
-                             build.currentState === 'Enqueued' ||
-                             build.currentState === 'Scheduled' ||
-                             build.currentState === 'Awaiting' ||
-                             build.currentState === 'Created')
+                            (build.state === 'Processing' ||
+                             build.state === 'Enqueued' ||
+                             build.state === 'Scheduled' ||
+                             build.state === 'Awaiting' ||
+                             build.state === 'Created')
                         );
 
                         if (activeBuild) {
                             this.buildLoading = true;
-                            this.buildState = activeBuild;
+                            this.buildState = { path: activeBuild.path, currentState: activeBuild.state };
                             this.icon = this.file.icon;
                             return;
                         }
 
-                        // For buildable types without a successful build, show build loading initially
-                        // This covers newly uploaded files that need processing
-                        const hasSuccessfulBuild = builds.find(build =>
+                        const hasSuccessfulBuild = buildTasks.find(build =>
                             build.path === this.file.entry.path &&
-                            build.currentState === 'Succeeded'
+                            build.state === 'Succeeded'
                         );
 
                         if (!hasSuccessfulBuild) {
-                            this.buildLoading = true;
                             this.icon = this.file.icon;
-                            // Don't return here - let it fall through to try thumbnail generation
                         }
                     }
                 } catch (e) {
@@ -240,9 +253,9 @@ export default {
             } catch (e) {
                 this.loading = false; // Reset loading state on error
 
-                // For buildable files that fail thumbnail generation, keep showing build loading
+                // For buildable files without a build yet, show the icon and let the
+                // queued/pending badge explain the state instead of a perpetual spinner.
                 if (this.dataset && BuildManager.isBuildableType(this.file.entry.type) && !this.buildState) {
-                    this.buildLoading = true;
                     this.icon = this.file.icon;
                 } else {
                     this.buildLoading = false;
@@ -399,6 +412,14 @@ export default {
 
 .build-badge.processing {
     background-color: var(--ddb-warning);
+}
+
+.build-badge.queued {
+    background-color: var(--ddb-warning);
+}
+
+.build-badge.pending {
+    background-color: #e67e22;
 }
 
 .build-badge i.icon {

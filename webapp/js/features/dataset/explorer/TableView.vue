@@ -32,7 +32,7 @@
                     <template #body="{ data }">
                         <i v-if="!isBuildLoading(data)" class="icon" :class="data.icon"></i>
                         <i v-else class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
-                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)"></i>
+                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)"></i>
                     </template>
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
@@ -101,7 +101,7 @@ import { clone } from '@/libs/utils';
 import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
-import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, buildFile } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { bytesToSize } from '@/libs/utils';
 
@@ -430,6 +430,10 @@ export default {
 
         getBuildBadge: function(file) {
             return getBuildBadge(this.dataset, file);
+        },
+
+        getBuildBadgeTooltip: function(file) {
+            return getBuildBadgeTooltip(this.dataset, file);
         },
 
         buildSelectedFile: async function() {
