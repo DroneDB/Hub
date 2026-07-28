@@ -20,20 +20,20 @@ class Entry {
         const copcUrl = this.buildUrl("copc/cloud.copc.laz");
 
         if (await this.dataset.registry.headRequest(copcUrl)) return copcUrl;
-        else throw new Error(`Il file COPC non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+        else throw new Error(`The COPC file is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
     }
 
     async getCog() {
         const cogUrl = this.buildUrl("cog/cog.tif");
 
         if (await this.dataset.registry.headRequest(cogUrl)) return cogUrl;
-        else throw new Error(`Il file COG non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+        else throw new Error(`The COG file is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
     }
 
     async getNxz() {
         const nxzUrl = this.buildUrl("nxs/model.nxz");
         if (await this.dataset.registry.headRequest(nxzUrl)) return nxzUrl;
-        else throw new Error(`Il modello 3D non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+        else throw new Error(`The 3D model is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
     }
 
     /**
@@ -52,7 +52,7 @@ class Entry {
     async getGsplat() {
         const spzUrl = this.buildUrl("gsplat/model.spz");
         if (await this.dataset.registry.headRequest(spzUrl)) return spzUrl;
-        else throw new Error(`Il Gaussian Splat non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+        else throw new Error(`The Gaussian Splat is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
     }
 
     /**
@@ -103,7 +103,7 @@ class Entry {
         const vectorUrl = this.buildUrl("vec/vector.fgb");
 
         if (await this.dataset.registry.headRequest(vectorUrl)) return vectorUrl;
-        else throw new Error(`Il file vettoriale non è disponibile.\n\nIl file potrebbe essere ancora in fase di elaborazione. Torna alla lista file per verificare lo stato del build.`);
+        else throw new Error(`The vector file is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
     }
 
     /**
