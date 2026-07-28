@@ -117,11 +117,11 @@ const TaskMonitor = {
         _clearTimer(ent);
     },
 
-    /** Trigger an immediate refresh (e.g. user hit Refresh, tab activated). */
+    /** Trigger an immediate refresh (e.g. user hit Refresh, tab activated). Returns the in-flight fetch promise so callers can await freshness. */
     forceRefresh(dataset) {
         const ent = getStore(dataset);
-        if (!ent) return;
-        _fetch(ent);
+        if (!ent) return Promise.resolve();
+        return _fetch(ent);
     },
 
     /** Hint that new files were added (may spawn new build tasks). */

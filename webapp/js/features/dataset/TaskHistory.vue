@@ -469,14 +469,14 @@ export default {
         },
 
         async refreshData() {
-            // Trigger an immediate fetch from taskMonitor
-            taskMonitor.forceRefresh(this.dataset);
+            // Trigger an immediate fetch from taskMonitor and wait for it to land before reading the store.
+            await taskMonitor.forceRefresh(this.dataset);
             await this.loadTasks();
         },
 
         // Called by TabSwitcher when the Tasks tab is activated. Refreshes the task list.
         async onTabActivated() {
-            taskMonitor.forceRefresh(this.dataset);
+            await taskMonitor.forceRefresh(this.dataset);
             await this.loadTasks();
         },
 
@@ -739,7 +739,6 @@ export default {
                 this.photogrammetryDialogOpen = false;
                 this._toast('info', 'Photogrammetry started', 'The task is now queued on the processing node.');
                 await this.loadTasks();
-                this.scheduleAutoRefresh();
             } catch (e) {
                 if (e && e.status === 403) {
                     this._toast('error', 'Not available', e.message || this.photogrammetryDisabledMsg);
@@ -779,7 +778,6 @@ export default {
             try {
                 await this.dataset.retryTask(task.taskId);
                 await this.loadTasks();
-                this.scheduleAutoRefresh();
             } catch (e) {
                 this._toast('error', 'Retry failed', e.message);
             }
