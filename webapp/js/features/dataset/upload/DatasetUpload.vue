@@ -85,7 +85,7 @@
                     </div>
                     <div class="summary-stat">
                         <i class="fa-solid fa-database"></i>
-                        <span class="stat-label">Data transferred:</span>
+                        <span class="stat-label">Transferred:</span>
                         <span class="stat-value">{{ humanTotalBytes }}</span>
                     </div>
                     <div class="summary-stat">
@@ -601,7 +601,7 @@ export default {
 /* Header */
 .upload-header {
     flex-shrink: 0;
-    padding: var(--ddb-spacing-md) var(--ddb-spacing-lg);
+    padding: var(--ddb-spacing-md) 0;
     border-bottom: var(--ddb-border-width) solid var(--ddb-border);
 }
 
