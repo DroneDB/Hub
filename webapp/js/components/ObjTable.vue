@@ -22,6 +22,8 @@
                             <div v-else-if="key === 'dimensions' && Array.isArray(val)">
                                 {{ val.join(", ") }}
                             </div>
+                            <div v-else-if="typeof val === 'boolean' && val" class="bool-true" title="true">✓</div>
+                            <div v-else-if="typeof val === 'boolean'" class="bool-false" title="false">✗</div>
                             <div v-else-if="val !== null && typeof val === 'string'" class="wrap">
                                 <a v-if="isUrl(val)" :href="val" target="_blank" rel="noopener noreferrer">{{ val }}</a>
                                 <template v-else>{{ val }}</template>
@@ -153,6 +155,16 @@ export default {
 ul {
     margin: 0;
     padding-left: 1rem;
+}
+
+.bool-true {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.bool-false {
+    color: #f44336;
+    font-weight: bold;
 }
 
 .wrap {

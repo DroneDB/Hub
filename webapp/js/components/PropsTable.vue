@@ -24,6 +24,8 @@
                     <div v-else-if="data.key === 'dimensions' && Array.isArray(data.rawValue)">
                         {{ data.rawValue.join(', ') }}
                     </div>
+                    <div v-else-if="typeof data.rawValue === 'boolean' && data.rawValue" class="bool-true" title="true">✓</div>
+                    <div v-else-if="typeof data.rawValue === 'boolean'" class="bool-false" title="false">✗</div>
                     <div v-else-if="data.rawValue !== null && typeof data.rawValue === 'string'" class="wrap copyable-row">
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
                         <template v-else>{{ data.rawValue }}</template>
@@ -330,6 +332,16 @@ export default {
     word-wrap: break-word;
     word-break: break-all;
     white-space: normal;
+}
+
+.bool-true {
+    color: #4caf50;
+    font-weight: bold;
+}
+
+.bool-false {
+    color: #f44336;
+    font-weight: bold;
 }
 
 .props-datatable :deep(.p-datatable-thead) {
