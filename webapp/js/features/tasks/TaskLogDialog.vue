@@ -72,11 +72,14 @@ export default {
             }
         },
         autoRefresh(val) {
-            if (val) {
+            if (val && this.isActive) {
                 this.startRefreshInterval();
             } else {
                 this.clearRefreshInterval();
             }
+        },
+        isActive(val) {
+            if (!val) this.clearRefreshInterval();
         },
         logText() {
             this.handleLogTextChange();

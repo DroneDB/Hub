@@ -170,7 +170,11 @@ export default {
         startPolling() {
             this.stopPolling();
 
+            this._pollTick = false;
             this.pollInterval = setInterval(async () => {
+                // Guard against overlapping ticks if loadBuilds() is slower than the interval
+                if (this._pollTick) return;
+                this._pollTick = true;
                 try {
                     const buildState = BuildManager.getBuildState(this.dataset, this.entry.path);
 
@@ -198,6 +202,8 @@ export default {
                     }
                 } catch (error) {
                     console.error('Error polling build state:', error);
+                } finally {
+                    this._pollTick = false;
                 }
             }, 3000); // Poll every 3 seconds
         },

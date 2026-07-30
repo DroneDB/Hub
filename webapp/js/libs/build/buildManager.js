@@ -79,15 +79,18 @@ class BuildManager {
     registerDataset(dataset) {
         const key = this.getDatasetKey(dataset);
         this.datasets.set(key, dataset);
-        this._boundOnStateChange = this._boundOnStateChange || ((data) => {
-            if (data.dataset && data.dataset.baseApi === dataset.baseApi) {
-                this._sync(data.dataset);
-                this.emit('buildStateChanged', data);
-            }
-        });
-        // Start the unified poller and listen for state changes
+        // Subscribe once; check against all registered datasets, not just the first one
+        if (!this._boundOnStateChange) {
+            this._boundOnStateChange = (data) => {
+                if (data.dataset && this.datasets.has(this.getDatasetKey(data.dataset))) {
+                    this._sync(data.dataset);
+                    this.emit('buildStateChanged', data);
+                }
+            };
+            taskMonitor.on('buildStateChanged', this._boundOnStateChange);
+        }
+        // Start the unified poller for this dataset
         taskMonitor.start(dataset);
-        taskMonitor.on('buildStateChanged', this._boundOnStateChange);
         this._sync(dataset);
     }
 

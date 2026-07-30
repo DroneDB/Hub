@@ -76,7 +76,8 @@ function _scheduleTick(ent) {
     _clearTimer(ent);
     if (!ent._started) return;
     const delay = hasActive(ent) ? POLL_ACTIVE : POLL_IDLE;
-    ent.timerId = setTimeout(() => { _fetch(ent); _scheduleTick(ent); }, delay);
+    // Await the fetch before rescheduling to avoid overlapping/out-of-order requests
+    ent.timerId = setTimeout(async () => { await _fetch(ent); _scheduleTick(ent); }, delay);
 }
 
 function _clearTimer(ent) {

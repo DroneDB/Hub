@@ -439,7 +439,9 @@ module.exports = class Dataset {
         const response = await this.registry.postFormData(`${this.baseApi}/build`, formData);
 
         return response === true ? { success: true } : response;
-    }async clearCompletedBuilds() {
+    }
+
+    async clearCompletedBuilds() {
         const response = await this.registry.postRequest(`${this.baseApi}/builds/clear`, {});
         return response;
     }
