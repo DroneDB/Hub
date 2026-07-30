@@ -13,7 +13,7 @@
  */
 import { reactive } from 'vue';
 
-// Reactive state — usable in Vue templates and composables
+// Reactive state - usable in Vue templates and composables
 const keyboardState = reactive({
     shiftPressed: false,
     ctrlPressed: false,

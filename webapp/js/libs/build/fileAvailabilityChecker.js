@@ -7,6 +7,8 @@
 
 import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
+import taskMonitor from '@/libs/tasks/taskMonitor';
+import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 
 // Mapping between viewer type and required output file
 const VIEW_OUTPUT_FILES = {
@@ -14,7 +16,15 @@ const VIEW_OUTPUT_FILES = {
     'map-pointcloud': 'copc/cloud.copc.laz',
     'map-georaster': 'cog/cog.tif',
     'map-vector': 'vec/vector.fgb',
+    // Models prefer the OGC 3D Tiles artifact (3dtiles/tileset.json) but accept the legacy
+    // Nexus output (nxs/model.nxz) too, so datasets built before 3D Tiles support keep
+    // working (any-of match). The model viewer picks the right renderer per availability.
     'model': 'nxs/model.nxz',
+    // The UnifiedViewer (georeferenced Giro3D scene) needs the 3D Tiles output specifically,
+    // since it cannot render the legacy Nexus mesh.
+    'unified-model': '3dtiles/tileset.json',
+    // Uploaded OGC 3D Tiles (.3tz) are extracted to the same 3dtiles/ build artifact.
+    'unified-tiles3d': '3dtiles/tileset.json',
     // Splats prefer the LOD artifact (model.rad) but accept the legacy plain .spz too,
     // so datasets built before the .rad-only switch keep working (any-of match).
     'splat': ['gsplat/model.rad', 'gsplat/model.spz'],
@@ -28,7 +38,8 @@ const BUILDABLE_TYPES = [
     ddb.entry.type.GEORASTER,
     ddb.entry.type.MODEL,
     ddb.entry.type.VECTOR,
-    ddb.entry.type.GAUSSIAN_SPLAT
+    ddb.entry.type.GAUSSIAN_SPLAT,
+    ddb.entry.type.TILES3D
 ];
 
 /**
@@ -51,9 +62,35 @@ class FileAvailabilityChecker {
      * @returns {Promise<AvailabilityResult>}
      */
     async check(dataset, entry, viewType) {
+        // Normalize: .3tz files indexed by older ddb versions may appear as Generic.
+        if (entry.type === ddb.entry.type.GENERIC && /\.3tz$/i.test(entry.path || '')) entry = { ...entry, type: ddb.entry.type.TILES3D };
+
         // For non-buildable files, only check if they exist
         if (!this.isBuildableType(entry.type)) {
             return this.checkNonBuildableFile(dataset, entry, viewType);
+        }
+
+        // The unified 3D viewer needs its SPECIFIC artifact (3D Tiles for models, COPC for point
+        // clouds, COG for rasters, MVT/FGB for vectors). A generic "Succeeded" build state is not
+        // enough - e.g. a model can have a legacy Nexus build but no 3D Tiles output - so verify
+        // the exact artifact directly.
+        if (viewType === 'unified') {
+            const outputFile = this.getOutputFile(entry.type, viewType);
+            if (outputFile) {
+                const entryObj = dataset.Entry(entry);
+                const available = await this.checkOutputFileAvailability(entryObj, outputFile);
+                if (available) {
+                    return { available: true, status: 'ready', message: '', title: '', buildState: null, actions: [] };
+                }
+                return {
+                    available: false,
+                    status: 'not-found',
+                    message: `'${this.getFileName(entry.path)}' is not available in the 3D viewer.\n\nThe required output has not been produced yet - this file may need to be (re)built.`,
+                    title: 'Not available in 3D viewer',
+                    buildState: null,
+                    actions: ['close']
+                };
+            }
         }
 
         // For buildable files, verify build state
@@ -98,18 +135,50 @@ class FileAvailabilityChecker {
      */
     async checkBuildableFile(dataset, entry, viewType) {
         try {
-            // 1. Check build state in BuildManager cache
+            const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
+
+            // 1. Check build state in BuildManager cache. An in-progress build is always
+            // authoritative (nothing fresher can exist), so surface it immediately.
             const buildState = BuildManager.getBuildState(dataset, entry.path);
 
+            if (buildState && activeStates.includes(buildState.currentState))
+                return this.handleExistingBuildState(buildState, entry);
+
+            // 2. If no active build state in cache, query taskMonitor store for one
+            const allTasks = taskMonitor.getTasks(dataset);
+            const buildTasks = allTasks.filter(t => t.toolId === 'build');
+            const currentBuild = buildTasks.find(b => b.path === entry.path);
+
+            if (currentBuild && activeStates.includes(currentBuild.state))
+                return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
+
+            // 2b. No active job found: the list API may already know the build is
+            // deferred because a dependency (companion file or external tool) is missing.
+            // This must be checked BEFORE trusting any terminal (Succeeded/Failed) cached
+            // job below: a build can have succeeded in the past and then become pending
+            // again (e.g. its companion file was later removed), leaving a stale
+            // "Succeeded" job record for the same path. entry.buildStatus reflects the
+            // CURRENT on-disk state, freshly recomputed by the server on every list()
+            // call from ddb.GetPendingBuildInfo(), so it takes priority over job history.
+            if (entry.buildStatus === 'pending') {
+                return {
+                    available: false,
+                    status: 'blocked',
+                    message: `Processing of '${this.getFileName(entry.path)}' is on hold.\n\nMissing: ${formatMissingDeps(entry.buildMissingDependencies)}.`,
+                    title: 'Processing On Hold',
+                    buildState: null,
+                    missingDependencies: entry.buildMissingDependencies || [],
+                    actions: ['cancel', 'retry-build']
+                };
+            }
+
+            // 2c. Not pending: now it's safe to trust a terminal cached build state
+            // (Succeeded/Failed/etc.) found above.
             if (buildState)
                 return this.handleExistingBuildState(buildState, entry);
 
-            // 2. If no build state in cache, query the API
-            const builds = await dataset.getBuilds(1, 200);
-            const currentBuild = builds.find(b => b.path === entry.path);
-
             if (currentBuild)
-                return this.handleExistingBuildState(currentBuild, entry);
+                return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
 
             // 3. No build found - check if output file exists anyway
             const outputFile = this.getOutputFile(entry.type, viewType);
@@ -244,6 +313,19 @@ class FileAvailabilityChecker {
                 key = 'map-georaster';
             } else if (entryType === ddb.entry.type.VECTOR) {
                 key = 'map-vector';
+            }
+        } else if (viewType === 'unified') {
+            // The UnifiedViewer renders each type from its build artifact.
+            if (entryType === ddb.entry.type.POINTCLOUD) {
+                key = 'map-pointcloud';
+            } else if (entryType === ddb.entry.type.GEORASTER) {
+                key = 'map-georaster';
+            } else if (entryType === ddb.entry.type.VECTOR) {
+                key = 'map-vector';
+            } else if (entryType === ddb.entry.type.MODEL) {
+                key = 'unified-model';
+            } else if (entryType === ddb.entry.type.TILES3D) {
+                key = 'unified-tiles3d';
             }
         }
 

@@ -155,6 +155,54 @@ export function emitMove(sourceItem, destItem, extraSourceItems = []) {
 }
 
 /**
+ * Returns true when the string looks like an absolute http or https URL.
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isHttpUrl(text) {
+    if (!text || typeof text !== 'string') return false;
+    const t = text.trim();
+    return t.startsWith('http://') || t.startsWith('https://');
+}
+
+/**
+ * Extracts File objects from a ClipboardEvent (OS paste).
+ *
+ * Only individual files are supported: the Clipboard API does not expose
+ * directory entries (no webkitGetAsEntry on clipboard items), so folder
+ * pasting is not possible and is silently skipped.
+ *
+ * Browser support note: Chromium fully supports file items in clipboardData.
+ * Firefox (as of 2026) does not expose File items on paste events in most
+ * configurations; in those cases an empty array is returned.
+ *
+ * @param {ClipboardEvent} e
+ * @returns {File[]}
+ */
+export function getFilesFromClipboard(e) {
+    const files = [];
+    const cd = e.clipboardData;
+    if (!cd) return files;
+
+    // Prefer items (gives kind/type metadata) over the files shortcut.
+    if (cd.items && cd.items.length) {
+        for (const item of Array.from(cd.items)) {
+            if (item.kind === 'file') {
+                const f = item.getAsFile();
+                if (f) files.push(f);
+            }
+        }
+        return files;
+    }
+
+    // Fallback: FileList shortcut (older APIs).
+    if (cd.files && cd.files.length) {
+        files.push(...Array.from(cd.files));
+    }
+    return files;
+}
+
+/**
  * Common dragstart handler: serializes the dragged item on dataTransfer so
  * that any drop target in the app can read it back.
  */

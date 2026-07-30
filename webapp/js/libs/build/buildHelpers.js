@@ -1,5 +1,6 @@
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
+import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 import ddb from 'ddb';
 
 function isBuildableFile(dataset, file) {
@@ -23,14 +24,62 @@ function isBuildLoading(dataset, file) {
 
 function getBuildBadge(dataset, file) {
     if (!dataset) return null;
-    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
-    if (!buildState) return null;
 
-    switch (buildState.currentState) {
-        case BUILD_STATES.FAILED:
+    // Live Hangfire state (from BuildManager polling) takes priority: it is
+    // the most up-to-date signal once a job actually exists.
+    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
+    if (buildState) {
+        switch (buildState.currentState) {
+            case BUILD_STATES.FAILED:
+                return 'fa-solid fa-circle-xmark red';
+            case BUILD_STATES.PROCESSING:
+            case BUILD_STATES.ENQUEUED:
+            case BUILD_STATES.SCHEDULED:
+            case BUILD_STATES.AWAITING:
+            case BUILD_STATES.CREATED:
+                return null; // spinner overlay already covers the "building" case
+            default:
+                return null;
+        }
+    }
+
+    // No live job yet: fall back to the static build status returned by the
+    // list API. "ready" (built) is the default state and never gets a badge.
+    switch (file.entry.buildStatus) {
+        case 'pending':
+            return 'fa-solid fa-triangle-exclamation orange';
+        case 'queued':
+            return 'fa-solid fa-clock amber';
+        case 'failed':
             return 'fa-solid fa-circle-xmark red';
         default:
             return null;
+    }
+}
+
+/**
+ * Human-readable tooltip/description for why a buildable file's badge is
+ * shown. Single source of truth so Thumbnail, TableView, DetailPanel and
+ * FileAvailabilityDialog never diverge on wording.
+ */
+function getBuildBadgeTooltip(dataset, file) {
+    if (!dataset) return '';
+
+    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
+    if (buildState) {
+        if (buildState.currentState === BUILD_STATES.FAILED) return 'Build failed';
+        return '';
+    }
+
+    switch (file.entry.buildStatus) {
+        case 'pending':
+            return `Waiting for: ${formatMissingDeps(file.entry.buildMissingDependencies)}`;
+        case 'queued':
+            return 'Queued for processing';
+        case 'failed':
+            return 'Build failed';
+        default:
+            return '';
     }
 }
 
@@ -72,6 +121,8 @@ export {
     hasActiveBuild,
     isBuildLoading,
     getBuildBadge,
+    getBuildBadgeTooltip,
+    formatMissingDeps,
     buildFile,
     isBuildSucceeded,
     isFileBuilt

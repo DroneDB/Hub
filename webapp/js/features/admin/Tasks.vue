@@ -30,7 +30,15 @@
             @cancel="cancelTask" @retry="retryTask" />
 
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
-            @refresh="refreshLog" />
+            :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
+
+        <!-- Cancel task confirmation -->
+        <ConfirmDialog v-if="cancelDialogOpen"
+            title="Cancel Task"
+            :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
+            confirmText="Cancel Task" cancelText="Don't Cancel" confirmButtonClass="danger"
+            @onClose="handleCancelDialogClose">
+        </ConfirmDialog>
     </div>
 </template>
 
@@ -38,6 +46,7 @@
 import useTaskFormatting from '@/composables/useTaskFormatting';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Toast from 'primevue/toast';
@@ -51,7 +60,7 @@ import reg from '@/libs/api/sharedRegistry';
 export default {
     mixins: [useTaskFormatting],
 
-    components: { Button, Select, Toast, TasksTable, TaskLogDialog },
+    components: { Button, Select, Toast, TasksTable, TaskLogDialog, ConfirmDialog },
 
     data() {
         return {
@@ -71,6 +80,9 @@ export default {
             logText: '',
 
             downloadingTaskId: null,
+
+            cancelDialogOpen: false,
+            cancellingTask: null,
 
             _refreshTimer: null
         };
@@ -178,7 +190,19 @@ export default {
             return reg.Organization(task.orgSlug).Dataset(task.dsSlug);
         },
 
-        async cancelTask(task) {
+        cancelTask(task) {
+            this.cancellingTask = task;
+            this.cancelDialogOpen = true;
+        },
+
+        async handleCancelDialogClose(buttonId) {
+            this.cancelDialogOpen = false;
+            if (buttonId !== 'confirm' || !this.cancellingTask) {
+                this.cancellingTask = null;
+                return;
+            }
+            const task = this.cancellingTask;
+            this.cancellingTask = null;
             try {
                 await this.datasetFor(task).cancelTask(task.taskId);
                 await this.loadTasks();

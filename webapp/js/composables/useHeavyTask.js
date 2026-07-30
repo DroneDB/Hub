@@ -5,26 +5,14 @@
  * (build, raster-export, photogrammetry, ...): submit, poll status + log
  * until a terminal state, and expose reactive per-task progress.
  *
- * Requirements on the host component:
- * - none mandatory; `this.$toast` is used opportunistically for notifications.
- *
- * Usage:
- *   methods: {
- *     async runPhotogrammetry() {
- *       const result = await this.runHeavyTask(this.dataset, 'photogrammetry', {
- *         params: { folder: '', options: [] },
- *         onProgress: (t) => { ... },
- *       });
- *       // result is the final TaskStatusDto (state === 'Succeeded')
- *     }
- *   }
- *
- * Reactive state:
- *   this.heavyTasks  -> object keyed by taskId: { taskId, toolId, state,
- *                       percent, phase, logTail, logCursor, error, artifact }
+ * Primary data source is now `taskMonitor` (shared GET /tasks poller).
+ * Full status (GET /tasks/{id}) fetched only on terminal state for artifact/error,
+ * or when a task is not yet in the shared store.  Incremental logs fetched only
+ * while actively tracking.
  */
 const TERMINAL_STATES = ['Succeeded', 'Failed', 'Deleted'];
 const DEFAULT_POLL_MS = 2000;
+import taskMonitor from '@/libs/tasks/taskMonitor';
 
 export default {
     data() {
@@ -121,10 +109,24 @@ export default {
             return new Promise((resolve, reject) => {
                 const tick = async () => {
                     try {
-                        const status = await dataset.getTask(taskId);
+                        // Primary data source: taskMonitor (shared GET /tasks poller).
+                        let summary = taskMonitor.getTask(dataset, taskId);
+
+                        // If not in the shared store yet, fall back to direct API.
+                        if (!summary) {
+                            try { summary = (await dataset.getTasks({ skip: 0, take: 200 }) || []).find(t => t.taskId === taskId); }
+                            catch(e) { /* ignore */ }
+                        }
+
+                        if (!summary) {
+                            // Still not available; schedule retry (task may be new).
+                            this._heavyTaskTimers[taskId] = setTimeout(tick, pollMs);
+                            return;
+                        }
+
                         const prev = this.heavyTasks[taskId] || {};
 
-                        // Pull incremental log lines beyond our cursor.
+                        // Pull incremental log lines beyond our cursor (best-effort).
                         let logTail = prev.logTail || [];
                         let logCursor = prev.logCursor || 0;
                         try {
@@ -136,19 +138,19 @@ export default {
                         } catch (e) { /* log fetch is best-effort */ }
 
                         const entry = {
-                            taskId,
-                            toolId: status.toolId,
-                            version: status.version,
-                            state: status.state,
-                            percent: status.progress ? (status.progress.percent || 0) : 0,
-                            phase: status.progress ? status.progress.phase : null,
+                            taskId: summary.taskId,
+                            toolId: summary.toolId,
+                            version: summary.version,
+                            state: summary.state,
+                            percent: summary.progressPercent ?? 0,
+                            phase: summary.phaseMessage,
                             logTail,
                             logCursor,
-                            error: status.error || null,
-                            artifact: status.artifact || null,
-                            createdAt: status.createdAt,
-                            startedAt: status.startedAt,
-                            finishedAt: status.finishedAt,
+                            error: summary.errorType || null,
+                            artifact: null, // artifact not in summary; fetched on terminal state
+                            createdAt: summary.createdAt,
+                            startedAt: summary.startedAt,
+                            finishedAt: summary.finishedAt,
                         };
                         this._setHeavyTask(taskId, entry);
 
@@ -156,16 +158,23 @@ export default {
                             try { options.onProgress(entry); } catch (e) { /* ignore */ }
                         }
 
-                        if (TERMINAL_STATES.includes(status.state)) {
+                        if (TERMINAL_STATES.includes(summary.state)) {
                             this._clearTimer(taskId);
-                            if (status.state === 'Succeeded') {
+                            // Fetch full status (includes artifact/error details).
+                            try {
+                                const full = await dataset.getTask(taskId);
+                                entry.error = full.error || null;
+                                entry.artifact = full.artifact || null;
+                            } catch(e) { /* best-effort */ }
+
+                            if (summary.state === 'Succeeded') {
                                 if (notify) this._toast('success', 'Task completed',
                                     `${entry.toolId} finished`);
                                 resolve(entry);
                             } else {
                                 if (notify) this._toast('error', 'Task failed',
-                                    entry.error || `${entry.toolId} ${status.state.toLowerCase()}`);
-                                const err = new Error(entry.error || `Task ${status.state}`);
+                                    entry.error || `${entry.toolId} ${summary.state.toLowerCase()}`);
+                                const err = new Error(entry.error || `Task ${summary.state}`);
                                 err.task = entry;
                                 reject(err);
                             }

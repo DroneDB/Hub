@@ -85,7 +85,7 @@ const virtualizer = useVirtualizer(computed(() => ({
 // and `virtualItems` are used directly (as number and array).
 // Calling `virtualizer.value.method()` directly in the template is WRONG
 // because `virtualizer` is auto-unwrapped to a Virtualizer object, which
-// has no `.value` property — resulting in undefined.getTotalSize() errors.
+// has no `.value` property - resulting in undefined.getTotalSize() errors.
 const virtualItems = computed(() => virtualizer.value.getVirtualItems());
 const totalSize = computed(() => virtualizer.value.getTotalSize());
 

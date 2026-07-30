@@ -171,7 +171,7 @@ import Tag from 'primevue/tag';
 import { useToast } from 'primevue/usetoast';
 
 /**
- * Admin Configuration Editor — inspect all Registry config fields grouped by
+ * Admin Configuration Editor - inspect all Registry config fields grouped by
  * section, with typed inputs and JSON generation for appsettings.json.
  */
 export default {
@@ -348,6 +348,16 @@ export default {
                         case 'array':
                             value = Array.isArray(rawValue) ? rawValue :
                                 (typeof rawValue === 'string' ? rawValue.split(',').map(s => s.trim()).filter(Boolean) : []);
+                            break;
+                        case 'json':
+                            // Parse the JSON text into an object so it serializes as structured JSON.
+                            try {
+                                value = typeof rawValue === 'string' && rawValue.trim()
+                                    ? JSON.parse(rawValue)
+                                    : null;
+                            } catch {
+                                value = rawValue; // keep raw (invalid) text visible for the admin to fix
+                            }
                             break;
                         case 'timespan':
                             value = rawValue || null;

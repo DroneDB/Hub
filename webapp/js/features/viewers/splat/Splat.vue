@@ -31,6 +31,16 @@
 
             <!-- Bottom-left buttons -->
             <div v-if="loaded" class="btn-stack">
+                <button class="btn-overlay" :class="{ active: navMode === 'fly' }"
+                    @click="setNavMode('fly')"
+                    title="Fly navigation: drag to look around, WASD/QE to move">
+                    <i class="fa-solid fa-plane" />
+                </button>
+                <button class="btn-overlay" :class="{ active: navMode === 'earth' }"
+                    @click="setNavMode('earth')"
+                    title="Earth navigation: drag to pan, right-drag to orbit, wheel to zoom">
+                    <i class="fa-solid fa-earth-americas" />
+                </button>
                 <button class="btn-overlay" @click="toggleSettings" title="View settings">
                     <i class="fa-solid fa-gear" />
                 </button>
@@ -194,6 +204,7 @@ export default {
             flipped: true,         // most INRIA/3DGS scenes render upside down without this
             pointScale: 1.0,
             isTouch: false,        // pointer-capable touch device (enlarges the nav overlay)
+            navMode: 'fly',        // 'fly' = WASD + mouse look; 'earth' = Potree-style pan/orbit/zoom
             navKeys: NAV_KEYS,
             // Reactive highlight state for the on-screen WASDEQ keys (true while held).
             pressed: { KeyW: false, KeyA: false, KeyS: false, KeyD: false, KeyE: false, KeyQ: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false },
@@ -275,6 +286,20 @@ export default {
         this.onCanvasMouseDownBound = this.onCanvasMouseDown.bind(this);
         this.onCanvasMouseMoveBound = this.onCanvasMouseMove.bind(this);
         this.onCanvasMouseUpBound = this.onCanvasMouseUp.bind(this);
+        // Earth-navigation (Potree-style) gesture state (non-reactive; touched every event/frame).
+        this.earthPointers = new Map();   // active pointerId -> { x, y } (mouse + touch)
+        this.earthGesture = null;         // null | 'pan' | 'rotate' | 'twofinger'
+        this.earthPivot = null;           // world-space pivot (ground point under the cursor)
+        this.earthCamStart = null;        // camera position at gesture start (pan anchor)
+        this.earthTargetStart = null;     // controls.target at gesture start
+        this.earthLastX = 0;              // last pointer / midpoint x (incremental rotate)
+        this.earthLastY = 0;
+        this.earthLastDist = 0;           // last two-finger spread (pinch zoom)
+        this.pivotIndicator = null;       // THREE.Mesh sphere shown at the pivot while dragging
+        this.onEarthPointerDownBound = this.onEarthPointerDown.bind(this);
+        this.onEarthPointerMoveBound = this.onEarthPointerMove.bind(this);
+        this.onEarthPointerUpBound = this.onEarthPointerUp.bind(this);
+        this.onEarthWheelBound = this.onEarthWheel.bind(this);
         // Accumulated velocity for smooth WASD acceleration (THREE.Vector3, lazy init).
         this.flyVelocity = null;
         // Scene "up" vector the camera locks roll to. Defaults to world +Y; the ground-plane
@@ -369,6 +394,19 @@ export default {
             this._t_right    = new THREE.Vector3();
             this._t_targetVel = new THREE.Vector3();
 
+            // Earth-navigation reusable temporaries (avoid per-event allocations).
+            this._earthRaycaster = new THREE.Raycaster();
+            this._earthRay = new THREE.Ray();
+            this._earthPlaneScratch = new THREE.Plane();
+            this.earthPlane = new THREE.Plane();
+            this._e_v1 = new THREE.Vector3();
+            this._e_v2 = new THREE.Vector3();
+            this._e_v3 = new THREE.Vector3();
+            this._e_v4 = new THREE.Vector3();
+            this._e_q1 = new THREE.Quaternion();
+            this._e_q2 = new THREE.Quaternion();
+            this._e_q3 = new THREE.Quaternion();
+
             const canvas = this.$refs.canvas;
             const width = canvas.clientWidth || 1;
             const height = canvas.clientHeight || 1;
@@ -423,6 +461,25 @@ export default {
             canvas.addEventListener('mouseup', this.onCanvasMouseUpBound);
             canvas.addEventListener('mouseleave', this.onCanvasMouseUpBound);
 
+            // Earth-navigation pointer + wheel listeners (Potree-style pan / orbit / zoom). They
+            // act only when navMode === 'earth' (otherwise they early-return); pointer events
+            // unify mouse and touch so earth navigation works on touch devices too.
+            canvas.addEventListener('pointerdown', this.onEarthPointerDownBound);
+            canvas.addEventListener('pointermove', this.onEarthPointerMoveBound);
+            canvas.addEventListener('pointerup', this.onEarthPointerUpBound);
+            canvas.addEventListener('pointercancel', this.onEarthPointerUpBound);
+            canvas.addEventListener('wheel', this.onEarthWheelBound, { passive: false });
+
+            // Marker sphere drawn at the pivot while earth-dragging (always rendered on top).
+            const pivotGeo = new THREE.SphereGeometry(1, 16, 16);
+            const pivotMat = new THREE.MeshBasicMaterial({
+                color: 0x3399ff, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false
+            });
+            this.pivotIndicator = new THREE.Mesh(pivotGeo, pivotMat);
+            this.pivotIndicator.renderOrder = 999;
+            this.pivotIndicator.visible = false;
+            scene.add(this.pivotIndicator);
+
             // Load the splat. With a .rad (paged: true) Spark fetches LOD chunks on demand via
             // HTTP range requests; with a plain .spz (lod: true) it downloads the whole file and
             // builds the LOD structure client-side in a background worker. Auth rides on the
@@ -442,6 +499,10 @@ export default {
             // immediately and this frames on the first try.
             this.frameCameraWhenReady();
             this.loaded = true;
+
+            // Restore the saved navigation mode (fly/earth) before the presentation starts, so an
+            // 'earth' preference configures OrbitControls without cancelling the intro animation.
+            this.restoreNavMode();
 
             // Start the default presentation: a tour through the saved presets when any exist,
             // otherwise a slow auto-orbit. Stops on any user interaction; resume with "P".
@@ -466,27 +527,37 @@ export default {
                 // reset our FPS quaternion. Reassert it immediately after, except during
                 // animations that drive the camera direction themselves.
                 if (!this.animating) {
-                    // Fix 1: frame-decoupled damped mouse look.
-                    // Lerp yaw/pitch toward the target accumulated by onCanvasMouseMove.
-                    // Runs every frame even when no fresh mouse sample arrived, so frames
-                    // that fall in the input/refresh-rate beat still advance the camera
-                    // rather than freezing it - eliminating visible micro-stutter.
-                    if (this.mouseDragging && dt > 0) {
-                        const a = 1 - Math.exp(-35 * dt);
-                        this.yaw   += (this.targetYaw   - this.yaw)   * a;
-                        this.pitch += (this.targetPitch - this.pitch) * a;
+                    if (this.navMode === 'earth') {
+                        // Earth mode: OrbitControls.update() above already applied lookAt(target)
+                        // from the position/target our pointer handlers set. Just keep yaw/pitch
+                        // in sync so a later switch back to fly resumes from the right angles.
+                        this.syncYawPitch();
                     } else {
-                        // Not dragging: snap immediately to avoid floating-point drift.
-                        this.yaw   = this.targetYaw;
-                        this.pitch = this.targetPitch;
+                        // Fix 1: frame-decoupled damped mouse look.
+                        // Lerp yaw/pitch toward the target accumulated by onCanvasMouseMove.
+                        // Runs every frame even when no fresh mouse sample arrived, so frames
+                        // that fall in the input/refresh-rate beat still advance the camera
+                        // rather than freezing it - eliminating visible micro-stutter.
+                        if (this.mouseDragging && dt > 0) {
+                            const a = 1 - Math.exp(-35 * dt);
+                            this.yaw   += (this.targetYaw   - this.yaw)   * a;
+                            this.pitch += (this.targetPitch - this.pitch) * a;
+                        } else {
+                            // Not dragging: snap immediately to avoid floating-point drift.
+                            this.yaw   = this.targetYaw;
+                            this.pitch = this.targetPitch;
+                        }
+                        this.applyYawPitch();
                     }
-                    this.applyYawPitch();
                 } else if (this.animState && this.animState.mode === 'orbit') {
                     // Auto-orbit: OrbitControls rotates - track where it put us.
                     this.syncYawPitch();
                 }
                 // Tour mode: applyPoseLerp drives position+target, controls.update sets
                 // quaternion via lookAt, no intervention needed.
+
+                // Keep the earth pivot marker at a constant on-screen size while visible.
+                if (this.pivotIndicator && this.pivotIndicator.visible) this.updatePivotIndicator();
 
                 renderer.render(scene, camera);
             });
@@ -719,6 +790,8 @@ export default {
         // like a first-person shooter. No pointer lock needed.
         onCanvasMouseDown: function (e) {
             if (e.button !== 0) return;
+            // Earth mode drives the camera from its own pointer handlers; skip the fly look.
+            if (this.navMode === 'earth') return;
             // Don't capture the drag when a dialog is open (user clicks its controls).
             if (this.showSettings || this.showCameraManager) return;
             this.mouseDragging = true;
@@ -885,6 +958,275 @@ export default {
         releaseDir: function (code) {
             this.activeKeys.delete(code);
             if (Object.prototype.hasOwnProperty.call(this.pressed, code)) this.pressed[code] = false;
+        },
+
+        // ---- Navigation mode (fly / earth) ----
+
+        // Switch between 'fly' (WASD + first-person mouse look) and 'earth' (Potree-style:
+        // left-drag pans across the ground, right-drag orbits the pivot, wheel zooms toward the
+        // cursor). Reconfigures OrbitControls and persists the choice to localStorage.
+        setNavMode: function (mode) {
+            if (mode !== 'fly' && mode !== 'earth') mode = 'fly';
+            this.navMode = mode;
+            const controls = this.controls;
+            if (controls) {
+                // Rotation is handled by our own code in both modes.
+                controls.enableRotate = false;
+                if (mode === 'earth') {
+                    // Our pointer/wheel handlers drive pan/orbit/zoom; disable OrbitControls'
+                    // own pan+dolly so it doesn't fight them. Its update() still runs each frame
+                    // to re-apply lookAt(target), which gives us the camera orientation.
+                    this.stopAnimation();
+                    controls.enablePan = false;
+                    controls.enableZoom = false;
+                } else {
+                    // Fly mode: OrbitControls handles right-drag pan + wheel zoom; the canvas
+                    // mouse listeners handle the first-person look.
+                    controls.enablePan = true;
+                    controls.enableZoom = true;
+                    this.hidePivot();
+                    if (this.earthPointers) this.earthPointers.clear();
+                    this.earthGesture = null;
+                    this.syncYawPitch();
+                }
+            }
+            try { window.localStorage.setItem('ddb.splat.navMode', mode); } catch (e) { /* ignore */ }
+        },
+
+        // Read the persisted navigation mode (default 'fly') and apply it.
+        restoreNavMode: function () {
+            let saved = 'fly';
+            try { saved = window.localStorage.getItem('ddb.splat.navMode') || 'fly'; } catch (e) { /* ignore */ }
+            this.setNavMode(saved);
+        },
+
+        // ---- Earth navigation (Potree-style pan / orbit / zoom) ----
+
+        // Cast a ray from a client (screen) point and intersect the given world plane. When
+        // fromAnchor is set the ray origin is pinned to the gesture-start camera position, so the
+        // screen->world mapping stays stable while the camera translates during a pan (the view
+        // direction is unchanged during a pan, so the ray direction is still valid).
+        // Returns a fresh THREE.Vector3, or null when the ray is parallel to the plane.
+        earthScreenToPlane: function (clientX, clientY, plane, fromAnchor) {
+            const canvas = this.renderer.domElement;
+            const rect = canvas.getBoundingClientRect();
+            const ndcX = ((clientX - rect.left) / (rect.width || 1)) * 2 - 1;
+            const ndcY = -((clientY - rect.top) / (rect.height || 1)) * 2 + 1;
+            this._earthRaycaster.setFromCamera({ x: ndcX, y: ndcY }, this.camera);
+            const ray = this._earthRay;
+            ray.direction.copy(this._earthRaycaster.ray.direction);
+            ray.origin.copy(fromAnchor && this.earthCamStart
+                ? this.earthCamStart : this._earthRaycaster.ray.origin);
+            const hit = ray.intersectPlane(plane, this._e_v1);
+            return hit ? hit.clone() : null;
+        },
+
+        // Begin an earth gesture: fix the ground plane through the current look target (normal =
+        // scene-up) and pick the pivot (ground point under the pointer / midpoint). Shows the marker.
+        beginEarthGesture: function (clientX, clientY) {
+            const up = this.sceneUp || this._t_yAxis;
+            this.earthPlane.setFromNormalAndCoplanarPoint(up, this.controls.target);
+            this.earthCamStart = this.camera.position.clone();
+            this.earthTargetStart = this.controls.target.clone();
+            const pivot = this.earthScreenToPlane(clientX, clientY, this.earthPlane, false);
+            this.earthPivot = pivot || this.controls.target.clone();
+            this.earthLastX = clientX;
+            this.earthLastY = clientY;
+        },
+
+        onEarthPointerDown: function (e) {
+            if (this.navMode !== 'earth') return;
+            if (this.showSettings || this.showCameraManager) return;
+            const canvas = this.renderer && this.renderer.domElement;
+            if (canvas && canvas.setPointerCapture) {
+                try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+            }
+            this.earthPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+            this.onUserInteract();
+            if (this.earthPointers.size === 1) {
+                // Right mouse button orbits, everything else (left / single touch) pans.
+                this.earthGesture = (e.pointerType === 'mouse' && e.button === 2) ? 'rotate' : 'pan';
+                this.beginEarthGesture(e.clientX, e.clientY);
+            } else if (this.earthPointers.size === 2) {
+                // Two fingers: orbit from midpoint motion + pinch to zoom toward the pivot.
+                this.earthGesture = 'twofinger';
+                const mid = this.earthPointersMidpoint();
+                this.earthLastDist = this.earthPointersDistance();
+                this.beginEarthGesture(mid.x, mid.y);
+            }
+            e.preventDefault();
+        },
+
+        onEarthPointerMove: function (e) {
+            if (this.navMode !== 'earth') return;
+            if (!this.earthPointers.has(e.pointerId)) return;
+            this.earthPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (this.earthGesture === 'pan' && this.earthPointers.size === 1) {
+                this.earthPan(e.clientX, e.clientY);
+            } else if (this.earthGesture === 'rotate' && this.earthPointers.size === 1) {
+                this.earthRotate(e.clientX - this.earthLastX, e.clientY - this.earthLastY);
+                this.earthLastX = e.clientX;
+                this.earthLastY = e.clientY;
+            } else if (this.earthGesture === 'twofinger' && this.earthPointers.size >= 2) {
+                const mid = this.earthPointersMidpoint();
+                const dist = this.earthPointersDistance();
+                this.earthRotate(mid.x - this.earthLastX, mid.y - this.earthLastY);
+                if (this.earthLastDist > 0 && dist > 0) {
+                    this.earthZoomToward(this.earthPivot, (dist / this.earthLastDist - 1) * 1.0);
+                }
+                this.earthLastX = mid.x;
+                this.earthLastY = mid.y;
+                this.earthLastDist = dist;
+            }
+            e.preventDefault();
+        },
+
+        onEarthPointerUp: function (e) {
+            if (!this.earthPointers.has(e.pointerId)) return;
+            const canvas = this.renderer && this.renderer.domElement;
+            if (canvas && canvas.releasePointerCapture) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+            }
+            this.earthPointers.delete(e.pointerId);
+            if (this.earthPointers.size === 1) {
+                // Dropped from two fingers to one: restart a clean pan from the remaining finger.
+                this.earthGesture = 'pan';
+                const p = this.earthPointers.values().next().value;
+                if (p) this.beginEarthGesture(p.x, p.y);
+            } else if (this.earthPointers.size === 0) {
+                this.earthGesture = null;
+                this.hidePivot();
+            }
+        },
+
+        onEarthWheel: function (e) {
+            if (this.navMode !== 'earth') return;
+            if (this.showSettings || this.showCameraManager) return;
+            e.preventDefault();
+            this.onUserInteract();
+            // Ground point under the cursor (plane through the current look target).
+            const up = this.sceneUp || this._t_yAxis;
+            this._earthPlaneScratch.setFromNormalAndCoplanarPoint(up, this.controls.target);
+            const point = this.earthScreenToPlane(e.clientX, e.clientY, this._earthPlaneScratch, false)
+                || this.controls.target.clone();
+            this.earthZoomToward(point, (e.deltaY < 0 ? 1 : -1) * 0.15);
+        },
+
+        // Screen-space midpoint of the active pointers.
+        earthPointersMidpoint: function () {
+            let sx = 0, sy = 0, n = 0;
+            for (const p of this.earthPointers.values()) { sx += p.x; sy += p.y; n++; }
+            return { x: n ? sx / n : 0, y: n ? sy / n : 0 };
+        },
+
+        // Screen-space distance between the first two active pointers (pinch spread).
+        earthPointersDistance: function () {
+            const it = this.earthPointers.values();
+            const a = it.next().value;
+            const b = it.next().value;
+            if (!a || !b) return 0;
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        },
+
+        // Pan by "grabbing" the ground: keep the point picked at gesture start under the cursor.
+        earthPan: function (clientX, clientY) {
+            const I = this.earthScreenToPlane(clientX, clientY, this.earthPlane, true);
+            if (!I || !this.earthPivot || !this.earthCamStart) return;
+            const movedBy = this._e_v2.subVectors(I, this.earthPivot);
+            this.camera.position.copy(this.earthCamStart).sub(movedBy);
+            this.controls.target.copy(this.earthTargetStart).sub(movedBy);
+            this.updatePivotIndicator();
+        },
+
+        // Orbit the camera rig (position + target) around the pivot: yaw about scene-up, pitch
+        // about the view's right axis. Rejects the pitch component near the up/down pole so the
+        // view can't flip over.
+        earthRotate: function (dx, dy) {
+            const camera = this.camera;
+            const controls = this.controls;
+            const pivot = this.earthPivot;
+            if (!pivot) return;
+            const up = this.sceneUp || this._t_yAxis;
+            const rotSpeed = 0.005;
+            const yawDelta = -dx * rotSpeed;
+            const pitchDelta = -dy * rotSpeed;
+
+            const forward = this._e_v1.subVectors(controls.target, camera.position);
+            if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1);
+            forward.normalize();
+            const side = this._e_v2.crossVectors(forward, up);
+            if (side.lengthSq() < 1e-8) side.set(1, 0, 0);
+            side.normalize();
+
+            const qYaw = this._e_q1.setFromAxisAngle(up, yawDelta);
+            const qPitch = this._e_q2.setFromAxisAngle(side, pitchDelta);
+            const q = this._e_q3.copy(qYaw).multiply(qPitch);
+            const offP = this._e_v3.subVectors(camera.position, pivot).applyQuaternion(q);
+            const offT = this._e_v4.subVectors(controls.target, pivot).applyQuaternion(q);
+
+            // Pole guard: if the new view direction gets within ~5 degrees of scene-up, redo the
+            // rotation with yaw only (drop the pitch delta).
+            const newFwd = this._e_v1.copy(offT).sub(offP);
+            if (newFwd.lengthSq() > 1e-12) {
+                newFwd.normalize();
+                if (Math.abs(newFwd.dot(up)) > 0.996) {
+                    const qy = this._e_q1.setFromAxisAngle(up, yawDelta);
+                    offP.subVectors(camera.position, pivot).applyQuaternion(qy);
+                    offT.subVectors(controls.target, pivot).applyQuaternion(qy);
+                }
+            }
+            camera.position.copy(pivot).add(offP);
+            controls.target.copy(pivot).add(offT);
+            this.updatePivotIndicator();
+        },
+
+        // Dolly the camera (and its target) toward a world point. amount > 0 moves closer.
+        earthZoomToward: function (point, amount) {
+            if (!point || !amount) return;
+            const camera = this.camera;
+            const controls = this.controls;
+            const toPoint = this._e_v1.subVectors(point, camera.position);
+            const distToPoint = toPoint.length();
+            if (distToPoint < 1e-6) return;
+            const dir = toPoint.multiplyScalar(1 / distToPoint);
+            const distToTarget = camera.position.distanceTo(controls.target) || distToPoint;
+            // The zoom step is scaled by a reference distance. Cap it by the look-target distance
+            // so a cursor near the horizon (a very distant ground-plane hit) can't launch the
+            // camera off into the distance in a single wheel tick.
+            const refDist = Math.min(distToPoint, distToTarget * 3);
+            let step = refDist * amount;
+            // Cap each call to a fraction of the reference distance so a fast pinch or scroll
+            // burst can't jump most of the way in a single event.
+            const cap = refDist * 0.4;
+            step = Math.max(-cap, Math.min(cap, step));
+            // Never move past the point when zooming in.
+            if (step > 0) step = Math.min(step, distToPoint * 0.9);
+            camera.position.addScaledVector(dir, step);
+            controls.target.addScaledVector(dir, step);
+            this.updatePivotIndicator();
+        },
+
+        showPivot: function (pos) {
+            if (!this.pivotIndicator) return;
+            this.pivotIndicator.position.copy(pos);
+            this.pivotIndicator.visible = true;
+            this.updatePivotIndicator();
+        },
+
+        hidePivot: function () {
+            if (this.pivotIndicator) this.pivotIndicator.visible = false;
+        },
+
+        // Scale the pivot sphere so it keeps a roughly constant on-screen size (~8 px radius).
+        updatePivotIndicator: function () {
+            const ind = this.pivotIndicator;
+            const camera = this.camera;
+            if (!ind || !camera || !ind.visible) return;
+            const h = this.renderer.domElement.clientHeight || 1;
+            const dist = camera.position.distanceTo(ind.position);
+            const worldPerPixel = (2 * Math.tan((camera.fov * Math.PI) / 360) * dist) / h;
+            ind.scale.setScalar(Math.max(worldPerPixel * 8, 1e-4));
         },
 
         // ---- Camera presets (loaded from / saved to <basename>_cameras.json) ----
@@ -1269,11 +1611,24 @@ export default {
                 cvs.removeEventListener('mousemove', this.onCanvasMouseMoveBound);
                 cvs.removeEventListener('mouseup', this.onCanvasMouseUpBound);
                 cvs.removeEventListener('mouseleave', this.onCanvasMouseUpBound);
+                cvs.removeEventListener('pointerdown', this.onEarthPointerDownBound);
+                cvs.removeEventListener('pointermove', this.onEarthPointerMoveBound);
+                cvs.removeEventListener('pointerup', this.onEarthPointerUpBound);
+                cvs.removeEventListener('pointercancel', this.onEarthPointerUpBound);
+                cvs.removeEventListener('wheel', this.onEarthWheelBound);
             }
             if (this.controls) {
                 this.controls.removeEventListener('start', this.onUserInteractBound);
                 if (this.controls.dispose) this.controls.dispose();
             }
+            if (this.pivotIndicator) {
+                if (this.scene) this.scene.remove(this.pivotIndicator);
+                if (this.pivotIndicator.geometry) this.pivotIndicator.geometry.dispose();
+                if (this.pivotIndicator.material) this.pivotIndicator.material.dispose();
+                this.pivotIndicator = null;
+            }
+            if (this.earthPointers) this.earthPointers.clear();
+            this.earthGesture = null;
             if (this.splatMesh && this.splatMesh.dispose) this.splatMesh.dispose();
             if (this.renderer) {
                 this.renderer.dispose();
@@ -1316,6 +1671,8 @@ export default {
     display: flex;
     width: 100%;
     height: 100%;
+    /* Let our pointer handlers own touch gestures (earth pan/orbit/pinch) on touch devices. */
+    touch-action: none;
 }
 
 #splat .loading {
@@ -1390,6 +1747,11 @@ export default {
 
 #splat .btn-overlay:hover {
     background: rgba(0, 0, 0, 0.75);
+}
+
+#splat .btn-overlay.active {
+    background: rgba(40, 110, 190, 0.85);
+    color: var(--ddb-text-on-dark);
 }
 
 /* Left-edge camera rail (vertically centered): jump between saved cameras,

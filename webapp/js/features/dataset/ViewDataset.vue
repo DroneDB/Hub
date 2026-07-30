@@ -17,7 +17,7 @@
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
                     @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                    @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                    @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
             </div>
             </template>
             <template #second>
@@ -36,7 +36,7 @@
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
                         @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                        @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                        @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                 </template>
                 <template v-slot:map>
                     <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
@@ -54,7 +54,7 @@
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -78,7 +78,7 @@
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
                                 @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
-                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" />
+                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
                             <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -107,7 +107,7 @@
         <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
         <SettingsDialog v-if="showSettings" :dataset="dataset" :canWrite="canWrite" @onClose="handleSettingsClose"
             @addMarkdown="handleAddMarkdown" @rescanRequested="handleRescanRequested" />
-        <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" :path="currentPath"
+        <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" @importFromUrl="handleUploadImportFromUrl" :path="currentPath"
             :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true">
         </AddToDatasetDialog>
         <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
@@ -136,6 +136,8 @@
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
         <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
         <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
+        <ImportFromUrlDialog v-if="importUrlDialogOpen" @onClose="handleImportUrlClose"
+            :dataset="dataset" :initial-url="importUrlInitial" :initial-folder="currentPath || ''" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
             title="Mask Borders"
             :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
@@ -259,6 +261,7 @@ import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
 import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
 import AlignDialog from './dialogs/AlignDialog.vue';
 import ExtractDialog from './dialogs/ExtractDialog.vue';
+import ImportFromUrlDialog from './dialogs/ImportFromUrlDialog.vue';
 import FsLightbox from 'fslightbox-vue';
 import VideoLightbox from './VideoLightbox.vue';
 
@@ -273,6 +276,7 @@ import { renameDataset, entryLabel } from '@/libs/api/registryUtils';
 import { b64encode } from '@/libs/base64';
 import BuildManager from '@/libs/build/buildManager';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
+import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { shouldOpenAsText, canOpenAsText, isPdfFile } from '@/libs/textFileUtils';
 
 import ddb from 'ddb';
@@ -281,6 +285,7 @@ const { pathutils, utils } = ddb;
 
 import { OpenItemDefaults } from '@/libs/openItemDefaults';
 import { isArchiveFile } from '@/libs/entryTypes';
+import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 
 // Import mixins
 import dialogManager from '@/composables/useDialogManager';
@@ -339,6 +344,7 @@ export default {
         MergeMultispectralDialog,
         AlignDialog,
         ExtractDialog,
+        ImportFromUrlDialog,
         FsLightbox,
         VideoLightbox
     },
@@ -462,6 +468,9 @@ export default {
         // Listen for Delete key to delete selected files
         document.addEventListener('keydown', this.handleKeyDown);
 
+        // Listen for OS paste (files and URL text from clipboard)
+        document.addEventListener('paste', this.handleOsPaste);
+
         // Listen to build state change events
         BuildManager.on('buildStateChanged', this.handleBuildStateNotification);
         BuildManager.on('buildStarted', this.handleBuildStartedNotification);
@@ -506,6 +515,9 @@ export default {
 
         // Remove Delete key listener
         document.removeEventListener('keydown', this.handleKeyDown);
+
+        // Remove OS paste listener
+        document.removeEventListener('paste', this.handleOsPaste);
 
         // Cleanup BuildManager listeners
         BuildManager.off('buildStateChanged', this.handleBuildStateNotification);
@@ -585,7 +597,7 @@ export default {
             // Don't trigger if any dialog is already open
             const anyDialogOpen = this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
                 this.createFolderDialogOpen || this.transferDialogOpen || this.showProperties ||
-                this.showSettings || this.textEditorDialogOpen ||
+                this.showSettings || this.textEditorDialogOpen || this.importUrlDialogOpen ||
                 this.pasteConflictDialogOpen || this.pasteResultDialogOpen;
             if (anyDialogOpen) return;
 
@@ -602,11 +614,9 @@ export default {
                     this.clipboardCutSelected();
                     return;
                 }
-                if (k === 'v' && this.canWrite) {
-                    e.preventDefault();
-                    this.clipboardPaste();
-                    return;
-                }
+                // NOTE: Ctrl+V is handled by the unified handleOsPaste listener so
+                // that OS file paste and URL paste take priority over the internal
+                // Hub clipboard. The keydown branch is intentionally removed here.
             }
 
             // Delete key
@@ -625,6 +635,56 @@ export default {
             const data = this.pasteConflictData;
             this.pasteConflictData = null;
             if (data && typeof data.resolve === 'function') data.resolve(mode);
+        },
+
+        // Unified OS paste handler (Ctrl+V from the OS / file manager).
+        // Priority: (1) OS files -> upload, (2) http(s) URL text -> import, (3) Hub internal clipboard.
+        // NOTE: The 'paste' event fires for Ctrl+V on the document; text in an <input> or
+        // <textarea> is handled by the browser natively and this listener is not reached
+        // because of the target check below.
+        handleOsPaste(e) {
+            // Skip when focus is inside any editable element - the browser handles it.
+            const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
+            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+
+            // Skip when any dialog is already open.
+            const anyDialogOpen = this.deleteDialogOpen || this.renameDialogOpen || this.uploadDialogOpen ||
+                this.createFolderDialogOpen || this.transferDialogOpen || this.showProperties ||
+                this.showSettings || this.textEditorDialogOpen || this.importUrlDialogOpen ||
+                this.pasteConflictDialogOpen || this.pasteResultDialogOpen;
+            if (anyDialogOpen) return;
+
+            // 1. OS files in clipboard -> upload.
+            if (this.canWrite) {
+                const files = getFilesFromClipboard(e);
+                if (files.length > 0) {
+                    e.preventDefault();
+                    emitter.emit('uploadItems', { files, path: this.currentPath });
+                    return;
+                }
+            }
+
+            // 2. http/https URL text -> import from URL dialog.
+            if (this.canWrite && e.clipboardData) {
+                const text = e.clipboardData.getData('text/plain') || e.clipboardData.getData('text');
+                if (isHttpUrl(text)) {
+                    e.preventDefault();
+                    this.openImportUrlDialog(text.trim());
+                    return;
+                }
+            }
+
+            // 3. Fallback: internal Hub clipboard (copy/cut dataset files).
+            if (this.canWrite) {
+                this.clipboardPaste();
+            }
+        },
+
+        // Called when the user clicks "Import from URL" inside the Upload dialog.
+        handleUploadImportFromUrl() {
+            this.uploadDialogOpen = false;
+            this.filesToUpload = null;
+            this.openImportUrlDialog('');
         },
 
         handlePasteResultClose() {
@@ -745,6 +805,10 @@ export default {
 
             const t = node.entry.type;
             if (!view) view = OpenItemDefaults[t];
+
+            // .3tz files (OGC 3D Tiles archives) indexed by older ddb may appear as Generic.
+            // Fall back to the Unified Viewer by extension so double-click works correctly.
+            if (!view && /\.3tz$/i.test(node.entry.path || '')) view = 'unified';
 
             // Archives are indexed as generic files but we can extract them. When the
             // user can write, make "Extract" the default action (matches the context menu).
@@ -1075,6 +1139,52 @@ export default {
                     this.showError(e.message || e, "Download Error");
                 }
             }
+        },
+
+        /**
+         * Handles the downloadBuildArtifact event from context menu.
+         * Double-checks build status (async) then opens the direct download URL.
+         */
+        handleDownloadBuildArtifact: async function (file) {
+            if (!file || !file.entry) return;
+
+            // Async double-check: isFileBuilt does a HEAD request if cache is stale
+            const built = await isFileBuilt(this.dataset, file);
+            if (!built) {
+                this.$toast.add({
+                    severity: 'warn',
+                    summary: 'Not available',
+                    detail: 'This file has not been built yet. Run Build first.',
+                    life: 4000
+                });
+                return;
+            }
+
+            const url = `${this.dataset.baseApi}/build-artifact?path=${encodeURIComponent(file.entry.path)}`;
+
+            // Preflight: check download slot availability (same pattern as downloadWithCheck)
+            const headers = { 'X-Download-Check': '1' };
+            const authToken = this.dataset.registry.getAuthToken();
+            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+            const checkResp = await fetch(url, { headers });
+            if (checkResp.status === 429) {
+                this.$toast.add({
+                    severity: 'error',
+                    summary: 'Download Limit',
+                    detail: 'Download limit reached. Please wait for a download to finish before starting a new one.',
+                    life: 5000
+                });
+                return;
+            }
+
+            // Preflight passed - initiate native browser download via <a>.click()
+            const a = document.createElement('a');
+            a.href = url;
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         },
 
         // Total selection size vs the async threshold. Unknown sizes (e.g. folders)

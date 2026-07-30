@@ -3,7 +3,7 @@ const { pathutils } = ddb;
 
 import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceeded } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -71,6 +71,22 @@ function openModelItem(ctx) {
         },
         click: () => {
             ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'model'));
+        }
+    };
+}
+
+function openUnifiedItem(ctx) {
+    const T = ddb.entry.type;
+    const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
+    return {
+        label: 'Unified Viewer',
+        icon: 'fa-solid fa-earth-europe',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1 && supported.includes(sel[0].entry.type);
+        },
+        click: () => {
+            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'unified'));
         }
     };
 }
@@ -253,7 +269,7 @@ function buildItem(ctx) {
 
 function transferItem(ctx) {
     return {
-        label: 'Transfer to Dataset',
+        label: 'Transfer',
         icon: 'fa-solid fa-right-left',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
@@ -327,7 +343,7 @@ function setThumbnailItem(ctx) {
             if (!isThumbnailCandidate(type)) return false;
             const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
             if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
-            if (type === ddb.entry.type.GEORASTER) {
+            if (type === ddb.entry.type.GEORASTER || type === ddb.entry.type.GAUSSIAN_SPLAT) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);
                 if (!buildState) return true;
                 return buildState.currentState !== BUILD_STATES.FAILED && !hasActiveBuild(ctx.dataset, file);
@@ -389,6 +405,19 @@ function selectionSeparator(ctx) {
     return {
         type: 'separator',
         isVisible: () => ctx.getSelectedEntries().length > 0
+    };
+}
+
+/**
+ * Build the Experimental submenu containing experimental viewer features.
+ */
+function experimentalMenuItems(ctx) {
+    return {
+        label: 'Experimental',
+        icon: 'fa-solid fa-flask',
+        items: [
+            openUnifiedItem(ctx)
+        ]
     };
 }
 
@@ -471,15 +500,63 @@ function extractItem(ctx) {
     };
 }
 
+/**
+ * Factory: create a context menu item for downloading a build artifact.
+ * @param {string} label - Menu item label (e.g. "Download COG")
+ * @param {string} icon - Font Awesome icon class
+ * @param {number} entryType - ddb.entry.type constant (GEORASTER, POINTCLOUD, VECTOR)
+ * @param {object} ctx - Context menu context object
+ */
+function makeDownloadItem(label, icon, entryType, ctx) {
+    return {
+        label,
+        icon,
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1
+                && sel[0].entry.type === entryType
+                && isBuildSucceeded(ctx.dataset, sel[0]);
+        },
+        click: () => {
+            const sel = ctx.getSelectedEntries();
+            if (sel.length === 1) ctx.emit('downloadBuildArtifact', sel[0]);
+        }
+    };
+}
+
 function toolsItem(ctx) {
+    const cogItem = makeDownloadItem('Download COG', 'fa-solid fa-file-image', ddb.entry.type.GEORASTER, ctx);
+    const copcItem = makeDownloadItem('Download COPC', 'fa-solid fa-cube', ddb.entry.type.POINTCLOUD, ctx);
+    const gpkgItem = makeDownloadItem('Download GPKG', 'fa-solid fa-map', ddb.entry.type.VECTOR, ctx);
+
+    const mergeMultispectral = mergeMultispectralItem(ctx);
+    const maskBorders = maskBordersItem(ctx);
+    const alignGeoRaster = alignGeoRasterItem(ctx);
+    const extract = extractItem(ctx);
+    const build = buildItem(ctx);
+    const transfer = transferItem(ctx);
+
     return {
         label: 'Tools',
         icon: 'fa-solid fa-wrench',
         items: [
-            mergeMultispectralItem(ctx),
-            maskBordersItem(ctx),
-            alignGeoRasterItem(ctx),
-            extractItem(ctx)
+            mergeMultispectral,
+            maskBorders,
+            alignGeoRaster,
+            extract,
+            {
+                type: 'separator',
+                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() || extract.isVisible()
+            },
+            build,
+            transfer,
+            {
+                type: 'separator',
+                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible()
+            },
+            cogItem,
+            copcItem,
+            gpkgItem
         ]
     };
 }
@@ -499,9 +576,8 @@ function buildActionMenuItems(ctx) {
             type: 'separator',
             isVisible: shareDownloadVisible
         },
-        buildItem(ctx),
         toolsItem(ctx),
-        transferItem(ctx),
+        experimentalMenuItems(ctx),
         setThumbnailItem(ctx),
         clipboardSeparator(ctx),
         renameItem(ctx),
@@ -544,6 +620,7 @@ export {
     openMapItem,
     openPointCloudItem,
     openModelItem,
+    openUnifiedItem,
     openPanoramaItem,
     openMarkdownItem,
     openPdfItem,
@@ -573,5 +650,6 @@ export {
     buildViewerMenuItems,
     buildActionMenuItems,
     buildFooterMenuItems,
-    buildStandardContextMenu
+    buildStandardContextMenu,
+    experimentalMenuItems
 };

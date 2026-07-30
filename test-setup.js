@@ -1,5 +1,5 @@
 /**
- * Vitest setup file — runs before each test.
+ * Vitest setup file - runs before each test.
  * Provides mocks for browser APIs and global constants.
  */
 import { vi } from 'vitest';

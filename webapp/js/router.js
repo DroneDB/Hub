@@ -15,6 +15,7 @@ const AdminTasks = () => import(/* webpackChunkName: "admin" */ '@/features/admi
 const AdminConfig = () => import(/* webpackChunkName: "admin" */ '@/features/admin/Config.vue');
 const Potree = () => import(/* webpackChunkName: "pointcloud" */ '@/features/viewers/pointcloud/Potree.vue');
 const Nexus = () => import(/* webpackChunkName: "model" */ '@/features/viewers/model/Nexus.vue');
+const UnifiedViewer = () => import(/* webpackChunkName: "unified" */ '@/features/viewers/unified/UnifiedViewer.vue');
 const Splat = () => import(/* webpackChunkName: "splat" */ '@/features/viewers/splat/Splat.vue');
 const Panorama = () => import(/* webpackChunkName: "panorama" */ '@/features/viewers/panorama/Panorama.vue');
 const Markdown = () => import(/* webpackChunkName: "markdown" */ '@/features/viewers/markdown/Markdown.vue');
@@ -36,6 +37,7 @@ export function createAppRouter(embed = false) {
         { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: 'PointCloud', components: viewsFor(Potree), meta: { title: 'Point Cloud' } },
         { path: '/r/:org/:ds/view/:encodedPath/markdown', name: 'Markdown', components: viewsFor(Markdown), meta: { title: 'Markdown' } },
         { path: '/r/:org/:ds/view/:encodedPath/model', name: 'Model', components: viewsFor(Nexus), meta: { title: 'Model' } },
+        { path: '/r/:org/:ds/view/:encodedPath/unified', name: 'UnifiedViewer', components: viewsFor(UnifiedViewer), meta: { title: '3D Viewer' } },
         { path: '/r/:org/:ds/view/:encodedPath/splat', name: 'Splat', components: viewsFor(Splat), meta: { title: 'Gaussian Splat' } },
         { path: '/r/:org/:ds/view/:encodedPath/panorama', name: 'Panorama', components: viewsFor(Panorama), meta: { title: 'Panorama' } },
         { path: '/login', name: 'Login', components: viewsFor(Login), meta: { title: 'Login' } },

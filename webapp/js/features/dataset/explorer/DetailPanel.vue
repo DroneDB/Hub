@@ -25,11 +25,18 @@
 
                     <i class="fa-solid fa-circle-notch fa-spin loading massive" v-if="buildLoading || loading" />
 
-                    <div v-if="buildState && shouldShowBuildBadge" class="build-status" :class="buildBadgeClass">
+                    <div v-if="shouldShowBuildBadge" class="build-status" :class="buildBadgeClass">
                         <i class="icon" :class="buildBadgeIcon"></i>
-                        <span>{{ buildState.currentState }}</span>
+                        <span>{{ buildBadgeLabel }}</span>
                     </div>
                 </div>
+            </div>
+
+            <!-- Build status explanation (queued/pending/failed) -->
+            <div class="build-explanation-section" v-if="buildExplanation">
+                <Message :severity="buildExplanation.severity" :closable="false">
+                    {{ buildExplanation.text }}
+                </Message>
             </div>
 
             <!-- Properties section -->
@@ -64,7 +71,7 @@
 <script>
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
-import { isFileBuilt } from '@/libs/build/buildHelpers';
+import { isFileBuilt, formatMissingDeps } from '@/libs/build/buildHelpers';
 import ddb from 'ddb';
 import PropsTable from '@/components/PropsTable.vue';
 import Button from 'primevue/button';
@@ -112,33 +119,80 @@ export default {
             if (!this.file || !this.dataset) return false;
             return BuildManager.hasActiveBuild(this.dataset, this.file.entry.path);
         },
+        // Effective badge status: the live Hangfire state (once a job exists) takes
+        // priority over the static list-API status. "ready" (built) is the default
+        // and never produces a badge - only queued/processing/pending/failed do.
+        effectiveBuildStatus() {
+            if (this.buildState) {
+                const state = this.buildState.currentState;
+                if (state === 'Failed') return 'failed';
+                if (state === 'Processing') return 'processing';
+                return null;
+            }
+            const status = this.file && this.file.entry && this.file.entry.buildStatus;
+            return status === 'pending' || status === 'queued' || status === 'failed' ? status : null;
+        },
         shouldShowBuildBadge() {
-            if (!this.buildState) return false;
-            const state = this.buildState.currentState;
-            return state === 'Failed' || state === 'Processing';
+            return !!this.effectiveBuildStatus;
         },
         buildBadgeClass() {
-            if (!this.buildState) return '';
-            const state = this.buildState.currentState;
-            switch (state) {
-                case 'Failed':
+            switch (this.effectiveBuildStatus) {
+                case 'failed':
                     return 'error';
-                case 'Processing':
+                case 'processing':
                     return 'processing';
+                case 'pending':
+                    return 'pending';
+                case 'queued':
+                    return 'queued';
                 default:
                     return '';
             }
         },
         buildBadgeIcon() {
-            if (!this.buildState) return '';
-            const state = this.buildState.currentState;
-            switch (state) {
-                case 'Failed':
+            switch (this.effectiveBuildStatus) {
+                case 'failed':
                     return 'fa-solid fa-xmark fa-circle';
-                case 'Processing':
+                case 'processing':
                     return 'fa-solid fa-circle-notch fa-spin';
+                case 'pending':
+                    return 'fa-solid fa-triangle-exclamation';
+                case 'queued':
+                    return 'fa-solid fa-clock';
                 default:
                     return '';
+            }
+        },
+        buildBadgeLabel() {
+            if (this.buildState) return this.buildState.currentState;
+            switch (this.effectiveBuildStatus) {
+                case 'pending':
+                    return 'On Hold';
+                case 'queued':
+                    return 'Queued';
+                case 'failed':
+                    return 'Failed';
+                default:
+                    return '';
+            }
+        },
+        // Human-readable explanation of the current build status, shown below the
+        // thumbnail so the user understands why the file isn't ready yet.
+        buildExplanation() {
+            if (!this.isBuildableFile) return null;
+
+            switch (this.effectiveBuildStatus) {
+                case 'pending': {
+                    const deps = this.file.entry.buildMissingDependencies;
+                    return {
+                        severity: 'warn',
+                        text: `Processing is on hold - waiting for: ${formatMissingDeps(deps)}.`
+                    };
+                }
+                case 'queued':
+                    return { severity: 'info', text: 'This file is queued for processing.' };
+                default:
+                    return null;
             }
         },
         extendedProperties() {
@@ -436,6 +490,18 @@ export default {
 
 .build-status.processing {
     background-color: var(--ddb-warning);
+}
+
+.build-status.queued {
+    background-color: var(--ddb-warning);
+}
+
+.build-status.pending {
+    background-color: #e67e22;
+}
+
+.build-explanation-section {
+    margin-bottom: 1.5rem;
 }
 
 .properties-section {

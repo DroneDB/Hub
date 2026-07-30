@@ -441,15 +441,6 @@ module.exports = class Dataset {
         return response === true ? { success: true } : response;
     }
 
-    async getBuilds(page = 1, pageSize = 50) {
-        const params = new URLSearchParams({
-            page: page.toString(),
-            pageSize: pageSize.toString()
-        });
-
-        return this.registry.getRequest(`${this.baseApi}/builds?${params}`);
-    }
-
     async clearCompletedBuilds() {
         const response = await this.registry.postRequest(`${this.baseApi}/builds/clear`, {});
         return response;
@@ -553,6 +544,40 @@ module.exports = class Dataset {
     }
 
     /**
+     * Probes a URL (HEAD request, no download) to verify reachability, derive the
+     * file name and check size/deny-list constraints.
+     * @param {string} url Absolute http/https URL
+     * @param {Object} [opts]
+     * @param {string} [opts.username] Optional basic-auth user name
+     * @param {string} [opts.password] Optional basic-auth password
+     * @returns {Promise<{reachable, sizeBytes, fileName, blocked, sizeExceedsLimit, note}>}
+     */
+    async verifyUrlImport(url, { username, password } = {}) {
+        if (!url) throw new Error('Invalid URL');
+        return this.registry.postRequest(`${this.baseApi}/import/verify-url`, { url, username, password });
+    }
+
+    /**
+     * Submits an import-file heavy task that downloads the file from the URL into
+     * this dataset.
+     * @param {Object} req
+     * @param {string} req.url Absolute http/https URL
+     * @param {string} [req.fileName] Destination file name (derived from URL when omitted)
+     * @param {string} [req.folder] Destination folder inside the dataset
+     * @param {boolean} [req.overwrite] Overwrite existing file (default false)
+     * @param {string} [req.username] Optional basic-auth user name
+     * @param {string} [req.password] Optional basic-auth password
+     * @param {number} [req.sizeBytes] Advertised size captured during verification
+     * @returns {Promise<{taskId: string}>}
+     */
+    async importFromUrl({ url, fileName, folder, overwrite = false, username, password, sizeBytes } = {}) {
+        if (!url) throw new Error('Invalid URL');
+        return this.registry.postRequest(`${this.baseApi}/import/url`, {
+            url, fileName, folder, overwrite, username, password, sizeBytes
+        });
+    }
+
+    /**
      * Builds the download URL for a completed task's artifact.
      * @param {string} id Task id
      * @returns {string}
@@ -561,3 +586,4 @@ module.exports = class Dataset {
         return `${this.baseApi}/tasks/${encodeURIComponent(id)}/result`;
     }
 };
+

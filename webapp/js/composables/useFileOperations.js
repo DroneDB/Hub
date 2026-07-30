@@ -59,6 +59,12 @@ export default {
                     this.fileBrowserFiles = this.fileBrowserFiles.filter(
                         item => !response.deleted.includes(item.entry.path)
                     );
+
+                    // If the deleted file is the one shown in the detail panel, close it
+                    if (this.selectedDetailFile && response.deleted.includes(this.selectedDetailFile.entry.path)) {
+                        this.selectedDetailFile = null;
+                    }
+
                     emitter.emit('deleteEntries', response.deleted);
 
                     // Distinguish folders from files in the message instead of always

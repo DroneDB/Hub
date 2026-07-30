@@ -17,6 +17,7 @@ const typeIconMap = {
     [entry.type.GEOPANORAMA]: "fa-solid fa-globe",
     [entry.type.VECTOR]: "fa-solid fa-object-ungroup",
     [entry.type.GAUSSIAN_SPLAT]: "fa-solid fa-spray-can-sparkles",
+    [entry.type.TILES3D]: "fa-solid fa-cube",
 };
 
 // Extension-based icon overrides for GENERIC type
@@ -38,6 +39,8 @@ export default {
             // Archives are indexed as generic files but we can extract them, so show
             // a distinct archive icon (their default action is "Extract").
             if (isArchivePath(path)) return 'fa-regular fa-file-zipper';
+            // .3tz files (OGC 3D Tiles archives) indexed by older ddb appear as Generic.
+            if (/\.3tz$/i.test(path)) return 'fa-solid fa-cube';
             const ext = getExtension(path);
             if (extensionIconMap[ext]) return extensionIconMap[ext];
         }

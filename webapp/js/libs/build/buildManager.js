@@ -1,20 +1,14 @@
 /**
- * Build Manager - Manages build state, polling and cache
+ * Build Manager - delegates to taskMonitor for unified polling.
  *
- * ARCHITECTURE NOTE:
- * This manager works with actual file entries that contain real type information,
- * NOT file paths or extensions. Components should pass actual entry objects
- * with type, path, and other metadata rather than strings or guessed types.
- *
- * USAGE:
- * - onFilesAdded(dataset, [entry1, entry2, ...]) - with actual entries
- * - isBuildableType(entry.type) - with real entry type
- * - No extension-based type guessing
+ * Public API preserved for backward compatibility with existing consumers:
+ * DetailPanel, Thumbnail, buildHelpers, fileAvailabilityChecker,
+ * contextMenuItems, FileAvailabilityDialog, useFileOperations, useDialogManager.
  */
 
+import taskMonitor from '@/libs/tasks/taskMonitor';
 import ddb from 'ddb';
 
-const POLL_INTERVAL = 5000; // 5 seconds
 const BUILDABLE_TYPES = [
     ddb.entry.type.POINTCLOUD,
     ddb.entry.type.GEORASTER,
@@ -23,7 +17,7 @@ const BUILDABLE_TYPES = [
     ddb.entry.type.GAUSSIAN_SPLAT
 ];
 
-// Build states according to Hangfire
+// Build states according to Hangfire / JobIndex states
 const BUILD_STATES = {
     AWAITING: 'Awaiting',
     CREATED: 'Created',
@@ -35,7 +29,6 @@ const BUILD_STATES = {
     SUCCEEDED: 'Succeeded'
 };
 
-// "Active" states that require polling
 const ACTIVE_STATES = [
     BUILD_STATES.AWAITING,
     BUILD_STATES.CREATED,
@@ -46,113 +39,129 @@ const ACTIVE_STATES = [
 
 class BuildManager {
     constructor() {
-        this.buildCache = new Map(); // Map<datasetKey, Map<filePath, buildInfo>>
-        this.pollingTimers = new Map(); // Map<datasetKey, timerId>
+        this._buildByPath = new Map(); // datasetKey -> Map<filePath, TaskSummaryDto>
         this.eventListeners = {};
-        this.datasets = new Map(); // Map<datasetKey, dataset>
+        this.datasets = new Map();
     }
 
-    /**
-     * Registers a dataset for build monitoring
-     */
-    registerDataset(dataset) {
-        const key = this.getDatasetKey(dataset);
-        this.datasets.set(key, dataset);
+    /* ---- event system ---- */
 
-        if (!this.buildCache.has(key)) {
-            this.buildCache.set(key, new Map());
+    on(event, callback) {
+        if (!this.eventListeners[event]) this.eventListeners[event] = [];
+        this.eventListeners[event].push(callback);
+    }
+    off(event, callback) {
+        if (this.eventListeners[event]) {
+            const idx = this.eventListeners[event].indexOf(callback);
+            if (idx > -1) this.eventListeners[event].splice(idx, 1);
         }
     }
+    emit(event, data) {
+        (this.eventListeners[event] || []).forEach(cb => {
+            try { cb(data); } catch (e) { console.error('Event listener error:', e); }
+        });
+    }
 
-    /**
-     * Checks if a file type is buildable
-     */
+    /* ---- dataset key (mirrors old getDatasetKey) ---- */
+
+    getDatasetKey(dataset) {
+        return dataset.baseApi || `${dataset.org}/${dataset.ds}`;
+    }
+
+    /* ---- buildable type helpers ---- */
+
     isBuildableType(entryType) {
         return BUILDABLE_TYPES.includes(entryType);
     }
 
-    /**
-     * Checks if a file has an active/pending build
-     */
+    /* ---- dataset registration & initialisation ---- */
+
+    registerDataset(dataset) {
+        const key = this.getDatasetKey(dataset);
+        this.datasets.set(key, dataset);
+        // Subscribe once; check against all registered datasets, not just the first one
+        if (!this._boundOnStateChange) {
+            this._boundOnStateChange = (data) => {
+                if (data.dataset && this.datasets.has(this.getDatasetKey(data.dataset))) {
+                    this._sync(data.dataset);
+                    this.emit('buildStateChanged', data);
+                }
+            };
+            taskMonitor.on('buildStateChanged', this._boundOnStateChange);
+        }
+        // Start the unified poller for this dataset
+        taskMonitor.start(dataset);
+        this._sync(dataset);
+    }
+
+    /** Sync _buildByPath from taskMonitor store (filtered on toolId='build'). */
+    _sync(dataset) {
+        const key = this.getDatasetKey(dataset);
+        const prev = this._buildByPath.get(key) || new Map();
+        const updated = new Map();
+
+        for (const task of taskMonitor.getTasks(dataset)) {
+            if (task.toolId === 'build' && task.path) {
+                updated.set(task.path, task);
+            }
+        }
+        this._buildByPath.set(key, updated);
+
+        // Emit state changes
+        for (const [path, task] of updated) {
+            const prevEntry = prev.get(path);
+            if (prevEntry && prevEntry.state !== task.state) {
+                this.emit('buildStateChanged', {
+                    dataset,
+                    filePath: path,
+                    previousState: prevEntry.state,
+                    newState: task.state,
+                    buildInfo: { path, currentState: task.state },
+                });
+            }
+        }
+    }
+
+    /* ---- build state queries (consume _buildByPath) ---- */
+
     hasActiveBuild(dataset, filePath) {
         const key = this.getDatasetKey(dataset);
-        const cache = this.buildCache.get(key);
-
-        if (!cache || !cache.has(filePath)) {
-            return false;
-        }
-
-        const buildInfo = cache.get(filePath);
-        return ACTIVE_STATES.includes(buildInfo.currentState);
+        const cache = this._buildByPath.get(key);
+        if (!cache || !cache.has(filePath)) return false;
+        return ACTIVE_STATES.includes(cache.get(filePath).state);
     }
 
-    /**
-     * Gets the build state for a file
-     */
+    /** Get build info for a file. Returns { path, currentState } to match old BuildJobDto. */
     getBuildState(dataset, filePath) {
         const key = this.getDatasetKey(dataset);
-        const cache = this.buildCache.get(key);
-
-        if (!cache || !cache.has(filePath)) {
-            return null;
-        }
-
-        return cache.get(filePath);
+        const cache = this._buildByPath.get(key);
+        if (!cache || !cache.has(filePath)) return null;
+        const task = cache.get(filePath);
+        return { path: task.path, currentState: task.state };
     }
 
-    /**
-     * Updates the build state for a file in the cache
-     */
-    updateBuildState(dataset, buildState) {
-        if (!buildState || !buildState.path) {
-            console.warn('Invalid build state:', buildState);
-            return;
-        }
+    /* ---- start/force build ---- */
 
-        const key = this.getDatasetKey(dataset);
-        const cache = this.buildCache.get(key) || new Map();
-
-        cache.set(buildState.path, buildState);
-        this.buildCache.set(key, cache);
-
-        console.log('Build state updated for', buildState.path, ':', buildState.currentState);
-    }
-
-    /**
-     * Starts a build for a file
-     */
     async startBuild(dataset, filePath, force = false) {
         try {
-            // Check if it's buildable
             const entry = await dataset.listOne(filePath);
             if (!this.isBuildableType(entry.type)) {
                 throw new Error(`File type ${entry.type} is not buildable`);
             }
-
-            // Check if it already has an active build
             if (this.hasActiveBuild(dataset, filePath) && !force) {
                 throw new Error(`Build already in progress for ${filePath}`);
             }
-
-            // Start the build
             await dataset.build(filePath, force);
 
             // Update cache with temporary "Enqueued" state
             const key = this.getDatasetKey(dataset);
-            const cache = this.buildCache.get(key) || new Map();
-            cache.set(filePath, {
-                path: filePath,
-                currentState: BUILD_STATES.ENQUEUED,
-                createdAt: new Date().toISOString()
-            });
-            this.buildCache.set(key, cache);
+            const cache = this._buildByPath.get(key) || new Map();
+            cache.set(filePath, { path: filePath, state: BUILD_STATES.ENQUEUED });
+            this._buildByPath.set(key, cache);
 
-            // Start polling if not already active
-            this.startPolling(dataset);
-
-            // Emit event
+            // Trigger immediate refresh so the new build task shows up
+            taskMonitor.forceRefresh(dataset);
             this.emit('buildStarted', { dataset, filePath, force });
-
             return true;
         } catch (error) {
             this.emit('buildError', { dataset, filePath, error: error.message });
@@ -160,388 +169,102 @@ class BuildManager {
         }
     }
 
-    /**
-     * Loads existing builds for a dataset
-     */
+    /* ---- load builds (backward compat, delegates to taskMonitor) ---- */
+
     async loadBuilds(dataset) {
-        try {
-            const builds = await dataset.getBuilds(1, 100); // Get the first 100 builds
-            const key = this.getDatasetKey(dataset);
-            const cache = this.buildCache.get(key) || new Map();
-
-            // Track which paths we've already processed
-            // Since builds are ordered by createdAt DESC (newest first),
-            // we only want to keep the most recent build for each path
-            const processedPaths = new Set();
-
-            // Update cache with existing builds - only the most recent for each path
-            builds.forEach(build => {
-                if (build.path) {
-                    // Skip if we've already processed a newer build for this path
-                    if (processedPaths.has(build.path)) {
-                        return;
-                    }
-                    processedPaths.add(build.path);
-                    cache.set(build.path, build);
-                }
-            });
-
-            this.buildCache.set(key, cache);
-
-            // Check if there are active builds that require polling
-            const hasActiveBuilds = builds.some(build =>
-                ACTIVE_STATES.includes(build.currentState)
-            );
-
-            if (hasActiveBuilds) {
-                this.startPolling(dataset);
-            }
-
-            return builds;
-        } catch (error) {
-            console.error('Error loading builds:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * Starts polling for a dataset
-     */
-    startPolling(dataset) {
         const key = this.getDatasetKey(dataset);
-
-        // If polling is already active, do nothing
-        if (this.pollingTimers.has(key)) {
-            return;
-        }
-
-        const poll = async () => {
-            try {
-                const builds = await dataset.getBuilds(1, 100);
-                const cache = this.buildCache.get(key) || new Map();
-
-                let hasActiveBuilds = false;
-                const previousStates = new Map();
-
-                // Save previous states
-                cache.forEach((build, path) => {
-                    previousStates.set(path, build.currentState);
-                });
-
-                // Track which paths we've already processed in this poll cycle
-                // Since builds are ordered by createdAt DESC (newest first),
-                // we only want to keep the most recent build for each path
-                const processedPaths = new Set();
-
-                // Update cache - only consider the most recent build for each path
-                builds.forEach(build => {
-                    if (build.path) {
-                        // Skip if we've already processed a newer build for this path
-                        if (processedPaths.has(build.path)) {
-                            return;
-                        }
-                        processedPaths.add(build.path);
-
-                        const previousState = previousStates.get(build.path);
-                        cache.set(build.path, build);
-
-                        // Check if state has changed
-                        if (previousState && previousState !== build.currentState) {
-                            this.emit('buildStateChanged', {
-                                dataset,
-                                filePath: build.path,
-                                previousState,
-                                newState: build.currentState,
-                                buildInfo: build
-                            });
-                        }
-
-                        if (ACTIVE_STATES.includes(build.currentState)) {
-                            hasActiveBuilds = true;
-                            console.log('Active build found:', build.path, 'state:', build.currentState);
-                        }
-                    }
-                });
-
-                this.buildCache.set(key, cache);
-
-                // If there are no active builds, stop polling
-                if (!hasActiveBuilds) {
-                    console.log('No active builds found, stopping polling for dataset:', key);
-                    this.stopPolling(dataset);
-                } else {
-                    console.log('Active builds found, continuing polling for dataset:', key);
-                }
-            } catch (error) {
-                console.error('Polling error:', error);
-            }
-        };
-
-        // Polling every 5 seconds
-        const timerId = setInterval(poll, POLL_INTERVAL);
-        this.pollingTimers.set(key, timerId);
-
-        // First immediate poll
-        poll();
+        this.datasets.set(key, dataset);
+        await taskMonitor.forceRefresh(dataset);
+        this._sync(dataset);
+        return taskMonitor.getTasks(dataset)
+            .filter(t => t.toolId === 'build')
+            .map(t => ({ path: t.path, currentState: t.state }));
     }
 
-    /**
-     * Starts polling when new files are detected in the dataset
-     * This method should be called when new buildable files with actual entries are added
-     */
+    // Legacy API that consumers may still call — now forwards to taskMonitor
+    startPolling(dataset)  { taskMonitor.start(dataset); }
+    stopPolling(dataset)   { taskMonitor.stop(dataset); }
+
+    /* ---- file-added callbacks ---- */
+
     async startPollingForNewFiles(dataset, fileEntries = []) {
-        const key = this.getDatasetKey(dataset);
-
-        // Register the dataset if not already done
-        this.registerDataset(dataset);
-
-        // Check for buildable files using real entry data
-        const buildableFiles = fileEntries.filter(entry => {
-            return entry && this.isBuildableType(entry.type);
-        });
-
+        const buildableFiles = fileEntries.filter(e => e && this.isBuildableType(e.type));
         if (buildableFiles.length > 0) {
-            console.log('New buildable files detected:', buildableFiles.map(e => e.path));
-
-            // Always start polling for buildable files - let polling determine actual states
-            this.startPolling(dataset);
-
-            // Emit event for new buildable files detected
+            taskMonitor.onFilesAdded(dataset);
             this.emit('newBuildableFilesDetected', {
                 dataset,
-                filePaths: buildableFiles.map(e => e.path)
+                filePaths: buildableFiles.map(e => e.path),
             });
         }
     }
 
-    /**
-     * Helper method to detect if files are buildable based on actual entry data
-     * This method checks both if files exist in cache and if they need building
-     */
     hasNewBuildableFiles(dataset, fileEntries = []) {
-        const key = this.getDatasetKey(dataset);
-        const cache = this.buildCache.get(key) || new Map();
-
         return fileEntries.some(entry => {
-            if (!entry || !this.isBuildableType(entry.type)) {
-                return false;
-            }
-
-            // File is buildable and either not in cache or doesn't have a successful build
-            const buildInfo = cache.get(entry.path);
-            return !buildInfo || buildInfo.currentState !== BUILD_STATES.SUCCEEDED;
+            if (!entry || !this.isBuildableType(entry.type)) return false;
+            const bs = this.getBuildState(dataset, entry.path);
+            return !bs || bs.currentState !== BUILD_STATES.SUCCEEDED;
         });
     }
 
-
-
-    /**
-     * Stops polling for a dataset
-     */
-    stopPolling(dataset) {
-        const key = this.getDatasetKey(dataset);
-        const timerId = this.pollingTimers.get(key);
-
-        if (timerId) {
-            clearInterval(timerId);
-            this.pollingTimers.delete(key);
-        }
-    }
-
-    /**
-     * Monitors a dataset for new buildable files and automatically starts polling
-     * This method should be called when files are added to trigger build monitoring
-     */
-    monitorDatasetForBuilds(dataset) {
-        this.registerDataset(dataset);
-
-        // Load existing builds first
-        this.loadBuilds(dataset).then(() => {
-            // Check if there are any active builds or pending files
-            const key = this.getDatasetKey(dataset);
-            const cache = this.buildCache.get(key) || new Map();
-
-            const hasActiveBuilds = Array.from(cache.values()).some(build =>
-                ACTIVE_STATES.includes(build.currentState)
-            );
-
-            if (hasActiveBuilds) {
-                console.log('Active builds detected, starting polling for dataset:', key);
-                this.startPolling(dataset);
-            }
-        }).catch(error => {
-            console.error('Error monitoring dataset for builds:', error);
-        });
-    }
-
-    /**
-     * Notifies the manager that new files have been added to a dataset
-     * This triggers automatic build monitoring if needed
-     * @param {Object} dataset - The dataset object
-     * @param {Array} fileEntries - Array of file entries with actual type information
-     */
     async onFilesAdded(dataset, fileEntries) {
         if (!fileEntries || fileEntries.length === 0) return;
-
-        console.log('Files added to dataset, checking for buildables:', fileEntries.map(e => e.path || e));
-
-        // Check if any of the new files are buildable
         if (this.hasNewBuildableFiles(dataset, fileEntries)) {
-            console.log('Buildable files detected among new files, starting polling');
             await this.startPollingForNewFiles(dataset, fileEntries);
         }
     }
 
-    /**
-     * Checks if a file is ready for visualization
-     * Considers build state and output file availability
-     * @param {Object} dataset - DDB Dataset
-     * @param {Object} entry - File entry
-     * @param {string} viewType - Viewer type
-     * @returns {Promise<boolean>}
-     */
-    async isFileReadyForViewing(dataset, entry, viewType) {
-        // Non-buildable files are always ready
-        if (!this.isBuildableType(entry.type)) {
-            return true;
-        }
+    monitorDatasetForBuilds(dataset) {
+        this.registerDataset(dataset);
+        this.loadBuilds(dataset).catch(e => console.error('Error monitoring dataset for builds:', e));
+    }
 
-        // Check build state
-        const buildState = this.getBuildState(dataset, entry.path);
+    /* ---- readiness helpers ---- */
 
-        if (buildState) {
-            return buildState.currentState === BUILD_STATES.SUCCEEDED;
-        }
-
-        // If no build state, check the API
-        try {
-            const builds = await dataset.getBuilds(1, 100);
-            const currentBuild = builds.find(b => b.path === entry.path);
-
-            if (currentBuild) {
-                return currentBuild.currentState === BUILD_STATES.SUCCEEDED;
-            }
-        } catch (error) {
-            console.error('Error checking build state:', error);
-        }
-
+    async isFileReadyForViewing(dataset, entry, _viewType) {
+        if (!this.isBuildableType(entry.type)) return true;
+        const bs = this.getBuildState(dataset, entry.path);
+        if (bs) return bs.currentState === BUILD_STATES.SUCCEEDED;
+        // Fallback: check taskMonitor store directly
+        const builds = taskMonitor.getTasks(dataset).filter(t => t.toolId === 'build');
+        const cur = builds.find(b => b.path === entry.path);
+        if (cur) return cur.state === BUILD_STATES.SUCCEEDED;
         return false;
     }
 
-    /**
-     * Waits for build completion with polling
-     * @param {Object} dataset - DDB Dataset
-     * @param {string} filePath - File path
-     * @param {number} maxWaitMs - Maximum timeout in milliseconds (default 5 minutes)
-     * @returns {Promise<Object>} Promise that resolves with build state when complete
-     */
     async waitForBuildCompletion(dataset, filePath, maxWaitMs = 300000) {
         const startTime = Date.now();
-        const pollInterval = 3000; // 3 seconds
-
         return new Promise((resolve, reject) => {
-            const checkBuild = async () => {
+            const tick = async () => {
                 try {
-                    // Check timeout
                     if (Date.now() - startTime > maxWaitMs) {
                         reject(new Error('Timeout waiting for build completion'));
                         return;
                     }
-
-                    // Reload builds
-                    await this.loadBuilds(dataset);
-
-                    // Check state
-                    const buildState = this.getBuildState(dataset, filePath);
-
-                    if (!buildState) {
-                        // No build found, retry
-                        setTimeout(checkBuild, pollInterval);
-                        return;
-                    }
-
-                    if (buildState.currentState === BUILD_STATES.SUCCEEDED) {
-                        resolve(buildState);
-                        return;
-                    }
-
-                    if (buildState.currentState === BUILD_STATES.FAILED) {
+                    this._sync(dataset);
+                    const bs = this.getBuildState(dataset, filePath);
+                    if (!bs) { setTimeout(tick, 3000); return; }
+                    if (bs.currentState === BUILD_STATES.SUCCEEDED) { resolve(bs); return; }
+                    if (bs.currentState === BUILD_STATES.FAILED) {
                         reject(new Error(`Build failed for ${filePath}`));
                         return;
                     }
-
-                    // Build still in progress, retry
-                    if (ACTIVE_STATES.includes(buildState.currentState)) {
-                        setTimeout(checkBuild, pollInterval);
-                        return;
-                    }
-
-                    // Unexpected state
-                    reject(new Error(`Unexpected build state: ${buildState.currentState}`));
-
-                } catch (error) {
-                    reject(error);
-                }
+                    setTimeout(tick, 3000);
+                } catch (e) { reject(e); }
             };
-
-            // Start first check
-            checkBuild();
+            tick();
         });
     }
 
-    /**
-     * Cleans up everything (call when leaving the dataset)
-     */
-    cleanup() {
-        // Stop all polling
-        this.pollingTimers.forEach(timerId => clearInterval(timerId));
-        this.pollingTimers.clear();
+    /* ---- cleanup ---- */
 
-        // Clear cache
-        this.buildCache.clear();
+    cleanup() {
+        for (const ds of this.datasets.values()) taskMonitor.stop(ds);
+        taskMonitor.off('buildStateChanged', this._boundOnStateChange);
+        this._buildByPath.clear();
         this.datasets.clear();
         this.eventListeners = {};
     }
-
-    /**
-     * Generates a unique key for the dataset
-     */
-    getDatasetKey(dataset) {
-        return `${dataset.org}/${dataset.ds}`;
-    }
-
-    /**
-     * Event system
-     */
-    on(event, callback) {
-        if (!this.eventListeners[event]) {
-            this.eventListeners[event] = [];
-        }
-        this.eventListeners[event].push(callback);
-    }
-
-    off(event, callback) {
-        if (this.eventListeners[event]) {
-            const index = this.eventListeners[event].indexOf(callback);
-            if (index > -1) {
-                this.eventListeners[event].splice(index, 1);
-            }
-        }
-    }
-
-    emit(event, data) {
-        if (this.eventListeners[event]) {
-            this.eventListeners[event].forEach(callback => {
-                try {
-                    callback(data);
-                } catch (error) {
-                    console.error('Event listener error:', error);
-                }
-            });
-        }
-    }
 }
 
-// Export a singleton instance and build states
 export { BUILD_STATES };
 export default new BuildManager();
