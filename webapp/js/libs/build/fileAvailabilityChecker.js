@@ -187,14 +187,12 @@ class FileAvailabilityChecker {
                 const isAvailable = await this.checkOutputFileAvailability(entryObj, outputFile);
 
                 if (isAvailable) {
-                    // Cache a synthetic "Succeeded" build state to avoid rechecking
                     const syntheticBuildState = {
                         path: entry.path,
                         currentState: 'Succeeded',
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString()
                     };
-                    BuildManager.updateBuildState(dataset, syntheticBuildState);
 
                     return {
                         available: true,
