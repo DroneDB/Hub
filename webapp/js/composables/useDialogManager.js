@@ -176,7 +176,7 @@ export default {
 
                 // Notify BuildManager about new files (use original entries, not synthetic ones)
                 const newEntries = uploaded;
-                this.BuildManager.onFilesAdded(this.dataset, newEntries);
+                BuildManager.onFilesAdded(this.dataset, newEntries);
             }
 
             if (uploadSuccess) this.$toast.add({ severity: 'success', summary: 'Upload Complete', detail: `Uploaded ${uploaded.length} file${uploaded.length > 1 ? 's' : ''}`, life: 3000 });
@@ -663,7 +663,7 @@ export default {
                 // into the matching already-expanded node.
                 if (currentItems.length > 0) {
                     emitter.emit('addItems', currentItems);
-                    this.BuildManager.onFilesAdded(this.dataset, currentItems.map(i => i.entry));
+                    BuildManager.onFilesAdded(this.dataset, currentItems.map(i => i.entry));
                 }
 
                 // If the destination is a DIFFERENT folder (e.g. a sub-folder), also fetch
