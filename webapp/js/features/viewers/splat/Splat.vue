@@ -3,6 +3,7 @@
         <TabViewLoader @loaded="handleLoad" titleSuffix="Gaussian Splat" />
 
         <Message bindTo="error" noDismiss />
+        <Toast position="bottom-left" />
         <div v-if="loading" class="loading">
             <p>Loading Gaussian Splat...</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
