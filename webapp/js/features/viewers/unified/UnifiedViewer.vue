@@ -717,34 +717,28 @@ export default {
             this.controls = controls;
 
             // GlobeControls require a manual update loop (they are not a giro3d view control).
+            // The camera is passed as the change source so that every entity's preUpdate() runs
+            // each frame, driving 3D Tiles streaming (Tiles3D.preUpdate -> _tiles.update()).
+            // Without a change source the update loop filters out every entity and the stream stalls.
             const tick = () => {
                 if (!this.controls) return;
                 try {
                     this.controls.update();
-                    this.instance.notifyChange();
+                    this.instance.notifyChange(this.instance.view.camera);
                 } catch (e) { /* ignore transient errors during teardown */ }
                 this._globeRaf = requestAnimationFrame(tick);
             };
             this._globeRaf = requestAnimationFrame(tick);
         },
 
-        // Frames the camera on a georeferenced tileset. Giro3D's view.goTo computes a proper ECEF
-        // point-of-view from the object's bounding box; a manual radial placement is the fallback.
+        // Frames the camera on a georeferenced tileset, using the tileset's declared bounding
+        // volume (from tileset.json). Giro3D's view.goTo must NOT be used here: it derives the
+        // point of view from the Object3D hierarchy, which is still empty before any tile has
+        // streamed in. An empty Box3 has centre (0,0,0), so goTo parks the camera at the centre
+        // of the Earth, culling the whole tileset and stalling the stream for good - the camera
+        // can never be framed from geometry that can never load.
         frameGlobe: function (tileset, box) {
             const { THREE } = this.libs;
-            try {
-                const obj = tileset.object3d || (tileset.tiles && tileset.tiles.group);
-                if (obj) {
-                    const pov = this.instance.view.goTo(obj);
-                    if (pov) {
-                        if (this.controls && this.controls.update) this.controls.update();
-                        this.instance.notifyChange();
-                        return;
-                    }
-                }
-            } catch (e) {
-                // Fall through to manual framing.
-            }
 
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -760,7 +754,7 @@ export default {
             camera.lookAt(center);
             camera.updateMatrixWorld();
             if (this.controls && this.controls.update) this.controls.update();
-            this.instance.notifyChange();
+            this.instance.notifyChange(this.instance.view.camera);
         },
 
         // True when a THREE.Box3 is fully finite (no NaN/Infinity) and non-empty.
