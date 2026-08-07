@@ -32,7 +32,7 @@
                     <template #body="{ data }">
                         <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
                         <template v-else-if="expandedGrid">
-                            <img v-if="getThumbnail(data)" class="thumb-preview" :src="getThumbnail(data)" @error="onThumbError(data)" />
+                            <img v-if="getThumbnail(data)" class="thumb-preview" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)" />
                             <i v-else class="icon" :class="data.icon"></i>
                         </template>
                         <i v-else class="icon" :class="data.icon"></i>

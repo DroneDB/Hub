@@ -17,16 +17,16 @@
 
             <!-- Measurement toolbar (top-left) -->
             <div v-if="ready" class="toolbar">
-                <button :class="{ active: activeTool === 'point' }" @click="measure('point')" title="Measure point">
+                <button :class="{ active: activeTool === 'point' }" @click="measure('point')" title="Measure point" aria-label="Measure point">
                     <i class="fa-solid fa-location-dot" />
                 </button>
-                <button :class="{ active: activeTool === 'distance' }" @click="measure('distance')" title="Measure distance">
+                <button :class="{ active: activeTool === 'distance' }" @click="measure('distance')" title="Measure distance" aria-label="Measure distance">
                     <i class="fa-solid fa-ruler" />
                 </button>
-                <button :class="{ active: activeTool === 'area' }" @click="measure('area')" title="Measure area">
+                <button :class="{ active: activeTool === 'area' }" @click="measure('area')" title="Measure area" aria-label="Measure area">
                     <i class="fa-solid fa-draw-polygon" />
                 </button>
-                <button :disabled="measureCount === 0" @click="clearMeasurements" title="Clear measurements">
+                <button :disabled="measureCount === 0" @click="clearMeasurements" title="Clear measurements" aria-label="Clear measurements">
                     <i class="fa-solid fa-trash" />
                 </button>
             </div>
@@ -57,7 +57,7 @@
             </div>
 
             <!-- Settings gear (bottom-right) -->
-            <button v-if="ready" class="btn-settings" @click="toggleSettings" title="Display settings">
+            <button v-if="ready" class="btn-settings" @click="toggleSettings" title="Display settings" aria-label="Display settings">
                 <i class="fa-solid fa-gear" />
             </button>
         </div>
