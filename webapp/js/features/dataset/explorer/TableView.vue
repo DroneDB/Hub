@@ -76,7 +76,10 @@
                         </span>
                     </template>
                     <template #body="{ data }">
-                        <span class="file-date">{{ getModifiedDate(data) }}</span>
+                        <div class="file-date">
+                            <div>{{ getModifiedDate(data) }}</div>
+                            <small class="relative-time">{{ getFileModifiedDateRel(data) }}</small>
+                        </div>
                     </template>
                 </Column>
                 <template #empty>
@@ -97,13 +100,12 @@
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
+import { clone, formatTimeAgo, bytesToSize } from '@/libs/utils';
 import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { bytesToSize } from '@/libs/utils';
 
 import ddb from 'ddb';
 const { pathutils, entry } = ddb;
@@ -415,6 +417,12 @@ export default {
             return date.toLocaleString();
         },
 
+        getFileModifiedDateRel: function(file) {
+            if (!file.entry.mtime) return '';
+
+            return formatTimeAgo(file.entry.mtime * 1000);
+        },
+
         // Build management methods (delegated to shared helpers)
         isBuildableFile: function(file) {
             return isBuildableFile(this.dataset, file);
@@ -572,6 +580,12 @@ export default {
 
     .file-date {
         white-space: nowrap;
+    }
+
+    .file-date .relative-time {
+        font-size: 0.75rem;
+        color: var(--ddb-text-muted);
+        display: block;
     }
 }
 </style>
