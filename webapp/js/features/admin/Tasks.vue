@@ -27,7 +27,7 @@
             style="flex: 1; min-height: 0;"
             empty-message="No tasks match the current filters."
             @page="onPage" @view-log="openLog" @download-result="downloadResult"
-            @cancel="cancelTask" @retry="retryTask" />
+            @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
 
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
             :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
@@ -38,6 +38,16 @@
             :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
             confirmText="Cancel Task" cancelText="Don't Cancel" confirmButtonClass="danger"
             @onClose="handleCancelDialogClose">
+        </ConfirmDialog>
+
+        <!-- Delete task confirmation -->
+        <ConfirmDialog v-if="deleteDialogOpen"
+            title="Delete Task"
+            :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, taskTools)}</strong> will be removed together with any downloadable results it produced.`"
+            confirmText="Delete" cancelText="Cancel" confirmButtonClass="danger"
+            warningTitle="Warning"
+            warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
+            @onClose="handleDeleteDialogClose">
         </ConfirmDialog>
     </div>
 </template>
@@ -83,6 +93,9 @@ export default {
 
             cancelDialogOpen: false,
             cancellingTask: null,
+
+            deleteDialogOpen: false,
+            deletingTask: null,
 
             _refreshTimer: null
         };
@@ -220,6 +233,27 @@ export default {
                 this._toast('error', 'Retry failed', e.message);
             }
         },
+
+        deleteTask(task) {
+            this.deletingTask = task;
+            this.deleteDialogOpen = true;
+        },
+
+        async handleDeleteDialogClose(buttonId) {
+            this.deleteDialogOpen = false;
+            if (buttonId !== 'confirm' || !this.deletingTask) {
+                this.deletingTask = null;
+                return;
+            }
+            const task = this.deletingTask;
+            this.deletingTask = null;
+            try {
+                await reg.adminDeleteTask(task.taskId);
+                await this.loadTasks();
+                this._toast('success', 'Task deleted', 'The task has been removed from history.');
+            } catch (e) {
+                this._toast('error', 'Delete failed', e.message);
+            }
 
         async downloadResult(task) {
             // Navigate to the authenticated result URL (cookie auth); the server
