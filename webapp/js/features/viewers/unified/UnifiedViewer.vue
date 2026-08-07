@@ -68,19 +68,19 @@
             <div class="settings-content">
                 <div class="form-group">
                     <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100" type="range" v-model.number="ambientIntensity" min="0" max="3" step="0.1"
+                    <div><input class="w-100" type="range" v-model.number="ambientIntensity" min="0" max="5" step="0.1"
                         @input="updateLighting" /></div>
                 </div>
 
                 <div class="form-group">
                     <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100" type="range" v-model.number="directionalIntensity" min="0" max="3"
+                    <div><input class="w-100" type="range" v-model.number="directionalIntensity" min="0" max="5"
                         step="0.1" @input="updateLighting" /></div>
                 </div>
 
                 <div class="form-group">
                     <div><label>Sky / ground fill: {{ hemisphereIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100" type="range" v-model.number="hemisphereIntensity" min="0" max="3"
+                    <div><input class="w-100" type="range" v-model.number="hemisphereIntensity" min="0" max="5"
                         step="0.1" @input="updateLighting" /></div>
                 </div>
 
@@ -108,9 +108,9 @@ import { createEarthControls } from './earthControls';
 const SETTINGS_KEY = 'unified-viewer-settings';
 
 const DEFAULTS = {
-    ambientIntensity: 1.5,
+    ambientIntensity: 3,
     directionalIntensity: 1.8,
-    hemisphereIntensity: 0.6,
+    hemisphereIntensity: 3,
     flightSpeed: 1
 };
 
