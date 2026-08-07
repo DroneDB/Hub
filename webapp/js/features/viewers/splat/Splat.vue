@@ -167,6 +167,7 @@ import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
+import Toast from 'primevue/toast';
 import CameraManager from './CameraManager.vue';
 
 // Immersive navigation keys, in the 2x3 layout shown in the on-screen overlay:
@@ -190,7 +191,7 @@ const NAV_KEYS = [
  */
 export default {
     components: {
-        Message, TabViewLoader, Window, Button, CameraManager
+        Message, TabViewLoader, Window, Button, CameraManager, Toast
     },
     props: ['uri'],
     data: function () {
