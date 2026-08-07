@@ -857,6 +857,7 @@ export default {
             } catch (e) {
                 this._toast('error', 'Delete failed', e.message);
             }
+        },
 
         // ---- output folder picker ----
 

@@ -254,6 +254,7 @@ export default {
             } catch (e) {
                 this._toast('error', 'Delete failed', e.message);
             }
+        },
 
         async downloadResult(task) {
             // Navigate to the authenticated result URL (cookie auth); the server
