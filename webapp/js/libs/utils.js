@@ -85,7 +85,7 @@ export function formatTimeAgo(ms) {
     if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ${suffix}`;
     if (days < 30) return `${days} day${days > 1 ? 's' : ''} ${suffix}`;
     if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
-    return `${years} year${years > 1 ? 's' : ''} ${suffix}`;
+    return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
 }
 
 /* Is currently in full screen or not */
