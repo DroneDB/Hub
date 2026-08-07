@@ -100,7 +100,12 @@
                 </Column>
                 <Column field="creationDate" header="Creation Date" :sortable="true"
                     :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
-                    <template #body="slotProps">{{ formatDate(slotProps.data.creationDate) }}</template>
+                    <template #body="slotProps">
+                        <div class="file-date">
+                            <div>{{ formatDate(slotProps.data.creationDate) }}</div>
+                            <small class="relative-time">{{ formatCreationDateRel(slotProps.data.creationDate) }}</small>
+                        </div>
+                    </template>
                 </Column>
                 <Column field="entries" header="Files" :sortable="true"
                     :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
@@ -172,7 +177,7 @@
 
 <script>
 import Message from '@/components/Message.vue';
-import { setTitle, bytesToSize } from '@/libs/utils';
+import { setTitle, bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences } from '@/libs/storageUtils';
 import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
@@ -481,6 +486,11 @@ export default {
         formatDate(timestamp) {
             const date = new Date(timestamp);
             return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        },
+
+        formatCreationDateRel(timestamp) {
+            if (!timestamp) return '';
+            return formatTimeAgo(timestamp);
         },
 
         getVisibilityText(visibility) {
@@ -1010,6 +1020,13 @@ export default {
                 padding: 0.5rem;
             }
         }
+    }
+
+    /* Relative time under absolute date */
+    .file-date .relative-time {
+        font-size: 0.75rem;
+        color: var(--ddb-text-muted);
+        display: block;
     }
 }
 </style>
