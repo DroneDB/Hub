@@ -3,6 +3,7 @@
         <TabViewLoader @loaded="handleLoad" titleSuffix="3D Viewer" />
 
         <Message bindTo="error" noDismiss />
+        <Toast position="bottom-left" />
         <div v-if="loading" class="loading">
             <p>{{ loadingText }}</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -103,6 +104,7 @@ import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
+import Toast from 'primevue/toast';
 import { createEarthControls } from './earthControls';
 
 const SETTINGS_KEY = 'unified-viewer-settings';
@@ -144,7 +146,7 @@ function loadSettings() {
  */
 export default {
     components: {
-        Message, TabViewLoader, Window, Button
+        Message, TabViewLoader, Window, Button, Toast
     },
     props: ['uri'],
     data: function () {
@@ -612,7 +614,7 @@ export default {
             await this.instance.add(tileset);
             this.configureTilesetStreaming(tileset);
 
-            const box = tileset.getBoundingBox();
+            let box = tileset.getBoundingBox();
             if (!box || !this.isFiniteBox(box))
                 throw new Error(`The 3D Tiles '${this.basename(entry.path)}' are empty or invalid and cannot be displayed.`);
 
@@ -627,8 +629,12 @@ export default {
             // Keep the loading indicator up until the tileset has put geometry on screen.
             await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
 
-            // Re-frame once tiles have settled (adding the tileset can move the camera target).
-            if (georeferenced) this.frameGlobe(tileset, box);
+            // Grounding needs real streamed-in geometry (see groundGlobeTileset), so it can only
+            // run once the first tile has rendered - hence doing it here rather than before framing.
+            if (georeferenced) {
+                box = this.groundGlobeTileset(tileset, box);
+                this.frameGlobe(tileset, box);
+            }
         },
 
         // Prepares a freshly added Tiles3D entity for robust progressive streaming. Must be called
@@ -729,6 +735,88 @@ export default {
                 this._globeRaf = requestAnimationFrame(tick);
             };
             this._globeRaf = requestAnimationFrame(tick);
+        },
+
+        // Drops a georeferenced tileset onto the ellipsoid, using its actual streamed-in geometry,
+        // and clips away whatever remains below ground. Must be called AFTER the first tile has
+        // rendered (see loadTiles3D). The OSM basemap is draped on a bare WGS84 ellipsoid (the
+        // globe has no elevation layer), so a tileset sitting at its true ellipsoidal height would
+        // otherwise hang visibly in mid-air.
+        //
+        // Grounds on a low percentile of vertex altitude rather than the true minimum. Photogrammetry
+        // exports - e.g. RealityCapture - are commonly a solid, watertight mesh: a flat cap closes
+        // off the bottom of the capture volume several metres below the real ground contact point,
+        // constant across the whole footprint (verified in-browser: every vertical ray through the
+        // model hit that same cap at the same depth, regardless of XY position). Anchoring on the
+        // true minimum grounds on that cap instead of the visible surface, leaving the model floating
+        // by the cap's depth. But even after grounding on the real surface, that cap still juts out
+        // below elevation 0 at the model's edges, visible under it from any oblique angle - since the
+        // flat basemap texture has no volume to hide it behind. A clipping plane at elevation 0
+        // (world-flat is an excellent approximation at building scale) removes that cap outright
+        // instead of merely repositioning it.
+        //
+        // The shift is rigid, so distances and areas measured on the model are unaffected.
+        // Returns the repositioned bounding box, for framing.
+        groundGlobeTileset: function (tileset, box) {
+            const { THREE } = this.libs;
+            const ellipsoid = this._globe && this._globe.ellipsoid;
+            if (!ellipsoid) return box;
+
+            tileset.object3d.updateMatrixWorld(true);
+            const vertex = new THREE.Vector3();
+            const samples = [];
+            tileset.object3d.traverse(obj => {
+                const positions = obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position;
+                if (!positions) return;
+                // Cap samples per mesh so grounding stays cheap on dense point clouds / meshes.
+                const step = Math.max(1, Math.floor(positions.count / 2000));
+                for (let i = 0; i < positions.count; i += step) {
+                    vertex.fromBufferAttribute(positions, i).applyMatrix4(obj.matrixWorld);
+                    samples.push({
+                        altitude: ellipsoid.toGeodetic(vertex.x, vertex.y, vertex.z).altitude,
+                        position: vertex.clone()
+                    });
+                }
+            });
+            if (samples.length === 0) return box;
+
+            // Ranking by toGeodetic().altitude is safe even though the value itself is unreliable
+            // (see below): every sample shares the same latitude-dependent bias, so relative order
+            // is preserved. Only the ground reference is ever fed back into ellipsoid math.
+            samples.sort((a, b) => a.altitude - b.altitude);
+            const ground = samples[Math.floor(samples.length * 0.02)];
+            const groundElevation = ground.altitude;
+            if (!Number.isFinite(groundElevation)) return box;
+
+            const up = ellipsoid.getNormalFromCartesian(ground.position, new THREE.Vector3());
+            const offset = up.clone().multiplyScalar(-groundElevation);
+
+            if (Math.abs(groundElevation) >= 0.01) {
+                tileset.object3d.position.add(offset);
+                tileset.object3d.updateMatrixWorld(true);
+
+                // The basemap has no elevation layer, so the model's real ellipsoidal height
+                // would otherwise leave it floating above (or sunk below) the ground - let the
+                // user know its altitude was shifted to rest on the ground.
+                this.$toast.add({
+                    severity: 'info',
+                    summary: 'Altitude adjusted',
+                    detail: `The model was shifted by ${Math.round(Math.abs(groundElevation))} m to rest on the ground.`,
+                    life: 6000
+                });
+            }
+
+            // Clip away anything left below ground (the closed-bottom cap) - a rigid shift alone
+            // repositions it but can never remove it, and it would otherwise still be visible
+            // poking out under the model. groundPoint is the actual sampled vertex (shifted by the
+            // same offset), NOT reconstructed via ellipsoid.toCartesian(toGeodetic(...).lat/lon, ...):
+            // that round-trip hits a real bug in giro3d's Ellipsoid.toGeodetic() that introduces
+            // tens to hundreds of metres of latitude-dependent error (verified: 0 at the equator,
+            // ~130 m at this latitude) - using a real ECEF point sidesteps it entirely.
+            const groundPoint = ground.position.clone().add(offset);
+            tileset.clippingPlanes = [new THREE.Plane().setFromNormalAndCoplanarPoint(up, groundPoint)];
+
+            return box.clone().translate(offset);
         },
 
         // Frames the camera on a georeferenced tileset, using the tileset's declared bounding
