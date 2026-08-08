@@ -303,7 +303,10 @@ export default {
             }
             if (this.isAdmin) {
                 items.push({ label: 'Tasks', icon: 'fa-solid fa-list-check fixed-icon', command: () => this.adminTasks() });
+                items.push({ separator: true });
                 items.push({ label: 'Configuration', icon: 'fa-solid fa-gear fixed-icon', command: () => this.adminConfig() });
+                items.push({ label: 'Hangfire', icon: 'fa-solid fa-fire fixed-icon', url: '/hangfire', target: '_blank', rel: 'noopener' });
+                items.push({ label: 'API Docs', icon: 'fa-solid fa-code fixed-icon', url: '/scalar/v1', target: '_blank', rel: 'noopener' });
             }
 
             items.push({ separator: true });

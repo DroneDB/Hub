@@ -3,6 +3,7 @@
         <TabViewLoader @loaded="handleLoad" titleSuffix="3D Viewer" />
 
         <Message bindTo="error" noDismiss />
+        <Toast position="bottom-left" />
         <div v-if="loading" class="loading">
             <p>{{ loadingText }}</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -17,16 +18,16 @@
 
             <!-- Measurement toolbar (top-left) -->
             <div v-if="ready" class="toolbar">
-                <button :class="{ active: activeTool === 'point' }" @click="measure('point')" title="Measure point">
+                <button :class="{ active: activeTool === 'point' }" @click="measure('point')" title="Measure point" aria-label="Measure point">
                     <i class="fa-solid fa-location-dot" />
                 </button>
-                <button :class="{ active: activeTool === 'distance' }" @click="measure('distance')" title="Measure distance">
+                <button :class="{ active: activeTool === 'distance' }" @click="measure('distance')" title="Measure distance" aria-label="Measure distance">
                     <i class="fa-solid fa-ruler" />
                 </button>
-                <button :class="{ active: activeTool === 'area' }" @click="measure('area')" title="Measure area">
+                <button :class="{ active: activeTool === 'area' }" @click="measure('area')" title="Measure area" aria-label="Measure area">
                     <i class="fa-solid fa-draw-polygon" />
                 </button>
-                <button :disabled="measureCount === 0" @click="clearMeasurements" title="Clear measurements">
+                <button :disabled="measureCount === 0" @click="clearMeasurements" title="Clear measurements" aria-label="Clear measurements">
                     <i class="fa-solid fa-trash" />
                 </button>
             </div>
@@ -39,7 +40,61 @@
                     <i :class="l.icon" /> <span>{{ l.name }}</span>
                 </label>
             </div>
+
+            <!-- Navigation mode toolbar (bottom-left) -->
+            <div v-if="ready && navModesAvailable" class="nav-toolbar">
+                <button :class="{ active: navMode === 'orbit' }" @click="switchNavMode('orbit')"
+                    title="Orbit - rotate around the pivot (left drag), pan (right drag), zoom (scroll)">
+                    <i class="fa-solid fa-rotate" />
+                </button>
+                <button :class="{ active: navMode === 'flight' }" @click="switchNavMode('flight')"
+                    title="Flight - look around (left drag), arrow keys to move, Page Up / Page Down for altitude">
+                    <i class="fa-solid fa-plane" />
+                </button>
+                <button :class="{ active: navMode === 'earth' }" @click="switchNavMode('earth')"
+                    title="Earth - ground-locked orbit, double-click to re-centre on a point">
+                    <i class="fa-solid fa-earth-americas" />
+                </button>
+            </div>
+
+            <!-- Settings gear (bottom-right) -->
+            <button v-if="ready" class="btn-settings" @click="toggleSettings" title="Display settings" aria-label="Display settings">
+                <i class="fa-solid fa-gear" />
+            </button>
         </div>
+
+        <!-- Lighting / navigation settings -->
+        <Window v-if="showSettings" title="Display settings" id="unified-settings" @onClose="toggleSettings" fixedSize
+            sizeClass="dialog-xs">
+            <div class="settings-content">
+                <div class="form-group">
+                    <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
+                    <div><input class="w-100" type="range" v-model.number="ambientIntensity" min="0" max="5" step="0.1"
+                        @input="updateLighting" /></div>
+                </div>
+
+                <div class="form-group">
+                    <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
+                    <div><input class="w-100" type="range" v-model.number="directionalIntensity" min="0" max="5"
+                        step="0.1" @input="updateLighting" /></div>
+                </div>
+
+                <div class="form-group">
+                    <div><label>Sky / ground fill: {{ hemisphereIntensity.toFixed(1) }}</label></div>
+                    <div><input class="w-100" type="range" v-model.number="hemisphereIntensity" min="0" max="5"
+                        step="0.1" @input="updateLighting" /></div>
+                </div>
+
+                <div v-if="navModesAvailable" class="form-group">
+                    <div><label>Flight speed: {{ flightSpeed.toFixed(1) }}&times;</label></div>
+                    <div><input class="w-100" type="range" v-model.number="flightSpeed" min="0.1" max="5" step="0.1"
+                        @input="updateFlightSpeed" /></div>
+                </div>
+
+                <Button label="Reset" @click="resetSettings" text />
+                <Button label="Close" severity="secondary" @click="toggleSettings" text />
+            </div>
+        </Window>
     </div>
 </template>
 
@@ -47,6 +102,29 @@
 import ddb from 'ddb';
 import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
+import Window from '@/components/Window.vue';
+import Button from 'primevue/button';
+import Toast from 'primevue/toast';
+import { createEarthControls } from './earthControls';
+
+const SETTINGS_KEY = 'unified-viewer-settings';
+
+const DEFAULTS = {
+    ambientIntensity: 3,
+    directionalIntensity: 1.8,
+    hemisphereIntensity: 3,
+    flightSpeed: 1
+};
+
+function loadSettings() {
+    try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    } catch (e) {
+        // Ignore parse errors and fall back to the defaults.
+    }
+    return { ...DEFAULTS };
+}
 
 /**
  * UnifiedViewer - a single georeferenced Giro3D scene that can render any of the build
@@ -68,10 +146,11 @@ import TabViewLoader from '@/features/viewers/TabViewLoader';
  */
 export default {
     components: {
-        Message, TabViewLoader
+        Message, TabViewLoader, Window, Button, Toast
     },
     props: ['uri'],
     data: function () {
+        const saved = loadSettings();
         return {
             error: "",
             loading: false,
@@ -81,6 +160,16 @@ export default {
             ready: false,
             activeTool: null,
             measureCount: 0,
+            showSettings: false,
+            // Lighting and flight speed, restored from localStorage when present.
+            ambientIntensity: saved.ambientIntensity,
+            directionalIntensity: saved.directionalIntensity,
+            hemisphereIntensity: saved.hemisphereIntensity,
+            flightSpeed: saved.flightSpeed,
+            // Potree-style navigation: 'orbit' (default), 'flight' or 'earth'. Only offered for
+            // 3D content in a flat scene - globe mode has its own ground-following controls.
+            navMode: 'orbit',
+            navModesAvailable: false,
             // Reactive metadata for the layer panel; the heavy Giro3D objects are kept
             // out of the reactive tree (see created()).
             layers: []
@@ -99,6 +188,17 @@ export default {
         this.shapes = [];
         this.layerObjects = {};
         this._layerId = 0;
+        // Scene lights, kept so the settings panel can retune them live.
+        this._lights = { ambient: null, hemisphere: null, sun: null, fill: null };
+        // The three navigation controls. Orbit is built with the scene; flight and earth are
+        // created on first use so non-3D entries never pay for them.
+        this._orbitControls = null;
+        this._flightControls = null;
+        this._earthControls = null;
+        // Distance from camera to pivot at framing time, used to rebuild an orbit pivot after
+        // free-flying, and the scene size that sets the flight speed baseline.
+        this._focusDistance = 0;
+        this._sceneSize = 0;
         // Globe-mode (georeferenced 3D Tiles) state: the Giro3D Globe entity and the
         // requestAnimationFrame handle driving GlobeControls.update() (see setupGlobe).
         this._globe = null;
@@ -179,7 +279,8 @@ export default {
             const [
                 THREE, controls, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
                 TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
-                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe, GlobeControls
+                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe, GlobeControls,
+                FirstPersonControls
             ] = await Promise.all([
                 import(/* webpackChunkName: "giro3d" */ 'three'),
                 import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/MapControls.js'),
@@ -202,7 +303,8 @@ export default {
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMapMode.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/sources/las/config.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js'),
-                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/controls/GlobeControls.js')
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/controls/GlobeControls.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/controls/FirstPersonControls.js')
             ]);
 
             // Offline-first: serve the laz-perf WebAssembly decoder from our own origin (webpack
@@ -231,7 +333,8 @@ export default {
                 ColorMap: ColorMap.default,
                 ColorMapMode: ColorMapMode.default,
                 Globe: Globe.default,
-                GlobeControls: GlobeControls.default
+                GlobeControls: GlobeControls.default,
+                FirstPersonControls: FirstPersonControls.default
             };
         },
 
@@ -241,7 +344,7 @@ export default {
         // CRS. Every entry type (raster, vector, point cloud, model) uses a flat scene with
         // MapControls and an OSM basemap underneath - there is no globe mode.
         setupInstance: function (crs) {
-            const { THREE, Instance, MapControls } = this.libs;
+            const { Instance, MapControls } = this.libs;
 
             const instance = new Instance({
                 target: this.$refs.view,
@@ -254,20 +357,40 @@ export default {
             camera.up.set(0, 0, 1); // Giro3D scenes are Z-up
 
             // Lighting for 3D entities (models / point clouds). Map layers are unlit.
-            const ambient = new THREE.AmbientLight(0xffffff, 1.2);
-            instance.scene.add(ambient);
-            const sun = new THREE.DirectionalLight(0xffffff, 1.4);
-            sun.position.set(1, 1, 2);
-            instance.scene.add(sun);
-            const fill = new THREE.DirectionalLight(0xffffff, 0.5);
-            fill.position.set(-1, -1, 1);
-            instance.scene.add(fill);
+            this.addLights(instance, { fill: true });
 
             const controls = new MapControls(camera, instance.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.2;
             instance.view.setControls(controls);
+            this._orbitControls = controls;
             this.controls = controls;
+            this.navMode = 'orbit';
+        },
+
+        // Adds the scene lighting. A hemisphere light provides the sky/ground fill that keeps
+        // unlit-facing surfaces readable - without it 3D Tiles meshes render noticeably darker
+        // than the same model in the Nexus viewer. Every light is kept so the settings panel can
+        // retune it live.
+        addLights: function (instance, { fill }) {
+            const { THREE } = this.libs;
+            const lights = this._lights;
+
+            lights.ambient = new THREE.AmbientLight(0xffffff, this.ambientIntensity);
+            instance.scene.add(lights.ambient);
+
+            lights.hemisphere = new THREE.HemisphereLight(0xffffff, 0x444444, this.hemisphereIntensity);
+            instance.scene.add(lights.hemisphere);
+
+            lights.sun = new THREE.DirectionalLight(0xffffff, this.directionalIntensity);
+            lights.sun.position.set(1, 1, 2);
+            instance.scene.add(lights.sun);
+
+            if (fill) {
+                lights.fill = new THREE.DirectionalLight(0xffffff, this.directionalIntensity * 0.35);
+                lights.fill.position.set(-1, -1, 1);
+                instance.scene.add(lights.fill);
+            }
         },
 
         // Lazily creates the DrawTool the first time a measurement is started.
@@ -423,6 +546,7 @@ export default {
             // Flat local-space scene (no globe): the DroneDB 3D Tiles output is rendered in its own
             // frame with MapControls, consistent with every other type.
             this.setupInstance(this.libs.CoordinateSystem.epsg3857);
+            this.navModesAvailable = true;
 
             const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8, ktx2DecoderPath: '/wasm/basis/' });
 
@@ -480,6 +604,7 @@ export default {
             } else {
                 // Local/engineering tileset: flat scene, like the model path.
                 this.setupInstance(this.libs.CoordinateSystem.epsg3857);
+                this.navModesAvailable = true;
             }
 
             const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8, ktx2DecoderPath: '/wasm/basis/' });
@@ -489,7 +614,7 @@ export default {
             await this.instance.add(tileset);
             this.configureTilesetStreaming(tileset);
 
-            const box = tileset.getBoundingBox();
+            let box = tileset.getBoundingBox();
             if (!box || !this.isFiniteBox(box))
                 throw new Error(`The 3D Tiles '${this.basename(entry.path)}' are empty or invalid and cannot be displayed.`);
 
@@ -504,8 +629,12 @@ export default {
             // Keep the loading indicator up until the tileset has put geometry on screen.
             await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
 
-            // Re-frame once tiles have settled (adding the tileset can move the camera target).
-            if (georeferenced) this.frameGlobe(tileset, box);
+            // Grounding needs real streamed-in geometry (see groundGlobeTileset), so it can only
+            // run once the first tile has rendered - hence doing it here rather than before framing.
+            if (georeferenced) {
+                box = this.groundGlobeTileset(tileset, box);
+                this.frameGlobe(tileset, box);
+            }
         },
 
         // Prepares a freshly added Tiles3D entity for robust progressive streaming. Must be called
@@ -554,7 +683,7 @@ export default {
         // WGS84 ellipsoid, plus GlobeControls. Mirrors the giro3d simple-globe example. Unlike
         // MapControls, GlobeControls must be driven by a manual requestAnimationFrame loop.
         setupGlobe: function () {
-            const { THREE, Instance, Globe, GlobeControls, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
+            const { Instance, Globe, GlobeControls, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
 
             const instance = new Instance({
                 target: this.$refs.view,
@@ -567,10 +696,7 @@ export default {
             const camera = instance.view.camera;
             camera.up.set(0, 0, 1); // Z is the Earth rotation axis in ECEF.
 
-            instance.scene.add(new THREE.AmbientLight(0xffffff, 1.4));
-            const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-            sun.position.set(1, 1, 1);
-            instance.scene.add(sun);
+            this.addLights(instance, { fill: false });
 
             // OSM basemap on the ellipsoid (best-effort: a basemap failure must not hide the data).
             try {
@@ -597,34 +723,110 @@ export default {
             this.controls = controls;
 
             // GlobeControls require a manual update loop (they are not a giro3d view control).
+            // The camera is passed as the change source so that every entity's preUpdate() runs
+            // each frame, driving 3D Tiles streaming (Tiles3D.preUpdate -> _tiles.update()).
+            // Without a change source the update loop filters out every entity and the stream stalls.
             const tick = () => {
                 if (!this.controls) return;
                 try {
                     this.controls.update();
-                    this.instance.notifyChange();
+                    this.instance.notifyChange(this.instance.view.camera);
                 } catch (e) { /* ignore transient errors during teardown */ }
                 this._globeRaf = requestAnimationFrame(tick);
             };
             this._globeRaf = requestAnimationFrame(tick);
         },
 
-        // Frames the camera on a georeferenced tileset. Giro3D's view.goTo computes a proper ECEF
-        // point-of-view from the object's bounding box; a manual radial placement is the fallback.
+        // Drops a georeferenced tileset onto the ellipsoid, using its actual streamed-in geometry,
+        // and clips away whatever remains below ground. Must be called AFTER the first tile has
+        // rendered (see loadTiles3D). The OSM basemap is draped on a bare WGS84 ellipsoid (the
+        // globe has no elevation layer), so a tileset sitting at its true ellipsoidal height would
+        // otherwise hang visibly in mid-air.
+        //
+        // Grounds on a low percentile of vertex altitude rather than the true minimum. Photogrammetry
+        // exports - e.g. RealityCapture - are commonly a solid, watertight mesh: a flat cap closes
+        // off the bottom of the capture volume several metres below the real ground contact point,
+        // constant across the whole footprint (verified in-browser: every vertical ray through the
+        // model hit that same cap at the same depth, regardless of XY position). Anchoring on the
+        // true minimum grounds on that cap instead of the visible surface, leaving the model floating
+        // by the cap's depth. But even after grounding on the real surface, that cap still juts out
+        // below elevation 0 at the model's edges, visible under it from any oblique angle - since the
+        // flat basemap texture has no volume to hide it behind. A clipping plane at elevation 0
+        // (world-flat is an excellent approximation at building scale) removes that cap outright
+        // instead of merely repositioning it.
+        //
+        // The shift is rigid, so distances and areas measured on the model are unaffected.
+        // Returns the repositioned bounding box, for framing.
+        groundGlobeTileset: function (tileset, box) {
+            const { THREE } = this.libs;
+            const ellipsoid = this._globe && this._globe.ellipsoid;
+            if (!ellipsoid) return box;
+
+            tileset.object3d.updateMatrixWorld(true);
+            const vertex = new THREE.Vector3();
+            const samples = [];
+            tileset.object3d.traverse(obj => {
+                const positions = obj.geometry && obj.geometry.attributes && obj.geometry.attributes.position;
+                if (!positions) return;
+                // Cap samples per mesh so grounding stays cheap on dense point clouds / meshes.
+                const step = Math.max(1, Math.floor(positions.count / 2000));
+                for (let i = 0; i < positions.count; i += step) {
+                    vertex.fromBufferAttribute(positions, i).applyMatrix4(obj.matrixWorld);
+                    samples.push({
+                        altitude: ellipsoid.toGeodetic(vertex.x, vertex.y, vertex.z).altitude,
+                        position: vertex.clone()
+                    });
+                }
+            });
+            if (samples.length === 0) return box;
+
+            // Ranking by toGeodetic().altitude is safe even though the value itself is unreliable
+            // (see below): every sample shares the same latitude-dependent bias, so relative order
+            // is preserved. Only the ground reference is ever fed back into ellipsoid math.
+            samples.sort((a, b) => a.altitude - b.altitude);
+            const ground = samples[Math.floor(samples.length * 0.02)];
+            const groundElevation = ground.altitude;
+            if (!Number.isFinite(groundElevation)) return box;
+
+            const up = ellipsoid.getNormalFromCartesian(ground.position, new THREE.Vector3());
+            const offset = up.clone().multiplyScalar(-groundElevation);
+
+            if (Math.abs(groundElevation) >= 0.01) {
+                tileset.object3d.position.add(offset);
+                tileset.object3d.updateMatrixWorld(true);
+
+                // The basemap has no elevation layer, so the model's real ellipsoidal height
+                // would otherwise leave it floating above (or sunk below) the ground - let the
+                // user know its altitude was shifted to rest on the ground.
+                this.$toast.add({
+                    severity: 'info',
+                    summary: 'Altitude adjusted',
+                    detail: `The model was shifted by ${Math.round(Math.abs(groundElevation))} m to rest on the ground.`,
+                    life: 6000
+                });
+            }
+
+            // Clip away anything left below ground (the closed-bottom cap) - a rigid shift alone
+            // repositions it but can never remove it, and it would otherwise still be visible
+            // poking out under the model. groundPoint is the actual sampled vertex (shifted by the
+            // same offset), NOT reconstructed via ellipsoid.toCartesian(toGeodetic(...).lat/lon, ...):
+            // that round-trip hits a real bug in giro3d's Ellipsoid.toGeodetic() that introduces
+            // tens to hundreds of metres of latitude-dependent error (verified: 0 at the equator,
+            // ~130 m at this latitude) - using a real ECEF point sidesteps it entirely.
+            const groundPoint = ground.position.clone().add(offset);
+            tileset.clippingPlanes = [new THREE.Plane().setFromNormalAndCoplanarPoint(up, groundPoint)];
+
+            return box.clone().translate(offset);
+        },
+
+        // Frames the camera on a georeferenced tileset, using the tileset's declared bounding
+        // volume (from tileset.json). Giro3D's view.goTo must NOT be used here: it derives the
+        // point of view from the Object3D hierarchy, which is still empty before any tile has
+        // streamed in. An empty Box3 has centre (0,0,0), so goTo parks the camera at the centre
+        // of the Earth, culling the whole tileset and stalling the stream for good - the camera
+        // can never be framed from geometry that can never load.
         frameGlobe: function (tileset, box) {
             const { THREE } = this.libs;
-            try {
-                const obj = tileset.object3d || (tileset.tiles && tileset.tiles.group);
-                if (obj) {
-                    const pov = this.instance.view.goTo(obj);
-                    if (pov) {
-                        if (this.controls && this.controls.update) this.controls.update();
-                        this.instance.notifyChange();
-                        return;
-                    }
-                }
-            } catch (e) {
-                // Fall through to manual framing.
-            }
 
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -640,7 +842,7 @@ export default {
             camera.lookAt(center);
             camera.updateMatrixWorld();
             if (this.controls && this.controls.update) this.controls.update();
-            this.instance.notifyChange();
+            this.instance.notifyChange(this.instance.view.camera);
         },
 
         // True when a THREE.Box3 is fully finite (no NaN/Infinity) and non-empty.
@@ -668,6 +870,7 @@ export default {
             // but no longer responds to drag/zoom.
             const crsRegistered = this.registerCrs(crs);
             this.setupInstance(crs);
+            this.navModesAvailable = true;
             if (this.instance.renderingOptions) {
                 this.instance.renderingOptions.enableEDL = true;
             }
@@ -775,6 +978,8 @@ export default {
             this.instance.view.minNearPlane = Math.max(dist / 1000, 0.1);
             this.controls.target.set(cx, cy, 0);
             this.controls.update();
+            this._focusDistance = camera.position.distanceTo(this.controls.target);
+            this._sceneSize = span;
             this.instance.notifyChange();
         },
 
@@ -797,7 +1002,148 @@ export default {
             camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);
             if (this.controls.target && this.controls.target.copy) this.controls.target.copy(center);
             if (this.controls.update) this.controls.update();
+            this._focusDistance = camera.position.distanceTo(center);
+            this._sceneSize = maxDim;
+            this.applyFlightSpeed();
             this.instance.notifyChange();
+        },
+
+        // --- Navigation modes ------------------------------------------------------------
+
+        // Switches between the Potree-style navigation modes. Orbit and earth are MapControls
+        // variants driven by Giro3D's view; flight is Giro3D's FirstPersonControls, which drives
+        // itself from the instance update loop and so must not be registered as a view control.
+        switchNavMode: function (mode) {
+            if (!this.instance || mode === this.navMode) return;
+
+            const previous = this.controls;
+            const controls = this.ensureControls(mode);
+            if (!controls) return;
+
+            if (previous && previous !== controls) previous.enabled = false;
+            controls.enabled = true;
+
+            if (mode === 'flight') {
+                // FirstPersonControls listens to 'after-camera-update' itself.
+                this.instance.view.setControls(null);
+                controls.reset();
+                this.instance.domElement.focus();
+            } else {
+                this.adoptPivot(controls, previous);
+                this.instance.view.setControls(controls);
+                controls.update();
+            }
+
+            this.controls = controls;
+            this.navMode = mode;
+            this.instance.notifyChange();
+        },
+
+        // Returns the control for a mode, building flight and earth controls on first use so
+        // entries that never leave orbit mode do not pay for them.
+        ensureControls: function (mode) {
+            if (mode === 'orbit') return this._orbitControls;
+
+            if (mode === 'earth') {
+                if (!this._earthControls) {
+                    this._earthControls = createEarthControls(
+                        this.libs, this.instance.view.camera, this.instance.domElement,
+                        () => this.instance.notifyChange());
+                    this._earthControls.enabled = false;
+                }
+                return this._earthControls;
+            }
+
+            if (mode === 'flight') {
+                if (!this._flightControls) {
+                    // The canvas must be focusable for the arrow-key handlers to receive events.
+                    if (!this.instance.domElement.hasAttribute('tabindex')) {
+                        this.instance.domElement.tabIndex = 0;
+                    }
+                    this._flightControls = new this.libs.FirstPersonControls(this.instance, {
+                        focusOnClick: true,
+                        focusOnMouseOver: true,
+                        moveSpeed: this.moveSpeedForScene()
+                    });
+                }
+                return this._flightControls;
+            }
+
+            return null;
+        },
+
+        // Gives an orbit-style control its pivot when it becomes active: carried over from the
+        // previous control when there was one, or - coming back from free flight, which has no
+        // pivot - placed in front of the camera at the distance the scene was framed with.
+        adoptPivot: function (controls, previous) {
+            if (!controls.target) return;
+
+            if (previous && previous.target) {
+                controls.target.copy(previous.target);
+                return;
+            }
+
+            if (!this._focusDistance) return;
+            const { THREE } = this.libs;
+            const camera = this.instance.view.camera;
+            const forward = camera.getWorldDirection(new THREE.Vector3());
+            controls.target.copy(camera.position).addScaledVector(forward, this._focusDistance);
+        },
+
+        // Flight speed in m/s, scaled to the scene so crossing the data takes a few seconds
+        // whether it is a 10 m model or a 10 km point cloud.
+        moveSpeedForScene: function () {
+            return Math.max((this._sceneSize || 100) / 5, 0.5) * this.flightSpeed;
+        },
+
+        applyFlightSpeed: function () {
+            if (this._flightControls) {
+                this._flightControls.options.moveSpeed = this.moveSpeedForScene();
+            }
+        },
+
+        updateFlightSpeed: function () {
+            this.applyFlightSpeed();
+            this.persistSettings();
+        },
+
+        // --- Display settings ------------------------------------------------------------
+
+        toggleSettings: function () {
+            this.showSettings = !this.showSettings;
+        },
+
+        updateLighting: function () {
+            const { ambient, hemisphere, sun, fill } = this._lights;
+            if (ambient) ambient.intensity = this.ambientIntensity;
+            if (hemisphere) hemisphere.intensity = this.hemisphereIntensity;
+            if (sun) sun.intensity = this.directionalIntensity;
+            if (fill) fill.intensity = this.directionalIntensity * 0.35;
+            this.persistSettings();
+            if (this.instance) this.instance.notifyChange();
+        },
+
+        resetSettings: function () {
+            this.ambientIntensity = DEFAULTS.ambientIntensity;
+            this.directionalIntensity = DEFAULTS.directionalIntensity;
+            this.hemisphereIntensity = DEFAULTS.hemisphereIntensity;
+            this.flightSpeed = DEFAULTS.flightSpeed;
+            this.updateLighting();
+            this.applyFlightSpeed();
+            try { localStorage.removeItem(SETTINGS_KEY); } catch (e) { /* ignore */ }
+        },
+
+        persistSettings: function () {
+            try {
+                localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                    ambientIntensity: this.ambientIntensity,
+                    directionalIntensity: this.directionalIntensity,
+                    hemisphereIntensity: this.hemisphereIntensity,
+                    flightSpeed: this.flightSpeed
+                }));
+            } catch (e) {
+                // Ignore storage errors (private mode, quota).
+            }
         },
 
         // A simple OpenLayers style for MVT features (points, lines, polygons).
@@ -923,10 +1269,23 @@ export default {
                 try { this.drawTool.dispose(); } catch (e) { /* ignore */ }
                 this.drawTool = null;
             }
-            if (this.controls) {
-                this.controls.dispose();
-                this.controls = null;
+            // FirstPersonControls has no dispose(); disabling it stops it responding to input and
+            // its listeners die with the Giro3D DOM element below. GlobeControls, MapControls and
+            // the earth controls all dispose properly, and this.controls is always one of them, so
+            // it is covered by the list rather than disposed separately.
+            if (this._flightControls) {
+                this._flightControls.enabled = false;
+                this._flightControls = null;
             }
+            [this._orbitControls, this._earthControls, this.controls].forEach(c => {
+                if (c && typeof c.dispose === 'function') {
+                    try { c.dispose(); } catch (e) { /* ignore */ }
+                }
+            });
+            this.controls = null;
+            this._orbitControls = null;
+            this._earthControls = null;
+            this._lights = { ambient: null, hemisphere: null, sun: null, fill: null };
             // Giro3D disposes its renderer, scene, entities, layers and canvas.
             if (this.instance) {
                 try { this.instance.dispose(); } catch (e) { /* ignore */ }
@@ -1077,5 +1436,86 @@ export default {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+#unified-viewer .nav-toolbar {
+    position: absolute;
+    bottom: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    display: flex;
+    gap: 0.25rem;
+    z-index: 100;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--ddb-border-radius, 4px);
+    padding: 0.25rem;
+}
+
+#unified-viewer .nav-toolbar button {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--ddb-text-on-dark);
+    font-size: var(--ddb-font-size-base);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+#unified-viewer .nav-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#unified-viewer .nav-toolbar button.active {
+    background: var(--ddb-primary, #2978b4);
+}
+
+#unified-viewer .btn-settings {
+    position: absolute;
+    bottom: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-md);
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    color: var(--ddb-text-on-dark);
+    font-size: var(--ddb-font-size-base);
+    cursor: pointer;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+#unified-viewer .btn-settings:hover {
+    background: rgba(0, 0, 0, 0.85);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+#unified-viewer .settings-content {
+    padding: 0.25rem 0;
+}
+
+#unified-viewer .settings-content .form-group {
+    margin-bottom: 0.75rem;
+}
+
+#unified-viewer .settings-content .form-group label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--ddb-viewer-label-color);
+}
+
+#unified-viewer .settings-content .form-group input[type="range"] {
+    width: 100%;
+    cursor: pointer;
 }
 </style>

@@ -226,39 +226,37 @@ export default {
             this.selectedUsingFileBrowserList = true;
         },
 
-        async handleRenameClose(id, newPath, entry, measurementsInfo) {
+        async handleRenameClose(id, newPath, entry, sidecarsInfo) {
             if (id == "rename") {
                 if (newPath == null || newPath.length == 0) return;
 
-                // Handle measurements rename if requested
-                if (measurementsInfo && measurementsInfo.renameMeasurements) {
+                // Handle sidecar files rename if requested
+                if (sidecarsInfo && sidecarsInfo.sidecars && sidecarsInfo.sidecars.length > 0) {
                     this.isBusy = true;
                     try {
-                        // First rename the point cloud
+                        // First rename the main file
                         await this.renameSelectedFile(newPath);
 
-                        // Then rename the measurements file
-                        console.log('Renaming measurements file...');
-                        await this.dataset.moveObj(
-                            measurementsInfo.oldMeasurementsPath,
-                            measurementsInfo.newMeasurementsPath
-                        );
-
-                        console.log('Both files renamed successfully');
-                        this.$toast.add({ severity: 'success', summary: 'Renamed', detail: 'Point cloud and measurements file renamed successfully', life: 3000 });
-                    } catch (e) {
-                        // If measurements rename fails, show warning but not critical error
-                        if (e.message && e.message.includes('measurements')) {
-                            this.$toast.add({ severity: 'warn', summary: 'Partial Rename', detail: 'Point cloud renamed, but measurements file could not be renamed', life: 5000 });
-                            console.warn('Measurements rename failed:', e);
-                        } else {
-                            this.showError(e, "Rename");
+                        // Then rename each sidecar file, reusing renameFile() so the
+                        // file browser list and treeview (via emitter) are refreshed too
+                        for (const sc of sidecarsInfo.sidecars) {
+                            const sidecarItem = this.fileBrowserFiles.find(item => item.entry.path === sc.oldPath);
+                            if (sidecarItem) {
+                                await this.renameFile(sidecarItem, sc.newPath, { action: 'rename', silent: true });
+                            } else {
+                                await this.dataset.moveObj(sc.oldPath, sc.newPath);
+                            }
                         }
+
+                        const count = sidecarsInfo.sidecars.length;
+                        this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File and ${count} sidecar${count > 1 ? 's' : ''} renamed successfully`, life: 3000 });
+                    } catch (e) {
+                        this.showError(e, "Rename");
                     } finally {
                         this.isBusy = false;
                     }
                 } else {
-                    // Normal rename without measurements
+                    // Normal rename without sidecars
                     await this.renameSelectedFile(newPath);
                 }
             } else if (id == "renameddb") {

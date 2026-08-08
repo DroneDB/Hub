@@ -14,6 +14,7 @@
  * Pure formatting (severity/icon/date/duration) stays client-side.
  */
 import reg from '@/libs/api/sharedRegistry';
+import { formatTimeAgo } from '@/libs/utils';
 
 export default {
     data() {
@@ -109,15 +110,7 @@ export default {
 
         getRelativeTime(dateString) {
             if (!dateString) return '';
-            const diffMs = Date.now() - new Date(dateString).getTime();
-            const minutes = Math.floor(diffMs / 60000);
-            const hours = Math.floor(diffMs / 3600000);
-            const days = Math.floor(diffMs / 86400000);
-            if (minutes < 1) return 'Just now';
-            if (minutes < 60) return `${minutes} minutes ago`;
-            if (hours < 24) return `${hours} hours ago`;
-            if (days < 30) return `${days} days ago`;
-            return 'Over a month ago';
+            return formatTimeAgo(new Date(dateString).getTime());
         },
 
         // Elapsed time for a task still in flight.

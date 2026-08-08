@@ -30,8 +30,12 @@
                 @row-contextmenu="onRowContextMenu">
                 <Column header="" style="width: 3rem; text-align: center;">
                     <template #body="{ data }">
-                        <i v-if="!isBuildLoading(data)" class="icon" :class="data.icon"></i>
-                        <i v-else class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
+                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
+                        <template v-else-if="expandedGrid">
+                            <img v-if="getThumbnail(data)" class="thumb-preview" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)" />
+                            <i v-else class="icon" :class="data.icon"></i>
+                        </template>
+                        <i v-else class="icon" :class="data.icon"></i>
                         <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)"></i>
                     </template>
                 </Column>
@@ -76,7 +80,10 @@
                         </span>
                     </template>
                     <template #body="{ data }">
-                        <span class="file-date">{{ getModifiedDate(data) }}</span>
+                        <div class="file-date">
+                            <div>{{ getModifiedDate(data) }}</div>
+                            <small v-show="expandedGrid" class="relative-time">{{ getFileModifiedDateRel(data) }}</small>
+                        </div>
                     </template>
                 </Column>
                 <template #empty>
@@ -97,16 +104,15 @@
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
+import { clone, formatTimeAgo, bytesToSize } from '@/libs/utils';
 import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { bytesToSize } from '@/libs/utils';
 
 import ddb from 'ddb';
-const { pathutils, entry } = ddb;
+const { pathutils, entry, thumbs } = ddb;
 
 import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
@@ -125,7 +131,7 @@ export default {
         Toolbar, ContextMenu, Breadcrumb, DataTable, Column
     },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'expandedGrid', 'canWrite', 'isLoadingFiles'],
     inject: { showBuildConfirm: { default: null } },
     data: function () {
         const self = this;
@@ -153,7 +159,8 @@ export default {
             contextMenu,
             sortColumn: 'name',
             sortDirection: 'asc',
-            rangeStartIdx: null
+            rangeStartIdx: null,
+            thumbnailCache: new Map() // path -> thumbnail URL, or null if unsupported/unavailable
         };
     },
     watch: {
@@ -161,7 +168,15 @@ export default {
             handler() {
                 // Reset loading state when files change (folder opened)
                 this.loading = false;
+                if (this.expandedGrid) this.prepareThumbnails();
             }
+        },
+        expandedGrid: {
+            handler(enabled) {
+                if (enabled) this.prepareThumbnails();
+                else this.thumbnailCache.clear();
+            },
+            immediate: true
         }
     },
     computed: {
@@ -415,6 +430,38 @@ export default {
             return date.toLocaleString();
         },
 
+        getFileModifiedDateRel: function(file) {
+            if (!file.entry.mtime) return '';
+
+            return formatTimeAgo(file.entry.mtime * 1000);
+        },
+
+        // Returns the cached thumbnail URL for a file, or null if unsupported/not yet available
+        getThumbnail: function(file) {
+            const cached = this.thumbnailCache.get(file.entry.path);
+            return cached || null;
+        },
+
+        // Thumbnail failed to load (e.g. build not ready) - fall back to icon
+        onThumbError: function(file) {
+            this.thumbnailCache.delete(file.entry.path);
+        },
+
+        // Populate thumbnail URLs for the current file list (synchronous URL construction for ddb:// paths)
+        prepareThumbnails: function() {
+            this.thumbnailCache.clear();
+            if (!this.files) return;
+
+            for (const file of this.files) {
+                if (!thumbs.supportedForType(file.entry.type)) continue;
+                try {
+                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48));
+                } catch (e) {
+                    // Unsupported URI scheme or fetch error - fall back to icon
+                }
+            }
+        },
+
         // Build management methods (delegated to shared helpers)
         isBuildableFile: function(file) {
             return isBuildableFile(this.dataset, file);
@@ -561,6 +608,15 @@ export default {
         color: var(--ddb-text-muted);
     }
 
+    .thumb-preview {
+        width: 48px;
+        height: 48px;
+        object-fit: cover;
+        border-radius: 4px;
+        display: block;
+        margin: 0 auto;
+    }
+
     .file-name {
         word-break: break-all;
     }
@@ -572,6 +628,12 @@ export default {
 
     .file-date {
         white-space: nowrap;
+    }
+
+    .file-date .relative-time {
+        font-size: 0.75rem;
+        color: var(--ddb-text-muted);
+        display: block;
     }
 }
 </style>

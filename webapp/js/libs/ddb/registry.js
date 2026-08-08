@@ -929,6 +929,16 @@ module.exports = class Registry {
         return this.getRequest(`/sys/tasks?${q}`);
     }
 
+    /**
+     * Deletes a concluded task from the global admin task list (admin only).
+     * @param {string} id Task id
+     * @returns {Promise<Object>} { deleted }
+     */
+    async adminDeleteTask(id) {
+        if (!id) throw new Error('Invalid task id');
+        return this.postRequest(`/sys/tasks/${encodeURIComponent(id)}/delete`, {});
+    }
+
     // User update method (email and roles)
     async updateUser(userName, email, roles) {
         return await this.putRequest(`/users/${encodeURIComponent(userName)}`, {

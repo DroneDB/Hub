@@ -4,22 +4,21 @@
         <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close('close')"
             v-model="renameText" :invalid="renameText == null || renameText.length == 0" :disabled="busy" fluid />
 
-        <!-- Checkbox to also rename the measurements file -->
-        <div v-if="hasMeasurementsFile" class="measurements-rename-option">
+        <!-- Checkbox to also rename sidecar files (e.g. _measurements.geojson, _cameras.json) -->
+        <div v-if="sidecars.length > 0" class="sidecar-rename-option">
             <div class="d-flex align-items-center gap-2 mb-2">
                 <Checkbox
-                    v-model="renameMeasurements"
+                    v-model="renameSidecars"
                     :binary="true"
                     :disabled="busy"
-                    inputId="renameMeasurementsCheckbox" />
-                <label for="renameMeasurementsCheckbox">
-                    Also rename associated measurements file
+                    inputId="renameSidecarsCheckbox" />
+                <label for="renameSidecarsCheckbox">
+                    Also rename sidecar files
                 </label>
             </div>
-            <div class="hint">
-                <i class="fa-solid fa-circle-info"></i>
-                A measurements file was found for this point cloud
-            </div>
+            <ul class="sidecar-list">
+                <li v-for="sc in sidecars" :key="sc.path">{{ sc.label }}</li>
+            </ul>
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
@@ -35,7 +34,7 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ddb from 'ddb';
-import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import { discoverSidecars } from '@/libs/sidecarUtils';
 
 export default {
     components: {
@@ -44,16 +43,16 @@ export default {
 
     props: {
         file: { type: Object, required: true },
-        busy: { type: Boolean, default: false }
+        busy: { type: Boolean, default: false },
+        allEntries: { type: Array, default: () => [] }
     },
     emits: ['onClose'],
 
     data: function () {
         return {
             renameText: null,
-            hasMeasurementsFile: false,
-            renameMeasurements: true,  // Checked by default
-            checkingMeasurements: false
+            sidecars: [],
+            renameSidecars: true  // Checked by default
         };
     },
     mounted: function () {
@@ -64,8 +63,7 @@ export default {
         // completed and PrimeVue's own focus handling can no longer steal it.
         this.focusInput();
 
-        // Check if measurements file exists
-        this.checkForMeasurementsFile();
+        this.sidecars = discoverSidecars(this.allEntries, this.file.entry.path);
     },
     methods: {
         focusInput() {
@@ -80,37 +78,6 @@ export default {
                     inputEl.selectionEnd = dotIdx;
                 }
             });
-        },
-        async checkForMeasurementsFile() {
-            // Check only for point clouds
-            if (this.file.entry.type !== ddb.entry.type.POINTCLOUD) {
-                this.hasMeasurementsFile = false;
-                return;
-            }
-
-            this.checkingMeasurements = true;
-
-            try {
-                // Use dataset from parent to create MeasurementStorage
-                const dataset = this.$parent.dataset || this.$root.dataset;
-                if (!dataset) {
-                    console.warn('Dataset not available for measurements check');
-                    this.hasMeasurementsFile = false;
-                    return;
-                }
-
-                const storage = new MeasurementStorage(dataset, this.file.entry);
-                this.hasMeasurementsFile = await storage.exists();
-
-                if (this.hasMeasurementsFile) {
-                    console.log('Measurements file found:', storage.measurementPath);
-                }
-            } catch (e) {
-                console.error('Error checking for measurements file:', e);
-                this.hasMeasurementsFile = false;
-            } finally {
-                this.checkingMeasurements = false;
-            }
         },
         close: function (buttonId) {
             if (this.busy && buttonId !== 'rename' && buttonId !== 'renameddb') return;
@@ -146,39 +113,21 @@ export default {
                 ? basePath + '/' + this.renameText
                 : this.renameText;
 
-            // If it's a point cloud with measurements, handle rename for that too
-            if (this.file.entry.type === ddb.entry.type.POINTCLOUD &&
-                this.hasMeasurementsFile &&
-                this.renameMeasurements) {
+            // If sidecar files were found and the checkbox is checked, rename them too
+            if (this.renameSidecars && this.sidecars.length > 0) {
+                const oldBase = this.file.entry.path.replace(/\.[^./\\]+$/, '');
+                const newBase = newPath.replace(/\.[^./\\]+$/, '');
 
-                try {
-                    // Calculate the new path for the measurements file
-                    const dataset = this.$parent.dataset || this.$root.dataset;
-                    if (dataset) {
-                        const oldStorage = new MeasurementStorage(dataset, this.file.entry);
-                        const oldMeasurementsPath = oldStorage.measurementPath;
+                const sidecarsInfo = this.sidecars.map(sc => ({
+                    oldPath: sc.path,
+                    newPath: newBase + sc.path.substring(oldBase.length)
+                }));
 
-                        // Calculate new measurements path based on new name
-                        const newPathWithoutExt = newPath.substring(0, newPath.lastIndexOf('.'));
-                        const newMeasurementsPath = `${newPathWithoutExt}_measurements.geojson`;
-
-                        console.log(`Will rename measurements: ${oldMeasurementsPath} -> ${newMeasurementsPath}`);
-
-                        // Emit event with both paths
-                        this.$emit('onClose', "rename", newPath, this.file.entry, {
-                            renameMeasurements: true,
-                            oldMeasurementsPath: oldMeasurementsPath,
-                            newMeasurementsPath: newMeasurementsPath
-                        });
-                        return;
-                    }
-                } catch (e) {
-                    console.error('Error preparing measurements rename:', e);
-                    // Continue anyway with normal rename
-                }
+                this.$emit('onClose', "rename", newPath, this.file.entry, { sidecars: sidecarsInfo });
+                return;
             }
 
-            // Normal emit for files without measurements or with unchecked checkbox
+            // Normal emit for files without sidecars or with unchecked checkbox
             this.$emit('onClose', "rename", newPath, this.file.entry);
         }
     }
@@ -191,7 +140,7 @@ export default {
     width: 100%;
 }
 
-.measurements-rename-option {
+.sidecar-rename-option {
     margin-top: var(--ddb-spacing-lg);
     padding: var(--ddb-spacing-md);
     background: rgba(var(--ddb-primary-rgb), 0.1);
@@ -199,21 +148,20 @@ export default {
     border-left: 0.25rem solid var(--ddb-primary);
 }
 
-.measurements-rename-option label {
+.sidecar-rename-option label {
     color: var(--ddb-text);
     font-weight: 500;
 }
 
-.measurements-rename-option .hint {
+.sidecar-list {
+    margin: 0;
+    padding-left: 1.25rem;
     font-size: 0.75rem;
     color: var(--ddb-text-muted);
-    margin-top: 0.25rem;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
+    list-style: disc;
 }
 
-.measurements-rename-option .hint i {
-    font-size: var(--ddb-font-size-base);
+.sidecar-list li {
+    margin-bottom: 0.15rem;
 }
 </style>

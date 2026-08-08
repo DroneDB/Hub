@@ -102,6 +102,8 @@
                             icon="fa-solid fa-stop" title="Cancel" @click="$emit('cancel', slotProps.data)" />
                         <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
                             icon="fa-solid fa-rotate-right" title="Retry" @click="$emit('retry', slotProps.data)" />
+                        <Button v-if="!isActive(slotProps.data.state)" size="small" severity="danger"
+                            icon="fa-solid fa-trash" title="Delete from history" @click="$emit('delete', slotProps.data)" />
                     </div>
                 </template>
             </Column>
@@ -151,7 +153,7 @@ export default {
         currentPageFirst: { type: Number, default: 0 }
     },
 
-    emits: ['view-log', 'download-result', 'cancel', 'retry', 'page', 'page-reset'],
+    emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset'],
 
     data() {
         return {

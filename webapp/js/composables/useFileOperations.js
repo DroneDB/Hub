@@ -109,6 +109,8 @@ export default {
          *        result toast and whether the build pipeline is re-triggered.
          *        DroneDB indexes builds by file hash, so a pure move never
          *        changes buildability and must NOT trigger build callbacks.
+         * @param {boolean} [options.silent=false] - skip the result toast (used
+         *        when the caller shows its own aggregate toast, e.g. sidecar renames).
          */
         async renameFile(file, newPath, options = {}) {
             const action = options.action === 'move' ? 'move' : 'rename';
@@ -141,14 +143,20 @@ export default {
 
                 this.sortFiles();
 
-                // Only re-trigger build pipeline on rename (extension may have changed,
-                // making the file buildable). On move the hash is unchanged, so any
-                // existing build artifacts still apply and no notification is needed.
-                if (action === 'rename' && BuildManager.isBuildableType(newItem.entry.type)) {
+                // Only notify the build pipeline when the rename's extension change made a
+                // previously non-buildable file buildable. Hash-based build artifacts already
+                // apply to files that were buildable before the rename, so no new build is
+                // ever queued in that case - showing the "buildable files detected" toast then
+                // would be misleading since nothing is actually being built.
+                const wasBuildable = BuildManager.isBuildableType(file.entry.type);
+                const isBuildable = BuildManager.isBuildableType(newItem.entry.type);
+                if (action === 'rename' && !wasBuildable && isBuildable) {
                     BuildManager.onFilesAdded(this.dataset, [newItem.entry]);
                 }
 
-                if (action === 'move') {
+                if (options.silent) {
+                    // Caller shows its own (aggregate) toast
+                } else if (action === 'move') {
                     this.$toast.add({ severity: 'success', summary: 'Moved', detail: `File moved successfully`, life: 3000 });
                 } else {
                     this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File renamed successfully`, life: 3000 });

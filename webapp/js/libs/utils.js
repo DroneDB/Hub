@@ -64,6 +64,29 @@ export function bytesToSize(bytes, decimals = 2) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
+/**
+ * Format a timestamp as a human-readable relative time string.
+ * This is the single source of truth for "time ago" formatting across the app.
+ * @param {number} ms - Millisecond timestamp (e.g., `Date.now()` or `new Date(str).getTime()`)
+ * @returns {string} e.g. "just now", "5 minutes ago", "3 months ago", "2 years ago"
+ */
+export function formatTimeAgo(ms) {
+    if (ms == null) return '';
+    const diff = Date.now() - ms;
+    const absDiff = Math.abs(diff);
+    const suffix = diff >= 0 ? 'ago' : 'from now';
+    const minutes = Math.floor(absDiff / 60000);
+    const hours = Math.floor(absDiff / 3600000);
+    const days = Math.floor(absDiff / 86400000);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ${suffix}`;
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ${suffix}`;
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ${suffix}`;
+    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
+    return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
+}
 
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {

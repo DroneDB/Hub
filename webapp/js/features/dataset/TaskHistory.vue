@@ -28,7 +28,7 @@
                 :downloading-task-id="downloadingTaskId"
                 empty-message="No processing tasks have been run for this dataset yet."
                 @view-log="openLog" @download-result="downloadResult"
-                @cancel="cancelTask" @retry="retryTask"
+                @cancel="cancelTask" @retry="retryTask" @delete="deleteTask"
                 @page-reset="onPageReset" />
         </div>
 
@@ -200,6 +200,16 @@
             @onClose="handleCancelDialogClose">
         </ConfirmDialog>
 
+        <!-- Delete task confirmation -->
+        <ConfirmDialog v-if="deleteDialogOpen"
+            title="Delete Task"
+            :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, tools)}</strong> will be removed together with any downloadable results it produced.`"
+            confirmText="Delete" cancelText="Cancel" confirmButtonClass="danger"
+            warningTitle="Warning"
+            warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
+            @onClose="handleDeleteDialogClose">
+        </ConfirmDialog>
+
         <!-- Folder picker for output folder -->
         <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
             :initialPath="photogrammetryForm.destPath || ''" title="Select output folder"
@@ -345,6 +355,9 @@ export default {
             logText: '',
 
             clearDialogOpen: false,
+            deleteDialogOpen: false,
+            deletingTask: null,
+            deletingTask: null,
 
             cancelDialogOpen: false,
             cancellingTask: null,
@@ -821,6 +834,28 @@ export default {
                 this._toast('error', 'Clear failed', e.message);
             } finally {
                 this.loading = false;
+            }
+        },
+
+        deleteTask(task) {
+            this.deletingTask = task;
+            this.deleteDialogOpen = true;
+        },
+
+        async handleDeleteDialogClose(buttonId) {
+            this.deleteDialogOpen = false;
+            if (buttonId !== 'confirm' || !this.deletingTask) {
+                this.deletingTask = null;
+                return;
+            }
+            const task = this.deletingTask;
+            this.deletingTask = null;
+            try {
+                await this.dataset.deleteTask(task.taskId);
+                await this.loadTasks();
+                this._toast('success', 'Task deleted', 'The task has been removed from history.');
+            } catch (e) {
+                this._toast('error', 'Delete failed', e.message);
             }
         },
 

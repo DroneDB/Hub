@@ -70,7 +70,7 @@
                     <div v-else class="detail-layout">
                         <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
                             <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                                :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
+                                :dataset="dataset" :viewMode="viewMode" :expandedGrid="expandedGrid" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
                                 @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
                                 @transferSelectedItems="openTransferItemsDialog"
                                 @setAsCover="setAsCover"
@@ -132,7 +132,7 @@
             confirmText="Replace"
             confirmButtonClass="danger"
             @onClose="handleSetCoverClose" />
-        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename"></RenameDialog>
+        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename" :all-entries="fileBrowserFiles"></RenameDialog>
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
         <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
         <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
@@ -388,6 +388,9 @@ export default {
         // Load view mode preference from localStorage
         const savedViewMode = localStorage.getItem('fileViewMode') || 'grid';
 
+        // Load expanded grid preference (table view: thumbnails + relative time vs icons + date only)
+        const savedExpandedGrid = localStorage.getItem('tableExpandedGrid') !== 'false';
+
         return {
             startTab: mainTabs[0].key,
             error: "",
@@ -401,6 +404,7 @@ export default {
                 .Dataset(this.$route.params.ds),
             currentPath: null,
             viewMode: savedViewMode, // 'grid' or 'table'
+            expandedGrid: savedExpandedGrid, // Table view: thumbnails + relative time vs icons + date only
             selectedDetailFile: null, // For DetailPanel in table view
             rootDatasetEntry: null, // Root dataset entry with permissions
 
@@ -703,6 +707,12 @@ export default {
 
         toggleViewMode() {
             this.switchViewMode(this.viewMode === 'grid' ? 'table' : 'grid');
+        },
+
+        toggleExpandedGrid() {
+            this.expandedGrid = !this.expandedGrid;
+            localStorage.setItem('tableExpandedGrid', this.expandedGrid);
+            this.updateExplorerTools();
         },
 
         handleRefresh() {
@@ -1388,6 +1398,19 @@ export default {
                     this.handleRefresh();
                 }
             });
+
+            // Expanded grid toggle (thumbnails + relative time) only applies to table view
+            if (this.viewMode === 'table') {
+                this.explorerTools.push({
+                    id: 'expanded-grid',
+                    title: "Expanded Table View",
+                    icon: "fa-solid fa-table-cells-large",
+                    selected: this.expandedGrid,
+                    onClick: () => {
+                        this.toggleExpandedGrid();
+                    }
+                });
+            }
 
             // Show only the button to switch to the opposite view
             if (this.viewMode === 'grid') {

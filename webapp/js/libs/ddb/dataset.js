@@ -535,6 +535,15 @@ module.exports = class Dataset {
     }
 
     /**
+     * Deletes a concluded task (Succeeded/Failed/Deleted) from the history.
+     * @param {string} id Task id
+     */
+    async deleteTask(id) {
+        if (!id) throw new Error('Invalid task id');
+        return this.registry.postRequest(`${this.baseApi}/tasks/${encodeURIComponent(id)}/delete`, {});
+    }
+
+    /**
      * Clears terminal tasks (Succeeded/Failed/Deleted) from the history.
      * @param {string} [toolId] Restrict to a single tool
      */
