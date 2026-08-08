@@ -95,6 +95,7 @@ import TabViewLoader from '@/features/viewers/TabViewLoader';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Toast from 'primevue/toast';
 import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
+import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.vue';
 import { loadResources } from '@/libs/lazy';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
@@ -290,10 +291,7 @@ export default {
 
             // Listen for new annotations being added
             scene.annotations.addEventListener('annotation_added', (e) => {
-                // Delay to let the annotation fully initialize
-                setTimeout(() => {
-                    self.addAnnotationEditListener(e.annotation);
-                }, 100);
+                self.addAnnotationEditListener(e.annotation);
             });
         },
 
@@ -322,15 +320,16 @@ export default {
                 return;
             }
 
-            // Find the title element within the annotation's domElement
-            // Potree annotations have a structure with a title span
+            // Potree annotations store domElement as a jQuery object — unwrap to get the raw
+            // HTMLElement for querySelector and addEventListener
             const domElement = annotation.domElement;
-            if (!domElement || !(domElement instanceof HTMLElement)) return;
+            const el = domElement.jquery ? domElement[0] : domElement;
+            if (!el || !(el instanceof HTMLElement)) return;
 
             // Look for the title element (usually has class 'annotation-titlebar' or similar)
-            const titleElement = domElement.querySelector('.annotation-titlebar') ||
-                                 domElement.querySelector('[id$="-titlebar"]') ||
-                                 domElement;
+            const titleElement = el.querySelector('.annotation-titlebar') ||
+                                 el.querySelector('[id$="-titlebar"]') ||
+                                 el;
 
             // Remove existing listener to avoid duplicates
             if (annotation._editHandler) {
@@ -348,35 +347,19 @@ export default {
         },
 
         /**
-         * Open properties dialog for an annotation
+         * Open properties dialog for an annotation (dedicated annotation dialog, not the map measurement one)
          */
         openAnnotationPropertiesDialog: function(annotation) {
             // Close any existing dialog
             this.closePropertiesDialog();
 
-            // Create a wrapper object that mimics OpenLayers Feature interface
-            const featureWrapper = {
-                get: (prop) => {
-                    switch(prop) {
-                        case 'name': return annotation.title || '';
-                        case 'description': return annotation.description || '';
-                        case 'stroke': return '#ffcc33';
-                        case 'stroke-width': return 2;
-                        case 'stroke-opacity': return 1;
-                        case 'fill': return '#ffcc33';
-                        case 'fill-opacity': return 0.2;
-                        default: return null;
-                    }
-                }
-            };
-
             // Create Vue 3 app instance
             const self = this;
             this._dialogContainer = document.createElement('div');
             document.body.appendChild(this._dialogContainer);
-            this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
-                feature: featureWrapper,
-                geometryType: 'Point',
+            this.propertiesDialogApp = createApp(AnnotationPropertiesDialog, {
+                annotation,
+                showDelete: true,
                 onOnSave: (properties) => {
                     // Update annotation properties
                     if (properties.name !== undefined) {
@@ -391,7 +374,11 @@ export default {
                 },
                 onOnClose: () => {
                     self.closePropertiesDialog();
-                }
+                },
+                onOnDelete: () => {
+                    self.viewer.scene.annotations.remove(annotation);
+                    self.measurementCount--;
+                },
             });
             this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
             this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
@@ -776,8 +763,10 @@ export default {
 
             // Create description tooltip if description is set
             if (annotation.description && annotation.description.trim() !== '') {
+                // Potree annotations store domElement as a jQuery object — unwrap for native events
                 const domElement = annotation.domElement;
-                if (!domElement || !(domElement instanceof HTMLElement)) return;
+                const el = domElement.jquery ? domElement[0] : domElement;
+                if (!el || !(el instanceof HTMLElement)) return;
 
                 const tooltip = document.createElement('div');
                 tooltip.className = 'potree-annotation-tooltip ddb-tooltip ddb-tooltip--dark';
@@ -790,16 +779,16 @@ export default {
                 annotation._descriptionTooltip = tooltip;
 
                 // Show on hover
-                domElement.addEventListener('mouseenter', (e) => {
+                el.addEventListener('mouseenter', (e) => {
                     tooltip.style.left = (e.clientX + 15) + 'px';
                     tooltip.style.top = (e.clientY - 10) + 'px';
                     tooltip.style.display = 'block';
                 });
-                domElement.addEventListener('mousemove', (e) => {
+                el.addEventListener('mousemove', (e) => {
                     tooltip.style.left = (e.clientX + 15) + 'px';
                     tooltip.style.top = (e.clientY - 10) + 'px';
                 });
-                domElement.addEventListener('mouseleave', () => {
+                el.addEventListener('mouseleave', () => {
                     tooltip.style.display = 'none';
                 });
             }
