@@ -47,6 +47,7 @@ import ddb from 'ddb';
 import { bytesToSize } from '@/libs/utils';
 import Dropzone from '@/vendor/dropzone';
 import { inIframe } from '@/libs/utils';
+import { useResilientUpload } from '@/composables/useResilientUpload';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -69,7 +70,10 @@ export default {
             totalBytesSent: 0,
             lastUpdated: 0,
 
-            url: ""
+            url: "",
+
+            // Retry/backpressure policy shared with DatasetUpload.vue (see useResilientUpload)
+            resilience: useResilientUpload({ parallelUploads: 8 })
         }
     },
     computed: {
@@ -94,12 +98,11 @@ export default {
     mounted: async function () {
         Dropzone.autoDiscover = false;
         this.uploadToken = null;
-        const MAX_RETRIES = 30;
 
         this.dz = new Dropzone(this.$refs.droparea, {
             paramName: function () { return "file"; },
             url: "/share/upload/<uuid>", // change this later
-            parallelUploads: 8, // http://blog.olamisan.com/max-parallel-http-connections-in-a-browser max parallel connections
+            parallelUploads: this.resilience.aimd.current, // http://blog.olamisan.com/max-parallel-http-connections-in-a-browser max parallel connections
             uploadMultiple: false,
             autoProcessQueue: false,
             createImageThumbnails: false,
@@ -115,28 +118,23 @@ export default {
             this.dz.options.url = `/share/upload/${this.uploadToken}`;
             this.fileUploadStatus[file.name] = 0;
         })
-            .on("error", (file, res) => {
+            .on("error", (file, res, xhr) => {
 
-                if (res.noRetry) {
+                if (res && res.noRetry) {
                     this.dz.cancelUpload(file);
                     this.error = `Failed to upload ${file.name}: ${res.error}`;
                     this.uploading = false;
                     file.status = Dropzone.CANCELED;
-                } else {
-
-                    // Retry
-                    if (file.retries < MAX_RETRIES) {
-                        console.log("Error uploading ", res, file, " put back in queue...");
-                        file.status = Dropzone.QUEUED;
-                    } else {
-                        this.dz.cancelUpload(file);
-                        this.error = `Failed to upload ${file.name} after 30 retries`;
-                        this.uploading = false;
-                    }
                     delete this.fileUploadStatus[file.name];
-                    setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
+                    return;
                 }
 
+                // Stash status/Retry-After for the "complete" handler, which owns the actual
+                // retry-count bookkeeping and re-queueing.
+                file._lastStatus = xhr ? xhr.status : 0;
+                file._retryAfterSeconds = xhr
+                    ? this.resilience.parseRetryAfterSeconds(xhr.getResponseHeader && xhr.getResponseHeader('Retry-After'))
+                    : null;
             })
             .on("uploadprogress", (file, progress, bytesSent) => {
                 const now = new Date().getTime();
@@ -179,36 +177,45 @@ export default {
             .on("complete", (file) => {
                 if (file.status === "success") {
                     this.uploadedFiles = this.uploadedFiles + 1;
+                    this.applyAimd('success');
 
                     // Update progress by removing the tracked progress and
                     // use the file size as the true number of bytes
                     this.totalBytesSent = this.totalBytesSent + file.size;
                     if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
-                } else {
-
-                    var res = JSON.parse(file.xhr.response);
-                    if (res && res.noRetry) {
-                        this.dz.cancelUpload(file);
-                        return;
-                    }
-
-                    let err = `Failed to upload ${file.name}, retrying... (${file.retries})`;
-
-                    // Update progress
-                    this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
-                    file.status = Dropzone.QUEUED;
-                    file.deltaBytesSent = 0;
-                    file.trackedBytesSent = 0;
-                    file.retries++;
-
-                    if (file.retries > MAX_RETRIES) {
-                        this.dz.cancelUpload(file);
-                        this.error = err;
-                    }
+                    delete this.fileUploadStatus[file.name];
+                    setTimeout(() => this.dz.processQueue(), 100);
+                    return;
                 }
+
+                var res = JSON.parse(file.xhr.response);
+                if (res && res.noRetry) {
+                    delete this.fileUploadStatus[file.name];
+                    return; // already canceled by the "error" handler
+                }
+
+                const status = file._lastStatus ?? (file.xhr ? file.xhr.status : 0);
+                const canRetry = this.resilience.shouldRetryStatus(status) && file.retries < this.resilience.maxRetries;
+
                 delete this.fileUploadStatus[file.name];
 
-                setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
+                if (!canRetry) {
+                    this.dz.cancelUpload(file);
+                    this.error = `Failed to upload ${file.name} (status ${status})`;
+                    return;
+                }
+
+                this.applyAimd('failure');
+
+                // Update progress
+                this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
+                file.status = Dropzone.QUEUED;
+                file.deltaBytesSent = 0;
+                file.trackedBytesSent = 0;
+                file.retries++;
+
+                const delay = this.resilience.computeRetryDelayMs(file.retries, file._retryAfterSeconds);
+                setTimeout(() => this.dz.processQueue(), delay);
             })
             .on("sending", (file, xhr, formData) => {
                 // Send filename
@@ -238,6 +245,13 @@ export default {
             });
     },
     methods: {
+        // Applies the AIMD decision to Dropzone's live-read parallelUploads option (05-workstream
+        // §6.1: parallelUploads is read from options on every processQueue(), not cached).
+        applyAimd: function (outcome) {
+            const next = outcome === 'success' ? this.resilience.aimd.onSuccess() : this.resilience.aimd.onFailure();
+            if (this.dz) this.dz.options.parallelUploads = next;
+        },
+
         resetUpload: function () {
             this.filesCount = 0;
             this.totalBytes = 0;

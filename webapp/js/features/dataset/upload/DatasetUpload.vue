@@ -126,13 +126,16 @@ import Button from 'primevue/button';
 import ddb from 'ddb';
 import { bytesToSize } from '@/libs/utils';
 import Dropzone from '@/vendor/dropzone';
+import { useResilientUpload } from '@/composables/useResilientUpload';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
 
-// Constants for retry logic
-const MAX_RETRIES = 3;
+// Small files still get a fast bounded retry loop of their own for legacy parity; the
+// composable's status/backoff/Retry-After policy (05-workstream-hub-ui.md §6.1) governs
+// everything else.
 const SMALL_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const SMALL_FILE_MAX_RETRIES = 3;
 
 /**
  * DatasetUpload - Chunked file upload panel for adding files to a dataset.
@@ -173,7 +176,10 @@ export default {
             // Speed & ETA tracking
             speedHistory: [],
             currentSpeed: 0,
-            estimatedTimeRemaining: null
+            estimatedTimeRemaining: null,
+
+            // Retry/backpressure policy shared with Upload.vue (see useResilientUpload)
+            resilience: useResilientUpload({ parallelUploads: 8 })
         }
     },
     computed: {
@@ -267,7 +273,7 @@ export default {
         this.dz = new Dropzone(this.hiddenDropzone, {
             paramName: function () { return "file"; },
             url: "/share/upload/<uuid>",
-            parallelUploads: 8,
+            parallelUploads: this.resilience.aimd.current,
             uploadMultiple: false,
             autoProcessQueue: false,
             createImageThumbnails: false,
@@ -281,7 +287,7 @@ export default {
             this.dz.options.url = `/orgs/${this.organization}/ds/${this.dataset}/obj`;
             this.updateFileStatus(file.upload.uuid, 'uploading', 0);
         })
-        .on("error", (file, message) => {
+        .on("error", (file, message, xhr) => {
             const fileId = file.upload.uuid;
             const fileInfo = this.fileList[fileId];
             const errorMsg = this.parseErrorMessage(message);
@@ -300,22 +306,41 @@ export default {
                 return;
             }
 
-            // Check if auto-retry is allowed (small files, under max retries)
-            const canAutoRetry = file.size < SMALL_FILE_SIZE && fileInfo.retryCount < MAX_RETRIES;
+            const status = xhr ? xhr.status : 0;
+            const retryAfterSeconds = xhr
+                ? this.resilience.parseRetryAfterSeconds(xhr.getResponseHeader && xhr.getResponseHeader('Retry-After'))
+                : null;
+
+            // Small files additionally get a fast, tight retry loop for legacy parity;
+            // everything else (including small files once that budget is exhausted) is
+            // governed by the shared status-code + Retry-After + jittered-backoff policy.
+            const canAutoRetry = file.size < SMALL_FILE_SIZE && fileInfo.retryCount < SMALL_FILE_MAX_RETRIES;
+            const canPolicyRetry = this.resilience.shouldRetryStatus(status) && fileInfo.retryCount < this.resilience.maxRetries;
 
             if (canAutoRetry) {
                 // Increment retry count and schedule retry with exponential backoff
                 fileInfo.retryCount++;
                 const delay = Math.pow(2, fileInfo.retryCount) * 1000; // 2s, 4s, 8s
 
-                console.log(`Auto-retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${MAX_RETRIES}) in ${delay/1000}s`);
-                this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${MAX_RETRIES})`);
+                console.log(`Auto-retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${SMALL_FILE_MAX_RETRIES}) in ${delay/1000}s`);
+                this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${SMALL_FILE_MAX_RETRIES})`);
+
+                file.status = Dropzone.QUEUED;
+                setTimeout(() => this.dz.processQueue(), delay);
+            } else if (canPolicyRetry) {
+                fileInfo.retryCount++;
+                const delay = this.resilience.computeRetryDelayMs(fileInfo.retryCount, retryAfterSeconds);
+
+                this.applyAimd('failure');
+
+                console.log(`Retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${this.resilience.maxRetries}, status ${status}) in ${delay}ms`);
+                this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${this.resilience.maxRetries})`);
 
                 file.status = Dropzone.QUEUED;
                 setTimeout(() => this.dz.processQueue(), delay);
             } else {
                 // Mark as error, allow manual retry for large files
-                const canManualRetry = file.size >= SMALL_FILE_SIZE || fileInfo.retryCount >= MAX_RETRIES;
+                const canManualRetry = file.size >= SMALL_FILE_SIZE || fileInfo.retryCount >= SMALL_FILE_MAX_RETRIES;
                 this.updateFileStatus(fileId, 'error', 0, errorMsg);
                 this.fileList[fileId].canRetry = canManualRetry;
                 this.fileList[fileId].dzFile = file;
@@ -374,6 +399,7 @@ export default {
         .on("complete", (file) => {
             if (file.status === "success") {
                 this.updateFileStatus(file.upload.uuid, 'done', 100);
+                this.applyAimd('success');
 
                 // Correct total bytes sent
                 this.totalBytesSent = this.totalBytesSent + file.size;
@@ -463,6 +489,13 @@ export default {
                     this.fileList[id].errorMessage = errorMessage;
                 }
             }
+        },
+
+        // Applies the AIMD decision to Dropzone's live-read parallelUploads option (05-workstream
+        // §6.1: parallelUploads is read from options on every processQueue(), not cached).
+        applyAimd(outcome) {
+            const next = outcome === 'success' ? this.resilience.aimd.onSuccess() : this.resilience.aimd.onFailure();
+            if (this.dz) this.dz.options.parallelUploads = next;
         },
 
         parseErrorMessage(message) {
