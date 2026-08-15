@@ -96,7 +96,9 @@ export function createAimdConcurrency(configuredValue, opts = {}) {
         },
         onFailure() {
             consecutiveSuccesses = 0;
-            current = Math.max(2, Math.floor(current / 2));
+            // Floor at 2 but never above `configured` - the docstring guarantees
+            // concurrency stays at or below the configured value for any input.
+            current = Math.min(configured, Math.max(2, Math.floor(current / 2)));
             return current;
         },
         onSuccess() {
