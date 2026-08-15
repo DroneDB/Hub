@@ -18,6 +18,9 @@ const RETRYABLE_STATUSES = new Set([0, 429, 502, 503, 504]);
 export const DEFAULT_MAX_RETRIES = 5;
 export const DEFAULT_BASE_DELAY_MS = 1000;
 export const DEFAULT_MAX_DELAY_MS = 30000;
+// Misbehaving proxies/servers can demand absurd Retry-After values; cap the per-file
+// wait at 5 minutes
+export const DEFAULT_RETRY_AFTER_CAP_SECONDS = 300;
 
 /**
  * Whether an HTTP status code returned by the server warrants a retry.
@@ -35,17 +38,22 @@ export function shouldRetryStatus(status) {
  * exponential backoff with full jitter (`rand(0, min(maxDelay, base * 2^attempt))`),
  * matching the core's RetryPolicy so client and server backoff do not resonate.
  *
+ * The `Retry-After`-derived delay is capped (default 300 seconds) so a bad proxy
+ * cannot stall the queue for hours; the exponential-backoff path is unchanged.
+ *
  * @param {number} attempt 0-based retry attempt number.
  * @param {number|null} retryAfterSeconds Value of the `Retry-After` response header, if any.
  * @param {object} [opts]
  * @param {number} [opts.baseDelayMs]
  * @param {number} [opts.maxDelayMs]
+ * @param {number} [opts.retryAfterCapSeconds] Hard cap (seconds) for the header-derived delay.
  * @param {() => number} [opts.rng] Injectable RNG (returns [0,1)) for deterministic tests.
  * @returns {number} Delay in milliseconds.
  */
 export function computeRetryDelayMs(attempt, retryAfterSeconds, opts = {}) {
     if (retryAfterSeconds != null && Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
-        return Math.round(retryAfterSeconds * 1000);
+        const retryAfterCapSeconds = opts.retryAfterCapSeconds ?? DEFAULT_RETRY_AFTER_CAP_SECONDS;
+        return Math.round(Math.min(retryAfterSeconds, retryAfterCapSeconds) * 1000);
     }
 
     const baseDelayMs = opts.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;

@@ -21,6 +21,14 @@ describe('shouldRetryStatus', () => {
         }
     });
 
+    it('treats network-level failures (status 0) as transient and computes a jittered backoff for them', () => {
+        expect(shouldRetryStatus(0)).toBe(true);
+        // status 0 comes with no Retry-After header -> exponential/jittered backoff, not the header branch
+        const delay = computeRetryDelayMs(1, null, { rng: () => 0.5, baseDelayMs: 1000, maxDelayMs: 30000 });
+        // backoff = min(30000, 1000 * 2^1) = 2000; delay = 0.5 * 2000
+        expect(delay).toBe(1000);
+    });
+
     it('does not retry on permanent statuses', () => {
         for (const status of [400, 401, 403, 404, 409, 413, 500, 507]) {
             expect(shouldRetryStatus(status)).toBe(false);
@@ -45,6 +53,18 @@ describe('computeRetryDelayMs', () => {
     it('honours Retry-After when present, ignoring backoff/jitter', () => {
         expect(computeRetryDelayMs(0, 3)).toBe(3000);
         expect(computeRetryDelayMs(5, 0)).toBe(0);
+    });
+
+    it('caps the Retry-After-derived delay at 300 seconds (5 minutes)', () => {
+        expect(computeRetryDelayMs(0, 999999)).toBe(300000);
+        expect(computeRetryDelayMs(0, 301)).toBe(300000);
+        expect(computeRetryDelayMs(0, 300)).toBe(300000);
+        expect(computeRetryDelayMs(0, 299)).toBe(299000);
+    });
+
+    it('applies the Retry-After cap inside the useResilientUpload bundle too', () => {
+        const resilience = useResilientUpload();
+        expect(resilience.computeRetryDelayMs(0, 999999)).toBe(300000);
     });
 
     it('is bounded and jittered when Retry-After is absent (deterministic RNG)', () => {
