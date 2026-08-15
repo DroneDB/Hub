@@ -344,8 +344,10 @@ export default {
                 file.status = Dropzone.QUEUED;
                 this.scheduleProcessQueue(delay);
             } else if (canPolicyRetry) {
-                fileInfo.retryCount++;
+                // computeRetryDelayMs takes a 0-based attempt, so use the counter
+                // BEFORE incrementing (first retry -> attempt 0 -> base backoff)
                 const delay = this.resilience.computeRetryDelayMs(fileInfo.retryCount, retryAfterSeconds);
+                fileInfo.retryCount++;
 
                 this.applyAimd('failure');
 

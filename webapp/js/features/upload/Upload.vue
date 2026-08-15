@@ -252,9 +252,11 @@ export default {
                 file.status = Dropzone.QUEUED;
                 file.deltaBytesSent = 0;
                 file.trackedBytesSent = 0;
-                file.retries++;
-
+                // computeRetryDelayMs takes a 0-based attempt, so use the counter
+                // BEFORE incrementing (first retry -> attempt 0 -> base backoff, not
+                // 2x base)
                 const delay = this.resilience.computeRetryDelayMs(file.retries, file._retryAfterSeconds);
+                file.retries++;
                 this.scheduleProcessQueue(delay);
             })
             .on("sending", (file, xhr, formData) => {
