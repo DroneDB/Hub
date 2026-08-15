@@ -236,6 +236,12 @@ export default {
                 if (!canRetry) {
                     this.dz.cancelUpload(file);
                     this.error = `Failed to upload ${file.name} (status ${status})`;
+                    // A permanent failure for this file. Advance the queue so any
+                    // still-queued files complete (autoProcessQueue is off, so without
+                    // this they would sit abandoned); `queuecomplete` clears the
+                    // uploading state once Dropzone has nothing left queued or in
+                    // flight, so the spinner resets even on partial failure.
+                    this.scheduleProcessQueue(0);
                     return;
                 }
 
@@ -257,7 +263,11 @@ export default {
             })
             .on("queuecomplete", async (files) => {
                 if (this._isUnmounted) return;
-                // Commit
+                // Treat this as the true terminal only when nothing is left queued or
+                // in flight, so a failure followed by more uploads doesn't fire early
+                const remaining = this.dz.getQueuedFiles().length + this.dz.getUploadingFiles().length;
+                if (remaining > 0) return;
+                // Commit only on full success
                 if (this.uploadedFiles - this.filesCount === 0) {
                     try {
                         const r = await reg.makeRequest(`/share/commit/${this.uploadToken}`, "POST");
@@ -274,8 +284,10 @@ export default {
                     } catch (e) {
                         this.error = e.message;
                     }
-                    this.uploading = false;
                 }
+                // Always clear the uploading state now (success OR partial failure), so
+                // a permanent failure doesn't leave the spinner up forever
+                this.uploading = false;
             })
             .on("reset", () => {
                 this.filesCount = 0;
