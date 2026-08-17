@@ -87,7 +87,16 @@ export function formatTimeAgo(ms) {
     if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
     return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
 }
-
+/**
+ * ProgressBar mode for task progress values.
+ * A task that reports no progress (null/undefined), 0 or a negative percent
+ * renders as an animated indeterminate bar until a real percent arrives.
+ * @param {number|null|undefined} percent Task progress percent (0-100, nullable)
+ * @returns {'indeterminate'|'determinate'} ProgressBar mode
+ */
+export function taskProgressMode(percent) {
+    return (percent == null || percent <= 0) ? 'indeterminate' : 'determinate';
+}
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {
     const fse = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;

@@ -13,6 +13,7 @@
 const TERMINAL_STATES = ['Succeeded', 'Failed', 'Deleted'];
 const DEFAULT_POLL_MS = 2000;
 import taskMonitor from '@/libs/tasks/taskMonitor';
+import { taskProgressMode } from '@/libs/utils';
 
 export default {
     data() {
@@ -29,6 +30,9 @@ export default {
     },
 
     methods: {
+        // Animated indeterminate bar while a task reports no real percent.
+        taskProgressMode,
+
         /**
          * Submits a heavy task and polls until it reaches a terminal state.
          *
