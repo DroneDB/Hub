@@ -59,13 +59,14 @@
             </Column>
             <Column header="Progress">
                 <template #body="slotProps">
-                    <div v-if="isActive(slotProps.data.state)">
-                        <ProgressBar :value="slotProps.data.progressPercent || 0" :showValue="true" style="height: 1rem;" />
+                    <template v-if="progressKind(slotProps.data) === 'bar'">
+                        <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
+                            :showValue="true" style="height: 1rem;" />
                         <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
-                    </div>
-                    <div v-else-if="slotProps.data.state === 'Failed'" class="error-text" :title="slotProps.data.errorType">
-                        <i class="fa-solid fa-triangle-exclamation"></i> {{ slotProps.data.errorType || 'Failed' }}
-                    </div>
+                        <small v-if="slotProps.data.state === 'Failed'" class="error-text" :title="slotProps.data.errorType">
+                            <i class="fa-solid fa-triangle-exclamation"></i> {{ slotProps.data.errorType || 'Failed' }}
+                        </small>
+                    </template>
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
@@ -182,6 +183,31 @@ export default {
     },
 
     methods: {
+        /**
+         * Whether the progress bar renders at all for a row: 'bar' or 'none'.
+         * Only Processing, Succeeded (100%) and Failed (100% + error text) render
+         * a bar. Queued states (Created/Enqueued/Scheduled/Reused/Awaiting) and
+         * Deleted (reached by the Cancel button) show a muted placeholder.
+         */
+        progressKind(task) {
+            if (task.state === 'Processing' || task.state === 'Succeeded' || task.state === 'Failed') return 'bar';
+            return 'none';
+        },
+
+        /** Bar fill: reported percent while Processing, full for ended tasks. */
+        progressValue(task) {
+            if (task.state === 'Processing') return task.progressPercent || 0;
+            return 100; // Succeeded / Failed
+        },
+
+        /** Ended tasks show a full determinate bar; Processing shows one only with a real percent. */
+        barMode(task) {
+            const ended = task.state === 'Succeeded' || task.state === 'Failed';
+            const percent = task.progressPercent;
+            const determinate = ended || (task.state === 'Processing' && percent != null && percent > 0);
+            return determinate ? 'determinate' : 'indeterminate';
+        },
+
         /**
          * Format a file path for display: truncate long paths with ... and insert
          * zero-width spaces after slashes so line breaks only occur at "/" boundaries.
