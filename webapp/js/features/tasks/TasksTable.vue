@@ -124,7 +124,7 @@ import ProgressBar from 'primevue/progressbar';
 
 /**
  * Presentational task table shared by the per-dataset Task History tab and the
- * admin Tasks dashboard (spec §B.3). Contains no fetch logic: data, loading and
+ * admin Tasks dashboard. Contains no fetch logic: data, loading and
  * paging are driven by the parent via props/events.
  */
 export default {

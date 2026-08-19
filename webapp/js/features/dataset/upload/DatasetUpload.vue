@@ -132,8 +132,7 @@ const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
 
 // Small files still get a fast bounded retry loop of their own for legacy parity; the
-// composable's status/backoff/Retry-After policy (05-workstream-hub-ui.md §6.1) governs
-// everything else.
+// composable's status/backoff/Retry-After policy governs everything else.
 const SMALL_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SMALL_FILE_MAX_RETRIES = 3;
 
@@ -539,8 +538,8 @@ export default {
             }
         },
 
-        // Applies the AIMD decision to Dropzone's live-read parallelUploads option (05-workstream
-        // §6.1: parallelUploads is read from options on every processQueue(), not cached).
+        // Applies the AIMD decision to Dropzone's live-read parallelUploads option
+        // (it is read from options on every processQueue(), not cached).
         applyAimd(outcome) {
             const next = outcome === 'success' ? this.resilience.aimd.onSuccess() : this.resilience.aimd.onFailure();
             if (this.dz) this.dz.options.parallelUploads = next;

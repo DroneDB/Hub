@@ -145,7 +145,7 @@ function loadSettings() {
  * the COPC header) so they render at full precision. Mercator length/area measurements are
  * corrected by cos(latitude) so they report true ground distances.
  *
- * Per the additive strategy (spec sec 4.2), this viewer is opt-in only: the default opening
+ * This viewer is opt-in only (additive, non-breaking): the default opening
  * for each entry type is unchanged (map, pointcloud, model, etc.). The user reaches the
  * unified viewer via the "Open in 3D Viewer" context menu action.
  */

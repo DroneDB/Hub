@@ -1134,7 +1134,7 @@ export default {
             });
 
             // Authenticated selections over the configured size threshold are
-            // offloaded to the async bulk-download task (spec §A.4.1).
+            // offloaded to the async bulk-download task.
             if (reg.isLoggedIn() && this.selectionExceedsAsyncThreshold(files)) {
                 await this.startAsyncDownload(paths);
                 return;
@@ -1198,7 +1198,7 @@ export default {
         },
 
         // Total selection size vs the async threshold. Unknown sizes (e.g. folders)
-        // force the async path for safety (spec §7.3).
+        // force the async path for safety.
         selectionExceedsAsyncThreshold: function (files) {
             const threshold = reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES);
             if (!threshold || threshold <= 0) return false;

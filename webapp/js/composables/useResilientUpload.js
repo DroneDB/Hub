@@ -2,9 +2,8 @@
  * useResilientUpload - Shared retry/backoff/backpressure policy for Dropzone-based uploads.
  *
  * Consumed by DatasetUpload.vue and Upload.vue, which previously duplicated ad-hoc retry
- * logic (see ImproveParallelWrites plan, workstream 05). This composable does not touch
- * Dropzone itself (it is a vendored file - see 05-workstream-hub-ui.md §2); callers wire its
- * decisions into their own Dropzone "error"/"complete" handlers.
+ * logic. This composable does not touch Dropzone itself (it is a vendored file); callers
+ * wire its decisions into their own Dropzone "error"/"complete" handlers.
  *
  * Exposes:
  *   - shouldRetryStatus(status): whether an HTTP status is transient for this purpose

@@ -323,8 +323,8 @@ export default {
             this._queueTimers.push(timerId);
         },
 
-        // Applies the AIMD decision to Dropzone's live-read parallelUploads option (05-workstream
-        // §6.1: parallelUploads is read from options on every processQueue(), not cached).
+        // Applies the AIMD decision to Dropzone's live-read parallelUploads option
+        // (it is read from options on every processQueue(), not cached).
         applyAimd: function (outcome) {
             const next = outcome === 'success' ? this.resilience.aimd.onSuccess() : this.resilience.aimd.onFailure();
             if (this.dz) this.dz.options.parallelUploads = next;
