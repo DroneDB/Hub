@@ -85,26 +85,28 @@ const fireShortcutEvent = (accelerator) => {
 };
 
 window.addEventListener("keydown", e => {
+    // e.key can be undefined on some browsers/devices (e.g. iOS virtual keyboards, synthetic events)
+    const key = e.key || "";
     const state = {
         ctrlKey: e.ctrlKey,
         metaKey: e.metaKey,
         shiftKey: e.shiftKey
     };
 
-    if (e.key === "Control") state.ctrlKey = true;
-    if (e.key === "Meta") state.metaKey = true;
-    if (e.key === "Shift") state.shiftKey = true;
+    if (key === "Control") state.ctrlKey = true;
+    if (key === "Meta") state.metaKey = true;
+    if (key === "Shift") state.shiftKey = true;
 
     api.updateState(state);
 
     // Shortcuts
-    if (e.key.length === 1 && (state.ctrlKey || state.metaKey)) {
-        fireShortcutEvent("CmdOrCtrl+" + e.key.toUpperCase());
-    } else if (e.key.length === 2 && e.key[0] === 'F') {
-        fireShortcutEvent(e.key);
-    } else if (e.key.length === 6) {
+    if (key.length === 1 && (state.ctrlKey || state.metaKey)) {
+        fireShortcutEvent("CmdOrCtrl+" + key.toUpperCase());
+    } else if (key.length === 2 && key[0] === 'F') {
+        fireShortcutEvent(key);
+    } else if (key.length === 6) {
         // Delete
-        fireShortcutEvent(e.key);
+        fireShortcutEvent(key);
     }
 
     keyDownListeners.forEach(l => l(e));
