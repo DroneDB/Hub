@@ -42,6 +42,7 @@ class BuildManager {
         this._buildByPath = new Map(); // datasetKey -> Map<filePath, TaskSummaryDto>
         this.eventListeners = {};
         this.datasets = new Map();
+        this._acquired = new Set(); // datasetKeys holding a taskMonitor reference
     }
 
     /* ---- event system ---- */
@@ -89,9 +90,20 @@ class BuildManager {
             };
             taskMonitor.on('buildStateChanged', this._boundOnStateChange);
         }
-        // Start the unified poller for this dataset
-        taskMonitor.start(dataset);
+        // Start the unified poller for this dataset (once per dataset, released on unregister)
+        if (!this._acquired.has(key)) {
+            this._acquired.add(key);
+            taskMonitor.acquire(dataset);
+        }
         this._sync(dataset);
+    }
+
+    /** Drop this dataset's monitor reference and cached build state. */
+    unregisterDataset(dataset) {
+        const key = this.getDatasetKey(dataset);
+        if (this._acquired.delete(key)) taskMonitor.release(dataset);
+        this.datasets.delete(key);
+        this._buildByPath.delete(key);
     }
 
     /** Sync _buildByPath from taskMonitor store (filtered on toolId='build'). */
@@ -181,9 +193,8 @@ class BuildManager {
             .map(t => ({ path: t.path, currentState: t.state }));
     }
 
-    // Legacy API that consumers may still call — now forwards to taskMonitor
-    startPolling(dataset)  { taskMonitor.start(dataset); }
-    stopPolling(dataset)   { taskMonitor.stop(dataset); }
+    // Legacy API that consumers may still call — a task was just started, so refresh now
+    startPolling(dataset)  { taskMonitor.forceRefresh(dataset); }
 
     /* ---- file-added callbacks ---- */
 
@@ -258,10 +269,12 @@ class BuildManager {
     /* ---- cleanup ---- */
 
     cleanup() {
-        for (const ds of this.datasets.values()) taskMonitor.stop(ds);
+        for (const ds of Array.from(this.datasets.values())) this.unregisterDataset(ds);
         taskMonitor.off('buildStateChanged', this._boundOnStateChange);
+        this._boundOnStateChange = null;
         this._buildByPath.clear();
         this.datasets.clear();
+        this._acquired.clear();
         this.eventListeners = {};
     }
 }

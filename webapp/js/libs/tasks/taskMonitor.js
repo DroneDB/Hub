@@ -6,6 +6,10 @@
  *
  * Polling schedule:
  *   2500 ms while any active task exists, 15000 ms when idle.
+ *
+ * Events:
+ *   'buildStateChanged' - a build task changed state (consumed by buildManager).
+ *   'tasksUpdated'      - the store snapshot actually changed (consume to re-render).
  */
 
 const POLL_ACTIVE = 2500;
@@ -17,20 +21,27 @@ const ACTIVE_STATES = ['Awaiting', 'Created', 'Enqueued', 'Processing', 'Schedul
 
 //----- per-dataset store helper -----
 
-function key(dataset) {
+// Stable identity of a dataset for store keys and event matching.
+export function datasetKey(dataset) {
     return dataset.baseApi || `${dataset.org}/${dataset.slug}`;
 }
 
-const stores = new Map(); // datasetKey -> { tasks: Map, timerId, dataset, _started }
+const stores = new Map(); // datasetKey -> { tasks: Map, timerId, dataset, refs, _started }
 
 function getStore(dataset) {
-    const k = key(dataset);
+    const k = datasetKey(dataset);
     let ent = stores.get(k);
     if (!ent) {
-        ent = { tasks: new Map(), timerId: null, dataset, _started: false };
+        ent = { tasks: new Map(), timerId: null, dataset, refs: 0, _started: false, _lastSig: '' };
         stores.set(k, ent);
     }
     return ent;
+}
+
+// Read-only lookup: never resurrects a released dataset, so a consumer can't mistake
+// a frozen snapshot for live data and wait forever on a state that will never change.
+function peekStore(dataset) {
+    return stores.get(datasetKey(dataset));
 }
 
 function hasActive(ent) {
@@ -38,6 +49,15 @@ function hasActive(ent) {
         if (ACTIVE_STATES.includes(t.state)) return true;
     }
     return false;
+}
+
+// Cheap snapshot signature: which task carries which state/progress/phase.
+// Lets us tell (in O(n) string compare) whether a fetch actually changed anything.
+function computeSignature(ent) {
+    return Array.from(ent.tasks.values())
+        .sort((a, b) => String(a.taskId).localeCompare(String(b.taskId)))
+        .map(t => `${t.taskId}:${t.state}:${t.progressPercent ?? ''}:${t.phaseMessage ?? ''}`)
+        .join('|');
 }
 
 //----- core operations -----
@@ -64,6 +84,13 @@ async function _fetch(ent) {
                     buildInfo: { path: task.path, currentState: task.state },
                 });
             }
+        }
+
+        // Notify generic listeners (e.g. the Tasks tab) when the snapshot changed.
+        const sig = computeSignature(ent);
+        if (sig !== ent._lastSig) {
+            ent._lastSig = sig;
+            emit('tasksUpdated', { dataset: ds });
         }
     } catch (err) {
         console.error('taskMonitor: fetch failed', err);
@@ -101,21 +128,30 @@ function emit(event, data) {
 //----- public API -----
 
 const TaskMonitor = {
-    /** Begin monitoring. Starts an immediate fetch + adaptive timer. */
-    start(dataset) {
+    /**
+     * Take a reference on this dataset's monitor, starting it if idle.
+     * Ref-counted so consumers that outlive the dataset screen (e.g. a bulk download
+     * tracked from the persistent Header) keep receiving fresh data until they finish.
+     */
+    acquire(dataset) {
         const ent = getStore(dataset);
-        ent._started = true;
+        ent.refs++;
         ent.dataset = dataset;
+        if (ent._started) return;
+        ent._started = true;
         _fetch(ent);
         _scheduleTick(ent);
     },
 
-    /** Stop polling for this dataset. */
-    stop(dataset) {
-        const ent = getStore(dataset);
+    /** Drop a reference; the last one stops polling and discards the snapshot. */
+    release(dataset) {
+        const ent = peekStore(dataset);
         if (!ent) return;
+        ent.refs = Math.max(0, ent.refs - 1);
+        if (ent.refs > 0) return;
         ent._started = false;
         _clearTimer(ent);
+        stores.delete(datasetKey(dataset));
     },
 
     /** Trigger an immediate refresh (e.g. user hit Refresh, tab activated). Returns the in-flight fetch promise so callers can await freshness. */
@@ -127,26 +163,26 @@ const TaskMonitor = {
 
     /** Hint that new files were added (may spawn new build tasks). */
     onFilesAdded(dataset) {
-        const ent = getStore(dataset);
+        const ent = peekStore(dataset);
         if (ent && ent._started) _fetch(ent);
     },
 
     /** Get all task summaries for a dataset (TaskSummaryDto[]). */
     getTasks(dataset) {
-        const ent = getStore(dataset);
+        const ent = peekStore(dataset);
         return ent ? Array.from(ent.tasks.values()) : [];
     },
 
     /** Get a single task by taskId, or null. */
     getTask(dataset, taskId) {
-        const ent = getStore(dataset);
+        const ent = peekStore(dataset);
         if (!ent) return null;
         return ent.tasks.get(taskId) || null;
     },
 
     /** Does this dataset have any active tasks? */
     hasActiveTasks(dataset) {
-        const ent = getStore(dataset);
+        const ent = peekStore(dataset);
         return ent ? hasActive(ent) : false;
     },
 
@@ -169,7 +205,8 @@ const TaskMonitor = {
     async startBuild(dataset, filePath, force = false) {
         await dataset.build(filePath, force);
         emit('buildStarted', { dataset, filePath, force });
-        _fetch(getStore(dataset));
+        const ent = peekStore(dataset);
+        if (ent) _fetch(ent);
         return true;
     },
 };

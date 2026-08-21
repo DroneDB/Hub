@@ -537,7 +537,7 @@ export default {
         emitter.off('setActiveBulkDownload', this._onSetActiveBulkDownload);
 
         // Cleanup BuildManager
-        BuildManager.cleanup();
+        BuildManager.unregisterDataset(this.dataset);
     },
     computed: {
         selectedFiles: function () {
