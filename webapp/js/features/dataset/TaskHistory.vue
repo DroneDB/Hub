@@ -4,9 +4,9 @@
             <div class="filter-bar">
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                     <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value"
-                        placeholder="All States" @change="applyFilters" />
+                        placeholder="All States" @change="onFilterChange" />
                     <Select v-model="selectedTool" :options="toolFilterOptions" optionLabel="label" optionValue="value"
-                        placeholder="All Tools" @change="applyFilters" />
+                        placeholder="All Tools" @change="onFilterChange" />
                     <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary"
                         :loading="loading" />
                     <span v-if="showPhotogrammetryButton" class="d-inline-block"
@@ -226,7 +226,7 @@
 import useHeavyTask from '@/composables/useHeavyTask';
 import useTaskFormatting from '@/composables/useTaskFormatting';
 import emitter from '@/libs/eventBus';
-import taskMonitor from '@/libs/tasks/taskMonitor';
+import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -425,11 +425,23 @@ export default {
         await this.loadProcessingNodes();
         await this.loadTasks();
 
+        // Background refresh: re-render when the shared task store is polled
+        // (taskMonitor polls GET /tasks for this dataset as long as it is open).
+        this._onTasksUpdated = (data) => {
+            if (data?.dataset && datasetKey(data.dataset) === datasetKey(this.dataset)) {
+                this._backgroundReload();
+            }
+        };
+        taskMonitor.on('tasksUpdated', this._onTasksUpdated);
+
         // Register with TabSwitcher so onTabActivated() is called on tab switch
         if (this.registerTabChild) this.registerTabChild('tasks', this);
     },
 
     beforeUnmount() {
+        // Unsubscribe from the shared task store
+        taskMonitor.off('tasksUpdated', this._onTasksUpdated);
+
         // Unregister from TabSwitcher
         if (this.unregisterTabChild) this.unregisterTabChild('tasks');
 
@@ -493,13 +505,42 @@ export default {
             await this.loadTasks();
         },
 
-        applyFilters() {
+        // Re-read the shared store after a background poll. Keeps the current
+        // page and skips the loading overlay so 2.5 s ticks don't flicker a spinner.
+        _backgroundReload() {
+            try {
+                this.tasks = taskMonitor.getTasks(this.dataset) || [];
+                this.applyFilters(false);
+            } catch (e) {
+                console.error('Failed to reload tasks:', e);
+                this.tasks = [];
+                this.filteredTasks = [];
+            }
+        },
+
+        // Wrapper for the filter dropdowns: PrimeVue passes the selected value as the
+        // change argument (and 'All States'/'All Tools' are '' — falsy), so rebind to
+        // this so a filter change ALWAYS resets pagination to the first page.
+        onFilterChange() {
+            this.applyFilters();
+        },
+
+        // Re-render either after a filter change (resetPage = true) or after a
+        // background store update (resetPage = false, keeps the current page).
+        applyFilters(resetPage = true) {
             let filtered = [...this.tasks];
             if (this.selectedState) filtered = filtered.filter(t => t.state === this.selectedState);
             if (this.selectedTool) filtered = filtered.filter(t => t.toolId === this.selectedTool);
             this.filteredTasks = filtered;
-            // Reset to first page when filters change
-            this.currentPageFirst = 0;
+
+            if (resetPage) {
+                // Reset to first page when filters change
+                this.currentPageFirst = 0;
+            } else if (this.currentPageFirst >= filtered.length) {
+                // List shrank: clamp onto the last valid page so a background
+                // refresh never leaves an empty off-range page.
+                this.currentPageFirst = Math.max(0, (Math.ceil(filtered.length / this.pageSize) - 1) * this.pageSize);
+            }
 
             // Broadcast whether there is an active (queued/running) bulk-download task so
             // Header.vue and ViewDataset.vue can disable the download button globally.
