@@ -52,6 +52,8 @@ export default {
             importUrlInitial: '',
 
             // Mask borders dialog
+            maskBordersDialogOpen: false,
+            maskBordersDialogEntry: null,
             maskBordersConfirmOpen: false,
             maskBordersEntry: null,
             maskBordersOutputPath: null
@@ -693,7 +695,20 @@ export default {
         },
 
         // Mask Borders
-        async handleMaskBorders(entry) {
+        openMaskBordersDialog(entry) {
+            this.maskBordersDialogEntry = entry;
+            this.maskBordersDialogOpen = true;
+        },
+
+        handleMaskBordersDialogClose(action) {
+            this.maskBordersDialogOpen = false;
+            if (action === 'confirm' && this.maskBordersDialogEntry) {
+                this.proceedMaskBorders(this.maskBordersDialogEntry);
+            }
+            this.maskBordersDialogEntry = null;
+        },
+
+        async proceedMaskBorders(entry) {
             try {
                 const check = await this.dataset.checkMaskedFileExists(entry.entry.path);
 

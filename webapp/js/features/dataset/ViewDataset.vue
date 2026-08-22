@@ -16,7 +16,7 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                     @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
             </div>
             </template>
@@ -35,7 +35,7 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                         @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                 </template>
                 <template v-slot:map>
@@ -53,7 +53,7 @@
                                 @setAsCover="setAsCover"
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -77,7 +77,7 @@
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="handleMaskBorders" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -135,6 +135,7 @@
         <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename" :all-entries="fileBrowserFiles"></RenameDialog>
         <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
         <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
+        <MaskBordersDialog v-if="maskBordersDialogOpen" @onClose="handleMaskBordersDialogClose" :entry="maskBordersDialogEntry" />
         <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
         <ImportFromUrlDialog v-if="importUrlDialogOpen" @onClose="handleImportUrlClose"
             :dataset="dataset" :initial-url="importUrlInitial" :initial-folder="currentPath || ''" />
@@ -260,6 +261,7 @@ import TextEditorDialog from './dialogs/TextEditorDialog.vue';
 import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
 import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
 import AlignDialog from './dialogs/AlignDialog.vue';
+import MaskBordersDialog from './dialogs/MaskBordersDialog.vue';
 import ExtractDialog from './dialogs/ExtractDialog.vue';
 import ImportFromUrlDialog from './dialogs/ImportFromUrlDialog.vue';
 import FsLightbox from 'fslightbox-vue';
@@ -343,6 +345,7 @@ export default {
         PdfViewerDialog,
         MergeMultispectralDialog,
         AlignDialog,
+        MaskBordersDialog,
         ExtractDialog,
         ImportFromUrlDialog,
         FsLightbox,
