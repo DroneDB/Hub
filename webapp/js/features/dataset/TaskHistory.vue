@@ -792,6 +792,7 @@ export default {
 
                 this.photogrammetryDialogOpen = false;
                 this._toast('info', 'Photogrammetry started', 'The task is now queued on the processing node.');
+                await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
                 if (e && e.status === 403) {
@@ -822,6 +823,7 @@ export default {
             this.cancellingTask = null;
             try {
                 await this.dataset.cancelTask(task.taskId);
+                await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
                 this._toast('error', 'Cancel failed', e.message);
@@ -831,6 +833,7 @@ export default {
         async retryTask(task) {
             try {
                 await this.dataset.retryTask(task.taskId);
+                await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
                 this._toast('error', 'Retry failed', e.message);
@@ -870,7 +873,9 @@ export default {
             try {
                 this.loading = true;
                 await this.dataset.clearTasks(this.selectedTool || undefined);
+                await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
+                this._toast('success', 'Tasks cleared', 'The concluded tasks have been removed.');
             } catch (e) {
                 this._toast('error', 'Clear failed', e.message);
             } finally {
@@ -893,6 +898,7 @@ export default {
             this.deletingTask = null;
             try {
                 await this.dataset.deleteTask(task.taskId);
+                await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
                 this._toast('success', 'Task deleted', 'The task has been removed from history.');
             } catch (e) {
