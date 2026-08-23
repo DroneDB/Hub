@@ -78,7 +78,7 @@ export function parseRetryAfterSeconds(headerValue) {
 /**
  * Additive-increase / multiplicative-decrease concurrency controller.
  *
- * on503(): halves concurrency (floor 2).
+ * onFailure(): halves concurrency (floor 2, capped at configured).
  * onSuccess(): after `successesToGrow` consecutive successes, grows by 1 up to `configured`.
  * Concurrency never exceeds the originally configured value - the goal is cooperating with
  * server backpressure, not permanently raising throughput above what was asked for.

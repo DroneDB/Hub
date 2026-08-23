@@ -249,15 +249,12 @@ export default {
 
                 // Update progress
                 this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
-                file.status = Dropzone.QUEUED;
-                file.deltaBytesSent = 0;
-                file.trackedBytesSent = 0;
                 // computeRetryDelayMs takes a 0-based attempt, so use the counter
                 // BEFORE incrementing (first retry -> attempt 0 -> base backoff, not
                 // 2x base)
                 const delay = this.resilience.computeRetryDelayMs(file.retries, file._retryAfterSeconds);
                 file.retries++;
-                this.scheduleProcessQueue(delay);
+                this.scheduleRetry(file, delay);
             })
             .on("sending", (file, xhr, formData) => {
                 // Send filename
@@ -319,6 +316,24 @@ export default {
             const timerId = setTimeout(() => {
                 this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
                 if (this.dz) this.dz.processQueue();
+            }, delay);
+            this._queueTimers.push(timerId);
+        },
+
+        // Re-queues `file` only when its own delay expires. Parked as ADDED (not
+        // QUEUED) meanwhile: processQueue() - which any other completion schedules
+        // after 100 ms - never sees it, so backoff/Retry-After is not bypassed;
+        // ADDED consumes no upload slot and keeps queuecomplete from firing early
+        scheduleRetry: function (file, delay) {
+            if (this._isUnmounted) return;
+            file.status = Dropzone.ADDED;
+            file.deltaBytesSent = 0;
+            file.trackedBytesSent = 0;
+            const timerId = setTimeout(() => {
+                this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
+                if (this._isUnmounted || !this.dz) return;
+                file.status = Dropzone.QUEUED;
+                this.dz.processQueue();
             }, delay);
             this._queueTimers.push(timerId);
         },

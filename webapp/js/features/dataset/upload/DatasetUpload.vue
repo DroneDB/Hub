@@ -340,8 +340,7 @@ export default {
                 console.log(`Auto-retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${SMALL_FILE_MAX_RETRIES}) in ${delay/1000}s`);
                 this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${SMALL_FILE_MAX_RETRIES})`);
 
-                file.status = Dropzone.QUEUED;
-                this.scheduleProcessQueue(delay);
+                this.scheduleRetry(file, delay);
             } else if (canPolicyRetry) {
                 // computeRetryDelayMs takes a 0-based attempt, so use the counter
                 // BEFORE incrementing (first retry -> attempt 0 -> base backoff)
@@ -353,8 +352,7 @@ export default {
                 console.log(`Retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${this.resilience.maxRetries}, status ${status}) in ${delay}ms`);
                 this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${this.resilience.maxRetries})`);
 
-                file.status = Dropzone.QUEUED;
-                this.scheduleProcessQueue(delay);
+                this.scheduleRetry(file, delay);
             } else {
                 // Mark as error, allow manual retry for large files
                 const canManualRetry = file.size >= SMALL_FILE_SIZE || fileInfo.retryCount >= SMALL_FILE_MAX_RETRIES;
@@ -501,6 +499,22 @@ export default {
             const timerId = setTimeout(() => {
                 this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
                 if (this.dz) this.dz.processQueue();
+            }, delay);
+            this._queueTimers.push(timerId);
+        },
+
+        // Re-queues `file` only when its own delay expires. Parked as ADDED (not
+        // QUEUED) meanwhile: processQueue() - which the 100 ms timer of any other
+        // file's own "complete" event schedules - never sees it, so the backoff is
+        // not bypassed; ADDED consumes no slot and keeps queuecomplete from firing
+        scheduleRetry(file, delay) {
+            if (this._isUnmounted) return;
+            file.status = Dropzone.ADDED;
+            const timerId = setTimeout(() => {
+                this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
+                if (this._isUnmounted || !this.dz) return;
+                file.status = Dropzone.QUEUED;
+                this.dz.processQueue();
             }, delay);
             this._queueTimers.push(timerId);
         },
