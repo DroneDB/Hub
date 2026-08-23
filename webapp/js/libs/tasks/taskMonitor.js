@@ -51,12 +51,12 @@ function hasActive(ent) {
     return false;
 }
 
-// Cheap snapshot signature: which task carries which state/progress/phase.
+// Cheap snapshot signature: which task carries which state/progress/phase/error.
 // Lets us tell (in O(n) string compare) whether a fetch actually changed anything.
 function computeSignature(ent) {
     return Array.from(ent.tasks.values())
         .sort((a, b) => String(a.taskId).localeCompare(String(b.taskId)))
-        .map(t => `${t.taskId}:${t.state}:${t.progressPercent ?? ''}:${t.phaseMessage ?? ''}`)
+        .map(t => `${t.taskId}:${t.state}:${t.progressPercent ?? ''}:${t.phaseMessage ?? ''}:${t.errorType ?? ''}`)
         .join('|');
 }
 
