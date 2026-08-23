@@ -421,9 +421,15 @@ export default {
     },
 
     async mounted() {
+        // Flag runs before the first await so an unmount during the loads below
+        // is observed here and never registers a permanent listener on a
+        // destroyed instance
+        this._isUnmounted = false;
         await this.loadTools();
         await this.loadProcessingNodes();
         await this.loadTasks();
+
+        if (this._isUnmounted) return;
 
         // Background refresh: re-render when the shared task store is polled
         // (taskMonitor polls GET /tasks for this dataset as long as it is open).
@@ -439,6 +445,7 @@ export default {
     },
 
     beforeUnmount() {
+        this._isUnmounted = true;
         // Unsubscribe from the shared task store
         taskMonitor.off('tasksUpdated', this._onTasksUpdated);
 
