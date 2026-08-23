@@ -14,8 +14,8 @@
 
             <!-- Source (read-only) -->
             <div class="section">
-                <label class="section-label">Source file</label>
-                <InputText :modelValue="entry.entry.path" readonly fluid class="w-100" />
+                <label class="section-label" for="mask-borders-source">Source file</label>
+                <InputText id="mask-borders-source" :modelValue="entry.entry.path" readonly fluid class="w-100" />
             </div>
 
             <!-- Actions -->
