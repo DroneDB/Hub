@@ -1,6 +1,18 @@
 <template>
     <Window title="Align GeoTIFF to Reference" id="align-georaster" @onClose="close" modal width="600px" height="auto" fixedPosition>
         <div class="align-dialog">
+            <!-- Explanation -->
+            <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="align-info">
+                <div>
+                    Aligns the source GeoTIFF to the selected reference by template matching, correcting
+                    georeferencing offsets (GPS drift, rotation, scale drift) between two surveys.<br />
+                    <strong>Similarity</strong> mode corrects translation, rotation and uniform scale; <br />
+                    <strong>Translation</strong> mode corrects position only and is faster for small offsets.<br />
+                    The aligned result is added to the dataset as a <em>new</em> GeoTIFF file with the <i>_aligned</i> suffix, the original source is never modified.<br />
+                    See the <a href="https://docs.dronedb.app/docs/features/raster-alignment" target="_blank" rel="noopener">Raster Alignment documentation</a> for details.
+                </div>
+            </PrimeMessage>
+
             <!-- Source (read-only) -->
             <div class="section">
                 <label class="section-label">Source file</label>
@@ -95,11 +107,12 @@ import Window    from '@/components/Window.vue';
 import Button    from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select    from 'primevue/select';
+import PrimeMessage from 'primevue/message';
 import useHeavyTask from '@/composables/useHeavyTask';
 
 export default {
     name: 'AlignDialog',
-    components: { Window, Button, InputText, Select },
+    components: { Window, Button, InputText, Select, PrimeMessage },
     mixins: [useHeavyTask],
 
     props: {
@@ -305,6 +318,15 @@ export default {
     display: flex;
     flex-direction: column;
     gap: 0;
+}
+
+.align-info {
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.align-info :deep(a) {
+    color: var(--p-blue-600);
 }
 
 .section {

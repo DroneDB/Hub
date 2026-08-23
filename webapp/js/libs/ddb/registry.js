@@ -910,7 +910,7 @@ module.exports = class Registry {
     }
 
     /**
-     * Lists all tasks across all users and datasets (admin only, spec §B.4).
+     * Lists all tasks across all users and datasets (admin only).
      * @param {Object} [filter]
      * @param {string} [filter.toolId]
      * @param {string} [filter.state]

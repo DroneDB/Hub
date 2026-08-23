@@ -47,6 +47,7 @@ import ddb from 'ddb';
 import { bytesToSize } from '@/libs/utils';
 import Dropzone from '@/vendor/dropzone';
 import { inIframe } from '@/libs/utils';
+import { useResilientUpload } from '@/composables/useResilientUpload';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -69,7 +70,10 @@ export default {
             totalBytesSent: 0,
             lastUpdated: 0,
 
-            url: ""
+            url: "",
+
+            // Retry/backpressure policy shared with DatasetUpload.vue (see useResilientUpload)
+            resilience: useResilientUpload({ parallelUploads: 8 })
         }
     },
     computed: {
@@ -94,18 +98,32 @@ export default {
     mounted: async function () {
         Dropzone.autoDiscover = false;
         this.uploadToken = null;
-        const MAX_RETRIES = 30;
+        // processQueue timers (completions and retries, the latter able to run up to the
+        // 5-minute Retry-After cap) are tracked so unmount can cancel them - otherwise
+        // pending retries keep uploading after the view is gone (ghost uploads)
+        this._queueTimers = [];
+        this._isUnmounted = false;
 
         this.dz = new Dropzone(this.$refs.droparea, {
             paramName: function () { return "file"; },
             url: "/share/upload/<uuid>", // change this later
-            parallelUploads: 8, // http://blog.olamisan.com/max-parallel-http-connections-in-a-browser max parallel connections
+            parallelUploads: this.resilience.aimd.current, // http://blog.olamisan.com/max-parallel-http-connections-in-a-browser max parallel connections
             uploadMultiple: false,
             autoProcessQueue: false,
             createImageThumbnails: false,
             maxFilesize: Number.MAX_SAFE_INTEGER,
             previewTemplate: '<div style="display:none"></div>',
             clickable: this.$refs.btnUpload.$el,
+            // Explicit handler fully replaces dropzone's default "canceled" (options are
+            // merged in the constructor via Dropzone.extend), which re-emits "Upload
+            // canceled." as an "error" event with no xhr. That would classify a user
+            // cancellation as a transient status-0 failure: AIMD budget halved and the
+            // file re-queued for retry. Note: dropzone internally still wires
+            // canceled -> complete (init), so the "complete" handler also bails on
+            // Dropzone.CANCELED.
+            canceled: (file) => {
+                delete this.fileUploadStatus[file.name];
+            },
             chunkSize: Number.MAX_SAFE_INTEGER,
             timeout: 2147483647
         });
@@ -115,28 +133,23 @@ export default {
             this.dz.options.url = `/share/upload/${this.uploadToken}`;
             this.fileUploadStatus[file.name] = 0;
         })
-            .on("error", (file, res) => {
+            .on("error", (file, res, xhr) => {
 
-                if (res.noRetry) {
+                if (res && res.noRetry) {
                     this.dz.cancelUpload(file);
                     this.error = `Failed to upload ${file.name}: ${res.error}`;
                     this.uploading = false;
                     file.status = Dropzone.CANCELED;
-                } else {
-
-                    // Retry
-                    if (file.retries < MAX_RETRIES) {
-                        console.log("Error uploading ", res, file, " put back in queue...");
-                        file.status = Dropzone.QUEUED;
-                    } else {
-                        this.dz.cancelUpload(file);
-                        this.error = `Failed to upload ${file.name} after 30 retries`;
-                        this.uploading = false;
-                    }
                     delete this.fileUploadStatus[file.name];
-                    setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
+                    return;
                 }
 
+                // Stash status/Retry-After for the "complete" handler, which owns the actual
+                // retry-count bookkeeping and re-queueing.
+                file._lastStatus = xhr ? xhr.status : 0;
+                file._retryAfterSeconds = xhr
+                    ? this.resilience.parseRetryAfterSeconds(xhr.getResponseHeader && xhr.getResponseHeader('Retry-After'))
+                    : null;
             })
             .on("uploadprogress", (file, progress, bytesSent) => {
                 const now = new Date().getTime();
@@ -179,47 +192,88 @@ export default {
             .on("complete", (file) => {
                 if (file.status === "success") {
                     this.uploadedFiles = this.uploadedFiles + 1;
+                    this.applyAimd('success');
 
                     // Update progress by removing the tracked progress and
                     // use the file size as the true number of bytes
                     this.totalBytesSent = this.totalBytesSent + file.size;
                     if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
-                } else {
-
-                    var res = JSON.parse(file.xhr.response);
-                    if (res && res.noRetry) {
-                        this.dz.cancelUpload(file);
-                        return;
-                    }
-
-                    let err = `Failed to upload ${file.name}, retrying... (${file.retries})`;
-
-                    // Update progress
-                    this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
-                    file.status = Dropzone.QUEUED;
-                    file.deltaBytesSent = 0;
-                    file.trackedBytesSent = 0;
-                    file.retries++;
-
-                    if (file.retries > MAX_RETRIES) {
-                        this.dz.cancelUpload(file);
-                        this.error = err;
-                    }
+                    delete this.fileUploadStatus[file.name];
+                    this.scheduleProcessQueue(100);
+                    return;
                 }
+
+                // dropzone also emits "complete" for user cancellations (canceled ->
+                // complete is wired in its init). A cancellation is not a failure:
+                // no AIMD signaling, no error, no re-queue, no timer
+                if (file.status === Dropzone.CANCELED) {
+                    delete this.fileUploadStatus[file.name];
+                    return;
+                }
+
+                // Only parse a plausible JSON body: on network failures xhr.response
+                // is "" (JSON.parse would throw SyntaxError) and on cancellation
+                // file.xhr may be undefined (TypeError). Anything else degrades to
+                // res = null, which flows into the status-0 retry branch below
+                var res = null;
+                if (file.xhr && file.xhr.status >= 0
+                    && typeof file.xhr.response === "string"
+                    && (file.xhr.response[0] === "{" || file.xhr.response[0] === "[")) {
+                    try {
+                        res = JSON.parse(file.xhr.response);
+                    } catch (e) { /* noop */ }
+                }
+                if (res && res.noRetry) {
+                    delete this.fileUploadStatus[file.name];
+                    return; // already canceled by the "error" handler
+                }
+
+                const status = file._lastStatus ?? (file.xhr ? file.xhr.status : 0);
+                const canRetry = this.resilience.shouldRetryStatus(status) && file.retries < this.resilience.maxRetries;
+
                 delete this.fileUploadStatus[file.name];
 
-                setTimeout(() => this.dz.processQueue(), 2000); // Wait 2 secs
+                if (!canRetry) {
+                    this.dz.cancelUpload(file);
+                    this.error = `Failed to upload ${file.name} (status ${status})`;
+                    // A permanent failure for this file. Advance the queue so any
+                    // still-queued files complete (autoProcessQueue is off, so without
+                    // this they would sit abandoned); `queuecomplete` clears the
+                    // uploading state once Dropzone has nothing left queued or in
+                    // flight, so the spinner resets even on partial failure.
+                    this.scheduleProcessQueue(0);
+                    return;
+                }
+
+                this.applyAimd('failure');
+
+                // Update progress
+                this.totalBytesSent = this.totalBytesSent - file.trackedBytesSent;
+                // computeRetryDelayMs takes a 0-based attempt, so use the counter
+                // BEFORE incrementing (first retry -> attempt 0 -> base backoff, not
+                // 2x base)
+                const delay = this.resilience.computeRetryDelayMs(file.retries, file._retryAfterSeconds);
+                file.retries++;
+                this.scheduleRetry(file, delay);
             })
             .on("sending", (file, xhr, formData) => {
                 // Send filename
                 formData.append("path", file.name);
             })
             .on("queuecomplete", async (files) => {
-                // Commit
+                if (this._isUnmounted) return;
+                // Treat this as the true terminal only when nothing is left queued or
+                // in flight, so a failure followed by more uploads doesn't fire early
+                const remaining = this.dz.getQueuedFiles().length + this.dz.getUploadingFiles().length;
+                if (remaining > 0) return;
+                // Commit only on full success
                 if (this.uploadedFiles - this.filesCount === 0) {
                     try {
                         const r = await reg.makeRequest(`/share/commit/${this.uploadToken}`, "POST");
-                        if (r.url) {
+                        // The commit request is async; the component may unmount while it
+                        // is in flight. The terminal redirect is only safe while we are
+                        // still alive
+                        if (r.url && !this._isUnmounted) {
                             location.href = r.url;
                         } else if (r.error) {
                             this.error = r.error;
@@ -229,15 +283,68 @@ export default {
                     } catch (e) {
                         this.error = e.message;
                     }
-                    this.uploading = false;
                 }
+                // Always clear the uploading state now (success OR partial failure), so
+                // a permanent failure doesn't leave the spinner up forever
+                this.uploading = false;
             })
             .on("reset", () => {
                 this.filesCount = 0;
                 this.uploadedFiles = 0;
             });
     },
+    beforeUnmount: function () {
+        // Prevent ghost uploads: pending retry timers (Retry-After can be up to the
+        // 5-minute cap) and the live dropzone must not keep working after the view
+        // is gone. The unmount flag is set first so the canceled/complete events
+        // triggered by dz.destroy() short-circuit instead of scheduling new timers
+        this._isUnmounted = true;
+        if (this._queueTimers) {
+            this._queueTimers.forEach((timerId) => clearTimeout(timerId));
+            this._queueTimers = [];
+        }
+        if (this.dz) {
+            this.dz.destroy();
+            this.dz = null;
+        }
+    },
     methods: {
+        // Schedules Dropzone to pick up queued files; the timer is tracked so
+        // beforeUnmount can cancel it. A destroyed dropzone is a safe no-op
+        scheduleProcessQueue: function (delay) {
+            if (this._isUnmounted) return;
+            const timerId = setTimeout(() => {
+                this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
+                if (this.dz) this.dz.processQueue();
+            }, delay);
+            this._queueTimers.push(timerId);
+        },
+
+        // Re-queues `file` only when its own delay expires. Parked as ADDED (not
+        // QUEUED) meanwhile: processQueue() - which any other completion schedules
+        // after 100 ms - never sees it, so backoff/Retry-After is not bypassed;
+        // ADDED consumes no upload slot and keeps queuecomplete from firing early
+        scheduleRetry: function (file, delay) {
+            if (this._isUnmounted) return;
+            file.status = Dropzone.ADDED;
+            file.deltaBytesSent = 0;
+            file.trackedBytesSent = 0;
+            const timerId = setTimeout(() => {
+                this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
+                if (this._isUnmounted || !this.dz) return;
+                file.status = Dropzone.QUEUED;
+                this.dz.processQueue();
+            }, delay);
+            this._queueTimers.push(timerId);
+        },
+
+        // Applies the AIMD decision to Dropzone's live-read parallelUploads option
+        // (it is read from options on every processQueue(), not cached).
+        applyAimd: function (outcome) {
+            const next = outcome === 'success' ? this.resilience.aimd.onSuccess() : this.resilience.aimd.onFailure();
+            if (this.dz) this.dz.options.parallelUploads = next;
+        },
+
         resetUpload: function () {
             this.filesCount = 0;
             this.totalBytes = 0;

@@ -478,9 +478,9 @@ export default {
         },
 
         // Decide whether an authenticated download should go through the async
-        // bulk-download task (spec §A.4.1). Whole-dataset always async; a selection
-        // is async when its total size exceeds the configured threshold (or when a
-        // size is unknown, async is used for safety - spec §7.3).
+        // bulk-download task. Whole-dataset always async; a selection is async
+        // when its total size exceeds the configured threshold (when the size is
+        // unknown, async is used for safety).
         shouldUseAsyncDownload: function () {
             if (this.selectedFiles.length === 0) return true; // whole dataset
 

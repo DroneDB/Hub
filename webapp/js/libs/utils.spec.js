@@ -10,7 +10,8 @@ import {
     queryParams,
     inIframe,
     clone,
-    bytesToSize
+    bytesToSize,
+    taskProgressMode
 } from './utils';
 
 describe('setTitle', () => {
@@ -149,5 +150,26 @@ describe('bytesToSize', () => {
     it('respects decimals parameter', () => {
         expect(bytesToSize(1536000, 0)).toBe('1 MB');
         expect(bytesToSize(1536000, 3)).toBe('1.465 MB');
+    });
+});
+
+describe('taskProgressMode', () => {
+    it('returns indeterminate for null or undefined progress', () => {
+        expect(taskProgressMode(null)).toBe('indeterminate');
+        expect(taskProgressMode(undefined)).toBe('indeterminate');
+    });
+
+    it('returns indeterminate for zero progress', () => {
+        expect(taskProgressMode(0)).toBe('indeterminate');
+    });
+
+    it('returns indeterminate for negative progress', () => {
+        expect(taskProgressMode(-5)).toBe('indeterminate');
+    });
+
+    it('returns determinate for any positive progress', () => {
+        expect(taskProgressMode(1)).toBe('determinate');
+        expect(taskProgressMode(42)).toBe('determinate');
+        expect(taskProgressMode(100)).toBe('determinate');
     });
 });

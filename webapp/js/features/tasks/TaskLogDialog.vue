@@ -33,7 +33,7 @@ import ToggleSwitch from 'primevue/toggleswitch';
 
 /**
  * Presentational task log viewer dialog with auto-refresh and auto-scroll.
- * Shared by the Task History tab and the admin Tasks dashboard (spec §B.3).
+ * Shared by the Task History tab and the admin Tasks dashboard.
  * The parent owns the log fetching and passes the text in; this component
  * only renders, manages the refresh interval, and re-emits refresh/close.
  *

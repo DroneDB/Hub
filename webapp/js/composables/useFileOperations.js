@@ -299,7 +299,6 @@ export default {
 
         // ────────────────────────────────────────────────────────────────────
         // Copy / Cut / Paste - clipboard flow
-        // (See DroneDB-Roadmap/CopyPaste/README.md.)
         //
         // Source views call `clipboardCopySelected` / `clipboardCutSelected`
         // (typically wired to Ctrl+C / Ctrl+X / context menu).

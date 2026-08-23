@@ -16,6 +16,11 @@
         <div class="container-wrapper">
             <div ref="view" class="giro3d-view"></div>
 
+            <!-- Local coordinates badge (top-center) -->
+            <div v-if="ready && isLocalPointCloud" class="local-coords-badge">
+                <i class="fa-solid fa-unlock" /> Local coordinates
+            </div>
+
             <!-- Measurement toolbar (top-left) -->
             <div v-if="ready" class="toolbar">
                 <button :class="{ active: activeTool === 'point' }" @click="measure('point')" title="Measure point" aria-label="Measure point">
@@ -140,7 +145,7 @@ function loadSettings() {
  * the COPC header) so they render at full precision. Mercator length/area measurements are
  * corrected by cos(latitude) so they report true ground distances.
  *
- * Per the additive strategy (spec sec 4.2), this viewer is opt-in only: the default opening
+ * This viewer is opt-in only (additive, non-breaking): the default opening
  * for each entry type is unchanged (map, pointcloud, model, etc.). The user reaches the
  * unified viewer via the "Open in 3D Viewer" context menu action.
  */
@@ -154,6 +159,9 @@ export default {
         return {
             error: "",
             loading: false,
+            // Set by loadPointCloud when the COPC carries no CRS: the cloud is shown in its
+            // local metric coordinates and a badge explains that (no basemap is added).
+            isLocalPointCloud: false,
             loadingText: "Loading 3D viewer...",
             // Load progress (0..1) shown as a bar while data streams in; null hides the bar.
             progress: null,
@@ -225,6 +233,7 @@ export default {
             this.error = "";
             this.loading = true;
             this.progress = null;
+            this.isLocalPointCloud = false;
             try {
                 // Only point clouds, orthophotos/rasters, vectors and 3D models are supported.
                 // Gaussian splats have their own dedicated viewer and are not opened here.
@@ -236,7 +245,10 @@ export default {
                 const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
                 if (!supported.includes(entry.type))
                     throw new Error(`'${this.basename(entry.path)}' is not supported in the 3D viewer.`);
-                if (!ddb.entry.hasGeometry(entry) && entry.type !== T.MODEL && entry.type !== T.TILES3D)
+                // Point clouds without a valid SRS have no WGS84 footprint in the DB, but they
+                // still render in the viewer using their local metric coordinates (see
+                // loadPointCloud / the local-coordinates badge).
+                if (!ddb.entry.hasGeometry(entry) && entry.type !== T.MODEL && entry.type !== T.TILES3D && entry.type !== T.POINTCLOUD)
                     throw new Error(`'${this.basename(entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
 
                 // Availability gate: verify the required build artifact exists for this entry type
@@ -869,6 +881,10 @@ export default {
             // basemap tile, flooding the render loop and freezing the controls - the cloud renders
             // but no longer responds to drag/zoom.
             const crsRegistered = this.registerCrs(crs);
+            // No CRS in the COPC header: the cloud is displayed in its own local metric
+            // coordinates. Giro3D renders it in a flat scene without reprojection (same as
+            // 3D models); we skip the basemap and show a badge instead.
+            this.isLocalPointCloud = (crs === this.libs.CoordinateSystem.unknown);
             this.setupInstance(crs);
             this.navModesAvailable = true;
             if (this.instance.renderingOptions) {
@@ -1497,6 +1513,24 @@ export default {
 #unified-viewer .btn-settings:hover {
     background: rgba(0, 0, 0, 0.85);
     border-color: rgba(255, 255, 255, 0.5);
+}
+
+#unified-viewer .local-coords-badge {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--ddb-border-radius, 4px);
+    color: var(--ddb-text-on-dark);
+    font-size: 0.85rem;
+    pointer-events: none;
 }
 
 #unified-viewer .settings-content {

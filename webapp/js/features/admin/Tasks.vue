@@ -63,7 +63,7 @@ import Toast from 'primevue/toast';
 import reg from '@/libs/api/sharedRegistry';
 
 /**
- * Admin global tasks dashboard (spec §B.4). Lists tasks across all users and
+ * Admin global tasks dashboard. Lists tasks across all users and
  * datasets with server-side paging and tool/state/user filters. Reuses the shared
  * presentational TasksTable and the per-dataset task endpoints for row actions.
  */
@@ -198,7 +198,7 @@ export default {
         },
 
         // Per-task actions reuse the existing per-dataset endpoints, which already
-        // authorize admins via dataset ownership (spec §B.2).
+        // authorize admins via dataset ownership.
         datasetFor(task) {
             return reg.Organization(task.orgSlug).Dataset(task.dsSlug);
         },
