@@ -61,6 +61,7 @@
             <div v-if="paginatedOrganizations.length === 0" class="text-center p-4">
                 <h3>No organizations found</h3>
                 <p v-if="searchQuery">Try adjusting your search criteria.</p>
+                <p v-else-if="!showAll">You don't own any organizations yet. You may have access to organizations owned by others: enable <b>Show all</b> above to see them. You can also create a new organization.</p>
                 <p v-else>You can create a new organization by clicking the create organization button.</p>
             </div>
             <div v-for="org in paginatedOrganizations" :key="org.slug"
@@ -246,11 +247,6 @@ export default {
                         permissions: org.permissions
                     };
                 });
-
-                if (this.organizations.length === 0 && !this.showAll) {
-                    this.$router.push({ name: "Upload" }).catch(() => {
-                    });
-                }
             } catch (e) {
                 if (e.status === 401) {
                     if (e.noRetry) {
