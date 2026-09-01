@@ -85,7 +85,8 @@
                 :pt="{ bodyRow: { style: 'cursor: pointer' } }">
                 <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
-                        <img :src="slotProps.data.thumbUrl" class="ds-thumb-img"
+                        <ProgressSpinner v-if="slotProps.data.loading" class="ds-row-spinner" strokeWidth="4" />
+                        <img v-else :src="slotProps.data.thumbUrl" class="ds-thumb-img"
                             :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }" />
                     </template>
                 </Column>
@@ -172,6 +173,11 @@
             @onClose="closeMembersDialog">
         </OrganizationMembersDialog>
 
+        <!-- Full-screen feedback while a new dataset is being created -->
+        <div v-if="creatingDataset" class="ds-overlay-wrapper">
+            <Loader></Loader>
+        </div>
+
     </div>
 </template>
 
@@ -186,6 +192,7 @@ import ImportDatasetDialog from './ImportDatasetDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import OrganizationDialog from '@/features/organizations/OrganizationDialog.vue';
 import OrganizationMembersDialog from '@/features/organizations/OrganizationMembersDialog.vue';
+import Loader from '@/components/Loader.vue';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
@@ -213,6 +220,7 @@ export default {
         ImportDatasetDialog,
         OrganizationDialog,
         OrganizationMembersDialog,
+        Loader,
         Button,
         DataTable,
         Column,
@@ -248,6 +256,9 @@ export default {
             dsDialogOpen: false,
 
             importDialogOpen: false,
+
+            // Blocking overlay flag while a new dataset is being created (Loader.vue)
+            creatingDataset: false,
 
             orgEditDialogOpen: false,
             orgDialogModel: null,
@@ -648,6 +659,9 @@ export default {
         },
 
         async handleDatasetClose(res, newds) {
+            // Ignore stray duplicate closes (e.g. double Enter on the name field)
+            if (this.creatingDataset) return;
+
             this.dsDialogOpen = false;
 
             if (res == "close") {
@@ -657,6 +671,7 @@ export default {
 
             if (this.dsDialogMode == "new") {
                 this.dsDialogModel = null;
+                this.creatingDataset = true;
 
                 try {
                     // Set loading state for the UI
@@ -725,6 +740,8 @@ export default {
                     this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
                     console.error(e);
                     this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create dataset: ' + e.message, life: 5000 });
+                } finally {
+                    this.creatingDataset = false;
                 }
 
             } else if (this.dsDialogMode == "edit") {
@@ -990,6 +1007,19 @@ export default {
 
     .ds-thumb-placeholder {
         opacity: 0.35;
+    }
+
+    /* Spinner shown in the thumb column of temporary (creating/importing) rows */
+    .ds-row-spinner {
+        width: 2rem;
+        height: 2rem;
+    }
+
+    /* Loader.vue is position:absolute, so pin it to the viewport via this wrapper */
+    .ds-overlay-wrapper {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
     }
 
     .ds-name {
