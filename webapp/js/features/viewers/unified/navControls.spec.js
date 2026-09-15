@@ -14,6 +14,7 @@ import {
     NAV,
     wheelNotches,
     createNavControls,
+    createTurntableRotate,
     applySceneMetrics,
     createDoubleClickRecenter,
     createCameraTweener
@@ -83,15 +84,17 @@ describe('createNavControls', () => {
 
         expect(controls.enableDamping).toBe(true);
         expect(controls.dampingFactor).toBe(NAV.dampingFactor);
-        // The old bug: MapControls-style LEFT=PAN. Orbiting must be on the left button.
+        // Rotation must NOT be OrbitControls' own: its pole handling flips/sticks the camera
+        // (verified live). LEFT/single-touch are handed to the custom turntable instead, so the
+        // control itself gets null there while keeping dolly/pan/two-finger.
         expect(controls.mouseButtons).toEqual({
-            LEFT: THREE.MOUSE.ROTATE,
+            LEFT: null,
             MIDDLE: THREE.MOUSE.DOLLY,
             RIGHT: THREE.MOUSE.PAN
         });
         expect(controls.zoomToCursor).toBe(false);
         expect(controls.touches).toEqual({
-            ONE: THREE.TOUCH.ROTATE,
+            ONE: null,
             TWO: THREE.TOUCH.DOLLY_PAN
         });
         expect(controls.listenToKeyEvents).toHaveBeenCalledWith(el);
@@ -209,15 +212,20 @@ describe('turntable rotation (real OrbitControls)', () => {
             const off = camera.position.clone().sub(center);
             return THREE.MathUtils.radToDeg(Math.atan2(off.y, off.x));
         };
-        const drag = dx => {
+        // Elevation of the camera above the pivot, in degrees (90 = level, 0 = straight above).
+        const elevation = () => {
+            const off = camera.position.clone().sub(center);
+            return THREE.MathUtils.radToDeg(Math.acos(off.z / off.length()));
+        };
+        const drag = (dx, dy = 0, steps = 5) => {
             el.dispatchEvent(pointer('pointerdown', VIEWPORT_W / 2, VIEWPORT_H / 2));
-            for (let i = 1; i <= 5; i++) {
-                el.dispatchEvent(pointer('pointermove', VIEWPORT_W / 2 + (dx * i) / 5, VIEWPORT_H / 2));
+            for (let i = 1; i <= steps; i++) {
+                el.dispatchEvent(pointer('pointermove', VIEWPORT_W / 2 + (dx * i) / steps, VIEWPORT_H / 2 + (dy * i) / steps));
             }
-            el.dispatchEvent(pointer('pointerup', VIEWPORT_W / 2 + dx, VIEWPORT_H / 2));
+            el.dispatchEvent(pointer('pointerup', VIEWPORT_W / 2 + dx, VIEWPORT_H / 2 + dy));
             for (let i = 0; i < 40; i++) controls.update(); // let damping settle
         };
-        return { el, camera, controls, center, azimuth, drag };
+        return { el, camera, controls, center, azimuth, elevation, drag };
     }
 
     it('rotates about the pivot on an axis-parallel drag without moving the pivot', () => {
@@ -235,6 +243,96 @@ describe('turntable rotation (real OrbitControls)', () => {
         expect(camera.position.z).toBeCloseTo(startHeight, 6);
         // And it must turn by exactly the pointer travel over the viewport height.
         expect(azimuth() - startAz).toBeCloseTo(-360 * 160 / VIEWPORT_H, 1);
+    });
+
+    it('pitches about the screen-horizontal axis on a vertical drag without rolling', () => {
+        const { camera, controls, center, azimuth, elevation, drag } = fixture();
+        const startAz = azimuth();
+        const startEl = elevation();
+        const startDist = camera.position.distanceTo(center);
+        const startUp = camera.up.clone();
+
+        drag(0, -160); // OrbitControls' native sign (verified live): drag UP drives phi UP
+
+        expect(controls.target.distanceTo(center)).toBeLessThan(1e-9);
+        expect(camera.position.distanceTo(center)).toBeCloseTo(startDist, 4);
+        expect(azimuth()).toBeCloseTo(startAz, 6); // pure pitch: no yaw leakage
+        // Dragging up by 160 px over an 800 px viewport carries the camera 72 deg toward the
+        // nadir (elevation = angle to the up axis, so it increases toward 180 = under the model).
+        expect(elevation() - startEl).toBeCloseTo(360 * 160 / VIEWPORT_H, 1);
+        // No roll, ever: the up axis is not what the rotation acts on.
+        expect(camera.up.distanceTo(startUp)).toBeLessThan(1e-12);
+    });
+
+    it('never flips at the poles: a huge vertical drag stops short and drags stay responsive', () => {
+        const { camera, controls, center, azimuth, elevation, drag } = fixture();
+        const startUp = camera.up.clone();
+
+        // 2 viewport heights in one drag: the equivalent accumulated rotation carried the real
+        // OrbitControls camera through the pole into the antipodal flipped view and left it dead.
+        // The turntable must instead clamp just short of straight-BELOW ...
+        drag(0, -VIEWPORT_H * 2);
+        expect(elevation()).toBeGreaterThan(179.9); // deg, ≈ EPS rad under the south pole ...
+        expect(elevation()).toBeLessThan(180); // ... but never AT it
+        expect(camera.up.distanceTo(startUp)).toBeLessThan(1e-12);
+
+        // At the pole the yaw orbit degenerates to an r*sin(eps) circle (inherent to every
+        // spherical camera, Potree included) - the azimuth still advances exactly, proven below
+        // one quadrant off the pole. The first thing a user does there is drag the other way:
+        // it must release off the pole immediately, by the expected amount ...
+        const el0 = elevation();
+        drag(0, VIEWPORT_H / 4); // drag down = back toward the zenith
+        expect(el0 - elevation()).toBeCloseTo(360 * (VIEWPORT_H / 4) / VIEWPORT_H, 1);
+
+        // ... and at normal latitude horizontal drags rotate normally: azimuth by exactly the
+        // pointer travel over the viewport height, camera actually moving (the native control,
+        // stuck at the pole, changed only its internal azimuth and froze the camera instead).
+        const az = azimuth();
+        const posBefore = camera.position.clone();
+        drag(160);
+        expect(azimuth() - az).toBeCloseTo(-360 * 160 / VIEWPORT_H, 1);
+        expect(camera.position.distanceTo(posBefore)).toBeGreaterThan(1);
+    });
+
+    it('yields rotation to a second finger so pinch goes to the dolly-pan control', () => {
+        const el = makeCanvas();
+        const center = new THREE.Vector3(0, 0, 10);
+        const camera = new THREE.PerspectiveCamera(50, VIEWPORT_W / VIEWPORT_H, 0.02, 20000);
+        camera.up.set(0, 0, 1);
+        camera.position.set(24, -24, 28);
+        const controls = { target: center.clone(), update: () => {}, enabled: true, rotateSpeed: 1 };
+        createTurntableRotate({ THREE }, camera, controls, el, () => camera.up);
+        const posBefore = camera.position.clone();
+        const touch = (type, id, x, y) => el.dispatchEvent(new PointerEvent(type, {
+            clientX: x, clientY: y, button: 0, pointerId: id,
+            pointerType: 'touch', isPrimary: id === 1, bubbles: true, cancelable: true
+        }));
+
+        touch('pointerdown', 1, 100, 100);
+        // Second finger down: the turntable must disarm itself immediately ...
+        touch('pointerdown', 2, 200, 200);
+        // ... so the first finger dragging changes nothing.
+        touch('pointermove', 1, 400, 200);
+        expect(camera.position.distanceTo(posBefore)).toBeLessThan(1e-9);
+
+        // A fresh single-finger drag right after still rotates normally.
+        touch('pointerdown', 3, 100, 100);
+        touch('pointermove', 3, 260, 100);
+        touch('pointerup', 3, 260, 100);
+        expect(camera.position.distanceTo(posBefore)).toBeGreaterThan(1);
+    });
+
+    it('stop responding once the control is disposed', () => {
+        const { el, camera, controls, azimuth, drag } = fixture();
+        controls.dispose();
+        const az = azimuth();
+        // Replaying the whole gesture on the disposed control must be inert: the listeners are
+        // gone with it (the wheel normalizer and key events are covered in the stub suite above).
+        el.dispatchEvent(pointer('pointerdown', VIEWPORT_W / 2, VIEWPORT_H / 2));
+        el.dispatchEvent(pointer('pointermove', VIEWPORT_W / 2 + 160, VIEWPORT_H / 2));
+        el.dispatchEvent(pointer('pointerup', VIEWPORT_W / 2 + 160, VIEWPORT_H / 2));
+        controls.update();
+        expect(azimuth()).toBeCloseTo(az, 9);
     });
 
     it('keeps the pivot on the model axis across wheel zooms (no zoom-to-cursor drift)', () => {

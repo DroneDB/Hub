@@ -83,10 +83,11 @@ function normalizeWheel(domElement) {
  * @param libs - the viewer's loaded library bundle ({ THREE, OrbitControls }).
  * @param camera - the camera to control; camera.up must already be final.
  * @param domElement - the element to listen to.
- * @returns the configured OrbitControls, with dispose() extended to undo the wheel normalizer
- * and the key-event listener.
+ * @param opts - { onDragStart } forwarded to the turntable, fired when a rotation drag begins.
+ * @returns the configured OrbitControls, with dispose() extended to undo the wheel normalizer,
+ * the turntable listeners and the key-event listener.
  */
-export function createNavControls(libs, camera, domElement) {
+export function createNavControls(libs, camera, domElement, opts = {}) {
     const { THREE, OrbitControls } = libs;
 
     const controls = new OrbitControls(camera, domElement);
@@ -114,20 +115,174 @@ export function createNavControls(libs, camera, domElement) {
     // same control read correctly in both, where screenSpacePanning=true would tilt the pivot off
     // the ground on every drag.
     controls.screenSpacePanning = false;
-    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
-    controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+    // Rotation deliberately does NOT go through OrbitControls: its spherical frame is built from
+    // camera.up in the constructor and breaks down near that frame's poles. Left-drag (and
+    // single-finger touch) are handled by createTurntableRotate below instead - same gain, absolute
+    // axes, epsilon-clamped so the camera can never stick at (or invert through) a pole.
+    controls.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+    controls.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_PAN };
     controls.listenToKeyEvents(domElement);
 
     const removeWheelNormalizer = normalizeWheel(domElement);
+    // camera.up is exactly the scene's up axis in every scene the viewer builds (flat: the
+    // constant (0,0,1) from setupInstance; globe: the frozen ellipsoid normal assigned by
+    // frameGlobe before it attaches the controls), so it is the up axis for both paths.
+    const removeTurntable = createTurntableRotate(libs, camera, controls, domElement, () => camera.up, opts);
 
     const disposeControls = controls.dispose.bind(controls);
     controls.dispose = () => {
         removeWheelNormalizer();
+        removeTurntable();
         controls.stopListenToKeyEvents();
         disposeControls();
     };
 
     return controls;
+}
+
+// Unit up axis for the turntable. getUpAxis may hand back camera.up itself, so normalize into
+// a dedicated vector instead of scaling the caller's object in place.
+function normalizeUp(THREE, camera, getUpAxis) {
+    const up = (typeof getUpAxis === 'function' ? getUpAxis() : camera.up).clone();
+    if (up.lengthSq() < 1e-12) up.set(0, 0, 1);
+    return up.normalize();
+}
+
+/**
+ * Absolute turntable rotation: the camera orbits a fixed pivot around the scene's up axis
+ * (drag horizontally) and around the screen-horizontal axis through the pivot (drag vertically),
+ * exactly like Potree's Orbit mode. camera.up is never touched, so the view can never roll.
+ *
+ * This replaces OrbitControls' own rotation because that one measures the polar angle from
+ * camera.up and only clamps at the END of an update: a single fast drag can therefore drive the
+ * accumulated delta straight through a pole - the camera lands at the antipode and the scene
+ * appears flipped - and once stuck at the pole its azimuth rotation leaves the position invariant
+ * (horizontal drags go dead until a later drag re-exits on a mirrored side). Here the clamp runs
+ * per pointer-move, so the camera only ever eases up to (never through) straight-up/down, and
+ * every drag stays responsive.
+ *
+ * Gain matches OrbitControls' rotateLeft/rotateUp exactly (full viewport height = 360 deg),
+ * including its sign convention (drag down = camera rises over the top), so the feel is a
+ * drop-in for the rotation that was disabled in createNavControls.
+ *
+ * @param libs - { THREE } bundle of the viewer.
+ * @param camera - camera to orbit; camera.up must equal the scene up axis (see createNavControls).
+ * @param controls - the OrbitControls whose target is the fixed pivot (pan/wheel keep working).
+ * @param domElement - element to listen for pointer events on.
+ * @param getUpAxis - () => Vector3-like absolute up axis (defaults to camera.up).
+ * @param opts - { onDragStart } fired once per drag, on the first pointer-move.
+ * @returns a disposer removing every listener this installed.
+ */
+export function createTurntableRotate(libs, camera, controls, domElement, getUpAxis, opts = {}) {
+    const { THREE } = libs;
+    const EPS = 1e-3; // rad from the exact poles: free full-sphere pitch, dead zones removed.
+    const state = { pointerId: null, x: 0, y: 0, active: false, started: false };
+    const qYaw = new THREE.Quaternion();
+
+    // A second finger (pinch -> dolly-pan goes to OrbitControls) or the right/middle mouse
+    // (pan/dolly) takes over the interaction: disarm the turntable instead of fighting it.
+    function abortIfTakenOver(e) {
+        if (state.pointerId === null) return;
+        if (e.pointerType === 'touch' && e.pointerId !== state.pointerId) { disarm(); return; }
+        if (e.buttons && (e.buttons & 0b110)) disarm();
+    }
+
+    function disarm() {
+        if (state.pointerId !== null && domElement.releasePointerCapture) {
+            try { domElement.releasePointerCapture(state.pointerId); } catch (e) { /* already gone */ }
+        }
+        state.pointerId = null;
+        state.active = false;
+        state.started = false;
+    }
+
+    const onPointerDown = e => {
+        abortIfTakenOver(e);
+        if (e.pointerType === 'mouse') {
+            if (e.button !== 0) return; // middle/right stay with OrbitControls
+        } else if (e.pointerType === 'touch') {
+            if (e.button !== 0) return;
+            if (state.active || state.pointerId !== null) { disarm(); return; } // second finger
+        } else {
+            return; // pen and anything else keep the previous behaviour (no rotation)
+        }
+        if (controls.enabled === false) return; // measurement tools suspend navigation
+        state.pointerId = e.pointerId;
+        state.x = e.clientX;
+        state.y = e.clientY;
+        state.active = true;
+        state.started = false;
+        if (domElement.setPointerCapture) {
+            try { domElement.setPointerCapture(e.pointerId); } catch (e2) { /* passive */ }
+        }
+    };
+
+    const onPointerMove = e => {
+        if (!state.active || e.pointerId !== state.pointerId) return;
+        abortIfTakenOver(e);
+        if (!state.active) return;
+        const dx = e.clientX - state.x;
+        const dy = e.clientY - state.y;
+        state.x = e.clientX;
+        state.y = e.clientY;
+        if (dx === 0 && dy === 0) return;
+        if (!state.started) {
+            state.started = true;
+            if (opts.onDragStart) opts.onDragStart();
+        }
+
+        const h = domElement.clientHeight || 1;
+        const k = (2 * Math.PI * (controls.rotateSpeed || 1)) / h;
+        const target = controls.target;
+        const offset = camera.position.clone().sub(target);
+        const radius = offset.length();
+        if (radius < 1e-10) return; // camera on the pivot: nothing to rotate
+        const dir = offset.divideScalar(radius);
+        const up = normalizeUp(THREE, camera, getUpAxis);
+
+        // Yaw about the absolute up axis through the pivot. OrbitControls' rotateLeft is
+        // -2π*rotateSpeed*dx/clientHeight too, so the gain matches the old rotation.
+        dir.applyQuaternion(qYaw.setFromAxisAngle(up, -k * dx));
+
+        // Pitch inside the great circle spanned by up and the view direction, written directly
+        // (d -> d*cos delta + toward*sin delta keeps d exactly unit): rotating by delta toward
+        // `up` = (up - (up.d) d)/sin(phi) decreases the angle-to-up by exactly delta. The
+        // sign follows the native OrbitControls convention measured live: dragging down raises
+        // the camera (phi decreases), dragging up lowers it under the model. Clamping phi
+        // per pointer-MOVE to [EPS, pi-EPS] is what stops big drags from ever crossing a pole.
+        const cosPhi = THREE.MathUtils.clamp(dir.dot(up), -1, 1);
+        const phi = Math.acos(cosPhi);
+        const wanted = Math.min(Math.max(phi - k * dy, EPS), Math.PI - EPS);
+        const delta = phi - wanted; // rotate this much toward `up` (negative = away from it)
+        const sinPhi = Math.sqrt(Math.max(0, 1 - cosPhi * cosPhi));
+        if (Math.abs(delta) > 1e-12 && sinPhi > 1e-6) {
+            const toward = up.clone().addScaledVector(dir, -cosPhi).multiplyScalar(1 / sinPhi);
+            dir.multiplyScalar(Math.cos(delta)).addScaledVector(toward, Math.sin(delta));
+        }
+
+        // Same contract OrbitControls' rotate honoured: distance kept, pivot never moves, up
+        // untouched (so no roll). update() then feeds the change to the view (streaming) and
+        // re-aims the camera at the pivot without disturbing camera.up.
+        camera.position.copy(target).add(dir.multiplyScalar(radius));
+        controls.update();
+    };
+
+    const onPointerUp = e => {
+        if (e.pointerId === state.pointerId) disarm();
+    };
+
+    domElement.addEventListener('pointerdown', onPointerDown);
+    domElement.addEventListener('pointermove', onPointerMove);
+    domElement.addEventListener('pointerup', onPointerUp);
+    domElement.addEventListener('pointercancel', onPointerUp);
+
+    return () => {
+        disarm();
+        domElement.removeEventListener('pointerdown', onPointerDown);
+        domElement.removeEventListener('pointermove', onPointerMove);
+        domElement.removeEventListener('pointerup', onPointerUp);
+        domElement.removeEventListener('pointercancel', onPointerUp);
+    };
 }
 
 /**

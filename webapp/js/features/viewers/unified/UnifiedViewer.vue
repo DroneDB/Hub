@@ -393,7 +393,15 @@ export default {
                 this.controls = null;
             }
 
-            const controls = createNavControls(this.libs, camera, instance.domElement);
+            const controls = createNavControls(this.libs, camera, instance.domElement, {
+                // The rotation is a custom turntable inside the control (not OrbitControls'), so
+                // its drags never fire the control's 'start' event: take ownership here instead -
+                // stop any camera tween and remember that the user holds the camera now.
+                onDragStart: () => {
+                    this._userInteracted = true;
+                    this._cameraTweener.stop();
+                }
+            });
             // Registering with the view is what makes Giro3D call update() every frame (that is
             // what damping needs) and relay the control's change events as notifyChange(camera),
             // which in turn is what keeps a 3D Tiles set streaming. No extra animation loop.
