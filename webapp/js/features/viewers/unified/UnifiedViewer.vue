@@ -101,6 +101,7 @@ import {
     createNavControls, applySceneMetrics,
     createDoubleClickRecenter, createCameraTweener, NAV
 } from './navControls';
+import { alignContentUpAxis } from './contentOrientation';
 
 const SETTINGS_KEY = 'unified-viewer-settings';
 
@@ -627,6 +628,7 @@ export default {
             this.frameBox(box);
             // Keep the loading indicator up until the tileset has actually put geometry on screen.
             await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
+            this.uprightTileset(tileset, box);
         },
 
         // Loads an uploaded OGC 3D Tiles archive (.3tz). The build step extracts it to the
@@ -686,6 +688,8 @@ export default {
             if (georeferenced) {
                 box = this.groundGlobeTileset(tileset, box);
                 if (!this._userInteracted) this.frameGlobe(tileset, box);
+            } else {
+                this.uprightTileset(tileset, box);
             }
         },
 
@@ -851,6 +855,21 @@ export default {
             tileset.clippingPlanes = [new THREE.Plane().setFromNormalAndCoplanarPoint(up, groundPoint)];
 
             return box.clone().translate(offset);
+        },
+
+        // Stands a flat-scene tileset back up when its content turns out not to be Z-up, and
+        // re-frames it. Runs only after the first tiles have rendered, because the up axis is
+        // measured from the geometry itself (see contentOrientation). The re-frame is skipped
+        // once the user has taken the camera, so a fast drag during loading is never overwritten.
+        uprightTileset: function (tileset, box) {
+            const camera = this.instance.view.camera;
+            const rotation = alignContentUpAxis(this.libs, tileset.object3d, camera.up);
+            if (!rotation) return box;
+
+            const uprightBox = box.clone().applyMatrix4(rotation);
+            if (!this._userInteracted && this.isFiniteBox(uprightBox)) this.frameBox(uprightBox);
+            this.instance.notifyChange(camera);
+            return uprightBox;
         },
 
         // Frames the camera on a georeferenced tileset, using the tileset's declared bounding
