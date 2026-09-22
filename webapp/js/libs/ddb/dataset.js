@@ -30,16 +30,22 @@ module.exports = class Dataset {
 
         let url = `${this.baseApi}/download`;
 
-        let q = {};
+        const q = new URLSearchParams();
 
-        if (paths !== undefined) {
-            if (paths.length > 1) q.path = paths.join(",");
-            else url += `/${paths[0]}`;
+        if (paths !== undefined && paths.length > 1) {
+            // One repeated ?path= per file: each query occurrence is treated as a
+            // literal path server-side, so filenames can contain ',' and '&'.
+            // (A single occurrence still keeps the legacy comma-joined semantics.)
+            paths.forEach(p => q.append("path", p));
+        } else if (paths !== undefined && paths.length === 1 && paths[0]) {
+            // Per-segment encoding: '&' and ',' are legal in a path segment, but '#'
+            // and '?' are not; '/' must survive as the separator.
+            url += `/${paths[0].split("/").map(encodeURIComponent).join("/")}`;
         }
 
-        if (options.inline) q.inline = "1";
-        q = new URLSearchParams(q).toString();
-        if (q) url += `?${q}`;
+        if (options.inline) q.set("inline", "1");
+        const qs = q.toString();
+        if (qs) url += `?${qs}`;
 
         return url;
     }
@@ -60,7 +66,7 @@ module.exports = class Dataset {
         let retina = "";
         if (options.retina) retina = "@2x";
 
-        let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.png?path=${path}`;
+        let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.png?path=${encodeURIComponent(path)}`;
         return url;
     }
 
