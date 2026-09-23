@@ -89,7 +89,7 @@
                         class="fa-solid fa-circle-notch fa-spin"></i></div>
                 <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail"
                     :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded"
-                    @error="onImagePopupLoaded" />
+                    @error="onImagePopupError" />
             </div>
             <div class="image-popup-footer" v-if="imagePopupCoords">
                 <span class="image-popup-coords" :title="imagePopupCoords">{{ imagePopupCoords }}</span>
@@ -188,6 +188,7 @@ import { getVectorColor } from '@/libs/map/mapUtils';
 import { sanitizeHtml } from '@/libs/sanitize';
 import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
 import { isPlantHealthCapable } from '@/libs/entryTypes';
+import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 import { getRenderPixel } from 'ol/render';
@@ -275,6 +276,9 @@ export default {
             imagePopupCoords: '',
             imagePopupCoordsCopied: false,
             imagePopupOverlay: null,
+            // Bounded retry state for the popup thumbnail (libs/build/thumbRetryPolicy)
+            imagePopupRetry: 0,
+            imagePopupRetryTimeout: null,
 
             // Video popup
             videoPopupVisible: false,
@@ -417,9 +421,14 @@ export default {
             const pathUtils = ddb.pathutils || ddb.utils;
             this.imagePopupFileName = pathUtils.basename ? pathUtils.basename(file.entry.path) : file.entry.path.split('/').pop();
 
-            // Reset loading state and thumbnail for new image
+            // Reset loading state, retry budget and thumbnail for new image
             this.imagePopupLoading = true;
             this.imagePopupThumbnail = null;
+            this.imagePopupRetry = 0;
+            if (this.imagePopupRetryTimeout) {
+                clearTimeout(this.imagePopupRetryTimeout);
+                this.imagePopupRetryTimeout = null;
+            }
 
             // Get thumbnail URL (set after nextTick so v-show hides the img while loading)
             this.$nextTick(() => {
@@ -468,9 +477,36 @@ export default {
             });
         },
 
-        // Called when popup image finishes loading (or errors)
+        // Called when popup image successfully loads
         onImagePopupLoaded: function () {
             this.imagePopupLoading = false;
+        },
+
+        // Popup thumbnail failed: bounded retry with the shared policy, then a
+        // filename-only fallback (v-show hides the image, download stays).
+        onImagePopupError: function () {
+            if (this.imagePopupThumbnail && this.imagePopupThumbnail.startsWith("/orgs") &&
+                shouldRetry(this.imagePopupRetry)) {
+                if (this.imagePopupRetryTimeout) {
+                    clearTimeout(this.imagePopupRetryTimeout);
+                }
+                const nextRetry = this.imagePopupRetry + 1;
+                this.imagePopupRetryTimeout = setTimeout(() => {
+                    // Cache-buster: fresh &retry=N busts the browser cache of the
+                    // failed response (server ignores the param).
+                    this.imagePopupThumbnail = `${stripRetryParam(this.imagePopupThumbnail)}&retry=${nextRetry}`;
+                    this.imagePopupRetry = nextRetry;
+                }, retryDelayMs(this.imagePopupRetry));
+                return;
+            }
+
+            // Terminal: drop the image, keep filename + download button visible.
+            if (this.imagePopupRetryTimeout) {
+                clearTimeout(this.imagePopupRetryTimeout);
+                this.imagePopupRetryTimeout = null;
+            }
+            this.imagePopupLoading = false;
+            this.imagePopupThumbnail = null;
         },
 
         // Close image popup
@@ -478,6 +514,10 @@ export default {
             this.imagePopupVisible = false;
             this.imagePopupLoading = true;
             this.imagePopupCoordsCopied = false;
+            if (this.imagePopupRetryTimeout) {
+                clearTimeout(this.imagePopupRetryTimeout);
+                this.imagePopupRetryTimeout = null;
+            }
             if (this.imagePopupOverlay) {
                 this.imagePopupOverlay.setPosition(undefined);
             }

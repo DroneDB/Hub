@@ -11,11 +11,18 @@ import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 
 // Mapping between viewer type and required output file
+// NOTE (SSOT): this map is only a client-side view of the server build outputs —
+// server-side ObjectsManager.GetBuildSource + the DroneDB build spec are the single
+// source of truth; entries here must be copied from that spec, never invented.
 const VIEW_OUTPUT_FILES = {
     'pointcloud': 'copc/cloud.copc.laz',
     'map-pointcloud': 'copc/cloud.copc.laz',
     'map-georaster': 'cog/cog.tif',
-    'map-vector': 'vec/vector.fgb',
+    // The map vector renderer draws MVT tiles; gate on the MVT metadata (a successful
+    // DroneDB vector build produces vec/source.gpkg AND mvt/metadata.json — requiring
+    // the exact rendered artifact keeps the gate closed when MVT is missing).
+    // The previous 'vec/vector.fgb' path was never emitted by DroneDB/Registry (dead gate).
+    'map-vector': 'mvt/metadata.json',
     // Models prefer the OGC 3D Tiles artifact (3dtiles/tileset.json) but accept the legacy
     // Nexus output (nxs/model.nxz) too, so datasets built before 3D Tiles support keep
     // working (any-of match). The model viewer picks the right renderer per availability.

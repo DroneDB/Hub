@@ -160,7 +160,11 @@ export default {
             sortColumn: 'name',
             sortDirection: 'asc',
             rangeStartIdx: null,
-            thumbnailCache: new Map() // path -> thumbnail URL, or null if unsupported/unavailable
+            thumbnailCache: new Map(), // path -> thumbnail URL, or null if unsupported/unavailable
+            // Paths whose thumbnail failed to load (e.g. build artifact missing).
+            // Component-scoped (cleared on mount / dataset switch) so failures
+            // stick for this list without cross-dataset poisoning (Fix 1 Q7).
+            failedThumbs: new Set()
         };
     },
     watch: {
@@ -177,7 +181,17 @@ export default {
                 else this.thumbnailCache.clear();
             },
             immediate: true
+        },
+        dataset: {
+            handler() {
+                // Dataset switch: reset the failed set so entries heal on the new dataset.
+                this.failedThumbs.clear();
+            }
         }
+    },
+    mounted: function () {
+        // Failed-thumbnail tracking is component-scoped: fresh set per mount.
+        this.failedThumbs.clear();
     },
     computed: {
         selectedFiles: function () {
@@ -442,8 +456,11 @@ export default {
             return cached || null;
         },
 
-        // Thumbnail failed to load (e.g. build not ready) - fall back to icon
+        // Thumbnail failed to load (e.g. build not ready) - fall back to icon and
+        // remember the path so the next prepareThumbnails() does not re-add the
+        // same failing URL (avoids an unbounded retry loop on scroll).
         onThumbError: function(file) {
+            this.failedThumbs.add(file.entry.path);
             this.thumbnailCache.delete(file.entry.path);
         },
 
@@ -454,6 +471,9 @@ export default {
 
             for (const file of this.files) {
                 if (!thumbs.supportedForType(file.entry.type)) continue;
+                // Skip paths whose thumbnail already failed in this component
+                // instance; they heal on remount / dataset switch.
+                if (this.failedThumbs.has(file.entry.path)) continue;
                 try {
                     this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48));
                 } catch (e) {

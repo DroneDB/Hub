@@ -4,7 +4,7 @@
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
-                @error="handleImageError" :src="thumbnail"
+                @load="handleImageLoad" @error="handleImageError" :src="thumbnail"
                 style="max-width: 100%; max-height: 100%;" />
 
             <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
@@ -35,6 +35,7 @@ import Keyboard from '@/libs/keyboard';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildHelpers';
+import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import ddb from 'ddb';
 
 export default {
@@ -77,7 +78,10 @@ export default {
                 width: (this.size / 16) + 'rem',
                 height: (this.size / 16) + 'rem'
             },
-            loading: false
+            loading: false,
+            // Bounded retry state (see libs/build/thumbRetryPolicy)
+            retryNumber: 0,
+            loadTimeout: null
         }
     },
     computed: {
@@ -148,24 +152,47 @@ export default {
             return this.$el.getBoundingClientRect();
         },
         handleImageError: function (e) {
-            // Retry
-            if (!this.retryNumber) this.retryNumber = 0;
-            if (this.retryNumber < 1000 && this.thumbnail.startsWith("/orgs")) {
+            // Bounded retry: MAX_RETRIES retries with backoff (thumbRetryPolicy),
+            // so a server-side failure costs <= 4 requests per tile instead of an
+            // unbounded 5s retry loop that amplifies outages.
+            if (this.thumbnail && this.thumbnail.startsWith("/orgs") && shouldRetry(this.retryNumber)) {
                 if (this.loadTimeout) {
                     clearTimeout(this.loadTimeout);
                     this.loadTimeout = null;
                 }
+                const nextRetry = this.retryNumber + 1;
                 this.loadTimeout = setTimeout(() => {
-                    if (this.retryNumber > 0 && this.thumbnail.endsWith(`&retry=${this.retryNumber}`)) {
-                        this.thumbnail = this.thumbnail.replace(new RegExp("&retry=" + this.retryNumber) + "$", `&retry=${this.retryNumber + 1}`);
-                    } else {
-                        this.thumbnail += "&retry=1";
-                    }
-                    this.retryNumber += 1;
-                }, 5000);
+                    // Cache-buster: stripRetryParam + fresh &retry=N busts the
+                    // browser cache of the failed response (server ignores it).
+                    this.thumbnail = `${stripRetryParam(this.thumbnail)}&retry=${nextRetry}`;
+                    this.retryNumber = nextRetry;
+                }, retryDelayMs(this.retryNumber));
+                return;
+            }
+
+            // Retries exhausted (or non-API URL): terminal fallback.
+            if (this.loadTimeout) {
+                clearTimeout(this.loadTimeout);
+                this.loadTimeout = null;
+            }
+            if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
+                // Buildable entry: show the file icon and let the
+                // queued/pending/failed badge explain the state (same rule as
+                // the loadThumbnail catch branch).
+                this.thumbnail = null;
+                this.icon = this.file.icon;
+                this.loading = false;
+                this.buildLoading = false;
             } else {
                 this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
             }
+        },
+        handleImageLoad: function () {
+            // Confirmed load: recharge the retry budget ONLY. Deliberately does
+            // NOT rewrite the bound URL — reassigning thumbnail would re-render
+            // the <img>, refetch the stripped URL and re-arm the budget against
+            // a possibly-still-broken server.
+            this.retryNumber = 0;
         },
         showError: function (e) {
             console.warn(e);
@@ -174,6 +201,16 @@ export default {
             this.loading = false;
         },
         loadThumbnail: async function (force = false) {
+            if (force) {
+                // Forced reload (e.g. build Succeeded): a file that exhausted its
+                // retry budget while unbuilt gets a fresh budget now.
+                this.retryNumber = 0;
+                if (this.loadTimeout) {
+                    clearTimeout(this.loadTimeout);
+                    this.loadTimeout = null;
+                }
+            }
+
             // Use single loading flag to prevent multiple calls
             if (this.loading) {
                 return; // Already loading
