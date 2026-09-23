@@ -65,7 +65,8 @@ export default {
             return new TileLayer({
                 source: new XYZ({
                     url: basemap.url,
-                    attributions: basemap.attributions
+                    attributions: basemap.attributions,
+                    ...(basemap.maxZoom != null ? { maxZoom: basemap.maxZoom } : {})
                 })
             });
         },
