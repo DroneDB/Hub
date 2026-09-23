@@ -161,6 +161,7 @@ import { markRaw } from 'vue';
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import HybridXYZ from '@/libs/map/olHybridXYZ';
+import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles, SOURCE_MIN_ZOOM } from '@/libs/map/rasterZoom';
 import olMeasure from './olMeasure';
 import olSelection from './olSelection';
 import olSettings from './olSettings';
@@ -320,6 +321,17 @@ export default {
         if (this._vectorSourceListenerKeys) {
             this._vectorSourceListenerKeys.forEach(key => unByKey(key));
             this._vectorSourceListenerKeys = [];
+        }
+
+        // Clean up View maxZoom cap collection listeners
+        if (this._viewCapListenerKeys) {
+            this._viewCapListenerKeys.forEach(key => unByKey(key));
+            this._viewCapListenerKeys = [];
+        }
+        if (this._viewCapDeferredKey) {
+            unByKey(this._viewCapDeferredKey);
+            this._viewCapDeferredKey = null;
+            this._viewCapDeferred = false;
         }
 
         // Clean up the tooltip overlay
@@ -972,6 +984,25 @@ export default {
             });
             // Add pointer move handler for tooltips
             this._olListenerKeys = [];
+
+            // Keep the View maxZoom capped to the deepest native raster zoom
+            // currently loaded (plus a small magnification allowance). The View
+            // exists here (created with `new Map(...)` above), so bind the
+            // collection listeners now; they are cleaned up in beforeUnmount
+            // via _viewCapListenerKeys.
+            this._lastAppliedViewCap = null;
+            this._viewCapPending = false;
+            this._viewCapDeferred = false;
+            this._viewCapDeferredKey = null;
+            this._viewCapListenerKeys = [];
+            const scheduleViewCap = () => this._scheduleViewCapUpdate();
+            [this.rasterLayer.getLayers(), this.footprintRastersLayer.getLayers()].forEach(collection => {
+                this._viewCapListenerKeys.push(
+                    collection.on('add', scheduleViewCap),
+                    collection.on('remove', scheduleViewCap)
+                );
+            });
+
             this._olListenerKeys.push(this.map.on('pointermove', (e) => {
                 if (e.dragging || this.measuring) {
                     this.hideFeatureTooltip();
@@ -1326,6 +1357,8 @@ export default {
                         footprintGeom.transform('EPSG:4326', 'EPSG:3857');
 
                         // Add geoprojected raster footprint
+                        const footprintRetina = useRetinaTiles();
+                        const footprintNative = computeNativeZoom(file.entry);
                         const rasterFootprint = new TileLayer({
                             extent: footprintGeom.getExtent(),
                             source: new HybridXYZ({
@@ -1333,11 +1366,13 @@ export default {
                                 tileSize: 256,
                                 transition: 200,
                                 minZoom: 14,
-                                maxZoom: 22
-                                // TODO: get min/max zoom somehow?
+                                retina: footprintRetina,
+                                maxZoom: sourceMaxZoom(footprintNative, footprintRetina)
                             })
                         });
+                        rasterFootprint.set('rasterNativeZoom', footprintNative);
                         this.footprintRastersLayer.getLayers().push(rasterFootprint);
+                        this._scheduleViewCapUpdate();
                     }, {
                         layerFilter: layer => {
                             return layer.getVisible() &&
@@ -1550,6 +1585,8 @@ export default {
                     }
                 } else if (f.entry.polygon_geom && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.GEOIMAGE || f.entry.type === ddb.entry.type.POINTCLOUD)) {
                     const extent = transformExtent(bbox(f.entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                    const rasterRetina = useRetinaTiles();
+                    const native = computeNativeZoom(f.entry);
                     const tileLayer = new TileLayer({
                         extent,
                         source: new HybridXYZ({
@@ -1557,10 +1594,11 @@ export default {
                             tileSize: 256,
                             transition: 200,
                             minZoom: 14,
-                            maxZoom: 22
-                            // TODO: get min/max zoom from file
+                            retina: rasterRetina,
+                            maxZoom: sourceMaxZoom(native, rasterRetina)
                         })
                     });
+                    tileLayer.set('rasterNativeZoom', native);
                     tileLayer.file = f;
                     rasters.push(tileLayer);
 
@@ -1738,6 +1776,58 @@ export default {
 
             // Restore plant health state from URL hash (once)
             this.restoreFromHash();
+
+            // Refresh the View maxZoom cap now that the raster set is final for
+            // this pass (collection 'add' events may already have coalesced).
+            this._scheduleViewCapUpdate();
+        },
+
+        /**
+         * Coalesce View maxZoom recomputation into a single microtask, so a
+         * clear+reload burst (which pops then re-pushes every raster layer)
+         * only triggers one setMaxZoom applied against the final layer set.
+         */
+        _scheduleViewCapUpdate: function () {
+            if (this._viewCapPending) return;
+            this._viewCapPending = true;
+            queueMicrotask(() => {
+                this._viewCapPending = false;
+                this._applyViewCapNow();
+            });
+        },
+
+        /**
+         * Recompute the View maxZoom from the native zooms stamped on the
+         * current raster and footprint layers, deferring while the View is
+         * animating or being interacted with so zoom changes never fight the user.
+         */
+        _applyViewCapNow: function () {
+            if (!this.map) return;
+            const natives = [];
+            if (this.rasterLayer) {
+                this.rasterLayer.getLayers().getArray().forEach(layer => natives.push(layer.get('rasterNativeZoom')));
+            }
+            if (this.footprintRastersLayer) {
+                this.footprintRastersLayer.getLayers().getArray().forEach(layer => natives.push(layer.get('rasterNativeZoom')));
+            }
+            const hasRaster = natives.some(n => Number.isFinite(n));
+            let cap = viewMaxZoom(natives);
+            if (hasRaster && cap < SOURCE_MIN_ZOOM) cap = SOURCE_MIN_ZOOM;
+            if (cap === this._lastAppliedViewCap) return;
+            const view = this.map.getView();
+            if (view.getAnimating() || view.getInteracting()) {
+                if (!this._viewCapDeferred) {
+                    this._viewCapDeferred = true;
+                    this._viewCapDeferredKey = view.once('moveend', () => {
+                        this._viewCapDeferred = false;
+                        this._viewCapDeferredKey = null;
+                        this._applyViewCapNow();
+                    });
+                }
+                return;
+            }
+            view.setMaxZoom(cap);
+            this._lastAppliedViewCap = cap;
         },
 
         restoreFromHash() {

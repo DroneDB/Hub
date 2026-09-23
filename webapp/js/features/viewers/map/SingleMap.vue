@@ -121,6 +121,7 @@ import { bbox as bboxStrategy } from 'ol/loadingstrategy';
 
 import ddb from 'ddb';
 import HybridXYZ from '@/libs/map/olHybridXYZ';
+import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles } from '@/libs/map/rasterZoom';
 import olMeasure from './olMeasure';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import { transformExtent, toLonLat } from 'ol/proj';
@@ -273,6 +274,9 @@ export default {
 
             if (entry.polygon_geom && (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.GEOIMAGE || entry.type === ddb.entry.type.POINTCLOUD)) {
                 const extent = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                const rasterRetina = useRetinaTiles();
+                // Native GSD zoom of the source: drives both the tile source cap and the view cap.
+                const native = computeNativeZoom(entry);
                 const tileLayer = new TileLayer({
                     extent,
                     source: new HybridXYZ({
@@ -280,11 +284,14 @@ export default {
                         tileSize: 256,
                         transition: 200,
                         minZoom: 14,
-                        maxZoom: 22
+                        retina: rasterRetina,
+                        maxZoom: sourceMaxZoom(native, rasterRetina)
                     })
                 });
                 tileLayer.entryPath = entry.path;
                 tileLayer.ddbUrl = this.ddbURI;
+                // Stamped so the view cap can be derived once the View exists (see below).
+                tileLayer.set('rasterNativeZoom', native);
                 rasters.push(tileLayer);
                 this.hasRasters = true;
                 extendExtent(ext, extent);
@@ -326,6 +333,15 @@ export default {
                     zoom: 2
                 })
             });
+
+            // View cap: the layer group is filled before the View exists, so the raster
+            // zoom allowance is applied here (single static raster per load; loadMap recreates
+            // the View on reload, so no add/remove listeners are needed).
+            if (this.map && this.rasterLayer) {
+                const native = this.rasterLayer.getLayers().item(0)?.get('rasterNativeZoom');
+                this.map.getView().setMaxZoom(viewMaxZoom([native]));
+            }
+
             this.map.addControl(this.measureControls);
 
             // Group controls into left/right toolbar zones so they stack

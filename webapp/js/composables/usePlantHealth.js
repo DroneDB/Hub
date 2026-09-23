@@ -9,6 +9,7 @@
  * - Component must call `this.refreshRasterLayers()` when vizParams change
  */
 import HybridXYZ from '@/libs/map/olHybridXYZ';
+import { sourceMaxZoom, FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
 
 export default {
     data() {
@@ -104,12 +105,35 @@ export default {
                 const url = this._getLayerUrl(layer);
                 if (!url) return;
 
+                // Carry over the retina flag from the source we are replacing,
+                // and recompute its maxZoom from the native GSD zoom stamped on
+                // the layer by Map.vue ('rasterNativeZoom'). OL's XYZ source never
+                // exposes '.maxZoom', so reading it back would always yield 22.
+                const prevRetina = typeof source.getTilePixelRatio === 'function'
+                    ? source.getTilePixelRatio(0) > 1
+                    : false;
+
+                const native = layer.get('rasterNativeZoom');
+                const gridMax = typeof source.getTileGrid === 'function'
+                    ? source.getTileGrid()?.getMaxZoom?.()
+                    : undefined;
+                // Prefer the stamped native zoom; otherwise reconstruct it from the
+                // current tile grid (which already stores sourceMaxZoom), adding the
+                // retina level back to recover native before calling sourceMaxZoom
+                // again — this keeps the result idempotent when the stamp is missing.
+                const nativeForSource = typeof native === 'number' && isFinite(native)
+                    ? native
+                    : (typeof gridMax === 'number' && isFinite(gridMax)
+                        ? gridMax + (prevRetina ? 1 : 0)
+                        : FALLBACK_NATIVE_ZOOM);
+
                 const newSource = new HybridXYZ({
                     url,
                     tileSize: 256,
                     transition: 200,
                     minZoom: 14,
-                    maxZoom: 22,
+                    retina: prevRetina,
+                    maxZoom: sourceMaxZoom(nativeForSource, prevRetina),
                     vizParams: Object.keys(vizParams).length > 0 ? vizParams : undefined
                 });
                 layer.setSource(newSource);
