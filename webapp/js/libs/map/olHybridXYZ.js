@@ -6,7 +6,7 @@ import ddb from 'ddb';
 // from internet and file:// URLs via
 // DDB tiling
 
-function genTileFSLoadFunction(filePath, minZoom) {
+function genTileFSLoadFunction(filePath, minZoom, retina) {
     return (tile, src) => {
         tile.setState(TileState.LOADING);
         const { tileCoord } = tile;
@@ -16,7 +16,7 @@ function genTileFSLoadFunction(filePath, minZoom) {
             // Do not load this one
             tile.setState(TileState.EMPTY);
         } else {
-            ddb.tile.getFromUserCache(filePath.replace(/^file:\/\//, ""), tz, tx, ty, { size: 256, tms: true }).then((tilePath) => {
+            ddb.tile.getFromUserCache(filePath.replace(/^file:\/\//, ""), tz, tx, ty, { size: retina ? 512 : 256, tms: true }).then((tilePath) => {
                 tile.getImage().src = "file://" + tilePath;
                 tile.setState(TileState.LOADED);
             }).catch(e => {
@@ -27,7 +27,7 @@ function genTileFSLoadFunction(filePath, minZoom) {
     };
 }
 
-function genTileDDBLoadFunction(ddbUri, minZoom, vizParams) {
+function genTileDDBLoadFunction(ddbUri, minZoom, vizParams, retina) {
     const [dataset, path] = ddb.utils.datasetPathFromUri(ddbUri);
 
     return (tile, src) => {
@@ -47,9 +47,9 @@ function genTileDDBLoadFunction(ddbUri, minZoom, vizParams) {
                 tile.setState(TileState.ERROR);
             };
             if (vizParams && Object.keys(vizParams).length > 0) {
-                tile.getImage().src = dataset.tileExUrl(path, tz, tx, ty, vizParams);
+                tile.getImage().src = dataset.tileExUrl(path, tz, tx, ty, vizParams, { retina });
             } else {
-                tile.getImage().src = dataset.tileUrl(path, tz, tx, ty);
+                tile.getImage().src = dataset.tileUrl(path, tz, tx, ty, { retina });
             }
         }
     };
@@ -68,6 +68,12 @@ class HybridXYZ extends XYZ {
         const url = opt_options.url;
         const vizParams = opt_options.vizParams || null;
 
+        // Retina requests 512 px tiles into 256 px slots (tilePixelRatio 2),
+        // which doubles the effective on-screen resolution of rasters.
+        const retina = opt_options.retina ?? ((window.devicePixelRatio || 1) > 1);
+        delete opt_options.retina;
+        if (retina) opt_options.tilePixelRatio = 2;
+
         // Override opt_options.url to a dummy URL
         // so that we can send parallel tile requests
         opt_options.url = "https://{z}/{x}/{y}";
@@ -75,9 +81,9 @@ class HybridXYZ extends XYZ {
         super(opt_options);
 
         if (isFS) {
-            this.tileLoadFunction = genTileFSLoadFunction(url, minZoom).bind(this);
+            this.tileLoadFunction = genTileFSLoadFunction(url, minZoom, retina).bind(this);
         } else if (isDDB) {
-            this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom, vizParams).bind(this);
+            this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom, vizParams, retina).bind(this);
         }
     }
 };
