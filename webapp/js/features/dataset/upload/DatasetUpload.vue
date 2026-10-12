@@ -127,6 +127,7 @@ import ddb from 'ddb';
 import { bytesToSize } from '@/libs/utils';
 import Dropzone from '@/vendor/dropzone';
 import { useResilientUpload } from '@/composables/useResilientUpload';
+import { orderCompanionsFirst } from '@/libs/uploadOrder';
 
 const { Registry } = ddb;
 const reg = new Registry(window.location.origin);
@@ -463,8 +464,9 @@ export default {
                 }
                 return file;
             });
+            // Queue companions (.mtl, textures, ...) before 3D models (best effort)
             // handleFiles assigns upload.uuid and triggers addedfile event
-            this.dz.handleFiles(fileArray);
+            this.dz.handleFiles(orderCompanionsFirst(fileArray));
             this.dz.processQueue();
         } else {
             // No files passed, show file selection screen
@@ -671,7 +673,8 @@ export default {
             this.$emit('update:closable', false);
 
             // Add files to dropzone - handleFiles must be called first to assign upload.uuid
-            this.dz.handleFiles(fileArray);
+            // Companions (.mtl, textures, ...) are queued before 3D models (best effort)
+            this.dz.handleFiles(orderCompanionsFirst(fileArray));
             // The addedfiles event will be triggered automatically by handleFiles
             this.dz.processQueue();
 
