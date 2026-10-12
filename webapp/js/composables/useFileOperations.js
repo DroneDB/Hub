@@ -404,7 +404,7 @@ export default {
             }
 
             // Detect conflicts: same-name entry already in target folder.
-            const existingNames = new Set(this.fileBrowserFiles.map(f => pathutils.basename(f.entry.path)));
+            const existingNames = await this._pasteTargetNames(target.basePath);
             const conflicts = items.filter(it => existingNames.has(pathutils.basename(it.path)));
 
             let conflictMode = 'overwrite';
@@ -533,6 +533,22 @@ export default {
                     skipped: result.skipped
                 };
                 this.pasteResultDialogOpen = true;
+            }
+        },
+
+        // Internal: names of the entries in the paste destination folder. Lists
+        // the folder on the server: fileBrowserFiles can hold only part of it
+        // (e.g. a single file selected in the tree), which would hide conflicts
+        // and let the paste overwrite files without asking.
+        async _pasteTargetNames(basePath) {
+            try {
+                const entries = await this.dataset.list(basePath || undefined) || [];
+                return new Set(entries.map(e => pathutils.basename(e.path)));
+            } catch (e) {
+                console.warn(`Could not list paste destination "${basePath}", using the loaded view:`, e);
+                return new Set(this.fileBrowserFiles
+                    .filter(f => (pathutils.getParentFolder(f.entry.path) || '') === (basePath || ''))
+                    .map(f => pathutils.basename(f.entry.path)));
             }
         },
 
