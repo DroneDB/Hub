@@ -24,7 +24,7 @@
             <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
                 ref="mainTabSwitcher" @tabChange="handleMainTabChange">
                 <template v-if="isMobile" v-slot:filebrowser>
-                    <FileBrowser :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
+                    <FileBrowser ref="mobileFileBrowser" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
                         @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
                         @openProperties="handleFileBrowserOpenProperties"
                         @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
@@ -608,6 +608,14 @@ export default {
                 this.pasteConflictDialogOpen || this.pasteResultDialogOpen;
             if (anyDialogOpen) return;
 
+            // Shortcuts typed in the tree act on the tree selection, which
+            // selectedFiles (the explorer selection) does not reflect.
+            const treeBrowser = this.fileBrowserForTreeTarget(e.target);
+            if (treeBrowser) {
+                treeBrowser.handleTreeKeyDown(e);
+                return;
+            }
+
             // Clipboard shortcuts: Ctrl/Cmd + C / X / V
             if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
                 const k = e.key.toLowerCase();
@@ -635,6 +643,13 @@ export default {
                 this.selectedUsingFileBrowserList = false;
                 this.deleteDialogOpen = true;
             }
+        },
+
+        // The FileBrowser whose tree contains `target`, or null.
+        fileBrowserForTreeTarget(target) {
+            if (!target || typeof target.closest !== 'function' || !target.closest('.tree-view')) return null;
+            const browsers = [this.$refs.fileBrowser, this.$refs.mobileFileBrowser];
+            return browsers.find(fb => fb && fb.$el && fb.$el.contains(target)) || null;
         },
 
         handlePasteConflictResolve(mode) {

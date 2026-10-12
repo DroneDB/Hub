@@ -18,7 +18,9 @@ import TreeNode from './TreeNode.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import { dragDropMixin } from '@/libs/dragDropUtils';
+import emitter from '@/libs/eventBus';
 import ddb from 'ddb';
+import { isPathRemoved } from './treeSelection';
 const { pathutils } = ddb;
 
 export default {
@@ -58,6 +60,19 @@ export default {
     mounted: function () {
         this.selectedNodes = [];
         this.rangeStartNode = null;
+
+        // Drop deleted/moved nodes (and their descendants) from the selection,
+        // so later actions don't target entries that no longer exist.
+        this._onDeleteEntries = (deleted) => {
+            const removed = n => isPathRemoved(n.node.entry.path, deleted);
+            this.selectedNodes = this.selectedNodes.filter(n => !removed(n));
+            if (this.rangeStartNode && removed(this.rangeStartNode)) this.rangeStartNode = null;
+            if (this.focusedNode && removed(this.focusedNode)) this.focusedNode = null;
+        };
+        emitter.on('deleteEntries', this._onDeleteEntries);
+    },
+    beforeUnmount: function () {
+        emitter.off('deleteEntries', this._onDeleteEntries);
     },
     methods: {
         handleOpen: function (component, sender) {

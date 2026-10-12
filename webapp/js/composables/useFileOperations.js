@@ -10,6 +10,7 @@ import emitter from '@/libs/eventBus';
 import clipboard from '@/composables/useClipboard';
 import { resolvePasteStrategy } from '@/composables/usePasteStrategy';
 import reg from '@/libs/api/sharedRegistry';
+import { selectionBasePath } from '@/features/dataset/explorer/treeSelection';
 const { pathutils } = ddb;
 
 export default {
@@ -314,9 +315,19 @@ export default {
             return [];
         },
 
-        clipboardCopySelected() {
-            const items = this._selectedItemsForClipboard()
+        // `selection` is an explicit list of items (from the tree). When omitted,
+        // the explorer selection is used. Tree items can come from any folder, so
+        // their source folder is their own parent, not the current folder.
+        _clipboardSelection(selection) {
+            const explicit = Array.isArray(selection);
+            const items = (explicit ? selection : this._selectedItemsForClipboard())
                 .filter(f => f.entry && f.entry.type !== ddb.entry.type.DRONEDB);
+            const basePath = explicit ? selectionBasePath(items) : (this.currentPath || '');
+            return { items, basePath };
+        },
+
+        clipboardCopySelected(selection) {
+            const { items, basePath } = this._clipboardSelection(selection);
             if (items.length === 0) {
                 this.$toast.add({ severity: 'info', summary: 'Copy', detail: 'No items selected', life: 2000 });
                 return;
@@ -324,18 +335,17 @@ export default {
             clipboard.copy({
                 orgSlug: this.dataset.org,
                 dsSlug: this.dataset.ds,
-                basePath: this.currentPath || ''
+                basePath
             }, items);
             this.$toast.add({ severity: 'success', summary: 'Copied', detail: `${items.length} item${items.length > 1 ? 's' : ''} copied to clipboard`, life: 2000 });
         },
 
-        clipboardCutSelected() {
+        clipboardCutSelected(selection) {
             if (!this.canWrite) {
                 this.$toast.add({ severity: 'warn', summary: 'Cut', detail: 'You do not have write access to this dataset', life: 3000 });
                 return;
             }
-            const items = this._selectedItemsForClipboard()
-                .filter(f => f.entry && f.entry.type !== ddb.entry.type.DRONEDB);
+            const { items, basePath } = this._clipboardSelection(selection);
             if (items.length === 0) {
                 this.$toast.add({ severity: 'info', summary: 'Cut', detail: 'No items selected', life: 2000 });
                 return;
@@ -343,7 +353,7 @@ export default {
             clipboard.cut({
                 orgSlug: this.dataset.org,
                 dsSlug: this.dataset.ds,
-                basePath: this.currentPath || ''
+                basePath
             }, items);
             this.$toast.add({ severity: 'success', summary: 'Cut', detail: `${items.length} item${items.length > 1 ? 's' : ''} ready to move`, life: 2000 });
         },

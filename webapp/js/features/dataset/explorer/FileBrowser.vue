@@ -42,6 +42,8 @@ import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
 import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator } from '@/libs/contextMenuItems';
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
+import emitter from '@/libs/eventBus';
+import { isPathRemoved, liveSelectionEntries } from './treeSelection';
 
 const { pathutils } = ddb;
 
@@ -66,24 +68,14 @@ export default {
         }
     },
     data: function () {
-        // Adapter: wrap lastSelectedNode as single-element array for the shared context menu factory
+        // Adapter: expose the tree selection to the shared context menu factory
         const self = this;
         const ctx = {
-            getSelectedEntries: () => {
-                if (self.lastSelectedNode === null) return [];
-                return [self.lastSelectedNode.node];
-            },
+            getSelectedEntries: () => self.getTreeSelectionEntries(),
             get canWrite() { return self.canWrite; },
             get dataset() { return self.dataset; },
             get showBuildConfirm() { return self.showBuildConfirm; },
-            emit: (event, ...args) => {
-                // For FileBrowser, some actions need to emit selectionChanged first
-                const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
-                if (needsSelectionSync.includes(event) && self.lastSelectedNode !== null) {
-                    self.$emit('selectionChanged', [self.lastSelectedNode.node]);
-                }
-                self.$emit(event, ...args);
-            },
+            emit: (event, ...args) => self.emitTreeAction(event, ...args),
             component: self
         };
 
@@ -155,11 +147,71 @@ export default {
         }
     },
     mounted: async function () {
+        // Forget a deleted/moved node so the context menu doesn't offer actions for it.
+        this._onDeleteEntries = (deleted) => {
+            if (this.lastSelectedNode && isPathRemoved(this.lastSelectedNode.node.entry.path, deleted)) {
+                this.lastSelectedNode = null;
+            }
+        };
+        emitter.on('deleteEntries', this._onDeleteEntries);
+
         await this.refreshNodes();
     },
     beforeUnmount: function () {
+        emitter.off('deleteEntries', this._onDeleteEntries);
     },
     methods: {
+
+        // Node data of the nodes currently selected in the tree.
+        getTreeSelectionEntries: function () {
+            const tree = this.$refs.treeView;
+            return liveSelectionEntries(tree ? tree.selectedNodes : null);
+        },
+
+        // Emits an action (context menu or keyboard) for the current tree selection.
+        emitTreeAction: function (event, ...args) {
+            const entries = this.getTreeSelectionEntries();
+
+            // Copy/cut carry the tree selection explicitly: the clipboard handlers
+            // otherwise read the explorer selection, which the tree never sets.
+            if (event === 'copySelectedItems' || event === 'cutSelectedItems') {
+                this.$emit(event, entries);
+                return;
+            }
+
+            // For FileBrowser, some actions need to emit selectionChanged first
+            const needsSelectionSync = ['openProperties', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems'];
+            if (needsSelectionSync.includes(event) && entries.length > 0) {
+                this.$emit('selectionChanged', entries);
+            }
+            this.$emit(event, ...args);
+        },
+
+        // Ctrl/Cmd + C / X and Delete typed in the tree (routed by ViewDataset).
+        // Ctrl+V is handled by the document paste listener and pastes into the
+        // current folder.
+        handleTreeKeyDown: function (e) {
+            const entries = this.getTreeSelectionEntries();
+            if (entries.length === 0) return;
+
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                const k = (e.key || '').toLowerCase();
+                if (k === 'c') {
+                    e.preventDefault();
+                    this.emitTreeAction('copySelectedItems');
+                } else if (k === 'x' && this.canWrite) {
+                    e.preventDefault();
+                    this.emitTreeAction('cutSelectedItems');
+                }
+                return;
+            }
+
+            if (e.key === 'Delete' && this.canWrite
+                && !entries.some(f => f.entry.type === ddb.entry.type.DRONEDB)) {
+                e.preventDefault();
+                this.emitTreeAction('deleteSelecteditems');
+            }
+        },
 
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
