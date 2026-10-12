@@ -5,6 +5,8 @@ import path from 'path';
 export default defineConfig({
     plugins: [vue()],
     resolve: {
+        // Match webpack: components are imported without the .vue extension.
+        extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.vue'],
         alias: {
             '@': path.resolve(__dirname, 'webapp/js'),
             'ddb': path.resolve(__dirname, 'webapp/js/libs/ddb')
