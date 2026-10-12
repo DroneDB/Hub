@@ -369,9 +369,10 @@ export default {
 
                 if (n.isExpandable || n.expanded) {
 
+                    // Load the children without expanding: only the caret
+                    // (or the arrow keys) expands a node in the tree.
                     if (!n.loadedChildren) {
-                        // Let's expand it
-                        await n.expand();
+                        await n.loadChildren();
                     }
 
                     n.children.forEach(c => c.selected = false);
