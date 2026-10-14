@@ -105,6 +105,15 @@ import { alignContentUpAxis } from './contentOrientation';
 
 const SETTINGS_KEY = 'unified-viewer-settings';
 
+// Screen-space error target (pixels) for the DroneDB-built 3D Tiles of models. Obj2Tiles >= 1.8.0
+// (DroneDB >= 1.12.2) writes per-tile geometricError from the mesh edge length instead of the
+// bounding-box diagonal, so the value now drives LOD selection. Measured on two ODM models
+// (224K and 524K faces): at 6, close-up views are pixel-identical to the finest LOD while the
+// overview downloads ~60% less; at 4 the 168-material model never settles (cache thrash), at 8
+// close-ups lose detail. Tilesets built by older Obj2Tiles carry inflated errors and still load
+// their finest LOD at this value, exactly as before.
+const MODEL_TILES_ERROR_TARGET = 6;
+
 const DEFAULTS = {
     ambientIntensity: 3,
     directionalIntensity: 1.8,
@@ -599,7 +608,7 @@ export default {
             // frame with the shared OrbitControls, consistent with every other type.
             this.setupInstance(this.libs.CoordinateSystem.epsg3857);
 
-            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: 8, ktx2DecoderPath: '/wasm/basis/' });
+            const tileset = new this.libs.Tiles3D({ url: tilesetUrl, errorTarget: MODEL_TILES_ERROR_TARGET, ktx2DecoderPath: '/wasm/basis/' });
 
             // Progressive LOD refinement for the DroneDB / Obj2Tiles tilesets. Obj2Tiles emits an
             // octree of REPLACE tiles: a coarse root.b3dm over successively finer LOD levels down to
