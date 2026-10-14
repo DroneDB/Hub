@@ -17,7 +17,7 @@ const POLL_IDLE   = 15000;
 const TAKE        = 200;
 
 // Non-terminal states (mirrors TaskStateCatalog.Active)
-const ACTIVE_STATES = ['Awaiting', 'Created', 'Enqueued', 'Processing', 'Scheduled', 'Reused'];
+const ACTIVE_STATES = ['Awaiting', 'Created', 'Indexing', 'Enqueued', 'Processing', 'Scheduled', 'Reused'];
 
 //----- per-dataset store helper -----
 
