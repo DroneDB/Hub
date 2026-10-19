@@ -105,6 +105,34 @@ export function formatCoordinates(pointGeom) {
  * @param {Object} file - The file object with entry property
  * @returns {Object|null}
  */
+/**
+ * Readable origin of a CAD drawing's coordinate system (DDB-12), from the
+ * properties.vector.crs that DroneDB records at index time. Returns null for
+ * entries without that information (non-CAD vectors, other types).
+ */
+export function formatCadCrs(entry) {
+    const vector = entry && entry.properties && entry.properties.vector;
+    const crs = vector && vector.crs;
+    if (!crs || !crs.source) return null;
+    const units = vector.units ? `, units: ${vector.units}` : '';
+    switch (crs.source) {
+        case 'prj':
+            return crs.label === 'local'
+                ? `None: local drawing coordinates, set by the .prj file${units}`
+                : `${crs.label} (from the .prj file)`;
+        case 'geodata':
+            return `${crs.label} (stored in the drawing)`;
+        case 'layer':
+            return crs.label || 'From the file';
+        case 'lonlat':
+            return 'WGS84 (EPSG:4326), assumed: the file has no coordinate system. Upload a .prj with the same name to change it';
+        case 'none':
+            return `None: local drawing coordinates${units}. Upload a .prj with the same name to place it on the map`;
+        default:
+            return null;
+    }
+}
+
 export function buildAllProperties(file) {
     if (!file) return null;
     const entry = file.entry;
@@ -121,6 +149,10 @@ export function buildAllProperties(file) {
     const coordStr = formatCoordinates(entry.point_geom);
     if (coordStr) {
         props['coordinates'] = coordStr;
+    }
+    const cadCrs = formatCadCrs(entry);
+    if (cadCrs) {
+        props['coordinate system'] = cadCrs;
     }
     if (entry.properties && entry.properties.meta) {
         props['metadata'] = entry.properties.meta;
