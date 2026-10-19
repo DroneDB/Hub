@@ -285,7 +285,7 @@ import ddb from 'ddb';
 import { coordAll } from '@turf/meta';
 const { pathutils, utils } = ddb;
 
-import { OpenItemDefaults } from '@/libs/openItemDefaults';
+import { defaultViewFor } from '@/libs/openItemDefaults';
 import { isArchiveFile } from '@/libs/entryTypes';
 import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 
@@ -832,7 +832,7 @@ export default {
             }
 
             const t = node.entry.type;
-            if (!view) view = OpenItemDefaults[t];
+            if (!view) view = defaultViewFor(node.entry);
 
             // .3tz files (OGC 3D Tiles archives) indexed by older ddb may appear as Generic.
             // Fall back to the Unified Viewer by extension so double-click works correctly.
@@ -1055,7 +1055,7 @@ export default {
 
             // Automatically open the viewer
             setTimeout(() => {
-                const view = OpenItemDefaults[entry.type];
+                const view = defaultViewFor(entry);
                 if (view) {
                     const [_, path] = ddb.utils.datasetPathFromUri(entry.path);
                     const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;

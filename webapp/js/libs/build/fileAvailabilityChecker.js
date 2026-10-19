@@ -9,6 +9,7 @@ import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
+import { isLocalVector } from '@/libs/openItemDefaults';
 
 // Mapping between viewer type and required output file
 // NOTE (SSOT): this map is only a client-side view of the server build outputs —
@@ -23,6 +24,9 @@ const VIEW_OUTPUT_FILES = {
     // the exact rendered artifact keeps the gate closed when MVT is missing).
     // The previous 'vec/vector.fgb' path was never emitted by DroneDB/Registry (dead gate).
     'map-vector': 'mvt/metadata.json',
+    // A vector without geolocation (CAD drawing, no CRS) has no MVT pyramid: DroneDB writes
+    // vec/source.gpkg in drawing coordinates plus vec/local.json, read by the local viewer.
+    'unified-vector-local': 'vec/local.json',
     // Models prefer the OGC 3D Tiles artifact (3dtiles/tileset.json) but accept the legacy
     // Nexus output (nxs/model.nxz) too, so datasets built before 3D Tiles support keep
     // working (any-of match). The model viewer picks the right renderer per availability.
@@ -82,7 +86,7 @@ class FileAvailabilityChecker {
         // enough - e.g. a model can have a legacy Nexus build but no 3D Tiles output - so verify
         // the exact artifact directly.
         if (viewType === 'unified') {
-            const outputFile = this.getOutputFile(entry.type, viewType);
+            const outputFile = this.getOutputFile(entry.type, viewType, entry);
             if (outputFile) {
                 const entryObj = dataset.Entry(entry);
                 const available = await this.checkOutputFileAvailability(entryObj, outputFile);
@@ -188,7 +192,7 @@ class FileAvailabilityChecker {
                 return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
 
             // 3. No build found - check if output file exists anyway
-            const outputFile = this.getOutputFile(entry.type, viewType);
+            const outputFile = this.getOutputFile(entry.type, viewType, entry);
             if (outputFile) {
                 const entryObj = dataset.Entry(entry);
                 const isAvailable = await this.checkOutputFileAvailability(entryObj, outputFile);
@@ -307,7 +311,7 @@ class FileAvailabilityChecker {
     /**
      * Gets the required output file based on type
      */
-    getOutputFile(entryType, viewType) {
+    getOutputFile(entryType, viewType, entry = null) {
         // Determine the key for VIEW_OUTPUT_FILES
         let key = viewType;
 
@@ -326,7 +330,7 @@ class FileAvailabilityChecker {
             } else if (entryType === ddb.entry.type.GEORASTER) {
                 key = 'map-georaster';
             } else if (entryType === ddb.entry.type.VECTOR) {
-                key = 'map-vector';
+                key = isLocalVector(entry) ? 'unified-vector-local' : 'map-vector';
             } else if (entryType === ddb.entry.type.MODEL) {
                 key = 'unified-model';
             } else if (entryType === ddb.entry.type.TILES3D) {

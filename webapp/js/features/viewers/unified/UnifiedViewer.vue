@@ -17,8 +17,9 @@
             <div ref="view" class="giro3d-view"></div>
 
             <!-- Local coordinates badge (top-center) -->
-            <div v-if="ready && isLocalPointCloud" class="local-coords-badge">
-                <i class="fa-solid fa-unlock" /> Local coordinates
+            <div v-if="ready && (isLocalPointCloud || isLocalDrawing)" class="local-coords-badge"
+                 :title="isLocalDrawing ? 'This drawing has no coordinate system: it is shown in its own coordinates, without a map. Add a .prj file with the same name to place it on the map.' : ''">
+                <i class="fa-solid fa-unlock" /> Local coordinates<span v-if="isLocalDrawing && localUnits">&nbsp;({{ localUnits }})</span>
             </div>
 
             <!-- Measurement toolbar (top-left) -->
@@ -102,6 +103,7 @@ import {
     createDoubleClickRecenter, createCameraTweener, NAV
 } from './navControls';
 import { alignContentUpAxis } from './contentOrientation';
+import { isLocalVector } from '@/libs/openItemDefaults';
 
 const SETTINGS_KEY = 'unified-viewer-settings';
 
@@ -161,6 +163,10 @@ export default {
             // Set by loadPointCloud when the COPC carries no CRS: the cloud is shown in its
             // local metric coordinates and a badge explains that (no basemap is added).
             isLocalPointCloud: false,
+            // Set by loadLocalVector for a CAD drawing without a coordinate system (DDB-12):
+            // drawn in its own coordinates, without a basemap; localUnits from $INSUNITS.
+            isLocalDrawing: false,
+            localUnits: "",
             loadingText: "Loading 3D viewer...",
             // Load progress (0..1) shown as a bar while data streams in; null hides the bar.
             progress: null,
@@ -243,6 +249,8 @@ export default {
             this.loading = true;
             this.progress = null;
             this.isLocalPointCloud = false;
+            this.isLocalDrawing = false;
+            this.localUnits = "";
             try {
                 // Only point clouds, orthophotos/rasters, vectors and 3D models are supported.
                 // Gaussian splats have their own dedicated viewer and are not opened here.
@@ -257,7 +265,10 @@ export default {
                 // Point clouds without a valid SRS have no WGS84 footprint in the DB, but they
                 // still render in the viewer using their local metric coordinates (see
                 // loadPointCloud / the local-coordinates badge).
-                if (!ddb.entry.hasGeometry(entry) && entry.type !== T.MODEL && entry.type !== T.TILES3D && entry.type !== T.POINTCLOUD)
+                // Drawings without geolocation (local vectors) likewise render in their own
+                // coordinates (loadLocalVector).
+                if (!ddb.entry.hasGeometry(entry) && entry.type !== T.MODEL && entry.type !== T.TILES3D &&
+                    entry.type !== T.POINTCLOUD && !isLocalVector(entry))
                     throw new Error(`'${this.basename(entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
 
                 // Availability gate: verify the required build artifact exists for this entry type
@@ -304,7 +315,8 @@ export default {
             const [
                 THREE, controls, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
                 TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
-                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe
+                XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe,
+                FeatureCollection, OlVectorSource, OlGeoJSON
             ] = await Promise.all([
                 import(/* webpackChunkName: "giro3d" */ 'three'),
                 import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/OrbitControls.js'),
@@ -326,7 +338,10 @@ export default {
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMap.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/ColorMapMode.js'),
                 import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/sources/las/config.js'),
-                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js')
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Globe.js'),
+                import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/FeatureCollection.js'),
+                import(/* webpackChunkName: "giro3d" */ 'ol/source/Vector.js'),
+                import(/* webpackChunkName: "giro3d" */ 'ol/format/GeoJSON.js')
             ]);
 
             // Offline-first: serve the laz-perf WebAssembly decoder from our own origin (webpack
@@ -354,7 +369,10 @@ export default {
                 olProj,
                 ColorMap: ColorMap.default,
                 ColorMapMode: ColorMapMode.default,
-                Globe: Globe.default
+                Globe: Globe.default,
+                FeatureCollection: FeatureCollection.default,
+                OlVectorSource: OlVectorSource.default,
+                OlGeoJSON: OlGeoJSON.default
             };
         },
 
@@ -572,6 +590,8 @@ export default {
         },
 
         loadVector: async function (entry) {
+            if (isLocalVector(entry)) return this.loadLocalVector(entry);
+
             this.loadingText = "Loading vector data...";
             const data = this.computeExtent(entry);
             if (!data) throw new Error("This vector layer has no geographic footprint");
@@ -590,6 +610,69 @@ export default {
             this.registerLayer(this.basename(entry.path), 'fa-solid fa-bezier-curve', () => layer.visible, v => { layer.visible = v; });
 
             this.frameExtent(data);
+        },
+
+        // A CAD drawing without a coordinate system (DDB-12): no footprint, no MVT pyramid.
+        // Its features come in drawing coordinates from OGC API Features (over the built
+        // vec/source.gpkg) and are drawn in a local scene without a basemap, like a point
+        // cloud without CRS.
+        loadLocalVector: async function (entry) {
+            this.loadingText = "Loading drawing...";
+            const { FeatureCollection, OlVectorSource, OlGeoJSON, Extent, CoordinateSystem, THREE } = this.libs;
+
+            const features = await this.fetchLocalFeatures(entry);
+            if (features.length === 0)
+                throw new Error(`The drawing '${this.basename(entry.path)}' has no features to display.`);
+
+            const source = new OlVectorSource({ features });
+            const [minX, minY, maxX, maxY] = source.getExtent();
+            const pad = Math.max(maxX - minX, maxY - minY, 1) * 0.01;
+            const crs = CoordinateSystem.unknown;
+            const extent = new Extent(crs, minX - pad, maxX + pad, minY - pad, maxY + pad);
+
+            this.isLocalDrawing = true;
+            this.localUnits = (entry.properties && entry.properties.vector && entry.properties.vector.units) || "";
+            this.setupInstance(crs);
+
+            const collection = new FeatureCollection({
+                source,
+                extent,
+                minLevel: 0,
+                maxLevel: 0,
+                ignoreZ: true,
+                style: {
+                    stroke: { color: '#ff9800', lineWidth: 2 },
+                    fill: { color: '#ff9800', opacity: 0.25 },
+                    point: { color: '#ffeb3b', pointSize: 8 }
+                }
+            });
+            await this.instance.add(collection);
+            this.registerLayer(this.basename(entry.path), 'fa-solid fa-compass-drafting',
+                () => collection.visible, v => { collection.visible = v; });
+
+            this.frameBox(new THREE.Box3(new THREE.Vector3(minX, minY, 0), new THREE.Vector3(maxX, maxY, 0)));
+        },
+
+        // All features of a local drawing, every GPKG layer, paged through OGC API Features.
+        fetchLocalFeatures: async function (entry) {
+            const { OlGeoJSON } = this.libs;
+            const format = new OlGeoJSON();
+            const layers = (entry.properties && entry.properties.vector && entry.properties.vector.layers) || [];
+            const names = layers.map(l => l.name).filter(Boolean);
+            if (names.length === 0) names.push('entities'); // GDAL's single DXF layer
+
+            const pageSize = 1000;
+            const features = [];
+            for (const name of names) {
+                for (let offset = 0; ; offset += pageSize) {
+                    const page = await this.dataset.getFeatures(`${entry.path}:${name}`, { limit: pageSize, offset });
+                    const read = format.readFeatures(page);
+                    features.push(...read);
+                    this.loadingText = `Loading drawing... ${features.length} features`;
+                    if (read.length < pageSize) break;
+                }
+            }
+            return features;
         },
 
         loadModel: async function (entry) {

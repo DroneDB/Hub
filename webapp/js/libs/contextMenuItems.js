@@ -1,6 +1,7 @@
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
+import { isLocalVector } from '@/libs/openItemDefaults';
 import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceeded } from '@/libs/build/buildHelpers';
@@ -39,7 +40,8 @@ function openMapItem(ctx) {
         icon: 'fa-solid fa-map',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && isMapViewable(sel[0].entry.type);
+            // A drawing without geolocation has nothing to place on a map.
+            return sel.length === 1 && isMapViewable(sel[0].entry.type) && !isLocalVector(sel[0].entry);
         },
         click: () => {
             ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'map'));

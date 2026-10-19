@@ -106,6 +106,16 @@ module.exports = class Dataset {
         return this.registry.getRequest(`${this.baseApi}/raster-info?path=${encodeURIComponent(path)}`);
     }
 
+    /**
+     * One page of features (GeoJSON FeatureCollection) of a built vector layer, through
+     * OGC API Features. collectionId is "<entry path>:<GPKG layer name>". Features of a
+     * layer without a coordinate system (a local CAD drawing) come in drawing coordinates.
+     */
+    async getFeatures(collectionId, { limit = 1000, offset = 0 } = {}) {
+        const id = encodeURIComponent(collectionId);
+        return this.registry.getRequest(`${this.baseApi}/ogcapi/collections/${id}/items?limit=${limit}&offset=${offset}&f=json`);
+    }
+
     async getRasterMetadata(path, formula, bandFilter) {
         let url = `${this.baseApi}/raster-metadata?path=${encodeURIComponent(path)}`;
         if (formula) url += `&formula=${encodeURIComponent(formula)}`;

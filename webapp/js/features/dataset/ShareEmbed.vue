@@ -108,7 +108,7 @@ import Textarea from 'primevue/textarea';
 import copy from 'clipboard-copy';
 import ddb from 'ddb';
 
-import { OpenItemDefaults } from '@/libs/openItemDefaults';
+import { defaultViewFor } from '@/libs/openItemDefaults';
 import { b64encode } from '@/libs/base64';
 import { buildOgcShareUrls, OGC_SHARE_MODES } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
@@ -237,7 +237,7 @@ export default {
             if (this.scope !== 'entry' || !this.entry) return '';
             const baseUrl = this.baseUrl;
             if (this.shareMode === 'link' || this.shareMode === 'embed') {
-                const view = OpenItemDefaults[this.entry.type];
+                const view = defaultViewFor(this.entry);
                 if (view) {
                     let url = `${baseUrl}/r/${this.org}/${this.ds}/view/${b64encode(this.entry.path)}/${view}`;
                     if (this.shareMode === 'embed') {
