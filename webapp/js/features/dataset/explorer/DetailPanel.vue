@@ -276,7 +276,7 @@ export default {
 
             try {
                 if (thumbs.supportedForType(this.file.entry.type)) {
-                    this.thumbnail = await thumbs.fetch(this.file.path, 512);
+                    this.thumbnail = await thumbs.fetch(this.file.path, 512, this.file.entry.hash);
                     this.buildLoading = false;
                 }
             } catch (e) {

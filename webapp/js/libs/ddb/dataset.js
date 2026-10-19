@@ -50,9 +50,12 @@ module.exports = class Dataset {
         return url;
     }
 
-    thumbUrl(path, size) {
+    // hash: the entry hash, when known. It makes the URL change when the entry changes, so the
+    // server can let the browser reuse the response without revalidating (REG-03).
+    thumbUrl(path, size, hash) {
         let url = `${this.baseApi}/thumb?path=${encodeURIComponent(path)}`;
         if (size) url += `&size=${size}`;
+        if (hash) url += `&v=${encodeURIComponent(hash)}`;
         return url;
     }
 
@@ -67,6 +70,7 @@ module.exports = class Dataset {
         if (options.retina) retina = "@2x";
 
         let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.png?path=${encodeURIComponent(path)}`;
+        if (options.hash) url += `&v=${encodeURIComponent(options.hash)}`;
         return url;
     }
 

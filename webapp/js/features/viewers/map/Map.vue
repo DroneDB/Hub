@@ -445,7 +445,7 @@ export default {
             // Get thumbnail URL (set after nextTick so v-show hides the img while loading)
             this.$nextTick(() => {
                 if (thumbs.supportedForType(file.entry.type)) {
-                    this.imagePopupThumbnail = thumbs.fetch(file.path, 512);
+                    this.imagePopupThumbnail = thumbs.fetch(file.path, 512, file.entry.hash);
                 } else {
                     this.imagePopupLoading = false;
                 }
@@ -1363,6 +1363,7 @@ export default {
                             extent: footprintGeom.getExtent(),
                             source: new HybridXYZ({
                                 url: file.path,
+                                hash: file.entry.hash,
                                 tileSize: 256,
                                 transition: 200,
                                 minZoom: 14,
@@ -1591,6 +1592,7 @@ export default {
                         extent,
                         source: new HybridXYZ({
                             url: f.path,
+                            hash: f.entry.hash,
                             tileSize: 256,
                             transition: 200,
                             minZoom: 14,

@@ -43,6 +43,16 @@ describe('Dataset URL builders — special characters in paths', () => {
         expect(url).toBe(`${base}/thumb?path=a%20%26%20b.tif&size=256`);
     });
 
+    it('tileUrl and thumbUrl append the entry hash as v when given (REG-03)', () => {
+        expect(ds.tileUrl('o.tif', 1, 2, 3, { retina: true, hash: 'abc' }))
+            .toBe(`${base}/tiles/1/2/3@2x.png?path=o.tif&v=abc`);
+        expect(ds.thumbUrl('o.tif', 256, 'abc')).toBe(`${base}/thumb?path=o.tif&size=256&v=abc`);
+        expect(ds.thumbUrl('o.tif', undefined, 'abc')).toBe(`${base}/thumb?path=o.tif&v=abc`);
+        // Without a hash the URLs are unchanged.
+        expect(ds.tileUrl('o.tif', 1, 2, 3)).toBe(`${base}/tiles/1/2/3.png?path=o.tif`);
+        expect(ds.thumbUrl('o.tif', 256)).toBe(`${base}/thumb?path=o.tif&size=256`);
+    });
+
     it('tileExUrl encodes path and viz params', () => {
         const url = ds.tileExUrl('x & y.tif', 1, 2, 3, { bands: '1&2', colormap: 'a b' });
         expect(url).toContain(`path=${encodeURIComponent('x & y.tif')}`);

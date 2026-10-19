@@ -17,11 +17,12 @@ module.exports = {
             entryType === entry.type.GAUSSIAN_SPLAT;
     },
 
-    fetch: function (uri, thumbSize = 256) {
+    // hash: optional entry hash, see Dataset.thumbUrl
+    fetch: function (uri, thumbSize = 256, hash = undefined) {
         if (isDDBUri(uri)) {
             const { registryUrl, org, ds, path } = parseUri(uri);
             const dataset = new Registry(registryUrl).Organization(org).Dataset(ds);
-            return dataset.thumbUrl(path, thumbSize);
+            return dataset.thumbUrl(path, thumbSize, hash);
         } else if (uri.startsWith("file://")) {
             // Local file, use getFromUserCache (if available)
             if (this.getFromUserCache) {

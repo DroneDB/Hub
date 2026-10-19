@@ -281,6 +281,7 @@ export default {
                     extent,
                     source: new HybridXYZ({
                         url: this.ddbURI,
+                        hash: entry.hash,
                         tileSize: 256,
                         transition: 200,
                         minZoom: 14,

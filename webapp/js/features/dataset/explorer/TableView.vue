@@ -475,7 +475,7 @@ export default {
                 // instance; they heal on remount / dataset switch.
                 if (this.failedThumbs.has(file.entry.path)) continue;
                 try {
-                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48));
+                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48, file.entry.hash));
                 } catch (e) {
                     // Unsupported URI scheme or fetch error - fall back to icon
                 }

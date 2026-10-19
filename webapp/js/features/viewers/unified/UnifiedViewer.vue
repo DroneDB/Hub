@@ -557,7 +557,7 @@ export default {
             this.addBasemap(data.extent);
 
             const { ColorLayer, TiledImageSource, XYZ } = this.libs;
-            const url = `${this.dataset.baseApi}/tiles/{z}/{x}/{y}.png?path=${encodeURIComponent(entry.path)}`;
+            const url = this.dataset.tileUrl(entry.path, "{z}", "{x}", "{y}", { hash: entry.hash });
             const layer = new ColorLayer({
                 name: entry.path,
                 extent: data.extent,

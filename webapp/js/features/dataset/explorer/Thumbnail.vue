@@ -278,7 +278,7 @@ export default {
 
             try {
                 if (thumbs.supportedForType(this.file.entry.type)) {
-                    this.thumbnail = await thumbs.fetch(this.file.path);
+                    this.thumbnail = await thumbs.fetch(this.file.path, undefined, this.file.entry.hash);
 
                     this.loading = false;
                     this.buildLoading = false; // Clear build loading when thumbnail succeeds
