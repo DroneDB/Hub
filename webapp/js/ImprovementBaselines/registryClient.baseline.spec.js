@@ -130,4 +130,19 @@ describe('HUB-06 Registry client request behaviour', () => {
         await expect(after).resolves.toEqual({ name: 'new' });
         expect(fetchMock).toHaveBeenCalledTimes(3); // info, update, info again
     });
+
+    it('a dataset page without X-Total-Count counts its items', async () => {
+        const reg = new Registry('http://registry.test');
+        fetchMock.mockImplementationOnce(async () => jsonResponse([{ slug: 'a' }, { slug: 'b' }]));
+        const page = await reg.Organization('admin').datasetsPage({ skip: 0, take: 10 });
+        expect(page.total).toBe(2);
+    });
+
+    it('a dataset page reads its total from X-Total-Count', async () => {
+        const reg = new Registry('http://registry.test');
+        fetchMock.mockImplementationOnce(async () => new Response(JSON.stringify([{ slug: 'a' }]),
+            { status: 200, headers: { 'Content-Type': 'application/json', 'X-Total-Count': '42' } }));
+        const page = await reg.Organization('admin').datasetsPage({ skip: 0, take: 1 });
+        expect(page.total).toBe(42);
+    });
 });

@@ -35,7 +35,11 @@ module.exports = class Organization {
         const items = await this.registry.getRequest(this.datasetsUrl({ ...query, includeThumbnailCheck: opts.includeThumbnailCheck }), {
             cache: false,
             signal: opts.signal,
-            onHeaders: headers => { total = Number(headers.get('X-Total-Count')); }
+            // A missing header (a server without paging) leaves the total to the items
+            onHeaders: headers => {
+                const count = headers.get('X-Total-Count');
+                if (count != null) total = Number(count);
+            }
         });
         return { items, total: Number.isFinite(total) ? total : items.length };
     }
