@@ -1,5 +1,5 @@
 <template>
-    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Add User" :confirm-disabled="!isFilled()" :busy="adding" @confirm="confirmAddUser()" @close="close">
+    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Add User" :confirm-disabled="!isFilled()" :busy="adding" @confirm="confirmAddUser()" @close="$emit('close')">
 
         <LoadingSpinner v-if="loading" />
 
@@ -90,9 +90,6 @@ export default {
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
-        close: function () {
-            this.$emit('close');
-        },
         clearError: function () {
             this.error = "";
         },

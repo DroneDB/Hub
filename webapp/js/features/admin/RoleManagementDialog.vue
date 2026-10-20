@@ -1,5 +1,5 @@
 <template>
-    <Window id="roleManagementDialog" title="Role Management" modal max-width="60%" fixed-size @close="close">
+    <Window id="roleManagementDialog" title="Role Management" modal max-width="60%" fixed-size @close="$emit('close')">
 
         <LoadingSpinner v-if="loading" />
 
@@ -59,7 +59,7 @@
             </Tabs>
 
             <div class="dialog-buttons">
-                <Button severity="secondary" label="Close" @click="close()" />
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
             </div>
         </div>
 
@@ -139,9 +139,6 @@ export default {
             }
         },
 
-        close: function () {
-            this.$emit('close');
-        },
 
         clearError: function () {
             this.error = "";

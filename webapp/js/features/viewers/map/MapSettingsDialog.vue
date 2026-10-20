@@ -1,5 +1,5 @@
 <template>
-    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @close="close">
+    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @close="$emit('close')">
         <div class="map-settings-content">
             <div class="setting-row">
                 <label class="setting-label align-items-baseline">
@@ -57,7 +57,7 @@
 
         </div>
         <div class="d-flex justify-content-end mt-3" style="padding: 0 0.75rem;">
-            <Button severity="secondary" label="Close" @click="close" />
+            <Button severity="secondary" label="Close" @click="$emit('close')" />
         </div>
     </Window>
 </template>
@@ -156,9 +156,6 @@ export default {
 
 
     methods: {
-        close: function () {
-            this.$emit('close');
-        },
 
         onBasemapChange: function (value) {
             this.$emit('basemapChanged', value);

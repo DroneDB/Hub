@@ -1,5 +1,5 @@
 <template>
-    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size confirm-label="Update User" :confirm-disabled="!isValid()" :busy="updating" @confirm="confirmUpdate()" @close="close">
+    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size confirm-label="Update User" :confirm-disabled="!isValid()" :busy="updating" @confirm="confirmUpdate()" @close="$emit('close')">
 
         <LoadingSpinner v-if="loading" />
 
@@ -74,9 +74,6 @@ export default {
         // PrimeVue MultiSelect handles roles reactively via v-model
     },
     methods: {
-        close: function () {
-            this.$emit('close');
-        },
         clearError: function () {
             this.error = "";
         },

@@ -1,5 +1,5 @@
 <template>
-    <Window id="feature-info" :title="title" modal close-modal-on-click max-width="70%" fixed-size @close="close('close')">
+    <Window id="feature-info" :title="title" modal close-modal-on-click max-width="70%" fixed-size @close="$emit('close', 'close')">
         <div class="feature-info-content">
             <template v-for="(categoryProps, category) in categorizedProperties" :key="category">
                 <div v-if="categoryProps && Object.keys(categoryProps).length > 0" class="category-section">
@@ -20,7 +20,7 @@
         </div>
 
         <div class="text-end mt-3">
-            <Button severity="secondary" label="Close" @click="close('close')" />
+            <Button severity="secondary" label="Close" @click="$emit('close', 'close')" />
         </div>
     </Window>
 </template>
@@ -100,9 +100,6 @@ export default {
     },
 
     methods: {
-        close: function (buttonId) {
-            this.$emit('close', buttonId);
-        },
 
         formatValue: function(value) {
             if (value === null || value === undefined) {

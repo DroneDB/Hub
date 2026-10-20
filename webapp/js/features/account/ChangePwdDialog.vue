@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" confirm-severity="info" :confirm-disabled="!isFilled()" :busy="changing" @confirm="changePwd()" @close="close">
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" confirm-severity="info" :confirm-disabled="!isFilled()" :busy="changing" @confirm="changePwd()" @close="$emit('close')">
         <div class="dialog">
             <form @submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
@@ -70,9 +70,6 @@ export default {
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
-        close: function () {
-            this.$emit('close');
-        },
         clearError: function () {
             this.error = "";
         },
@@ -113,7 +110,7 @@ export default {
                 await reg.changePwd(this.oldPwd, this.newPwd);
                 this.success = true;
                 this.later(() => {
-                    this.close();
+                    this.$emit('close');
                     this.changing = false;
                 }, 2500);
             } catch (e) {

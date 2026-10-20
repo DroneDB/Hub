@@ -1,6 +1,6 @@
 <template>
     <Window id="settings" title="Settings" modal max-width="70%" fixed-size fixed-position close-modal-on-click
-            @close="close('close')">
+            @close="$emit('close', 'close')">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
@@ -191,9 +191,6 @@ export default {
     beforeUnmount: function () {
     },
     methods: {
-        close: function (buttonId) {
-            this.$emit('close', buttonId);
-        },
         setVisibility: async function () {
             try {
                 this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);

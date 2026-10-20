@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size confirm-label="Change Password" :confirm-disabled="!isValid()" :busy="changing" @confirm="confirmChange()" @close="close">
+    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size confirm-label="Change Password" :confirm-disabled="!isValid()" :busy="changing" @confirm="confirmChange()" @close="$emit('close')">
 
         <LoadingSpinner v-if="loading" />
 
@@ -66,9 +66,6 @@ export default {
         };
     },
     methods: {
-        close: function () {
-            this.$emit('close');
-        },
         clearError: function () {
             this.error = "";
         },

@@ -1,5 +1,5 @@
 <template>
-    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="close" @confirm="close">
+    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="$emit('close')" @confirm="$emit('close')">
         <div class="delete-results-content">
             <!-- Success section -->
             <div v-if="deleted.length > 0" class="result-section success-section">
@@ -49,9 +49,6 @@ export default {
     emits: ['close'],
 
     methods: {
-        close: function () {
-            this.$emit('close');
-        }
     }
 }
 </script>

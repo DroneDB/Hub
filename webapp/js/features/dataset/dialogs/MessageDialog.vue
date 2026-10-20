@@ -1,12 +1,12 @@
 <template>
-    <Window id="info" title="Information" modal max-width="70%" fixed-size @close="close('close')">
+    <Window id="info" title="Information" modal max-width="70%" fixed-size @close="$emit('close', 'close')">
 
         {{ message }}
 
         <br>
 
         <div class="text-end mt-3">
-            <Button severity="secondary" label="Close" @click="close('close')" />
+            <Button severity="secondary" label="Close" @click="$emit('close', 'close')" />
         </div>
     </Window>
 </template>
@@ -31,9 +31,6 @@ export default {
     mounted: function () {
     },
     methods: {
-        close: function (buttonId) {
-            this.$emit('close', buttonId);
-        }
     }
 }
 </script>

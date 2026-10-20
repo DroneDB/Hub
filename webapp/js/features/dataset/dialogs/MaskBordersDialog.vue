@@ -1,5 +1,5 @@
 <template>
-    <Window id="mask-borders-dialog" title="Mask Borders" modal width="600px" height="auto" fixed-position @close="close('cancel')">
+    <Window id="mask-borders-dialog" title="Mask Borders" modal width="600px" height="auto" fixed-position @close="$emit('close', 'cancel')">
         <div class="mask-borders-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-3">
@@ -20,8 +20,8 @@
 
             <!-- Actions -->
             <div class="actions">
-                <Button label="Cancel" severity="secondary" @click="close('cancel')" />
-                <Button label="Mask Borders" icon="fa-solid fa-eraser" severity="primary" @click="close('confirm')" />
+                <Button label="Cancel" severity="secondary" @click="$emit('close', 'cancel')" />
+                <Button label="Mask Borders" icon="fa-solid fa-eraser" severity="primary" @click="$emit('close', 'confirm')" />
             </div>
         </div>
     </Window>
@@ -54,9 +54,6 @@ export default {
     emits: ['close'],
 
     methods: {
-        close(action) {
-            this.$emit('close', action);
-        }
     }
 };
 </script>

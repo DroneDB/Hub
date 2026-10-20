@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @close="close">
+        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @close="$emit('close')">
             <div class="members-dialog">
                 <!-- Loading state -->
                 <div v-if="loading" class="ui active centered inline loader" />
@@ -86,7 +86,7 @@
 
                 <!-- Footer -->
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <Button severity="secondary" label="Close" @click="close" />
+                    <Button severity="secondary" label="Close" @click="$emit('close')" />
                 </div>
             </div>
 
@@ -257,9 +257,6 @@ export default {
 
         formatDate,
 
-        close() {
-            this.$emit('close');
-        }
     }
 };
 </script>

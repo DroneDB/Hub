@@ -1,5 +1,5 @@
 <template>
-    <Window id="createOrganizationDialog" title="Create Organization" modal max-width="40%" fixed-size @close="close">
+    <Window id="createOrganizationDialog" title="Create Organization" modal max-width="40%" fixed-size @close="$emit('close')">
         <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
@@ -26,7 +26,7 @@
             </form>
 
             <div class="d-flex justify-content-end gap-2 mt-3">
-                <Button severity="secondary" label="Cancel" @click="close()" />
+                <Button severity="secondary" label="Cancel" @click="$emit('close')" />
                 <Button :disabled="creating || !organizationName.trim()" :loading="creating"
                         severity="primary" icon="fa-solid fa-plus" label="Create Organization" @click="confirmCreate()" />
             </div>
@@ -92,9 +92,6 @@ export default {
             }
         },
 
-        close: function () {
-            this.$emit('close');
-        },
 
         clearError: function () {
             this.error = "";

@@ -1,19 +1,19 @@
 <template>
     <Teleport to="body">
-        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" tabindex="-1" @click.self="close"
-             @keydown.esc="close">
+        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" tabindex="-1" @click.self="$emit('close')"
+             @keydown.esc="$emit('close')">
             <div class="video-lightbox-toolbar">
                 <div v-if="entry" class="video-lightbox-name">{{ entryName }}</div>
                 <div class="video-lightbox-actions">
                     <a class="video-lightbox-action" :href="src" target="_blank" rel="noopener" title="Open in new tab">
                         <i class="fa-solid fa-up-right-from-square" />
                     </a>
-                    <div class="video-lightbox-action" title="Close" @click="close">
+                    <div class="video-lightbox-action" title="Close" @click="$emit('close')">
                         <i class="fa-solid fa-xmark" />
                     </div>
                 </div>
             </div>
-            <div class="video-lightbox-content" @click.self="close">
+            <div class="video-lightbox-content" @click.self="$emit('close')">
                 <video ref="videoEl" :src="src" controls preload="metadata" class="video-lightbox-player"
                        @error="handleError" />
                 <div v-if="error" class="video-lightbox-error">
@@ -73,14 +73,11 @@ export default {
         document.removeEventListener('keydown', this.onKey);
     },
     methods: {
-        close() {
-            this.$emit('close');
-        },
         handleError() {
             this.error = true;
         },
         onKey(e) {
-            if (this.visible && e.key === 'Escape') this.close();
+            if (this.visible && e.key === 'Escape') this.$emit('close');
         }
     }
 };

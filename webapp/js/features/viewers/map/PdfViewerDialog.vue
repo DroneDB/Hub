@@ -1,6 +1,6 @@
 <template>
     <div class="pdf-viewer-wrapper">
-        <Window id="pdfViewerDialog" :title="windowTitle" modal width="85%" height="90%" @close="close">
+        <Window id="pdfViewerDialog" :title="windowTitle" modal width="85%" height="90%" @close="$emit('close')">
             <div class="pdf-viewer-dialog">
                 <div class="pdf-container">
                     <iframe
@@ -56,12 +56,9 @@ export default {
         document.removeEventListener('keydown', this.handleKeyDown);
     },
     methods: {
-        close() {
-            this.$emit('close');
-        },
         handleKeyDown(e) {
             if (e.key === 'Escape') {
-                this.close();
+                this.$emit('close');
             }
         },
         openInNewTab() {

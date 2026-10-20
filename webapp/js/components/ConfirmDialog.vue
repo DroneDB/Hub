@@ -1,5 +1,5 @@
 <template>
-    <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @close="close('cancel')" @confirm="close('confirm')">
+    <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @close="$emit('close', 'cancel')" @confirm="$emit('close', 'confirm')">
         <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
         <div v-html="safeMessage" />
 
@@ -13,9 +13,9 @@
         <slot name="extra" />
 
         <template #footer>
-            <Button :label="cancelText" severity="secondary" @click="close('cancel')" />
-            <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="close('secondary')" />
-            <Button :label="confirmText" :severity="confirmButtonClass" @click="close('confirm')" />
+            <Button :label="cancelText" severity="secondary" @click="$emit('close', 'cancel')" />
+            <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="$emit('close', 'secondary')" />
+            <Button :label="confirmText" :severity="confirmButtonClass" @click="$emit('close', 'confirm')" />
         </template>
     </Window>
 </template>
@@ -99,9 +99,6 @@ export default {
         }
     },
     methods: {
-        close: function (buttonId) {
-            this.$emit('close', buttonId);
-        }
     }
 }
 </script>

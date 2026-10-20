@@ -1,5 +1,5 @@
 <template>
-    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size confirm-label="Convert" @close="close('cancel')" @confirm="close('confirm')">
+    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size confirm-label="Convert" @close="$emit('close', 'cancel')" @confirm="$emit('close', 'confirm')">
         <div class="change-units-content">
             <p>
                 Convert <strong>{{ measurementsCount }}</strong> measurement{{ measurementsCount !== 1 ? 's' : '' }}
@@ -47,9 +47,6 @@ export default {
 
 
     methods: {
-        close: function (buttonId) {
-            this.$emit('close', buttonId);
-        }
     }
 }
 </script>

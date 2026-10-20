@@ -1,5 +1,5 @@
 <template>
-    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size close-button cancel-label="Close" @close="close">
+    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size close-button cancel-label="Close" @close="$emit('close')">
         <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
@@ -200,9 +200,6 @@ export default {
             this.loading = false;
         },
 
-        close: function () {
-            this.$emit('close');
-        },
 
         confirmDeleteOrganization: function(org) {
             if (org.slug.toLowerCase() === 'public') {
