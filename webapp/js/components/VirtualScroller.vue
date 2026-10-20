@@ -11,6 +11,8 @@
  *
  * Slot:
  *   Receives { item } for each visible item, same as RecycleScroller's v-slot.
+ *
+ * Exposes scrollToIndex(index) and scrollElement.
  */
 <template>
   <div
@@ -92,6 +94,14 @@ const totalSize = computed(() => virtualizer.value.getTotalSize());
 watch(() => props.items.length, async () => {
   await nextTick();
   virtualizer.value.measure();
+});
+
+// For parents: scroll to a row, and the element that scrolls (e.g. an IntersectionObserver root)
+defineExpose({
+  scrollToIndex: (index) => virtualizer.value.scrollToIndex(index, { align: 'start' }),
+  get scrollElement() {
+    return parentRef.value;
+  }
 });
 </script>
 

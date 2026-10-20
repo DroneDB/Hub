@@ -15,7 +15,7 @@
             </Breadcrumb>
             <!--<div class="ui divider"></div>-->
         </div>
-        <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping }" @scroll="onScroll"
+        <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping, virtual: virtualGrid }"
             @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
             @dragenter="explorerDragEnter($event)" @dragover.prevent>
             <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment m-3 w-100">
@@ -27,6 +27,19 @@
                     This folder is empty
                 </div>
             </div>
+            <!-- Large folders: only the rows on screen are rendered (HUB-03) -->
+            <VirtualScroller v-else-if="virtualGrid" ref="grid" class="thumbnail-grid" :items="gridRows"
+                :item-size="gridRowHeight" :min-height="0" v-slot="{ item: row }">
+                <div class="thumbnail-row">
+                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" :draggable="canWrite" @dragstart="startDrag($event, f)"
+                        @drop="onDrop($event, f)" @dragenter="itemDragEnter($event, f)"
+                        @dragover="itemDragOver($event, f)" @dragleave="itemDragLeave($event, f)"
+                        :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }">
+                        <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
+                            :lazyLoad="true" :dataset="dataset" />
+                    </div>
+                </div>
+            </VirtualScroller>
             <template v-else>
                 <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="canWrite" @dragstart="startDrag($event, f)"
                     @drop="onDrop($event, f)" @dragenter="itemDragEnter($event, f)"
@@ -42,6 +55,14 @@
 
 <script>
 import Thumbnail from './Thumbnail.vue';
+import VirtualScroller from '@/components/VirtualScroller.vue';
+import { createThumbnailQueue, createVisibilityTracker } from '@/libs/thumbnailQueue';
+
+// Folders at least this large render as a virtual grid (HUB-03)
+const VIRTUAL_GRID_MIN_FILES = 200;
+// One grid cell: the 128 px tile plus its margins and label
+const GRID_CELL_WIDTH = 140;
+const GRID_ROW_HEIGHT = 180;
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
@@ -64,7 +85,16 @@ import Breadcrumb from 'primevue/breadcrumb';
 export default {
     mixins: [dragDropMixin],
     components: {
-        Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb
+        Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb, VirtualScroller
+    },
+    // Thumbnails load as they come into view, a few at a time (HUB-03)
+    provide: function () {
+        this.thumbnailLoader ??= {
+            queue: createThumbnailQueue({ concurrency: 6 }),
+            // #explorer clips the virtual grid too: one root for both layouts
+            visibility: createVisibilityTracker({ root: () => this.$refs.explorer ?? null, rootMargin: '200px' })
+        };
+        return { thumbnailLoader: this.thumbnailLoader };
     },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
     props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
@@ -78,8 +108,9 @@ export default {
             get showBuildConfirm() { return self.showBuildConfirm; },
             emit: (...args) => self.$emit(...args),
             onSelectAllNone: () => {
-                if (!self.$refs.thumbs) return;
-                if (self.selectedFiles.length === self.$refs.thumbs.length) {
+                if (self.files.length === 0) return;
+                // Every file of the folder, rendered or not (the virtual grid renders only some)
+                if (self.selectedFiles.length === self.files.length) {
                     self.deselectAll();
                 } else {
                     self.selectAll();
@@ -120,6 +151,7 @@ export default {
             loading: false,
             dropping: false,
             contextMenu,
+            gridColumns: 6
         };
     },
     computed: {
@@ -159,6 +191,24 @@ export default {
                 command: () => this.goTo(home)
             };
         },
+        virtualGrid: function () {
+            return this.files.length >= VIRTUAL_GRID_MIN_FILES;
+        },
+        gridRowHeight: function () {
+            return GRID_ROW_HEIGHT;
+        },
+        // The files in rows of `gridColumns`, each with its index in `files` (range selection)
+        gridRows: function () {
+            const rows = [];
+            const cols = this.gridColumns;
+            for (let i = 0; i < this.files.length; i += cols) {
+                rows.push({
+                    key: i,
+                    cells: this.files.slice(i, i + cols).map((file, j) => ({ file, idx: i + j }))
+                });
+            }
+            return rows;
+        },
         breadcrumbItems: function () {
             if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
             return this.breadcrumbs.slice(1).map((b, idx, arr) => {
@@ -172,13 +222,18 @@ export default {
     mounted: function () {
         this.rangeStartThumb = null;
 
-        // Load thumbnails immediately after mount
-        this.$nextTick(() => {
-            this.lazyLoadThumbs();
-        });
+        // Columns of the virtual grid follow the explorer's width
+        if (typeof ResizeObserver !== 'undefined') {
+            this._resizeObserver = new ResizeObserver(entries => {
+                const width = entries[0]?.contentRect?.width ?? 0;
+                if (width > 0) this.gridColumns = Math.max(1, Math.floor(width / GRID_CELL_WIDTH));
+            });
+            this._resizeObserver.observe(this.$refs.explorer);
+        }
     },
-    updated: function () {
-        this.lazyLoadThumbs();
+    beforeUnmount: function () {
+        this._resizeObserver?.disconnect();
+        this.thumbnailLoader.visibility.disconnect();
     },
     methods: {
 
@@ -190,17 +245,6 @@ export default {
 
         // startDrag, onDrop and explorerDropHandler are inherited from dragDropMixin.
 
-        onTabActivated: function () {
-            this.$nextTick(() => {
-                this.lazyLoadThumbs();
-            });
-        },
-
-        onPanelResized: function () {
-            this.$nextTick(() => {
-                this.lazyLoadThumbs();
-            });
-        },
 
         onClick: function (e) {
 
@@ -208,29 +252,6 @@ export default {
             if (e.target.id === 'explorer') {
                 this.clearSelection();
             }
-        },
-        lazyLoadThumbs: function () {
-            if (!this.$refs.thumbs) return;
-
-            const parentBcr = this.$el.getBoundingClientRect();
-            this.$refs.thumbs.forEach(t => {
-                const thumbBcr = t.getBoundingRect();
-                if (thumbBcr.bottom - parentBcr.top > 0 &&
-                    parentBcr.bottom - thumbBcr.top > 0 &&
-                    thumbBcr.right - parentBcr.left > 0 &&
-                    parentBcr.right - thumbBcr.left > 0) {
-                    t.loadThumbnail();
-                }
-            });
-        },
-        onScroll: function () {
-            if (this.scrollTimeout) {
-                clearTimeout(this.scrollTimeout);
-                this.scrollTimeout = null;
-            }
-            this.scrollTimeout = setTimeout(() => {
-                this.lazyLoadThumbs();
-            }, 250);
         },
         selectAll: function () {
             this.files.forEach(f => f.selected = true);
@@ -295,7 +316,12 @@ export default {
         },
 
         scrollTo: function (file) {
-            const thumb = this.$refs.thumbs.find(t => t.file === file);
+            if (this.virtualGrid) {
+                const idx = this.files.indexOf(file);
+                if (idx >= 0) this.$refs.grid?.scrollToIndex(Math.floor(idx / this.gridColumns));
+                return;
+            }
+            const thumb = (this.$refs.thumbs || []).find(t => t.file === file);
             if (thumb) {
                 this.$refs.explorer.scrollTo(0, thumb.$el.offsetTop - this.$el.offsetTop - 12);
             }
@@ -377,5 +403,19 @@ export default {
         color: inherit;
         font-weight: 600;
     }
+}
+#explorer.virtual {
+    display: block;
+    overflow: hidden;
+}
+
+.thumbnail-grid {
+    height: 100%;
+}
+
+.thumbnail-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
 }
 </style>

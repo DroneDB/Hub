@@ -1482,14 +1482,7 @@ export default {
             // When viewMode changes, rebuild explorerTools to show the correct icon
             this.updateExplorerTools();
 
-            // When switching to grid view, trigger thumbnail loading
-            if (newMode === 'grid') {
-                this.$nextTick(() => {
-                    if (this.$refs.explorer) {
-                        this.$refs.explorer.lazyLoadThumbs();
-                    }
-                });
-            }
+            // The grid's thumbnails load as they become visible (HUB-03): nothing to trigger
         },
 
         fileBrowserFiles: {

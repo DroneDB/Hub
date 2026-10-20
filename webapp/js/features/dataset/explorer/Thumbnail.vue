@@ -36,12 +36,15 @@ import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildHelpers';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import ddb from 'ddb';
 
 export default {
     components: {
     },
     emits: ['clicked', 'open'],
+    // Provided by the Explorer: load when visible, a few at a time (HUB-03)
+    inject: { thumbnailLoader: { default: null } },
     props: {
         file: {
             type: Object,
@@ -138,6 +141,13 @@ export default {
     },
     mounted: async function () {
         if (!this.lazyLoad) await this.loadThumbnail();
+        else if (this.thumbnailLoader) {
+            this.thumbnailLoader.visibility.observe(this.$el, visible => {
+                if (visible) this.loadThumbnail();
+                // Scrolled away before its turn: it asks again when it comes back
+                else if (this.imageTicket?.state === 'waiting') this.cancelImageRequest();
+            });
+        }
 
         // Setup build listeners if dataset is available
         if (this.dataset) {
@@ -146,12 +156,42 @@ export default {
     },
     beforeUnmount() {
         this.cleanupBuildListeners();
+        this.thumbnailLoader?.visibility.unobserve(this.$el);
+        this.cancelImageRequest();
+        if (this.loadTimeout) clearTimeout(this.loadTimeout);
     },
     methods: {
         getBoundingRect: function () {
             return this.$el.getBoundingClientRect();
         },
+        // Shows `url` once the loader grants a slot (at once without a loader)
+        showImage: function (url) {
+            this.cancelImageRequest();
+            if (!this.thumbnailLoader) {
+                this.thumbnail = url;
+                this.loading = false;
+                return;
+            }
+            this.imageTicket = this.thumbnailLoader.queue.enqueue(() => {
+                this.thumbnail = url;
+                this.loading = false;
+            });
+        },
+        cancelImageRequest: function () {
+            if (!this.imageTicket) return;
+            const waiting = this.imageTicket.state === 'waiting';
+            this.imageTicket.cancel();
+            this.imageTicket = null;
+            // Never shown: the next visibility asks again
+            if (waiting) this.loading = false;
+        },
+        // The image request ended (loaded or failed): its slot goes to the next tile
+        releaseImageSlot: function () {
+            this.imageTicket?.release();
+            this.imageTicket = null;
+        },
         handleImageError: function (e) {
+            this.releaseImageSlot();
             // Bounded retry: MAX_RETRIES retries with backoff (thumbRetryPolicy),
             // so a server-side failure costs <= 4 requests per tile instead of an
             // unbounded 5s retry loop that amplifies outages.
@@ -188,6 +228,7 @@ export default {
             }
         },
         handleImageLoad: function () {
+            this.releaseImageSlot();
             // Confirmed load: recharge the retry budget ONLY. Deliberately does
             // NOT rewrite the bound URL — reassigning thumbnail would re-render
             // the <img>, refetch the stripped URL and re-arm the budget against
@@ -278,10 +319,10 @@ export default {
 
             try {
                 if (thumbs.supportedForType(this.file.entry.type)) {
-                    this.thumbnail = await thumbs.fetch(this.file.path, undefined, this.file.entry.hash);
-
-                    this.loading = false;
+                    // The tile's size times the pixel ratio, not a fixed 256 px
+                    const url = await thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
                     this.buildLoading = false; // Clear build loading when thumbnail succeeds
+                    this.showImage(url);
                 } else {
                     this.icon = this.file.icon;
                     this.loading = false;
