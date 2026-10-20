@@ -21,6 +21,7 @@ import { nextPollDelay } from './pollingPolicy';
 import { openEventStream } from '@/libs/sse';
 import emitter from '@/libs/eventBus';
 import { UPLOAD_ACTIVITY_EVENT } from '@/libs/upload/uploadEvents';
+import { datasetKey, isActiveState } from './taskStates';
 
 const TAKE        = 200;
 // After the event stream fails, polling alone for this long before trying it again
@@ -29,15 +30,10 @@ const STREAM_RETRY_MS = 60000;
 const isHidden = () => typeof document !== 'undefined' && document.hidden === true;
 let uploading = false;
 
-// Non-terminal states (mirrors TaskStateCatalog.Active)
-const ACTIVE_STATES = ['Awaiting', 'Created', 'Indexing', 'Enqueued', 'Processing', 'Scheduled', 'Reused'];
-
 // ----- per-dataset store helper -----
 
-// Stable identity of a dataset for store keys and event matching.
-export function datasetKey(dataset) {
-    return dataset.baseApi || `${dataset.org}/${dataset.slug}`;
-}
+// Stable identity of a dataset for store keys and event matching (libs/tasks/taskStates)
+export { datasetKey };
 
 const stores = new Map(); // datasetKey -> { tasks: Map, timerId, dataset, refs, _started }
 
@@ -62,7 +58,7 @@ function peekStore(dataset) {
 
 function hasActive(ent) {
     for (const t of ent.tasks.values()) {
-        if (ACTIVE_STATES.includes(t.state)) return true;
+        if (isActiveState(t.state)) return true;
     }
     return false;
 }

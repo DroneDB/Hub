@@ -10,9 +10,9 @@
  * or when a task is not yet in the shared store.  Incremental logs fetched only
  * while actively tracking.
  */
-const TERMINAL_STATES = ['Succeeded', 'Failed', 'Deleted'];
 const DEFAULT_POLL_MS = 2000;
 import taskMonitor from '@/libs/tasks/taskMonitor';
+import { isTerminalState } from '@/libs/tasks/taskStates';
 import { taskProgressMode } from '@/libs/utils';
 
 export default {
@@ -186,7 +186,7 @@ export default {
                             try { options.onProgress(entry); } catch { /* ignore */ }
                         }
 
-                        if (TERMINAL_STATES.includes(summary.state)) {
+                        if (isTerminalState(summary.state)) {
                             this._endHeavyTask(taskId);
                             // Fetch full status (includes artifact/error details).
                             try {

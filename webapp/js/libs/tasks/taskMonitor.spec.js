@@ -35,8 +35,9 @@ describe('datasetKey', () => {
         expect(datasetKey({ baseApi: 'org/dsY', org: 'org', slug: 'dsX' })).toBe('org/dsY');
     });
 
-    it('falls back to org/slug', () => {
-        expect(datasetKey({ org: 'org', slug: 'dsX' })).toBe('org/dsX');
+    it('falls back to org/ds', () => {
+        // Datasets carry `ds`, not `slug`: the old fallback produced "org/undefined"
+        expect(datasetKey({ org: 'org', ds: 'dsX' })).toBe('org/dsX');
     });
 
     it('returns a string that is stable across dataset instances', () => {

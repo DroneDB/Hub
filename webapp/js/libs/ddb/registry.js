@@ -17,6 +17,7 @@ import RequestCache from './requestCache';
 import { DEFAULT_REGISTRY } from './constants';
 import { applyHubBranding } from '../hubBranding';
 import { ApiError } from './apiError';
+import { createHttpClient } from './http/httpClient';
 
 let refreshTimers = {};
 
@@ -73,6 +74,8 @@ export default class Registry {
         this._features = {};
         // Shared by every client of this origin (HUB-06)
         this.requestCache = RequestCache.forOrigin(url);
+        // Transport: auth header, timeout, parsing, ApiError (HQ-05)
+        this.http = createHttpClient({ baseUrl: url, getToken: () => this.getAuthToken() });
     }
 
     /**
@@ -616,286 +619,24 @@ export default class Registry {
     }
 
     // Sends one request; with `withMeta` resolves { value, etag, notModified } (request cache)
-    async _send(endpoint, method, options) {
-        const timeoutMs = 300000;
-        try {
-            const headers = { ...(options.headers || {}) };
-            const authToken = this.getAuthToken();
-
-            if (authToken) headers.Authorization = `Bearer ${authToken}`;
-            if (options.etag) headers['If-None-Match'] = options.etag;
-
-            const fetchOptions = {
-                method,
-                headers
-            };
-
-            // Handle request body
-            const body = options.body;
-            const contentType = options.contentType;
-            if (body !== null && body !== undefined) {
-                if (contentType) {
-                    // Explicit content type override
-                    headers['Content-Type'] = contentType;
-                    if (contentType === 'application/json') {
-                        fetchOptions.body = JSON.stringify(body);
-                    } else {
-                        fetchOptions.body = body;
-                    }
-                } else if (body instanceof FormData) {
-                    // Use FormData as-is (don't set Content-Type, let browser handle it)
-                    fetchOptions.body = body;
-                } else if (typeof body === 'string') {
-                    // Send as plain text
-                    headers['Content-Type'] = 'text/plain';
-                    fetchOptions.body = body;
-                } else if (typeof body === 'object') {
-                    // Default: send objects as JSON (modern approach)
-                    headers['Content-Type'] = 'application/json';
-                    fetchOptions.body = JSON.stringify(body);
-                } else {
-                    // For other types, send as-is
-                    fetchOptions.body = body;
-                }
-            }
-
-            let response;
-            // Timeout (5 minutes), combined with the caller's signal when there is one
-            const timeout = new AbortController();
-            const timeoutId = setTimeout(() => timeout.abort(), timeoutMs);
-            const signal = options.signal
-                ? (typeof AbortSignal !== 'undefined' && AbortSignal.any ? AbortSignal.any([options.signal, timeout.signal]) : options.signal)
-                : timeout.signal;
-            try {
-                response = await fetch(`${this.url}${endpoint}`, { ...fetchOptions, signal });
-            } catch (fetchError) {
-                // Only network errors (connection refused, DNS failure, etc.) reach here
-                // fetch() throws TypeError for network failures in standard implementations
-                if (fetchError.name === 'AbortError') {
-                    // Aborted by the caller: an AbortError, not a failure to report
-                    if (options.signal?.aborted) throw fetchError;
-                    throwError(`Request timed out after ${timeoutMs / 1000}s`, 0, { originalError: fetchError });
-                }
-
-                throwError(`Network error: ${fetchError.message}`, 0, { originalError: fetchError });
-            } finally {
-                clearTimeout(timeoutId);
-            }
-
-            options.onHeaders?.(response.headers);
-
-            if (options.withMeta) {
-                if (response.status === 304) return { value: undefined, notModified: true };
-                const value = await this._handleResponse(response, method, options.responseType);
-                return { value, etag: response.headers.get('ETag') || undefined };
-            }
-
-            // Response handling errors are not caught here - they propagate as-is
-            return await this._handleResponse(response, method, options.responseType);
-
-        } catch (error) {
-            // The server rejected the session (not a sign-in attempt): tell the app once
-            if (error.status === 401 && this._unauthorizedHandler && !endpoint.startsWith('/users/authenticate')) {
-                this._unauthorizedHandler(error);
-            }
-            // Re-throw errors that already have a status (our custom API errors), and aborts
-            if (error.status !== undefined || error.name === 'AbortError') {
-                throw error;
-            }
-            // Wrap unexpected errors
-            throwError(`Request failed: ${error.message}`, 0, { originalError: error });
-        }
+    _send(endpoint, method, options) {
+        return this.http.send(endpoint, { ...options, method });
     }
 
-    async _handleResponse(response, method, responseType = null) {
-        const status = response.status;
-
-        // Handle successful responses first
-        if (status >= 200 && status < 300) {
-            // No content responses
-            if (status === 204) return true;
-
-            // HEAD requests
-            if (method.toUpperCase() === "HEAD") return true;
-
-            // Try to parse response based on content type
-            return await this._parseResponseBody(response, status, responseType);
-        }
-
-        // Handle specific error status codes
-        switch (status) {
-            case 400:
-                await this._throwResponseError(response, "Bad Request", status);
-                break;
-            case 401:
-                await this._throwResponseError(response, "Unauthorized", status);
-                break;
-            case 403:
-                await this._throwResponseError(response, "Forbidden", status);
-                break;
-            case 404:
-                throwError("Not found", 404);
-                break;
-            case 422:
-                await this._throwResponseError(response, "Unprocessable Entity", status);
-                break;
-            case 429:
-                await this._throwResponseError(response, "Too Many Requests", status);
-                break;
-            case 500:
-                await this._throwResponseError(response, "Internal Server Error", status);
-                break;
-            case 502:
-                await this._throwResponseError(response, "Bad Gateway", status);
-                break;
-            case 503:
-                await this._throwResponseError(response, "Service Unavailable", status);
-                break;
-            default:
-                // Handle other 4xx and 5xx errors
-                if (status >= 400 && status < 500) {
-                    await this._throwResponseError(response, "Client Error", status);
-                } else if (status >= 500) {
-                    await this._throwResponseError(response, "Server Error", status);
-                } else {
-                    await this._throwResponseError(response, "Unexpected Response", status);
-                }
-                break;
-        }
+    /** Request headers carrying the session token (for URLs fetched outside this client). */
+    authHeaders(extra = {}) {
+        return this.http.authHeaders(extra);
     }
 
     /**
-     * Extracts error message from a JSON response body.
-     * Checks common error fields: 'error', 'message'.
-     * @param {Object} json - The parsed JSON response
-     * @returns {string|null} The error message if found, null otherwise
+     * An authenticated fetch() that returns the raw Response, for blobs, streams and
+     * callers that treat HTTP statuses as results (HQ-05).
+     * @param {string} endpoint  path starting with '/', or an absolute URL of this registry
+     * @param {RequestInit} [init]
+     * @returns {Promise<Response>}
      */
-    _extractErrorMessage(json) {
-        if (!json || typeof json !== 'object') {
-            return null;
-        }
-        return json.error || json.message || null;
-    }
-
-    /**
-     * Parses the response body based on content type.
-     * Note: This method also checks for error fields in successful HTTP responses (2xx)
-     * because some APIs return 200 OK with an error in the body.
-     * @param {Response} response - The fetch response object
-     * @param {number} status - HTTP status code
-     * @param {string|null} responseType - Force response type: 'text' to always return text, null for auto-detection
-     */
-    async _parseResponseBody(response, status, responseType = null) {
-        const contentType = response.headers.get("Content-Type");
-
-        try {
-            // Force text response if explicitly requested (useful for downloading file contents)
-            if (responseType === 'text') {
-                return await response.text();
-            }
-
-            // Handle JSON responses
-            if (contentType && contentType.toLowerCase().includes("application/json")) {
-                const json = await response.json();
-
-                // Check for error field in successful JSON responses
-                // Some APIs return HTTP 200 but include an error in the response body
-                const errorMessage = this._extractErrorMessage(json);
-                if (errorMessage) {
-                    throwError(errorMessage, status, json);
-                }
-
-                return json;
-            }
-
-            // Handle text responses
-            if (contentType && contentType.toLowerCase().includes("text/")) {
-                return await response.text();
-            }
-
-            // Handle responses with no content type or other content types
-            if (!contentType || contentType.trim() === '') {
-                // Try to read as text for empty content type
-                const text = await response.text();
-
-                // If empty response, return true for successful status
-                if (!text || text.trim() === '') {
-                    return true;
-                }
-
-                // Try to parse as JSON if it looks like JSON
-                if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-                    try {
-                        const json = JSON.parse(text);
-                        // Check for error field (same as explicit JSON content-type handling)
-                        const errorMessage = this._extractErrorMessage(json);
-                        if (errorMessage) {
-                            throwError(errorMessage, status, json);
-                        }
-                        return json;
-                    } catch {
-                        // If JSON parsing fails, return as text
-                        return text;
-                    }
-                }
-
-                return text;
-            }
-
-            // Handle binary content types (images, etc.)
-            if (contentType && (contentType.toLowerCase().includes("image/") || contentType.toLowerCase().includes("application/octet-stream"))) {
-                return await response.blob();
-            }
-
-            // Handle explicit blob response type
-            if (responseType === 'blob') {
-                return await response.blob();
-            }
-
-            // For other content types, try to read as text
-            return await response.text();
-
-        } catch (error) {
-            // Handle parsing errors
-            if (error.status) {
-                // Re-throw our custom errors
-                throw error;
-            } else {
-                throwError(`Failed to parse response: ${error.message}`, status, { originalError: error });
-            }
-        }
-    }
-
-    /**
-     * Throws an error based on the response body content.
-     * Used for non-2xx HTTP responses to extract meaningful error messages.
-     * Unlike _parseResponseBody(), this always throws - it's meant for error responses.
-     */
-    async _throwResponseError(response, defaultMessage, status) {
-        const contentType = response.headers.get("Content-Type");
-
-        try {
-            if (contentType && contentType.toLowerCase().includes("application/json")) {
-                const json = await response.json();
-                const errorMessage = this._extractErrorMessage(json) || defaultMessage;
-                throwError(errorMessage, status, json);
-            } else if (contentType && contentType.toLowerCase().includes("text/")) {
-                const text = await response.text();
-                throwError(text || defaultMessage, status);
-            } else {
-                // For other content types or no content type, try text
-                const text = await response.text();
-                throwError(text || defaultMessage, status);
-            }
-        } catch (error) {
-            if (error.status) {
-                // Re-throw our custom errors
-                throw error;
-            } else {
-                // If parsing fails, throw with default message
-                throwError(defaultMessage, status);
-            }
-        }
+    fetchRaw(endpoint, init) {
+        return this.http.fetchRaw(endpoint, init);
     }
 
     /**
@@ -971,7 +712,7 @@ export default class Registry {
      * @param {(error: Error) => void} handler
      */
     onUnauthorized(handler) {
-        this._unauthorizedHandler = handler;
+        this.http.onUnauthorized(handler);
     }
 
     addEventListener(event, cb) {

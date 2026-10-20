@@ -8,6 +8,7 @@
 
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import ddb from 'ddb';
+import { datasetKey, isActiveState } from '@/libs/tasks/taskStates';
 
 const BUILDABLE_TYPES = [
     ddb.entry.type.POINTCLOUD,
@@ -29,13 +30,6 @@ const BUILD_STATES = {
     SUCCEEDED: 'Succeeded'
 };
 
-const ACTIVE_STATES = [
-    BUILD_STATES.AWAITING,
-    BUILD_STATES.CREATED,
-    BUILD_STATES.ENQUEUED,
-    BUILD_STATES.PROCESSING,
-    BUILD_STATES.SCHEDULED
-];
 
 class BuildManager {
     constructor() {
@@ -63,10 +57,10 @@ class BuildManager {
         });
     }
 
-    /* ---- dataset key (mirrors old getDatasetKey) ---- */
+    /* ---- dataset key (libs/tasks/taskStates) ---- */
 
     getDatasetKey(dataset) {
-        return dataset.baseApi || `${dataset.org}/${dataset.ds}`;
+        return datasetKey(dataset);
     }
 
     /* ---- buildable type helpers ---- */
@@ -140,7 +134,7 @@ class BuildManager {
         const key = this.getDatasetKey(dataset);
         const cache = this._buildByPath.get(key);
         if (!cache || !cache.has(filePath)) return false;
-        return ACTIVE_STATES.includes(cache.get(filePath).state);
+        return isActiveState(cache.get(filePath).state);
     }
 
     /** Get build info for a file. Returns { path, currentState } to match old BuildJobDto. */
