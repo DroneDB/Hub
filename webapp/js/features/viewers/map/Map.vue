@@ -1,10 +1,10 @@
 <template>
     <div id="map" @mouseover="setMouseInside(true)" @mouseleave="setMouseInside(false)">
+        <DialogHost :dialogs="dialogs" />
         <div ref="map-container" class="map-container" :class="{
             'cursor-pointer': selectSingle,
             'cursor-crosshair': selectPolygon
         }">
-            <olMeasure ref="measure" />
             <OpacityControl v-if="rasterLayerList.length <= 1 && !splitMode" v-model="rasterOpacity" :visible="hasRasters"
                             :show-plant-health-btn="rasterLayerList.length === 1 && !!rasterLayerList[0]?.plantHealthCapable"
                             :plant-health-active="plantHealthVisible"
@@ -158,9 +158,9 @@ import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import HybridXYZ from '@/libs/map/olHybridXYZ';
 import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles, SOURCE_MIN_ZOOM } from '@/libs/map/rasterZoom';
-import olMeasure from './olMeasure';
-import olSelection from './olSelection';
-import olSettings from './olSettings';
+import MeasureControls from '@/libs/map/controls/measureControl';
+import SelectionControl from '@/libs/map/controls/selectionControl';
+import SettingsControl from '@/libs/map/controls/settingsControl';
 import OpacityControl from './OpacityControl.vue';
 import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
@@ -200,12 +200,15 @@ import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
 import { useCopyText } from '@/composables/useCopyText';
 import { EPSG } from '@/libs/constants';
 import { getPref, setPref, PREF } from '@/libs/preferences';
+import { useDialogs } from '@/composables/useDialogs';
+import { useTimerGroup } from '@/composables/useTimers';
+import DialogHost from '@/components/DialogHost.vue';
 
 
 export default {
     name: 'MapViewer',
     components: {
-        olMeasure, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
+        DialogHost, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     inject: {
@@ -232,6 +235,12 @@ export default {
         canDelete: {
             type: Boolean,
             default: true
+        },
+        // The single-file map route (SingleMap): a Back button, no selection tools, and a
+        // photo with a footprint is drawn as a raster instead of a camera marker
+        standalone: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ['scrollTo', 'openItem'],
@@ -240,7 +249,9 @@ export default {
         const videoCopy = useCopyText();
         return {
             copyImageCoords: imageCopy.copy, imagePopupCoordsCopied: imageCopy.copied,
-            copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied
+            copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied,
+            dialogs: useDialogs(),
+            later: useTimerGroup()
         };
     },
     data: function () {
@@ -302,6 +313,11 @@ export default {
         };
     },
     computed: {
+        // Identity of the file set: a change (added, removed, reordered, replaced in place)
+        // rebuilds the layers; anything else is a selection change
+        filesKey: function () {
+            return this.files.map(f => f.path || (f.entry && f.entry.path)).join('\n');
+        },
         // Names of each band in display order (left → right), mirroring rasterLayerList order.
         splitBands: function () {
             return this.rasterLayerList.map(r => r.name);
@@ -317,36 +333,28 @@ export default {
                 this.updateRastersOpacity();
             }
         },
+        filesKey: function () {
+            // Coalesce bursts (the explorer replaces the array, then patches entries)
+            this.later.clear();
+            this.later(() => this.reloadFileLayers(), 5);
+        },
         files: {
             deep: true,
-            handler: function (newVal, oldVal) {
-                // Prevent multiple updates
-                if (this._updateMap) {
-                    clearTimeout(this._updateMap);
-                    this._updateMap = null;
+            handler: function () {
+                // Selection change: restyle without rebuilding
+                if (typeof this.fileLayer !== 'undefined') {
+                    this.fileLayer.changed();
+                    this.updateRastersOpacity();
                 }
-
-                this._updateMap = setTimeout(() => {
-                    // Do we need to redraw the features?
-                    // Count has changed or first or last items are different
-                    if (newVal.length !== oldVal.length ||
-                        newVal[0] !== oldVal[0] ||
-                        newVal[newVal.length - 1] !== oldVal[oldVal.length - 1]) {
-                        this.reloadFileLayers();
-                    } else {
-                        // Just update (selection change)
-                        if (typeof this.fileLayer !== 'undefined') {
-                            this.fileLayer.changed();
-                            this.updateRastersOpacity();
-                        }
-                    }
-                }, 5);
             }
         }
     },
     mounted: function () {
         if (this.registerTabChild) this.registerTabChild('map', this);
-        if (!this.lazyload) this.loadMap();
+        if (!this.lazyload) {
+            this.loadMap();
+            this.reloadFileLayers();
+        }
     }, beforeUnmount: function () {
         if (this.unregisterTabChild) this.unregisterTabChild('map');
         Keyboard.offKeyDown(this.handleKeyDown);
@@ -608,7 +616,6 @@ export default {
             if (this.loaded) return;
 
             this.loaded = true;
-            this._updateMap = null;
             this.vectorLayers = [];
 
             const genShotStyle = (fill, stroke, size) => {
@@ -879,7 +886,7 @@ export default {
 
             this.basemapLayer = this.createBasemapLayer();
 
-            this.selectionControl = new olSelection.Control({
+            this.selectionControl = this.standalone ? null : new SelectionControl({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
                 onActivated: () => {
                     this.selectSingle = false;
@@ -895,9 +902,10 @@ export default {
                 }
             });
 
-            this.measureControls = new olMeasure.Controls({
+            this.measureControls = new MeasureControls({
+                openDialog: (component, props) => this.dialogs.open(component, props),
                 onToolSelected: () => { this.measuring = true; if (this.selectionControl) this.selectionControl.deactivate(); },
-                onToolDelesected: () => { this.measuring = false; },
+                onToolDeselected: () => { this.measuring = false; },
                 onSave: () => { this.saveMeasurements(); },
                 onClearAll: () => { this.onClearAllMeasurements(); },
                 onExport: () => { this.exportMeasurementsToFile(); },
@@ -1093,17 +1101,17 @@ export default {
                 }
             }));
 
-            this.map.addControl(this.selectionControl);
+            if (this.selectionControl) this.map.addControl(this.selectionControl);
             this.map.addControl(this.measureControls);
 
-            this.settingsControl = new olSettings.Control({
+            this.settingsControl = new SettingsControl({
                 onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
             });
             this.map.addControl(this.settingsControl);
 
             // Group the controls into toolbar zones so they stack without overlapping.
             this.createControlZones();
-            this.moveControlToZone(this.selectionControl, this._zoneTopLeft);
+            if (this.selectionControl) this.moveControlToZone(this.selectionControl, this._zoneTopLeft);
             this.moveControlToZone(this.measureControls, this._zoneTopRight);
             this.moveControlToZone(this.settingsControl, this._zoneBottomLeft);
 
@@ -1111,6 +1119,17 @@ export default {
             // Matches the SingleMap.vue pattern (appendAnalysisButtonsToContainer).
             const utilContainer = document.createElement('div');
             utilContainer.className = 'ol-map-buttons ol-unselectable ol-control';
+
+            if (this.standalone && this.dataset) {
+                const backBtn = document.createElement('button');
+                backBtn.title = 'Back to Dataset';
+                backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+                // lifetime: element (the map's own control buttons)
+                backBtn.addEventListener('click', () => {
+                    this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
+                });
+                utilContainer.appendChild(backBtn);
+            }
 
             const resetBtn = document.createElement('button');
             resetBtn.title = 'Reset View (H)';
@@ -1126,7 +1145,7 @@ export default {
                 // lifetime: element (the map's own control buttons)
                 fsBtn.addEventListener('click', () => {
                     if (isFullScreenCurrently()) { exitFullScreen(); }
-                    else { requestFullScreen(this.$el); setTimeout(() => { this.map.updateSize(); }, 500); }
+                    else { requestFullScreen(this.$el); this.later(() => this.map.updateSize(), 500); }
                 });
                 utilContainer.appendChild(fsBtn);
             }
@@ -1181,7 +1200,7 @@ export default {
             displayContainer.appendChild(splitBtn);
             this._splitBtn = splitBtn;
 
-            this.map.addControl(new Control({ element: displayContainer, target: this._zoneTopCenter }));
+            if (!this.standalone) this.map.addControl(new Control({ element: displayContainer, target: this._zoneTopCenter }));
 
             // Apply flight path visibility preference
             this.flightPathLayer.setVisible(this.showFlightPath);
@@ -1389,7 +1408,7 @@ export default {
 
             // Redraw, otherwise openlayers does not draw
             // the map correctly
-            setTimeout(() => this.map.updateSize(), 1);
+            this.later(() => this.map.updateSize(), 1);
         },
         onPanelResized: function () {
             // Redraw when map is resized (via panels)
@@ -1514,7 +1533,8 @@ export default {
             this.files.forEach(f => {
                 if (!f.entry) return;
 
-                if (f.entry.type === ddb.entry.type.GEOIMAGE || f.entry.type === ddb.entry.type.GEOVIDEO) {
+                const imageAsRaster = this.standalone && f.entry.type === ddb.entry.type.GEOIMAGE && f.entry.polygon_geom;
+                if ((f.entry.type === ddb.entry.type.GEOIMAGE && !imageAsRaster) || f.entry.type === ddb.entry.type.GEOVIDEO) {
                     const coords = coordAll(f.entry.point_geom)[0];
                     const point = new Point(coords);
                     const feat = new Feature(point);

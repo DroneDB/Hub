@@ -1,4 +1,3 @@
-<script>
 import { Control } from 'ol/control';
 import Draw, { createBox } from 'ol/interaction/Draw';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
@@ -292,5 +291,4 @@ class SelectionControl extends Control {
     }
 }
 
-export default { Control: SelectionControl };
-</script>
+export default SelectionControl;

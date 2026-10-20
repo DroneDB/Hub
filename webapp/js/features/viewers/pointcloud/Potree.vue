@@ -1,5 +1,6 @@
 <template>
     <div id="potree">
+        <DialogHost :dialogs="dialogs" />
         <TabViewLoader title-suffix="Point Cloud" @loaded="handleLoad" />
 
         <Message v-model="error" no-dismiss />
@@ -84,11 +85,7 @@
 </template>
 
 <script>
-/* eslint-disable vue/one-component-per-file -- the createApp() dialogs below move into the app in HQ-08 */
 import ddb from 'ddb';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import { primeVueOptions } from '@/theme';
 import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -104,19 +101,21 @@ import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 import { getPref, setPref, PREF } from '@/libs/preferences';
 import { useTimerGroup } from '@/composables/useTimers';
+import { useDialogs } from '@/composables/useDialogs';
+import DialogHost from '@/components/DialogHost.vue';
 
 
 
 export default {
     name: 'PotreeViewer',
     components: {
-        Message, TabViewLoader, ConfirmDialog
+        DialogHost, Message, TabViewLoader, ConfirmDialog
     },
     props: {
         uri: { type: String, default: null }
     },
     setup() {
-        return { later: useTimerGroup() };
+        return { later: useTimerGroup(), dialogs: useDialogs() };
     },
     data: function () {
         return {
@@ -364,11 +363,8 @@ export default {
             // Close any existing dialog
             this.closePropertiesDialog();
 
-            // Create Vue 3 app instance
             const self = this;
-            this._dialogContainer = document.createElement('div');
-            document.body.appendChild(this._dialogContainer);
-            this.propertiesDialogApp = createApp(AnnotationPropertiesDialog, {
+            this._dialog = this.dialogs.open(AnnotationPropertiesDialog, {
                 annotation,
                 showDelete: true,
                 onOnSave: (properties) => {
@@ -384,15 +380,13 @@ export default {
                     self.updateAnnotationLabel(annotation);
                 },
                 onOnClose: () => {
-                    self.closePropertiesDialog();
+                    self._dialog = null;
                 },
                 onOnDelete: () => {
                     self.viewer.scene.annotations.remove(annotation);
                     self.measurementCount--;
                 },
             });
-            this.propertiesDialogApp.use(PrimeVue, primeVueOptions);
-            this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
         },
 
         /**
@@ -454,11 +448,8 @@ export default {
                 }
             };
 
-            // Create Vue 3 app instance
             const self = this;
-            this._dialogContainer = document.createElement('div');
-            document.body.appendChild(this._dialogContainer);
-            this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
+            this._dialog = this.dialogs.open(MeasurementPropertiesDialog, {
                 feature: featureWrapper,
                 geometryType: geometryType,
                 onOnSave: (properties) => {
@@ -562,25 +553,18 @@ export default {
                     self.updateMeasurementNameLabel(measure);
                 },
                 onOnClose: () => {
-                    self.closePropertiesDialog();
+                    self._dialog = null;
                 }
             });
-            this.propertiesDialogApp.use(PrimeVue, primeVueOptions);
-            this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
         },
 
         /**
          * Close properties dialog
          */
         closePropertiesDialog: function() {
-            if (this.propertiesDialogApp) {
-                this.propertiesDialogApp.unmount();
-                if (this._dialogContainer && this._dialogContainer.parentNode) {
-                    this._dialogContainer.parentNode.removeChild(this._dialogContainer);
-                }
-                this.propertiesDialogApp = null;
-                this.propertiesDialog = null;
-                this._dialogContainer = null;
+            if (this._dialog) {
+                this._dialog.close();
+                this._dialog = null;
             }
         },
 

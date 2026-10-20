@@ -3,7 +3,7 @@
  * Shared between Map.vue and SingleMap.vue.
  *
  * The consuming component must provide:
- *   - this.measureControls   (olMeasure.Controls instance)
+ *   - this.measureControls   (MeasureControls instance)
  *   - this.canWrite          (boolean)
  *   - this.canDelete         (boolean)
  *   - this.getActiveMeasurementEntry()  → the entry whose path is used for export/save

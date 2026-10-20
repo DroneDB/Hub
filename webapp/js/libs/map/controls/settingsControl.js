@@ -1,4 +1,3 @@
-<script>
 import { Control } from 'ol/control';
 
 /**
@@ -34,5 +33,4 @@ class SettingsControl extends Control {
     }
 }
 
-export default { Control: SettingsControl };
-</script>
+export default SettingsControl;

@@ -310,7 +310,7 @@ export default {
                 this._setupRasterProfileMeasurementWatcher();
 
                 // Floating tooltip on the line (matches length/area). Hidden
-                // by default; revealed on hover by olMeasure's hover handler.
+                // by default; revealed on hover by the measure control's hover handler.
                 this._createProfileStaticTooltip(feature);
 
                 if (typeof this.measureControls.updateButtonsVisibility === 'function') {
@@ -379,7 +379,7 @@ export default {
         /**
          * Build a static, hover-revealed tooltip overlay for a finalized
          * profile feature. Mirrors the format used by length/area
-         * measurements in olMeasure.vue and `createStaticTooltip` in
+         * measurements in the measure control (libs/map/controls/measureControl.js) and `createStaticTooltip` in
          * olMeasurementConverter.js so the visual style stays consistent.
          */
         _createProfileStaticTooltip(feature) {

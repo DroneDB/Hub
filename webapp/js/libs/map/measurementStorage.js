@@ -33,7 +33,7 @@ export class MeasurementStorage {
     }
 
     /**
-     * Default set of measurement types considered "owned" by olMeasure (2D map
+     * Default set of measurement types considered "owned" by the map measure control (2D map
      * viewer). When saving, features with these `measurementType` values are
      * replaced by the incoming GeoJSON; all others are preserved verbatim
      * (e.g. stockpiles or 3D viewer measurements).
@@ -52,7 +52,7 @@ export class MeasurementStorage {
      * Foreign feature types (anything written by other DroneDB subsystems
      * into the same file) are preserved verbatim - we only replace features
      * whose `measurementType` is in `ownedTypes`. Defaults to the 2D
-     * olMeasure types for backward compatibility; callers from the 3D
+     * map measure-control types for backward compatibility; callers from the 3D
      * Potree viewer must pass `POTREE_OWNED_TYPES`.
      *
      * @param {Object} geojsonData - GeoJSON FeatureCollection from the caller.

@@ -26,7 +26,8 @@ const DS = `smoke-${Date.now().toString(36)}`;
 const FILES = {
     photo: path.join(DATA, 'images', 'DJI_0018.JPG'),
     raster: path.join(DATA, 'ortho', 'brighton-beach-cog.tif'),
-    cloud: path.join(DATA, 'point-clouds', 'brighton-beach.laz')
+    cloud: path.join(DATA, 'point-clouds', 'brighton-beach.laz'),
+    dem: path.join(DATA, 'dem', 'test_dem.tiff')
 };
 const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 
@@ -136,6 +137,49 @@ test('the header Settings button opens the dataset settings', async () => {
 test('map tab renders an OpenLayers map', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.raster))}/map`);
     await page.waitForSelector('.ol-viewport canvas', { timeout: 30000 });
+});
+
+// Measure a line on the map currently open (the single-map route or the dataset Map tab)
+async function measureLength() {
+    await page.click('button[title^="Measure Length"]');
+    const box = await page.locator('.ol-viewport').boundingBox();
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    await page.mouse.click(cx - 80, cy);
+    await page.mouse.dblclick(cx + 80, cy);
+    const text = await page.locator('.ol-tooltip-static').last().textContent({ timeout: 10000 });
+    assert.match(text, /\d+(\.\d+)? (m|km)/);
+    await page.keyboard.press('Escape');
+}
+
+test('single map: measure a length', async () => {
+    await measureLength();
+});
+
+test('single map (DEM): raster analysis and stockpile panels open and close', async () => {
+    await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.dem))}/map`);
+    await page.waitForSelector('.ol-viewport canvas', { timeout: 30000 });
+    await page.click('[data-testid="raster-analysis-toolbar-btn"]');
+    await page.waitForSelector('.raster-panel', { timeout: 15000 });
+    await page.click('[data-testid="stockpile-toolbar-btn"]');
+    await page.waitForSelector('[data-testid="stockpile-panel"]', { timeout: 15000 });
+    // One analysis panel at a time
+    assert.equal(await page.locator('.raster-panel').count(), 0);
+    await page.click('[data-testid="stockpile-toolbar-btn"]');
+    await page.waitForSelector('[data-testid="stockpile-panel"]', { state: 'detached', timeout: 15000 });
+});
+
+test('single map: settings dialog switches the basemap', async () => {
+    await page.click('button[title^="Map Settings"]');
+    await page.waitForSelector('text=Basemap', { timeout: 15000 });
+    await page.keyboard.press('Escape');
+});
+
+test('dataset Map tab renders and measures', async () => {
+    await page.goto(`${URL_}/r/${USER}/${DS}`);
+    await page.waitForSelector(`#explorer >> text=${path.basename(FILES.raster)}`, { timeout: 20000 });
+    await page.click('text=Map');
+    await page.waitForSelector('.ol-viewport canvas', { timeout: 30000 });
+    await measureLength();
 });
 
 test('point cloud viewer renders a canvas', async () => {

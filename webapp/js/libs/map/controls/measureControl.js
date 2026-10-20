@@ -1,5 +1,3 @@
-<script>
-/* eslint-disable vue/one-component-per-file -- the createApp() dialogs below move into the app in HQ-07 */
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
@@ -14,11 +12,8 @@ import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import { primeVueOptions } from '@/theme';
-import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
-import PointAnnotationDialog from './PointAnnotationDialog.vue';
+import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
+import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
 import { pointPopupHtml } from '@/libs/map/pointPopup';
 import { formatArea as formatAreaText, formatLength as formatLengthText } from '@/libs/format';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
@@ -146,6 +141,9 @@ class MeasureControls extends Control {
         // the deletedMeasurementIds tracking in sync so persisted features
         // (stockpiles) don't get re-hydrated from the saved GeoJSON file.
         this.onMeasurementDeleted = options.onMeasurementDeleted || (() => { });
+        // Renders a dialog inside the app (useDialogs().open) and returns its handle
+        this.openDialog = options.openDialog;
+        this._dialog = null;
 
         this.source = new VectorSource();
         // lifetime: owner (the control's own measurement source)
@@ -994,9 +992,7 @@ class MeasureControls extends Control {
         const currentColor = feature.get('stroke') || MEASURE_COLOR;
         const currentDescription = feature.get('description') || '';
 
-        this._dialogContainer = document.createElement('div');
-        document.body.appendChild(this._dialogContainer);
-        this.propertiesDialogApp = createApp(PointAnnotationDialog, {
+        this._dialog = this.openDialog(PointAnnotationDialog, {
             initialColor: currentColor,
             initialDescription: currentDescription,
             onOnSave: (data) => {
@@ -1021,11 +1017,9 @@ class MeasureControls extends Control {
                 }
             },
             onOnClose: () => {
-                this.closePropertiesDialog();
+                this._dialog = null;
             }
         });
-        this.propertiesDialogApp.use(PrimeVue, primeVueOptions);
-        this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
     }
 
     /**
@@ -1086,10 +1080,7 @@ class MeasureControls extends Control {
         const showDelete = !!(options && options.showDelete);
         const groups = (options && options.groups) || [];
 
-        // Create Vue 3 app instance
-        this._dialogContainer = document.createElement('div');
-        document.body.appendChild(this._dialogContainer);
-        this.propertiesDialogApp = createApp(MeasurementPropertiesDialog, {
+        this._dialog = this.openDialog(MeasurementPropertiesDialog, {
             feature: feature,
             geometryType: geometryType,
             showDelete: showDelete,
@@ -1115,25 +1106,18 @@ class MeasureControls extends Control {
                 this.deleteMeasurement(feature);
             },
             onOnClose: () => {
-                this.closePropertiesDialog();
+                this._dialog = null;
             }
         });
-        this.propertiesDialogApp.use(PrimeVue, primeVueOptions);
-        this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
     }
 
     /**
      * Close properties dialog
      */
     closePropertiesDialog() {
-        if (this.propertiesDialogApp) {
-            this.propertiesDialogApp.unmount();
-            if (this._dialogContainer && this._dialogContainer.parentNode) {
-                this._dialogContainer.parentNode.removeChild(this._dialogContainer);
-            }
-            this.propertiesDialogApp = null;
-            this.propertiesDialog = null;
-            this._dialogContainer = null;
+        if (this._dialog) {
+            this._dialog.close();
+            this._dialog = null;
         }
     }
 
@@ -1477,7 +1461,4 @@ class MeasureControls extends Control {
     }
 }
 
-export default {
-    Controls: MeasureControls
-};
-</script>
+export default MeasureControls;

@@ -18,8 +18,7 @@ export const GUARDS = [
         }],
         allow: [
             'webapp/js/features/dataset/ViewDataset.vue',
-            'webapp/js/features/viewers/map/Map.vue',
-            'webapp/js/features/viewers/map/SingleMap.vue'
+            'webapp/js/features/viewers/map/Map.vue'
         ]
     },
     {

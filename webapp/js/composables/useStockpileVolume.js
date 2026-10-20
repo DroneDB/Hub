@@ -209,7 +209,7 @@ export default {
         },
 
         /**
-         * Hook invoked by olMeasure (via Map.vue / SingleMap.vue) whenever a
+         * Hook invoked by the measure control (via Map.vue / SingleMap.vue) whenever a
          * feature is removed from the shared measurement source. When the
          * removed feature is the current stockpile draft (eraser tool, edit
          * dialog Delete button, list-dialog delete, ...), reset the panel so

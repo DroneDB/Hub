@@ -8,9 +8,6 @@
 import Overlay from 'ol/Overlay';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import { primeVueOptions } from '@/theme';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
 
 export default {
@@ -102,29 +99,7 @@ export default {
                 }
             }
 
-            const container = document.createElement('div');
-            document.body.appendChild(container);
-
-            const cleanup = () => {
-                try {
-                    dialogApp.unmount();
-                } catch { /* already unmounted */ }
-                if (container.parentNode) {
-                    document.body.removeChild(container);
-                }
-            };
-
-            const dialogApp = createApp(FeatureInfoDialog, {
-                title,
-                properties,
-                onOnClose: cleanup
-            });
-            dialogApp.config.errorHandler = (err) => {
-                console.error('FeatureInfoDialog error:', err);
-                cleanup();
-            };
-            dialogApp.use(PrimeVue, primeVueOptions);
-            dialogApp.mount(container);
+            this.dialogs.open(FeatureInfoDialog, { title, properties });
         },
 
         /**
