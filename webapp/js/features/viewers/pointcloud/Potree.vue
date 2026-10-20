@@ -8,14 +8,14 @@
                 <!-- Undo/Redo toolbar -->
                 <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
                     <button
-                        :disabled="undoStack.length === 0"
+                        :disabled="!canUndo"
                         class="btn-undo-redo"
                         title="Undo (Ctrl+Z)"
                         @click="undo">
                         <i class="fa-solid fa-rotate-left" />
                     </button>
                     <button
-                        :disabled="redoStack.length === 0"
+                        :disabled="!canRedo"
                         class="btn-undo-redo"
                         title="Redo (Ctrl+Y)"
                         @click="redo">
@@ -87,6 +87,7 @@ import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.
 import { loadResources } from '@/libs/lazy';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import { createUndoStack } from '@/libs/undoStack';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { isMobile } from '@/libs/responsive';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
@@ -129,9 +130,9 @@ export default {
             // Properties dialog for editing measurements
             propertiesDialog: null,
 
-            // Undo/Redo stacks for measurements
-            undoStack: [],
-            redoStack: [],
+            // Undo/redo availability (the history itself is this.history, created())
+            canUndo: false,
+            canRedo: false,
 
             // Delete tool state
             deleteToolActive: false,
@@ -155,6 +156,14 @@ export default {
         // Replaced by each viewer (loadViewer); one exists from the start so the listener
         // helpers always have a session to register with
         this.session = new PotreeSession();
+        // Measurement deletions, undone/redone from the toolbar or Ctrl+Z / Ctrl+Y
+        this.history = createUndoStack({
+            limit: 50,
+            onChange: h => {
+                this.canUndo = h.canUndo();
+                this.canRedo = h.canRedo();
+            }
+        });
     },
     mounted: function () {
         this.entryLoaded.then(ok => { if (ok) this.handleLoad(); });
@@ -1196,15 +1205,7 @@ export default {
                 }))
             };
 
-            this.undoStack.push(measureData);
-
-            // Clear redo stack when new action is performed
-            this.redoStack = [];
-
-            // Limit stack size to prevent memory issues
-            if (this.undoStack.length > 50) {
-                this.undoStack.shift();
-            }
+            this.history.push(measureData);
         },
 
         /**
@@ -1241,9 +1242,8 @@ export default {
          * Undo last action
          */
         undo: function() {
-            if (this.undoStack.length === 0) return;
-
-            const measureData = this.undoStack.pop();
+            const measureData = this.history.undo();
+            if (!measureData) return;
 
             if (measureData.actionType === 'delete') {
                 // Recreate the deleted measurement
@@ -1254,22 +1254,14 @@ export default {
                 }
             }
 
-            // Push to redo stack
-            this.redoStack.push(measureData);
-
-            // Limit redo stack size
-            if (this.redoStack.length > 50) {
-                this.redoStack.shift();
-            }
         },
 
         /**
          * Redo last undone action
          */
         redo: function() {
-            if (this.redoStack.length === 0) return;
-
-            const measureData = this.redoStack.pop();
+            const measureData = this.history.redo();
+            if (!measureData) return;
 
             if (measureData.actionType === 'delete') {
                 // Find and delete the measurement again
@@ -1284,9 +1276,6 @@ export default {
                     }
                 }
             }
-
-            // Push back to undo stack
-            this.undoStack.push(measureData);
         },
 
         /**

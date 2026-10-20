@@ -1,3 +1,4 @@
+import { createUndoStack } from '@/libs/undoStack';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
@@ -190,9 +191,8 @@ class MeasureControls extends Control {
         this.changeFeatureListener = null;
         this.doubleClickZoomInteraction = null;
 
-        // Undo stack for geometry modifications
-        this.undoStack = [];
-        this.maxUndoSteps = 50;
+        // Geometry modifications, undone with Ctrl+Z while editing
+        this.undoStack = createUndoStack({ limit: 50 });
     }
 
     /**
@@ -855,7 +855,7 @@ class MeasureControls extends Control {
         this.closePropertiesDialog();
 
         // Clear undo stack when exiting edit mode
-        this.undoStack = [];
+        this.undoStack.clear();
     }
 
     /**
@@ -866,27 +866,19 @@ class MeasureControls extends Control {
         if (!geometry) return;
 
         // Clone geometry and save with feature reference
-        const state = {
+        this.undoStack.push({
             feature: feature,
             geometry: geometry.clone(),
             tooltipText: feature.get('tooltipText')
-        };
-
-        this.undoStack.push(state);
-
-        // Limit stack size
-        if (this.undoStack.length > this.maxUndoSteps) {
-            this.undoStack.shift();
-        }
+        });
     }
 
     /**
      * Undo last geometry modification
      */
     undo() {
-        if (this.undoStack.length === 0) return;
-
-        const state = this.undoStack.pop();
+        const state = this.undoStack.undo();
+        if (!state) return;
         const feature = state.feature;
 
         // Check if feature still exists in source
