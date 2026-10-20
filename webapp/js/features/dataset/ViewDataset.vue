@@ -296,7 +296,7 @@ import { getPref, setPref, PREF } from '@/libs/preferences';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { mapStores, mapState } from 'pinia';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
-import { DOWNLOAD_LIMIT_MESSAGE } from '@/libs/constants';
+import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError } from '@/libs/datasetDownloads';
 
 /**
  * ViewDataset - Main dataset page hosting the explorer, map viewer, and
@@ -1139,21 +1139,15 @@ export default {
                 return path;
             });
 
-            // Authenticated selections over the configured size threshold are
-            // offloaded to the async bulk-download task.
-            if (reg.isLoggedIn() && this.selectionExceedsAsyncThreshold(files)) {
-                await this.startAsyncDownload(paths);
-                return;
-            }
-
             try {
-                await this.dataset.downloadWithCheck(paths);
+                await downloadFromDataset({
+                    dataset: this.dataset, paths, files,
+                    signedIn: reg.isLoggedIn(),
+                    thresholdBytes: reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES),
+                    runTask: this.runHeavyTask
+                });
             } catch (e) {
-                if (e.status === 429) {
-                    this.$notify.error(DOWNLOAD_LIMIT_MESSAGE, { summary: 'Download Limit' });
-                } else {
-                    this.showError(e.message || e, "Download Error");
-                }
+                notifyDownloadError(e);
             }
         },
 
@@ -1171,58 +1165,10 @@ export default {
                 return;
             }
 
-            const url = `${this.dataset.baseApi}/build-artifact?path=${encodeURIComponent(file.entry.path)}`;
-
-            // Preflight: check download slot availability (same pattern as downloadWithCheck)
-            const headers = { 'X-Download-Check': '1' };
-            const authToken = this.dataset.registry.getAuthToken();
-            if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-            const checkResp = await fetch(url, { headers });
-            if (checkResp.status === 429) {
-                this.$notify.error(DOWNLOAD_LIMIT_MESSAGE, { summary: 'Download Limit' });
-                return;
-            }
-
-            // Preflight passed - initiate native browser download via <a>.click()
-            const a = document.createElement('a');
-            a.href = url;
-            a.target = '_blank';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        },
-
-        // Total selection size vs the async threshold. Unknown sizes (e.g. folders)
-        // force the async path for safety.
-        selectionExceedsAsyncThreshold: function (files) {
-            const threshold = reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES);
-            if (!threshold || threshold <= 0) return false;
-
-            let total = 0;
-            for (const f of files) {
-                const size = f.entry && typeof f.entry.size === 'number' ? f.entry.size : null;
-                if (size == null) return true; // unknown size → async for safety
-                total += size;
-            }
-            return total > threshold;
-        },
-
-        startAsyncDownload: async function (paths) {
-            if (this.activeBulkDownload) return; // safety guard (should already be blocked)
             try {
-                const params = {};
-                if (paths && paths.length) params.paths = paths;
-
-                // Inform the user upfront: ZIP creation runs as a background task.
-                this.$notify.info('Archive creation started. Open the Tasks tab to download it when ready.', { summary: 'Preparing archive', life: 'long' });
-
-                const result = await this.runHeavyTask(this.dataset, 'bulk-download', { params, notify: false });
-
-                // Trigger the browser download via the authenticated result URL.
-                window.location.href = this.dataset.taskResultUrl(result.taskId);
+                await downloadBuildArtifact(this.dataset, file.entry.path);
             } catch (e) {
-                this.showError(e.message || e, "Download Error");
+                notifyDownloadError(e);
             }
         },
 

@@ -18,6 +18,9 @@ import { DEFAULT_REGISTRY } from './constants';
 import { applyHubBranding } from '../hubBranding';
 import { ApiError } from './apiError';
 import { createHttpClient } from './http/httpClient';
+import SysApi from './sysApi';
+import { safeStorage } from '../preferences';
+import ShareApi from './shareApi';
 
 let refreshTimers = {};
 
@@ -43,26 +46,8 @@ function parseJwt(token) {
     }
 }
 
-// Check localStorage availability
-const hasLocalStorage = (() => {
-    try {
-        const test = '__localStorage_test__';
-        localStorage.setItem(test, test);
-        localStorage.removeItem(test);
-        return true;
-    } catch {
-        return false;
-    }
-})();
-
-// In-memory fallback storage when localStorage is not available
-const memoryStorage = {};
-
-const storage = {
-    getItem: (key) => hasLocalStorage ? localStorage.getItem(key) : (memoryStorage[key] || null),
-    setItem: (key, value) => hasLocalStorage ? localStorage.setItem(key, value) : (memoryStorage[key] = value),
-    removeItem: (key) => hasLocalStorage ? localStorage.removeItem(key) : delete memoryStorage[key]
-};
+// Session token and username: localStorage with an in-memory fallback (libs/preferences)
+const storage = safeStorage;
 
 const registries = new Map();
 
@@ -76,6 +61,8 @@ export default class Registry {
         this.requestCache = RequestCache.forOrigin(url);
         // Transport: auth header, timeout, parsing, ApiError (HQ-05)
         this.http = createHttpClient({ baseUrl: url, getToken: () => this.getAuthToken() });
+        this.sys = new SysApi(this);
+        this.share = new ShareApi(this);
     }
 
     /**

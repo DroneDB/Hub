@@ -67,20 +67,14 @@ export default {
             this.running = true;
             this.error = '';
             try {
-                const headers = () => {
-                    const token = reg.getAuthToken();
-                    return token ? { Authorization: `Bearer ${token}` } : {};
-                };
                 this.result = await runUploadProbe({
                     upload: async body => {
-                        const res = await fetch(`${reg.url}/sys/upload-probe`, {
-                            method: 'POST', body, headers: headers(), cache: 'no-store'
-                        });
+                        const res = await reg.sys.uploadProbe(body);
                         if (res.status === 429) throw new Error('Too many tests in a short time: try again in a minute');
                         if (!res.ok) throw new Error(`The test upload failed (HTTP ${res.status})`);
                     },
                     ping: async () => {
-                        await fetch(`${reg.url}/sys/version`, { headers: headers(), cache: 'no-store' });
+                        await reg.sys.ping();
                     }
                 });
             } catch (e) {

@@ -360,18 +360,8 @@ export default {
             this.bounds = await entry.getGsplatBounds();
 
             // Optional georeferencing sidecar (informational in the standalone viewer).
-            try {
-                const georefUrl = await entry.getGeoref();
-                if (georefUrl) {
-                    const resp = await fetch(georefUrl);
-                    if (resp.ok) {
-                        const georef = await resp.json();
-                        this.crs = georef && georef.srs ? georef.srs : null;
-                    }
-                }
-            } catch {
-                // Georeferencing is optional; ignore failures.
-            }
+            const georef = await entry.getGeorefJson();
+            this.crs = georef && georef.srs ? georef.srs : null;
 
             // Load the camera presets sidecar (best-effort; absent for most datasets).
             await this.loadCameras();

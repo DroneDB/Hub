@@ -417,12 +417,13 @@ export default {
             const url = this.dataset.exportUrl(this.filePath, vizParams);
             try {
                 this.exporting = true;
-                const resp = await fetch(url, { cache: 'no-store' });
+                const resp = await this.dataset.registry.fetchRaw(url, { cache: 'no-store' });
                 if (!resp.ok) throw new Error(`Export failed (HTTP ${resp.status})`);
                 const blob = await resp.blob();
                 downloadBlob(blob, filenameFromDisposition(resp.headers.get('content-disposition'), 'raster_export.tif'));
             } catch (e) {
                 console.error('Export error:', e);
+                this.$notify.error(e, { summary: 'Export Failed' });
             } finally {
                 this.exporting = false;
             }

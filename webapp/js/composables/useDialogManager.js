@@ -434,7 +434,7 @@ export default {
 
                 // Fetch the thumbnail at 1024px
                 const thumbUrl = this.dataset.thumbUrl(file.entry.path, 1024);
-                const response = await fetch(thumbUrl, { credentials: 'include' });
+                const response = await this.dataset.registry.fetchRaw(thumbUrl);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch thumbnail: ${response.statusText}`);
                 }

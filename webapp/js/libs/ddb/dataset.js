@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Entry } from './entry';
+import { ApiError } from './apiError';
 
 export default class Dataset {
     constructor(registry, org, ds) {
@@ -21,7 +22,7 @@ export default class Dataset {
 
 
     get baseApi() {
-        return `/orgs/${this.org}/ds/${this.ds}`;
+        return `/orgs/${encodeURIComponent(this.org)}/ds/${encodeURIComponent(this.ds)}`;
     }
 
     downloadUrl(paths, options = {}) {
@@ -264,27 +265,7 @@ export default class Dataset {
      */
     async downloadWithCheck(paths, options = {}) {
         const url = this.downloadUrl(paths, options);
-        const headers = { 'X-Download-Check': '1' };
-        const authToken = this.registry.getAuthToken();
-        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-            let errorMessage = `Download failed (${response.status})`;
-            try {
-                const contentType = response.headers.get('Content-Type');
-                if (contentType && contentType.includes('application/json')) {
-                    const json = await response.json();
-                    errorMessage = json.error || json.message || errorMessage;
-                }
-            } catch {
-                // Ignore parse errors, use default message
-            }
-            const err = new Error(errorMessage);
-            err.status = response.status;
-            throw err;
-        }
+        await this.checkDownloadSlot(url);
 
         // Preflight passed - initiate native browser download
         if (url.length < 2000) {
@@ -628,6 +609,41 @@ export default class Dataset {
      */
     taskResultUrl(id) {
         return `${this.baseApi}/tasks/${encodeURIComponent(id)}/result`;
+    }
+
+    /**
+     * A completed task's artifact as a Blob (authenticated).
+     * @param {string} id Task id
+     * @returns {Promise<Blob>}
+     */
+    taskResult(id) {
+        return this.registry.makeRequest(this.taskResultUrl(id), { responseType: 'blob' });
+    }
+
+    /** URL of a built file's main artifact (e.g. a COG, a point-cloud EPT). */
+    buildArtifactUrl(path) {
+        return `${this.baseApi}/build-artifact?path=${encodeURIComponent(path)}`;
+    }
+
+    /**
+     * Preflight of a download: asks the server whether a download slot is free
+     * (X-Download-Check) before the browser navigates to `url`.
+     * @param {string} url
+     * @throws {ApiError} status 429 when the user's download limit is reached
+     */
+    async checkDownloadSlot(url) {
+        const response = await this.registry.fetchRaw(url, { headers: { 'X-Download-Check': '1' } });
+        if (response.ok) return;
+        let message = `Download failed (${response.status})`;
+        try {
+            if ((response.headers.get('Content-Type') || '').includes('application/json')) {
+                const json = await response.json();
+                message = json.error || json.message || message;
+            }
+        } catch {
+            // No JSON body: keep the default message
+        }
+        throw new ApiError(message, response.status);
     }
 };
 

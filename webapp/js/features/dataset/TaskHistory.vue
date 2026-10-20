@@ -460,7 +460,7 @@ export default {
 
         async loadProcessingNodes() {
             try {
-                const nodes = await this.dataset.registry.getRequest('/sys/processingNodes') || [];
+                const nodes = await this.dataset.registry.sys.processingNodes() || [];
                 this.photogrammetryNodes = nodes.map(n => ({
                     value: n.id,
                     id: n.id,
@@ -586,9 +586,7 @@ export default {
         async loadOdmOptions() {
             try {
                 const nodeId = this.photogrammetryForm.nodeId || 'default';
-                this.availableOdmOptions = await this.dataset.registry.getRequest(
-                    `/sys/processingNodes/${nodeId}/options`
-                ) || [];
+                this.availableOdmOptions = await this.dataset.registry.sys.processingNodeOptions(nodeId) || [];
             } catch (e) {
                 console.warn('Failed to load ODM options:', e);
                 this.availableOdmOptions = [];
@@ -633,8 +631,7 @@ export default {
             this.checkingNode = true;
             this.nodeStatus = null;
             try {
-                const status = await this.dataset.registry.getRequest(
-                    `/sys/processingNodes/${encodeURIComponent(nodeId)}/status`);
+                const status = await this.dataset.registry.sys.processingNodeStatus(nodeId);
                 this.nodeStatus = status;
                 if (status.reachable) {
                     this.$notify.success(`${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`, { summary: 'Node reachable' });

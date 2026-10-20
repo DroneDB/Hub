@@ -107,8 +107,8 @@ import useHeavyTask from '@/composables/useHeavyTask';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
-import { DOWNLOAD_LIMIT_MESSAGE } from '@/libs/constants';
 import { loginLocation } from '@/libs/authRoutes';
+import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
 
 export default {
     name: 'HubHeader',
@@ -447,63 +447,16 @@ export default {
                 })
                 : undefined;
 
-            // Authenticated bulk downloads (whole dataset or selection over the
-            // threshold) are offloaded to the async bulk-download task. Anonymous
-            // users and small/single selections keep the legacy direct streaming.
-            if (this.loggedIn && this.shouldUseAsyncDownload()) {
-                await this.startAsyncDownload(dataset, paths);
-                return;
-            }
-
-            this.isDownloading = true;
-
-            try {
-                await dataset.downloadWithCheck(paths);
-            } catch (err) {
-                if (err.status === 429) {
-                    this.$notify.error(err.message || DOWNLOAD_LIMIT_MESSAGE, { summary: 'Download Limit' });
-                } else {
-                    this.$notify.error(err);
-                }
-            } finally {
-                this.isDownloading = false;
-            }
-        },
-
-        // Decide whether an authenticated download should go through the async
-        // bulk-download task. Whole-dataset always async; a selection is async
-        // when its total size exceeds the configured threshold (when the size is
-        // unknown, async is used for safety).
-        shouldUseAsyncDownload: function () {
-            if (this.selectedFiles.length === 0) return true; // whole dataset
-
-            const threshold = reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES);
-            if (!threshold || threshold <= 0) return false;
-
-            let total = 0;
-            for (const f of this.selectedFiles) {
-                const size = f.entry && typeof f.entry.size === 'number' ? f.entry.size : null;
-                if (size == null) return true; // unknown size → async for safety
-                total += size;
-            }
-            return total > threshold;
-        },
-
-        startAsyncDownload: async function (dataset, paths) {
             this.isDownloading = true;
             try {
-                const params = {};
-                if (paths && paths.length) params.paths = paths;
-
-                // Inform the user upfront: ZIP creation runs as a background task.
-                this.$notify.info('Archive creation started. Open the Tasks tab to download it when ready.', { summary: 'Preparing archive', life: 'long' });
-
-                const result = await this.runHeavyTask(dataset, 'bulk-download', { params, notify: false });
-
-                // Trigger the browser download via the authenticated result URL.
-                window.location.href = dataset.taskResultUrl(result.taskId);
+                await downloadFromDataset({
+                    dataset, paths, files: this.selectedFiles,
+                    signedIn: this.loggedIn,
+                    thresholdBytes: reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES),
+                    runTask: this.runHeavyTask
+                });
             } catch (err) {
-                this.$notify.error(err);
+                notifyDownloadError(err);
             } finally {
                 this.isDownloading = false;
             }

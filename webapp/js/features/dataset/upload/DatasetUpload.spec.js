@@ -19,7 +19,10 @@ vi.mock('@/libs/upload/uploadRequests', () => ({
     })
 }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
-    default: { url: 'http://hub.test', getAuthToken: () => 'token', invalidateCache: vi.fn() }
+    default: {
+        url: 'http://hub.test', getAuthToken: () => 'token', invalidateCache: vi.fn(),
+        Organization: org => ({ Dataset: ds => ({ baseApi: `/orgs/${org}/ds/${ds}` }) })
+    }
 }));
 
 const { default: DatasetUpload } = await import('./DatasetUpload.vue');

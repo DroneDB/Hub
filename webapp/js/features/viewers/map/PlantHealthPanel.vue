@@ -458,9 +458,8 @@ export default {
                     notify: false
                 });
 
-                // Download the produced GeoTIFF (auth via Authorization header).
-                const url = this.dataset.taskResultUrl(result.taskId);
-                const blob = await this.dataset.registry.makeRequest(url, 'GET', null, null, 'blob');
+                // Download the produced GeoTIFF
+                const blob = await this.dataset.taskResult(result.taskId);
                 downloadBlob(blob, `${pathutils.stem(this.filePath) || 'export'}_export.tif`);
             } catch (e) {
                 console.error('Export error:', e);

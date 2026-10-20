@@ -69,6 +69,7 @@ import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
+import { fetchWmsLayers } from '@/libs/map/wmsCapabilities';
 
 export default {
     components: {
@@ -217,7 +218,7 @@ export default {
             this.customError = null;
 
             try {
-                const layers = await this.fetchWmsCapabilities(this.customUrl.trim());
+                const layers = await fetchWmsLayers(this.customUrl.trim());
                 this.wmsLayers = layers;
                 if (layers.length > 0) {
                     this.customLayerName = layers[0].name;
@@ -231,74 +232,6 @@ export default {
             }
         },
 
-        /**
-         * Fetch WMS GetCapabilities and return all layer names and titles
-         */
-        fetchWmsCapabilities: function (url) {
-            return new Promise((resolve, reject) => {
-                const separator = url.includes('?') ? '&' : '?';
-                const capUrl = url + separator + 'SERVICE=WMS&REQUEST=GetCapabilities';
-                const xhr = new XMLHttpRequest();
-                xhr.open('GET', capUrl, true);
-                xhr.timeout = 15000;
-                xhr.onload = () => {
-                    try {
-                        const parser = new DOMParser();
-                        const xml = parser.parseFromString(xhr.responseText, 'text/xml');
-
-                        // Check for parse errors
-                        if (xml.querySelector('parsererror')) {
-                            reject(new Error('Invalid XML response from WMS server.'));
-                            return;
-                        }
-
-                        const layers = [];
-                        // Find all Layer elements that have a Name child (queryable layers)
-                        const layerElements = xml.querySelectorAll('Layer');
-                        layerElements.forEach(el => {
-                            const nameEl = el.querySelector(':scope > Name');
-                            if (nameEl) {
-                                const titleEl = el.querySelector(':scope > Title');
-                                // Extract TIME dimension default value if present
-                                let defaultTime = '';
-                                const dims = el.querySelectorAll(':scope > Dimension');
-                                dims.forEach(dim => {
-                                    if ((dim.getAttribute('name') || '').toLowerCase() === 'time') {
-                                        defaultTime = dim.getAttribute('default') || '';
-                                        if (!defaultTime) {
-                                            // Fallback: use last value from extent text
-                                            const extent = (dim.textContent || '').trim();
-                                            if (extent) {
-                                                const parts = extent.split(',');
-                                                const last = parts[parts.length - 1].trim();
-                                                // Extract first ISO date from range (e.g. "2026-03-12T12:28:18Z/...")
-                                                defaultTime = last.split('/')[0];
-                                            }
-                                        }
-                                    }
-                                });
-                                layers.push({
-                                    name: nameEl.textContent,
-                                    title: titleEl ? titleEl.textContent : '',
-                                    defaultTime: defaultTime
-                                });
-                            }
-                        });
-
-                        if (layers.length > 0) {
-                            resolve(layers);
-                        } else {
-                            reject(new Error('No layers found in WMS capabilities.'));
-                        }
-                    } catch {
-                        reject(new Error('Failed to parse WMS capabilities.'));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('Could not connect to WMS server.'));
-                xhr.ontimeout = () => reject(new Error('WMS capabilities request timed out.'));
-                xhr.send();
-            });
-        },
 
         /**
          * Build a test URL for verifying the custom source is reachable

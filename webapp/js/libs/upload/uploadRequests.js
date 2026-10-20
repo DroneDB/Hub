@@ -15,6 +15,7 @@
  */
 import { sendXhr } from './xhrTransport';
 import { newId } from '@/libs/ids';
+import { bearer } from '@/libs/ddb/http/httpClient';
 
 export const CHUNK_BYTES = 64 * 1024 * 1024;
 export const RECEIPT_POLL_MS = 2000;
@@ -45,10 +46,7 @@ export function createUploadRequests(deps) {
     const receipts = deps.receipts ?? true;
 
     const headers = uploadId => {
-        const h = { 'X-Upload-Id': uploadId };
-        const token = deps.authToken();
-        if (token) h.Authorization = `Bearer ${token}`;
-        return h;
+        return { 'X-Upload-Id': uploadId, ...bearer(deps.authToken()) };
     };
 
     async function send(job, hooks) {

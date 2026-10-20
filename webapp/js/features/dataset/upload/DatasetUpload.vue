@@ -253,7 +253,7 @@ export default {
     methods: {
         createQueue() {
             const requests = createUploadRequests({
-                baseUrl: `${reg.url}/orgs/${this.organization}/ds/${this.dataset}`,
+                baseUrl: `${reg.url}${reg.Organization(this.organization).Dataset(this.dataset).baseApi}`,
                 authToken: () => reg.getAuthToken(),
                 getJson: authorizedGetJson(reg),
                 destination: item => item.path

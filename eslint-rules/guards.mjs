@@ -72,15 +72,7 @@ export const GUARDS = [
             { name: 'fetch', message: 'Use the Registry client (Dataset/SysApi methods, httpClient.fetchRaw) (HQ-05).' },
             { name: 'XMLHttpRequest', message: 'Use the Registry client (HQ-05).' }
         ],
-        allow: [
-            'webapp/js/composables/useDialogManager.js',
-            'webapp/js/composables/useMvtLayer.js',
-            'webapp/js/features/account/UploadDiagnostics.vue',
-            'webapp/js/features/dataset/ViewDataset.vue',
-            'webapp/js/features/viewers/map/MapSettingsDialog.vue',
-            'webapp/js/features/viewers/map/RasterAnalysisControls.vue',
-            'webapp/js/features/viewers/splat/Splat.vue'
-        ]
+        allow: []
     }
 ];
 

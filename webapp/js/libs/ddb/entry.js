@@ -78,7 +78,7 @@ class Entry {
         const boundsUrl = this.buildUrl("gsplat/bounds.json");
         if (!(await this.dataset.registry.headRequest(boundsUrl))) return null;
         try {
-            const resp = await fetch(boundsUrl);
+            const resp = await this.dataset.registry.fetchRaw(boundsUrl);
             if (!resp.ok) return null;
             const b = await resp.json();
             if (b && Array.isArray(b.min) && Array.isArray(b.max)) return b;
@@ -97,6 +97,18 @@ class Entry {
         const georefUrl = this.buildUrl("gsplat/georef.json");
         if (await this.dataset.registry.headRequest(georefUrl)) return georefUrl;
         return null;
+    }
+
+    /** The parsed georeferencing sidecar, or null when absent or unreadable. */
+    async getGeorefJson() {
+        const georefUrl = await this.getGeoref();
+        if (!georefUrl) return null;
+        try {
+            const resp = await this.dataset.registry.fetchRaw(georefUrl);
+            return resp.ok ? await resp.json() : null;
+        } catch {
+            return null;
+        }
     }
 
     async getVector() {

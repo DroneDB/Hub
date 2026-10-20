@@ -27,6 +27,15 @@ const STATUS_TEXT = {
     503: 'Service Unavailable'
 };
 
+/**
+ * The Authorization header for a session token (the only place it is built).
+ * @param {string|null|undefined} token
+ * @returns {Record<string, string>}
+ */
+export function bearer(token) {
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 /** @returns {never} */
 function fail(message, status, extra = {}) {
     throw new ApiError(message, status, extra);
@@ -173,8 +182,7 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
 
     /** @param {Record<string, string>} [extra] @returns {Record<string, string>} */
     function authHeaders(extra = {}) {
-        const token = getToken();
-        return token ? { ...extra, Authorization: `Bearer ${token}` } : { ...extra };
+        return { ...extra, ...bearer(getToken()) };
     }
 
     /**

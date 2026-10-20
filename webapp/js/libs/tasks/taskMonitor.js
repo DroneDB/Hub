@@ -151,10 +151,9 @@ function _updateStream(ent) {
     const controller = new AbortController();
     ent.stream = controller;
     const registry = ent.dataset.registry;
-    const token = registry.getAuthToken?.();
     openEventStream({
         url: `${registry.url}${ent.dataset.baseApi}/tasks/events`,
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: registry.authHeaders ? registry.authHeaders() : {},
         signal: controller.signal,
         onOpen: () => {
             if (ent.stream !== controller) return;

@@ -134,11 +134,11 @@ export default {
 
             try {
                 if (!this.uploadToken) {
-                    const r = await reg.makeRequest('/share/init', "POST");
+                    const r = await reg.share.init();
                     this.uploadToken = r.token;
                     this.shareRequests = createUploadRequests({
                         baseUrl: reg.url,
-                        singleUrl: `${reg.url}/share/upload/${this.uploadToken}`,
+                        singleUrl: reg.share.uploadUrl(this.uploadToken),
                         authToken: () => reg.getAuthToken(),
                         getJson: authorizedGetJson(reg),
                         destination: item => item.path,
@@ -164,7 +164,7 @@ export default {
 
             this.committing = true;
             try {
-                const r = await reg.makeRequest(`/share/commit/${this.uploadToken}`, "POST");
+                const r = await reg.share.commit(this.uploadToken);
                 // The component may unmount while the commit is in flight
                 if (r.url && !this._isUnmounted) {
                     location.href = r.url;

@@ -11,9 +11,8 @@
  */
 export function authorizedGetJson(registry) {
     return async url => {
-        const token = registry.getAuthToken();
         try {
-            const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {}, cache: 'no-store' });
+            const res = await registry.fetchRaw(url, { cache: 'no-store' });
             let body = null;
             try {
                 body = await res.json();

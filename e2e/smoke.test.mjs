@@ -115,6 +115,18 @@ test('dragging a file onto a folder moves it', async () => {
     assert.fail(`${name} was not moved into sub/`);
 });
 
+test('the header downloads the selected file', async () => {
+    const name = path.basename(FILES.raster);
+    await page.click(`#explorer >> text=${name}`);
+    await page.click(`button[title="Download ${name}"]`);
+    const [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: 30000 }),
+        page.click('.p-dialog button:has-text("Download")')
+    ]);
+    assert.equal(download.suggestedFilename(), name);
+    await download.cancel();
+});
+
 test('the header Settings button opens the dataset settings', async () => {
     await page.click('button[title="Settings"]');
     await page.waitForSelector('text=License:', { timeout: 15000 });

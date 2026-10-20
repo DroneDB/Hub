@@ -201,7 +201,7 @@ export default {
         async loadConfig() {
             this.loading = true;
             try {
-                const data = await reg.makeRequest('/sys/config', 'GET');
+                const data = await reg.sys.config();
                 this.sections = data.sections || [];
             } catch (e) {
                 console.error('Failed to load config:', e);
