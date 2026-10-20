@@ -255,11 +255,11 @@
         cursor: not-allowed;
     }
 
-    .btn-measurement.btn-danger {
+    .btn-measurement--danger {
         background: var(--ddb-viewer-btn-danger);
     }
 
-    .btn-measurement.btn-danger:hover {
+    .btn-measurement--danger:hover {
         background: var(--ddb-viewer-btn-danger-hover);
     }
 

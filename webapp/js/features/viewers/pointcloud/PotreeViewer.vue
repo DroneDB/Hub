@@ -33,7 +33,7 @@
                     <i class="fa-solid fa-floppy-disk" />
                     Save Measurements
                 </button>
-                <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-danger"
+                <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-measurement--danger"
                         title="Delete saved measurements file" @click="requestDelete">
                     <i class="fa-solid fa-trash" />
                     Delete Saved
