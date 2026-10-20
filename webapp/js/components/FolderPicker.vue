@@ -488,11 +488,11 @@ export default {
 /* Highlight the currently selected folder/file row. */
 .folder-picker-body :deep(tr.row-selected),
 .folder-picker-body :deep(tr.row-selected > td) {
-    background-color: var(--ddb-selected-bg, #e8f4ff) !important;
+    background-color: var(--ddb-selected-bg) !important;
 }
 
 .folder-picker-body :deep(tr.row-selected:hover),
 .folder-picker-body :deep(tr.row-selected:hover > td) {
-    background-color: var(--ddb-selected-active-bg, #d8e8f8) !important;
+    background-color: var(--ddb-selected-active-bg) !important;
 }
 </style>

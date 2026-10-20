@@ -506,14 +506,14 @@ export default {
 }
 
 .verify-stat i {
-    color: var(--p-primary-color, #2563eb);
+    color: var(--p-primary-color);
 }
 
 .import-log {
     font-family: monospace;
     font-size: 0.8rem;
     color: var(--ddb-text-muted);
-    background: var(--p-content-background, rgba(0, 0, 0, 0.03));
+    background: var(--p-content-background);
     border-radius: 4px;
     padding: 0.5rem;
     max-height: 8rem;

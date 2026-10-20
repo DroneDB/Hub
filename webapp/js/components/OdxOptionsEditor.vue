@@ -492,9 +492,9 @@ export default {
 
 <style scoped>
 .odm-options-editor {
-    border: 1px solid var(--ddb-border, #dee2e6);
+    border: 1px solid var(--ddb-border);
     border-radius: 6px;
-    background: var(--ddb-bg-secondary, #f8f9fa);
+    background: var(--ddb-bg-light);
 }
 
 .odm-editor-toolbar {
@@ -502,8 +502,8 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--ddb-border, #dee2e6);
-    background: var(--ddb-bg-primary, #fff);
+    border-bottom: 1px solid var(--ddb-border);
+    background: var(--ddb-bg-surface);
     border-radius: 6px 6px 0 0;
 }
 
@@ -525,7 +525,7 @@ export default {
 
 .odm-search-bar {
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--ddb-border, #dee2e6);
+    border-bottom: 1px solid var(--ddb-border);
 }
 
 .odm-options-content {
@@ -534,7 +534,7 @@ export default {
 }
 
 .odm-option-group {
-    border-bottom: 1px solid var(--ddb-border, #dee2e6);
+    border-bottom: 1px solid var(--ddb-border);
 }
 
 .odm-option-group-header {
@@ -544,24 +544,24 @@ export default {
     gap: 0.5rem;
     padding: 0.5rem 0.75rem;
     cursor: pointer;
-    background: var(--ddb-bg-primary, #fff);
+    background: var(--ddb-bg-surface);
     font-weight: 600;
     font-size: 0.85rem;
     user-select: none;
 }
 
 .odm-option-group-header:hover {
-    background: var(--ddb-bg-hover, #e9ecef);
+    background: var(--ddb-bg-hover);
 }
 
 .odm-toggle-icon {
     font-size: 0.7rem;
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .odm-group-icon {
     font-size: 0.9rem;
-    color: var(--ddb-primary, #0d6efd);
+    color: var(--ddb-primary);
 }
 
 .odm-group-name {
@@ -569,7 +569,7 @@ export default {
 }
 
 .odm-option-count {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
     font-weight: 400;
     font-size: 0.8rem;
 }
@@ -581,9 +581,9 @@ export default {
 .odm-option-subgroup-header {
     font-weight: 600;
     font-size: 0.8rem;
-    color: var(--ddb-text-muted, #6c757d);
+    color: var(--ddb-text-muted);
     padding: 0.3rem 0;
-    border-bottom: 1px solid var(--ddb-border, #dee2e6);
+    border-bottom: 1px solid var(--ddb-border);
     margin-bottom: 0.25rem;
 }
 
@@ -596,13 +596,13 @@ export default {
 }
 
 .muted {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 /* Brief highlight when scrolled to from pills */
 .odm-option-row.odm-option-highlight {
-    background: var(--ddb-selected-bg, #e8f4ff);
-    border-left: 3px solid var(--ddb-primary, #0070e0);
+    background: var(--ddb-selected-bg);
+    border-left: 3px solid var(--ddb-primary);
     transition: background-color 0.2s ease, border-left 0.2s ease;
 }
 </style>

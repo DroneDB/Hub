@@ -69,20 +69,19 @@
         </div>
 
         <!-- Drill-down dialog: only mounted from the top-level instance to avoid stacking -->
-        <Dialog v-if="depth === 0"
+        <Window v-if="depth === 0"
                 v-model:visible="drillDownVisible"
-                :header="drillDownTitle"
+                :title="drillDownTitle"
                 modal
-                dismissable-mask
-                :style="{ width: '75vw', maxWidth: '1100px' }"
-                :content-style="{ maxHeight: '75vh', overflow: 'auto' }">
+                close-modal-on-click
+                width="75vw" max-width="1100px" height="auto">
             <PropsTable v-if="drillDownVisible"
                         :obj="drillDownData"
                         :depth="0"
                         :max-depth="Infinity"
                         :preserve-order="preserveOrder"
                         :copyable-values="copyableValues" />
-        </Dialog>
+        </Window>
     </div>
 </template>
 
@@ -91,7 +90,7 @@ import { clone, sortObjectKeys } from '@/libs/utils';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
-import Dialog from 'primevue/dialog';
+import Window from '@/components/Window.vue';
 import { copyText } from '@/composables/useCopyText';
 
 /**
@@ -112,7 +111,7 @@ export default {
         DataTable,
         Column,
         Button,
-        Dialog,
+        Window,
         PropsTable: () => import('./PropsTable.vue')
     },
     // Root instance exposes a drill-down opener that any nested PropsTable can
@@ -331,12 +330,12 @@ export default {
 }
 
 .bool-true {
-    color: #4caf50;
+    color: var(--ddb-success);
     font-weight: bold;
 }
 
 .bool-false {
-    color: #f44336;
+    color: var(--ddb-danger);
     font-weight: bold;
 }
 

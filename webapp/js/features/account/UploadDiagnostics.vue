@@ -89,15 +89,15 @@ export default {
 
 <style scoped>
 .intro {
-    color: var(--ddb-text-muted, #666);
+    color: var(--ddb-text-muted);
     font-size: 0.9rem;
 }
 
 .results {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-    gap: var(--ddb-spacing-md, 1rem);
-    margin: var(--ddb-spacing-md, 1rem) 0;
+    gap: var(--ddb-spacing-md);
+    margin: var(--ddb-spacing-md) 0;
 }
 
 .results dd {
@@ -107,14 +107,14 @@ export default {
 .results dt {
     font-weight: normal;
     font-size: 0.8rem;
-    color: var(--ddb-text-muted, #666);
+    color: var(--ddb-text-muted);
 }
 
 .hint {
-    margin-bottom: var(--ddb-spacing-md, 1rem);
+    margin-bottom: var(--ddb-spacing-md);
 }
 
 .error {
-    color: var(--ddb-danger, #c00);
+    color: var(--ddb-danger);
 }
 </style>

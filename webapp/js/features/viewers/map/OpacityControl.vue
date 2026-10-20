@@ -82,10 +82,10 @@ export default {
 }
 
 .ph-btn:hover {
-    color: #fff;
+    color: var(--ddb-text-on-color);
 }
 
 .ph-btn.active {
-    color: #7bc67e;
+    color: var(--ddb-map-control-active);
 }
 </style>

@@ -115,7 +115,7 @@
         <OrganizationsDialog v-if="showOrganizationsDialog" :user="currentUser"
                              @close="handleCloseOrganizations" />
         <RoleManagementDialog v-if="showRoleManagement" :roles="availableRoles"
-                              @close="handleCloseRoleManagement" @on-roles-changed="refreshRoles" />
+                              @close="handleCloseRoleManagement" @roles-changed="refreshRoles" />
         <OrganizationManagementDialog v-if="showOrganizationManagement" @close="handleCloseOrganizationManagement" />
 
         <!-- Delete User Confirmation Dialog -->

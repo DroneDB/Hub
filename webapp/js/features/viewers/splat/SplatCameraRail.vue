@@ -60,7 +60,7 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
     overflow-y: auto;
     padding: 0.35rem 0.3rem;
     background: rgba(0, 0, 0, 0.35);
-    border-radius: 0 var(--ddb-border-radius, 6px) var(--ddb-border-radius, 6px) 0;
+    border-radius: 0 var(--ddb-radius-sm) var(--ddb-radius-sm) 0;
     user-select: none;
 }
 
@@ -75,7 +75,7 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
     height: 2.1rem;
     flex: 0 0 auto;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: var(--ddb-border-radius, 6px);
+    border-radius: var(--ddb-radius-sm);
     background: rgba(0, 0, 0, 0.5);
     color: var(--ddb-text-on-dark);
     cursor: pointer;

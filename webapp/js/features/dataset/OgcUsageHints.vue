@@ -76,7 +76,7 @@ export default {
 .hint-text code,
 .hint-url code {
     display: block;
-    background: var(--ddb-surface-section, #f4f4f4);
+    background: var(--ddb-bg-subtle);
     padding: 0.4rem 0.6rem;
     border-radius: 0.25rem;
     font-family: monospace;

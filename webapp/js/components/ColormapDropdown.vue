@@ -139,7 +139,7 @@ useEventListener(document, 'click', e => {
     width: 100%;
     background: rgba(255,255,255,0.1);
     border: 1px solid rgba(255,255,255,0.2);
-    color: #eee;
+    color: var(--panel-text);
     border-radius: 0.25rem;
     padding: 0.25rem 0.4rem;
     font-size: 0.8rem;
@@ -155,7 +155,7 @@ useEventListener(document, 'click', e => {
 .colormap-arrow {
     margin-left: auto;
     font-size: 0.6rem;
-    color: #aaa;
+    color: var(--panel-muted);
 }
 
 .colormap-menu {
@@ -166,7 +166,7 @@ useEventListener(document, 'click', e => {
     left: 0;
     right: 0;
     z-index: 10;
-    background: #2a2a2a;
+    background: var(--panel-option-bg);
     border: 1px solid rgba(255,255,255,0.2);
     border-radius: 0.25rem;
     margin-top: 2px;
@@ -182,7 +182,7 @@ useEventListener(document, 'click', e => {
     padding: 0.3rem 0.4rem;
     cursor: pointer;
     font-size: 0.8rem;
-    color: #eee;
+    color: var(--panel-text);
 }
 
 .colormap-option:hover,

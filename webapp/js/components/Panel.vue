@@ -104,14 +104,14 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
 .panel-splitter {
     height: 100%;
     min-height: 0;
     border: none !important;
 }
 
-.panel-splitter > .p-splitterpanel {
+.panel-splitter > :deep(.p-splitterpanel) {
     min-height: 0;
     min-width: 0;
     overflow: hidden;
@@ -119,7 +119,7 @@ export default {
     flex-direction: column;
 }
 
-.panel-gutter {
+.panel-splitter :deep(.panel-gutter) {
     background: var(--ddb-border-separator) !important;
 }
 </style>

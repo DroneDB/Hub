@@ -48,7 +48,7 @@ export default {
 }
 
 #loader-backdrop {
-  background: rgba(var(--ddb-text-rgb, 100, 100, 100), 0.2);
+  background: rgba(100, 100, 100, 0.2);
   position: absolute;
   right: 0;
   top: 0;

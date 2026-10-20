@@ -257,7 +257,7 @@ export default {
 .no-measurements {
     text-align: center;
     padding: 2rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     font-style: italic;
 }
 
@@ -267,9 +267,9 @@ export default {
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0.5rem;
-    background-color: var(--surface-section, rgba(0,0,0,0.03));
-    border-left: 3px solid var(--ddb-primary, #3388ff);
-    border-bottom: var(--ddb-border-width, 1px) solid var(--surface-border, #dee2e6);
+    background-color: var(--ddb-bg-subtle);
+    border-left: 3px solid var(--ddb-primary);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-weight: 600;
     font-size: 0.9rem;
     color: var(--ddb-text);
@@ -279,9 +279,9 @@ export default {
 }
 
 .group-row--ungrouped {
-    border-left-color: var(--ddb-border, #dee2e6);
+    border-left-color: var(--ddb-border);
     font-weight: 500;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
 }
 
 .group-name {
@@ -295,7 +295,7 @@ export default {
 
 .group-count {
     font-size: 0.78rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     font-weight: 400;
 }
 
@@ -316,7 +316,7 @@ export default {
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
-    border-bottom: var(--ddb-border-width, 1px) solid var(--surface-border, #dee2e6);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-size: 0.87rem;
 }
 
@@ -325,12 +325,12 @@ export default {
 }
 
 .measurement-row:hover {
-    background-color: var(--surface-hover, rgba(0,0,0,0.04));
+    background-color: var(--ddb-bg-hover);
 }
 
 .type-icon {
     width: 1rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     flex-shrink: 0;
 }
 
@@ -343,7 +343,7 @@ export default {
 
 .measurement-value {
     font-size: 0.78rem;
-    color: var(--text-color-secondary, #888);
+    color: var(--ddb-text-muted);
     white-space: nowrap;
     max-width: 8rem;
     overflow: hidden;
@@ -365,10 +365,10 @@ export default {
 /* Group select dropdown */
 .group-select {
     font-size: 0.75rem;
-    border: var(--ddb-border-width, 1px) solid var(--ddb-border);
+    border: var(--ddb-border-width) solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
     padding: 0.1rem 0.25rem;
-    background: var(--surface-0, #fff);
+    background: var(--ddb-bg-surface);
     color: var(--ddb-text);
     cursor: pointer;
     max-width: 7rem;
@@ -382,7 +382,7 @@ export default {
     padding: 0.2rem 0.35rem;
     border-radius: 0.25rem;
     font-size: 0.78rem;
-    color: var(--ddb-text, #495057);
+    color: var(--ddb-text);
     line-height: 1;
 }
 
@@ -392,7 +392,7 @@ export default {
 
 .btn-delete,
 .btn-delete-group {
-    color: var(--ddb-danger, #dc3545);
+    color: var(--ddb-danger);
 }
 
 .btn-delete:hover,
@@ -407,7 +407,7 @@ export default {
     justify-content: space-between;
     margin-top: 0.75rem;
     padding-top: 0.75rem;
-    border-top: var(--ddb-border-width, 1px) solid var(--surface-border, #dee2e6);
+    border-top: var(--ddb-border-width) solid var(--ddb-border);
 }
 
 .btn-new-group {
@@ -415,7 +415,7 @@ export default {
     align-items: center;
     gap: 0.4rem;
     background: none;
-    border: var(--ddb-border-width, 1px) solid var(--ddb-border);
+    border: var(--ddb-border-width) solid var(--ddb-border);
     padding: 0.35rem 0.75rem;
     border-radius: var(--ddb-radius-sm);
     cursor: pointer;
@@ -425,6 +425,6 @@ export default {
 }
 
 .btn-new-group:hover {
-    background-color: var(--surface-hover, rgba(0, 0, 0, 0.04));
+    background-color: var(--ddb-bg-hover);
 }
 </style>

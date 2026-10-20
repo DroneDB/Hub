@@ -1,10 +1,7 @@
 <template>
-    <Dialog :visible="visible"
-            modal
-            header="Vegetation index formulas"
-            :style="{ width: '640px' }"
-            :draggable="false"
-            @update:visible="onVisibleChange">
+    <Window id="plant-health-formulas" :visible="visible" title="Vegetation index formulas" modal fixed-position
+            width="640px" max-width="95vw" height="auto" close-button cancel-label="Close"
+            @update:visible="$emit('update:visible', $event)">
         <div class="info-dialog-body">
             <p class="info-intro">
                 Each formula combines spectral bands to highlight a specific
@@ -34,16 +31,11 @@
             </p>
         </div>
 
-        <template #footer>
-            <Button label="Close" icon="fas fa-times" severity="secondary"
-                    @click="onClose" />
-        </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
+import Window from '@/components/Window.vue';
 
 // Curated copy for the most common multispectral indices. Anything not listed
 // here falls back to the descriptions provided by the backend.
@@ -113,7 +105,7 @@ const FORMULA_INFO = {
 
 export default {
     name: 'PlantHealthFormulasDialog',
-    components: { Dialog, Button },
+    components: { Window },
     props: {
         visible: { type: Boolean, default: false },
         formulas: { type: Array, default: () => [] }
@@ -149,8 +141,6 @@ export default {
             // 3. Fall back gracefully
             return 'see formula expression above';
         },
-        onVisibleChange(v) { this.$emit('update:visible', v); },
-        onClose() { this.$emit('update:visible', false); }
     }
 };
 </script>
@@ -168,7 +158,7 @@ export default {
 }
 
 .formula-card {
-    border: 1px solid var(--p-content-border-color, rgba(255, 255, 255, 0.15));
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
@@ -185,7 +175,7 @@ export default {
 
 .formula-id {
     font-weight: 700;
-    color: #4caf50;
+    color: var(--ddb-success);
 }
 
 .formula-name {
@@ -205,7 +195,7 @@ export default {
 }
 
 .unavailable {
-    color: #ef9a9a;
+    color: var(--ddb-danger);
 }
 
 .unavailable i {

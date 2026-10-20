@@ -1,7 +1,7 @@
 <template>
     <Window id="addToDataset" :title="dialogTitle" modal :closable="closable" :fixed-size="true" @close="close">
         <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
-                       :files-to-upload="filesToUpload" @on-upload="onUploaded" @done="done"
+                       :files-to-upload="filesToUpload" @upload="onUploaded" @done="done"
                        @update:closable="updateClosable" @close="close"
                        @update:waiting-for-files="updateWaitingForFiles"
                        @import-from-url="$emit('importFromUrl')" />

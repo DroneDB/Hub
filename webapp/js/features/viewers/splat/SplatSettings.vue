@@ -47,7 +47,7 @@ const degrees = v => `${v.toFixed(1)}°`;
     display: flex;
     justify-content: flex-end;
     gap: 0.3rem;
-    margin-top: var(--ddb-spacing-sm, 0.5rem);
+    margin-top: var(--ddb-spacing-sm);
 }
 
 .form-group {
@@ -63,7 +63,7 @@ const degrees = v => `${v.toFixed(1)}°`;
 
 small {
     display: block;
-    color: var(--ddb-text-muted, #999);
+    color: var(--ddb-text-muted);
     margin: 0.15rem 0 0.4rem;
 }
 
@@ -76,9 +76,9 @@ small {
 .calib-reset {
     border: none;
     background: transparent;
-    color: var(--ddb-primary, #2a6fb0);
+    color: var(--ddb-primary);
     cursor: pointer;
-    font-size: var(--ddb-font-size-sm, 0.8rem);
+    font-size: var(--ddb-font-size-sm);
     padding: 0;
 }
 </style>

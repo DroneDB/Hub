@@ -1,5 +1,5 @@
 <template>
-    <div v-if="visible" class="raster-panel">
+    <div v-if="visible" class="analysis-panel analysis-panel--raster raster-panel">
         <div class="panel-header">
             <span class="panel-title">
                 <i :class="panelIconClass" /> {{ panelTitle }}
@@ -97,9 +97,9 @@
                                     @active-sample="onProfileHover" />
             </div>
             <!-- Actions: two rows so each button has room for a short label -->
-            <div class="section actions actions-grid">
-                <button class="btn btn-sm action-btn"
-                        :class="drawingProfile ? 'btn-warning active' : 'btn-secondary'"
+            <div class="section actions-grid">
+                <button class="panel-btn action-btn"
+                        :class="{ 'is-active': drawingProfile }"
                         :disabled="profileLoading"
                         :title="drawingProfile
                             ? 'Stop drawing and discard the partial profile (Esc)'
@@ -110,13 +110,13 @@
                         : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')" />
                     {{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}
                 </button>
-                <button v-if="profile && !drawingProfile" class="btn btn-link btn-sm action-btn"
+                <button v-if="profile && !drawingProfile" class="panel-btn action-btn"
                         title="Clear the chart and remove the line from the map" aria-label="Clear the chart and remove the line from the map"
                         @click="clearProfile">
                     <i class="fas fa-eraser" />
                 </button>
-                <button class="btn btn-sm action-btn"
-                        :class="inspectActive ? 'btn-warning active' : 'btn-secondary'"
+                <button class="panel-btn action-btn"
+                        :class="{ 'is-active': inspectActive }"
                         :title="inspectActive
                             ? 'Stop inspecting raster values (Esc)'
                             : 'Click on the map to read the raster value'"
@@ -124,35 +124,35 @@
                     <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'" />
                     <span class="action-label">Inspect</span>
                 </button>
-                <button v-if="supports3D" class="btn btn-sm action-btn"
-                        :class="view3D ? 'btn-primary active' : 'btn-secondary'"
+                <button v-if="supports3D" class="panel-btn action-btn"
+                        :class="{ 'panel-btn--primary': view3D }"
                         :title="view3D ? 'Switch back to 2D map view' : 'Show this raster as a 3D heightmap'"
                         data-testid="raster-3d-toggle"
                         @click="toggle3DView">
                     <i class="fas fa-cube" />
                     <span class="action-label">{{ view3D ? '2D View' : '3D View' }}</span>
                 </button>
-                <button v-if="!isThermal && !loadError" class="btn btn-secondary btn-sm action-btn"
+                <button v-if="!isThermal && !loadError" class="panel-btn action-btn"
                         title="Generate contour lines from this elevation raster"
                         data-testid="raster-contours-btn"
                         @click="onGenerateContoursClick">
                     <i class="fas fa-layer-group" />
                     <span class="action-label">Contours</span>
                 </button>
-                <button class="btn btn-secondary btn-sm action-btn" title="Reset all visualization parameters to their defaults"
+                <button class="panel-btn action-btn" title="Reset all visualization parameters to their defaults"
                         @click="reset">
                     <i class="fas fa-rotate-left" />
                     <span class="action-label">Reset</span>
                 </button>
-                <button class="btn btn-sm action-btn"
-                        :class="originalView ? 'btn-primary' : 'btn-secondary'"
+                <button class="panel-btn action-btn"
+                        :class="{ 'panel-btn--primary': originalView }"
                         :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
                         @click="toggleOriginalView">
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                     <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
                 <button v-if="!isExportTooLarge"
-                        class="btn btn-secondary btn-sm action-btn"
+                        class="panel-btn action-btn"
                         :disabled="exporting"
                         title="Export the current view as a GeoTIFF file"
                         @click="exportGeoTiff">
@@ -175,33 +175,13 @@
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
+import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 import RasterProfileChart from './RasterProfileChart.vue';
 import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
-
-const THERMAL_COLORMAPS = [
-    { id: 'ironbow', name: 'Ironbow', colors: ['#000000', '#570f6a', '#bd3754', '#f97808', '#ffe344', '#ffffff'] },
-    { id: 'whitehot', name: 'White Hot', colors: ['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff'] },
-    { id: 'blackhot', name: 'Black Hot', colors: ['#ffffff', '#cccccc', '#999999', '#666666', '#333333', '#000000'] },
-    { id: 'arctic', name: 'Arctic', colors: ['#000040', '#0064c8', '#64c8ff', '#c8f0ff', '#ffffff', '#ffffff'] },
-    { id: 'lava', name: 'Lava', colors: ['#000000', '#800000', '#ff5000', '#ffc800', '#ffffc8', '#ffffc8'] },
-    { id: 'inferno', name: 'Inferno', colors: ['#000004', '#57106e', '#bc3754', '#f98e09', '#fcffa4', '#fcffa4'] },
-    { id: 'magma', name: 'Magma', colors: ['#000004', '#51127c', '#b73779', '#fc8961', '#fcfdbf', '#fcfdbf'] },
-    { id: 'plasma', name: 'Plasma', colors: ['#0d0887', '#7e03a8', '#cc4778', '#f89540', '#f0f921', '#f0f921'] }
-];
-
-// Palettes suitable for elevation and generic value rasters.
-const GENERIC_COLORMAPS = [
-    { id: 'viridis', name: 'Viridis', colors: ['#440154', '#3b528b', '#21918c', '#5ec962', '#fde725'] },
-    { id: 'terrain', name: 'Terrain', colors: ['#333399', '#00b4b4', '#a0d979', '#ecd87a', '#a97443', '#ffffff'] },
-    { id: 'magma', name: 'Magma', colors: ['#000004', '#51127c', '#b73779', '#fc8961', '#fcfdbf', '#fcfdbf'] },
-    { id: 'plasma', name: 'Plasma', colors: ['#0d0887', '#7e03a8', '#cc4778', '#f89540', '#f0f921', '#f0f921'] },
-    { id: 'inferno', name: 'Inferno', colors: ['#000004', '#57106e', '#bc3754', '#f98e09', '#fcffa4', '#fcffa4'] },
-    { id: 'greys', name: 'Greys', colors: ['#ffffff', '#cccccc', '#999999', '#666666', '#333333', '#000000'] }
-];
 
 export default {
     components: { ColormapDropdown, RasterProfileChart, LoadingSpinner },
@@ -257,7 +237,7 @@ export default {
             return this.isThermal ? 'Temperature Range' : 'Value Range';
         },
         availableColormaps() {
-            return this.isThermal ? THERMAL_COLORMAPS : GENERIC_COLORMAPS;
+            return colormapList(this.isThermal ? THERMAL_COLORMAPS : GENERIC_COLORMAPS);
         },
         displayUnit() {
             if (this.isThermal) {
@@ -456,76 +436,10 @@ export default {
 </script>
 
 <style scoped>
-.raster-panel {
-    position: absolute;
-    top: 0.5rem;
-    right: 4rem;
-    z-index: 2;
-    width: 16rem;
-    background: rgba(0, 0, 0, 0.85);
-    color: #eee;
-    border-radius: 0.5rem;
-    font-size: 0.8rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    max-height: calc(100% - 1rem);
-    overflow-y: auto;
-}
+/* Shared look and palette: css/_analysis-panel.scss */
 
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-}
-
-.panel-title {
-    font-weight: 600;
-}
-
-.panel-title i {
-    color: #4fc3f7;
-    margin-right: 0.3rem;
-}
-
-.raster-panel >>> .panel-title i.fa-temperature-high {
-    color: #ff5722;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0;
-}
-
-.close-btn:hover {
-    color: #fff;
-}
-
-.panel-body {
-    padding: 0.5rem 0.75rem;
-}
-
-.panel-body.loading {
-    text-align: center;
-    padding: 1rem;
-    color: #aaa;
-}
-
-.section {
-    margin-bottom: 0.5rem;
-}
-
-.section-label {
-    display: block;
-    font-size: 0.7rem;
-    color: #aaa;
-    margin-bottom: 0.15rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
+.raster-panel .panel-title i.fa-temperature-high {
+    color: var(--panel-thermal-strong);
 }
 
 .temp-range {
@@ -533,45 +447,17 @@ export default {
     gap: 0.3rem;
     font-size: 0.85rem;
     font-weight: 600;
-    color: #4fc3f7;
+    color: var(--panel-accent);
 }
 
 .temp-range.thermal {
-    color: #ff9800;
+    color: var(--panel-thermal);
 }
 
-.sensor-badge {
-    display: inline-block;
-    background: rgba(79, 195, 247, 0.25);
-    border: 1px solid rgba(79, 195, 247, 0.5);
-    border-radius: 0.25rem;
-    padding: 0.1rem 0.4rem;
-    font-size: 0.75rem;
-}
 
 .sensor-badge.thermal {
     background: rgba(255, 87, 34, 0.25);
     border-color: rgba(255, 87, 34, 0.5);
-}
-
-.panel-select, .panel-input {
-    width: 100%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #eee;
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.8rem;
-}
-
-.panel-select:focus, .panel-input:focus {
-    outline: none;
-    border-color: rgba(79, 195, 247, 0.6);
-}
-
-.panel-select option {
-    background: #2a2a2a;
-    color: #eee;
 }
 
 .spot-info {
@@ -583,24 +469,16 @@ export default {
 .spot-temp {
     font-size: 1.1rem;
     font-weight: 700;
-    color: #4fc3f7;
+    color: var(--panel-accent);
 }
 
 .spot-temp.thermal {
-    color: #ff9800;
+    color: var(--panel-thermal);
 }
 
 .spot-coords {
     font-size: 0.7rem;
-    color: #888;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.15rem;
-    font-size: 0.75rem;
-    color: #ccc;
+    color: var(--panel-text-faint);
 }
 
 .profile-controls {
@@ -611,101 +489,8 @@ export default {
 
 .profile-error {
     font-size: 0.72rem;
-    color: #ff8a80;
+    color: var(--panel-error-text);
     margin-bottom: 0.25rem;
-}
-
-.actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-/* Two-row grid so each action button has room to display its short label
-   without overflowing the panel width. */
-.actions-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-}
-
-.action-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    padding: 0.4rem 0.3rem;
-    min-height: 2.6rem;
-    text-align: center;
-    line-height: 1.1;
-}
-
-.action-btn .action-label {
-    font-size: 0.7rem;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.action-btn i {
-    font-size: 0.95rem;
-}
-
-.btn {
-    border: none;
-    border-radius: 0.25rem;
-    padding: 0.3rem 0.6rem;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-
-.btn-primary {
-    background: #4fc3f7;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #29b6f6;
-}
-
-.btn-secondary {
-    background: rgba(255,255,255,0.15);
-    color: #ccc;
-}
-
-.btn-secondary:hover {
-    background: rgba(255,255,255,0.25);
-}
-
-.btn-warning {
-    background: rgba(255, 152, 0, 0.45);
-    color: #fff;
-    border: 1px solid #ff9800;
-}
-
-.btn-warning:hover {
-    background: rgba(255, 152, 0, 0.6);
-}
-
-.btn-warning.active {
-    box-shadow: 0 0 0 1px rgba(255, 152, 0, 0.5);
-}
-
-.btn-sm {
-    flex: 1;
-}
-
-.export-limit-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    font-size: 0.85rem;
-    color: #aaa;
-    cursor: default;
-    flex: 1;
-    justify-content: center;
 }
 
 .no-calibration-info {
@@ -714,7 +499,7 @@ export default {
     border-radius: 0.25rem;
     padding: 0.3rem 0.5rem;
     font-size: 0.75rem;
-    color: #ffb74d;
+    color: var(--panel-warn);
 }
 
 .no-calibration-info i {

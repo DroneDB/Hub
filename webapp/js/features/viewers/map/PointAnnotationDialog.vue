@@ -37,7 +37,7 @@ export default {
             default: ''
         }
     },
-    emits: ['close', 'onSave', 'onDiscard'],
+    emits: ['close', 'save', 'discard'],
     data() {
         return {
             formData: {
@@ -48,11 +48,11 @@ export default {
     },
     methods: {
         save() {
-            this.$emit('onSave', { ...this.formData });
+            this.$emit('save', { ...this.formData });
             this.$emit('close');
         },
         discard() {
-            this.$emit('onDiscard');
+            this.$emit('discard');
             this.$emit('close');
         }
     }

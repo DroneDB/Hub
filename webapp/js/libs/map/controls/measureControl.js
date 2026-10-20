@@ -987,7 +987,7 @@ class MeasureControls extends Control {
         this._dialog = this.openDialog(PointAnnotationDialog, {
             initialColor: currentColor,
             initialDescription: currentDescription,
-            onOnSave: (data) => {
+            onSave: (data) => {
                 feature.set('stroke', data.color);
                 feature.set('description', data.description);
                 feature.changed();
@@ -1001,7 +1001,7 @@ class MeasureControls extends Control {
                     this.updateButtonsVisibility(this.hasMeasurements(), false);
                 }
             },
-            onOnDiscard: () => {
+            onDiscard: () => {
                 if (!isEdit) {
                     // New point: remove it
                     this.source.removeFeature(feature);
@@ -1077,7 +1077,7 @@ class MeasureControls extends Control {
             geometryType: geometryType,
             showDelete: showDelete,
             groups: groups,
-            onOnSave: (properties) => {
+            onSave: (properties) => {
                 // Update feature properties
                 Object.keys(properties).forEach(key => {
                     feature.set(key, properties[key]);
@@ -1094,7 +1094,7 @@ class MeasureControls extends Control {
                 feature.changed();
                 if (this.vector) this.vector.changed();
             },
-            onOnDelete: () => {
+            onDelete: () => {
                 this.deleteMeasurement(feature);
             },
             onClose: () => {

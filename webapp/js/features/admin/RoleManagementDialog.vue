@@ -102,7 +102,7 @@ export default {
             required: true
         }
     },
-    emits: ['close', 'onRolesChanged'],
+    emits: ['close', 'rolesChanged'],
 
     data: function () {
         return {
@@ -156,7 +156,7 @@ export default {
                 this.newRoleName = "";
                 this.activeTab = 'view';
 
-                this.$emit('onRolesChanged');
+                this.$emit('rolesChanged');
             } catch (e) {
                 this.$notify.error('Failed to create role: ' + e.message);
                 this.error = e.message;
@@ -190,7 +190,7 @@ export default {
                 this.currentRoles = this.currentRoles.filter(role => role !== this.roleToDelete);
                 this.$notify.success(`Role "${this.roleToDelete}" deleted successfully`, { summary: 'Role Deleted' });
 
-                this.$emit('onRolesChanged');
+                this.$emit('rolesChanged');
 
                 this.showDeleteDialog = false;
                 this.roleToDelete = null;

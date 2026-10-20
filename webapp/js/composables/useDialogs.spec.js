@@ -6,10 +6,10 @@ import DialogHost from '@/components/DialogHost.vue';
 
 const Echo = defineComponent({
     props: { text: { type: String, default: '' } },
-    emits: ['onClose', 'onSave'],
+    emits: ['close', 'save'],
     setup(props, { emit }) {
         return () => h('div', { class: 'echo' }, [
-            h('button', { class: 'save', onClick: () => emit('onSave', props.text) }),
+            h('button', { class: 'save', onClick: () => emit('save', props.text) }),
             h('button', { class: 'close', onClick: () => emit('close', 'done') })
         ]);
     }
@@ -20,7 +20,7 @@ describe('useDialogs + DialogHost', () => {
         let dialogs;
         const wrapper = mount({ components: { DialogHost }, setup() { dialogs = useDialogs(); return { dialogs }; }, template: '<DialogHost :dialogs="dialogs" />' });
         const onSave = vi.fn();
-        const result = dialogs.open(Echo, { text: 'hi', onOnSave: onSave });
+        const result = dialogs.open(Echo, { text: 'hi', onSave: onSave });
         await nextTick();
         await wrapper.find('.save').trigger('click');
         expect(onSave).toHaveBeenCalledWith('hi');

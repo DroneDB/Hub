@@ -462,7 +462,7 @@ export default {
 }
 
 .build-status.pending {
-    background-color: #e67e22;
+    background-color: var(--ddb-build-pending);
 }
 
 .build-explanation-section {

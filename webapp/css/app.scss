@@ -21,7 +21,8 @@
 // Bootstrap grid + utilities are imported in main.js
 // Font Awesome 6 is imported in main.js
 
-@import 'variables';
+@use 'variables';
+@use 'analysis-panel';
 
 html {
     font-size: 16px;
@@ -346,3 +347,4 @@ body:fullscreen {
 .p-button-icon {
     cursor: pointer;
 }
+

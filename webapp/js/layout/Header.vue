@@ -81,7 +81,7 @@
                     :title="username" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
                 <i class="fa-solid fa-user" />
             </Button>
-            <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" />
+            <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" :pt="userMenuPt" />
         </div>
 
         <ShareEmbed v-if="shareFile" :file="shareFile" @close="handleCloseShareEmbed" />
@@ -147,6 +147,13 @@ export default {
     },
 
     computed: {
+        // The popup menu is rendered in <body>: styled through pass-through, not global CSS
+        userMenuPt: function () {
+            return {
+                itemIcon: { style: { width: '1.25rem', display: 'inline-flex', justifyContent: 'center' } },
+                itemLabel: ({ context }) => (context.item?.class === 'user-menu-header' ? { style: { fontWeight: 'bold' } } : {})
+            };
+        },
         ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
         ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload']),
         storageBarColor: function () {
@@ -281,19 +288,19 @@ export default {
             items.push({ separator: true });
 
             if (this.fileUploads)
-                items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up fixed-icon', command: () => this.uploadFiles() });
+                items.push({ label: 'Upload Files', icon: 'fa-solid fa-cloud-arrow-up', command: () => this.uploadFiles() });
 
-            items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap fixed-icon', command: () => this.myOrganizations() });
-            items.push({ label: 'My Datasets', icon: 'fa-solid fa-database fixed-icon', command: () => this.myDatasets() });
+            items.push({ label: 'My Organizations', icon: 'fa-solid fa-sitemap', command: () => this.myOrganizations() });
+            items.push({ label: 'My Datasets', icon: 'fa-solid fa-database', command: () => this.myDatasets() });
 
             if (this.storageInfo) {
                 items.push({ separator: true });
                 if (this.storageInfo.total != null && this.storageInfo.used > 0) {
-                    items.push({ label: this.percent(this.storageInfo.usedPercentage, 2), icon: 'fa-regular fa-hard-drive fixed-icon', command: () => { this.storageInfoDialogOpen = true; } });
+                    items.push({ label: this.percent(this.storageInfo.usedPercentage, 2), icon: 'fa-regular fa-hard-drive', command: () => { this.storageInfoDialogOpen = true; } });
                 } else if (this.storageInfo.total != null && !this.storageInfo.used) {
-                    items.push({ label: this.bytes(this.storageInfo.total), icon: 'fa-regular fa-hard-drive fixed-icon', command: () => {} });
+                    items.push({ label: this.bytes(this.storageInfo.total), icon: 'fa-regular fa-hard-drive', command: () => {} });
                 } else if (this.storageInfo.total == null) {
-                    items.push({ label: this.bytes(this.storageInfo.used), icon: 'fa-regular fa-hard-drive fixed-icon', command: () => {} });
+                    items.push({ label: this.bytes(this.storageInfo.used), icon: 'fa-regular fa-hard-drive', command: () => {} });
                 }
             }
 
@@ -301,21 +308,21 @@ export default {
                 items.push({ separator: true });
             }
             if (this.accountManagement && this.loggedIn) {
-                items.push({ label: 'My Account', icon: 'fa-solid fa-user fixed-icon', command: () => this.manageAccount() });
+                items.push({ label: 'My Account', icon: 'fa-solid fa-user', command: () => this.manageAccount() });
             }
             if (this.usersManagement && this.isAdmin) {
-                items.push({ label: 'Manage Users', icon: 'fa-solid fa-users fixed-icon', command: () => this.manageUsers() });
+                items.push({ label: 'Manage Users', icon: 'fa-solid fa-users', command: () => this.manageUsers() });
             }
             if (this.isAdmin) {
-                items.push({ label: 'Tasks', icon: 'fa-solid fa-list-check fixed-icon', command: () => this.adminTasks() });
+                items.push({ label: 'Tasks', icon: 'fa-solid fa-list-check', command: () => this.adminTasks() });
                 items.push({ separator: true });
-                items.push({ label: 'Configuration', icon: 'fa-solid fa-gear fixed-icon', command: () => this.adminConfig() });
-                items.push({ label: 'Hangfire', icon: 'fa-solid fa-fire fixed-icon', url: '/hangfire', target: '_blank', rel: 'noopener' });
-                items.push({ label: 'API Docs', icon: 'fa-solid fa-code fixed-icon', url: '/scalar/v1', target: '_blank', rel: 'noopener' });
+                items.push({ label: 'Configuration', icon: 'fa-solid fa-gear', command: () => this.adminConfig() });
+                items.push({ label: 'Hangfire', icon: 'fa-solid fa-fire', url: '/hangfire', target: '_blank', rel: 'noopener' });
+                items.push({ label: 'API Docs', icon: 'fa-solid fa-code', url: '/scalar/v1', target: '_blank', rel: 'noopener' });
             }
 
             items.push({ separator: true });
-            items.push({ label: 'Logout', icon: 'fa-solid fa-right-from-bracket fixed-icon', command: () => this.logout() });
+            items.push({ label: 'Logout', icon: 'fa-solid fa-right-from-bracket', command: () => this.logout() });
 
             return items;
         }
@@ -590,22 +597,5 @@ export default {
         font-weight: bold;
         margin-bottom: var(--ddb-spacing-xs);
     }
-}
-</style>
-
-<style>
-.user-menu-header .p-menuitem-text {
-    font-weight: bold !important;
-}
-
-#user_menu .p-menuitem-icon {
-    width: 1.25rem;
-    text-align: center;
-    display: inline-flex;
-    justify-content: center;
-}
-
-.fixed-icon {
-    width: 1.25rem;
 }
 </style>

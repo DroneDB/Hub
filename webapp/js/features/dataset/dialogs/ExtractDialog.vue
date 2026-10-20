@@ -293,22 +293,22 @@ export default {
 }
 
 .dest-error {
-    color: var(--p-red-500, #e24c4c);
+    color: var(--p-red-500);
     font-size: 0.8rem;
 }
 
 .help-text {
-    color: var(--p-text-muted-color, #888);
+    color: var(--p-text-muted-color);
     font-size: 0.8rem;
 }
 
 .dest-exists {
-    color: var(--p-text-muted-color, #888);
+    color: var(--p-text-muted-color);
     font-size: 0.8rem;
 }
 
 .dest-create {
-    color: var(--p-primary-color, #3b82f6);
+    color: var(--p-primary-color);
     font-size: 0.8rem;
 }
 
@@ -319,7 +319,7 @@ export default {
 .progress-label {
     margin-top: 0.4rem;
     font-size: 0.85rem;
-    color: var(--p-text-muted-color, #888);
+    color: var(--p-text-muted-color);
     text-align: center;
 }
 </style>

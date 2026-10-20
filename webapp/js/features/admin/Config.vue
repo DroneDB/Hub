@@ -419,7 +419,7 @@ export default {
     font-style: italic;
     margin-bottom: 1.5rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--ddb-border-color);
+    border-bottom: 1px solid var(--ddb-border);
 }
 
 .config-section-inactive {
@@ -508,7 +508,7 @@ export default {
 }
 
 .section-actions {
-    border-top: 1px solid var(--ddb-border-color);
+    border-top: 1px solid var(--ddb-border);
     padding-top: 1rem;
 }
 

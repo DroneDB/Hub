@@ -51,8 +51,8 @@ defineProps({
 }
 
 .color-swatch.selected {
-    border-color: #000;
-    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
+    border-color: var(--ddb-text);
+    box-shadow: 0 0 0 0.25rem var(--ddb-bg-surface), 0 0 0 0.5rem var(--ddb-text);
 }
 
 .color-picker-custom {

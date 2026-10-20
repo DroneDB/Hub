@@ -1,18 +1,15 @@
 <template>
-    <Window id="measurement-group" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel">
+    <Window id="measurement-group" :title="dialogTitle" modal fixed-size size-class="dialog-sm"
+            :confirm-label="isEdit ? 'Rename' : 'Create'" :confirm-disabled="!formName.trim()"
+            @close="cancel" @confirm="save">
         <div class="measurement-group-form">
             <div class="form-group">
                 <label for="mg-name">Group Name</label>
-                <input id="mg-name" ref="nameInput" v-model="formName" type="text" placeholder="Enter a group name..."
-                       @keydown.enter="save" @keydown.esc="cancel">
+                <input id="mg-name" ref="nameInput" v-model="formName" type="text" placeholder="Enter a group name...">
             </div>
             <div class="form-group">
                 <label for="mg-color">Color</label>
                 <ColorSwatchPicker v-model="formColor" input-id="mg-color" />
-            </div>
-            <div class="buttons">
-                <button class="btn-cancel" @click="cancel">Cancel</button>
-                <button class="btn-save" :disabled="!formName.trim()" @click="save">{{ isEdit ? 'Rename' : 'Create' }}</button>
             </div>
         </div>
     </Window>
@@ -32,7 +29,7 @@ export default {
             default: null
         }
     },
-    emits: ['close', 'onSave'],
+    emits: ['close', 'save'],
     data() {
         return {
             formName: this.group ? this.group.name : '',
@@ -59,7 +56,7 @@ export default {
         save() {
             const name = this.formName.trim();
             if (!name) return;
-            this.$emit('onSave', { name, color: this.formColor });
+            this.$emit('save', { name, color: this.formColor });
             this.$emit('close');
         },
         cancel() {
@@ -95,42 +92,4 @@ export default {
     box-sizing: border-box;
 }
 
-.buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1.5rem;
-}
-
-.btn-save {
-    background-color: var(--ddb-primary, #007bff);
-    color: white;
-    border: none;
-    padding: 0.5rem 1.25rem;
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    font-weight: 500;
-}
-
-.btn-save:hover:not(:disabled) {
-    background-color: var(--ddb-primary-dark, #0056b3);
-}
-
-.btn-save:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn-cancel {
-    background: none;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    padding: 0.5rem 1.25rem;
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    color: var(--ddb-text);
-}
-
-.btn-cancel:hover {
-    background-color: var(--surface-hover, rgba(0, 0, 0, 0.04));
-}
 </style>

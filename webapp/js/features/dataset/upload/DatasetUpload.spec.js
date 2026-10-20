@@ -47,7 +47,7 @@ describe('DatasetUpload', () => {
 
     function mountUpload(props) {
         wrapper = mount(DatasetUpload, {
-            props: { organization: 'org', dataset: 'ds', path: '', ...props, onOnUpload: entry => uploaded.push(entry.path) },
+            props: { organization: 'org', dataset: 'ds', path: '', ...props, onUpload: entry => uploaded.push(entry.path) },
             attachTo: document.body,
             global: {
                 plugins: [PrimeVue],

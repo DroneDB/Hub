@@ -77,16 +77,16 @@ export default {
     right: 1rem;
     z-index: 998;
     width: 280px;
-    background: var(--ddb-bg-elevated, #fff);
-    border: 1px solid var(--ddb-border-color, #d0d7de);
-    border-radius: var(--ddb-radius-md, 6px);
+    background: var(--ddb-bg-surface);
+    border: 1px solid var(--ddb-border);
+    border-radius: var(--ddb-radius-md);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
     padding: 0.6rem 0.8rem;
     font-size: 0.85rem;
 }
 
 .clipboard-panel.cut-mode {
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid var(--ddb-warning);
 }
 
 .clipboard-panel-header {
@@ -114,25 +114,25 @@ export default {
 
 .cut-mode .clipboard-panel-mode {
     background: rgba(245, 158, 11, 0.18);
-    color: #b45309;
+    color: var(--ddb-warning-text);
 }
 
 .clipboard-panel-close {
     background: none;
     border: none;
     cursor: pointer;
-    color: var(--ddb-text-muted, #6e7781);
+    color: var(--ddb-text-muted);
     padding: 0.2rem;
     border-radius: 4px;
 }
 
 .clipboard-panel-close:hover {
     background: rgba(0, 0, 0, 0.06);
-    color: var(--ddb-text-primary, #24292f);
+    color: var(--ddb-text);
 }
 
 .clipboard-panel-source {
-    color: var(--ddb-text-muted, #6e7781);
+    color: var(--ddb-text-muted);
     font-size: 0.78rem;
     margin-bottom: 0.3rem;
     word-break: break-all;
@@ -140,7 +140,7 @@ export default {
 
 .clipboard-panel-count {
     font-size: 0.78rem;
-    color: var(--ddb-text-muted, #6e7781);
+    color: var(--ddb-text-muted);
     margin-bottom: 0.4rem;
 }
 
@@ -165,7 +165,7 @@ export default {
 .clipboard-panel-more {
     font-style: italic;
     font-size: 0.78rem;
-    color: var(--ddb-text-muted, #6e7781);
+    color: var(--ddb-text-muted);
     padding-top: 0.2rem;
 }
 

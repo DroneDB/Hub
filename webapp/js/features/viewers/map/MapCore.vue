@@ -61,7 +61,7 @@
         <MeasurementGroupDialog v-if="measurementGroupDialogOpen"
                                 :group="pendingGroupForRename"
                                 @close="measurementGroupDialogOpen = false"
-                                @on-save="handleGroupDialogSave" />
+                                @save="handleGroupDialogSave" />
         <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selected-basemap="selectedBasemap"
                            :unit-pref="currentUnitPref" :custom-basemap-config="customBasemapConfig"
                            @close="mapSettingsDialogOpen = false" @basemap-changed="handleBasemapChanged"

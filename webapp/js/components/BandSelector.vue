@@ -104,7 +104,7 @@ export default {
     width: 100%;
     background: rgba(255,255,255,0.1);
     border: 1px solid rgba(255,255,255,0.2);
-    color: #eee;
+    color: var(--panel-text);
     border-radius: 0.25rem;
     padding: 0.2rem 0.15rem;
     font-size: 0.7rem;
@@ -116,7 +116,7 @@ export default {
 }
 
 .channel-select option {
-    background: #2a2a2a;
-    color: #eee;
+    background: var(--panel-option-bg);
+    color: var(--panel-text);
 }
 </style>

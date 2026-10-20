@@ -102,7 +102,7 @@ export default {
     text-overflow: ellipsis;
     white-space: nowrap;
     opacity: 0.85;
-    font-size: var(--ddb-font-size-sm, 0.7rem);
+    font-size: var(--ddb-font-size-sm);
 }
 
 .raster-opacity-row input[type="range"] {
@@ -163,10 +163,10 @@ export default {
 }
 
 .ph-btn:hover {
-    color: #fff;
+    color: var(--ddb-text-on-color);
 }
 
 .ph-btn.active {
-    color: #7bc67e;
+    color: var(--ddb-map-control-active);
 }
 </style>

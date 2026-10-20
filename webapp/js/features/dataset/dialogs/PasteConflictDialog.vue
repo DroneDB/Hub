@@ -63,13 +63,13 @@ export default {
     padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
     margin: var(--ddb-spacing-xs) 0;
     border-radius: var(--ddb-radius-sm);
-    background-color: rgba(var(--ddb-warning-rgb, 255, 193, 7), 0.1);
+    background-color: rgba(var(--ddb-warning-rgb), 0.1);
     display: flex;
     align-items: center;
     gap: var(--ddb-spacing-sm);
 }
 
-.amber { color: #f59e0b; }
+.amber { color: var(--ddb-warning); }
 
 .file-path {
     word-break: break-all;

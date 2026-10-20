@@ -158,7 +158,7 @@ export default {
         path: { type: String, default: null },
         filesToUpload: { type: Array, default: null }
     },
-    emits: ['close', 'onUpload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
+    emits: ['close', 'upload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
     data: function () {
         return {
             error: null,
@@ -260,7 +260,7 @@ export default {
             });
             return useUploadQueue({
                 send: requests.send,
-                onItemDone: (_item, entry) => this.$emit('onUpload', entry),
+                onItemDone: (_item, entry) => this.$emit('upload', entry),
                 // Dataset size, entry count, storage: the cached reads are stale now
                 onIdle: () => reg.invalidateCache()
             });
@@ -633,8 +633,8 @@ export default {
 }
 .diagnostics-link {
     display: inline-block;
-    margin-top: var(--ddb-spacing-sm, 0.5rem);
+    margin-top: var(--ddb-spacing-sm);
     font-size: 0.8rem;
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 </style>

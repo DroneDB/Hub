@@ -70,7 +70,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         openDialog(MeasurementPropertiesDialog, {
             feature: measureAsFeature(measure),
             geometryType: measure.showArea && measure.closed ? 'Polygon' : 'LineString',
-            onOnSave: properties => {
+            onSave: properties => {
                 assignMeasureProperties(measure, properties);
                 applyMeasureStyle(measure);
                 updateNameLabel(measure, labelCtx());
@@ -82,12 +82,12 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         openDialog(AnnotationPropertiesDialog, {
             annotation,
             showDelete: true,
-            onOnSave: properties => {
+            onSave: properties => {
                 if (properties.name !== undefined) annotation.title = properties.name;
                 if (properties.description !== undefined) annotation.description = properties.description;
                 updateAnnotationTooltip(annotation, labelCtx());
             },
-            onOnDelete: () => {
+            onDelete: () => {
                 viewer.scene.annotations.remove(annotation);
                 countMeasurements();
             }

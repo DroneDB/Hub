@@ -274,10 +274,10 @@ export default {
     }
 
     > div.drop-target {
-        outline: 2px dashed var(--ddb-color-primary, #1976d2);
+        outline: 2px dashed var(--ddb-primary);
         outline-offset: -2px;
         background-color: var(--ddb-bg-hover);
-        border-radius: var(--ddb-radius-sm, 4px);
+        border-radius: var(--ddb-radius-sm);
     }
 }
 

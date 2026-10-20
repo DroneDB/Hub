@@ -60,7 +60,7 @@
         <div class="profile-actions">
             <span v-if="hoveredSample" class="hover-info">{{ hoverText }}</span>
             <span v-else class="hover-info placeholder">Hover or focus the chart for details</span>
-            <button class="btn btn-secondary btn-sm" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
+            <button class="panel-btn" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
                 <i class="fas fa-file-csv" aria-hidden="true" />
             </button>
         </div>
@@ -263,11 +263,11 @@ export default {
     flex-wrap: wrap;
     gap: 8px;
     font-size: 11px;
-    color: #ccc;
+    color: var(--panel-text-soft);
 }
 
 .profile-summary.thermal {
-    color: #ffab91;
+    color: var(--panel-thermal-soft);
 }
 
 .profile-svg {
@@ -296,16 +296,16 @@ export default {
 
 .profile-svg .label {
     font-size: 9px;
-    fill: #bbb;
+    fill: var(--panel-text-soft);
     font-family: inherit;
 }
 
 .profile-line {
-    stroke: #4fc3f7;
+    stroke: var(--panel-accent);
 }
 
 .profile-line.thermal {
-    stroke: #ff7043;
+    stroke: var(--panel-thermal-strong);
 }
 
 .null-bands rect {
@@ -319,13 +319,13 @@ export default {
 }
 
 .hover-dot {
-    fill: #fff;
-    stroke: #4fc3f7;
+    fill: var(--ddb-text-on-color);
+    stroke: var(--panel-accent);
     stroke-width: 1.5;
 }
 
 .hover-dot.thermal {
-    stroke: #ff7043;
+    stroke: var(--panel-thermal-strong);
 }
 
 .profile-actions {
@@ -333,11 +333,11 @@ export default {
     justify-content: space-between;
     align-items: center;
     font-size: 11px;
-    color: #ccc;
+    color: var(--panel-text-soft);
 }
 
 .hover-info.placeholder {
-    color: #888;
+    color: var(--panel-text-faint);
     font-style: italic;
 }
 </style>

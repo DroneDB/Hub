@@ -1,5 +1,5 @@
 <template>
-    <div v-if="visible" class="plant-health-panel">
+    <div v-if="visible" class="analysis-panel analysis-panel--plant-health plant-health-panel">
         <div class="panel-header">
             <span class="panel-title"><i class="fas fa-leaf" /> Plant Health</span>
             <button class="close-btn" title="Close" aria-label="Close" @click="close"><i class="fas fa-times" /></button>
@@ -66,7 +66,7 @@
                 <ColormapDropdown
                     v-model="selectedColormap"
                     input-id="plant-health-panel-colormap" aria-labelledby="plant-health-panel-colormap-label"
-                    :colormaps="availableColormaps"
+                    :colormaps="colormapOptions"
                     @update:model-value="debouncedApply" />
             </div>
 
@@ -111,26 +111,26 @@
             </div>
 
             <!-- Reset / Toggle / Copy Link / Export -->
-            <div class="section actions actions-grid">
-                <button class="btn btn-secondary btn-sm action-btn" title="Reset visualization parameters to defaults"
+            <div class="section actions-grid">
+                <button class="panel-btn action-btn" title="Reset visualization parameters to defaults"
                         @click="reset">
                     <i class="fas fa-rotate-left" />
                     <span class="action-label">Reset</span>
                 </button>
-                <button class="btn btn-sm action-btn"
-                        :class="originalView ? 'btn-primary' : 'btn-secondary'"
+                <button class="panel-btn action-btn"
+                        :class="{ 'panel-btn--primary': originalView }"
                         :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
                         @click="toggleOriginalView">
                     <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                     <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm action-btn" title="Copy a shareable link with the current settings"
+                <button class="panel-btn action-btn" title="Copy a shareable link with the current settings"
                         @click="copyLink">
                     <i class="fas fa-link" />
                     <span class="action-label">Copy Link</span>
                 </button>
                 <button v-if="!isExportTooLarge"
-                        class="btn btn-secondary btn-sm action-btn"
+                        class="panel-btn action-btn"
                         :disabled="exporting"
                         title="Export the current view as a GeoTIFF file"
                         @click="exportGeoTiff">
@@ -157,6 +157,7 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import HistogramChart from '@/components/HistogramChart.vue';
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
+import { colormap, INDEX_COLORMAPS } from '@/libs/map/colormaps';
 import BandSelector from '@/components/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import reg from '@/libs/api/sharedRegistry';
@@ -202,7 +203,8 @@ export default {
             selectedStretch: 'percentile',
             rescale: '',
             availableFormulas: [],
-            availableColormaps: ['rdylgn', 'discrete_ndvi', 'spectral', 'viridis', 'plasma', 'inferno', 'magma', 'grayscale', 'ironbow', 'rainbow', 'bugn', 'whitehot', 'blackhot', 'arctic', 'lava'],
+            // Ids, or { id, name } from the raster metadata
+            availableColormaps: INDEX_COLORMAPS,
             exporting: false,
             originalView: false,
             showFormulasInfo: false
@@ -210,10 +212,12 @@ export default {
     },
 
     computed: {
-        normalizedColormaps() {
-            return this.availableColormaps.map(cm =>
-                typeof cm === 'string' ? { id: cm, name: cm } : cm
-            );
+        // With the swatch colours of the shared table (the server sends ids and names)
+        colormapOptions() {
+            return this.availableColormaps.map(cm => {
+                const id = typeof cm === 'string' ? cm : cm.id;
+                return { ...colormap(id), ...(cm.name ? { name: cm.name } : {}) };
+            });
         },
         maxExportSizeBytes() {
             return reg.features.value(Features.MAX_EXPORT_SIZE_BYTES);
@@ -503,137 +507,15 @@ export default {
 </script>
 
 <style scoped>
-.plant-health-panel {
-    position: absolute;
-    top: 0.5rem;
-    right: 4rem;
-    z-index: 2;
-    width: 16rem;
-    background: rgba(0, 0, 0, 0.85);
-    color: #eee;
-    border-radius: 0.5rem;
-    font-size: 0.8rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    max-height: calc(100% - 1rem);
-    overflow-y: auto;
-}
+/* Shared look and palette: css/_analysis-panel.scss */
 
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-}
-
-.panel-title {
-    font-weight: 600;
-}
-
-.panel-title i {
-    color: #4caf50;
-    margin-right: 0.3rem;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0;
-}
-
-.close-btn:hover {
-    color: #fff;
-}
-
-.panel-body {
-    padding: 0.5rem 0.75rem;
-}
-
-.panel-body.loading {
-    text-align: center;
-    padding: 1rem;
-    color: #aaa;
-}
-
-.section {
-    margin-bottom: 0.5rem;
-}
-
-.section-label {
-    display: block;
-    font-size: 0.7rem;
-    color: #aaa;
-    margin-bottom: 0.15rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.info-icon-btn {
-    background: none;
-    border: none;
-    padding: 0;
-    margin-left: 0.35rem;
-    color: #4caf50;
-    cursor: pointer;
-    opacity: 0.85;
-    font-size: 0.8rem;
-    line-height: 1;
-}
-
-.info-icon-btn:hover {
-    opacity: 1;
-}
-
-.sensor-badge {
-    display: inline-block;
-    background: rgba(76, 175, 80, 0.25);
-    border: 1px solid rgba(76, 175, 80, 0.5);
-    border-radius: 0.25rem;
-    padding: 0.1rem 0.4rem;
-    font-size: 0.75rem;
-}
-
-.panel-select, .panel-input {
-    width: 100%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #eee;
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.8rem;
-}
-
-.panel-select:focus, .panel-input:focus {
-    outline: none;
-    border-color: rgba(76, 175, 80, 0.6);
-}
-
-.panel-select option {
-    background: #2a2a2a;
-    color: #eee;
-}
-
-.panel-select option:disabled {
-    color: #777;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.15rem;
-    font-size: 0.75rem;
-    color: #ccc;
-}
 
 .single-band-info {
     display: flex;
     align-items: flex-start;
     gap: 0.4rem;
     font-size: 0.75rem;
-    color: #bbb;
+    color: var(--panel-text-soft);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 4px;
@@ -642,119 +524,9 @@ export default {
 }
 
 .single-band-info i {
-    color: #66b3ff;
+    color: var(--panel-info);
     margin-top: 0.1rem;
     flex-shrink: 0;
 }
 
-.actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-/* Two-row grid so each action button has room to display its short label
-   without overflowing the panel width. Mirrors RasterAnalysisControls. */
-.actions-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-}
-
-.action-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    padding: 0.4rem 0.3rem;
-    min-height: 2.6rem;
-    text-align: center;
-    line-height: 1.1;
-}
-
-.action-btn .action-label {
-    font-size: 0.7rem;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.action-btn i {
-    font-size: 0.95rem;
-}
-
-.export-limit-hint {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn {
-    border: none;
-    border-radius: 0.25rem;
-    padding: 0.3rem 0.6rem;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-
-.btn-primary {
-    background: #4caf50;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #388e3c;
-}
-
-.btn-secondary {
-    background: rgba(255,255,255,0.15);
-    color: #ccc;
-}
-
-.btn-secondary:hover {
-    background: rgba(255,255,255,0.25);
-}
-
-.btn-sm {
-    flex: 1;
-}
-
-.export-limit-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    font-size: 0.85rem;
-    color: #aaa;
-    cursor: default;
-    flex: 1;
-    justify-content: center;
-}
-
-/* Responsive: bottom-sheet on mobile */
-@media (max-width: 768px) {
-    .plant-health-panel {
-        position: fixed;
-        top: auto;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        max-height: 50vh;
-        border-radius: 0.75rem 0.75rem 0 0;
-        transition: transform 0.3s ease;
-    }
-
-    .panel-body {
-        padding: 0.5rem;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .actions {
-        flex-wrap: wrap;
-    }
-}
 </style>

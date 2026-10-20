@@ -414,7 +414,7 @@ export default {
 }
 
 .thumbnail:hover {
-    background: var(--ddb-bg-secondary);
+    background: var(--ddb-bg-hover);
     cursor: pointer;
 }
 
@@ -503,7 +503,7 @@ export default {
 }
 
 .build-badge.pending {
-    background-color: #e67e22;
+    background-color: var(--ddb-build-pending);
 }
 
 .build-badge i.icon {

@@ -256,15 +256,15 @@ export default {
 }
 
 .muted {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .error-text {
-    color: var(--ddb-danger, #d9534f);
+    color: var(--ddb-danger);
 }
 
 .path-details {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .dataset-cell,
@@ -288,6 +288,6 @@ export default {
 }
 
 .duration.running {
-    color: var(--ddb-warning, #f0ad4e);
+    color: var(--ddb-warning);
 }
 </style>

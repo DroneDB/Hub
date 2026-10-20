@@ -5,7 +5,7 @@
  * host) and per-dialog boolean flags.
  *
  *   setup() { return { dialogs: useDialogs() }; }          // template: <DialogHost :dialogs="dialogs" />
- *   const result = await this.dialogs.open(RenameDialog, { entry, onOnSave: ... });
+ *   const result = await this.dialogs.open(RenameDialog, { entry, onSave: ... });
  *   this.dialogs.open('rename', { path }) ... this.dialogs.close('rename', 'b.jpg');   // named, with a component map on DialogHost
  *
  * Props may be a function returning them (re-read on render: reactive, e.g. `busy`); an

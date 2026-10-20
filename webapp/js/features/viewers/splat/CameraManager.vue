@@ -77,12 +77,12 @@ export default {
 .cameras-manager {
     display: flex;
     flex-direction: column;
-    gap: var(--ddb-spacing-sm, 0.5rem);
+    gap: var(--ddb-spacing-sm);
     min-width: 22rem;
 }
 
 .cameras-manager .empty {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
     text-align: center;
     margin: var(--ddb-spacing-md) 0;
 }
@@ -100,29 +100,29 @@ export default {
     align-items: center;
     gap: 0.4rem;
     padding: 0.25rem 0.15rem;
-    border-bottom: 1px solid var(--ddb-border-color, rgba(0, 0, 0, 0.08));
+    border-bottom: 1px solid var(--ddb-border);
 }
 
 .cameras-manager .camera-row.active {
-    background: var(--ddb-surface-hover, rgba(40, 110, 190, 0.12));
-    border-radius: var(--ddb-border-radius, 4px);
+    background: var(--ddb-bg-hover);
+    border-radius: var(--ddb-radius-sm);
 }
 
 .cameras-manager .idx {
     flex: 0 0 1.4rem;
     text-align: center;
     font-weight: 600;
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .cameras-manager .name {
     flex: 1 1 auto;
     min-width: 0;
     padding: 0.25rem 0.4rem;
-    border: 1px solid var(--ddb-border-color, rgba(0, 0, 0, 0.15));
-    border-radius: var(--ddb-border-radius, 4px);
-    background: var(--ddb-surface, #fff);
-    color: var(--ddb-text, #222);
+    border: 1px solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    background: var(--ddb-bg-surface);
+    color: var(--ddb-text);
 }
 
 .cameras-manager .name[readonly] {
@@ -139,14 +139,14 @@ export default {
     width: 1.9rem;
     height: 1.9rem;
     border: none;
-    border-radius: var(--ddb-border-radius, 4px);
+    border-radius: var(--ddb-radius-sm);
     background: transparent;
-    color: var(--ddb-text, #444);
+    color: var(--ddb-text);
     cursor: pointer;
 }
 
 .cameras-manager .act:hover:not(:disabled) {
-    background: var(--ddb-surface-hover, rgba(0, 0, 0, 0.07));
+    background: var(--ddb-bg-hover);
 }
 
 .cameras-manager .act:disabled {
@@ -155,18 +155,18 @@ export default {
 }
 
 .cameras-manager .act.danger:hover {
-    color: var(--ddb-danger, #c0392b);
+    color: var(--ddb-danger);
 }
 
 .cameras-manager .hint {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .cameras-manager .manager-footer {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    margin-top: var(--ddb-spacing-sm, 0.5rem);
+    margin-top: var(--ddb-spacing-sm);
 }
 
 .cameras-manager .manager-footer .spacer {
@@ -174,7 +174,7 @@ export default {
 }
 
 .cameras-manager .readonly-note {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .cameras-manager .readonly-note i {

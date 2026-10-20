@@ -252,7 +252,7 @@ export default {
         user-select: none;
 
         &:hover {
-            background: var(--ddb-bg-secondary);
+            background: var(--ddb-bg-hover);
             cursor: pointer;
         }
 
@@ -266,7 +266,7 @@ export default {
         }
 
         &.drop-target {
-            outline: 2px dashed var(--ddb-color-primary, #1976d2);
+            outline: 2px dashed var(--ddb-primary);
             outline-offset: -2px;
             background: var(--ddb-bg-hover);
         }

@@ -186,7 +186,7 @@ export default {
 
 .pending-message {
     font-size: 0.75rem;
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

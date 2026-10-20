@@ -107,7 +107,7 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 8px 16px;
-    color: #fff;
+    color: var(--ddb-text-on-dark);
     background: rgba(0, 0, 0, 0.4);
 }
 
@@ -125,7 +125,7 @@ export default {
 }
 
 .video-lightbox-action {
-    color: #fff;
+    color: var(--ddb-text-on-dark);
     cursor: pointer;
     padding: 6px 10px;
     border-radius: 4px;
@@ -155,7 +155,7 @@ export default {
 
 .video-lightbox-error {
     position: absolute;
-    color: #fff;
+    color: var(--ddb-text-on-dark);
     background: rgba(180, 30, 30, 0.85);
     padding: 12px 18px;
     border-radius: 6px;

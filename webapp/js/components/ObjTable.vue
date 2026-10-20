@@ -158,12 +158,12 @@ ul {
 }
 
 .bool-true {
-    color: #4caf50;
+    color: var(--ddb-success);
     font-weight: bold;
 }
 
 .bool-false {
-    color: #f44336;
+    color: var(--ddb-danger);
     font-weight: bold;
 }
 

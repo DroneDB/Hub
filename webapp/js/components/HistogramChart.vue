@@ -21,6 +21,7 @@
 
 <script>
 import Chart from 'primevue/chart';
+import { colorAt } from '@/libs/map/colormaps';
 
 const HANDLE_KEYS = ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'];
 
@@ -142,33 +143,7 @@ export default {
 
     methods: {
         getBarColor(position) {
-            const colormapColors = {
-                rdylgn: ['#d73027', '#fdae61', '#fee08b', '#d9ef8b', '#66bd63', '#1a9850'],
-                discrete_ndvi: ['#8b0000', '#ff4500', '#ffd700', '#32cd32', '#006400'],
-                spectral: ['#d53e4f', '#fc8d59', '#fee08b', '#e6f598', '#99d594', '#3288bd'],
-                viridis: ['#440154', '#31688e', '#35b779', '#fde725'],
-                plasma: ['#0d0887', '#7e03a8', '#cc4778', '#f89540', '#f0f921'],
-                inferno: ['#000004', '#420a68', '#932667', '#dd513a', '#fca50a', '#fcffa4'],
-                magma: ['#000004', '#3b0f70', '#8c2981', '#de4968', '#fe9f6d', '#fcfdbf'],
-                grayscale: ['#000000', '#ffffff'],
-                ironbow: ['#00000a', '#2d0571', '#a4105e', '#ed6926', '#fffe00'],
-                rainbow: ['#ff0000', '#ff8000', '#ffff00', '#00ff00', '#0000ff', '#8000ff']
-            };
-            const colors = colormapColors[this.colormap] || colormapColors.grayscale;
-            const idx = position * (colors.length - 1);
-            const lo = Math.floor(idx);
-            const hi = Math.min(lo + 1, colors.length - 1);
-            const t = idx - lo;
-            return this.lerpColor(colors[lo], colors[hi], t);
-        },
-
-        lerpColor(a, b, t) {
-            const ar = parseInt(a.slice(1, 3), 16), ag = parseInt(a.slice(3, 5), 16), ab = parseInt(a.slice(5, 7), 16);
-            const br = parseInt(b.slice(1, 3), 16), bg = parseInt(b.slice(3, 5), 16), bb = parseInt(b.slice(5, 7), 16);
-            const r = Math.round(ar + (br - ar) * t);
-            const g = Math.round(ag + (bg - ag) * t);
-            const bl = Math.round(ab + (bb - ab) * t);
-            return `rgb(${r},${g},${bl})`;
+            return colorAt(this.colormap, position);
         },
 
         formatVal(v) {
@@ -290,7 +265,7 @@ export default {
     transform: translate(-50%, -50%);
     width: 4px;
     height: 24px;
-    background: #fff;
+    background: var(--ddb-text-on-color);
     border: 1px solid rgba(0,0,0,0.5);
     border-radius: 2px;
 }
@@ -301,7 +276,7 @@ export default {
     left: 50%;
     transform: translateX(-50%);
     font-size: 0.65rem;
-    color: #ccc;
+    color: var(--panel-text-soft);
     white-space: nowrap;
 }
 

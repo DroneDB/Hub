@@ -1,5 +1,5 @@
 <template>
-    <Window id="annotation-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel">
+    <Window id="annotation-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel" @confirm="save">
         <div class="measurement-properties-form">
             <div class="form-group">
                 <label for="ap-name">Name</label>
@@ -12,36 +12,36 @@
             </div>
 
             <div class="form-group">
-                <span id="ap-position-label" class="field-label">Position</span>
-                <div class="coords-row">
-                    <code class="coords-text" aria-labelledby="ap-position-label">{{ coordsText }}</code>
+                <span id="ap-position-label" class="form-label">Position</span>
+                <div class="coords-row" role="group" aria-labelledby="ap-position-label">
+                    <code class="coords-text">{{ coordsText }}</code>
                     <button type="button" class="btn-copy-coords" :title="copyTooltip" :aria-label="copyTooltip" @click="copyCoordinates">
                         <i :class="copyIconClass" />
                     </button>
                 </div>
             </div>
 
-            <div class="buttons">
-                <button v-if="showDelete" class="btn-delete" title="Delete this annotation" @click="deleteAnnotation">
-                    <i class="fa-solid fa-trash" />
-                    Delete
-                </button>
-                <button class="btn-cancel" @click="cancel">Cancel</button>
-                <button class="btn-save" @click="save">Save</button>
-            </div>
         </div>
+
+        <template #footer>
+            <Button v-if="showDelete" label="Delete" icon="fa-solid fa-trash" severity="danger" text class="me-auto"
+                    title="Delete this annotation" @click="deleteAnnotation" />
+            <Button label="Cancel" severity="secondary" @click="cancel" />
+            <Button label="Save" data-confirm @click="save" />
+        </template>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
+import Button from 'primevue/button';
 import { useCopyText } from '@/composables/useCopyText';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
  *
  * Name, description, and read-only XYZ position display with clipboard copy.
- * Submits changes to an onSave callback; emits onDelete when the delete button
+ * Emits save with the changes, delete when the delete button
  * is pressed (annotation stays in memory until the caller removes it).
  *
  * Props:
@@ -50,7 +50,7 @@ import { useCopyText } from '@/composables/useCopyText';
  */
 export default {
     components: {
-        Window
+        Window, Button
     },
     props: {
         annotation: {
@@ -62,7 +62,7 @@ export default {
             default: true
         }
     },
-    emits: ['close', 'onSave', 'onDelete'],
+    emits: ['close', 'save', 'delete'],
     setup() {
         const { copy: copyText, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
         return { copyText, coordsCopied };
@@ -102,11 +102,11 @@ export default {
     },
     methods: {
         save() {
-            this.$emit('onSave', { ...this.formData });
+            this.$emit('save', { ...this.formData });
             this.$emit('close');
         },
         deleteAnnotation() {
-            this.$emit('onDelete');
+            this.$emit('delete');
             this.$emit('close');
         },
         cancel() {
@@ -134,7 +134,7 @@ export default {
 }
 
 .form-group label,
-.form-group .field-label {
+.form-group .form-label {
     display: block;
     margin-bottom: 0.25rem;
     font-weight: 500;
@@ -162,7 +162,7 @@ export default {
     padding: var(--ddb-spacing-sm);
     border: var(--ddb-border-width) solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
-    background-color: var(--ddb-background-soft, rgba(0, 0, 0, 0.03));
+    background-color: var(--ddb-bg-subtle);
 }
 
 .coords-text {
@@ -186,50 +186,4 @@ export default {
     background-color: var(--ddb-border-separator);
 }
 
-.buttons {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--ddb-spacing-sm);
-    margin-top: 1.25rem;
-    padding-top: var(--ddb-spacing-lg);
-    border-top: var(--ddb-border-width) solid var(--ddb-border-separator);
-}
-
-.buttons button {
-    padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
-    border-radius: var(--ddb-radius-sm);
-    font-size: var(--ddb-font-size-base);
-    cursor: pointer;
-    border: none;
-}
-
-.btn-cancel {
-    background-color: var(--ddb-border-separator);
-    color: var(--ddb-text);
-}
-
-.btn-cancel:hover {
-    background-color: var(--ddb-border);
-}
-
-.btn-save {
-    background-color: var(--ddb-success);
-    color: var(--ddb-text-on-color);
-}
-
-.btn-save:hover {
-    background-color: var(--ddb-success);
-    filter: brightness(0.9);
-}
-
-.btn-delete {
-    background-color: var(--ddb-danger);
-    color: var(--ddb-text-on-color);
-    margin-right: auto;
-}
-
-.btn-delete:hover {
-    background-color: var(--ddb-danger);
-    filter: brightness(0.9);
-}
 </style>

@@ -40,8 +40,8 @@
         </div>
 
         <!-- Photogrammetry launcher -->
-        <Dialog v-model:visible="photogrammetryDialogOpen" modal header="Run Photogrammetry (NodeODX)"
-                :style="{ width: '52rem' }">
+        <Window id="photogrammetry" v-model:visible="photogrammetryDialogOpen" modal title="Run Photogrammetry (NodeODX)"
+                fixed-position width="52rem" max-width="95vw" height="auto">
             <div class="mb-3">
                 <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
                 <div class="d-flex gap-2">
@@ -161,7 +161,7 @@
                         :loading="checkingNode" @click="checkNode" />
                 <Button label="Start" icon="fa-solid fa-play" :loading="submitting" @click="submitPhotogrammetry" />
             </template>
-        </Dialog>
+        </Window>
 
         <!-- Log viewer -->
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
@@ -193,7 +193,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import { escapeHtml } from '@/libs/sanitize';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import Dialog from 'primevue/dialog';
+import Window from '@/components/Window.vue';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
@@ -258,7 +258,7 @@ const ODM_PRESETS = [
 export default {
 
     components: {
-        DialogHost, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
+        DialogHost, Button, Select, Window, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
     },
 
     inject: {
@@ -895,7 +895,7 @@ export default {
 
 .filters {
     padding: var(--ddb-spacing-lg);
-    background: var(--ddb-bg-secondary);
+    background: var(--ddb-bg-hover);
 }
 
 .content {
@@ -912,32 +912,32 @@ export default {
 }
 
 .muted {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .error-text {
-    color: var(--ddb-danger, #d9534f);
+    color: var(--ddb-danger);
 }
 
 .pg-preset-tags {
-    border: 1px solid var(--ddb-border, #dee2e6);
+    border: 1px solid var(--ddb-border);
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
-    background: var(--ddb-bg-secondary, #f8f9fa);
+    background: var(--ddb-bg-light);
 }
 
 .pg-node-details {
-    border: 1px solid var(--ddb-border, #dee2e6);
+    border: 1px solid var(--ddb-border);
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
-    background: var(--ddb-bg-secondary, #f8f9fa);
+    background: var(--ddb-bg-light);
     font-size: 0.9rem;
 }
 
 .pg-option-chip {
     display: inline-block;
-    background: var(--ddb-primary, #0d6efd);
-    color: #fff;
+    background: var(--ddb-primary);
+    color: var(--ddb-text-on-color);
     border-radius: 12px;
     padding: 0.15rem 0.6rem;
     font-size: 0.78rem;
@@ -951,7 +951,7 @@ export default {
 }
 
 .pg-option-chip-clickable:hover {
-    background-color: var(--ddb-primary-hover, #0060bf);
+    background-color: var(--ddb-primary-hover);
 }
 
 .duration {
@@ -960,18 +960,7 @@ export default {
 }
 
 .duration.running {
-    color: var(--ddb-warning, #f0ad4e);
+    color: var(--ddb-warning);
 }
 
-.task-log {
-    max-height: 24rem;
-    overflow: auto;
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
 </style>

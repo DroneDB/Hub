@@ -1,10 +1,7 @@
 <template>
-    <Dialog :visible="visible"
-            modal
-            header="Base plane methods"
-            :style="{ width: '560px' }"
-            :draggable="false"
-            @update:visible="onVisibleChange">
+    <Window id="stockpile-base-methods" :visible="visible" title="Base plane methods" modal fixed-position
+            width="560px" max-width="95vw" height="auto" close-button cancel-label="Close"
+            @update:visible="$emit('update:visible', $event)">
         <div class="info-dialog-body">
             <p class="info-intro">
                 The <b>base plane</b> is the reference surface used to compute
@@ -32,20 +29,15 @@
             </div>
         </div>
 
-        <template #footer>
-            <Button label="Close" icon="fas fa-times" severity="secondary"
-                    @click="onClose" />
-        </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
+import Window from '@/components/Window.vue';
 
 export default {
     name: 'StockpileBaseMethodsDialog',
-    components: { Dialog, Button },
+    components: { Window },
     props: {
         visible: { type: Boolean, default: false }
     },
@@ -87,10 +79,6 @@ export default {
                 }
             ]
         };
-    },
-    methods: {
-        onVisibleChange(v) { this.$emit('update:visible', v); },
-        onClose() { this.$emit('update:visible', false); }
     }
 };
 </script>
@@ -108,7 +96,7 @@ export default {
 }
 
 .method-card {
-    border: 1px solid var(--p-content-border-color, rgba(255, 255, 255, 0.15));
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
@@ -135,7 +123,7 @@ export default {
 }
 
 .param-card {
-    border: 1px solid var(--p-content-border-color, rgba(255, 255, 255, 0.15));
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     background: rgba(255, 255, 255, 0.03);

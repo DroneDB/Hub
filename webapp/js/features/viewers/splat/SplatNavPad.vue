@@ -64,7 +64,7 @@ function press(code, ev) {
     width: 2.6rem;
     height: 2.6rem;
     border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: var(--ddb-border-radius, 6px);
+    border-radius: var(--ddb-radius-sm);
     background: rgba(0, 0, 0, 0.4);
     color: var(--ddb-text-on-dark);
     cursor: pointer;

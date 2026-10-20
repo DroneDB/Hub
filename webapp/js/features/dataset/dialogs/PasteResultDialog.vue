@@ -123,6 +123,6 @@ export default {
     padding-left: 1.25rem;
 }
 
-.green { color: #22c55e; }
-.red { color: #ef4444; }
+.green { color: var(--ddb-success); }
+.red { color: var(--ddb-danger); }
 </style>

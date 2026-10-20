@@ -117,12 +117,12 @@ export default {
 }
 
 .crs-error {
-    color: var(--p-red-500, #e24c4c);
+    color: var(--p-red-500);
     font-size: 0.8rem;
 }
 
 .help-text {
-    color: var(--p-text-muted-color, #888);
+    color: var(--p-text-muted-color);
     font-size: 0.8rem;
 }
 </style>

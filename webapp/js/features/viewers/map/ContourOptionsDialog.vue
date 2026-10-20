@@ -1,14 +1,9 @@
 <template>
-    <Dialog :visible="visible"
-            modal
-            header="Generate Contour Lines"
-            :style="{ width: '460px' }"
-            :draggable="false"
-            :closable="!loading"
-            :close-on-escape="!loading"
-            @update:visible="onVisibleChange">
-
-        <!-- Full-dialog loading overlay - teleported above the PrimeVue dialog z-index -->
+    <Window id="contour-options" :visible="visible" title="Generate Contour Lines" modal fixed-position
+            width="460px" max-width="95vw" height="auto" :busy="loading"
+            confirm-label="Generate" confirm-icon="fas fa-check" :confirm-disabled="!!validationError"
+            @update:visible="$emit('update:visible', $event)" @close="$emit('cancel')" @confirm="onGenerate">
+        <!-- Full-page overlay while generating, above the dialog -->
         <Teleport to="body">
             <div v-if="loading && visible" class="contour-gen-overlay">
                 <LoadingSpinner class="contour-gen-spinner" size="lg" label="Generating contour lines…" />
@@ -104,27 +99,17 @@
             </div>
         </div>
 
-        <template #footer>
-            <Button label="Cancel" icon="fas fa-times" severity="secondary" text
-                    :disabled="loading"
-                    @click="onCancel" />
-            <Button :label="loading ? 'Generating...' : 'Generate'"
-                    icon="fas fa-check" :loading="loading"
-                    :disabled="loading || !!validationError"
-                    @click="onGenerate" />
-        </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
+import Window from '@/components/Window.vue';
 import InputNumber from 'primevue/inputnumber';
 
 export default {
     name: 'ContourOptionsDialog',
-    components: { Dialog, Button, InputNumber, LoadingSpinner },
+    components: { Window, InputNumber, LoadingSpinner },
     props: {
         visible: { type: Boolean, default: false },
         loading: { type: Boolean, default: false },
@@ -202,23 +187,15 @@ export default {
             };
         },
         onGenerate() {
-            if (this.validationError) return;
+            if (this.validationError || this.loading) return;
             this.$emit('generate', this.buildPayload());
-        },
-        onCancel() {
-            this.$emit('cancel');
-            this.$emit('update:visible', false);
-        },
-        onVisibleChange(v) {
-            this.$emit('update:visible', v);
-            if (!v) this.$emit('cancel');
         }
     }
 };
 </script>
 
-<style>
-/* Global (not scoped) - the Teleport overlay renders outside this component's root */
+<style scoped>
+/* Teleported, still scoped: the overlay is this template's */
 .contour-gen-overlay {
     position: fixed;
     inset: 0;
@@ -239,13 +216,11 @@ export default {
     align-items: center;
     gap: 1rem;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
-    color: #444;
+    color: var(--ddb-text-secondary);
     font-size: 0.95rem;
     font-weight: 500;
 }
-</style>
 
-<style scoped>
 .contour-dialog-body {
     display: flex;
     flex-direction: column;
@@ -255,7 +230,7 @@ export default {
 
 .dialog-help {
     margin: 0 0 8px 0;
-    color: #666;
+    color: var(--ddb-text-secondary);
     font-size: 0.85rem;
     line-height: 1.4;
 }
@@ -278,11 +253,11 @@ export default {
 .form-label {
     font-weight: 600;
     font-size: 0.82rem;
-    color: #444;
+    color: var(--ddb-text-secondary);
 }
 
 .form-hint {
-    color: #888;
+    color: var(--ddb-text-muted);
     font-size: 0.78rem;
 }
 
@@ -308,9 +283,9 @@ export default {
 }
 
 .form-error {
-    color: #c62828;
+    color: var(--ddb-danger);
     font-size: 0.82rem;
-    background: #ffebee;
+    background: var(--ddb-danger-bg);
     padding: 6px 10px;
     border-radius: 4px;
 }

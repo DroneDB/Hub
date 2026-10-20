@@ -115,6 +115,6 @@ export default {
 }
 
 .text-success {
-    color: var(--p-green-500, #22c55e);
+    color: var(--p-green-500);
 }
 </style>

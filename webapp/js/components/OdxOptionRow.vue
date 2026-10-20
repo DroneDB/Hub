@@ -141,7 +141,7 @@ export default {
 <style scoped>
 .odm-option-row {
     padding: 0.4rem 0;
-    border-bottom: 1px solid var(--ddb-border, #dee2e6);
+    border-bottom: 1px solid var(--ddb-border);
 }
 
 .odm-option-label {
@@ -158,12 +158,12 @@ export default {
 }
 
 .odm-option-domain {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
     font-size: 0.8rem;
 }
 
 .odm-option-help {
-    color: var(--ddb-primary, #0d6efd);
+    color: var(--ddb-primary);
     cursor: pointer;
     font-size: 0.85rem;
 }
@@ -186,10 +186,10 @@ export default {
     margin-left: 1.5rem;
     margin-top: 0.25rem;
     padding: 0.3rem 0.5rem;
-    background: #fff3cd;
-    border: 1px solid #ffc107;
+    background: var(--ddb-warning-bg);
+    border: 1px solid var(--ddb-warning);
     border-radius: 4px;
-    color: #856404;
+    color: var(--ddb-warning-text);
     font-size: 0.8rem;
     display: flex;
     align-items: center;
