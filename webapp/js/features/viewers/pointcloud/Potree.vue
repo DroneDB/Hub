@@ -103,6 +103,7 @@ import { getPref, setPref, PREF } from '@/libs/preferences';
 import { useTimerGroup } from '@/composables/useTimers';
 import { useDialogs } from '@/composables/useDialogs';
 import DialogHost from '@/components/DialogHost.vue';
+import { flash } from '@/composables/useMapAlerts';
 
 
 
@@ -1179,20 +1180,8 @@ export default {
             }
         },
 
-        /**
-         * Show flash message
-         */
-        showFlash: function(message, color = 'positive') {
-            const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
-            this.$notify[severityMap[color] || 'success']({ summary: message });
-        },
-
-        /**
-         * Close flash message
-         */
-        closeFlash: function() {
-            // No-op: Toast auto-closes
-        },
+        // Short notice (shared with the map viewers)
+        showFlash: flash,
 
         // ---- Undo/Redo System ----
 

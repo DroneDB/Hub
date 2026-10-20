@@ -152,7 +152,7 @@ import { fromExtent } from 'ol/geom/Polygon';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
 import { lifecycleListenersMixin } from '@/composables/useEventListener';
-import { markRaw } from 'vue';
+import { markRaw, shallowRef } from 'vue';
 
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
@@ -171,7 +171,6 @@ import MapDialogs from './MapDialogs.vue';
 import Keyboard from '@/libs/keyboard';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { isMobile } from '@/libs/responsive';
-import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
@@ -188,8 +187,8 @@ import { getRenderPixel } from 'ol/render';
 import RasterSplitOverlay from './RasterSplitOverlay.vue';
 
 // Mixins
-import mapAlertFlash from '@/composables/useMapAlertFlash';
-import mapBasemap from '@/composables/useMapBasemap';
+import { useMapAlerts } from '@/composables/useMapAlerts';
+import { useMapBasemap } from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
 import mapMeasurements from '@/composables/useMapMeasurements';
 import mapPlantHealth from '@/composables/usePlantHealth';
@@ -210,7 +209,7 @@ export default {
     components: {
         DialogHost, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
-    mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
+    mixins: [lifecycleListenersMixin, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -245,9 +244,14 @@ export default {
     },
     emits: ['scrollTo', 'openItem'],
     setup() {
+        // OpenLayers map, shared with the map composables (assigned in loadMap)
+        const map = shallowRef(null);
         const imageCopy = useCopyText();
         const videoCopy = useCopyText();
         return {
+            map,
+            ...useMapAlerts(),
+            ...useMapBasemap(map),
             copyImageCoords: imageCopy.copy, imagePopupCoordsCopied: imageCopy.copied,
             copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied,
             dialogs: useDialogs(),
@@ -264,7 +268,6 @@ export default {
             initialExtent: null,
             vectorLayers: [],
             vectorLayerColors: {},
-            selectedBasemap: getPref(PREF.BASEMAP, 'satellite'),
             currentOrthophotoEntry: null,
             mapSettingsDialogOpen: false,
             showFlightPath: savedFlightPath,
@@ -884,7 +887,7 @@ export default {
             ]));
 
 
-            this.basemapLayer = this.createBasemapLayer();
+            const basemapLayer = this.createBasemapLayer();
 
             this.selectionControl = this.standalone ? null : new SelectionControl({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
@@ -928,7 +931,7 @@ export default {
             }); this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
-                    this.basemapLayer,
+                    basemapLayer,
                     this.rasterLayer,
                     this.footprintRastersLayer,
                     this.extentLayer,
@@ -2025,18 +2028,6 @@ export default {
                 }
             });
         },
-        /**
-         * Override base mixin to also persist the selection.
-         */
-        updateBasemap: function () {
-            const newLayer = this.createBasemapLayer();
-            const layers = this.map.getLayers();
-            // Replace the basemap layer at position 0
-            layers.removeAt(0);
-            layers.insertAt(0, newLayer);
-            this.basemapLayer = newLayer;
-            setPref(PREF.BASEMAP, this.selectedBasemap);
-        },
 
         /**
          * Get the current folder being viewed based on the files' paths
@@ -2170,24 +2161,7 @@ export default {
             }
         },
 
-        /**
-         * Handle basemap change from settings dialog
-         */
-        handleBasemapChanged: function (basemap) {
-            this.selectedBasemap = basemap;
-            this.updateBasemap();
-        },
 
-        /**
-         * Handle custom basemap configuration change from settings dialog
-         */
-        handleCustomBasemapConfigChanged: function (config) {
-            saveCustomBasemapConfig(config);
-            this.customBasemapConfig = config;
-            if (this.selectedBasemap === 'custom') {
-                this.updateBasemap();
-            }
-        },
 
         /**
          * Handle units change from settings dialog
