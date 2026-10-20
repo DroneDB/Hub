@@ -3,11 +3,16 @@ const CopyPlugin = require('copy-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
+const CompressionPlugin = require('compression-webpack-plugin');
 const webpack = require('webpack');
 const path = require('path');
+const zlib = require('zlib');
 
 const pkg = require('./package.json');
 const isProduction = process.env.NODE_ENV === 'production';
+
+// Text assets worth a precompressed twin (HUB-09)
+const COMPRESSIBLE = /\.(js|css|html|svg|wasm|json|txt|xml)$/i;
 
 module.exports = {
     mode: isProduction ? 'production' : 'development',
@@ -205,6 +210,26 @@ module.exports = {
         ...(isProduction ? [new MiniCssExtractPlugin({
             filename: '[name].[contenthash:8].css',
         })] : []),
+        // HUB-09: compress once at build time at the highest levels; the Registry serves the
+        // .br / .gz twin instead of compressing every response again at a fast level
+        ...(isProduction ? [
+            new CompressionPlugin({
+                filename: '[path][base].br',
+                algorithm: 'brotliCompress',
+                test: COMPRESSIBLE,
+                compressionOptions: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 } },
+                threshold: 1024,
+                minRatio: 0.9
+            }),
+            new CompressionPlugin({
+                filename: '[path][base].gz',
+                algorithm: 'gzip',
+                test: COMPRESSIBLE,
+                compressionOptions: { level: 9 },
+                threshold: 1024,
+                minRatio: 0.9
+            })
+        ] : []),
     ],
 
     resolve: {
