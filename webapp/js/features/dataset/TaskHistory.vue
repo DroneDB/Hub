@@ -357,7 +357,6 @@ export default {
             clearDialogOpen: false,
             deleteDialogOpen: false,
             deletingTask: null,
-            deletingTask: null,
 
             cancelDialogOpen: false,
             cancellingTask: null,

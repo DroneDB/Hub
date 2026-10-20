@@ -15,6 +15,7 @@
  */
 import reg from '@/libs/api/sharedRegistry';
 import { formatTimeAgo } from '@/libs/utils';
+import { onTick } from '@/libs/clock';
 
 export default {
     data() {
@@ -24,15 +25,14 @@ export default {
     },
 
     mounted() {
-        // `now` ticks every second so live running-time columns refresh.
-        this._taskClockTimer = setInterval(() => { this.now = Date.now(); }, 1000);
+        // `now` ticks every second so live running-time columns refresh: one shared
+        // ticker for every consumer, paused while the page is hidden (HUB-05)
+        this._stopTaskClock = onTick(now => { this.now = now; });
     },
 
     beforeUnmount() {
-        if (this._taskClockTimer) {
-            clearInterval(this._taskClockTimer);
-            this._taskClockTimer = null;
-        }
+        this._stopTaskClock?.();
+        this._stopTaskClock = null;
     },
 
     computed: {
