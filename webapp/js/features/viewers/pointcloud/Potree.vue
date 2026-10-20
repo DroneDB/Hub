@@ -97,9 +97,14 @@ import Toast from 'primevue/toast';
 import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.vue';
 import { loadResources } from '@/libs/lazy';
+import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { isMobile } from '@/libs/responsive';
+import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
+import { HUB_VERSION } from '@/libs/hubUpdateChecker';
+
+
 
 export default {
     components: {
@@ -143,18 +148,17 @@ export default {
             unitPref: localStorage.getItem("measureUnitPref") || "metric"
         };
     },
-    mounted: function () {
+    created: function () {
+        // Replaced by each viewer (loadViewer); one exists from the start so the listener
+        // helpers always have a session to register with
+        this.session = new PotreeSession();
     },
 
     beforeUnmount: function() {
-        // Clean up keyboard event listeners to prevent memory leaks
-        if (this.undoRedoKeyHandler) {
-            document.removeEventListener('keydown', this.undoRedoKeyHandler);
-        }
-        // Clean up measurement double-click listener
-        if (this.measurementDblClickHandler && this.viewer && this.viewer.renderer) {
-            this.viewer.renderer.domElement.removeEventListener('dblclick', this.measurementDblClickHandler);
-        }
+        // Everything the viewer created goes with it: listeners, render loop, WebGL context,
+        // the jQuery UI sidebar, window.viewer (HUB-04)
+        this.session.dispose();
+        this.viewer = null;
     },
 
     computed: {
@@ -242,15 +246,15 @@ export default {
             };
 
             // Listen to measurement events
-            scene.addEventListener('measurement_added', updateCount);
-            scene.addEventListener('measurement_removed', updateCount);
-            scene.addEventListener('profile_added', updateCount);
-            scene.addEventListener('profile_removed', updateCount);
-            scene.addEventListener('volume_added', updateCount);
-            scene.addEventListener('volume_removed', updateCount);
+            this.session.track(scene, 'measurement_added', updateCount);
+            this.session.track(scene, 'measurement_removed', updateCount);
+            this.session.track(scene, 'profile_added', updateCount);
+            this.session.track(scene, 'profile_removed', updateCount);
+            this.session.track(scene, 'volume_added', updateCount);
+            this.session.track(scene, 'volume_removed', updateCount);
 
             // Listen to annotation events
-            scene.annotations.addEventListener('annotation_added', updateCount);
+            this.session.track(scene.annotations, 'annotation_added', updateCount);
 
             // Initial count
             updateCount();
@@ -284,13 +288,13 @@ export default {
                     self.openPropertiesDialog(measure);
                 }
             };
-            renderer.domElement.addEventListener('dblclick', this.measurementDblClickHandler);
+            this.session.track(renderer.domElement, 'dblclick', this.measurementDblClickHandler);
 
             // Setup listeners for annotations (they have HTML domElements)
             this.setupAnnotationEditListeners();
 
             // Listen for new annotations being added
-            scene.annotations.addEventListener('annotation_added', (e) => {
+            this.session.track(scene.annotations, 'annotation_added', (e) => {
                 self.addAnnotationEditListener(e.annotation);
             });
         },
@@ -333,7 +337,7 @@ export default {
 
             // Remove existing listener to avoid duplicates
             if (annotation._editHandler) {
-                titleElement.removeEventListener('dblclick', annotation._editHandler);
+                this.session.untrack(titleElement, 'dblclick', annotation._editHandler);
             }
 
             // Create and store handler
@@ -343,7 +347,7 @@ export default {
                 self.openAnnotationPropertiesDialog(annotation);
             };
 
-            titleElement.addEventListener('dblclick', annotation._editHandler);
+            this.session.track(titleElement, 'dblclick', annotation._editHandler);
         },
 
         /**
@@ -591,12 +595,12 @@ export default {
             }
             // Clean up update handler
             if (measure._labelUpdateHandler && this.viewer) {
-                this.viewer.removeEventListener('update', measure._labelUpdateHandler);
+                this.session.untrack(this.viewer, 'update', measure._labelUpdateHandler);
                 measure._labelUpdateHandler = null;
             }
             // Clean up tooltip hover handler
             if (measure._tooltipHoverHandler && this.viewer && this.viewer.renderer) {
-                this.viewer.renderer.domElement.removeEventListener('mousemove', measure._tooltipHoverHandler);
+                this.session.untrack(this.viewer.renderer.domElement, 'mousemove', measure._tooltipHoverHandler);
                 measure._tooltipHoverHandler = null;
             }
 
@@ -676,7 +680,7 @@ export default {
                     updateLabelScale();
                 }
             };
-            self.viewer.addEventListener('update', updateHandler);
+            self.session.track(self.viewer, 'update', updateHandler);
             measure._labelUpdateHandler = updateHandler;
 
             measure._nameLabel = label;
@@ -691,7 +695,7 @@ export default {
                     position: fixed;
                     display: none;
                 `;
-                document.body.appendChild(tooltip);
+                document.body.appendChild(this.session.adopt(tooltip));
                 measure._nameLabelTooltip = tooltip;
 
                 // Update tooltip position on render
@@ -746,7 +750,7 @@ export default {
                     }
                 };
 
-                domElement.addEventListener('mousemove', hoverHandler);
+                this.session.track(domElement, 'mousemove', hoverHandler);
                 measure._tooltipHoverHandler = hoverHandler;
             }
         },
@@ -775,20 +779,20 @@ export default {
                     position: fixed;
                     display: none;
                 `;
-                document.body.appendChild(tooltip);
+                document.body.appendChild(this.session.adopt(tooltip));
                 annotation._descriptionTooltip = tooltip;
 
                 // Show on hover
-                el.addEventListener('mouseenter', (e) => {
+                this.session.track(el, 'mouseenter', (e) => {
                     tooltip.style.left = (e.clientX + 15) + 'px';
                     tooltip.style.top = (e.clientY - 10) + 'px';
                     tooltip.style.display = 'block';
                 });
-                el.addEventListener('mousemove', (e) => {
+                this.session.track(el, 'mousemove', (e) => {
                     tooltip.style.left = (e.clientX + 15) + 'px';
                     tooltip.style.top = (e.clientY - 10) + 'px';
                 });
-                el.addEventListener('mouseleave', () => {
+                this.session.track(el, 'mouseleave', () => {
                     tooltip.style.display = 'none';
                 });
             }
@@ -875,24 +879,10 @@ export default {
 
                 this.loading = true;
 
-                await loadResources("/potree/build/potree/potree.css");
-                await loadResources("/potree/libs/jquery-ui/jquery-ui.min.css");
-                await loadResources("/potree/libs/spectrum/spectrum.css");
-                await loadResources("/potree/libs/jstree/themes/mixed/style.css");
-                await loadResources("/potree/libs/jquery/jquery-3.1.1.min.js");
-                await loadResources("/potree/libs/spectrum/spectrum.js");
-                await loadResources("/potree/libs/jquery-ui/jquery-ui.min.js");
-                await loadResources("/potree/libs/three.js/build/three.min.js");
-                await loadResources("/potree/libs/three.js/extra/lines.js");
-                await loadResources("/potree/libs/other/BinaryHeap.js");
-                await loadResources("/potree/libs/tween/tween.min.js");
-                await loadResources("/potree/libs/d3/d3.js");
-                await loadResources("/potree/libs/proj4/proj4.js");
-                await loadResources("/potree/libs/i18next/i18next.js");
-                await loadResources("/potree/libs/jstree/jstree.js");
-                await loadResources("/potree/build/potree/potree.js");
-                await loadResources("/potree/libs/copc/index.js");
-                await loadResources("/potree/libs/plasio/js/laslaz.js");
+                // One request wave: every file downloads in parallel, the scripts run in this
+                // order (they depend on each other) - instead of 18 round trips one after the other
+                await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
+                fixPotreePaths(window.Potree, window.location.origin);
 
                 await this.loadViewer();
 
@@ -905,12 +895,13 @@ export default {
         loadViewer: async function () {
             this.error = "";
 
-            if (this.viewer) {
-                this.viewer = null;
-                this.$refs.container.innerHTML = '';
-            }
+            // A previous viewer of this component is released completely first
+            this.session.dispose();
+            this.viewer = null;
+            this.session = new PotreeSession();
 
-            let viewer = new Potree.Viewer(this.$refs.container);
+            let viewer = this.session.create(() => new Potree.Viewer(this.$refs.container),
+                [this.$refs.container, this.$refs.sidebar]);
 
             viewer.toggleSidebar = () => {
                 let renderArea = this.$refs.container;
@@ -924,7 +915,7 @@ export default {
             };
             viewer.setEDLEnabled(false);
             viewer.setFOV(60);
-            viewer.setPointBudget(10 * 1000 * 1000);
+            viewer.setPointBudget(pointBudgetFor(navigator.deviceMemory, isMobile()));
 
             // Apply unit preference from localStorage
             viewer.setLengthUnit(this.unitPref === 'metric' ? 'm' : 'ft');
@@ -1384,7 +1375,7 @@ export default {
             // Deactivate when any other Potree tool starts
             const self = this;
             this.cancelInsertionsHandler = () => self.deactivateDeleteTool();
-            this.viewer.addEventListener('cancel_insertions', this.cancelInsertionsHandler);
+            this.session.track(this.viewer, 'cancel_insertions', this.cancelInsertionsHandler);
 
             // Create click handler
             this.deleteClickHandler = (event) => {
@@ -1403,7 +1394,7 @@ export default {
                 // Tool stays active for multiple deletions
             };
 
-            renderer.domElement.addEventListener('click', this.deleteClickHandler);
+            this.session.track(renderer.domElement, 'click', this.deleteClickHandler);
 
             // ESC key to deactivate
             this.deleteKeyHandler = (event) => {
@@ -1411,7 +1402,7 @@ export default {
                     self.deactivateDeleteTool();
                 }
             };
-            document.addEventListener('keydown', this.deleteKeyHandler);
+            this.session.track(document, 'keydown', this.deleteKeyHandler);
 
             this.showFlash('Delete tool active - Click on measurements to delete. Press ESC to exit.', 'info', 'fa-solid fa-trash');
         },
@@ -1430,19 +1421,19 @@ export default {
 
             // Remove click handler
             if (this.deleteClickHandler) {
-                renderer.domElement.removeEventListener('click', this.deleteClickHandler);
+                this.session.untrack(renderer.domElement, 'click', this.deleteClickHandler);
                 this.deleteClickHandler = null;
             }
 
             // Remove ESC key handler
             if (this.deleteKeyHandler) {
-                document.removeEventListener('keydown', this.deleteKeyHandler);
+                this.session.untrack(document, 'keydown', this.deleteKeyHandler);
                 this.deleteKeyHandler = null;
             }
 
             // Remove cancel_insertions listener
             if (this.cancelInsertionsHandler) {
-                this.viewer.removeEventListener('cancel_insertions', this.cancelInsertionsHandler);
+                this.session.untrack(this.viewer, 'cancel_insertions', this.cancelInsertionsHandler);
                 this.cancelInsertionsHandler = null;
             }
 
@@ -1471,7 +1462,7 @@ export default {
                 }
             };
 
-            document.addEventListener('keydown', this.undoRedoKeyHandler);
+            this.session.track(document, 'keydown', this.undoRedoKeyHandler);
         },
 
         handleHistoryBack: function () {

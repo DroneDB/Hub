@@ -194,7 +194,20 @@ module.exports = {
         }),
         new CopyPlugin({
             patterns: [
-                { from: 'webapp/public', to: '', globOptions: { ignore: ['**/index.html'] } },
+                {
+                    from: 'webapp/public', to: '', globOptions: {
+                        ignore: [
+                            '**/index.html',
+                            // HUB-04: Potree workers the Hub never starts. It loads COPC only
+                            // (EptLaszipDecoderWorker); the EPT binary/zstandard workers import
+                            // /libs/ept and /libs/zstd-codec, which are not shipped, and the plasio
+                            // workers are superseded by workers/LASLAZWorker.js.
+                            '**/potree/build/potree/workers/EptZstandardDecoderWorker.js*',
+                            '**/potree/build/potree/workers/EptBinaryDecoderWorker.js',
+                            '**/potree/libs/plasio/workers/**'
+                        ]
+                    }
+                },
                 // Serve the laz-perf WebAssembly decoder locally (offline-first): the unified
                 // Giro3D viewer configures setLazPerfPath('/wasm') so COPC point clouds decode
                 // without fetching the .wasm from a public CDN.

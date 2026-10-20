@@ -21,6 +21,9 @@ const SESSION_GUARD_KEY = 'hubUpdateAttempted';
 const BUNDLE_VERSION =
     typeof __HUB_VERSION__ !== 'undefined' ? __HUB_VERSION__ : null;
 
+/** The Hub version this bundle was built from (package.json), or null outside webpack. */
+export const HUB_VERSION = BUNDLE_VERSION;
+
 /**
  * If the server reports a Hub version different from the one this bundle
  * was built with, persist a notice and force a reload. Returns `true`
