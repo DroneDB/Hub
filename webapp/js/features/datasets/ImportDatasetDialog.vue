@@ -159,7 +159,7 @@ import { bytesToSize } from '@/libs/utils';
 import { slugFromName } from '@/libs/api/registryUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Visibility } from 'ddb';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { IMPORT_SOURCES, getImportSource } from './importSources';
 import { formatDurationSeconds } from '@/libs/format';
 
@@ -179,13 +179,16 @@ export default {
     components: {
         Window, Select, InputText, Button, PrimeMessage, ProgressBar
     },
-    mixins: [useHeavyTask],
     props: {
         orgSlug: { type: String, required: true },
         forbiddenSlugs: { type: Array, default: () => [] }
     },
     emits: ['onClose'],
 
+    setup() {
+        const { trackHeavyTask } = useHeavyTask();
+        return { trackHeavyTask };
+    },
     data() {
         return {
             title: 'Import dataset',

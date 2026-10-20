@@ -159,7 +159,7 @@ import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { downloadBlob } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { copyText } from '@/composables/useCopyText';
@@ -174,7 +174,6 @@ import { formatNumber } from '@/libs/format';
  */
 export default {
     components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },
-    mixins: [useHeavyTask],
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -184,6 +183,10 @@ export default {
 
     emits: ['close', 'vizParamsChanged'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
+    },
     data() {
         return {
             rasterInfo: null,

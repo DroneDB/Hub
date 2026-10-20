@@ -130,14 +130,13 @@ import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
 import FolderPickerDialog from './FolderPickerDialog.vue';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { bytesToSize } from '@/libs/utils';
 import { isHttpUrl } from '@/libs/dragDropUtils';
 
 export default {
     /** ImportFromUrlDialog - Single-file URL import dialog. */
     components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPickerDialog },
-    mixins: [useHeavyTask],
 
     props: {
         /** ddb Dataset instance for the target dataset. */
@@ -149,6 +148,10 @@ export default {
     },
     emits: ['onClose'],
 
+    setup() {
+        const { trackHeavyTask } = useHeavyTask();
+        return { trackHeavyTask };
+    },
     data() {
         return {
             url: this.initialUrl || '',

@@ -218,7 +218,7 @@
 </template>
 
 <script>
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import useTaskFormatting from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
@@ -293,7 +293,7 @@ export default {
     components: {
         ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
     },
-    mixins: [useHeavyTask, useTaskFormatting],
+    mixins: [useTaskFormatting],
 
     inject: {
         registerTabChild: { default: null },
@@ -305,6 +305,10 @@ export default {
         canWrite: { type: Boolean, default: false }
     },
 
+    setup() {
+        const { trackHeavyTask } = useHeavyTask();
+        return { trackHeavyTask };
+    },
     data() {
         return {
             tasks: [],

@@ -20,21 +20,14 @@ export const GUARDS = [
             'webapp/js/features/admin/Tasks.vue',
             'webapp/js/features/dataset/TaskHistory.vue',
             'webapp/js/features/dataset/ViewDataset.vue',
-            'webapp/js/features/dataset/dialogs/AlignDialog.vue',
-            'webapp/js/features/dataset/dialogs/ExtractDialog.vue',
-            'webapp/js/features/dataset/dialogs/ImportFromUrlDialog.vue',
-            'webapp/js/features/dataset/dialogs/MergeMultispectralDialog.vue',
             'webapp/js/features/dataset/explorer/Explorer.vue',
             'webapp/js/features/dataset/explorer/FileBrowser.vue',
             'webapp/js/features/dataset/explorer/TableView.vue',
             'webapp/js/features/dataset/explorer/TreeNode.vue',
             'webapp/js/features/dataset/explorer/TreeView.vue',
-            'webapp/js/features/datasets/ImportDatasetDialog.vue',
             'webapp/js/features/tasks/TasksTable.vue',
             'webapp/js/features/viewers/map/Map.vue',
-            'webapp/js/features/viewers/map/PlantHealthPanel.vue',
-            'webapp/js/features/viewers/map/SingleMap.vue',
-            'webapp/js/layout/Header.vue'
+            'webapp/js/features/viewers/map/SingleMap.vue'
         ]
     },
     {

@@ -108,7 +108,7 @@ import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { pathutils } from 'ddb';
 
 /**
@@ -120,13 +120,16 @@ import { pathutils } from 'ddb';
  */
 export default {
     components: { Window, Button, InputText, Checkbox },
-    mixins: [useHeavyTask],
     props: {
         files: { type: Array, required: true },
         dataset: { type: Object, required: true }
     },
     emits: ['onClose'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
+    },
     data() {
         return {
             orderedFiles: [...this.files],

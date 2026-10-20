@@ -108,12 +108,11 @@ import Button    from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select    from 'primevue/select';
 import PrimeMessage from 'primevue/message';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 
 export default {
     name: 'AlignDialog',
     components: { Window, Button, InputText, Select, PrimeMessage },
-    mixins: [useHeavyTask],
 
     props: {
         sourceEntry: { type: Object, required: true },
@@ -122,6 +121,10 @@ export default {
     },
     emits: ['onClose'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
+    },
     data() {
         const stem = (this.sourceEntry?.entry?.path ?? 'output').replace(/\.tiff?$/i, '');
         return {

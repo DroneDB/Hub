@@ -76,14 +76,13 @@ import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
 import FolderPickerDialog from './FolderPickerDialog.vue';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import ddb from 'ddb';
 
 const { pathutils } = ddb;
 
 export default {
     components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPickerDialog },
-    mixins: [useHeavyTask],
 
     props: {
         file: { type: Object, required: true },
@@ -91,6 +90,10 @@ export default {
     },
     emits: ['onClose'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
+    },
     data() {
         return {
             destPath: '',

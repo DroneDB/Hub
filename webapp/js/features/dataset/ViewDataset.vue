@@ -290,7 +290,7 @@ import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 import dialogManager from '@/composables/useDialogManager';
 import fileOperations from '@/composables/useFileOperations';
 import buildEvents from '@/composables/useBuildEvents';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { Features } from '@/libs/features';
 import { getPref, setPref, PREF } from '@/libs/preferences';
 import { isUnauthorized } from '@/libs/ddb/apiError';
@@ -347,7 +347,7 @@ export default {
         FsLightbox,
         VideoLightbox
     },
-    mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask, requestScopeMixin],
+    mixins: [dialogManager, fileOperations, buildEvents, requestScopeMixin],
     provide: function () {
         return {
             showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm),
@@ -357,6 +357,10 @@ export default {
                 move: (source, dest) => this.handleMoveItem(source, dest)
             }
         };
+    },
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
     },
     data: function () {
         const mobile = isMobile();

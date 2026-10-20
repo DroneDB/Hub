@@ -103,7 +103,7 @@ import Button from 'primevue/button';
 import Menu from 'primevue/menu';
 import ProgressBar from 'primevue/progressbar';
 import PrimeMessage from 'primevue/message';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
@@ -121,7 +121,10 @@ export default {
         ProgressBar,
         PrimeMessage
     },
-    mixins: [useHeavyTask],
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
+    },
     data: function () {
 
         const loggedIn = reg.isLoggedIn();
