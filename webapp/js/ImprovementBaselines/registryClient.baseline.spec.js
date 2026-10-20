@@ -115,4 +115,19 @@ describe('HUB-06 Registry client request behaviour', () => {
         await expect(reg.getRequest('/orgs/admin/ds/photos', { signal: new AbortController().signal })).resolves.toEqual({ slug: 'photos' });
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+    it('a GET made after a write does not reuse a read that started before it', async () => {
+        const reg = new Registry('http://registry.test');
+        const ds = reg.Organization('admin').Dataset('photos');
+        let release;
+        fetchMock.mockImplementationOnce(() => new Promise(resolve => { release = () => resolve(jsonResponse({ name: 'old' })); }));
+        const before = ds.info();
+        await ds.update('new');
+        fetchMock.mockImplementationOnce(async () => jsonResponse({ name: 'new' }));
+        const after = ds.info();
+        release();
+
+        await expect(before).resolves.toEqual({ name: 'old' });
+        await expect(after).resolves.toEqual({ name: 'new' });
+        expect(fetchMock).toHaveBeenCalledTimes(3); // info, update, info again
+    });
 });

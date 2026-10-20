@@ -11,7 +11,7 @@
  * - Conditional requests: an answer that came with an ETag is kept, and the next GET of the
  *   same URL sends If-None-Match; a 304 returns the kept body (the task list, HUB-05).
  * - Any write through the client (and invalidate()) drops the cached answers, and an answer
- *   whose request started before a drop is not kept.
+ *   whose request started before a drop is neither kept nor handed to a GET made after it.
  *
  * Callers get their own copy of a JSON answer, so changing it cannot change what others see.
  */
@@ -73,7 +73,10 @@ class RequestCache {
                     if (res.etag) this.etags.set(key, { etag: res.etag, value });
                 }
                 return value;
-            })().finally(() => this.inFlight.delete(key));
+            })().finally(() => {
+                // invalidate() may have replaced this flight with a newer one
+                if (this.inFlight.get(key) === flight) this.inFlight.delete(key);
+            });
             this.inFlight.set(key, flight);
             // The first caller owns the answer: joiners get copies
             return flight;
@@ -102,10 +105,13 @@ class RequestCache {
         });
     }
 
-    /** Drops cached answers (all, or the endpoints starting with `prefix`). */
+    /**
+     * Drops cached answers (all, or the endpoints starting with `prefix`). Requests in flight
+     * are forgotten too: they started before the drop, so a later GET sends its own.
+     */
     invalidate(prefix = '') {
         this.generation++;
-        for (const map of [this.entries, this.etags])
+        for (const map of [this.entries, this.etags, this.inFlight])
             for (const key of [...map.keys()])
                 if (key.startsWith(prefix)) map.delete(key);
     }
