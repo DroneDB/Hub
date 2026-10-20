@@ -39,8 +39,8 @@
                         @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                 </template>
                 <template v-slot:map>
-                    <Map ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
-                        @openItem="handleOpenItem" />
+                    <Map v-if="openedTabs.map" ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
+                        @openItem="handleOpenItem" @vue:mounted="handleLazyTabMounted('map')" />
                 </template>
                 <template v-slot:explorer>
                     <!-- Grid View (Explorer) with optional Detail Panel -->
@@ -91,7 +91,7 @@
                     </div>
                 </template>
                 <template v-slot:tasks>
-                    <TaskHistory :dataset="dataset" :canWrite="canWrite" />
+                    <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :canWrite="canWrite" />
                 </template>
                 <template v-if="isMobile" v-slot:properties>
                     <DetailPanel :file="selectedDetailFile" :dataset="dataset"
@@ -221,7 +221,7 @@
                 <i class="fa-solid fa-arrows-up-down me-1"></i>{{ lightboxCurrentEntry.altitude }} m
             </div>
         </div>
-        <VideoLightbox :visible="videoLightboxVisible" :src="videoLightboxSrc" :entry="videoLightboxEntry"
+        <VideoLightbox v-if="videoLightboxVisible || videoLightboxSrc" :visible="videoLightboxVisible" :src="videoLightboxSrc" :entry="videoLightboxEntry"
             @close="closeVideoLightbox" />
     </div>
 </template>
@@ -229,7 +229,7 @@
 <script>
 import Header from '@/layout/Header.vue';
 import SettingsDialog from './dialogs/SettingsDialog.vue';
-import AddToDatasetDialog from './dialogs/AddToDatasetDialog.vue';
+const AddToDatasetDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-upload" */ './dialogs/AddToDatasetDialog.vue'));
 import DeleteDialog from './dialogs/DeleteDialog.vue';
 import DeleteResultDialog from './dialogs/DeleteResultDialog.vue';
 import RescanResultDialog from './dialogs/RescanResultDialog.vue';
@@ -244,7 +244,8 @@ import PasteResultDialog from './dialogs/PasteResultDialog.vue';
 import ClipboardPanel from '@/components/ClipboardPanel.vue';
 import Message from '@/components/Message.vue';
 import FileBrowser from './explorer/FileBrowser.vue';
-import Map from '@/features/viewers/map/Map.vue';
+// The map tab mounts on first activation; prefetched so opening it is instant on a warm connection
+const Map = lazyComponent(() => import(/* webpackChunkName: "dataset-map", webpackPrefetch: true */ '@/features/viewers/map/Map.vue'), { showLoader: false });
 import Explorer from './explorer/Explorer.vue';
 import TableView from './explorer/TableView.vue';
 import DetailPanel from './explorer/DetailPanel.vue';
@@ -255,19 +256,20 @@ import Alert from '@/components/Alert.vue';
 import Loader from '@/components/Loader.vue';
 import Toast from 'primevue/toast';
 import ShareEmbed from './ShareEmbed.vue';
-import TaskHistory from './TaskHistory.vue';
+const TaskHistory = lazyComponent(() => import(/* webpackChunkName: "dataset-tasks" */ './TaskHistory.vue'), { showLoader: false });
 import FileAvailabilityDialog from './dialogs/FileAvailabilityDialog.vue';
-import TextEditorDialog from './dialogs/TextEditorDialog.vue';
-import PdfViewerDialog from '@/features/viewers/map/PdfViewerDialog.vue';
-import MergeMultispectralDialog from './dialogs/MergeMultispectralDialog.vue';
-import AlignDialog from './dialogs/AlignDialog.vue';
-import MaskBordersDialog from './dialogs/MaskBordersDialog.vue';
-import ExtractDialog from './dialogs/ExtractDialog.vue';
-import ImportFromUrlDialog from './dialogs/ImportFromUrlDialog.vue';
-import FsLightbox from 'fslightbox-vue';
-import VideoLightbox from './VideoLightbox.vue';
+const TextEditorDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-editor" */ './dialogs/TextEditorDialog.vue'));
+const PdfViewerDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/viewers/map/PdfViewerDialog.vue'));
+const MergeMultispectralDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/MergeMultispectralDialog.vue'));
+const AlignDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/AlignDialog.vue'));
+const MaskBordersDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/MaskBordersDialog.vue'));
+const ExtractDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/ExtractDialog.vue'));
+const ImportFromUrlDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/ImportFromUrlDialog.vue'));
+const FsLightbox = lazyComponent(() => import(/* webpackChunkName: "dataset-lightbox" */ 'fslightbox-vue'), { showLoader: false });
+const VideoLightbox = lazyComponent(() => import(/* webpackChunkName: "dataset-lightbox" */ './VideoLightbox.vue'), { showLoader: false });
 
 import emitter from '@/libs/eventBus';
+import { lazyComponent } from '@/libs/lazyComponent';
 import icons from '@/libs/icons';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
@@ -395,6 +397,8 @@ export default {
         const savedExpandedGrid = localStorage.getItem('tableExpandedGrid') !== 'false';
 
         return {
+            // Lazy tabs (HUB-02): mounted on first activation, then kept
+            openedTabs: { map: false, tasks: false },
             startTab: mainTabs[0].key,
             error: "",
             isMobile: mobile,
@@ -857,10 +861,8 @@ export default {
                     if (this.$refs.mainTabSwitcher) {
                         this.$refs.mainTabSwitcher.activateTab('map');
                     }
-                    this.$nextTick(() => {
-                        if (this.$refs.mapViewer && this.$refs.mapViewer.openPlantHealth) {
-                            this.$refs.mapViewer.openPlantHealth(node, options);
-                        }
+                    this.withMap(map => {
+                        if (map.openPlantHealth) map.openPlantHealth(node, options);
                     });
                     return;
                 }
@@ -1255,7 +1257,30 @@ export default {
         // Relay the active main tab to the global toolbar (Header) so it can gate
         // the Download/Share actions to the Files tab only.
         handleMainTabChange: function (key) {
+            // Tabs whose code loads on first use (HUB-02) stay mounted once opened
+            if (key in this.openedTabs) this.openedTabs[key] = true;
             if (!this.$embed) emitter.emit('setActiveTab', key);
+        },
+
+        // A lazily loaded tab mounts after its activation was signalled: forward it now
+        handleLazyTabMounted: function (key) {
+            this.$nextTick(() => {
+                const node = key === 'map' ? this.$refs.mapViewer : null;
+                if (node && this.$refs.mainTabSwitcher?.activeTab === key && node.onTabActivated) node.onTabActivated();
+                if (key === 'map' && node && this._pendingMapActions) {
+                    const actions = this._pendingMapActions;
+                    this._pendingMapActions = null;
+                    actions.forEach(action => action(node));
+                }
+            });
+        },
+
+        // Runs `action` with the map viewer, once its code has loaded if it has not yet
+        withMap: function (action) {
+            this.$nextTick(() => {
+                if (this.$refs.mapViewer) action(this.$refs.mapViewer);
+                else (this._pendingMapActions ??= []).push(action);
+            });
         },
 
         updateExplorerTools: function() {

@@ -94,11 +94,18 @@ module.exports = {
                 ]
             },
             {
-                test: /\.(png|woff|woff2|eot|ttf|svg|jpg|gif)$/,
+                // Fonts are always files: hashed, cached once, and only the faces and subsets
+                // a page uses are downloaded (HUB-01: 850 KB of base64 fonts were in the CSS)
+                test: /\.(woff|woff2|eot|ttf)$/,
+                type: 'asset/resource'
+            },
+            {
+                test: /\.(png|svg|jpg|gif)$/,
                 type: 'asset',
                 parser: {
+                    // Small icons stay inline
                     dataUrlCondition: {
-                        maxSize: 131072
+                        maxSize: 8 * 1024
                     }
                 }
             }
@@ -111,47 +118,55 @@ module.exports = {
                 exclude: /potree/,
             }),
         ],
+        // HUB-01: one chunk per concern. The heavy viewer libraries are async: they load with
+        // the viewer that needs them, never with the login page. The default group has no
+        // fixed name, so webpack splits the remaining packages by the chunks that use them
+        // instead of merging every package into one initial file.
         splitChunks: {
             chunks: 'all',
+            maxInitialRequests: 10,
             cacheGroups: {
                 vue: {
                     test: /[\\/]node_modules[\\/](vue|vue-router|@tanstack)[\\/]/,
                     name: 'vendor-vue',
-                    chunks: 'all',
                     priority: 20
                 },
                 primevue: {
                     test: /[\\/]node_modules[\\/](primevue|@primevue)[\\/]/,
                     name: 'vendor-primevue',
-                    chunks: 'all',
                     priority: 20
+                },
+                three: {
+                    test: /[\\/]node_modules[\\/](three|@giro3d|@sparkjsdev|laz-perf|copc)[\\/]/,
+                    name: 'vendor-3d',
+                    chunks: 'async',
+                    priority: 25
                 },
                 chartjs: {
                     test: /[\\/]node_modules[\\/]chart\.js[\\/]/,
                     name: 'vendor-chartjs',
-                    chunks: 'all',
+                    chunks: 'async',
                     priority: 15
                 },
                 codemirror: {
                     test: /[\\/]node_modules[\\/]@codemirror[\\/]/,
                     name: 'vendor-codemirror',
-                    chunks: 'all',
+                    chunks: 'async',
                     priority: 15
                 },
                 openlayers: {
-                    test: /[\\/]node_modules[\\/]ol[\\/]/,
+                    test: /[\\/]node_modules[\\/](ol|proj4|color-parse|color-rgba)[\\/]/,
                     name: 'vendor-openlayers',
-                    chunks: 'all',
-                    priority: 10,
+                    chunks: 'async',
+                    priority: 10
                 },
                 defaultVendors: {
                     test: /[\\/]node_modules[\\/]/,
-                    name: 'vendor-default',
-                    chunks: 'all',
-                    priority: -10
-                },
-            },
-        },
+                    priority: -10,
+                    reuseExistingChunk: true
+                }
+            }
+        }
     } : {},
 
     plugins: [
