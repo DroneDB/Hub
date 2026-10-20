@@ -18,11 +18,6 @@ export const GUARDS = [
         }],
         allow: [
             'webapp/js/features/dataset/ViewDataset.vue',
-            'webapp/js/features/dataset/explorer/Explorer.vue',
-            'webapp/js/features/dataset/explorer/FileBrowser.vue',
-            'webapp/js/features/dataset/explorer/TableView.vue',
-            'webapp/js/features/dataset/explorer/TreeNode.vue',
-            'webapp/js/features/dataset/explorer/TreeView.vue',
             'webapp/js/features/viewers/map/Map.vue',
             'webapp/js/features/viewers/map/SingleMap.vue'
         ]

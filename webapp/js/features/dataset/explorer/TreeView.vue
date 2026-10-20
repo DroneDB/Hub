@@ -17,17 +17,17 @@
 import TreeNode from './TreeNode.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { dragDropMixin, requestMove } from '@/libs/dragDropUtils';
+import { requestMove } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import ddb from 'ddb';
 import { isPathRemoved } from './treeSelection';
+import { useDragDrop } from '@/composables/useDragDrop';
 const { pathutils } = ddb;
 
 export default {
     components: {
         TreeNode
     },
-    mixins: [dragDropMixin],
     provide: function () {
         // Nodes register themselves, so the tree listens to the file-system events once
         // (instead of every node subscribing to the global bus)
@@ -48,7 +48,7 @@ export default {
             type: Function,
             required: true
         },
-        // dragDropMixin contract
+        // useDragDrop() contract
         canWrite: {
             type: Boolean,
             default: false
@@ -61,9 +61,11 @@ export default {
         }
     },
     emits: ['opened', 'selectionChanged'],
+    setup(props) {
+        return useDragDrop(props);
+    },
     data() {
         return {
-            dropping: false,
             focusedNode: null
         };
     },

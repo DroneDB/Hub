@@ -105,7 +105,6 @@ import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import { formatTimeAgo } from '@/libs/utils';
 import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
-import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
@@ -118,6 +117,8 @@ import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import { getCurrentInstance } from 'vue';
+import { useDragDrop } from '@/composables/useDragDrop';
 
 /**
  * TableView - Flat-list table view for dataset files.
@@ -129,7 +130,6 @@ export default {
     components: {
         Toolbar, ContextMenu, Breadcrumb, DataTable, Column
     },
-    mixins: [dragDropMixin],
     inject: { showBuildConfirm: { default: null } },
     props: {
         files: { type: Array, required: true },
@@ -142,6 +142,10 @@ export default {
         isLoadingFiles: { type: Boolean, default: false }
     },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
+    setup(props) {
+        const instance = getCurrentInstance();
+        return useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles });
+    },
     data: function () {
         const self = this;
         const ctx = {
@@ -164,7 +168,6 @@ export default {
 
         return {
             loading: false,
-            dropping: false,
             contextMenu,
             sortColumn: 'name',
             sortDirection: 'asc',
@@ -349,7 +352,7 @@ export default {
             emitter.emit("folderOpened", pathutils.getTree(itm.path));
         },
 
-        // startDrag, onDrop and explorerDropHandler are inherited from dragDropMixin.
+        // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
 
         onClick: function (e) {
             // Clicked an empty area (DataTable wrapper or empty body)

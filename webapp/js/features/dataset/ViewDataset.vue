@@ -265,7 +265,7 @@ const VideoLightbox = lazyComponent(() => import(/* webpackChunkName: "dataset-l
 
 import emitter from '@/libs/eventBus';
 import { lazyComponent } from '@/libs/lazyComponent';
-import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
+import { useRequestScope, isAbort } from '@/composables/useRequestScope';
 import icons from '@/libs/icons';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
@@ -347,7 +347,7 @@ export default {
         FsLightbox,
         VideoLightbox
     },
-    mixins: [dialogManager, fileOperations, requestScopeMixin],
+    mixins: [dialogManager, fileOperations],
     provide: function () {
         return {
             showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm),
@@ -360,7 +360,7 @@ export default {
     },
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask, ...useBuildEvents() };
+        return { requestSignal: useRequestScope().signal, runHeavyTask, ...useBuildEvents() };
     },
     data: function () {
         const mobile = isMobile();

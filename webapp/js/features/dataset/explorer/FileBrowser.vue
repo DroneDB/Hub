@@ -42,7 +42,7 @@ import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
-import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
+import { useRequestScope, isAbort } from '@/composables/useRequestScope';
 import { getPref, setPref, PREF } from '@/libs/preferences';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 
@@ -53,7 +53,6 @@ export default {
         TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
     // Listings in flight are aborted when the browser goes away (HUB-06)
-    mixins: [requestScopeMixin],
     inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {
@@ -70,6 +69,9 @@ export default {
         }
     },
     emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    setup() {
+        return { requestSignal: useRequestScope().signal };
+    },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
         const self = this;

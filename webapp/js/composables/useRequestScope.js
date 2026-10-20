@@ -7,31 +7,17 @@
  * leaving a dataset while a folder listing is in flight cancels the listing instead of
  * finishing it for nobody.
  *
- * Options API: `mixins: [requestScopeMixin]`, then pass `{ signal: this.requestSignal }`.
- * Composition API: `const scope = useRequestScope()`, then `{ signal: scope.signal }`.
+ *   setup() { return { requestSignal: useRequestScope().signal }; }   then `{ signal: this.requestSignal }`
+ * (HQ-06: the requestScopeMixin twin is gone.)
  */
-import { onBeforeUnmount } from 'vue';
+import { getCurrentScope, onScopeDispose } from 'vue';
 
+/** An AbortSignal aborted when the owning component (effect scope) goes away. */
 export function useRequestScope() {
     const controller = new AbortController();
-    onBeforeUnmount(() => controller.abort());
+    if (getCurrentScope()) onScopeDispose(() => controller.abort());
     return { signal: controller.signal };
 }
-
-export const requestScopeMixin = {
-    created() {
-        this._requestScope = new AbortController();
-    },
-    beforeUnmount() {
-        this._requestScope?.abort();
-    },
-    computed: {
-        /** Aborted when the component unmounts. */
-        requestSignal() {
-            return this._requestScope?.signal;
-        }
-    }
-};
 
 /** Whether `error` only says the request was aborted (nothing to report). */
 export function isAbort(error) {

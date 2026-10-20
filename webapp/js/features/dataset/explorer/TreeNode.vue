@@ -29,13 +29,13 @@
 import { defineAsyncComponent } from 'vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { startInternalDrag, isInternalDrag, itemDnDMixin } from '@/libs/dragDropUtils';
+import { startInternalDrag, isInternalDrag } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
+import { useItemDragDrop } from '@/composables/useDragDrop';
 const { pathutils } = ddb;
 
 export default {
     components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
-    mixins: [itemDnDMixin],
     inject: { treeRegistry: { default: null } },
     props: {
         node: {
@@ -46,13 +46,16 @@ export default {
             type: Function,
             required: true
         },
-        // Used by itemDnDMixin to gate internal drop dispatching.
+        // Gates internal drops (useItemDragDrop)
         canWrite: {
             type: Boolean,
             default: true
         }
     },
     emits: ['opened', 'selected'],
+    setup(props) {
+        return useItemDragDrop(props);
+    },
     data: function () {
         return {
             children: [],

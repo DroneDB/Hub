@@ -66,7 +66,6 @@ const GRID_ROW_HEIGHT = 180;
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild } from '@/libs/build/buildHelpers';
@@ -77,13 +76,14 @@ const { pathutils } = ddb;
 import { entry } from 'ddb';
 import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
+import { getCurrentInstance } from 'vue';
+import { useDragDrop } from '@/composables/useDragDrop';
 
 export default {
     name: 'DatasetExplorer',
     components: {
         Thumbnail, Toolbar, ContextMenu, Breadcrumb, VirtualScroller
     },
-    mixins: [dragDropMixin],
     // Thumbnails load as they come into view, a few at a time (HUB-03)
     provide: function () {
         this.thumbnailLoader ??= {
@@ -104,6 +104,10 @@ export default {
         isLoadingFiles: { type: Boolean, default: false }
     },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
+    setup(props) {
+        const instance = getCurrentInstance();
+        return useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles });
+    },
     data: function () {
         const self = this;
         const ctx = {
@@ -128,7 +132,6 @@ export default {
 
         return {
             loading: false,
-            dropping: false,
             contextMenu,
             gridColumns: 6
         };
@@ -222,7 +225,7 @@ export default {
             emitter.emit("folderOpened", pathutils.getTree(itm.path));
         },
 
-        // startDrag, onDrop and explorerDropHandler are inherited from dragDropMixin.
+        // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
 
 
         onClick: function (e) {

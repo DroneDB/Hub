@@ -3,15 +3,15 @@
  * Run with: npx vitest run webapp/js/composables/useRequestScope.spec.js
  */
 import { describe, it, expect } from 'vitest';
-import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
+import { effectScope } from 'vue';
+import { useRequestScope, isAbort } from '@/composables/useRequestScope';
 
-describe('requestScopeMixin', () => {
+describe('useRequestScope', () => {
     it('aborts the requests of a component when it unmounts', () => {
-        const vm = {};
-        requestScopeMixin.created.call(vm);
-        const signal = requestScopeMixin.computed.requestSignal.call(vm);
+        const scope = effectScope();
+        const { signal } = scope.run(() => useRequestScope());
         expect(signal.aborted).toBe(false);
-        requestScopeMixin.beforeUnmount.call(vm);
+        scope.stop();
         expect(signal.aborted).toBe(true);
     });
 
