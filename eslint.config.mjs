@@ -24,7 +24,9 @@ export default [
         },
         plugins: { hub: { rules: { 'paired-listeners': pairedListeners } } },
         rules: {
-            'hub/paired-listeners': 'error'
+            'hub/paired-listeners': 'error',
+            // SFC templates are case-sensitive: <Button> (PrimeVue) is not <button>
+            'vue/no-reserved-component-names': ['error', { htmlElementCaseSensitive: true }]
         }
     },
     {
