@@ -350,7 +350,12 @@ export default {
     mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask, requestScopeMixin],
     provide: function () {
         return {
-            showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm)
+            showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm),
+            // Drag-and-drop from the explorer, table and tree (libs/dragDropUtils)
+            datasetDrop: {
+                upload: files => this.openUploadDialog(files),
+                move: (source, dest) => this.handleMoveItem(source, dest)
+            }
         };
     },
     data: function () {
@@ -564,24 +569,6 @@ export default {
         BuildManager.on('buildStarted', this.handleBuildStartedNotification);
         BuildManager.on('buildError', this.handleBuildErrorNotification);
         BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
-
-        // Event bus listeners - saved as named refs for cleanup
-        this._onUploadItems = (msg) => {
-            this.filesToUpload = msg.files;
-            this.uploadDialogOpen = true;
-        };
-
-        // Single rich move handler shared by Explorer / TableView / TreeNode.
-        // Lives in useFileOperations mixin (this.handleMoveItem). The dnd mixin
-        // dispatches `moveItem` on the event bus; we route every emission to it.
-        this._onMoveItemBus = (payload) => {
-            // Payload shape: { source, dest } (mitt forwards only one arg).
-            if (!payload) return;
-            this.handleMoveItem(payload.source, payload.dest);
-        };
-
-        emitter.on('uploadItems', this._onUploadItems);
-        emitter.on('moveItem', this._onMoveItemBus);
     },
     beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
@@ -599,8 +586,6 @@ export default {
         BuildManager.off('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
         // Cleanup event bus listeners
-        emitter.off('uploadItems', this._onUploadItems);
-        emitter.off('moveItem', this._onMoveItemBus);
 
         // Cleanup BuildManager
         BuildManager.unregisterDataset(this.dataset);
@@ -692,7 +677,7 @@ export default {
                 const files = getFilesFromClipboard(e);
                 if (files.length > 0) {
                     e.preventDefault();
-                    emitter.emit('uploadItems', { files, path: this.currentPath });
+                    this.openUploadDialog(files);
                     return;
                 }
             }

@@ -7,7 +7,7 @@ import icons from '@/libs/icons';
 import BuildManager from '@/libs/build/buildManager';
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
-import clipboard from '@/composables/useClipboard';
+import { useClipboardStore } from '@/stores/clipboard';
 import { resolvePasteStrategy } from '@/composables/usePasteStrategy';
 import reg from '@/libs/api/sharedRegistry';
 import { selectionBasePath } from '@/features/dataset/explorer/treeSelection';
@@ -322,7 +322,7 @@ export default {
                 this.$notify.info('No items selected', { summary: 'Copy' });
                 return;
             }
-            clipboard.copy({
+            useClipboardStore().copy({
                 orgSlug: this.dataset.org,
                 dsSlug: this.dataset.ds,
                 basePath
@@ -340,7 +340,7 @@ export default {
                 this.$notify.info('No items selected', { summary: 'Cut' });
                 return;
             }
-            clipboard.cut({
+            useClipboardStore().cut({
                 orgSlug: this.dataset.org,
                 dsSlug: this.dataset.ds,
                 basePath
@@ -349,30 +349,30 @@ export default {
         },
 
         clipboardClear() {
-            clipboard.clear();
+            useClipboardStore().clear();
         },
 
         async _resolveSourceDataset() {
             // Source dataset object: same as `this.dataset` if intra, else build a
             // remote dataset wrapper for the source org/ds (server-side transfer).
-            if (clipboard.state.source.orgSlug === this.dataset.org
-                && clipboard.state.source.dsSlug === this.dataset.ds) {
+            if (useClipboardStore().source.orgSlug === this.dataset.org
+                && useClipboardStore().source.dsSlug === this.dataset.ds) {
                 return this.dataset;
             }
-            const org = reg.Organization(clipboard.state.source.orgSlug);
-            return org.Dataset(clipboard.state.source.dsSlug);
+            const org = reg.Organization(useClipboardStore().source.orgSlug);
+            return org.Dataset(useClipboardStore().source.dsSlug);
         },
 
         async clipboardPaste() {
-            if (clipboard.isEmpty.value) return;
+            if (useClipboardStore().isEmpty) return;
             if (!this.canWrite) {
                 this.$notify.warn('You do not have write access to this dataset', { summary: 'Paste', life: 'short' });
                 return;
             }
 
-            const mode = clipboard.state.mode;
-            const items = clipboard.state.items.slice();
-            const source = clipboard.state.source;
+            const mode = useClipboardStore().mode;
+            const items = useClipboardStore().items.slice();
+            const source = useClipboardStore().source;
             const target = {
                 orgSlug: this.dataset.org,
                 dsSlug: this.dataset.ds,
@@ -507,7 +507,7 @@ export default {
             }
 
             // cut consumed; copy persists (Windows-Explorer-like behaviour)
-            if (mode === 'cut') clipboard.clear();
+            if (mode === 'cut') useClipboardStore().clear();
 
             const failedCount = Object.keys(result.failed).length;
             const skippedCount = result.skipped.length;

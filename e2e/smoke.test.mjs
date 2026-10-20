@@ -62,6 +62,7 @@ before(async () => {
     for (const p of Object.values(FILES)) {
         await api('POST', `/orgs/${USER}/ds/${DS}/obj`, form({ path: path.basename(p), file: new Blob([fs.readFileSync(p)]) }));
     }
+    await api('POST', `/orgs/${USER}/ds/${DS}/obj`, form({ path: 'sub' }));
     browser = await chromium.launch({ headless: !process.env.HUB_HEADED, executablePath: chromeExecutable() });
     page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
     page.on('pageerror', e => pageErrors.push(e.message));
@@ -101,6 +102,17 @@ test('dataset list shows the smoke dataset', async () => {
 test('dataset page lists the uploaded files', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}`);
     for (const p of Object.values(FILES)) await page.waitForSelector(`text=${path.basename(p)}`, { timeout: 20000 });
+});
+
+test('dragging a file onto a folder moves it', async () => {
+    const name = path.basename(FILES.photo);
+    await page.dragAndDrop(`#explorer >> text=${name}`, '#explorer >> text=sub');
+    for (let i = 0; i < 40; i++) {
+        const listed = await api('POST', `/orgs/${USER}/ds/${DS}/list`, form({ path: 'sub' })).catch(() => []);
+        if (Array.isArray(listed) && listed.some(e => e.path === `sub/${name}`)) return;
+        await page.waitForTimeout(250);
+    }
+    assert.fail(`${name} was not moved into sub/`);
 });
 
 test('the header Settings button opens the dataset settings', async () => {

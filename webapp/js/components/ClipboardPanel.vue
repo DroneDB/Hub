@@ -32,7 +32,8 @@
 </template>
 
 <script>
-import clipboard from '@/composables/useClipboard';
+import { mapState } from 'pinia';
+import { useClipboardStore } from '@/stores/clipboard';
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
@@ -49,11 +50,7 @@ export default {
     name: 'ClipboardPanel',
 
     computed: {
-        isEmpty() { return clipboard.isEmpty.value; },
-        isCut() { return clipboard.isCut.value; },
-        count() { return clipboard.count.value; },
-        items() { return clipboard.state.items; },
-        source() { return clipboard.state.source; },
+        ...mapState(useClipboardStore, ['isEmpty', 'isCut', 'count', 'items', 'source']),
         visibleItems() {
             return this.items.slice(0, MAX_VISIBLE);
         },
@@ -64,7 +61,7 @@ export default {
 
     methods: {
         basename(p) { return pathutils.basename(p); },
-        clear() { clipboard.clear(); },
+        clear() { useClipboardStore().clear(); },
         iconFor(it) {
             if (it.type === ddb.entry.type.DIRECTORY) return 'fa-folder';
             return 'fa-file';

@@ -8,7 +8,8 @@
  */
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { isPathRemoved, liveSelectionEntries, selectionBasePath } from './treeSelection';
-import clipboard from '@/composables/useClipboard';
+import { setActivePinia, createPinia } from 'pinia';
+import { useClipboardStore } from '@/stores/clipboard';
 import fileOperations from '@/composables/useFileOperations';
 import ddb from 'ddb';
 
@@ -183,7 +184,12 @@ describe('clipboard copy/cut from the tree', () => {
         return vm;
     }
 
-    beforeEach(() => clipboard.clear());
+    let clipboard;
+    beforeEach(() => {
+        sessionStorage.clear(); // the store restores the last clipboard of the tab
+        setActivePinia(createPinia());
+        clipboard = useClipboardStore();
+    });
 
     it('records a selected folder with its parent as the source folder', () => {
         // Selecting a folder in the tree sets currentPath to the folder itself.
@@ -191,9 +197,9 @@ describe('clipboard copy/cut from the tree', () => {
 
         clipboardCopySelected.call(vm, [nodeData('a/folder', DIR)]);
 
-        expect(clipboard.state.mode).toBe('copy');
-        expect(clipboard.state.source).toEqual({ orgSlug: 'org', dsSlug: 'ds', basePath: 'a' });
-        expect(clipboard.state.items.map(i => i.path)).toEqual(['a/folder']);
+        expect(clipboard.mode).toBe('copy');
+        expect(clipboard.source).toEqual({ orgSlug: 'org', dsSlug: 'ds', basePath: 'a' });
+        expect(clipboard.items.map(i => i.path)).toEqual(['a/folder']);
     });
 
     it('cuts explicit items and skips the dataset root', () => {
@@ -201,9 +207,9 @@ describe('clipboard copy/cut from the tree', () => {
 
         clipboardCutSelected.call(vm, [nodeData('', ddb.entry.type.DRONEDB), nodeData('top.jpg')]);
 
-        expect(clipboard.state.mode).toBe('cut');
-        expect(clipboard.state.source.basePath).toBe('');
-        expect(clipboard.state.items.map(i => i.path)).toEqual(['top.jpg']);
+        expect(clipboard.mode).toBe('cut');
+        expect(clipboard.source.basePath).toBe('');
+        expect(clipboard.items.map(i => i.path)).toEqual(['top.jpg']);
     });
 
     it('still uses the explorer selection and current folder without arguments', () => {
@@ -212,14 +218,14 @@ describe('clipboard copy/cut from the tree', () => {
 
         clipboardCopySelected.call(vm);
 
-        expect(clipboard.state.source.basePath).toBe('other');
-        expect(clipboard.state.items.map(i => i.path)).toEqual(['other/x.jpg']);
+        expect(clipboard.source.basePath).toBe('other');
+        expect(clipboard.items.map(i => i.path)).toEqual(['other/x.jpg']);
     });
 
     it('warns when the explicit selection is empty', () => {
         const vm = fakeView();
         clipboardCopySelected.call(vm, []);
-        expect(clipboard.state.mode).toBe(null);
+        expect(clipboard.mode).toBe(null);
         expect(vm.$notify.info).toHaveBeenCalledWith('No items selected', { summary: 'Copy' });
     });
 });
@@ -242,7 +248,12 @@ describe('paste conflict detection', () => {
         return vm;
     }
 
-    beforeEach(() => clipboard.clear());
+    let clipboard;
+    beforeEach(() => {
+        sessionStorage.clear(); // the store restores the last clipboard of the tab
+        setActivePinia(createPinia());
+        clipboard = useClipboardStore();
+    });
 
     it('asks about conflicts that are not in the loaded file list', async () => {
         clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg')]);
@@ -284,6 +295,7 @@ describe('selection cleanup on deleteEntries', () => {
         const kept = treeNode('keep.jpg');
         const inside = treeNode('gone/a.jpg');
         const vm = {};
+        TreeView.created.call(vm);
         TreeView.mounted.call(vm);
         vm.selectedNodes = [kept, inside];
         vm.rangeStartNode = inside;
@@ -294,6 +306,36 @@ describe('selection cleanup on deleteEntries', () => {
         expect(vm.selectedNodes).toEqual([kept]);
         expect(vm.rangeStartNode).toBe(null);
         expect(vm.focusedNode).toBe(kept);
+        TreeView.beforeUnmount.call(vm);
+    });
+
+    it('TreeView forwards file-system events to its nodes and moves the other selected nodes', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        const TreeView = (await import('./TreeView.vue')).default;
+        const vm = { datasetDrop: { move: vi.fn() } };
+        TreeView.created.call(vm);
+        TreeView.mounted.call(vm);
+        vm.moveSelected = (dest, primary) => TreeView.methods.moveSelected.call(vm, dest, primary);
+        const node = path => ({ selected: false, node: { entry: { path } }, removeChildren: vi.fn(), addItems: vi.fn(), openFromTree: vi.fn() });
+        const a = node('a.jpg'), b = node('b.jpg'), c = node('c.jpg');
+        [a, b, c].forEach(n => vm._nodes.add(n));
+
+        const items = [{ entry: { path: 'x.jpg' } }];
+        emitter.emit('addItems', items);
+        emitter.emit('folderOpened', ['/', 'f']);
+        emitter.emit('deleteEntries', ['gone']);
+        for (const n of [a, b, c]) {
+            expect(n.addItems).toHaveBeenCalledWith(items);
+            expect(n.openFromTree).toHaveBeenCalledWith(['/', 'f']);
+            expect(n.removeChildren).toHaveBeenCalledWith(['gone']);
+        }
+
+        a.selected = b.selected = true;
+        const dest = { entry: { path: 'dest' } };
+        vm.moveSelected(dest, 'a.jpg');
+        expect(vm.datasetDrop.move).toHaveBeenCalledTimes(1);
+        expect(vm.datasetDrop.move).toHaveBeenCalledWith(b.node, dest);
+        expect(a.selected || b.selected).toBe(false);
         TreeView.beforeUnmount.call(vm);
     });
 

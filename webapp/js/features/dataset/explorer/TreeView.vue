@@ -17,7 +17,7 @@
 import TreeNode from './TreeNode.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { dragDropMixin } from '@/libs/dragDropUtils';
+import { dragDropMixin, requestMove } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import ddb from 'ddb';
 import { isPathRemoved } from './treeSelection';
@@ -28,6 +28,17 @@ export default {
         TreeNode
     },
     mixins: [dragDropMixin],
+    provide: function () {
+        // Nodes register themselves, so the tree listens to the file-system events once
+        // (instead of every node subscribing to the global bus)
+        return {
+            treeRegistry: {
+                add: node => this._nodes.add(node),
+                remove: node => this._nodes.delete(node),
+                moveSelected: (destItem, primaryPath) => this.moveSelected(destItem, primaryPath)
+            }
+        };
+    },
     props: {
         nodes: {
             type: Array,
@@ -57,6 +68,9 @@ export default {
         };
     },
 
+    created: function () {
+        this._nodes = new Set();
+    },
     mounted: function () {
         this.selectedNodes = [];
         this.rangeStartNode = null;
@@ -68,13 +82,35 @@ export default {
             this.selectedNodes = this.selectedNodes.filter(n => !removed(n));
             if (this.rangeStartNode && removed(this.rangeStartNode)) this.rangeStartNode = null;
             if (this.focusedNode && removed(this.focusedNode)) this.focusedNode = null;
+            for (const node of this._nodes) node.removeChildren(deleted);
+        };
+        this._onAddItems = items => {
+            for (const node of this._nodes) node.addItems(items);
+        };
+        this._onFolderOpened = tree => {
+            for (const node of this._nodes) node.openFromTree(tree);
         };
         emitter.on('deleteEntries', this._onDeleteEntries);
+        emitter.on('addItems', this._onAddItems);
+        emitter.on('folderOpened', this._onFolderOpened);
     },
     beforeUnmount: function () {
         emitter.off('deleteEntries', this._onDeleteEntries);
+        emitter.off('addItems', this._onAddItems);
+        emitter.off('folderOpened', this._onFolderOpened);
     },
     methods: {
+        // Drop of a node onto `destItem`: the other selected nodes move too
+        moveSelected: function (destItem, primaryPath) {
+            for (const node of this._nodes) {
+                if (!node.selected) continue;
+                node.selected = false;
+                // The dragged node itself was already moved by its drop handler
+                if (node.node.entry.path === primaryPath) continue;
+                requestMove(this.datasetDrop, node.node, destItem);
+            }
+        },
+
         handleOpen: function (component, sender) {
             if (!component) return;
             this.$emit("opened", component, sender);

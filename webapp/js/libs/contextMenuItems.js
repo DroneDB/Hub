@@ -9,7 +9,7 @@ import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceed
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import clipboard from '@/composables/useClipboard';
+import { useClipboardStore } from '@/stores/clipboard';
 
 /**
  * Context object interface:
@@ -318,7 +318,7 @@ function pasteClipboardItem(ctx) {
         label: 'Paste',
         icon: 'fa-solid fa-paste',
         accelerator: 'CmdOrCtrl+V',
-        isVisible: () => ctx.canWrite && !clipboard.isEmpty.value,
+        isVisible: () => ctx.canWrite && !useClipboardStore().isEmpty,
         click: () => ctx.emit('pasteFromClipboard')
     };
 }
@@ -329,7 +329,7 @@ function clipboardSeparator(ctx) {
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             const hasSel = sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-            return hasSel || (ctx.canWrite && !clipboard.isEmpty.value);
+            return hasSel || (ctx.canWrite && !useClipboardStore().isEmpty);
         }
     };
 }

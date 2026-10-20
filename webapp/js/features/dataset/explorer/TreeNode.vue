@@ -29,14 +29,14 @@
 import { defineAsyncComponent } from 'vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { startInternalDrag, isInternalDrag, emitMove, itemDnDMixin } from '@/libs/dragDropUtils';
+import { startInternalDrag, isInternalDrag, itemDnDMixin } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
-import emitter from '@/libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
     components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
     mixins: [itemDnDMixin],
+    inject: { treeRegistry: { default: null } },
     props: {
         node: {
             type: Object,
@@ -75,63 +75,38 @@ export default {
             await this.handleOpenDblClick(new CustomEvent('click'));
         }
 
-        this._onDeleteEntries = async (deleted) => {
+        this.treeRegistry?.add(this);
+    },
+    beforeUnmount: function () {
+        this.treeRegistry?.remove(this);
+    },
+    methods: {
+        // ---- called by TreeView, which listens to the file-system events once for all nodes ----
 
-            var els = this.children.filter(item => deleted.includes(item.entry.path));
-
-            // It's not our business
-            if (els.length == 0)
-                return;
-
+        removeChildren: function (deleted) {
+            if (!this.children.some(item => deleted.includes(item.entry.path))) return;
             this.children = this.children.filter(item => !deleted.includes(item.entry.path));
+        },
 
-        };
-        emitter.on('deleteEntries', this._onDeleteEntries);
-
-        this._onFolderOpened = async (tree) => {
-
-            var ourPath = this.node.entry.path;
-
-            if (tree.length === 0)
-                return;
-
-            if (tree.includes(ourPath))
-                await this.expand();
-
-            if (tree[tree.length - 1] === ourPath ||
-                (tree[tree.length - 1] === "/" && this.node.root))
+        // `tree` lists the folders from the root to the one just opened (pathutils.getTree)
+        openFromTree: async function (tree) {
+            const ourPath = this.node.entry.path;
+            if (tree.length === 0) return;
+            if (tree.includes(ourPath)) await this.expand();
+            if (tree[tree.length - 1] === ourPath || (tree[tree.length - 1] === "/" && this.node.root)) {
                 this.$emit('opened', this, "explorer");
-
-        };
-        emitter.on('folderOpened', this._onFolderOpened);
-
-        this._onAddItems = async (items) => {
-
-            if (items.length == 0)
-                return;
-
-            if (!this.isExpandable)
-                return;
-
-            var parentPath = pathutils.getParentFolder(items[0].entry.path);
-
-            if (parentPath == null) {
-                if (!this.node.root) {
-                    return;
-                }
-            } else {
-                if (parentPath != this.node.entry.path) {
-                    return;
-                }
             }
+        },
 
-            // Let's remove first the duplicates
+        addItems: async function (items) {
+            if (items.length == 0 || !this.isExpandable) return;
+
+            const parentPath = pathutils.getParentFolder(items[0].entry.path);
+            if (parentPath == null ? !this.node.root : parentPath != this.node.entry.path) return;
+
+            // Replace duplicates, then add
             this.children = this.children.filter(ch => !items.find(i => i.entry.path === ch.entry.path));
-
-            // Add new items
-            for (var item of items) {
-                this.children.push(item);
-            }
+            this.children.push(...items);
 
             if (!this.expanded) {
                 await this.expand();
@@ -139,31 +114,8 @@ export default {
             }
 
             this.sortChildren();
+        },
 
-        };
-        emitter.on('addItems', this._onAddItems);
-
-        this._onMoveItemInit = (payload) => {
-            // Backwards-compatible: accept both the legacy raw destItem (no
-            // `destItem` key) and the new { destItem, primaryPath } shape.
-            const destItem = payload && payload.destItem ? payload.destItem : payload;
-            const primaryPath = payload && payload.primaryPath ? payload.primaryPath : null;
-            if (!this.selected) return;
-            this.selected = false;
-            // Skip if this node is the primary dataTransfer source (already moved by emitMove).
-            if (primaryPath != null && this.node.entry.path === primaryPath) return;
-            emitMove(this.node, destItem);
-        };
-        emitter.on('moveItemInit', this._onMoveItemInit);
-
-    },
-    beforeUnmount: function () {
-        emitter.off('deleteEntries', this._onDeleteEntries);
-        emitter.off('folderOpened', this._onFolderOpened);
-        emitter.off('addItems', this._onAddItems);
-        emitter.off('moveItemInit', this._onMoveItemInit);
-    },
-    methods: {
         onClick: function (e) {
             Keyboard.updateState(e);
             this.$emit('selected', this, Mouse.LEFT);
@@ -194,9 +146,8 @@ export default {
 
         /**
          * Drop on a TreeNode entry. Reuses the mixin's `onDrop` (validates
-         * internal drag, gates on canWrite, emits `moveItem`) and additionally
-         * notifies other selected TreeNodes via the `moveItemInit` bus event
-         * so the multi-selection drag in the tree continues to work.
+         * internal drag, gates on canWrite, asks the page to move) and then has
+         * the tree move the other selected nodes too (multi-selection drag).
          */
         onItemDrop(evt, item) {
             // Capture source path before mixin clears state.
@@ -210,9 +161,8 @@ export default {
 
             this.onDrop(evt, item);
 
-            if (primaryPath != null) {
-                emitter.emit('moveItemInit', { destItem: item, primaryPath });
-            }
+            // The other selected nodes of the tree move with it
+            if (primaryPath != null) this.treeRegistry?.moveSelected(item, primaryPath);
         },
 
         sortChildren: function () {

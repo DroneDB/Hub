@@ -119,7 +119,6 @@ export function isInternalDrag(evt) {
     }
 }
 
-import emitter from '@/libs/eventBus';
 import { clone } from '@/libs/utils';
 import ddb from 'ddb';
 const { entry: ddbEntry } = ddb;
@@ -140,24 +139,25 @@ export function syntheticFolderItem(currentPath) {
 }
 
 /**
- * Emit a `moveItem` event on the global event bus for an internal drag-drop.
+ * Ask the dataset page to move items for an internal drag-drop (HQ-04: through the
+ * `datasetDrop` the page provides, not the global event bus).
  *
- * Centralized here to keep a single source of truth for source/destination
- * resolution. Multi-selection is supported: every currently-selected file in
- * `extraSourceItems` is also moved (deduplicated against the primary source).
+ * Multi-selection is supported: every currently-selected file in `extraSourceItems`
+ * is also moved (deduplicated against the primary source).
  *
+ * @param {{ move: (source: object, dest: object) => void }|null} datasetDrop - injected from the dataset page
  * @param {object} sourceItem - dragged item (file/node from the file browser)
  * @param {object} destItem - destination item (folder or any file; the handler
  *                            will use the parent folder if it is not a directory)
  * @param {object[]} [extraSourceItems=[]] - additional items selected at the
  *                            time of drop (multi-selection drag).
  */
-export function emitMove(sourceItem, destItem, extraSourceItems = []) {
-    // mitt only forwards a single payload, so wrap source/dest in an object.
-    emitter.emit('moveItem', { source: sourceItem, dest: destItem });
+export function requestMove(datasetDrop, sourceItem, destItem, extraSourceItems = []) {
+    if (!datasetDrop) return;
+    datasetDrop.move(sourceItem, destItem);
     for (const sel of extraSourceItems) {
         if (sel.entry.path === sourceItem.entry.path) continue;
-        emitter.emit('moveItem', { source: sel, dest: destItem });
+        datasetDrop.move(sel, destItem);
     }
 }
 
@@ -229,7 +229,7 @@ export function startInternalDrag(evt, item) {
  *  - drop-target highlight (via `dropTargetPath` + a per-target enter counter
  *    to avoid flicker when the pointer crosses internal child elements)
  *  - drop dispatch: OS file drops are forwarded to `explorerDropHandler` (if
- *    the host component provides one), internal drags emit a `moveItem` event.
+ *    the host component provides one), internal drags ask the injected `datasetDrop` to move.
  *
  * The host component is expected to expose:
  *  - `canWrite` (prop or computed)
@@ -237,6 +237,8 @@ export function startInternalDrag(evt, item) {
  *  - optionally `explorerDropHandler` (for OS-file uploads on per-item drop)
  */
 export const itemDnDMixin = {
+    // { upload(files, path), move(source, dest) }, provided by the dataset page
+    inject: { datasetDrop: { default: null } },
     data() {
         return {
             // Path of the item currently hovered as a drop target during an
@@ -351,7 +353,7 @@ export const itemDnDMixin = {
             if (!sourceItem || !sourceItem.entry) return;
 
             const extras = Array.isArray(this.selectedFiles) ? this.selectedFiles : [];
-            emitMove(sourceItem, destItem, extras);
+            requestMove(this.datasetDrop, sourceItem, destItem, extras);
         }
     }
 };
@@ -424,7 +426,7 @@ export const dragDropMixin = {
 
                 const destItem = syntheticFolderItem(this.currentPath);
                 const extras = Array.isArray(this.selectedFiles) ? this.selectedFiles : [];
-                emitMove(sourceItem, destItem, extras);
+                requestMove(this.datasetDrop, sourceItem, destItem, extras);
                 return;
             }
 
@@ -437,7 +439,7 @@ export const dragDropMixin = {
             const files = await getFilesFromDrop(ev);
             if (files.length === 0) return;
 
-            emitter.emit('uploadItems', { files: files, path: this.currentPath });
+            if (this.datasetDrop) this.datasetDrop.upload(files, this.currentPath);
         }
     }
 };
