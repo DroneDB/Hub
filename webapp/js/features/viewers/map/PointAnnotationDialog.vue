@@ -38,6 +38,7 @@
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import Textarea from 'primevue/textarea';
+import { MEASUREMENT_SWATCHES, MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
@@ -48,7 +49,7 @@ export default {
     props: {
         initialColor: {
             type: String,
-            default: '#ffcc33'
+            default: MEASURE_COLOR
         },
         initialDescription: {
             type: String,
@@ -58,16 +59,7 @@ export default {
     emits: ['onClose', 'onSave', 'onDiscard'],
     data() {
         return {
-            colorPalette: [
-                '#ffcc33', // Default yellow
-                '#ff0000', // Red
-                '#00ff00', // Green
-                '#0000ff', // Blue
-                '#ff6600', // Orange
-                '#9900ff', // Purple
-                '#00cccc', // Cyan
-                '#333333'  // Dark gray
-            ],
+            colorPalette: MEASUREMENT_SWATCHES,
             formData: {
                 color: this.initialColor,
                 description: this.initialDescription

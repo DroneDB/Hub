@@ -169,6 +169,7 @@ import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import Toast from 'primevue/toast';
 import CameraManager from './CameraManager.vue';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 // Immersive navigation keys, in the 2x3 layout shown in the on-screen overlay:
 //   Q (down)    W (forward)   E (up)
@@ -969,7 +970,7 @@ export default {
 
         // Switch between 'fly' (WASD + first-person mouse look) and 'earth' (Potree-style:
         // left-drag pans across the ground, right-drag orbits the pivot, wheel zooms toward the
-        // cursor). Reconfigures OrbitControls and persists the choice to localStorage.
+        // cursor). Reconfigures OrbitControls and persists the choice.
         setNavMode: function (mode) {
             if (mode !== 'fly' && mode !== 'earth') mode = 'fly';
             this.navMode = mode;
@@ -995,14 +996,12 @@ export default {
                     this.syncYawPitch();
                 }
             }
-            try { window.localStorage.setItem('ddb.splat.navMode', mode); } catch { /* ignore */ }
+            setPref(PREF.SPLAT_NAV_MODE, mode);
         },
 
         // Read the persisted navigation mode (default 'fly') and apply it.
         restoreNavMode: function () {
-            let saved = 'fly';
-            try { saved = window.localStorage.getItem('ddb.splat.navMode') || 'fly'; } catch { /* ignore */ }
-            this.setNavMode(saved);
+            this.setNavMode(getPref(PREF.SPLAT_NAV_MODE, 'fly'));
         },
 
         // ---- Earth navigation (Potree-style pan / orbit / zoom) ----

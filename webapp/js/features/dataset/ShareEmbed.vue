@@ -104,7 +104,6 @@ import Button from 'primevue/button';
 import Select from 'primevue/select';
 import PrimeMessage from 'primevue/message';
 import Textarea from 'primevue/textarea';
-import copy from 'clipboard-copy';
 import ddb from 'ddb';
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
@@ -112,6 +111,7 @@ import { b64encode } from '@/libs/base64';
 import { buildOgcShareUrls, OGC_SHARE_MODES } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
 import UrlRow from './ShareUrlRow.vue';
+import { useCopyText } from '@/composables/useCopyText';
 
 const LEGACY_MODES = [
     { value: 'link',  label: 'Link' },
@@ -131,9 +131,12 @@ export default {
         file: { type: Object, required: true }
     },
     emits: ['onClose'],
+    setup() {
+        const { copy, copied } = useCopyText();
+        return { copy, copied };
+    },
     data() {
         return {
-            copyIcon: "fa-regular fa-copy",
             loading: true,
             error: "",
             needsAuth: false,
@@ -145,6 +148,9 @@ export default {
         };
     },
     computed: {
+        copyIcon() {
+            return this.copied ? 'fa-solid fa-check' : 'fa-regular fa-copy';
+        },
         scope() {
             if (this.file && this.file.scope) return this.file.scope;
             if (!this.file || !this.file.entry) return 'dataset';
@@ -279,14 +285,7 @@ export default {
             return null;
         },
         copyToClipboard(value) {
-            if (!value) return;
-            copy(value);
-            this.copyIcon = "fa-solid fa-check";
-            if (this._copyTimeout) clearTimeout(this._copyTimeout);
-            this._copyTimeout = setTimeout(() => {
-                this.copyIcon = "fa-regular fa-copy";
-                this._copyTimeout = null;
-            }, 2000);
+            if (value) this.copy(value);
         },
         async handleSetUnlisted() {
             try {

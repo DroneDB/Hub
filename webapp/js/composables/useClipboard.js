@@ -11,8 +11,9 @@
  */
 import { reactive, computed, watch } from 'vue';
 import emitter from '@/libs/eventBus';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
-const STORAGE_KEY = 'ddb:hub:clipboard';
+const SESSION = { session: true };
 
 const state = reactive({
     mode: null,            // 'copy' | 'cut' | null
@@ -21,35 +22,21 @@ const state = reactive({
     capturedAt: null       // ISO string
 });
 
-// Restore from sessionStorage (best-effort)
-try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
-    if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.mode === 'copy' || parsed.mode === 'cut') && Array.isArray(parsed.items) && parsed.items.length > 0) {
-            state.mode = parsed.mode;
-            state.source = parsed.source || null;
-            state.items = parsed.items;
-            state.capturedAt = parsed.capturedAt || null;
-        }
-    }
-} catch {
-    // ignore - corrupt clipboard, start fresh
+// Restore from sessionStorage (best-effort; a corrupt value starts empty)
+const saved = getPref(PREF.CLIPBOARD, null, SESSION);
+if (saved && (saved.mode === 'copy' || saved.mode === 'cut') && Array.isArray(saved.items) && saved.items.length > 0) {
+    state.mode = saved.mode;
+    state.source = saved.source || null;
+    state.items = saved.items;
+    state.capturedAt = saved.capturedAt || null;
 }
 
 // Persist on every mutation
 watch(
     () => ({ mode: state.mode, source: state.source, items: state.items, capturedAt: state.capturedAt }),
     (val) => {
-        try {
-            if (!val.mode || !val.items || val.items.length === 0) {
-                window.sessionStorage.removeItem(STORAGE_KEY);
-            } else {
-                window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(val));
-            }
-        } catch {
-            // sessionStorage unavailable / quota - non-fatal
-        }
+        const empty = !val.mode || !val.items || val.items.length === 0;
+        setPref(PREF.CLIPBOARD, empty ? null : val, SESSION);
     },
     { deep: true }
 );

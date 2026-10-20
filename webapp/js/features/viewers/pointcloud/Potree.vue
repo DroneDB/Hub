@@ -103,6 +103,8 @@ import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasure
 import { isMobile } from '@/libs/responsive';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
+import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 
 
@@ -147,8 +149,8 @@ export default {
             deleteClickHandler: null,
             deleteToolIcon: null,
 
-            // Unit preference (shared with olMeasure via localStorage)
-            unitPref: localStorage.getItem("measureUnitPref") || "metric"
+            // Unit preference (shared with the map's measure control)
+            unitPref: getPref(PREF.MEASURE_UNIT, 'metric')
         };
     },
 
@@ -179,8 +181,8 @@ export default {
          * Handle unit preference change - updates viewer and all existing measurements
          */
         handleUnitChange: function() {
-            // Save preference to localStorage (shared with olMeasure)
-            localStorage.setItem("measureUnitPref", this.unitPref);
+            // Shared with the map's measure control
+            setPref(PREF.MEASURE_UNIT, this.unitPref);
 
             // Update Potree viewer unit
             const unit = this.unitPref === 'metric' ? 'm' : 'ft';
@@ -920,7 +922,7 @@ export default {
             viewer.setFOV(60);
             viewer.setPointBudget(pointBudgetFor(navigator.deviceMemory, isMobile()));
 
-            // Apply unit preference from localStorage
+            // Apply the stored unit preference
             viewer.setLengthUnit(this.unitPref === 'metric' ? 'm' : 'ft');
 
             // Propagate length units to scene so addMeasurement() uses correct units
@@ -1216,7 +1218,7 @@ export default {
             const measureData = {
                 actionType: actionType,
                 name: measure.name,
-                color: measure.color ? '#' + measure.color.getHexString() : '#ffcc33',
+                color: measure.color ? '#' + measure.color.getHexString() : MEASURE_COLOR,
                 showDistances: measure.showDistances,
                 showCoordinates: measure.showCoordinates,
                 showArea: measure.showArea,

@@ -1,4 +1,4 @@
-const CUSTOM_BASEMAP_KEY = 'customBasemap';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 const Basemaps = {
     'satellite': {
@@ -28,34 +28,19 @@ const Basemaps = {
 };
 
 /**
- * Get custom basemap configuration from localStorage
+ * Custom basemap configuration, or null when none (or an incomplete one) is stored.
  * @returns {{ sourceType: 'wms'|'xyz', url: string, layerName: string, attribution: string }|null}
  */
 function getCustomBasemapConfig() {
-    try {
-        const raw = localStorage.getItem(CUSTOM_BASEMAP_KEY);
-        if (raw) {
-            const config = JSON.parse(raw);
-            if (config && config.url && config.sourceType) {
-                return config;
-            }
-        }
-    } catch (e) {
-        console.error('Error reading custom basemap config from localStorage:', e);
-    }
-    return null;
+    const config = getPref(PREF.CUSTOM_BASEMAP, null);
+    return config && config.url && config.sourceType ? config : null;
 }
 
 /**
- * Save custom basemap configuration to localStorage
  * @param {{ sourceType: 'wms'|'xyz', url: string, layerName: string, attribution: string }} config
  */
 function saveCustomBasemapConfig(config) {
-    try {
-        localStorage.setItem(CUSTOM_BASEMAP_KEY, JSON.stringify(config));
-    } catch (e) {
-        console.error('Error saving custom basemap config to localStorage:', e);
-    }
+    setPref(PREF.CUSTOM_BASEMAP, config);
 }
 
 export { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig };

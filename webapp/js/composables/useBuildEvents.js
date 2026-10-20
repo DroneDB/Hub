@@ -2,6 +2,8 @@
  * Build Events Mixin
  * Manages build-related events and notifications
  */
+import { pathutils } from 'ddb';
+
 export default {
     methods: {
         // Build event handlers
@@ -23,7 +25,7 @@ export default {
 
         // Build notification handlers
         handleBuildStateNotification(data) {
-            const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
+            const fileName = data.filePath ? pathutils.basename(data.filePath) : 'file';
 
             switch (data.newState) {
                 case 'Succeeded':
@@ -39,7 +41,7 @@ export default {
         },
 
         handleBuildStartedNotification(data) {
-            const fileName = data.filePath ? data.filePath.split('/').pop() : 'file';
+            const fileName = data.filePath ? pathutils.basename(data.filePath) : 'file';
             this.$toast.add({ severity: 'info', summary: 'Build Started', detail: `Build started for ${fileName}`, life: 3000 });
         },
 

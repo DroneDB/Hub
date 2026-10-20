@@ -25,6 +25,7 @@
 
 <script>
 import Window from '@/components/Window.vue';
+import { MEASUREMENT_SWATCHES, GROUP_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: { Window },
@@ -39,17 +40,8 @@ export default {
     data() {
         return {
             formName: this.group ? this.group.name : '',
-            formColor: this.group ? this.group.color : '#3388ff',
-            colorPalette: [
-                '#3388ff', // Blue (default)
-                '#ffcc33', // Yellow
-                '#ff0000', // Red
-                '#00cc66', // Green
-                '#ff6600', // Orange
-                '#9900ff', // Purple
-                '#00cccc', // Cyan
-                '#333333'  // Dark gray
-            ]
+            formColor: this.group ? this.group.color : GROUP_COLOR,
+            colorPalette: MEASUREMENT_SWATCHES
         };
     },
     computed: {

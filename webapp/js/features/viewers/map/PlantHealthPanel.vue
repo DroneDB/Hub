@@ -156,11 +156,14 @@ import HistogramChart from '@/components/HistogramChart.vue';
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
 import BandSelector from '@/components/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
-import clipboardCopy from 'clipboard-copy';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 import useHeavyTask from '@/composables/useHeavyTask';
+import { downloadBlob } from '@/libs/download';
+import { pathutils } from 'ddb';
+import { copyText } from '@/composables/useCopyText';
+import { formatNumber } from '@/libs/format';
 
 /**
  * PlantHealthPanel - Plant health (NDVI / custom index) analysis panel.
@@ -458,15 +461,7 @@ export default {
                 // Download the produced GeoTIFF (auth via Authorization header).
                 const url = this.dataset.taskResultUrl(result.taskId);
                 const blob = await this.dataset.registry.makeRequest(url, 'GET', null, null, 'blob');
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                const baseName = this.filePath.split('/').pop().replace(/\.[^.]+$/, '');
-                a.download = `${baseName || 'export'}_export.tif`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
+                downloadBlob(blob, `${pathutils.stem(this.filePath) || 'export'}_export.tif`);
             } catch (e) {
                 console.error('Export error:', e);
                 if (this.$toast) {
@@ -493,12 +488,11 @@ export default {
             // Update browser URL
             window.history.replaceState(null, '', url.toString());
 
-            clipboardCopy(url.toString());
+            copyText(url.toString());
         },
 
         formatNum(val) {
-            if (val === undefined || val === null) return '-';
-            return typeof val === 'number' ? val.toFixed(3) : val;
+            return formatNumber(val, 3);
         }
     }
 };

@@ -131,7 +131,8 @@ import { bytesToSize } from '@/libs/utils';
 import { orderCompanionsFirst } from '@/libs/uploadOrder';
 import { useUploadQueue } from '@/composables/useUploadQueue';
 import { createUploadRequests } from '@/libs/upload/uploadRequests';
-import { formatDuration, authorizedGetJson } from '@/libs/upload/uploadFormat';
+import { authorizedGetJson } from '@/libs/upload/uploadFormat';
+import { formatDurationSeconds } from '@/libs/format';
 import reg from '@/libs/api/sharedRegistry';
 import { markRaw } from 'vue';
 
@@ -203,7 +204,7 @@ export default {
         uploadDuration() {
             const start = this.snapshot?.startedAt;
             if (!start) return '0s';
-            return formatDuration(((this.snapshot.endedAt ?? Date.now()) - start) / 1000);
+            return formatDurationSeconds(((this.snapshot.endedAt ?? Date.now()) - start) / 1000);
         },
         averageSpeed() {
             const s = this.snapshot;
@@ -217,7 +218,7 @@ export default {
         etaFormatted() {
             const eta = this.snapshot?.eta;
             if (eta == null) return 'Calculating...';
-            return eta < 1 ? '< 1s' : formatDuration(eta);
+            return eta < 1 ? '< 1s' : formatDurationSeconds(eta);
         }
     },
     watch: {

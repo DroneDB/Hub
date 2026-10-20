@@ -20,6 +20,10 @@ import PrimeVue from 'primevue/config';
 import Lara from '@primevue/themes/lara';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from './PointAnnotationDialog.vue';
+import { pointPopupHtml } from '@/libs/map/pointPopup';
+import { formatArea as formatAreaText, formatLength as formatLengthText } from '@/libs/format';
+import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 // Cursor shown over a measurement while the eraser tool is active. We use
 // the same static asset as the toolbar button (file URL, not an inline SVG
@@ -35,7 +39,7 @@ class MeasureControls extends Control {
     constructor(opt_options) {
         const options = opt_options || {};
 
-        const unitPref = localStorage.getItem("measureUnitPref") || "metric";
+        const unitPref = getPref(PREF.MEASURE_UNIT, 'metric');
 
         const btnPoint = document.createElement('button');
         btnPoint.title = 'Point Annotation - Click on the map to place an annotation.';
@@ -364,7 +368,7 @@ class MeasureControls extends Control {
      * @param {string} newUnit - The new unit preference ('metric' or 'imperial')
      */
     applyUnitsChange(newUnit) {
-        localStorage.setItem("measureUnitPref", newUnit);
+        setPref(PREF.MEASURE_UNIT, newUnit);
         this.unitPref = newUnit;
 
         // Recalculate all existing measurement tooltips
@@ -544,7 +548,7 @@ class MeasureControls extends Control {
      */
     createFeatureStyle(feature) {
         // Default colors
-        const defaultStroke = '#ffcc33';
+        const defaultStroke = MEASURE_COLOR;
         const defaultStrokeWidth = 2;
 
         // Read GeoJSON style properties from feature
@@ -638,38 +642,8 @@ class MeasureControls extends Control {
     importFromGeoJSON(geojson) {
         const map = this.getMap();
 
-        // Create format functions bound to current instance
-        const formatArea = (polygon) => {
-            const area = getArea(polygon);
-            let output;
-            if (this.unitPref === 'metric') {
-                if (area > 10000) {
-                    output = Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
-                } else {
-                    output = Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
-                }
-            } else {
-                const f = 0.00024710538146717;
-                output = Math.round((area * f) * 100) / 100 + ' acres';
-            }
-            return output;
-        };
-
-        const formatLength = (line) => {
-            const length = getLength(line);
-            let output;
-            if (this.unitPref === 'metric') {
-                if (length > 100) {
-                    output = Math.round((length / 1000) * 100) / 100 + ' ' + 'km';
-                } else {
-                    output = Math.round(length * 100) / 100 + ' ' + 'm';
-                }
-            } else {
-                const f = 3.28084;
-                output = Math.round((length * f) * 100) / 100 + ' ft';
-            }
-            return output;
-        };
+        const formatArea = polygon => formatAreaText(getArea(polygon), this.unitPref);
+        const formatLength = line => formatLengthText(getLength(line), this.unitPref);
 
         const result = importMeasurements(geojson, this.source, formatArea, formatLength, map, (feature, m) => {
             this.openPointAnnotationDialog(feature, m, true);
@@ -726,7 +700,7 @@ class MeasureControls extends Control {
             style: new Style({
                 image: new CircleStyle({
                     radius: 6,
-                    fill: new Fill({ color: '#ffcc33' }),
+                    fill: new Fill({ color: MEASURE_COLOR }),
                     stroke: new Stroke({ color: '#fff', width: 2 })
                 })
             })
@@ -949,29 +923,9 @@ class MeasureControls extends Control {
 
         let output;
         if (geometry instanceof Polygon && measurementType === 'area') {
-            const area = getArea(geometry);
-            if (this.unitPref === 'metric') {
-                if (area > 10000) {
-                    output = Math.round((area / 1000000) * 100) / 100 + ' km<sup>2</sup>';
-                } else {
-                    output = Math.round(area * 100) / 100 + ' m<sup>2</sup>';
-                }
-            } else {
-                const f = 0.00024710538146717;
-                output = Math.round((area * f) * 100) / 100 + ' acres';
-            }
+            output = formatAreaText(getArea(geometry), this.unitPref);
         } else if (geometry instanceof LineString && measurementType === 'length') {
-            const length = getLength(geometry);
-            if (this.unitPref === 'metric') {
-                if (length > 100) {
-                    output = Math.round((length / 1000) * 100) / 100 + ' km';
-                } else {
-                    output = Math.round(length * 100) / 100 + ' m';
-                }
-            } else {
-                const f = 3.28084;
-                output = Math.round((length * f) * 100) / 100 + ' ft';
-            }
+            output = formatLengthText(getLength(geometry), this.unitPref);
         }
 
         if (output) {
@@ -1037,7 +991,7 @@ class MeasureControls extends Control {
     openPointAnnotationDialog(feature, map, isEdit) {
         this.closePropertiesDialog();
 
-        const currentColor = feature.get('stroke') || '#ffcc33';
+        const currentColor = feature.get('stroke') || MEASURE_COLOR;
         const currentDescription = feature.get('description') || '';
 
         this._dialogContainer = document.createElement('div');
@@ -1081,24 +1035,11 @@ class MeasureControls extends Control {
         const coords = feature.getGeometry().getCoordinates();
         const [lon, lat] = toLonLat(coords);
 
-        const ddToDms = (coordinate, posSymbol, negSymbol) => {
-            const dd = Math.abs(coordinate);
-            const d = Math.floor(dd);
-            const m = Math.floor((dd - d) * 60);
-            const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
-            const dir = coordinate >= 0 ? posSymbol : negSymbol;
-            return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
-        };
-
-        const dmsLat = ddToDms(lat, 'N', 'S');
-        const dmsLon = ddToDms(lon, 'E', 'W');
-        const ddLat = lat.toFixed(6);
-        const ddLon = lon.toFixed(6);
-        const description = feature.get('description') || '';
-
         const popupEl = document.createElement('div');
         popupEl.className = 'ol-point-popup';
-        popupEl.innerHTML = this.buildPointPopupHTML(feature, dmsLat, dmsLon, ddLat, ddLon, description);
+        popupEl.innerHTML = pointPopupHtml({
+            lat, lon, name: feature.get('name'), accent: feature.get('stroke'), description: feature.get('description') || ''
+        });
 
         const popupOverlay = new Overlay({
             element: popupEl,
@@ -1113,7 +1054,6 @@ class MeasureControls extends Control {
         feature.set('measureTooltipElement', popupEl);
         feature.set('measureTooltip', popupOverlay);
 
-        this.attachPointPopupHandlers(popupEl, feature, map, ddLat, ddLon);
     }
 
     /**
@@ -1128,52 +1068,6 @@ class MeasureControls extends Control {
 
         // Create new popup
         this.createPointPopupElement(feature, map);
-    }
-
-    /**
-     * Build the inner HTML for a point popup. Shows only the point title
-     * (when set) and coordinates - editing/copying/deleting is reachable via
-     * the double-click detail dialog so the popup stays visually quiet.
-     */
-    buildPointPopupHTML(feature, dmsLat, dmsLon, ddLat, ddLon, description) {
-        const escapeHtml = (s) => String(s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-
-        const accent = (feature && feature.get && feature.get('stroke')) || '#3b82f6';
-        const name = feature && feature.get && feature.get('name');
-        const headerHtml = name
-            ? `<div class="ol-point-popup-header" style="border-left-color:${escapeHtml(accent)}">
-                    <i class="fa-solid fa-location-dot" style="color:${escapeHtml(accent)}"></i>
-                    <span class="ol-point-popup-title">${escapeHtml(name)}</span>
-               </div>`
-            : '';
-        const descHtml = description
-            ? `<div class="ol-point-popup-description">${escapeHtml(description)}</div>`
-            : '';
-        return `
-            ${headerHtml}
-            <div class="ol-point-popup-body">
-                <div class="ol-point-popup-coords">
-                    <span class="ol-point-popup-dms" title="Degrees Minutes Seconds">
-                        <i class="fa-solid fa-compass ol-point-popup-coord-icon"></i>${dmsLat} / ${dmsLon}
-                    </span>
-                    <span class="ol-point-popup-dd" title="Decimal Degrees">
-                        <i class="fa-solid fa-hashtag ol-point-popup-coord-icon"></i>${ddLat} / ${ddLon}
-                    </span>
-                    ${descHtml}
-                </div>
-            </div>
-        `;
-    }
-
-    /**
-     * No-op kept for backward compatibility: the simplified popup has no
-     * interactive buttons, so nothing to wire. Editing happens via the
-     * double-click detail dialog instead.
-     */
-    attachPointPopupHandlers(/* popupEl, feature, map, ddLat, ddLon */) {
-        /* intentionally empty */
     }
 
     /**
@@ -1327,35 +1221,11 @@ class MeasureControls extends Control {
             let sketch;
 
             const formatArea = function (polygon) {
-                const area = getArea(polygon);
-                let output;
-                if (this.unitPref === 'metric') {
-                    if (area > 10000) {
-                        output = Math.round((area / 1000000) * 100) / 100 + ' ' + 'km<sup>2</sup>';
-                    } else {
-                        output = Math.round(area * 100) / 100 + ' ' + 'm<sup>2</sup>';
-                    }
-                } else {
-                    const f = 0.00024710538146717; // m2 to acres
-                    output = Math.round((area * f) * 100) / 100 + ' acres';
-                }
-                return output;
+                return formatAreaText(getArea(polygon), this.unitPref);
             };
 
             const formatLength = function (line) {
-                const length = getLength(line);
-                let output;
-                if (this.unitPref === 'metric') {
-                    if (length > 100) {
-                        output = Math.round((length / 1000) * 100) / 100 + ' ' + 'km';
-                    } else {
-                        output = Math.round(length * 100) / 100 + ' ' + 'm';
-                    }
-                } else {
-                    const f = 3.28084; // meters to feet
-                    output = Math.round((length * f) * 100) / 100 + ' ft';
-                }
-                return output;
+                return formatLengthText(getLength(line), this.unitPref);
             };
 
             this.pointerMoveHandler = function (evt) {

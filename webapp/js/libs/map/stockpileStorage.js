@@ -11,6 +11,11 @@
  * AND prior stockpiles) are preserved verbatim.
  */
 
+import { pathutils } from 'ddb';
+import { newId as makeId } from '@/libs/ids';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { EPSG } from '@/libs/constants';
+
 const SUFFIX = '_measurements.geojson';
 // Application id stamped on every file we own. Legacy values are still readable.
 export const APP_ID = 'DroneDB Registry';
@@ -24,9 +29,7 @@ const LEGACY_APP_IDS = new Set([APP_ID, 'Registry-Stockpile', 'Registry-Orthopho
 export function getStockpilePath(rasterPath) {
     if (!rasterPath) return null;
     if (rasterPath.endsWith(SUFFIX)) return rasterPath;
-    const lastDot = rasterPath.lastIndexOf('.');
-    const base = lastDot > 0 ? rasterPath.substring(0, lastDot) : rasterPath;
-    return `${base}${SUFFIX}`;
+    return `${pathutils.dropExtension(rasterPath)}${SUFFIX}`;
 }
 
 /**
@@ -36,15 +39,7 @@ export function getStockpilePath(rasterPath) {
 export function getStockpileFileName(rasterPath) {
     const p = getStockpilePath(rasterPath);
     if (!p) return null;
-    const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-    return idx >= 0 ? p.substring(idx + 1) : p;
-}
-
-function makeId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return 'sp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    return pathutils.basename(p);
 }
 
 async function readExisting(dataset, path) {
@@ -72,7 +67,7 @@ function buildEmptyFC(rasterPath) {
     const now = new Date().toISOString();
     return {
         type: 'FeatureCollection',
-        crs: { type: 'name', properties: { name: 'EPSG:4326' } },
+        crs: { type: 'name', properties: { name: EPSG.WGS84 } },
         metadata: {
             version: '1.0',
             kind: 'measurements',
@@ -109,7 +104,7 @@ export function buildStockpileFeature(polygon, properties = {}) {
             // Force the discriminators / styling regardless of caller input.
             id: properties.id || makeId(),
             measurementType: 'stockpile',
-            stroke: properties.stroke || '#ff9800',
+            stroke: properties.stroke || ANALYSIS_COLOR,
             'stroke-width': properties['stroke-width'] || 2,
             fill: properties.fill || 'rgba(255, 152, 0, 0.20)',
             'fill-opacity': properties['fill-opacity'] != null ? properties['fill-opacity'] : 0.2,

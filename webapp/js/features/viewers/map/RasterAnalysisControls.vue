@@ -177,6 +177,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 import RasterProfileChart from './RasterProfileChart.vue';
+import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 
 const THERMAL_COLORMAPS = [
     { id: 'ironbow', name: 'Ironbow', colors: ['#000000', '#570f6a', '#bd3754', '#f97808', '#ffe344', '#ffffff'] },
@@ -419,16 +420,7 @@ export default {
                 const resp = await fetch(url, { cache: 'no-store' });
                 if (!resp.ok) throw new Error(`Export failed (HTTP ${resp.status})`);
                 const blob = await resp.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                const disposition = resp.headers.get('content-disposition');
-                const match = disposition && disposition.match(/filename=([^;]+)/);
-                a.download = match ? match[1].trim() : 'raster_export.tif';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
+                downloadBlob(blob, filenameFromDisposition(resp.headers.get('content-disposition'), 'raster_export.tif'));
             } catch (e) {
                 console.error('Export error:', e);
             } finally {

@@ -150,6 +150,8 @@ import mapRasterAnalysis from '@/composables/useRasterAnalysis';
 import mapStockpileVolume from '@/composables/useStockpileVolume';
 import mapContourLines from '@/composables/useContourLines';
 import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
+import { EPSG } from '@/libs/constants';
+import { getPref, PREF } from '@/libs/preferences';
 
 export default {
     components: {
@@ -183,8 +185,8 @@ export default {
             measurementGroupDialogOpen: false,
             pendingGroupForRename: null,
             // Unit preference shared with sub-panels (volume / area conversions).
-            // Persisted across sessions via localStorage.
-            currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric'
+            // Persisted across sessions (libs/preferences).
+            currentUnitPref: getPref(PREF.MEASURE_UNIT, 'metric')
         };
     },
     watch: {
@@ -271,7 +273,7 @@ export default {
             const ext = createEmptyExtent();
 
             if (entry.polygon_geom && (entry.type === ddb.entry.type.GEORASTER || entry.type === ddb.entry.type.GEOIMAGE || entry.type === ddb.entry.type.POINTCLOUD)) {
-                const extent = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                const extent = transformExtent(bbox(entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
                 const rasterRetina = useRetinaTiles();
                 // Native GSD zoom of the source: drives both the tile source cap and the view cap.
                 const native = computeNativeZoom(entry);
@@ -570,7 +572,7 @@ export default {
                 const rawExtent = entry.polygon_geom ? bbox(entry.polygon_geom) : mvtBounds;
                 if (rawExtent) {
                     try {
-                        const ext3857 = transformExtent(rawExtent, 'EPSG:4326', 'EPSG:3857');
+                        const ext3857 = transformExtent(rawExtent, EPSG.WGS84, EPSG.WEB_MERCATOR);
                         if (!this.initialExtent) this.initialExtent = ext3857.slice();
                         this.map.getView().fit(ext3857, {
                             padding: [40, 40, 40, 40],

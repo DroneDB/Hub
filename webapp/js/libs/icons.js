@@ -1,4 +1,4 @@
-import { entry } from 'ddb';
+import { entry, pathutils } from 'ddb';
 import { isArchivePath } from '@/libs/entryTypes';
 
 const typeIconMap = {
@@ -26,10 +26,7 @@ const extensionIconMap = {
 };
 
 function getExtension(path) {
-    if (!path) return '';
-    const lastDot = path.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === 0) return '';
-    return path.substring(lastDot + 1).toLowerCase();
+    return path ? pathutils.extname(path).slice(1) : '';
 }
 
 export default {

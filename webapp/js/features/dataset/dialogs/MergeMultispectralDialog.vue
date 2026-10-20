@@ -109,6 +109,7 @@ import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import useHeavyTask from '@/composables/useHeavyTask';
+import { pathutils } from 'ddb';
 
 /**
  * MergeMultispectralDialog - Dialog for merging multispectral bands into a
@@ -201,7 +202,7 @@ export default {
             }
 
             // Find common base name among file names (without folder)
-            const names = this.files.map(f => f.label || f.entry.path.split('/').pop());
+            const names = this.files.map(f => f.label || pathutils.basename(f.entry.path));
             // Try to find common prefix
             let prefix = names[0];
             for (let i = 1; i < names.length; i++) {
@@ -330,7 +331,7 @@ export default {
                     params: { paths, outputPath }, force: true, notify: false
                 });
 
-                const sourceNames = paths.map(p => p.split('/').pop());
+                const sourceNames = paths.map(p => pathutils.basename(p));
                 this.$emit('onClose', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
             } catch (e) {
                 this.validationResult = { ok: false, errors: [e.message || 'Merge failed'], warnings: [] };

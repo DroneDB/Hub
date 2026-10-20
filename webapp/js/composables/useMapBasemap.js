@@ -9,11 +9,13 @@ import TileGrid from 'ol/tilegrid/TileGrid';
 import { get as getProjection } from 'ol/proj';
 import { getWidth } from 'ol/extent';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
+import { EPSG } from '@/libs/constants';
+import { getPref, PREF } from '@/libs/preferences';
 
 export default {
     data() {
         return {
-            selectedBasemap: localStorage.getItem('selectedBasemap') || 'satellite',
+            selectedBasemap: getPref(PREF.BASEMAP, 'satellite'),
             basemaps: Basemaps,
             customBasemapConfig: getCustomBasemapConfig()
         };
@@ -37,7 +39,7 @@ export default {
                             attributions: attributions
                         };
                         if (tileSize !== 256) {
-                            const projection = getProjection('EPSG:3857');
+                            const projection = getProjection(EPSG.WEB_MERCATOR);
                             const projExtent = projection.getExtent();
                             const size = getWidth(projExtent) / tileSize;
                             const resolutions = [];
@@ -73,7 +75,7 @@ export default {
 
         /**
          * Replace the basemap layer at position 0 in the map.
-         * Override in component if you need to persist to localStorage.
+         * Override in component if you need to persist the selection.
          */
         updateBasemap() {
             const newLayer = this.createBasemapLayer();

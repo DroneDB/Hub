@@ -111,6 +111,7 @@ import PrimeMessage from 'primevue/message';
 import Toast from 'primevue/toast';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import { formatDate } from '@/libs/format';
 
 export default {
     components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Toast },
@@ -256,11 +257,7 @@ export default {
             }
         },
 
-        formatDate(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString();
-        },
+        formatDate,
 
         close() {
             this.$emit('onClose');

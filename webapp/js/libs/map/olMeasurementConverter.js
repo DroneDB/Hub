@@ -7,6 +7,10 @@ import { LineString, Polygon, Point } from 'ol/geom';
 import Feature from 'ol/Feature';
 import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
+import { pointCoordinates, pointPopupHtml } from './pointPopup';
+import { copyText } from '@/composables/useCopyText';
+import { areaParts, lengthParts } from '@/libs/format';
+import { EPSG } from '@/libs/constants';
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -46,8 +50,8 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
     // Convert to GeoJSON using OpenLayers built-in formatter
     const format = new GeoJSON();
     const geoJsonFeature = JSON.parse(format.writeFeature(clonedFeature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
+        dataProjection: EPSG.WGS84,
+        featureProjection: EPSG.WEB_MERCATOR
     }));
 
     // Determine measurement type and calculate values
@@ -141,8 +145,8 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
 export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     const format = new GeoJSON();
     const feature = format.readFeature(geoJsonFeature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
+        dataProjection: EPSG.WGS84,
+        featureProjection: EPSG.WEB_MERCATOR
     });
 
     const props = geoJsonFeature.properties;
@@ -245,7 +249,7 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
         crs: {
             type: 'name',
             properties: {
-                name: 'EPSG:4326' // Output is always in WGS84
+                name: EPSG.WGS84 // Output is always in WGS84
             }
         },
         metadata: {
@@ -396,57 +400,13 @@ function createPointPopup(feature, map, source, onEdit) {
 
     if (lat === undefined || lon === undefined) return;
 
-    const ddToDms = (coordinate, posSymbol, negSymbol) => {
-        const dd = Math.abs(coordinate);
-        const d = Math.floor(dd);
-        const m = Math.floor((dd - d) * 60);
-        const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
-        const dir = coordinate >= 0 ? posSymbol : negSymbol;
-        return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
-    };
-
-    const dmsLat = ddToDms(lat, 'N', 'S');
-    const dmsLon = ddToDms(lon, 'E', 'W');
-    const ddLat = lat.toFixed(6);
-    const ddLon = lon.toFixed(6);
-    const description = feature.get('description') || '';
-
-    const escapeHtml = (s) => String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const accent = feature.get('stroke') || '#3b82f6';
-    const name = feature.get('name');
-    const headerHtml = name
-        ? `<div class="ol-point-popup-header" style="border-left-color:${escapeHtml(accent)}">
-                <i class="fa-solid fa-location-dot" style="color:${escapeHtml(accent)}"></i>
-                <span class="ol-point-popup-title">${escapeHtml(name)}</span>
-           </div>`
-        : '';
-    const descHtml = description
-        ? `<div class="ol-point-popup-description">${escapeHtml(description)}</div>`
-        : '';
-
+    const { ddLat, ddLon } = pointCoordinates(lat, lon);
     const popupEl = document.createElement('div');
     popupEl.className = 'ol-point-popup';
-    popupEl.innerHTML = `
-        ${headerHtml}
-        <div class="ol-point-popup-body">
-            <div class="ol-point-popup-coords">
-                <span class="ol-point-popup-dms" title="Degrees Minutes Seconds">
-                    <i class="fa-solid fa-compass ol-point-popup-coord-icon"></i>${dmsLat} / ${dmsLon}
-                </span>
-                <span class="ol-point-popup-dd" title="Decimal Degrees">
-                    <i class="fa-solid fa-hashtag ol-point-popup-coord-icon"></i>${ddLat} / ${ddLon}
-                </span>
-                ${descHtml}
-            </div>
-            <div class="ol-point-popup-actions">
-                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil"></i></button>
-                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy"></i></button>
-                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="fa-solid fa-trash"></i></button>
-            </div>
-        </div>
-    `;
+    popupEl.innerHTML = pointPopupHtml({
+        lat, lon, name: feature.get('name'), accent: feature.get('stroke'),
+        description: feature.get('description') || '', actions: true
+    });
 
     const Overlay = require('ol/Overlay').default;
     const popupOverlay = new Overlay({
@@ -473,7 +433,7 @@ function createPointPopup(feature, map, source, onEdit) {
     popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
         e.preventDefault();
         const text = `${ddLat}, ${ddLon}`;
-        navigator.clipboard.writeText(text).then(() => {
+        copyText(text).then(() => {
             const icon = popupEl.querySelector('.ol-point-popup-copy i');
             if (icon) { icon.className = 'fa-solid fa-check'; }
             setTimeout(() => { if (icon) { icon.className = 'fa-regular fa-copy'; } }, 1500);
@@ -500,32 +460,8 @@ function createPointPopup(feature, map, source, onEdit) {
  * @returns {Object} Calculated values
  */
 function calculateAreaValues(area, unitPref) {
-    let value, unit, displayValue;
-
-    if (unitPref === 'metric') {
-        if (area > 10000) {
-            value = area / 1000000;
-            unit = 'km²';
-            displayValue = Math.round(value * 100) / 100 + ' km²';
-        } else {
-            value = area;
-            unit = 'm²';
-            displayValue = Math.round(value * 100) / 100 + ' m²';
-        }
-    } else {
-        // Imperial: convert to acres
-        const f = 0.00024710538146717; // m² to acres
-        value = area * f;
-        unit = 'acres';
-        displayValue = Math.round(value * 100) / 100 + ' acres';
-    }
-
-    return {
-        area: Math.round(area * 100) / 100, // Always store raw m² value
-        areaValue: Math.round(value * 100) / 100,
-        unit: unit,
-        displayValue: displayValue
-    };
+    const { value, unit, text } = areaParts(area, unitPref);
+    return { area: Math.round(area * 100) / 100, areaValue: value, unit, displayValue: text };
 }
 
 /**
@@ -535,30 +471,6 @@ function calculateAreaValues(area, unitPref) {
  * @returns {Object} Calculated values
  */
 function calculateLengthValues(length, unitPref) {
-    let value, unit, displayValue;
-
-    if (unitPref === 'metric') {
-        if (length > 100) {
-            value = length / 1000;
-            unit = 'km';
-            displayValue = Math.round(value * 100) / 100 + ' km';
-        } else {
-            value = length;
-            unit = 'm';
-            displayValue = Math.round(value * 100) / 100 + ' m';
-        }
-    } else {
-        // Imperial: convert to feet
-        const f = 3.28084; // meters to feet
-        value = length * f;
-        unit = 'ft';
-        displayValue = Math.round(value * 100) / 100 + ' ft';
-    }
-
-    return {
-        length: Math.round(length * 100) / 100, // Always store raw meters value
-        lengthValue: Math.round(value * 100) / 100,
-        unit: unit,
-        displayValue: displayValue
-    };
+    const { value, unit, text } = lengthParts(length, unitPref);
+    return { length: Math.round(length * 100) / 100, lengthValue: value, unit, displayValue: text };
 }

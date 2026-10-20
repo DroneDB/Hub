@@ -103,7 +103,8 @@
 <script>
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
-import { formatTimeAgo, bytesToSize } from '@/libs/utils';
+import { formatTimeAgo } from '@/libs/utils';
+import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
@@ -436,16 +437,11 @@ export default {
         },
 
         getFileSize: function(file) {
-            if (entry.isDirectory(file.entry)) return '';
-            if (!file.entry.size) return '';
-            return bytesToSize(file.entry.size);
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate: function(file) {
-            if (!file.entry.mtime) return '--';
-
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         getFileModifiedDateRel: function(file) {

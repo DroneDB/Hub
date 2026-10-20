@@ -395,7 +395,7 @@ export default {
                 // Check if any cover already exists in the dataset root
                 const rootEntries = await this.dataset.list();
                 const existingCovers = rootEntries.filter(e => {
-                    const filename = e.path.split('/').pop().toLowerCase();
+                    const filename = this.pathutils.basename(e.path).toLowerCase();
                     return candidates.some(c => c.toLowerCase() === filename);
                 });
 

@@ -168,6 +168,7 @@ import Chips from 'primevue/chips';
 import Textarea from 'primevue/textarea';
 import Toast from 'primevue/toast';
 import Tag from 'primevue/tag';
+import { copyText } from '@/composables/useCopyText';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
@@ -391,7 +392,7 @@ export default {
         copyToClipboard() {
             const json = this.generateAppSettingsJson();
             const fullJson = JSON.stringify({ AppSettings: JSON.parse(json) }, null, 2);
-            navigator.clipboard.writeText(fullJson).then(() => {
+            copyText(fullJson).then(() => {
                 this.$toast.add({
                     severity: 'success', summary: 'Copied',
                     detail: 'AppSettings JSON copied to clipboard.',

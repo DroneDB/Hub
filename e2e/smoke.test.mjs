@@ -8,6 +8,8 @@
  * HUB_TEST_DATA (/mnt/data/repos/test_data), HUB_HEADED=1 to watch, HUB_CHROME to use a given
  * Chromium binary (otherwise Playwright's own, else the newest one in ~/.cache/ms-playwright).
  * It creates a throw-away dataset in the user's organisation and deletes it at the end.
+ * To test a local build: `npm run build`, copy build/* into <storage>/ClientApp, then restart
+ * the Registry (it keeps serving the Hub files it read before the copy).
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';

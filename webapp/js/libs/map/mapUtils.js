@@ -2,6 +2,27 @@
  * Shared utility functions for Map.vue and SingleMap.vue
  */
 
+/** Default colour of measurements and point annotations (map and point cloud). */
+export const MEASURE_COLOR = '#ffcc33';
+
+/** Colour of analysis overlays (raster analysis, stockpiles, profile lines). */
+export const ANALYSIS_COLOR = '#ff9800';
+
+/** Default colour of a new measurement group. */
+export const GROUP_COLOR = '#3388ff';
+
+/** Swatches offered by the measurement, annotation and group dialogs. */
+export const MEASUREMENT_SWATCHES = Object.freeze([
+    MEASURE_COLOR, // Yellow
+    GROUP_COLOR,   // Blue
+    '#ff0000',     // Red
+    '#00cc66',     // Green
+    '#ff6600',     // Orange
+    '#9900ff',     // Purple
+    '#00cccc',     // Cyan
+    '#333333'      // Dark gray
+]);
+
 /**
  * Color palette for vector layers - bright, distinct colors with good contrast
  */

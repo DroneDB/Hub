@@ -8,6 +8,26 @@ module.exports = {
         else return pathWithoutProto;
     },
 
+    // Extension of the last path component, lower-case with the dot ("" when none)
+    extname: function (path) {
+        const name = module.exports.basename(path);
+        const i = name.lastIndexOf(".");
+        return i > 0 ? name.substring(i).toLowerCase() : "";
+    },
+
+    // Last path component without its extension
+    stem: function (path) {
+        const name = module.exports.basename(path);
+        const i = name.lastIndexOf(".");
+        return i > 0 ? name.substring(0, i) : name;
+    },
+
+    // Path without the extension of its last component
+    dropExtension: function (path) {
+        const ext = module.exports.extname(path);
+        return ext ? path.substring(0, path.length - ext.length) : path;
+    },
+
     join: function (...paths) {
         return paths.map(p => {
             if (p[p.length - 1] === "/") return p.slice(0, p.length - 1);

@@ -4,15 +4,6 @@
 
 /** Helpers shared by the upload views. */
 
-/** "1h 2m 3s", "2m 3s", "3s" */
-export function formatDuration(totalSeconds) {
-    const seconds = Math.floor(totalSeconds);
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
-    return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${seconds % 60}s`;
-}
-
 /**
  * A GET with the session token of `registry` whose HTTP statuses are results, not
  * exceptions (the upload requests poll receipts and chunk states that may be 202 or 404).

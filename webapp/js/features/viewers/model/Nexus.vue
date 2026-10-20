@@ -70,29 +70,19 @@ import TabViewLoader from '@/features/viewers/TabViewLoader';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import { loadResources } from '@/libs/lazy';
+import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
 
-const STORAGE_KEY = 'nexus-lighting-settings';
 
 function loadSettings() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch {
-        // Ignore parse errors
-    }
-    return null;
+    return getPref(PREF.NEXUS_LIGHTING, null);
 }
 
 function saveSettings(ambient, directional, shininess) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-            ambientIntensity: ambient,
-            directionalIntensity: directional,
-            shininess: shininess
-        }));
-    } catch {
-        // Ignore storage errors
-    }
+    setPref(PREF.NEXUS_LIGHTING, {
+        ambientIntensity: ambient,
+        directionalIntensity: directional,
+        shininess: shininess
+    });
 }
 
 export default {
@@ -118,7 +108,7 @@ export default {
             DEFAULT_AMBIENT,
             DEFAULT_DIRECTIONAL,
             DEFAULT_SHININESS,
-            // Reactive controls (restored from localStorage if available)
+            // Reactive controls (restored from the stored settings if available)
             ambientIntensity: saved ? saved.ambientIntensity : DEFAULT_AMBIENT,
             directionalIntensity: saved ? saved.directionalIntensity : DEFAULT_DIRECTIONAL,
             shininess: saved ? saved.shininess : DEFAULT_SHININESS,
@@ -313,7 +303,7 @@ export default {
             this.updateAmbient();
             this.updateDirectional();
             this.updateShininess();
-            try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+            removePref(PREF.NEXUS_LIGHTING);
         },
     }
 }

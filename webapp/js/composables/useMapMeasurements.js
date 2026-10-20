@@ -9,6 +9,9 @@
  *   - this.getActiveMeasurementEntry()  → the entry whose path is used for export/save
  *   - this.initMeasurementStorage()     → (re)initialize this.measurementStorage if needed
  */
+import { newId } from '@/libs/ids';
+import { GROUP_COLOR } from '@/libs/map/mapUtils';
+
 export default {
     data() {
         return {
@@ -219,10 +222,10 @@ export default {
          * @param {{ name: string, color: string }} groupData
          */
         createGroup(groupData) {
-            const id = 'g-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+            const id = newId();
             this.measurementGroups = [
                 ...this.measurementGroups,
-                { id, name: groupData.name, color: groupData.color || '#3388ff', visible: true, collapsed: false }
+                { id, name: groupData.name, color: groupData.color || GROUP_COLOR, visible: true, collapsed: false }
             ];
             this.measurementListItems = this.measureControls ? this.measureControls.getMeasurementsList() : [];
         },

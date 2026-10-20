@@ -161,6 +161,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Visibility } from 'ddb';
 import useHeavyTask from '@/composables/useHeavyTask';
 import { IMPORT_SOURCES, getImportSource } from './importSources';
+import { formatDurationSeconds } from '@/libs/format';
 
 const slugRe = /^[a-z0-9\-_]+$/;
 
@@ -468,17 +469,10 @@ export default {
             if (p > 1 && p < 100) {
                 const elapsed = (Date.now() - this.importStartTime) / 1000;
                 const total = elapsed / (p / 100);
-                this.etaText = this.formatDuration(Math.max(0, total - elapsed));
+                this.etaText = formatDurationSeconds(Math.round(Math.max(0, total - elapsed)));
             } else if (p >= 100) {
                 this.etaText = '';
             }
-        },
-
-        formatDuration(seconds) {
-            const s = Math.round(seconds);
-            const m = Math.floor(s / 60);
-            const sec = s % 60;
-            return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
         },
 
         onWindowClose() {

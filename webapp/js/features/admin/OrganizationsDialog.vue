@@ -111,6 +111,7 @@ import PrimeMessage from 'primevue/message';
 import Divider from 'primevue/divider';
 import Tag from 'primevue/tag';
 import reg from '@/libs/api/sharedRegistry';
+import { formatDate } from '@/libs/format';
 
 export default {
     components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider, Tag },
@@ -261,11 +262,7 @@ export default {
             }
         },
 
-        formatDate(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString();
-        },
+        formatDate,
 
         close() {
             this.$emit('onClose', this.hasChanges ? 'updated' : null);

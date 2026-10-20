@@ -346,7 +346,7 @@ class FileAvailabilityChecker {
      */
     getFileName(path) {
         if (!path) return 'file';
-        return path.split('/').pop() || path;
+        return ddb.pathutils.basename(path);
     }
 
     /**

@@ -103,7 +103,7 @@
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
                         <div class="file-date">
-                            <div>{{ formatDate(slotProps.data.creationDate) }}</div>
+                            <div>{{ formatDateTime(slotProps.data.creationDate) }}</div>
                             <small class="relative-time">{{ formatCreationDateRel(slotProps.data.creationDate) }}</small>
                         </div>
                     </template>
@@ -210,6 +210,7 @@ import { datasetListQuery } from '@/libs/datasetList';
 const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
+import { formatDateTime } from '@/libs/format';
 
 export default {
     name: 'DatasetsPage',
@@ -462,10 +463,7 @@ export default {
         bytesToSize,
         datasetName,
 
-        formatDate(timestamp) {
-            const date = new Date(timestamp);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-        },
+        formatDateTime,
 
         formatCreationDateRel(timestamp) {
             if (!timestamp) return '';

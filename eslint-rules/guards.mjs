@@ -54,17 +54,7 @@ export const GUARDS = [
             { name: 'localStorage', message: 'Use libs/preferences.js or usePreference() (HQ-02).' },
             { name: 'sessionStorage', message: 'Use libs/preferences.js (HQ-02).' }
         ],
-        allow: [
-            'webapp/js/composables/useMapBasemap.js',
-            'webapp/js/features/dataset/ViewDataset.vue',
-            'webapp/js/features/dataset/explorer/FileBrowser.vue',
-            'webapp/js/features/viewers/map/Map.vue',
-            'webapp/js/features/viewers/map/SingleMap.vue',
-            'webapp/js/features/viewers/map/olMeasure.vue',
-            'webapp/js/features/viewers/model/Nexus.vue',
-            'webapp/js/features/viewers/pointcloud/Potree.vue',
-            'webapp/js/features/viewers/unified/UnifiedViewer.vue'
-        ]
+        allow: []
     },
     {
         id: 'window-storage',
@@ -74,10 +64,7 @@ export const GUARDS = [
             { object: 'window', property: 'sessionStorage', message: 'Use libs/preferences.js (HQ-02).' },
             { object: 'window', property: 'fetch', message: 'Use the Registry client (HQ-05).' }
         ],
-        allow: [
-            'webapp/js/composables/useClipboard.js',
-            'webapp/js/features/viewers/splat/Splat.vue'
-        ]
+        allow: []
     },
     {
         id: 'network',

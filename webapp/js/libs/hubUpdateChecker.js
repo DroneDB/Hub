@@ -14,8 +14,8 @@
  * record so the UI can show a one-shot dialog.
  */
 
-const STORAGE_KEY = 'hubUpdateNotice';
-const SESSION_GUARD_KEY = 'hubUpdateAttempted';
+import { getPref, setPref, removePref, safeStorage, PREF } from '@/libs/preferences';
+const SESSION = { session: true };
 
 /* global __HUB_VERSION__ */
 const BUNDLE_VERSION =
@@ -45,16 +45,11 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
     // the current tab session, give up to avoid an infinite refresh loop
     // when the server keeps reporting a version the browser cannot pick
     // up (stale proxy, mid-deploy, etc.).
-    try {
-        if (sessionStorage.getItem(SESSION_GUARD_KEY) === serverVersion) {
-             
-            console.warn(
-                `[hub-update] Mismatch persists after reload (bundle=${BUNDLE_VERSION}, server=${serverVersion}). Skipping further reloads in this session.`
-            );
-            return false;
-        }
-    } catch {
-        // sessionStorage unavailable (private mode, etc.): proceed without the guard.
+    if (safeStorage.getItem(PREF.HUB_UPDATE_ATTEMPTED, SESSION) === serverVersion) {
+        console.warn(
+            `[hub-update] Mismatch persists after reload (bundle=${BUNDLE_VERSION}, server=${serverVersion}). Skipping further reloads in this session.`
+        );
+        return false;
     }
 
     const notice = {
@@ -63,16 +58,8 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
         at: new Date().toISOString()
     };
 
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(notice));
-    } catch {
-        // localStorage unavailable: still reload (notice will be skipped).
-    }
-    try {
-        sessionStorage.setItem(SESSION_GUARD_KEY, serverVersion);
-    } catch {
-        // best-effort
-    }
+    setPref(PREF.HUB_UPDATE_NOTICE, notice);
+    safeStorage.setItem(PREF.HUB_UPDATE_ATTEMPTED, serverVersion, SESSION);
 
      
     console.info(
@@ -87,17 +74,13 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
  * @returns {{from: string, to: string, at: string} | null}
  */
 export function consumePendingUpdateNotice() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        localStorage.removeItem(STORAGE_KEY);
-        // Also clear the per-tab loop guard so a future legitimate
-        // upgrade can trigger a reload again.
-        try { sessionStorage.removeItem(SESSION_GUARD_KEY); } catch { /* noop */ }
-        return JSON.parse(raw);
-    } catch {
-        return null;
-    }
+    const notice = getPref(PREF.HUB_UPDATE_NOTICE, null);
+    if (!notice) return null;
+    removePref(PREF.HUB_UPDATE_NOTICE);
+    // Also clear the per-tab loop guard so a future legitimate
+    // upgrade can trigger a reload again.
+    safeStorage.removeItem(PREF.HUB_UPDATE_ATTEMPTED, SESSION);
+    return notice;
 }
 
-export const __TEST__ = { STORAGE_KEY, SESSION_GUARD_KEY, BUNDLE_VERSION };
+export const __TEST__ = { STORAGE_KEY: PREF.HUB_UPDATE_NOTICE, SESSION_GUARD_KEY: PREF.HUB_UPDATE_ATTEMPTED, BUNDLE_VERSION };

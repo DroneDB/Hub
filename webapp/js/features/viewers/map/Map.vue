@@ -198,6 +198,9 @@ import mapRasterAnalysis from '@/composables/useRasterAnalysis';
 import mapStockpileVolume from '@/composables/useStockpileVolume';
 import mapContourLines from '@/composables/useContourLines';
 import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
+import { useCopyText } from '@/composables/useCopyText';
+import { EPSG } from '@/libs/constants';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 
 export default {
@@ -233,9 +236,17 @@ export default {
         }
     },
     emits: ['scrollTo', 'openItem'],
+    setup() {
+        const imageCopy = useCopyText();
+        const videoCopy = useCopyText();
+        return {
+            copyImageCoords: imageCopy.copy, imagePopupCoordsCopied: imageCopy.copied,
+            copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied
+        };
+    },
     data: function () {
-        const savedDirectionIndicators = localStorage.getItem('showDirectionIndicators') === 'true';
-        const savedFlightPath = localStorage.getItem('showFlightPath') !== 'false';
+        const savedDirectionIndicators = getPref(PREF.SHOW_DIRECTION_INDICATORS, false);
+        const savedFlightPath = getPref(PREF.SHOW_FLIGHT_PATH, true);
 
         return {
             selectSingle: false,
@@ -243,12 +254,12 @@ export default {
             initialExtent: null,
             vectorLayers: [],
             vectorLayerColors: {},
-            selectedBasemap: localStorage.getItem('selectedBasemap') || 'satellite',
+            selectedBasemap: getPref(PREF.BASEMAP, 'satellite'),
             currentOrthophotoEntry: null,
             mapSettingsDialogOpen: false,
             showFlightPath: savedFlightPath,
             showDirectionIndicators: savedDirectionIndicators,
-            currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric',
+            currentUnitPref: getPref(PREF.MEASURE_UNIT, 'metric'),
 
             // Measurement group dialog
             measurementGroupDialogOpen: false,
@@ -268,7 +279,6 @@ export default {
             imagePopupOpenUrl: '',
             imagePopupDownloadUrl: '',
             imagePopupCoords: '',
-            imagePopupCoordsCopied: false,
             imagePopupOverlay: null,
             // Bounded retry state for the popup thumbnail (libs/build/thumbRetryPolicy)
             imagePopupRetry: 0,
@@ -281,7 +291,6 @@ export default {
             videoPopupDate: '',
             videoPopupDownloadUrl: '',
             videoPopupCoords: '',
-            videoPopupCoordsCopied: false,
             videoPopupOverlay: null,
             videoPopupFile: null,
             rasterOpacity: 1.0,
@@ -414,8 +423,7 @@ export default {
 
         // Show image popup overlay on the map
         showImagePopup: function (file, coordinate) {
-            const pathUtils = ddb.pathutils || ddb.utils;
-            this.imagePopupFileName = pathUtils.basename ? pathUtils.basename(file.entry.path) : file.entry.path.split('/').pop();
+            this.imagePopupFileName = ddb.pathutils.basename(file.entry.path);
 
             // Reset loading state, retry budget and thumbnail for new image
             this.imagePopupLoading = true;
@@ -521,29 +529,12 @@ export default {
 
         // Copy coordinates to clipboard
         copyCoordinates: function () {
-            if (!this.imagePopupCoords) return;
-            navigator.clipboard.writeText(this.imagePopupCoords).then(() => {
-                this.imagePopupCoordsCopied = true;
-                setTimeout(() => { this.imagePopupCoordsCopied = false; }, 2000);
-            }).catch(() => {
-                // Fallback for older browsers
-                const ta = document.createElement('textarea');
-                ta.value = this.imagePopupCoords;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                this.imagePopupCoordsCopied = true;
-                setTimeout(() => { this.imagePopupCoordsCopied = false; }, 2000);
-            });
+            if (this.imagePopupCoords) this.copyImageCoords(this.imagePopupCoords);
         },
 
         // Show video info popup overlay on the map
         showVideoPopup: function (file, coordinate) {
-            const pathUtils = ddb.pathutils || ddb.utils;
-            this.videoPopupFileName = pathUtils.basename ? pathUtils.basename(file.entry.path) : file.entry.path.split('/').pop();
+            this.videoPopupFileName = ddb.pathutils.basename(file.entry.path);
             this.videoPopupFile = file;
 
             // Resolution
@@ -611,22 +602,7 @@ export default {
 
         // Copy coordinates from video popup
         copyVideoCoordinates: function () {
-            if (!this.videoPopupCoords) return;
-            navigator.clipboard.writeText(this.videoPopupCoords).then(() => {
-                this.videoPopupCoordsCopied = true;
-                setTimeout(() => { this.videoPopupCoordsCopied = false; }, 2000);
-            }).catch(() => {
-                const ta = document.createElement('textarea');
-                ta.value = this.videoPopupCoords;
-                ta.style.position = 'fixed';
-                ta.style.opacity = '0';
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                this.videoPopupCoordsCopied = true;
-                setTimeout(() => { this.videoPopupCoordsCopied = false; }, 2000);
-            });
+            if (this.videoPopupCoords) this.copyVideoCoords(this.videoPopupCoords);
         },
 
         loadMap: function () {
@@ -1057,7 +1033,7 @@ export default {
                             if (clusterFeatures.length === 1) {
                                 const file = clusterFeatures[0].file;
                                 const feat = clusterFeatures[0];
-                                label = file.entry.path.split('/').pop();
+                                label = ddb.pathutils.basename(file.entry.path);
 
                                 // Append speed info when direction indicators are active
                                 if (this.showDirectionIndicators) {
@@ -1174,7 +1150,7 @@ export default {
             // lifetime: element (the map's own control buttons)
             dirBtn.addEventListener('click', () => {
                 this.showDirectionIndicators = !this.showDirectionIndicators;
-                localStorage.setItem('showDirectionIndicators', String(this.showDirectionIndicators));
+                setPref(PREF.SHOW_DIRECTION_INDICATORS, this.showDirectionIndicators);
                 this.applyDirectionStyles();
                 dirBtn.classList.toggle('active', this.showDirectionIndicators);
             });
@@ -1187,7 +1163,7 @@ export default {
             // lifetime: element (the map's own control buttons)
             flightBtn.addEventListener('click', () => {
                 this.showFlightPath = !this.showFlightPath;
-                localStorage.setItem('showFlightPath', String(this.showFlightPath));
+                setPref(PREF.SHOW_FLIGHT_PATH, this.showFlightPath);
                 if (this.flightPathLayer) this.flightPathLayer.setVisible(this.showFlightPath);
                 if (this.markerLayer) this.markerLayer.setVisible(this.showFlightPath);
                 flightBtn.classList.toggle('active', this.showFlightPath);
@@ -1337,7 +1313,7 @@ export default {
 
                         const coords = coordAll(file.entry.polygon_geom);
                         const footprintGeom = new Polygon([coords]);
-                        footprintGeom.transform('EPSG:4326', 'EPSG:3857');
+                        footprintGeom.transform(EPSG.WGS84, EPSG.WEB_MERCATOR);
 
                         // Add geoprojected raster footprint
                         const footprintRetina = useRetinaTiles();
@@ -1489,10 +1465,10 @@ export default {
                     if (!f.entry) return;
                     if (f.entry.type !== ddb.entry.type.VECTOR) return;
                     if (f.entry.polygon_geom) {
-                        const vExt = transformExtent(bbox(f.entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                        const vExt = transformExtent(bbox(f.entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
                         if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
                     } else if (f.entry.point_geom) {
-                        const vExt = transformExtent(bbox(f.entry.point_geom), 'EPSG:4326', 'EPSG:3857');
+                        const vExt = transformExtent(bbox(f.entry.point_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
                         if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
                     }
                 });
@@ -1545,7 +1521,7 @@ export default {
                     const feat = new Feature(point);
                     feat.style = this.showDirectionIndicators ? 'direction' : 'shot';
                     feat.file = f;
-                    feat.getGeometry().transform('EPSG:4326', 'EPSG:3857');
+                    feat.getGeometry().transform(EPSG.WGS84, EPSG.WEB_MERCATOR);
                     features.push(feat);
 
                     if (f.entry.type === ddb.entry.type.GEOIMAGE) {
@@ -1566,7 +1542,7 @@ export default {
                         }
                     }
                 } else if (f.entry.polygon_geom && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.GEOIMAGE || f.entry.type === ddb.entry.type.POINTCLOUD)) {
-                    const extent = transformExtent(bbox(f.entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+                    const extent = transformExtent(bbox(f.entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
                     const rasterRetina = useRetinaTiles();
                     const native = computeNativeZoom(f.entry);
                     const tileLayer = new TileLayer({
@@ -1596,10 +1572,10 @@ export default {
                     const feat = new Feature(point);
                     feat.style = 'pano';
                     feat.file = f;
-                    feat.getGeometry().transform('EPSG:4326', 'EPSG:3857'); features.push(feat);
+                    feat.getGeometry().transform(EPSG.WGS84, EPSG.WEB_MERCATOR); features.push(feat);
                 } else if (f.entry.type === ddb.entry.type.VECTOR) {
                     // Skip measurement files (they are loaded separately as measurements)
-                    const fileName = f.entry.path.split('/').pop();
+                    const fileName = ddb.pathutils.basename(f.entry.path);
                     if (f.entry.path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
                         console.log(`Skipping vector layer for measurement file: ${f.entry.path}`);
                         return;
@@ -1942,7 +1918,7 @@ export default {
                 if (!olLayer.file) return;
                 const name = this.getLayerDisplayName(olLayer) ||
                     (olLayer.file.entry && olLayer.file.entry.path
-                        ? olLayer.file.entry.path.split('/').pop()
+                        ? ddb.pathutils.basename(olLayer.file.entry.path)
                         : '');
                 const path = (olLayer.file.entry && olLayer.file.entry.path) || name;
                 // Preserve existing opacity for this layer if already tracked
@@ -2031,7 +2007,7 @@ export default {
             });
         },
         /**
-         * Override base mixin to also persist selection to localStorage.
+         * Override base mixin to also persist the selection.
          */
         updateBasemap: function () {
             const newLayer = this.createBasemapLayer();
@@ -2040,7 +2016,7 @@ export default {
             layers.removeAt(0);
             layers.insertAt(0, newLayer);
             this.basemapLayer = newLayer;
-            localStorage.setItem('selectedBasemap', this.selectedBasemap);
+            setPref(PREF.BASEMAP, this.selectedBasemap);
         },
 
         /**
@@ -2054,9 +2030,7 @@ export default {
             const fileWithPath = this.files.find(f => f.entry && f.entry.path);
             if (!fileWithPath) return '';
 
-            const path = fileWithPath.entry.path;
-            const lastSlash = path.lastIndexOf('/');
-            return lastSlash > 0 ? path.substring(0, lastSlash) : '';
+            return ddb.pathutils.getParentFolder(fileWithPath.entry.path) || '';
         },
 
         /**

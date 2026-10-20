@@ -92,6 +92,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
 import Dialog from 'primevue/dialog';
+import { copyText } from '@/composables/useCopyText';
 
 /**
  * PropsTable - Recursive object/array-to-PrimeVue-DataTable renderer.
@@ -286,7 +287,7 @@ export default {
         // Copy a value to the clipboard and show a toast notification
         async copyValue(text) {
             try {
-                await navigator.clipboard.writeText(text);
+                await copyText(text);
                 this.$toast.add({
                     severity: 'success',
                     summary: 'Copied',

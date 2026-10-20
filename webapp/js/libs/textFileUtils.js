@@ -35,10 +35,7 @@ const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
  * Get file extension from path
  */
 function getExtension(path) {
-    const base = pathutils.basename(path);
-    const lastDot = base.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === 0) return '';
-    return base.substring(lastDot + 1).toLowerCase();
+    return pathutils.extname(path).slice(1);
 }
 
 /**

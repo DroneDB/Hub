@@ -76,7 +76,7 @@ import ddb from 'ddb';
 import PropsTable from '@/components/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
-import { buildAllProperties, isDirectory } from '@/libs/propertiesUtils';
+import { buildAllProperties, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 import BuildConfirmDialog from '@/features/dataset/dialogs/BuildConfirmDialog.vue';
 
 export default {
@@ -293,42 +293,15 @@ export default {
         },
 
         getFileType(file) {
-            const typeMap = {
-                [ddb.entry.type.DIRECTORY]: 'Folder',
-                [ddb.entry.type.GENERIC]: 'File',
-                [ddb.entry.type.GEOIMAGE]: 'GeoImage',
-                [ddb.entry.type.GEORASTER]: 'GeoRaster',
-                [ddb.entry.type.POINTCLOUD]: 'Point Cloud',
-                [ddb.entry.type.IMAGE]: 'Image',
-                [ddb.entry.type.DRONEDB]: 'DroneDB',
-                [ddb.entry.type.MARKDOWN]: 'Markdown',
-                [ddb.entry.type.VIDEO]: 'Video',
-                [ddb.entry.type.MODEL]: '3D Model',
-                [ddb.entry.type.PANORAMA]: 'Panorama',
-                [ddb.entry.type.GEOPANORAMA]: 'GeoPanorama'
-            };
-            return typeMap[file.entry.type] || 'Unknown';
+            return getFileTypeName(file.entry.type);
         },
 
         getFileSize(file) {
-            if (ddb.entry.isDirectory(file.entry)) return '--';
-            if (!file.entry.size) return '--';
-
-            const bytes = file.entry.size;
-            if (bytes === 0) return '0 B';
-
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate(file) {
-            if (!file.entry.mtime) return '--';
-
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         formatMetaKey(key) {

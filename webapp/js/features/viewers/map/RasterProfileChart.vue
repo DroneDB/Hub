@@ -66,6 +66,8 @@
 </template>
 
 <script>
+import { downloadText } from '@/libs/download';
+
 /**
  * Elevation / value profile chart.
  *
@@ -222,16 +224,7 @@ export default {
             const escape = (v) => (v === null || v === undefined) ? '' : String(v);
             const rows = this.samples.map((s, i) =>
                 `${i},${escape(s.distance)},${escape(s.value)},${unit},${escape(s.lon)},${escape(s.lat)}`);
-            const blob = new Blob([header + rows.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'raster-profile.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            // Revoke on next tick to avoid cancelling the download on slow browsers.
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            downloadText(header + rows.join('\n') + '\n', 'raster-profile.csv', 'text/csv;charset=utf-8');
         }
     }
 };

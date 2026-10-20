@@ -126,7 +126,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { bytesToSize } from '@/libs/utils';
+import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 
 const { pathutils, entry } = ddb;
 
@@ -358,9 +358,8 @@ export default {
             const normalized = this.normalizePath(rawPath);
             if (!normalized) return true;
 
-            const slash = normalized.lastIndexOf('/');
-            const parent = slash >= 0 ? normalized.substring(0, slash) : '';
-            const base = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+            const parent = pathutils.getParentFolder(normalized) || '';
+            const base = pathutils.basename(normalized);
 
             const entries = await this.dataset.list(parent || null);
             return entries.some((e) => {
@@ -455,15 +454,11 @@ export default {
         },
 
         getFileSize: function (file) {
-            if (entry.isDirectory(file.entry)) return '';
-            if (!file.entry.size) return '';
-            return bytesToSize(file.entry.size);
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate: function (file) {
-            if (!file.entry.mtime) return '--';
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         createFolder: async function () {

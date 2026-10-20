@@ -73,6 +73,7 @@ import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Tag from 'primevue/tag';
+import { formatDateTime } from '@/libs/format';
 
 export default {
     components: {
@@ -258,17 +259,8 @@ export default {
             }
         },
 
-        formatDate(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleString('en-US', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            });
+        formatDate(value) {
+            return formatDateTime(value, { placeholder: '-', seconds: true });
         },
 
         formatWaitTime() {

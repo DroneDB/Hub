@@ -97,7 +97,7 @@ export default {
                 return;
             }
 
-            let basePath = this.file.entry.path.substring(0, this.file.entry.path.lastIndexOf('/'));
+            let basePath = ddb.pathutils.getParentFolder(this.file.entry.path) || '';
 
             // Check that renameText doesn't contain invalid characters
             if (this.renameText.indexOf('/') != -1 ||

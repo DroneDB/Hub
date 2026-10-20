@@ -82,7 +82,7 @@
                 </Column>
                 <Column field="createdDate" header="Created" :sortable="true">
                     <template #body="slotProps">
-                        {{ formatDate(slotProps.data.createdDate) }}
+                        {{ formatDateTime(slotProps.data.createdDate) }}
                     </template>
                 </Column>
                 <Column header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }">
@@ -229,6 +229,7 @@ import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
+import { formatDateTime } from '@/libs/format';
 
 /**
  * Users - Admin panel for managing platform users.
@@ -349,10 +350,7 @@ export default {
             }
         },
 
-        formatDate(dateString) {
-            const date = new Date(dateString);
-            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
-        },
+        formatDateTime,
 
         getStoragePercentage(user) {
             if (!user.storageQuota) return 0;

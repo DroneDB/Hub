@@ -13,6 +13,7 @@
 import { transformExtent } from 'ol/proj';
 import { getWidth, getHeight } from 'ol/extent';
 import bbox from '@turf/bbox';
+import { EPSG } from '@/libs/constants';
 
 // m/px at the equator for zoom 0 of the 256 px Web Mercator tile pyramid
 export const INITIAL_RESOLUTION = 156543.0339280410;
@@ -47,7 +48,7 @@ export function computeNativeZoom(entry) {
         return FALLBACK_NATIVE_ZOOM;
     }
 
-    const ext3857 = transformExtent(bbox(entry.polygon_geom), 'EPSG:4326', 'EPSG:3857');
+    const ext3857 = transformExtent(bbox(entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
     const gsd = Math.max(getWidth(ext3857) / width, getHeight(ext3857) / height);
     if (!isFinite(gsd) || gsd <= 0) return FALLBACK_NATIVE_ZOOM;
 

@@ -294,6 +294,7 @@ import fileOperations from '@/composables/useFileOperations';
 import buildEvents from '@/composables/useBuildEvents';
 import useHeavyTask from '@/composables/useHeavyTask';
 import { Features } from '@/libs/features';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 /**
  * ViewDataset - Main dataset page hosting the explorer, map viewer, and
@@ -388,11 +389,10 @@ export default {
             key: 'tasks'
         }]);
 
-        // Load view mode preference from localStorage
-        const savedViewMode = localStorage.getItem('fileViewMode') || 'grid';
+        const savedViewMode = getPref(PREF.FILE_VIEW_MODE, 'grid');
 
         // Load expanded grid preference (table view: thumbnails + relative time vs icons + date only)
-        const savedExpandedGrid = localStorage.getItem('tableExpandedGrid') !== 'false';
+        const savedExpandedGrid = getPref(PREF.TABLE_EXPANDED_GRID, true);
 
         return {
             // Lazy tabs (HUB-02): mounted on first activation, then kept
@@ -743,7 +743,7 @@ export default {
             window.dispatchEvent(new MouseEvent('click'));
 
             this.viewMode = mode;
-            localStorage.setItem('fileViewMode', mode);
+            setPref(PREF.FILE_VIEW_MODE, mode);
         },
 
         toggleViewMode() {
@@ -752,7 +752,7 @@ export default {
 
         toggleExpandedGrid() {
             this.expandedGrid = !this.expandedGrid;
-            localStorage.setItem('tableExpandedGrid', this.expandedGrid);
+            setPref(PREF.TABLE_EXPANDED_GRID, this.expandedGrid);
             this.updateExplorerTools();
         },
 

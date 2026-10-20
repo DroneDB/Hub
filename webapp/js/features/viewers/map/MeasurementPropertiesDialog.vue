@@ -108,6 +108,8 @@
 <script>
 import Window from '@/components/Window.vue';
 import { toLonLat } from 'ol/proj';
+import { useCopyText } from '@/composables/useCopyText';
+import { MEASUREMENT_SWATCHES, MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
@@ -136,26 +138,20 @@ export default {
         }
     },
     emits: ['onClose', 'onSave', 'onDelete'],
+    setup() {
+        const { copy: copyText, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
+        return { copyText, coordsCopied };
+    },
     data() {
         return {
-            colorPalette: [
-                '#ffcc33', // Default yellow
-                '#ff0000', // Red
-                '#00ff00', // Green
-                '#0000ff', // Blue
-                '#ff6600', // Orange
-                '#9900ff', // Purple
-                '#00cccc', // Cyan
-                '#333333'  // Dark gray
-            ],
-            coordsCopied: false,
+            colorPalette: MEASUREMENT_SWATCHES,
             formData: {
                 name: '',
                 description: '',
-                stroke: '#ffcc33',
+                stroke: MEASURE_COLOR,
                 'stroke-width': 2,
                 'stroke-opacity': 1,
-                fill: '#ffcc33',
+                fill: MEASURE_COLOR,
                 'fill-opacity': 0.2,
                 groupId: ''
             }
@@ -206,10 +202,10 @@ export default {
             const get = (k) => this.feature.get(k);
             this.formData.name = get('name') || '';
             this.formData.description = get('description') || '';
-            this.formData.stroke = get('stroke') || '#ffcc33';
+            this.formData.stroke = get('stroke') || MEASURE_COLOR;
             this.formData['stroke-width'] = get('stroke-width') !== undefined ? get('stroke-width') : 2;
             this.formData['stroke-opacity'] = get('stroke-opacity') !== undefined ? get('stroke-opacity') : 1;
-            this.formData.fill = get('fill') || '#ffcc33';
+            this.formData.fill = get('fill') || MEASURE_COLOR;
             this.formData['fill-opacity'] = get('fill-opacity') !== undefined ? get('fill-opacity') : 0.2;
             this.formData.groupId = get('groupId') || '';
         }
@@ -229,24 +225,7 @@ export default {
         copyCoordinates() {
             const text = this.coordsText;
             if (!text) return;
-            const done = () => {
-                this.coordsCopied = true;
-                setTimeout(() => { this.coordsCopied = false; }, 1500);
-            };
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(done).catch(() => { /* noop */ });
-            } else {
-                // Legacy fallback
-                try {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    done();
-                } catch { /* noop */ }
-            }
+            this.copyText(text);
         }
     }
 };

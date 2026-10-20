@@ -8,6 +8,8 @@ import { Point } from 'ol/geom';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import { getLength as olGetLength } from 'ol/sphere';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { EPSG } from '@/libs/constants';
 
 /**
  * Mixin for Raster Analysis panel (thermal + DEM + generic value rasters).
@@ -231,13 +233,13 @@ export default {
             // set below and inherits hover highlight automatically).
             const sketchStyle = new Style({
                 stroke: new Stroke({
-                    color: '#ff9800',
+                    color: ANALYSIS_COLOR,
                     width: 3,
                     lineDash: [8, 6]
                 }),
                 image: new CircleStyle({
                     radius: 4,
-                    fill: new Fill({ color: '#ff9800' }),
+                    fill: new Fill({ color: ANALYSIS_COLOR }),
                     stroke: new Stroke({ color: '#ffffff', width: 1.5 })
                 })
             });
@@ -276,7 +278,7 @@ export default {
                 const feature = evt.feature;
                 const geom = feature.getGeometry();
                 const mapProj = this.map.getView().getProjection();
-                const lineGeo = geom.clone().transform(mapProj, 'EPSG:4326');
+                const lineGeo = geom.clone().transform(mapProj, EPSG.WGS84);
                 const coords = lineGeo.getCoordinates();
 
                 // Drop degenerate profiles (the user double-clicked without
@@ -299,7 +301,7 @@ export default {
                     : `${lengthM.toFixed(1)} m`;
                 feature.set('measurementType', 'profile');
                 feature.set('createdAt', new Date().toISOString());
-                feature.set('stroke', '#ff9800');
+                feature.set('stroke', ANALYSIS_COLOR);
                 feature.set('stroke-width', 3);
                 feature.set('tooltipText', `Profile: ${lengthLabel}`);
                 if (this.rasterFilePath) feature.set('rasterFilePath', this.rasterFilePath);
@@ -498,7 +500,7 @@ export default {
             }
             this._ensureRasterProfileHoverLayer();
             const mapProj = this.map.getView().getProjection();
-            const coord = transform([sample.lon, sample.lat], 'EPSG:4326', mapProj);
+            const coord = transform([sample.lon, sample.lat], EPSG.WGS84, mapProj);
             if (!this._rasterProfileHoverFeature) {
                 this._rasterProfileHoverFeature = new Feature({ geometry: new Point(coord) });
                 this._rasterProfileHoverSource.addFeature(this._rasterProfileHoverFeature);

@@ -1,6 +1,9 @@
 /**
  * Handles saving and loading of GeoJSON measurement files
  */
+import { pathutils } from 'ddb';
+import { downloadText } from '@/libs/download';
+
 export class MeasurementStorage {
     /**
      * @param {Dataset} dataset - ddb dataset
@@ -20,16 +23,13 @@ export class MeasurementStorage {
         const path = this.entry.path;
 
         // If the path is already a measurements file, use it directly
-        const fileName = path.split('/').pop();
+        const fileName = pathutils.basename(path);
         if (path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
             return path;
         }
 
         // Remove extension and add _measurements.geojson
-        const lastDot = path.lastIndexOf('.');
-        const basePath = lastDot > 0 ? path.substring(0, lastDot) : path;
-
-        return `${basePath}_measurements.geojson`;
+        return `${pathutils.dropExtension(path)}_measurements.geojson`;
     }
 
     /**
@@ -108,9 +108,7 @@ export class MeasurementStorage {
 
     /** Just the file name component of the storage path (for toasts). */
     _fileName() {
-        const p = this.measurementPath || '';
-        const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-        return idx >= 0 ? p.substring(idx + 1) : p;
+        return this.measurementPath ? pathutils.basename(this.measurementPath) : '';
     }
 
     /**
@@ -175,17 +173,7 @@ export class MeasurementStorage {
      */
     exportToFile(geojsonData, filename = null) {
         const fname = filename || `measurements_${Date.now()}.geojson`;
-        const content = JSON.stringify(geojsonData, null, 2);
-        const blob = new Blob([content], { type: 'application/geo+json' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fname;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadText(JSON.stringify(geojsonData, null, 2), fname, 'application/geo+json');
 
         console.log(`Measurements exported as: ${fname}`);
     }

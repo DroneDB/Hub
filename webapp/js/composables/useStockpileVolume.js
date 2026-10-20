@@ -23,9 +23,13 @@ import {
     findStockpileMaterialBySlug,
     computeMaterialEstimate
 } from '@/libs/stockpileMaterials';
+import { downloadText } from '@/libs/download';
+import { pathutils } from 'ddb';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { EPSG } from '@/libs/constants';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
-const STOCKPILE_STROKE = '#ff9800';
+const STOCKPILE_STROKE = ANALYSIS_COLOR;
 
 function stockpileStyle() {
     return new Style({
@@ -388,7 +392,7 @@ export default {
             this._acquireStockpileToolLock();
             const mapProj = this.map.getView().getProjection();
             this._stockpileClickKey = this.map.once('singleclick', (evt) => {
-                const [lon, lat] = transform(evt.coordinate, mapProj, 'EPSG:4326');
+                const [lon, lat] = transform(evt.coordinate, mapProj, EPSG.WGS84);
                 // Tear everything down (cursor, ESC handler, mode flag) BEFORE running
                 // detection so no interactions/listeners linger after the click.
                 this._stockpileClickKey = null;
@@ -443,7 +447,7 @@ export default {
                 // half-alive Draw that starts a new polygon.
                 this.stockpileMode = null;
                 const mapProjForEnd = this.map.getView().getProjection();
-                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, 'EPSG:4326');
+                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, EPSG.WGS84);
                 const coords = geom.getCoordinates();
                 // Detach the live reference synchronously so a quick
                 // user re-click on Draw / Click does not get clobbered by
@@ -506,7 +510,7 @@ export default {
             this._stockpileSource.clear();
             const mapProj = this.map.getView().getProjection();
             const coords = polygonGeoJson.coordinates.map(ring =>
-                ring.map(c => transform(c, 'EPSG:4326', mapProj))
+                ring.map(c => transform(c, EPSG.WGS84, mapProj))
             );
             const feature = new Feature({ geometry: new Polygon(coords) });
             feature.setStyle(stockpileStyle());
@@ -733,19 +737,8 @@ export default {
                     properties: props
                 }]
             };
-            const json = JSON.stringify(feature, null, 2);
-            const blob = new Blob([json], { type: 'application/geo+json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const baseName = (this.rasterFilePath || 'stockpile').split('/').pop().replace(/\.[^.]+$/, '');
-            a.href = url;
-            a.download = `${baseName}-stockpile.geojson`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 0);
+            const baseName = pathutils.stem(this.rasterFilePath || 'stockpile');
+            downloadText(JSON.stringify(feature, null, 2), `${baseName}-stockpile.geojson`, 'application/geo+json');
         }
     }
 };

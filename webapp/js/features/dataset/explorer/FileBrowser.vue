@@ -45,6 +45,7 @@ import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
 import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 const { pathutils } = ddb;
 
@@ -132,7 +133,7 @@ export default {
             filter: null,
             searchStaticPaths: null,
             noResults: false,
-            sortDescending: localStorage.getItem('sortDescending') === 'true',
+            sortDescending: getPref(PREF.SORT_DESCENDING, false),
         };
     },
     watch: {
@@ -218,7 +219,7 @@ export default {
 
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
-            localStorage.setItem('sortDescending', this.sortDescending);
+            setPref(PREF.SORT_DESCENDING, this.sortDescending);
             // Watcher handles the refresh
         },
 

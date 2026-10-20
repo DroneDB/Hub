@@ -35,6 +35,7 @@
 
 <script>
 import Window from '@/components/Window.vue';
+import { useCopyText } from '@/composables/useCopyText';
 
 /**
  * AnnotationPropertiesDialog - Properties editor for Potree annotations.
@@ -62,9 +63,12 @@ export default {
         }
     },
     emits: ['onClose', 'onSave', 'onDelete'],
+    setup() {
+        const { copy: copyText, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
+        return { copyText, coordsCopied };
+    },
     data() {
         return {
-            coordsCopied: false,
             formData: {
                 name: '',
                 description: ''
@@ -113,23 +117,7 @@ export default {
             if (!pos || !pos.toArray) return;
             // Plain comma-separated numeric text (no grouping commas)
             const text = pos.toArray().map(c => parseFloat(c).toFixed(3)).join(', ');
-            const done = () => {
-                this.coordsCopied = true;
-                setTimeout(() => { this.coordsCopied = false; }, 1500);
-            };
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(done).catch(() => { /* noop */ });
-            } else {
-                try {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    done();
-                } catch { /* noop */ }
-            }
+            this.copyText(text);
         }
     }
 };

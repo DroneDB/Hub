@@ -14,7 +14,7 @@
  * Pure formatting (severity/icon/date/duration) stays client-side.
  */
 import reg from '@/libs/api/sharedRegistry';
-import { formatTimeAgo } from '@/libs/utils';
+import { formatTimeAgo, formatDateTime, formatDuration } from '@/libs/format';
 import { onTick } from '@/libs/clock';
 
 export default {
@@ -100,12 +100,7 @@ export default {
         },
 
         formatDateTime(dateString) {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            return new Intl.DateTimeFormat(undefined, {
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }).format(date);
+            return formatDateTime(dateString, { seconds: true });
         },
 
         getRelativeTime(dateString) {
@@ -132,14 +127,7 @@ export default {
         },
 
         formatDurationMs(ms) {
-            if (ms == null || ms < 0) return '';
-            const totalSeconds = Math.floor(ms / 1000);
-            const seconds = totalSeconds % 60;
-            const minutes = Math.floor(totalSeconds / 60) % 60;
-            const hours = Math.floor(totalSeconds / 3600);
-            if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
-            if (minutes > 0) return `${minutes}m ${seconds}s`;
-            return `${seconds}s`;
+            return formatDuration(ms);
         },
 
         // Synthetic download name; the extension comes from the server tool catalog.

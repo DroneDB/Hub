@@ -14,6 +14,7 @@
  * the outcome is asked for by that id instead of sending the file again (UPL-01 E.4).
  */
 import { sendXhr } from './xhrTransport';
+import { newId } from '@/libs/ids';
 
 export const CHUNK_BYTES = 64 * 1024 * 1024;
 export const RECEIPT_POLL_MS = 2000;
@@ -217,7 +218,4 @@ function statusText(status) {
     return status === 0 ? 'Network error' : `Upload failed (HTTP ${status})`;
 }
 
-export function newUploadId() {
-    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-    return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
-}
+export const newUploadId = newId;

@@ -29,6 +29,7 @@
 import Window from '@/components/Window.vue';
 import ObjTable from '@/components/ObjTable.vue';
 import Button from 'primevue/button';
+import { formatDateTime } from '@/libs/format';
 
 export default {
     components: {
@@ -167,16 +168,8 @@ export default {
             return false;
         },
 
-        formatDate: function(dateString) {
-            const date = new Date(dateString);
-            return new Intl.DateTimeFormat(undefined, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            }).format(date);
+        formatDate(value) {
+            return formatDateTime(value, { seconds: true });
         }
     }
 }

@@ -104,8 +104,10 @@ import {
 } from './navControls';
 import { alignContentUpAxis } from './contentOrientation';
 import { isLocalVector } from '@/libs/openItemDefaults';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { EPSG } from '@/libs/constants';
+import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
 
-const SETTINGS_KEY = 'unified-viewer-settings';
 
 // Screen-space error target (pixels) for the DroneDB-built 3D Tiles of models. Obj2Tiles >= 1.8.0
 // (DroneDB >= 1.12.2) writes per-tile geometricError from the mesh edge length instead of the
@@ -123,13 +125,7 @@ const DEFAULTS = {
 };
 
 function loadSettings() {
-    try {
-        const raw = localStorage.getItem(SETTINGS_KEY);
-        if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
-    } catch {
-        // Ignore parse errors and fall back to the defaults.
-    }
-    return { ...DEFAULTS };
+    return { ...DEFAULTS, ...getPref(PREF.UNIFIED_VIEWER, {}) };
 }
 
 /**
@@ -176,7 +172,7 @@ export default {
             activeTool: null,
             measureCount: 0,
             showSettings: false,
-            // Lighting, restored from localStorage when present.
+            // Lighting, restored from the stored settings when present.
             ambientIntensity: saved.ambientIntensity,
             directionalIntensity: saved.directionalIntensity,
             hemisphereIntensity: saved.hemisphereIntensity,
@@ -263,7 +259,7 @@ export default {
                     : this.entry;
                 const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
                 if (!supported.includes(entry.type))
-                    throw new Error(`'${this.basename(entry.path)}' is not supported in the 3D viewer.`);
+                    throw new Error(`'${ddb.pathutils.basename(entry.path)}' is not supported in the 3D viewer.`);
                 // Point clouds without a valid SRS have no WGS84 footprint in the DB, but they
                 // still render in the viewer using their local metric coordinates (see
                 // loadPointCloud / the local-coordinates badge).
@@ -271,7 +267,7 @@ export default {
                 // coordinates (loadLocalVector).
                 if (!ddb.entry.hasGeometry(entry) && entry.type !== T.MODEL && entry.type !== T.TILES3D &&
                     entry.type !== T.POINTCLOUD && !isLocalVector(entry))
-                    throw new Error(`'${this.basename(entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
+                    throw new Error(`'${ddb.pathutils.basename(entry.path)}' has no geographic footprint and cannot be opened in the 3D viewer.`);
 
                 // Availability gate: verify the required build artifact exists for this entry type
                 // (3D Tiles for models, COPC for point clouds, COG for rasters, MVT/FGB for vectors)
@@ -583,11 +579,11 @@ export default {
                 name: entry.path,
                 extent: data.extent,
                 source: new TiledImageSource({
-                    source: new XYZ({ url, projection: 'EPSG:3857', minZoom: 14, maxZoom: 22 })
+                    source: new XYZ({ url, projection: EPSG.WEB_MERCATOR, minZoom: 14, maxZoom: 22 })
                 })
             });
             this.map.addLayer(layer);
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-image', () => layer.visible, v => { layer.visible = v; });
+            this.registerLayer(ddb.pathutils.basename(entry.path), 'fa-solid fa-image', () => layer.visible, v => { layer.visible = v; });
 
             this.frameExtent(data);
         },
@@ -610,7 +606,7 @@ export default {
                 source: new VectorTileSource({ url, style: this.vectorStyle() })
             });
             this.map.addLayer(layer);
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-bezier-curve', () => layer.visible, v => { layer.visible = v; });
+            this.registerLayer(ddb.pathutils.basename(entry.path), 'fa-solid fa-bezier-curve', () => layer.visible, v => { layer.visible = v; });
 
             this.frameExtent(data);
         },
@@ -625,7 +621,7 @@ export default {
 
             const features = await this.fetchLocalFeatures(entry);
             if (features.length === 0)
-                throw new Error(`The drawing '${this.basename(entry.path)}' has no features to display.`);
+                throw new Error(`The drawing '${ddb.pathutils.basename(entry.path)}' has no features to display.`);
 
             const source = new OlVectorSource({ features });
             const [minX, minY, maxX, maxY] = source.getExtent();
@@ -644,13 +640,13 @@ export default {
                 maxLevel: 0,
                 ignoreZ: true,
                 style: {
-                    stroke: { color: '#ff9800', lineWidth: 2 },
-                    fill: { color: '#ff9800', opacity: 0.25 },
+                    stroke: { color: ANALYSIS_COLOR, lineWidth: 2 },
+                    fill: { color: ANALYSIS_COLOR, opacity: 0.25 },
                     point: { color: '#ffeb3b', pointSize: 8 }
                 }
             });
             await this.instance.add(collection);
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-compass-drafting',
+            this.registerLayer(ddb.pathutils.basename(entry.path), 'fa-solid fa-compass-drafting',
                 () => collection.visible, v => { collection.visible = v; });
 
             this.frameBox(new THREE.Box3(new THREE.Vector3(minX, minY, 0), new THREE.Vector3(maxX, maxY, 0)));
@@ -688,7 +684,7 @@ export default {
                 tilesetUrl = null;
             }
             if (!tilesetUrl)
-                throw new Error(`The 3D model '${this.basename(entry.path)}' is not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been produced for this model yet.`);
+                throw new Error(`The 3D model '${ddb.pathutils.basename(entry.path)}' is not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been produced for this model yet.`);
 
             // Flat local-space scene (no globe): the DroneDB 3D Tiles output is rendered in its own
             // frame with the shared OrbitControls, consistent with every other type.
@@ -717,9 +713,9 @@ export default {
             // renders nothing, so surface a clear message instead of an empty scene.
             const box = tileset.getBoundingBox();
             if (!box || !this.isFiniteBox(box))
-                throw new Error(`The 3D model '${this.basename(entry.path)}' is not available in the 3D viewer.\n\nIts 3D Tiles output is empty or invalid and needs to be rebuilt.`);
+                throw new Error(`The 3D model '${ddb.pathutils.basename(entry.path)}' is not available in the 3D viewer.\n\nIts 3D Tiles output is empty or invalid and needs to be rebuilt.`);
 
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
+            this.registerLayer(ddb.pathutils.basename(entry.path), 'fa-solid fa-cube', () => tileset.visible, v => { tileset.visible = v; });
             this.frameBox(box);
             // Keep the loading indicator up until the tileset has actually put geometry on screen.
             await this.waitForFirstRender(() => tileset.tiles.group.children.length > 0, 20000);
@@ -740,7 +736,7 @@ export default {
                 tilesetUrl = null;
             }
             if (!tilesetUrl)
-                throw new Error(`The 3D Tiles '${this.basename(entry.path)}' are not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been extracted for this archive yet.`);
+                throw new Error(`The 3D Tiles '${ddb.pathutils.basename(entry.path)}' are not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been extracted for this archive yet.`);
 
             // properties.georeferenced is populated by the DroneDB indexer from the tileset's
             // root boundingVolume (WGS84 region or ECEF box/sphere). Absent => assume georef.
@@ -762,9 +758,9 @@ export default {
 
             let box = tileset.getBoundingBox();
             if (!box || !this.isFiniteBox(box))
-                throw new Error(`The 3D Tiles '${this.basename(entry.path)}' are empty or invalid and cannot be displayed.`);
+                throw new Error(`The 3D Tiles '${ddb.pathutils.basename(entry.path)}' are empty or invalid and cannot be displayed.`);
 
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-cubes', () => tileset.visible, v => { tileset.visible = v; });
+            this.registerLayer(ddb.pathutils.basename(entry.path), 'fa-solid fa-cubes', () => tileset.visible, v => { tileset.visible = v; });
 
             if (georeferenced) {
                 this.frameGlobe(tileset, box);
@@ -1050,7 +1046,7 @@ export default {
             // Use a fixed pixel point size: Giro3D's automatic sizing (0) can collapse to
             // sub-pixel for sparse or large-extent COPC clouds, rendering them invisible.
             entity.pointSize = 2;
-            this.registerLayer(this.basename(entry.path), 'fa-solid fa-braille', () => entity.visible, v => { entity.visible = v; });
+            this.registerLayer(ddb.pathutils.basename(entry.path), 'fa-solid fa-braille', () => entity.visible, v => { entity.visible = v; });
 
             const box = entity.getBoundingBox();
             // A georeferenced cloud gets an OSM basemap in its own (metric) CRS, but only when that
@@ -1228,19 +1224,15 @@ export default {
             this.directionalIntensity = DEFAULTS.directionalIntensity;
             this.hemisphereIntensity = DEFAULTS.hemisphereIntensity;
             this.updateLighting();
-            try { localStorage.removeItem(SETTINGS_KEY); } catch { /* ignore */ }
+            removePref(PREF.UNIFIED_VIEWER);
         },
 
         persistSettings: function () {
-            try {
-                localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-                    ambientIntensity: this.ambientIntensity,
-                    directionalIntensity: this.directionalIntensity,
-                    hemisphereIntensity: this.hemisphereIntensity
-                }));
-            } catch {
-                // Ignore storage errors (private mode, quota).
-            }
+            setPref(PREF.UNIFIED_VIEWER, {
+                ambientIntensity: this.ambientIntensity,
+                directionalIntensity: this.directionalIntensity,
+                hemisphereIntensity: this.hemisphereIntensity
+            });
         },
 
         // A simple OpenLayers style for MVT features (points, lines, polygons).
@@ -1257,11 +1249,6 @@ export default {
                 if (type.indexOf('LineString') >= 0) return line;
                 return point;
             };
-        },
-
-        basename: function (p) {
-            const parts = p.split('/');
-            return parts[parts.length - 1] || p;
         },
 
         // Resolves once the primary data has produced its first meaningful frame (so the loading
