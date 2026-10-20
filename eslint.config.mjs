@@ -2,6 +2,8 @@ import pluginVue from 'eslint-plugin-vue';
 import js from '@eslint/js';
 import globals from 'globals';
 import pairedListeners from './eslint-rules/paired-listeners.mjs';
+import { guardConfigs } from './eslint-rules/guards.mjs';
+import { a11yConfigs } from './eslint-rules/a11y.mjs';
 
 export default [
     {
@@ -39,6 +41,10 @@ export default [
             'vue/v-on-event-hyphenation': ['warn', 'always', { autofix: true }]
         }
     },
+    // HQ-01: mixins, $parent, raw storage and raw network calls may not spread
+    ...guardConfigs(),
+    // HQ-01/HQ-10: accessibility rules; files with findings today are listed in a11y.mjs
+    ...a11yConfigs(),
     {
         // CommonJS modules shared with the Electron/Node build
         files: ['webapp/js/libs/ddb/**/*.js', 'webapp/js/dynamic/**/*.js', 'webapp/js/libs/map/olMeasurementConverter.js'],

@@ -4,7 +4,8 @@
  * summary. The request layer is replaced by a fake that answers each job at once.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createApp, h, nextTick } from 'vue';
+import { nextTick } from 'vue';
+import { mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
 const sent = [];
@@ -31,50 +32,46 @@ const flush = async () => {
 };
 
 describe('DatasetUpload', () => {
-    let el, app, errors, uploaded;
+    let wrapper, errors, uploaded;
 
     beforeEach(() => {
         sent.length = 0;
         errors = [];
         uploaded = [];
-        el = document.createElement('div');
-        document.body.appendChild(el);
     });
 
-    afterEach(() => {
-        app?.unmount();
-        el.remove();
-    });
+    afterEach(() => wrapper?.unmount());
 
-    function mount(props) {
-        app = createApp({
-            render: () => h(DatasetUpload, { organization: 'org', dataset: 'ds', path: '', ...props,
-                onOnUpload: entry => uploaded.push(entry.path) })
+    function mountUpload(props) {
+        wrapper = mount(DatasetUpload, {
+            props: { organization: 'org', dataset: 'ds', path: '', ...props, onOnUpload: entry => uploaded.push(entry.path) },
+            attachTo: document.body,
+            global: {
+                plugins: [PrimeVue],
+                config: { errorHandler: err => errors.push(err) },
+                mocks: { $router: { push: () => {} } },
+                stubs: { RouterLink: true }
+            }
         });
-        app.use(PrimeVue);
-        app.config.errorHandler = err => errors.push(err);
-        app.config.globalProperties.$router = { push: () => {} };
-        app.component('RouterLink', { render: () => null });
-        app.mount(el);
     }
 
     it('mounts without errors and shows the file picker when no files are given', async () => {
-        mount({ filesToUpload: [] });
+        mountUpload({ filesToUpload: [] });
         await flush();
 
         expect(errors).toEqual([]);
-        expect(el.textContent).toContain('Select Files');
+        expect(wrapper.text()).toContain('Select Files');
     });
 
     it('uploads the given files and shows the summary', async () => {
         const files = [new File(['a'], 'a.txt'), new File(['bb'], 'b.txt')];
-        mount({ filesToUpload: files });
+        mountUpload({ filesToUpload: files });
         await flush();
 
         expect(errors).toEqual([]);
         expect(sent.flat()).toEqual(['a.txt', 'b.txt']);
         expect(uploaded).toEqual(['a.txt', 'b.txt']);
-        expect(el.querySelector('.upload-summary')).not.toBeNull();
-        expect(el.textContent).toContain('All 2 files uploaded successfully');
+        expect(wrapper.find('.upload-summary').exists()).toBe(true);
+        expect(wrapper.text()).toContain('All 2 files uploaded successfully');
     });
 });
