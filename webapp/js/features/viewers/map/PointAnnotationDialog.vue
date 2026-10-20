@@ -2,23 +2,8 @@
     <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" @on-close="discard">
         <div class="point-annotation-form">
             <div class="mb-3">
-                <label class="d-block mb-1 fw-semibold">Color</label>
-                <div class="color-palette">
-                    <div
-                        v-for="color in colorPalette"
-                        :key="color"
-                        class="color-swatch"
-                        :class="{ selected: formData.color === color }"
-                        :style="{ backgroundColor: color }"
-                        @click="formData.color = color"
-                    />
-                    <input
-                        v-model="formData.color"
-                        type="color"
-                        class="color-picker-custom"
-                        title="Custom color"
-                    >
-                </div>
+                <label class="d-block mb-1 fw-semibold" for="pa-color">Color</label>
+                <ColorSwatchPicker v-model="formData.color" input-id="pa-color" />
             </div>
 
             <div class="mb-3">
@@ -36,15 +21,17 @@
 
 <script>
 import Window from '@/components/Window.vue';
+import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import Button from 'primevue/button';
 import Textarea from 'primevue/textarea';
-import { MEASUREMENT_SWATCHES, MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
         Window,
         Button,
-        Textarea
+        Textarea,
+        ColorSwatchPicker
     },
     props: {
         initialColor: {
@@ -59,7 +46,6 @@ export default {
     emits: ['onClose', 'onSave', 'onDiscard'],
     data() {
         return {
-            colorPalette: MEASUREMENT_SWATCHES,
             formData: {
                 color: this.initialColor,
                 description: this.initialDescription
@@ -83,40 +69,5 @@ export default {
 .point-annotation-form {
     padding: 1rem;
     min-width: 18.75rem;
-}
-
-.color-palette {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.color-swatch {
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    border: var(--ddb-border-width) solid transparent;
-    transition: border-color 0.2s, transform 0.1s;
-}
-
-.color-swatch:hover {
-    transform: scale(1.1);
-}
-
-.color-swatch.selected {
-    border-color: #000;
-    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
-}
-
-.color-picker-custom {
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
 }
 </style>

@@ -12,43 +12,13 @@
             </div>
 
             <div class="form-group">
-                <label>Stroke Color</label>
-                <div class="color-palette">
-                    <div
-                        v-for="color in colorPalette"
-                        :key="color"
-                        class="color-swatch"
-                        :class="{ selected: formData.stroke === color }"
-                        :style="{ backgroundColor: color }"
-                        @click="formData.stroke = color"
-                    />
-                    <input
-                        v-model="formData.stroke"
-                        type="color"
-                        class="color-picker-custom"
-                        title="Custom color"
-                    >
-                </div>
+                <label for="mp-stroke">Stroke Color</label>
+                <ColorSwatchPicker v-model="formData.stroke" input-id="mp-stroke" label="Stroke color" />
             </div>
 
             <div v-if="showFill" class="form-group">
-                <label>Fill Color</label>
-                <div class="color-palette">
-                    <div
-                        v-for="color in colorPalette"
-                        :key="'fill-' + color"
-                        class="color-swatch"
-                        :class="{ selected: formData.fill === color }"
-                        :style="{ backgroundColor: color }"
-                        @click="formData.fill = color"
-                    />
-                    <input
-                        v-model="formData.fill"
-                        type="color"
-                        class="color-picker-custom"
-                        title="Custom color"
-                    >
-                </div>
+                <label for="mp-fill">Fill Color</label>
+                <ColorSwatchPicker v-model="formData.fill" input-id="mp-fill" label="Fill color" />
             </div>
 
             <div class="form-group">
@@ -76,10 +46,10 @@
             </div>
 
             <div v-if="isPoint" class="form-group">
-                <label>Coordinates</label>
-                <div class="coords-row">
+                <span id="mp-coords" class="form-label">Coordinates</span>
+                <div class="coords-row" role="group" aria-labelledby="mp-coords">
                     <code class="coords-text">{{ coordsText }}</code>
-                    <button type="button" class="btn-copy-coords" :title="copyTooltip" @click="copyCoordinates">
+                    <button type="button" class="btn-copy-coords" :title="copyTooltip" :aria-label="copyTooltip" @click="copyCoordinates">
                         <i :class="copyIconClass" />
                     </button>
                 </div>
@@ -107,13 +77,15 @@
 
 <script>
 import Window from '@/components/Window.vue';
+import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import { toLonLat } from 'ol/proj';
 import { useCopyText } from '@/composables/useCopyText';
-import { MEASUREMENT_SWATCHES, MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
-        Window
+        Window,
+        ColorSwatchPicker
     },
     props: {
         feature: {
@@ -144,7 +116,6 @@ export default {
     },
     data() {
         return {
-            colorPalette: MEASUREMENT_SWATCHES,
             formData: {
                 name: '',
                 description: '',
@@ -241,7 +212,8 @@ export default {
     margin-bottom: 1rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group .form-label {
     display: block;
     margin-bottom: 0.25rem;
     font-weight: 500;
@@ -264,41 +236,6 @@ export default {
 
 .form-group input[type="range"] {
     width: 100%;
-}
-
-.color-palette {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ddb-spacing-xs);
-    align-items: center;
-}
-
-.color-swatch {
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    border: var(--ddb-border-width) solid transparent;
-    transition: border-color 0.2s, transform 0.1s;
-}
-
-.color-swatch:hover {
-    transform: scale(1.1);
-}
-
-.color-swatch.selected {
-    border-color: #000;
-    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
-}
-
-.color-picker-custom {
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
 }
 
 .buttons {

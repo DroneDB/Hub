@@ -7,13 +7,8 @@
                        @keydown.enter="save" @keydown.esc="cancel">
             </div>
             <div class="form-group">
-                <label>Color</label>
-                <div class="color-palette">
-                    <div v-for="color in colorPalette" :key="color" class="color-swatch"
-                         :class="{ selected: formColor === color }" :style="{ backgroundColor: color }"
-                         @click="formColor = color" />
-                    <input v-model="formColor" type="color" class="color-picker-custom" title="Custom color">
-                </div>
+                <label for="mg-color">Color</label>
+                <ColorSwatchPicker v-model="formColor" input-id="mg-color" />
             </div>
             <div class="buttons">
                 <button class="btn-cancel" @click="cancel">Cancel</button>
@@ -25,10 +20,11 @@
 
 <script>
 import Window from '@/components/Window.vue';
-import { MEASUREMENT_SWATCHES, GROUP_COLOR } from '@/libs/map/mapUtils';
+import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
+import { GROUP_COLOR } from '@/libs/map/mapUtils';
 
 export default {
-    components: { Window },
+    components: { Window, ColorSwatchPicker },
     props: {
         // When provided, the dialog is in "rename" mode
         group: {
@@ -41,7 +37,6 @@ export default {
         return {
             formName: this.group ? this.group.name : '',
             formColor: this.group ? this.group.color : GROUP_COLOR,
-            colorPalette: MEASUREMENT_SWATCHES
         };
     },
     computed: {
@@ -98,41 +93,6 @@ export default {
     border-radius: var(--ddb-radius-sm);
     font-size: var(--ddb-font-size-base);
     box-sizing: border-box;
-}
-
-.color-palette {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ddb-spacing-xs);
-    align-items: center;
-}
-
-.color-swatch {
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    border: var(--ddb-border-width) solid transparent;
-    transition: border-color 0.2s, transform 0.1s;
-}
-
-.color-swatch:hover {
-    transform: scale(1.1);
-}
-
-.color-swatch.selected {
-    border-color: #000;
-    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
-}
-
-.color-picker-custom {
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    background: none;
 }
 
 .buttons {
