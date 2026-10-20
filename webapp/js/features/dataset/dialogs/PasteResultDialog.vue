@@ -1,5 +1,5 @@
 <template>
-    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="close" @confirm="close">
+    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="$emit('close')" @confirm="$emit('close')">
         <div class="paste-results-content">
             <div v-if="succeeded.length > 0" class="result-section success-section">
                 <h4>
@@ -63,11 +63,6 @@ export default {
         title() {
             return this.mode === 'cut' ? 'Move Results' : 'Copy Results';
         }
-    },
-
-
-    methods: {
-        close() { this.$emit('close'); }
     }
 };
 </script>

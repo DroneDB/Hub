@@ -1,5 +1,5 @@
 <template>
-    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size cancel-label="Close" confirm-label="Apply" confirm-icon="fa-solid fa-earth-europe" :confirm-disabled="!canApply" :busy="saving" @confirm="apply" @close="close('close')">
+    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size cancel-label="Close" confirm-label="Apply" confirm-icon="fa-solid fa-earth-europe" :confirm-disabled="!canApply" :busy="saving" @confirm="apply" @close="$emit('close', 'close')">
         <div class="set-crs-dialog">
             <form @submit.prevent>
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -96,7 +96,7 @@ export default {
             this.errorMessage = null;
             try {
                 const entry = await this.dataset.setCadCrs(this.file.entry.path, crsRequest(this.mode, this.crs));
-                this.close('set', { prjPath: entry && entry.path ? entry.path : this.prjName });
+                this.$emit('close', 'set', { prjPath: entry && entry.path ? entry.path : this.prjName });
             } catch (e) {
                 this.errorMessage = (e && e.message) ? e.message : String(e);
             } finally {
@@ -104,9 +104,6 @@ export default {
             }
         },
 
-        close(action, result) {
-            this.$emit('close', action, result);
-        }
     }
 };
 </script>

@@ -1,5 +1,5 @@
 <template>
-    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @close="close">
+    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @close="$emit('close', 'close')">
         <div class="align-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="align-info">
@@ -95,7 +95,7 @@
                         :disabled="!selectedReference || validating || running" @click="validate" />
                 <Button label="Align" icon="fa-solid fa-crosshairs" severity="primary"
                         :disabled="!canAlign" @click="startAlign" />
-                <Button label="Close" severity="secondary" :disabled="running" @click="close" />
+                <Button label="Close" severity="secondary" :disabled="running" @click="$emit('close', 'close')" />
             </div>
         </div>
     </Window>
@@ -309,9 +309,6 @@ export default {
             }
         },
 
-        close() {
-            this.$emit('close', 'close');
-        }
     }
 };
 </script>
