@@ -194,6 +194,7 @@ class SelectionControl extends Control {
             this.onSelectionComplete(polygon);
 
             // Clear the drawn geometry after a tick (feature is added to source after drawend)
+            // lifetime: defer
             setTimeout(() => {
                 if (this.selectionSource) this.selectionSource.clear();
             }, 0);

@@ -44,6 +44,7 @@ import Message from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
+import { useTimerGroup } from '@/composables/useTimers';
 
 export default {
     components: {
@@ -54,6 +55,9 @@ export default {
     },
     emits: ['onClose'],
 
+    setup() {
+        return { later: useTimerGroup() };
+    },
     data: function () {
         return {
             changing: false,
@@ -114,7 +118,7 @@ export default {
             try {
                 await reg.changePwd(this.oldPwd, this.newPwd);
                 this.success = true;
-                setTimeout(() => {
+                this.later(() => {
                     this.close();
                     this.changing = false;
                 }, 2500);

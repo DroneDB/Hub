@@ -178,6 +178,7 @@ import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
 import RasterProfileChart from './RasterProfileChart.vue';
 import { downloadBlob, filenameFromDisposition } from '@/libs/download';
+import { useTimerGroup } from '@/composables/useTimers';
 
 const THERMAL_COLORMAPS = [
     { id: 'ironbow', name: 'Ironbow', colors: ['#000000', '#570f6a', '#bd3754', '#f97808', '#ffe344', '#ffffff'] },
@@ -224,7 +225,11 @@ export default {
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
             'profileHover', 'cancelDrawProfile', 'toggleInspectValue', 'toggle3DView',
-            'openContourDialog'],    data() {
+            'openContourDialog'],
+
+    setup() {
+        return { applyLater: useTimerGroup() };
+    },    data() {
         return {
             rasterInfo: null,
             loadError: false,
@@ -236,7 +241,6 @@ export default {
             originalView: false
         };
     },
-
     computed: {
         isThermal() {
             return !!(this.rasterInfo && this.rasterInfo.isThermal);
@@ -341,8 +345,8 @@ export default {
         },
 
         debouncedApply() {
-            if (this._debounceTimer) clearTimeout(this._debounceTimer);
-            this._debounceTimer = setTimeout(() => this.apply(), 300);
+            this.applyLater.clear();
+            this.applyLater(() => this.apply(), 300);
         },
 
         reset() {

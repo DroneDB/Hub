@@ -150,6 +150,7 @@ import mapContourLines from '@/composables/useContourLines';
 import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
 import { EPSG } from '@/libs/constants';
 import { getPref, PREF } from '@/libs/preferences';
+import { useTimerGroup } from '@/composables/useTimers';
 
 export default {
     components: {
@@ -158,6 +159,9 @@ export default {
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     props: {
         uri: { type: String, default: null }
+    },
+    setup() {
+        return { later: useTimerGroup() };
     },
     data: function () {
         return {
@@ -390,9 +394,7 @@ export default {
                         exitFullScreen();
                     } else {
                         requestFullScreen(this.$el);
-                        setTimeout(() => {
-                            this.map.updateSize();
-                        }, 500);
+                        this.later(() => this.map.updateSize(), 500);
                     }
                 });
                 controlContainer.appendChild(fsBtn);
@@ -496,7 +498,7 @@ export default {
                 }
             }));
 
-            setTimeout(() => this.map.updateSize(), 1);
+            this.later(() => this.map.updateSize(), 1);
 
             // Handle vector files
             if (entry.type === ddb.entry.type.VECTOR) {
@@ -511,7 +513,7 @@ export default {
             if (!isEmptyExtent(ext)) {
                 // Save initial extent
                 this.initialExtent = ext.slice(); // Clone the extent array
-                setTimeout(() => {
+                this.later(() => {
                     this.map.getView().fit(ext, {
                         padding: [40, 40, 40, 40],
                         duration: 500,

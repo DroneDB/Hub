@@ -97,6 +97,7 @@
 import OdxOptionRow from '@/components/OdxOptionRow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
+import { useTimerGroup } from '@/composables/useTimers';
 
 // Option groups (ported from WebODM EditPresetDialog.jsx)
 const OPTS_GROUPS = [
@@ -281,6 +282,9 @@ export default {
 
     emits: ['update:modelValue'],
 
+    setup() {
+        return { later: useTimerGroup() };
+    },
     data() {
         // Initialize collapsed groups
         const collapsedGroups = { ungrouped: true };
@@ -460,9 +464,7 @@ export default {
 
                     // 5. Brief highlight
                     targetEl.classList.add('odm-option-highlight');
-                    setTimeout(() => {
-                        targetEl.classList.remove('odm-option-highlight');
-                    }, 2000);
+                    this.later(() => targetEl.classList.remove('odm-option-highlight'), 2000);
                 }
             });
         },

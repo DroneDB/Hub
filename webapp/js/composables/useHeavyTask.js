@@ -91,6 +91,7 @@ export function useHeavyTask() {
                         if (disposed) return;
                     }
                     if (!summary) {
+                        // lifetime: paired (endTask clears timers[taskId], also on dispose)
                         timers[taskId] = setTimeout(tick, pollMs);
                         return;
                     }
@@ -150,6 +151,7 @@ export function useHeavyTask() {
                         return;
                     }
 
+                    // lifetime: paired (endTask clears timers[taskId], also on dispose)
                     timers[taskId] = setTimeout(tick, pollMs);
                 } catch (e) {
                     endTask(taskId);

@@ -69,3 +69,22 @@ export function useNow() {
     stopWithScope(stop);
     return now;
 }
+
+/**
+ * A `later(fn, ms)` function whose pending timeouts are cleared with the owner: for
+ * Options-API components, which schedule from methods (`this.later(...)`), outside setup.
+ *   setup() { return { later: useTimerGroup() }; }
+ * `later.clear()` drops every pending call.
+ * @returns {((fn: () => void, ms: number) => void) & { clear: () => void }}
+ */
+export function useTimerGroup() {
+    /** @type {Set<ReturnType<typeof setTimeout>>} */
+    const handles = new Set();
+    const later = /** @type {((fn: () => void, ms: number) => void) & { clear: () => void }} */ ((fn, ms) => {
+        const handle = setTimeout(() => { handles.delete(handle); fn(); }, ms);
+        handles.add(handle);
+    });
+    later.clear = () => { handles.forEach(h => clearTimeout(h)); handles.clear(); };
+    stopWithScope(later.clear);
+    return later;
+}

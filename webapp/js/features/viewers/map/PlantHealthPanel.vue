@@ -164,6 +164,7 @@ import { downloadBlob } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { copyText } from '@/composables/useCopyText';
 import { formatNumber } from '@/libs/format';
+import { useTimerGroup } from '@/composables/useTimers';
 
 /**
  * PlantHealthPanel - Plant health (NDVI / custom index) analysis panel.
@@ -185,7 +186,7 @@ export default {
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask };
+        return { runHeavyTask, applyLater: useTimerGroup() };
     },
     data() {
         return {
@@ -365,8 +366,8 @@ export default {
         },
 
         debouncedApply() {
-            if (this._debounceTimer) clearTimeout(this._debounceTimer);
-            this._debounceTimer = setTimeout(() => this.apply(), 300);
+            this.applyLater.clear();
+            this.applyLater(() => this.apply(), 300);
         },
 
         async reset() {

@@ -4,7 +4,7 @@
  * Same counting as scripts/audit_listeners.mjs (scripts/lib/listenerAudit.mjs).
  */
 import path from 'node:path';
-import { auditSource, HELPER_FILES } from '../scripts/lib/listenerAudit.mjs';
+import { auditSource, auditsTimeouts, HELPER_FILES } from '../scripts/lib/listenerAudit.mjs';
 
 const JS_ROOT = path.join('webapp', 'js') + path.sep;
 
@@ -14,8 +14,8 @@ export default {
         docs: { description: 'Listeners added in a file must be removed by that file (HUB-08)' },
         schema: [],
         messages: {
-            unpaired: 'Listeners not removed: addEventListener {{add}}/{{rem}}, setInterval {{si}}/{{ci}}, on {{on}}/{{off}}. '
-                + 'Use $listen/$onOl/$onBus/useEventListener, remove them on unmount, or add a `// lifetime:` comment.'
+            unpaired: 'Listeners or timers not removed: addEventListener {{add}}/{{rem}}, setInterval {{si}}/{{ci}}, setTimeout {{st}}/{{ct}}, on {{on}}/{{off}}. '
+                + 'Use $listen/$onOl/$onBus/useEventListener or composables/useTimers, remove them on unmount, or add a `// lifetime:` comment.'
         }
     },
     create(context) {
@@ -25,7 +25,7 @@ export default {
         if (HELPER_FILES.has(rel) || /\.(spec|test)\./.test(file) || /[\\/]vendor[\\/]/.test(file)) return {};
         return {
             'Program:exit'(node) {
-                const r = auditSource(context.sourceCode.text);
+                const r = auditSource(context.sourceCode.text, { timeouts: auditsTimeouts(rel) });
                 if (r.unpaired) context.report({ node, loc: { line: 1, column: 0 }, messageId: 'unpaired', data: r });
             }
         };

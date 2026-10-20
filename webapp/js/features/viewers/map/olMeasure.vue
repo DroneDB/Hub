@@ -951,6 +951,7 @@ class MeasureControls extends Control {
         // Throttle updates to avoid performance issues
         if (this._updateTimeout) return;
 
+        // lifetime: defer (50 ms throttle of the tooltip text; touches only OpenLayers objects)
         this._updateTimeout = setTimeout(() => {
             this.updateMeasurementValue(feature);
             this.updateTooltipPosition(feature);
@@ -1310,6 +1311,7 @@ class MeasureControls extends Control {
                 const feat = evt.feature;
                 if (tool === 'point') {
                     // Point annotation: open dialog before confirming the point
+                    // lifetime: defer (after OpenLayers adds the feature)
                     setTimeout(() => {
                         feat.set('measurementType', 'point');
                         feat.set('createdAt', new Date().toISOString());
@@ -1317,6 +1319,7 @@ class MeasureControls extends Control {
                         self.openPointAnnotationDialog(feat, map, false);
                     }, 10);
                 } else if (tool === 'erase') {
+                    // lifetime: defer (after OpenLayers adds the feature)
                     setTimeout(() => {
                         // Delete every measurement that contains the click
                         // coordinate. We use direct geometry intersection
@@ -1409,6 +1412,7 @@ class MeasureControls extends Control {
                     self.createMeasureTooltipElement(map);
 
                     // Update button visibility after a short delay to allow OpenLayers to add the feature to the source
+                    // lifetime: defer
                     setTimeout(() => {
                         const hasMeasurements = self.hasMeasurements();
                         self.updateButtonsVisibility(hasMeasurements, false);

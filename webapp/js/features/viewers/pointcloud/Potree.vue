@@ -103,6 +103,7 @@ import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potre
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 import { getPref, setPref, PREF } from '@/libs/preferences';
+import { useTimerGroup } from '@/composables/useTimers';
 
 
 
@@ -113,6 +114,9 @@ export default {
     },
     props: {
         uri: { type: String, default: null }
+    },
+    setup() {
+        return { later: useTimerGroup() };
     },
     data: function () {
         return {
@@ -1074,7 +1078,7 @@ export default {
                     // Apply visual properties (stroke-width, name labels) to loaded measurements
                     // Need to wait a bit for Potree to fully initialize the measurement geometry
                     const self = this;
-                    setTimeout(() => {
+                    this.later(() => {
                         if (imported && imported.length > 0) {
                             imported.forEach(item => {
                                 // Ensure measurements have correct unit settings from viewer

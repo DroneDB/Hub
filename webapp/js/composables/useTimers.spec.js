@@ -33,3 +33,20 @@ describe('component-owned timers', () => {
         expect(fn).toHaveBeenCalledWith(3);
     });
 });
+
+describe('useTimerGroup', () => {
+    it('clears every pending call with the owner', async () => {
+        const { useTimerGroup } = await import('./useTimers');
+        const fn = vi.fn();
+        const scope = effectScope();
+        const later = scope.run(() => useTimerGroup());
+        later(fn, 100);
+        later(fn, 200);
+        vi.advanceTimersByTime(150);
+        expect(fn).toHaveBeenCalledTimes(1);
+        scope.stop();
+        vi.advanceTimersByTime(500);
+        expect(fn).toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+});

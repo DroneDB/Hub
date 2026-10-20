@@ -69,6 +69,7 @@ import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
 import ddb from 'ddb';
+import { useTimerGroup } from '@/composables/useTimers';
 
 const { Registry } = ddb;
 const reg = Registry.forUrl(window.location.origin);
@@ -94,6 +95,9 @@ export default {
     },
     emits: ['onClose'],
 
+    setup() {
+        return { later: useTimerGroup() };
+    },
     data: function () {
         return {
             organizations: [],
@@ -227,9 +231,7 @@ export default {
                 this.statusMessage = "Transfer completed successfully!";
 
                 // Close dialog after a short delay
-                setTimeout(() => {
-                    this.$emit('onClose', 'transferred', this.files);
-                }, 1500);
+                this.later(() => this.$emit('onClose', 'transferred', this.files), 1500);
 
             } catch (e) {
                 console.error("Transfer error:", e);
