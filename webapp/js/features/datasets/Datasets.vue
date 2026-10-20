@@ -125,11 +125,11 @@
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
                                 severity="secondary" outlined size="small" :loading="slotProps.data.editing"
                                 :disabled="slotProps.data.editing || slotProps.data.deleting" icon="fa-solid fa-pencil"
-                                @click.stop="handleEdit(slotProps.data)" />
+                                aria-label="Edit dataset" @click.stop="handleEdit(slotProps.data)" />
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
                                 severity="danger" size="small" :loading="slotProps.data.deleting"
                                 :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
-                                class="ms-1" @click.stop="handleDelete(slotProps.data)" />
+                                class="ms-1" aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
                     </template>
                 </Column>
                 <template #empty>
@@ -155,7 +155,7 @@
             </div>
         </div>
 
-        <DeleteDatasetDialog v-if="deleteDialogOpen" :ds-slug="currentDsSlug" @close="handleDeleteClose" />
+        <DialogHost :dialogs="dialogs" />
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
                        @close="handleDatasetClose" />
@@ -183,7 +183,9 @@ import Message from '@/components/Message.vue';
 import { setTitle, bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences } from '@/libs/storageUtils';
-import DeleteDatasetDialog from './DeleteDatasetDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useEntityDelete } from '@/composables/useEntityDelete';
 import DatasetDialog from './DatasetDialog.vue';
 import ImportDatasetDialog from './ImportDatasetDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
@@ -215,7 +217,7 @@ export default {
     name: 'DatasetsPage',
     components: {
         Message,
-        DeleteDatasetDialog,
+        DialogHost,
         MessageDialog,
         DatasetDialog,
         ImportDatasetDialog,
@@ -235,6 +237,10 @@ export default {
         Skeleton,
         PrimeContextMenu
     },
+    setup() {
+        const dialogs = useDialogs();
+        return { dialogs, deleteEntity: useEntityDelete(dialogs) };
+    },
     data: function () {
         // Load preferences from Local Storage
         const prefs = getDatasetTablePreferences();
@@ -250,8 +256,6 @@ export default {
             // one opens)
             forbiddenSlugs: [],
             loading: true,
-            deleteDialogOpen: false,
-            currentDsSlug: null,
             messageDialogOpen: false,
             currentMessage: null,
 
@@ -496,36 +500,13 @@ export default {
         },
 
         handleDelete(ds) {
-            this.currentDsSlug = ds.slug;
-            this.deleteDialogOpen = true;
-        }, async handleDeleteClose(res) {
-            this.deleteDialogOpen = false;
-
-            if (res == "close") {
-                this.currentDsSlug = null;
-                return;
-            }
-
-            let ds = this.datasets.find(o => o.slug == this.currentDsSlug);
-            ds['deleting'] = true;
-
-            try {
-                let ret = await this.org.Dataset(this.currentDsSlug).delete()
-
-                if (ret) {
-                    // The next dataset moves into the page
-                    await this.reloadPage();
-                    this.$notify.success('Dataset deleted successfully', { summary: 'Dataset Deleted' });
-                } else {
-                    this.$notify.error('Failed to delete dataset "' + this.currentDsSlug + '"');
-                    console.error(ret);
-                    ds['deleting'] = false;
-                }
-            } catch (e) {
-                console.error(e);
-                this.$notify.error('Failed to delete dataset: ' + e.message);
-                ds['deleting'] = false;
-            }
+            this.deleteEntity(ds, {
+                kind: 'dataset',
+                warning: 'All the files will be deleted too.',
+                remove: () => this.org.Dataset(ds.slug).delete(),
+                // The next dataset moves into the page
+                done: () => this.reloadPage()
+            });
         },
 
         showMessage(msg) {

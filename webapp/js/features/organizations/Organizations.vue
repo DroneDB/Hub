@@ -108,7 +108,7 @@
                        :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
         </div>
 
-        <DeleteOrganizationDialog v-if="deleteDialogOpen" :org-slug="currentOrgSlug" @close="handleDeleteClose" />
+        <DialogHost :dialogs="dialogs" />
         <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
                             @close="handleOrganizationClose" />
@@ -121,7 +121,9 @@
 </template>
 
 <script>
-import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useEntityDelete } from '@/composables/useEntityDelete';
 import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
@@ -150,7 +152,7 @@ export default {
     name: 'OrganizationsPage',
     components: {
         
-        DeleteOrganizationDialog,
+        DialogHost,
         MessageDialog,
         OrganizationDialog,
         OrganizationMembersDialog,
@@ -165,14 +167,16 @@ export default {
         Paginator
     },
 
+    setup() {
+        const dialogs = useDialogs();
+        return { dialogs, deleteEntity: useEntityDelete(dialogs) };
+    },
     data: function () {
         const prefs = getOrgPagePreferences();
         return {
             error: "",
             organizations: [],
             loading: true,
-            deleteDialogOpen: false,
-            currentOrgSlug: null,
             messageDialogOpen: false,
             currentMessage: null,
             userName: reg.getUsername(),
@@ -285,39 +289,12 @@ export default {
         },
 
         handleDelete(org) {
-            this.currentOrgSlug = org.slug;
-            this.deleteDialogOpen = true;
-        },
-
-        async handleDeleteClose(res) {
-            this.deleteDialogOpen = false;
-
-            if (res == "close") {
-                this.currentOrgSlug = null;
-                return;
-            }
-
-            let org = this.organizations.find(o => o.slug == this.currentOrgSlug);
-            org.deleting = true;
-
-            try {
-
-                let ret = await reg.orgs.deleteOrganization(this.currentOrgSlug);
-
-                if (ret) {
-                    this.organizations = this.organizations.filter(o => o.slug !== this.currentOrgSlug);
-                    this.$notify.success('Organization deleted successfully', { summary: 'Organization Deleted' });
-                } else {
-                    this.$notify.error('Failed to delete organization "' + this.currentOrgSlug + '"');
-                    console.error(ret);
-                    org.deleting = false;
-                }
-            } catch (e) {
-                console.error(e);
-                this.$notify.error('Failed to delete organization: ' + e.message);
-                org.deleting = false;
-            }
-
+            this.deleteEntity(org, {
+                kind: 'organization',
+                warning: 'All the datasets owned by this organization will be deleted too.',
+                remove: () => reg.orgs.deleteOrganization(org.slug),
+                done: () => { this.organizations = this.organizations.filter(o => o.slug !== org.slug); }
+            });
         },
 
         editOrganization(org) {

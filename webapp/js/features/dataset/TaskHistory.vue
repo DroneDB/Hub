@@ -167,43 +167,7 @@
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
                        :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
-        <ConfirmDialog v-if="clearDialogOpen"
-                       title="Clear Concluded Tasks"
-                       :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`"
-                       confirm-text="Clear" cancel-text="Cancel" confirm-button-class="danger"
-                       warning-title="Warning" warning-message="This action cannot be undone. Any task results still available for download will be deleted."
-                       @close="handleClearDialogClose" />
-
-        <!-- Invalid path error (#5) -->
-        <ConfirmDialog v-if="errorDialogOpen"
-                       title="Invalid path"
-                       :message="errorDialogMessage"
-                       confirm-text="OK" cancel-text="Close" confirm-button-class="primary"
-                       @close="errorDialogOpen = false" />
-
-        <!-- Unreachable node confirmation before starting (#6) -->
-        <ConfirmDialog v-if="unreachableConfirmOpen"
-                       title="Processing node unreachable"
-                       :message="`The selected processing node did not respond${nodeStatus && nodeStatus.errorMessage ? ` (${nodeStatus.errorMessage})` : ''}.<br/>Do you want to start the task anyway?`"
-                       confirm-text="Start anyway" cancel-text="Cancel" confirm-button-class="primary"
-                       warning-title="Warning" warning-message="The task may fail immediately if the node is offline."
-                       @close="handleUnreachableConfirmClose" />
-
-        <!-- Cancel task confirmation -->
-        <ConfirmDialog v-if="cancelDialogOpen"
-                       title="Cancel Task"
-                       :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, tools)}</strong>${cancellingTask.path ? ' (path: ' + cancellingTask.path + ')' : ''} will be stopped.`"
-                       confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
-                       @close="handleCancelDialogClose" />
-
-        <!-- Delete task confirmation -->
-        <ConfirmDialog v-if="deleteDialogOpen"
-                       title="Delete Task"
-                       :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, tools)}</strong> will be removed together with any downloadable results it produced.`"
-                       confirm-text="Delete" cancel-text="Cancel" confirm-button-class="danger"
-                       warning-title="Warning"
-                       warning-message="This action cannot be undone. Any task results still available for download will be deleted."
-                       @close="handleDeleteDialogClose" />
+        <DialogHost :dialogs="dialogs" />
 
         <!-- Folder picker for output folder -->
         <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
@@ -223,7 +187,10 @@ import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
+import { escapeHtml } from '@/libs/sanitize';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Dialog from 'primevue/dialog';
@@ -291,7 +258,7 @@ const ODM_PRESETS = [
 export default {
 
     components: {
-        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
+        DialogHost, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
     },
 
     inject: {
@@ -306,7 +273,8 @@ export default {
 
     setup() {
         const { trackHeavyTask } = useHeavyTask();
-        return { trackHeavyTask, ...useTaskFormatting() };
+        const dialogs = useDialogs();
+        return { trackHeavyTask, dialogs, confirm: useConfirm(dialogs), ...useTaskFormatting() };
     },
     data() {
         return {
@@ -338,11 +306,8 @@ export default {
             optionsError: '',
             folderPathError: '',
             destPathError: '',
-            errorDialogOpen: false,
-            errorDialogMessage: '',
             checkingNode: false,
             nodeStatus: null,
-            unreachableConfirmOpen: false,
             availableOdmOptions: [],
             customOptions: [],
             visibilityOptions: [
@@ -354,13 +319,6 @@ export default {
             logDialogOpen: false,
             logTask: null,
             logText: '',
-
-            clearDialogOpen: false,
-            deleteDialogOpen: false,
-            deletingTask: null,
-
-            cancelDialogOpen: false,
-            cancellingTask: null,
 
             outputFolderPickerOpen: false,
             imageFolderPickerOpen: false
@@ -714,8 +672,7 @@ export default {
         },
 
         _showPathError(message) {
-            this.errorDialogMessage = message;
-            this.errorDialogOpen = true;
+            this.confirm({ title: 'Invalid path', message: escapeHtml(message), confirmText: 'OK', cancelText: 'Close' });
         },
 
         async submitPhotogrammetry() {
@@ -746,20 +703,17 @@ export default {
             // #6: pre-flight node check. We never hard-block on a full queue, but we
             // do ask for confirmation when the node appears unreachable.
             const status = await this.checkNode();
-            if (status && !status.reachable) {
-                this.unreachableConfirmOpen = true;
+            if (status && !status.reachable && !await this.confirm({
+                title: 'Processing node unreachable',
+                message: `The selected processing node did not respond${status.errorMessage ? ` (${escapeHtml(status.errorMessage)})` : ''}.<br/>Do you want to start the task anyway?`,
+                confirmText: 'Start anyway',
+                warningTitle: 'Warning',
+                warningMessage: 'The task may fail immediately if the node is offline.'
+            })) {
+                this._pendingParams = null;
                 return;
             }
             await this._doSubmit();
-        },
-
-        async handleUnreachableConfirmClose(buttonId) {
-            this.unreachableConfirmOpen = false;
-            if (buttonId === 'confirm') {
-                await this._doSubmit();
-            } else {
-                this._pendingParams = null;
-            }
         },
 
         async _doSubmit() {
@@ -805,19 +759,12 @@ export default {
 
         // ---- per-task actions ----
 
-        cancelTask(task) {
-            this.cancellingTask = task;
-            this.cancelDialogOpen = true;
-        },
-
-        async handleCancelDialogClose(buttonId) {
-            this.cancelDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.cancellingTask) {
-                this.cancellingTask = null;
-                return;
-            }
-            const task = this.cancellingTask;
-            this.cancellingTask = null;
+        async cancelTask(task) {
+            const what = `<strong>${escapeHtml(this.toolTitle(task.toolId, this.tools))}</strong>${task.path ? ` (path: ${escapeHtml(task.path)})` : ''}`;
+            if (!await this.confirm({
+                title: 'Cancel Task', danger: true, confirmText: 'Cancel Task', cancelText: "Don't Cancel",
+                message: `Are you sure you want to cancel this task?<br/>${what} will be stopped.`
+            })) return;
             try {
                 await this.dataset.cancelTask(task.taskId);
                 await taskMonitor.forceRefresh(this.dataset);
@@ -860,13 +807,13 @@ export default {
             }
         },
 
-        showClearDialog() {
-            this.clearDialogOpen = true;
-        },
-
-        async handleClearDialogClose(buttonId) {
-            this.clearDialogOpen = false;
-            if (buttonId !== 'confirm') return;
+        async showClearDialog() {
+            if (!await this.confirm({
+                title: 'Clear Concluded Tasks', danger: true, confirmText: 'Clear',
+                message: `Delete all concluded tasks?<br/><strong>${this.concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`,
+                warningTitle: 'Warning',
+                warningMessage: 'This action cannot be undone. Any task results still available for download will be deleted.'
+            })) return;
             try {
                 this.loading = true;
                 await this.dataset.clearTasks(this.selectedTool || undefined);
@@ -880,19 +827,13 @@ export default {
             }
         },
 
-        deleteTask(task) {
-            this.deletingTask = task;
-            this.deleteDialogOpen = true;
-        },
-
-        async handleDeleteDialogClose(buttonId) {
-            this.deleteDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.deletingTask) {
-                this.deletingTask = null;
-                return;
-            }
-            const task = this.deletingTask;
-            this.deletingTask = null;
+        async deleteTask(task) {
+            if (!await this.confirm({
+                title: 'Delete Task', danger: true, confirmText: 'Delete',
+                message: `Permanently delete this concluded task from the history?<br/><strong>${escapeHtml(this.toolTitle(task.toolId, this.tools))}</strong> will be removed together with any downloadable results it produced.`,
+                warningTitle: 'Warning',
+                warningMessage: 'This action cannot be undone. Any task results still available for download will be deleted.'
+            })) return;
             try {
                 await this.dataset.deleteTask(task.taskId);
                 await taskMonitor.forceRefresh(this.dataset);

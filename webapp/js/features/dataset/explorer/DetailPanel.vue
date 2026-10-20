@@ -56,9 +56,6 @@
                 </div>
             </div>
         </div>
-        <BuildConfirmDialog v-if="buildConfirmDialogOpen"
-                            @confirm="handleBuildConfirmOk"
-                            @cancel="buildConfirmDialogOpen = false" />
     </div>
     <div v-else class="detail-panel-empty">
         <Message severity="info" :closable="false" icon="fa-solid fa-circle-info">
@@ -77,10 +74,11 @@ import PropsTable from '@/components/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
 import { buildAllProperties, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
-import BuildConfirmDialog from '@/features/dataset/dialogs/BuildConfirmDialog.vue';
 
 export default {
-    components: { PropsTable, Button, Message, BuildConfirmDialog },
+    components: { PropsTable, Button, Message },
+    // The page asks before rebuilding (useDatasetActions.confirmBuild)
+    inject: { showBuildConfirm: { default: null } },
     props: {
         file: {
             type: Object,
@@ -99,8 +97,7 @@ export default {
             loading: false,
             buildState: null,
             buildLoading: false,
-            error: null,
-            buildConfirmDialogOpen: false
+            error: null
         }
     },
     computed: {
@@ -332,19 +329,14 @@ export default {
             if (!this.dataset || !this.file) return;
 
             try {
-                if (await isFileBuilt(this.dataset, this.file)) {
-                    this.buildConfirmDialogOpen = true;
-                } else {
-                    await BuildManager.startBuild(this.dataset, this.file.entry.path, true);
-                    this.buildLoading = true;
-                }
+                if (await isFileBuilt(this.dataset, this.file) && this.showBuildConfirm) this.showBuildConfirm(this.file, () => this.startBuild());
+                else await this.startBuild();
             } catch (error) {
                 this.$emit('buildError', { file: this.file, error: error.message });
             }
         },
 
-        async handleBuildConfirmOk() {
-            this.buildConfirmDialogOpen = false;
+        async startBuild() {
             if (!this.dataset || !this.file) return;
             try {
                 await BuildManager.startBuild(this.dataset, this.file.entry.path, true);

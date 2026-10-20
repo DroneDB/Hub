@@ -103,6 +103,20 @@ test('dataset list shows the smoke dataset', async () => {
     await page.waitForSelector(`text=${DS}`, { timeout: 15000 });
 });
 
+test('dataset list: delete asks first, then removes the dataset', async () => {
+    const victim = `${DS}-del`;
+    await api('POST', `/orgs/${USER}/ds`, form({ slug: victim, name: victim }));
+    await page.goto(`${URL_}/r/${USER}`);
+    const row = page.locator('tr', { hasText: victim });
+    await row.locator('button[aria-label="Delete dataset"]').click({ timeout: 15000 });
+    await page.waitForSelector(`.p-dialog >> text=${victim}`, { timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    await row.locator('button[aria-label="Delete dataset"]').click();
+    await page.click('.p-dialog button:has-text("Remove")');
+    await page.waitForSelector(`tr:has-text("${victim}")`, { state: 'detached', timeout: 15000 });
+});
+
 test('dataset page lists the uploaded files', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}`);
     for (const p of Object.values(FILES)) await page.waitForSelector(`text=${path.basename(p)}`, { timeout: 20000 });

@@ -16,13 +16,11 @@ import { renameDataset } from '@/libs/api/registryUtils';
 import BuildManager from '@/libs/build/buildManager';
 import emitter from '@/libs/eventBus';
 import { itemFor } from '@/libs/dataset/explorerItems';
+import { confirmDelete, CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import Alert from '@/components/Alert.vue';
-import DeleteDialog from '@/features/dataset/dialogs/DeleteDialog.vue';
 import DeleteResultDialog from '@/features/dataset/dialogs/DeleteResultDialog.vue';
-import RescanConfirmDialog from '@/features/dataset/dialogs/RescanConfirmDialog.vue';
-import BuildConfirmDialog from '@/features/dataset/dialogs/BuildConfirmDialog.vue';
 import RenameDialog from '@/features/dataset/dialogs/RenameDialog.vue';
 import NewFolderDialog from '@/features/dataset/dialogs/NewFolderDialog.vue';
 import TransferDialog from '@/features/dataset/dialogs/TransferDialog.vue';
@@ -111,9 +109,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     // ---- Delete --------------------------------------------------------------------------
 
-    function remove(files) {
-        if (!files.length) return;
-        dialogs.open(DeleteDialog, { files, onClose: id => { if (id === 'remove') deleteFiles(files); } });
+    async function remove(files) {
+        if (files.length && await confirm(confirmDelete(files))) deleteFiles(files);
     }
 
     async function deleteFiles(files) {
@@ -259,30 +256,23 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         }));
     }
 
-    function rescan(settingsDialog) {
-        dialogs.open(RescanConfirmDialog, {
-            onClose: async id => {
-                if (id !== 'confirm') return;
-                if (settingsDialog) settingsDialog.close();
-                await withBusy(async () => {
-                    try {
-                        // A heavy task: progress in the Tasks tab
-                        await dataset.submitTask('rescan-index', { params: { stopOnError: false }, force: true });
-                        notify.info('The dataset index rescan is running. Check the Tasks tab for progress.', { summary: 'Rescan Started', life: 'long' });
-                    } catch (e) {
-                        showError(e.message, 'Rescan Error');
-                    }
-                });
+    async function rescan(settingsDialog) {
+        if (!await confirm(CONFIRM_RESCAN)) return;
+        if (settingsDialog) settingsDialog.close();
+        await withBusy(async () => {
+            try {
+                // A heavy task: progress in the Tasks tab
+                await dataset.submitTask('rescan-index', { params: { stopOnError: false }, force: true });
+                notify.info('The dataset index rescan is running. Check the Tasks tab for progress.', { summary: 'Rescan Started', life: 'long' });
+            } catch (e) {
+                showError(e.message, 'Rescan Error');
             }
         });
     }
 
     /** Asks before a build that replaces existing output. */
-    function confirmBuild(file, onConfirm) {
-        const dialog = dialogs.open(BuildConfirmDialog, {
-            onConfirm: () => { dialog.close(); onConfirm(); },
-            onCancel: () => dialog.close()
-        });
+    async function confirmBuild(file, onConfirm) {
+        if (await confirm(CONFIRM_REBUILD)) onConfirm();
     }
 
     // ---- Cover ---------------------------------------------------------------------------
