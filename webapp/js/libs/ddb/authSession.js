@@ -151,7 +151,23 @@ export default class AuthSession {
         // Clear cached features
         this.registry.features.clear();
         this.clearCredentials();
+        this.expireServerCookie();
         this.registry.emit("logout");
+    }
+
+    /**
+     * The server sets the auth cookie HttpOnly on a Basic auth sign-in, and script cannot clear
+     * that one: ask the Registry to expire it. Fire-and-forget: sign-out never waits for or
+     * fails on it.
+     */
+    expireServerCookie() {
+        if (!this._isSameOrigin()) return;
+        this.registry.fetchRaw('/users/logout', { method: 'POST' }).catch(() => { /* best effort */ });
+    }
+
+    /** Whether this registry is the page's origin, so the auth cookie is the page's. */
+    _isSameOrigin() {
+        return typeof window !== "undefined" && window.location.origin === this.registry.url;
     }
 
     setCredentials(username, token, expires) {
@@ -162,12 +178,10 @@ export default class AuthSession {
         storage.setItem(`${this.registry.url}_jwt_token_expires`, expires);
 
         // Set cookie if the URL matches the current window
-        if (typeof window !== "undefined") {
-            if (window.location.origin === this.registry.url) {
-                const expiresDate = new Date(expires * 1000).toUTCString();
-                const isSecure = window.location.protocol === 'https:';
-                document.cookie = `jwtToken=${token};expires=${expiresDate};path=/;SameSite=Strict${isSecure ? ';Secure' : ''}`;
-            }
+        if (this._isSameOrigin()) {
+            const expiresDate = new Date(expires * 1000).toUTCString();
+            const isSecure = window.location.protocol === 'https:';
+            document.cookie = `jwtToken=${token};expires=${expiresDate};path=/;SameSite=Strict${isSecure ? ';Secure' : ''}`;
         }
     }
 
@@ -224,10 +238,8 @@ export default class AuthSession {
         storage.removeItem(`${this.registry.url}_username`);
 
         // Clear cookie if needed
-        if (typeof window !== "undefined") {
-            if (window.location.origin === this.registry.url) {
-                document.cookie = `jwtToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-            }
+        if (this._isSameOrigin()) {
+            document.cookie = `jwtToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
         }
     }
 
