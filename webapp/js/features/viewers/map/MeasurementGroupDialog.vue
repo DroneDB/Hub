@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 

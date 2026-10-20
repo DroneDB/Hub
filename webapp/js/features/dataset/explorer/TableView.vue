@@ -81,7 +81,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Toolbar from '@/features/dataset/explorer/Toolbar.vue';
+import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import { formatTimeAgo } from '@/libs/utils';
 import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';

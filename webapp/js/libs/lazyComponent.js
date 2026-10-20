@@ -13,7 +13,7 @@
  */
 import { defineAsyncComponent } from 'vue';
 import ToastEventBus from 'primevue/toasteventbus';
-import Loader from '@/components/Loader.vue';
+import Loader from '@/components/HubLoader.vue';
 
 /**
  * @param {() => Promise<any>} loader e.g. () => import('./Dialog.vue')

@@ -43,8 +43,8 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
+import Window from '@/components/HubWindow.vue';
+import Message from '@/components/HubMessage.vue';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';

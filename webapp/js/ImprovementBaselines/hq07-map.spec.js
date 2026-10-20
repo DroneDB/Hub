@@ -19,9 +19,9 @@ describe('map family structure', () => {
 
     it('shares one MapCore between the dataset map and the single map', () => {
         expect(fs.existsSync(path.join(MAP, 'MapCore.vue'))).toBe(true);
-        expect(lines('Map.vue')).toBeLessThanOrEqual(300);
+        expect(lines('DatasetMap.vue')).toBeLessThanOrEqual(300);
         expect(lines('SingleMap.vue')).toBeLessThanOrEqual(200);
-        for (const f of ['Map.vue', 'SingleMap.vue']) {
+        for (const f of ['DatasetMap.vue', 'SingleMap.vue']) {
             expect(fs.readFileSync(path.join(MAP, f), 'utf8')).not.toMatch(/\bmixins\s*:/);
         }
     });

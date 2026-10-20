@@ -41,7 +41,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window';
+import Window from '@/components/HubWindow';
 import Button from 'primevue/button';
 import { OGC_USAGE_HINTS } from '@/libs/ogcShareUrls';
 

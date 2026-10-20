@@ -47,7 +47,7 @@
 </template>
 
 <script>
-import Thumbnail from './Thumbnail.vue';
+import Thumbnail from './EntryThumbnail.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import { createThumbnailQueue, createVisibilityTracker } from '@/libs/thumbnailQueue';
 
@@ -56,7 +56,7 @@ const VIRTUAL_GRID_MIN_FILES = 200;
 // One grid cell: the 128 px tile plus its margins and label
 const GRID_CELL_WIDTH = 140;
 const GRID_ROW_HEIGHT = 180;
-import Toolbar from '@/features/dataset/explorer/Toolbar.vue';
+import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import emitter from '@/libs/eventBus';

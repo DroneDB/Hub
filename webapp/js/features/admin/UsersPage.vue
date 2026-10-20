@@ -205,8 +205,8 @@
 <script>
 import EmptyState from '@/components/EmptyState.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Message from '@/components/Message.vue';
-import Window from '@/components/Window.vue';
+import Message from '@/components/HubMessage.vue';
+import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import AddUserDialog from './AddUserDialog.vue';
 import EditUserDialog from './EditUserDialog.vue';

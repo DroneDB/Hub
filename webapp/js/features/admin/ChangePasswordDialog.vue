@@ -34,8 +34,8 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
+import Window from '@/components/HubWindow.vue';
+import Message from '@/components/HubMessage.vue';
 import Password from 'primevue/password';
 import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';

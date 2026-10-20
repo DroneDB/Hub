@@ -32,7 +32,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Password from 'primevue/password';
 import Message from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';

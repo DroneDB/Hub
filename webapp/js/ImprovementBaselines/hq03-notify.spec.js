@@ -31,9 +31,9 @@ describe('ApiError', () => {
     });
 });
 
-describe('Message.vue', () => {
+describe('HubMessage.vue', () => {
     it('shows v-model text and clears it on dismiss without touching $parent', async () => {
-        const Message = (await import('@/components/Message.vue')).default;
+        const Message = (await import('@/components/HubMessage.vue')).default;
         const wrapper = mount(Message, {
             props: { modelValue: 'Something failed', 'onUpdate:modelValue': v => wrapper.setProps({ modelValue: v }) },
             global: { plugins: [PrimeVue] }
@@ -45,7 +45,7 @@ describe('Message.vue', () => {
     });
 
     it('sanitises the text', async () => {
-        const Message = (await import('@/components/Message.vue')).default;
+        const Message = (await import('@/components/HubMessage.vue')).default;
         const wrapper = mount(Message, { props: { modelValue: '<img src=x onerror="alert(1)">Bad' }, global: { plugins: [PrimeVue] } });
         expect(wrapper.html()).not.toContain('onerror');
     });

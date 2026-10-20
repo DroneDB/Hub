@@ -26,7 +26,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import ObjTable from '@/features/viewers/map/ObjTable.vue';
 import Button from 'primevue/button';
 import { formatDateTime } from '@/libs/format';

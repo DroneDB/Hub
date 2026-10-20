@@ -38,7 +38,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Message from '@/components/Message.vue';
+import Message from '@/components/HubMessage.vue';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import ProgressBar from 'primevue/progressbar';

@@ -90,9 +90,9 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Message from '@/components/Message.vue';
+import Message from '@/components/HubMessage.vue';
 import { Licenses } from '@/libs/licenses';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';

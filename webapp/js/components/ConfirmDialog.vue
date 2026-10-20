@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import { sanitizeHtml } from '@/libs/sanitize';

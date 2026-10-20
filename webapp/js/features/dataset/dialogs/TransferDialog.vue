@@ -56,7 +56,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';

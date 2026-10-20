@@ -19,13 +19,13 @@ import { itemFor } from '@/libs/dataset/explorerItems';
 import { confirmDelete, CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
-import Alert from '@/components/Alert.vue';
+import Alert from '@/components/HubAlert.vue';
 import DeleteResultDialog from '@/features/dataset/dialogs/DeleteResultDialog.vue';
 import RenameDialog from '@/features/dataset/dialogs/RenameDialog.vue';
 import NewFolderDialog from '@/features/dataset/dialogs/NewFolderDialog.vue';
 import TransferDialog from '@/features/dataset/dialogs/TransferDialog.vue';
 import SettingsDialog from '@/features/dataset/dialogs/SettingsDialog.vue';
-import Properties from '@/features/dataset/explorer/Properties.vue';
+import Properties from '@/features/dataset/explorer/EntryProperties.vue';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 
 const lazy = loader => lazyComponent(loader);

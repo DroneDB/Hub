@@ -46,7 +46,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 
 export default {
     components: { Window },

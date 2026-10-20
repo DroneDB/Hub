@@ -8,7 +8,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import InputText from 'primevue/inputtext';
 
 export default {

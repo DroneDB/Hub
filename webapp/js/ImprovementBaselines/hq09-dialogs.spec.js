@@ -7,9 +7,9 @@ import { describe, it, expect } from 'vitest';
 import { effectScope } from 'vue';
 import { mount } from '@vue/test-utils';
 
-describe('Window.vue contract', () => {
+describe('HubWindow.vue contract', () => {
     it('emits close on Escape and confirm on Enter while visible', async () => {
-        const Window = (await import('@/components/Window.vue')).default;
+        const Window = (await import('@/components/HubWindow.vue')).default;
         const w = mount(Window, { props: { visible: true, title: 'T' }, attachTo: document.body, global: { stubs: { teleport: true } } });
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
@@ -44,9 +44,9 @@ describe('useFileSelection', () => {
     });
 });
 
-describe('Window.vue keyboard ownership', () => {
+describe('HubWindow.vue keyboard ownership', () => {
     it('closes on an Escape handled outside the dialog (focus left in a closed menu)', async () => {
-        const Window = (await import('@/components/Window.vue')).default;
+        const Window = (await import('@/components/HubWindow.vue')).default;
         const w = mount(Window, { props: { visible: true, title: 'T' }, attachTo: document.body, global: { stubs: { teleport: true } } });
         const outside = document.createElement('a');
         document.body.appendChild(outside);

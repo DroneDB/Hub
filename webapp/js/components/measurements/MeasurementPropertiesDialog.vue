@@ -75,7 +75,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import { toLonLat } from 'ol/proj';

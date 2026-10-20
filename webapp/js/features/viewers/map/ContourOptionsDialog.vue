@@ -104,7 +104,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import InputNumber from 'primevue/inputnumber';
 
 export default {

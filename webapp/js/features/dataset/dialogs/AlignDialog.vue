@@ -104,7 +104,7 @@
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ddb from 'ddb';
-import Window    from '@/components/Window.vue';
+import Window    from '@/components/HubWindow.vue';
 import Button    from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select    from 'primevue/select';

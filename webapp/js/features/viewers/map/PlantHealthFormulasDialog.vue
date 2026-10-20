@@ -35,7 +35,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 
 // Curated copy for the most common multispectral indices. Anything not listed
 // here falls back to the descriptions provided by the backend.

@@ -179,7 +179,7 @@
 
 <script>
 import EmptyState from '@/components/EmptyState.vue';
-import Message from '@/components/Message.vue';
+import Message from '@/components/HubMessage.vue';
 import { setTitle, bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences } from '@/libs/storageUtils';
@@ -191,7 +191,7 @@ import ImportDatasetDialog from './ImportDatasetDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import OrganizationDialog from '@/features/organizations/OrganizationDialog.vue';
 import OrganizationMembersDialog from '@/features/organizations/OrganizationMembersDialog.vue';
-import Loader from '@/components/Loader.vue';
+import Loader from '@/components/HubLoader.vue';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';

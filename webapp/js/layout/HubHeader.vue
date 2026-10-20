@@ -92,7 +92,7 @@
 import ddb, { utils } from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import Alert from '@/components/Alert';
+import Alert from '@/components/HubAlert';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { xAuthLogout } from '@/libs/api/xauth';

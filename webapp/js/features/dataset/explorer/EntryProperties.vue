@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';

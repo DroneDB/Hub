@@ -90,7 +90,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Message from '@/components/Message.vue';
+import Message from '@/components/HubMessage.vue';
 import ChangePwdDialog from './ChangePwdDialog.vue';
 import UploadDiagnostics from './UploadDiagnostics.vue';
 import Button from 'primevue/button';

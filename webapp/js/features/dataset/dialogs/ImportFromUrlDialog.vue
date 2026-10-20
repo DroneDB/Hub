@@ -123,7 +123,7 @@
  *   5. On successful completion the parent is notified via close('imported') so
  *      it can refresh the file browser.
  */
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';

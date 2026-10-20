@@ -120,7 +120,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window';
+import Window from '@/components/HubWindow';
 import Button from 'primevue/button';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 

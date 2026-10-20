@@ -10,7 +10,7 @@ import { ApiError } from '@/libs/ddb/apiError';
 const reg = vi.hoisted(() => ({ isAdmin: () => false, orgs: { getOrganizations: null } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
-const { default: Organizations } = await import('./Organizations.vue');
+const { default: Organizations } = await import('./OrganizationsPage.vue');
 
 function fakeView() {
     return {

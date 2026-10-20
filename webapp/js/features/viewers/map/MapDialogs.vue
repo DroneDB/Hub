@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import Alert from '@/components/Alert.vue';
+import Alert from '@/components/HubAlert.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 export default {

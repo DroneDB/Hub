@@ -36,8 +36,8 @@
  *   </ViewerShell>
  */
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Message from '@/components/Message.vue';
-import Window from '@/components/Window.vue';
+import Message from '@/components/HubMessage.vue';
+import Window from '@/components/HubWindow.vue';
 
 const error = defineModel('error', { type: String, default: '' });
 const settingsOpen = defineModel('settingsOpen', { type: Boolean, default: false });

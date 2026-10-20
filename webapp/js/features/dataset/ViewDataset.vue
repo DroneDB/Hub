@@ -82,20 +82,20 @@ import { useDatasetActions } from '@/composables/useDatasetActions';
 import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
 import { useOpenItem } from '@/composables/useOpenItem';
 import { useDatasetShortcuts } from '@/composables/useDatasetShortcuts';
-import Message from '@/components/Message.vue';
-import Panel from '@/features/dataset/Panel.vue';
+import Message from '@/components/HubMessage.vue';
+import Panel from '@/features/dataset/HubPanel.vue';
 import TabSwitcher from '@/features/dataset/TabSwitcher.vue';
-import Loader from '@/components/Loader.vue';
+import Loader from '@/components/HubLoader.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import ClipboardPanel from '@/features/dataset/ClipboardPanel.vue';
 import FileBrowser from './explorer/FileBrowser.vue';
-import Explorer from './explorer/Explorer.vue';
+import Explorer from './explorer/DatasetExplorer.vue';
 import TableView from './explorer/TableView.vue';
 import DetailPanel from './explorer/DetailPanel.vue';
 import DatasetLightbox from './DatasetLightbox.vue';
 
 // The Map tab mounts on first activation (prefetched: instant on a warm connection)
-const Map = lazyComponent(() => import(/* webpackChunkName: "dataset-map", webpackPrefetch: true */ '@/features/viewers/map/Map.vue'), { showLoader: false });
+const Map = lazyComponent(() => import(/* webpackChunkName: "dataset-map", webpackPrefetch: true */ '@/features/viewers/map/DatasetMap.vue'), { showLoader: false });
 const TaskHistory = lazyComponent(() => import(/* webpackChunkName: "dataset-tasks" */ './TaskHistory.vue'), { showLoader: false });
 
 defineOptions({ name: 'ViewDataset' });

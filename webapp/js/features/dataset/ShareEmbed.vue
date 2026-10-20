@@ -99,8 +99,8 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Window from '@/components/Window';
-import Message from '@/components/Message';
+import Window from '@/components/HubWindow';
+import Message from '@/components/HubMessage';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import PrimeMessage from 'primevue/message';

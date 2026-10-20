@@ -90,7 +90,7 @@ import { clone, sortObjectKeys } from '@/libs/utils';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import { copyText } from '@/composables/useCopyText';
 
 /**

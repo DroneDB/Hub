@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import Dialog from 'primevue/dialog';
 import PrimeVue from 'primevue/config';
-import Window from './Window.vue';
+import Window from './HubWindow.vue';
 
 const show = async props => {
     const w = mount(Window, { props: { visible: true, title: 'T', ...props }, attachTo: document.body, global: { plugins: [PrimeVue] } });

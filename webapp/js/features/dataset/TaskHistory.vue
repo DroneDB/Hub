@@ -193,7 +193,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import { escapeHtml } from '@/libs/sanitize';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
