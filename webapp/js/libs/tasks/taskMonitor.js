@@ -32,7 +32,7 @@ let uploading = false;
 // Non-terminal states (mirrors TaskStateCatalog.Active)
 const ACTIVE_STATES = ['Awaiting', 'Created', 'Indexing', 'Enqueued', 'Processing', 'Scheduled', 'Reused'];
 
-//----- per-dataset store helper -----
+// ----- per-dataset store helper -----
 
 // Stable identity of a dataset for store keys and event matching.
 export function datasetKey(dataset) {
@@ -76,7 +76,7 @@ function computeSignature(ent) {
         .join('|');
 }
 
-//----- core operations -----
+// ----- core operations -----
 
 async function _fetch(ent) {
     const ds = ent.dataset;
@@ -116,7 +116,7 @@ async function _fetch(ent) {
     }
 }
 
-//----- polling timer -----
+// ----- polling timer -----
 
 function _scheduleTick(ent) {
     _clearTimer(ent);
@@ -136,7 +136,7 @@ function _wake(ent) {
     _scheduleTick(ent);
 }
 
-//----- change notifications (server-sent events) -----
+// ----- change notifications (server-sent events) -----
 
 function _streamWanted(ent) {
     return ent._started && !isHidden() && !uploading &&
@@ -186,7 +186,7 @@ function _closeStream(ent) {
     controller.abort();
 }
 
-//----- page visibility and uploads -----
+// ----- page visibility and uploads -----
 
 function onVisibilityChange() {
     for (const ent of stores.values()) {
@@ -228,7 +228,7 @@ function _clearTimer(ent) {
     }
 }
 
-//----- event system -----
+// ----- event system -----
 
 function emit(event, data) {
     const fn = TaskMonitor._listeners?.[event];
@@ -239,7 +239,7 @@ function emit(event, data) {
     }
 }
 
-//----- public API -----
+// ----- public API -----
 
 const TaskMonitor = {
     /**

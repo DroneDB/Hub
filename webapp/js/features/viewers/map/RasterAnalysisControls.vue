@@ -1,22 +1,22 @@
 <template>
-    <div class="raster-panel" v-if="visible">
+    <div v-if="visible" class="raster-panel">
         <div class="panel-header">
             <span class="panel-title">
-                <i :class="panelIconClass"></i> {{ panelTitle }}
+                <i :class="panelIconClass" /> {{ panelTitle }}
             </span>
-            <button class="close-btn" @click="close" title="Close"><i class="fas fa-times"></i></button>
+            <button class="close-btn" title="Close" @click="close"><i class="fas fa-times" /></button>
         </div>
 
-        <div class="panel-body" v-if="rasterInfo">
+        <div v-if="rasterInfo" class="panel-body">
             <!-- No-calibration warning (thermal only) -->
-            <div class="section" v-if="isThermal && (loadError || !rasterInfo.calibration)">
+            <div v-if="isThermal && (loadError || !rasterInfo.calibration)" class="section">
                 <div class="no-calibration-info">
-                    <i class="fas fa-info-circle"></i>&nbsp;No thermal calibration data: Showing raw values.
+                    <i class="fas fa-info-circle" />&nbsp;No thermal calibration data: Showing raw values.
                 </div>
             </div>
 
             <!-- Value Range -->
-            <div class="section" v-if="!loadError">
+            <div v-if="!loadError" class="section">
                 <label class="section-label">{{ rangeLabel }}</label>
                 <div class="temp-range" :class="{ 'thermal': isThermal }">
                     <span>{{ formatValue(rasterInfo.valueMin) }}</span>
@@ -26,22 +26,22 @@
             </div>
 
             <!-- Sensor Info -->
-            <div class="section" v-if="rasterInfo.sensorId">
+            <div v-if="rasterInfo.sensorId" class="section">
                 <label class="section-label">Sensor</label>
                 <span class="sensor-badge" :class="{ thermal: isThermal }">{{ rasterInfo.sensorId }}</span>
             </div>
 
             <!-- Unit (thermal: °C/K toggle; generic: free text with autodetected default) -->
-            <div class="section" v-if="isThermal && rasterInfo.calibration">
+            <div v-if="isThermal && rasterInfo.calibration" class="section">
                 <label class="section-label">Unit</label>
-                <select v-model="selectedFormula" @change="onFormulaChange" class="panel-select">
+                <select v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
                     <option value="CELSIUS">Celsius (°C)</option>
                     <option value="KELVIN">Kelvin (K)</option>
                 </select>
             </div>
-            <div class="section" v-else-if="!isThermal">
+            <div v-else-if="!isThermal" class="section">
                 <label class="section-label">Unit</label>
-                <input v-model="unitLabel" class="panel-input" placeholder="e.g. m, ft" />
+                <input v-model="unitLabel" class="panel-input" placeholder="e.g. m, ft">
             </div>
 
             <!-- Colormap -->
@@ -50,17 +50,17 @@
                 <ColormapDropdown
                     v-model="selectedColormap"
                     :colormaps="availableColormaps"
-                    @update:modelValue="debouncedApply" />
+                    @update:model-value="debouncedApply" />
             </div>
 
             <!-- Rescale -->
             <div class="section">
                 <label class="section-label">Rescale</label>
-                <input v-model="rescale" @change="onRescaleChange" class="panel-input" placeholder="e.g. 0,50 (auto if empty)" />
+                <input v-model="rescale" class="panel-input" placeholder="e.g. 0,50 (auto if empty)" @change="onRescaleChange">
             </div>
 
             <!-- Spot Info -->
-            <div class="section" v-if="spotInfo">
+            <div v-if="spotInfo" class="section">
                 <label class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</label>
                 <div class="spot-info">
                     <span class="spot-temp" :class="{ thermal: isThermal }">{{ formatValue(spotInfo.value) }}</span>
@@ -69,7 +69,7 @@
             </div>
 
             <!-- Area Stats -->
-            <div class="section" v-if="areaStats">
+            <div v-if="areaStats" class="section">
                 <label class="section-label">Area Statistics</label>
                 <div class="stats-grid">
                     <span>Min: {{ formatValue(areaStats.min) }}</span>
@@ -82,91 +82,91 @@
             </div>
 
             <!-- Profile (elevation / value along a polyline) -->
-            <div class="section" v-if="!loadError">
+            <div v-if="!loadError" class="section">
                 <label class="section-label">
                     {{ isThermal ? 'Thermal Profile' : 'Value Profile' }}
                 </label>
-                <div class="profile-error" v-if="profileError">
-                    <i class="fas fa-exclamation-triangle"></i> {{ profileError }}
+                <div v-if="profileError" class="profile-error">
+                    <i class="fas fa-exclamation-triangle" /> {{ profileError }}
                 </div>
                 <RasterProfileChart v-if="profile"
-                    :profile="profile"
-                    :unit="displayUnit"
-                    :is-thermal="isThermal"
-                    @hover="onProfileHover" />
+                                    :profile="profile"
+                                    :unit="displayUnit"
+                                    :is-thermal="isThermal"
+                                    @hover="onProfileHover" />
             </div>
             <!-- Actions: two rows so each button has room for a short label -->
             <div class="section actions actions-grid">
                 <button class="btn btn-sm action-btn"
                         :class="drawingProfile ? 'btn-warning active' : 'btn-secondary'"
-                        @click="onProfileButtonClick"
                         :disabled="profileLoading"
                         :title="drawingProfile
-                              ? 'Stop drawing and discard the partial profile (Esc)'
-                              : (profile ? 'Discard the current profile and draw a new one'
-                                         : 'Draw a profile line on the map')">
-                  <i :class="profileLoading ? 'fas fa-spinner fa-spin'
-                              : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')"></i>
-                  {{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}
+                            ? 'Stop drawing and discard the partial profile (Esc)'
+                            : (profile ? 'Discard the current profile and draw a new one'
+                                : 'Draw a profile line on the map')"
+                        @click="onProfileButtonClick">
+                    <i :class="profileLoading ? 'fas fa-spinner fa-spin'
+                        : (drawingProfile ? 'fas fa-stop' : 'fas fa-route')" />
+                    {{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}
                 </button>
                 <button v-if="profile && !drawingProfile" class="btn btn-link btn-sm action-btn"
-                        @click="clearProfile"
-                        title="Clear the chart and remove the line from the map">
-                  <i class="fas fa-eraser"></i>
+                        title="Clear the chart and remove the line from the map"
+                        @click="clearProfile">
+                    <i class="fas fa-eraser" />
                 </button>
                 <button class="btn btn-sm action-btn"
-                    :class="inspectActive ? 'btn-warning active' : 'btn-secondary'"
-                    @click="toggleInspect"
-                    :title="inspectActive
-                        ? 'Stop inspecting raster values (Esc)'
-                        : 'Click on the map to read the raster value'">
-                    <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'"></i>
+                        :class="inspectActive ? 'btn-warning active' : 'btn-secondary'"
+                        :title="inspectActive
+                            ? 'Stop inspecting raster values (Esc)'
+                            : 'Click on the map to read the raster value'"
+                        @click="toggleInspect">
+                    <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'" />
                     <span class="action-label">Inspect</span>
                 </button>
                 <button v-if="supports3D" class="btn btn-sm action-btn"
-                    :class="view3D ? 'btn-primary active' : 'btn-secondary'"
-                    @click="toggle3DView"
-                    :title="view3D ? 'Switch back to 2D map view' : 'Show this raster as a 3D heightmap'"
-                    data-testid="raster-3d-toggle">
-                    <i class="fas fa-cube"></i>
+                        :class="view3D ? 'btn-primary active' : 'btn-secondary'"
+                        :title="view3D ? 'Switch back to 2D map view' : 'Show this raster as a 3D heightmap'"
+                        data-testid="raster-3d-toggle"
+                        @click="toggle3DView">
+                    <i class="fas fa-cube" />
                     <span class="action-label">{{ view3D ? '2D View' : '3D View' }}</span>
                 </button>
                 <button v-if="!isThermal && !loadError" class="btn btn-secondary btn-sm action-btn"
-                    @click="onGenerateContoursClick"
-                    title="Generate contour lines from this elevation raster"
-                    data-testid="raster-contours-btn">
-                    <i class="fas fa-layer-group"></i>
+                        title="Generate contour lines from this elevation raster"
+                        data-testid="raster-contours-btn"
+                        @click="onGenerateContoursClick">
+                    <i class="fas fa-layer-group" />
                     <span class="action-label">Contours</span>
                 </button>
-                <button class="btn btn-secondary btn-sm action-btn" @click="reset"
-                    title="Reset all visualization parameters to their defaults">
-                    <i class="fas fa-rotate-left"></i>
+                <button class="btn btn-secondary btn-sm action-btn" title="Reset all visualization parameters to their defaults"
+                        @click="reset">
+                    <i class="fas fa-rotate-left" />
                     <span class="action-label">Reset</span>
                 </button>
                 <button class="btn btn-sm action-btn"
-                    :class="originalView ? 'btn-primary' : 'btn-secondary'"
-                    @click="toggleOriginalView"
-                    :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'">
-                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                        :class="originalView ? 'btn-primary' : 'btn-secondary'"
+                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
+                        @click="toggleOriginalView">
+                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                     <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
                 <button v-if="!isExportTooLarge"
                         class="btn btn-secondary btn-sm action-btn"
-                        @click="exportGeoTiff"
                         :disabled="exporting"
-                        title="Export the current view as a GeoTIFF file">
-                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+                        title="Export the current view as a GeoTIFF file"
+                        @click="exportGeoTiff">
+                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'" />
                     <span class="action-label">Export</span>
                 </button>
                 <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
-                    <i class="fas fa-download"></i>
+                    <i class="fas fa-download" />
                     <span class="action-label">Export</span>
                 </span>
             </div>
         </div>
 
-        <div class="panel-body loading" v-else>
-            <i class="fas fa-spinner fa-spin"></i> Loading raster info...
+        <div v-else class="panel-body loading">
+            <i class="fas fa-spinner fa-spin" /> Loading raster info...
         </div>
     </div>
 </template>

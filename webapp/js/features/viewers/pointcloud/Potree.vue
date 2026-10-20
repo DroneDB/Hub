@@ -1,8 +1,8 @@
 <template>
     <div id="potree">
-        <TabViewLoader @loaded="handleLoad" titleSuffix="Point Cloud" />
+        <TabViewLoader title-suffix="Point Cloud" @loaded="handleLoad" />
 
-        <Message bindTo="error" noDismiss />
+        <Message bind-to="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p>Loading point cloud...</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -14,25 +14,25 @@
                 <!-- Undo/Redo toolbar -->
                 <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
                     <button
-                        @click="undo"
                         :disabled="undoStack.length === 0"
                         class="btn-undo-redo"
-                        title="Undo (Ctrl+Z)">
-                        <i class="fa-solid fa-rotate-left"></i>
+                        title="Undo (Ctrl+Z)"
+                        @click="undo">
+                        <i class="fa-solid fa-rotate-left" />
                     </button>
                     <button
-                        @click="redo"
                         :disabled="redoStack.length === 0"
                         class="btn-undo-redo"
-                        title="Redo (Ctrl+Y)">
-                        <i class="fa-solid fa-rotate-right"></i>
+                        title="Redo (Ctrl+Y)"
+                        @click="redo">
+                        <i class="fa-solid fa-rotate-right" />
                     </button>
                     <button
-                        @click="toggleDeleteTool"
                         :class="{ active: deleteToolActive }"
                         class="btn-undo-redo btn-delete-tool"
-                        title="Delete measurement tool (click on measurement to delete)">
-                        <i class="fa-solid fa-trash"></i>
+                        title="Delete measurement tool (click on measurement to delete)"
+                        @click="toggleDeleteTool">
+                        <i class="fa-solid fa-trash" />
                     </button>
                 </div>
 
@@ -50,37 +50,36 @@
             <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
                 <button
                     v-if="hasMeasurements && canWrite"
-                    @click="saveMeasurements"
                     :disabled="savingMeasurements"
                     class="btn-measurement"
-                    title="Save measurements">
-                    <i class="fa-solid fa-floppy-disk"></i>
+                    title="Save measurements"
+                    @click="saveMeasurements">
+                    <i class="fa-solid fa-floppy-disk" />
                     Save Measurements
                 </button>
 
                 <button
                     v-if="hasSavedMeasurements && canDelete"
-                    @click="deleteSavedMeasurements"
                     class="btn-measurement btn-danger"
-                    title="Delete saved measurements file">
-                    <i class="fa-solid fa-trash"></i>
+                    title="Delete saved measurements file"
+                    @click="deleteSavedMeasurements">
+                    <i class="fa-solid fa-trash" />
                     Delete Saved
                 </button>
             </div>
 
-            <div id="potree_sidebar_container" ref="sidebar"> </div>
-            <div id="potree_render_area" ref="container"></div>
+            <div id="potree_sidebar_container" ref="sidebar" />
+            <div id="potree_render_area" ref="container" />
         </div>
         <ConfirmDialog v-if="deleteMeasurementsDialogOpen"
-            title="Delete Saved Measurements"
-            message="Are you sure you want to delete all saved measurements?"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            warningTitle="Warning"
-            warningMessage="This action cannot be undone."
-            @onClose="handleDeleteMeasurementsDialogClose">
-        </ConfirmDialog>
+                       title="Delete Saved Measurements"
+                       message="Are you sure you want to delete all saved measurements?"
+                       confirm-text="Delete"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       warning-title="Warning"
+                       warning-message="This action cannot be undone."
+                       @on-close="handleDeleteMeasurementsDialogClose" />
         <Toast position="bottom-left" />
     </div>
 </template>
@@ -149,6 +148,15 @@ export default {
             unitPref: localStorage.getItem("measureUnitPref") || "metric"
         };
     },
+
+    computed: {
+        /**
+         * Check if there are any measurements in the viewer
+         */
+        hasMeasurements: function() {
+            return this.measurementCount > 0;
+        }
+    },
     created: function () {
         // Replaced by each viewer (loadViewer); one exists from the start so the listener
         // helpers always have a session to register with
@@ -160,15 +168,6 @@ export default {
         // the jQuery UI sidebar, window.viewer (HUB-04)
         this.session.dispose();
         this.viewer = null;
-    },
-
-    computed: {
-        /**
-         * Check if there are any measurements in the viewer
-         */
-        hasMeasurements: function() {
-            return this.measurementCount > 0;
-        }
     },
 
     methods: {
@@ -937,7 +936,7 @@ export default {
                 // Add delete measurement tool to the Potree toolbar
                 const elToolbar = $('#tools');
                 if (elToolbar.length > 0) {
-                    /*const deleteIcon = $(`
+                    /* const deleteIcon = $(`
                         <img src="${Potree.resourcePath}/icons/remove.svg"
                             style="width: 32px; height: 32px"
                             class="button-icon"

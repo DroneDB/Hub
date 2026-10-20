@@ -14,7 +14,7 @@
             <span class="odm-option-name">{{ option.name }}</span>
             <span v-if="domainLabel" class="odm-option-domain">({{ domainLabel }})</span>
             <i v-if="interpolatedHelp" v-tooltip.bottom="interpolatedHelp"
-                class="fa-solid fa-circle-info odm-option-help" />
+               class="fa-solid fa-circle-info odm-option-help" />
         </div>
 
         <div class="odm-option-control">
@@ -23,19 +23,19 @@
 
             <!-- Enum: select dropdown -->
             <Select v-else-if="isEnum" v-model="localValue" :options="enumChoices"
-                optionLabel="label" optionValue="value" class="w-100" />
+                    option-label="label" option-value="value" class="w-100" />
 
             <!-- JSON: textarea with file import -->
             <Textarea v-else-if="option.type === 'json'" v-model="localValue" rows="2"
-                placeholder="Paste JSON..." class="w-100" />
+                      placeholder="Paste JSON..." class="w-100" />
 
             <!-- String, int, float: text input -->
             <InputText v-else v-model="localValue" :placeholder="option.defaultValue ?? ''" class="w-100" />
         </div>
 
         <div class="odm-option-actions">
-            <Button v-if="hasChanged" type="button" severity="secondary" text @click="resetToDefault"
-                icon="fa-solid fa-rotate-left" class="odm-reset-btn" />
+            <Button v-if="hasChanged" type="button" severity="secondary" text icon="fa-solid fa-rotate-left"
+                    class="odm-reset-btn" @click="resetToDefault" />
         </div>
 
         <div v-if="showWarning" class="odm-option-warning">

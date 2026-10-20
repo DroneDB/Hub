@@ -1,23 +1,23 @@
 <template>
-    <Window :title="dialogTitle" id="measurement-group" @onClose="cancel" modal fixedSize sizeClass="dialog-sm">
+    <Window id="measurement-group" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @on-close="cancel">
         <div class="measurement-group-form">
             <div class="form-group">
                 <label for="mg-name">Group Name</label>
-                <input ref="nameInput" type="text" id="mg-name" v-model="formName" placeholder="Enter a group name..."
-                    @keydown.enter="save" @keydown.esc="cancel" />
+                <input id="mg-name" ref="nameInput" v-model="formName" type="text" placeholder="Enter a group name..."
+                       @keydown.enter="save" @keydown.esc="cancel">
             </div>
             <div class="form-group">
                 <label>Color</label>
                 <div class="color-palette">
                     <div v-for="color in colorPalette" :key="color" class="color-swatch"
-                        :class="{ selected: formColor === color }" :style="{ backgroundColor: color }"
-                        @click="formColor = color"></div>
-                    <input type="color" v-model="formColor" class="color-picker-custom" title="Custom color" />
+                         :class="{ selected: formColor === color }" :style="{ backgroundColor: color }"
+                         @click="formColor = color" />
+                    <input v-model="formColor" type="color" class="color-picker-custom" title="Custom color">
                 </div>
             </div>
             <div class="buttons">
                 <button class="btn-cancel" @click="cancel">Cancel</button>
-                <button class="btn-save" @click="save" :disabled="!formName.trim()">{{ isEdit ? 'Rename' : 'Create' }}</button>
+                <button class="btn-save" :disabled="!formName.trim()" @click="save">{{ isEdit ? 'Rename' : 'Create' }}</button>
             </div>
         </div>
     </Window>

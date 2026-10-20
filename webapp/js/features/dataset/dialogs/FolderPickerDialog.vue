@@ -1,21 +1,21 @@
 <template>
-    <Window title="Select Destination Folder" id="folderPicker" @onClose="cancel" modal maxWidth="520px" fixedSize>
+    <Window id="folderPicker" title="Select Destination Folder" modal max-width="520px" fixed-size @on-close="cancel">
         <div class="folder-picker">
             <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
                 {{ errorMessage }}
             </PrimeMessage>
 
             <div class="selected-path">
-                <i class="fa-solid fa-folder-open"></i>
+                <i class="fa-solid fa-folder-open" />
                 <span>{{ selectedPath && selectedPath.length > 0 ? selectedPath : 'root folder' }}</span>
             </div>
 
             <div class="tree-container">
-                <Tree :value="nodes" selectionMode="single" :metaKeySelection="false"
-                    :selectionKeys="selectionKeys" @update:selectionKeys="selectionKeys = $event"
-                    :expandedKeys="expandedKeys" @update:expandedKeys="expandedKeys = $event"
-                    :loading="loading" loadingMode="icon" scrollHeight="320px"
-                    @node-select="onNodeSelect" @node-expand="onNodeExpand">
+                <Tree :value="nodes" selection-mode="single" :meta-key-selection="false"
+                      :selection-keys="selectionKeys" :expanded-keys="expandedKeys"
+                      :loading="loading" loading-mode="icon"
+                      scroll-height="320px" @update:selection-keys="selectionKeys = $event" @update:expanded-keys="expandedKeys = $event"
+                      @node-select="onNodeSelect" @node-expand="onNodeExpand">
                     <template #empty>
                         <span class="empty-msg">No folders</span>
                     </template>
@@ -23,8 +23,8 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="cancel" severity="secondary" label="Cancel" />
-                <Button @click="confirm" severity="primary" icon="fa-solid fa-check" label="Select Folder" />
+                <Button severity="secondary" label="Cancel" @click="cancel" />
+                <Button severity="primary" icon="fa-solid fa-check" label="Select Folder" @click="confirm" />
             </div>
         </div>
     </Window>

@@ -3,16 +3,16 @@
         <div v-if="!isEmpty" class="clipboard-panel" :class="{ 'cut-mode': isCut }">
             <div class="clipboard-panel-header">
                 <span class="clipboard-panel-title">
-                    <i class="fa-solid fa-clipboard"></i>
+                    <i class="fa-solid fa-clipboard" />
                     Clipboard
                     <span class="clipboard-panel-mode">{{ isCut ? 'Cut' : 'Copy' }}</span>
                 </span>
-                <button class="clipboard-panel-close" @click="clear" title="Clear clipboard">
-                    <i class="fa-solid fa-xmark"></i>
+                <button class="clipboard-panel-close" title="Clear clipboard" @click="clear">
+                    <i class="fa-solid fa-xmark" />
                 </button>
             </div>
             <div class="clipboard-panel-source">
-                <i class="fa-solid fa-folder-open"></i>
+                <i class="fa-solid fa-folder-open" />
                 {{ source && source.orgSlug }} / {{ source && source.dsSlug }}<span v-if="source && source.basePath"> / {{ source.basePath }}</span>
             </div>
             <div class="clipboard-panel-count">
@@ -20,7 +20,7 @@
             </div>
             <ul class="clipboard-panel-list">
                 <li v-for="it in visibleItems" :key="it.path" class="clipboard-panel-item" :title="it.path">
-                    <i class="fa-solid" :class="iconFor(it)"></i>
+                    <i class="fa-solid" :class="iconFor(it)" />
                     {{ basename(it.path) }}
                 </li>
                 <li v-if="hiddenCount > 0" class="clipboard-panel-more">

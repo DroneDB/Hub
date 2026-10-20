@@ -1,21 +1,21 @@
 <template>
-    <div class="plant-health-panel" v-if="visible">
+    <div v-if="visible" class="plant-health-panel">
         <div class="panel-header">
-            <span class="panel-title"><i class="fas fa-leaf"></i> Plant Health</span>
-            <button class="close-btn" @click="close" title="Close"><i class="fas fa-times"></i></button>
+            <span class="panel-title"><i class="fas fa-leaf" /> Plant Health</span>
+            <button class="close-btn" title="Close" @click="close"><i class="fas fa-times" /></button>
         </div>
 
-        <div class="panel-body" v-if="rasterInfo">
+        <div v-if="rasterInfo" class="panel-body">
             <!-- Sensor Info -->
-            <div class="section" v-if="rasterInfo.detectedSensor">
+            <div v-if="rasterInfo.detectedSensor" class="section">
                 <label class="section-label">Sensor</label>
                 <span class="sensor-badge">{{ rasterInfo.detectedSensor }}</span>
             </div>
 
             <!-- Preset Selection -->
-            <div class="section" v-if="rasterInfo.presets && rasterInfo.presets.length > 0">
+            <div v-if="rasterInfo.presets && rasterInfo.presets.length > 0" class="section">
                 <label class="section-label">Preset</label>
-                <select v-model="selectedPreset" @change="onPresetChange" class="panel-select">
+                <select v-model="selectedPreset" class="panel-select" @change="onPresetChange">
                     <option value="">Custom...</option>
                     <option v-for="p in rasterInfo.presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                 </select>
@@ -26,52 +26,52 @@
                 <label class="section-label">
                     Formula
                     <button type="button" class="info-icon-btn"
-                            @click="showFormulasInfo = true"
                             title="Learn more about each vegetation index"
-                            data-testid="plant-health-formulas-info">
-                        <i class="fas fa-info-circle"></i>
+                            data-testid="plant-health-formulas-info"
+                            @click="showFormulasInfo = true">
+                        <i class="fas fa-info-circle" />
                     </button>
                 </label>
-                <select v-model="selectedFormula" @change="onFormulaChange" class="panel-select">
+                <select v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
                     <option value="">None (bands only)</option>
                     <option v-for="f in availableFormulas" :key="f.id" :value="f.id"
-                        :disabled="f.disabled"
-                        :title="f.disabled ? f.disabledReason : f.help">
+                            :disabled="f.disabled"
+                            :title="f.disabled ? f.disabledReason : f.help">
                         {{ f.name }}{{ f.disabled ? ' ✗' : '' }}
                     </option>
                 </select>
             </div>
 
             <!-- Band Mapping (when no formula) -->
-            <div class="section" v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3">
+            <div v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3" class="section">
                 <label class="section-label">Bands (R,G,B)</label>
                 <BandSelector
                     v-model="customBands"
                     :bands="rasterInfo.bands"
-                    @update:modelValue="debouncedApply" />
+                    @update:model-value="debouncedApply" />
             </div>
 
             <!-- Single band info message -->
-            <div class="section" v-if="rasterInfo.bands && rasterInfo.bands.length === 1">
+            <div v-if="rasterInfo.bands && rasterInfo.bands.length === 1" class="section">
                 <div class="single-band-info">
-                    <i class="fas fa-info-circle"></i>
+                    <i class="fas fa-info-circle" />
                     <span>Single band image. Use <strong>Merge Multispectral</strong> to combine bands for vegetation indices.</span>
                 </div>
             </div>
 
             <!-- Colormap (when formula is active) -->
-            <div class="section" v-if="selectedFormula">
+            <div v-if="selectedFormula" class="section">
                 <label class="section-label">Colormap</label>
                 <ColormapDropdown
                     v-model="selectedColormap"
                     :colormaps="availableColormaps"
-                    @update:modelValue="debouncedApply" />
+                    @update:model-value="debouncedApply" />
             </div>
 
             <!-- Stretch Type -->
-            <div class="section" v-if="selectedFormula">
+            <div v-if="selectedFormula" class="section">
                 <label class="section-label">Stretch</label>
-                <select v-model="selectedStretch" @change="onStretchChange" class="panel-select">
+                <select v-model="selectedStretch" class="panel-select" @change="onStretchChange">
                     <option value="percentile">Percentile (2%-98%)</option>
                     <option value="minmax">Min / Max</option>
                     <option value="stddev">Std Dev (±2σ)</option>
@@ -80,13 +80,13 @@
             </div>
 
             <!-- Rescale (when formula is active) -->
-            <div class="section" v-if="selectedFormula">
+            <div v-if="selectedFormula" class="section">
                 <label class="section-label">Rescale</label>
-                <input v-model="rescale" @change="onRescaleManualChange" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" />
+                <input v-model="rescale" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" @change="onRescaleManualChange">
             </div>
 
             <!-- Histogram -->
-            <div class="section" style="margin-bottom: 1rem" v-if="histogramData">
+            <div v-if="histogramData" class="section" style="margin-bottom: 1rem">
                 <label class="section-label">Histogram</label>
                 <HistogramChart
                     :data="histogramData"
@@ -98,7 +98,7 @@
             </div>
 
             <!-- Statistics -->
-            <div class="section" v-if="metadata && metadata.statistics">
+            <div v-if="metadata && metadata.statistics" class="section">
                 <label class="section-label">Statistics</label>
                 <div class="stats-grid">
                     <span>Min: {{ formatNum(firstBandStats.min) }}</span>
@@ -110,40 +110,40 @@
 
             <!-- Reset / Toggle / Copy Link / Export -->
             <div class="section actions actions-grid">
-                <button class="btn btn-secondary btn-sm action-btn" @click="reset"
-                        title="Reset visualization parameters to defaults">
-                    <i class="fas fa-rotate-left"></i>
+                <button class="btn btn-secondary btn-sm action-btn" title="Reset visualization parameters to defaults"
+                        @click="reset">
+                    <i class="fas fa-rotate-left" />
                     <span class="action-label">Reset</span>
                 </button>
                 <button class="btn btn-sm action-btn"
                         :class="originalView ? 'btn-primary' : 'btn-secondary'"
-                        @click="toggleOriginalView"
-                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'">
-                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
+                        @click="toggleOriginalView">
+                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                     <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm action-btn" @click="copyLink"
-                        title="Copy a shareable link with the current settings">
-                    <i class="fas fa-link"></i>
+                <button class="btn btn-secondary btn-sm action-btn" title="Copy a shareable link with the current settings"
+                        @click="copyLink">
+                    <i class="fas fa-link" />
                     <span class="action-label">Copy Link</span>
                 </button>
                 <button v-if="!isExportTooLarge"
                         class="btn btn-secondary btn-sm action-btn"
-                        @click="exportGeoTiff"
                         :disabled="exporting"
-                        title="Export the current view as a GeoTIFF file">
-                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+                        title="Export the current view as a GeoTIFF file"
+                        @click="exportGeoTiff">
+                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'" />
                     <span class="action-label">Export</span>
                 </button>
                 <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
-                    <i class="fas fa-download"></i>
+                    <i class="fas fa-download" />
                     <span class="action-label">Export</span>
                 </span>
             </div>
         </div>
 
-        <div class="panel-body loading" v-else>
-            <i class="fas fa-spinner fa-spin"></i> Loading raster info...
+        <div v-else class="panel-body loading">
+            <i class="fas fa-spinner fa-spin" /> Loading raster info...
         </div>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
@@ -170,8 +170,8 @@ import useHeavyTask from '@/composables/useHeavyTask';
  * rescaling, and copy-link functionality.
  */
 export default {
-    mixins: [useHeavyTask],
     components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },
+    mixins: [useHeavyTask],
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },

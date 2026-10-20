@@ -1,5 +1,5 @@
 <template>
-    <Window title="Confirm delete" id="remove" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="remove" title="Confirm delete" modal max-width="70%" fixed-size @on-close="close('close')">
 
         <div class="mb-3">Are you sure you want to delete the organization '{{ orgSlug }}'?</div>
 
@@ -9,8 +9,8 @@
         </PrimeMessage>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" severity="secondary" label="Close" />
-            <Button @click="close('remove')" severity="danger" label="Remove" />
+            <Button severity="secondary" label="Close" @click="close('close')" />
+            <Button severity="danger" label="Remove" @click="close('remove')" />
         </div>
     </Window>
 </template>

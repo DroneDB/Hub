@@ -1,12 +1,12 @@
 <template>
-    <Window title="Delete Results" id="delete-results" @onClose="close" modal sizeClass="dialog-lg" fixedSize>
+    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size @on-close="close">
         <div class="delete-results-content">
             <!-- Success section -->
             <div v-if="deleted.length > 0" class="result-section success-section">
-                <h4><i class="fa-solid fa-circle-check green"></i> Successfully Deleted ({{ deleted.length }})</h4>
+                <h4><i class="fa-solid fa-circle-check green" /> Successfully Deleted ({{ deleted.length }})</h4>
                 <ul class="file-list">
                     <li v-for="path in deleted" :key="path" class="file-item success">
-                        <i class="fa-solid fa-check green"></i>
+                        <i class="fa-solid fa-check green" />
                         <span class="file-path">{{ path }}</span>
                     </li>
                 </ul>
@@ -14,10 +14,10 @@
 
             <!-- Failure section -->
             <div v-if="Object.keys(failed).length > 0" class="result-section error-section">
-                <h4><i class="fa-solid fa-circle-exclamation red"></i> Failed to Delete ({{ Object.keys(failed).length }})</h4>
+                <h4><i class="fa-solid fa-circle-exclamation red" /> Failed to Delete ({{ Object.keys(failed).length }})</h4>
                 <ul class="file-list">
                     <li v-for="(error, path) in failed" :key="path" class="file-item error">
-                        <i class="fa-solid fa-xmark red"></i>
+                        <i class="fa-solid fa-xmark red" />
                         <span class="file-path">{{ path }}</span>
                         <span class="error-message">{{ error }}</span>
                     </li>
@@ -26,7 +26,7 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="close" />
         </div>
     </Window>
 </template>

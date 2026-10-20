@@ -1,8 +1,8 @@
 <template>
-    <Window title="Rename" id="rename" @onClose="onWindowClose" @show="focusInput" modal maxWidth="70%" fixedSize>
+    <Window id="rename" title="Rename" modal max-width="70%" fixed-size @on-close="onWindowClose" @show="focusInput">
 
-        <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close('close')"
-            v-model="renameText" :invalid="renameText == null || renameText.length == 0" :disabled="busy" fluid />
+        <InputText ref="renameInput" v-model="renameText" class="renameInput" :invalid="renameText == null || renameText.length == 0"
+                   :disabled="busy" fluid @keyup.enter="rename" @keyup.esc="close('close')" />
 
         <!-- Checkbox to also rename sidecar files (e.g. _measurements.geojson, _cameras.json) -->
         <div v-if="sidecars.length > 0" class="sidecar-rename-option">
@@ -11,7 +11,7 @@
                     v-model="renameSidecars"
                     :binary="true"
                     :disabled="busy"
-                    inputId="renameSidecarsCheckbox" />
+                    input-id="renameSidecarsCheckbox" />
                 <label for="renameSidecarsCheckbox">
                     Also rename sidecar files
                 </label>
@@ -22,8 +22,8 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" :disabled="busy" severity="secondary" label="Close" />
-            <Button @click="rename" :disabled="!renameText || renameText === file.label || busy" :loading="busy" severity="primary" label="Rename" />
+            <Button :disabled="busy" severity="secondary" label="Close" @click="close('close')" />
+            <Button :disabled="!renameText || renameText === file.label || busy" :loading="busy" severity="primary" label="Rename" @click="rename" />
         </div>
     </Window>
 </template>

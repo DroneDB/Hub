@@ -3,52 +3,52 @@
         <div class="filters">
             <div class="filter-bar">
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value"
-                        placeholder="All States" @change="onFilterChange" />
-                    <Select v-model="selectedTool" :options="toolFilterOptions" optionLabel="label" optionValue="value"
-                        placeholder="All Tools" @change="onFilterChange" />
-                    <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary"
-                        :loading="loading" />
+                    <Select v-model="selectedState" :options="stateOptions" option-label="label" option-value="value"
+                            placeholder="All States" @change="onFilterChange" />
+                    <Select v-model="selectedTool" :options="toolFilterOptions" option-label="label" option-value="value"
+                            placeholder="All Tools" @change="onFilterChange" />
+                    <Button icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary" :loading="loading"
+                            @click="refreshData" />
                     <span v-if="showPhotogrammetryButton" class="d-inline-block"
-                        :title="photogrammetryGatingDisabled ? photogrammetryDisabledMsg : ''">
-                        <Button severity="success" @click="openPhotogrammetryDialog"
-                            :disabled="photogrammetryGatingDisabled"
-                            icon="fa-solid fa-camera" label="Run Photogrammetry" />
+                          :title="photogrammetryGatingDisabled ? photogrammetryDisabledMsg : ''">
+                        <Button severity="success" :disabled="photogrammetryGatingDisabled"
+                                icon="fa-solid fa-camera"
+                                label="Run Photogrammetry" @click="openPhotogrammetryDialog" />
                     </span>
-                    <Button severity="danger" @click="showClearDialog" :disabled="concludedCount === 0"
-                        icon="fa-solid fa-trash" label="Clear Concluded" />
+                    <Button severity="danger" :disabled="concludedCount === 0" icon="fa-solid fa-trash"
+                            label="Clear Concluded" @click="showClearDialog" />
                 </div>
             </div>
         </div>
 
         <div class="content">
             <TasksTable :tasks="filteredTasks" :tools="tools" :loading="loading" :rows="pageSize"
-                :total-items="filteredTasks.length"
-                :current-page-first="currentPageFirst"
-                :downloading-task-id="downloadingTaskId"
-                empty-message="No processing tasks have been run for this dataset yet."
-                @view-log="openLog" @download-result="downloadResult"
-                @cancel="cancelTask" @retry="retryTask" @delete="deleteTask"
-                @page-reset="onPageReset" />
+                        :total-items="filteredTasks.length"
+                        :current-page-first="currentPageFirst"
+                        :downloading-task-id="downloadingTaskId"
+                        empty-message="No processing tasks have been run for this dataset yet."
+                        @view-log="openLog" @download-result="downloadResult"
+                        @cancel="cancelTask" @retry="retryTask" @delete="deleteTask"
+                        @page-reset="onPageReset" />
         </div>
 
         <!-- Standalone paginator (outside scrollable area, hidden when < 10 items) -->
         <div v-if="filteredTasks.length >= 10" class="paginator-wrapper">
-            <Paginator :rows="pageSize" :totalRecords="filteredTasks.length" :first="currentPageFirst"
-                @page="onPageChange" :rowsPerPageOptions="[10, 20, 25, 50, 100]"
-                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown" />
+            <Paginator :rows="pageSize" :total-records="filteredTasks.length" :first="currentPageFirst"
+                       :rows-per-page-options="[10, 20, 25, 50, 100]" paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                       @page="onPageChange" />
         </div>
 
         <!-- Photogrammetry launcher -->
         <Dialog v-model:visible="photogrammetryDialogOpen" modal header="Run Photogrammetry (NodeODX)"
-            :style="{ width: '52rem' }">
+                :style="{ width: '52rem' }">
             <div class="mb-3">
                 <label class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
                 <div class="d-flex gap-2">
                     <InputText v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
-                        placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
-                    <Button @click="openImageFolderPicker" icon="fa-regular fa-folder-open"
-                        severity="secondary" title="Browse dataset" />
+                               placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
+                    <Button icon="fa-regular fa-folder-open" severity="secondary"
+                            title="Browse dataset" @click="openImageFolderPicker" />
                 </div>
                 <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
                 <small v-else class="muted">All images under this folder will be processed.</small>
@@ -58,8 +58,8 @@
             <div class="mb-3">
                 <label class="d-block mb-1"><strong>Processing node</strong></label>
                 <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId"
-                    :options="photogrammetryNodes" optionLabel="label" optionValue="value"
-                    class="w-100" @change="onNodeChanged" />
+                        :options="photogrammetryNodes" option-label="label" option-value="value"
+                        class="w-100" @change="onNodeChanged" />
                 <div v-else-if="photogrammetryNodes.length === 1" class="pg-node-details">
                     <div><strong>{{ photogrammetryNodes[0].title }}</strong></div>
                     <div class="muted">ID: {{ photogrammetryNodes[0].id }}</div>
@@ -72,7 +72,7 @@
                     <template v-if="nodeStatus.reachable">
                         Node reachable - {{ nodeStatus.taskQueueCount }} task(s) queued,
                         max {{ nodeStatus.maxParallelTasks }} parallel.<span v-if="nodeStatus.engine">
-                        Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
+                            Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
                     </template>
                     <template v-else>
                         Node unreachable: {{ nodeStatus.errorMessage }}
@@ -87,25 +87,25 @@
             <div class="mb-3">
                 <label class="d-block mb-1"><strong>Processing profile</strong></label>
                 <Select v-model="photogrammetryForm.preset"
-                    :options="odmPresetOptions" optionLabel="label" optionValue="id"
-                    class="w-100" />
+                        :options="odmPresetOptions" option-label="label" option-value="id"
+                        class="w-100" />
                 <small class="d-block muted mt-1">{{ selectedPreset.description }}</small>
             </div>
 
             <!-- Options editor (non-custom presets) -->
             <template v-if="photogrammetryForm.preset !== 'custom'">
                 <OdxOptionsEditor v-if="availableOdmOptions.length > 0"
-                    ref="odmEditor"
-                    v-model="customOptions"
-                    :available-options="availableOdmOptions"
-                    :preset-options="selectedPreset.options" class="mb-3" />
+                                  ref="odmEditor"
+                                  v-model="customOptions"
+                                  :available-options="availableOdmOptions"
+                                  :preset-options="selectedPreset.options" class="mb-3" />
                 <div v-if="customOptions.length > 0" class="mb-3 pg-preset-tags">
                     <label class="d-block mb-1"><strong>Customized options ({{ customOptions.length }})</strong></label>
                     <div class="d-flex flex-wrap gap-1">
                         <span v-for="opt in customOptions" :key="opt.name"
-                            class="pg-option-chip pg-option-chip-clickable"
-                            @click="scrollToPresetOption(opt.name)"
-                            title="Click to scroll to option">
+                              class="pg-option-chip pg-option-chip-clickable"
+                              title="Click to scroll to option"
+                              @click="scrollToPresetOption(opt.name)">
                             {{ opt.name }}: {{ opt.value }}
                         </span>
                     </div>
@@ -116,14 +116,14 @@
             <div v-if="photogrammetryForm.preset === 'custom'" class="mb-2">
                 <label class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
                 <Textarea v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
-                    placeholder='[{"name":"fast-orthophoto","value":true},{"name":"dsm","value":true}]' />
+                          placeholder="[{&quot;name&quot;:&quot;fast-orthophoto&quot;,&quot;value&quot;:true},{&quot;name&quot;:&quot;dsm&quot;,&quot;value&quot;:true}]" />
             </div>
             <small v-if="optionsError" class="error-text">{{ optionsError }}</small>
 
             <!-- Output destination -->
             <div class="mb-3">
                 <Checkbox v-model="photogrammetryForm.createNewDataset" :binary="true"
-                    input-id="pg-create-new-dataset" />
+                          input-id="pg-create-new-dataset" />
                 <label for="pg-create-new-dataset" class="d-inline-block ms-2"><strong>Create new dataset for results</strong></label>
                 <small class="d-block muted mt-1">If unchecked, results are extracted into a folder in this dataset.</small>
             </div>
@@ -132,9 +132,9 @@
                 <label class="d-block mb-1"><strong>Output folder</strong></label>
                 <div class="d-flex gap-2">
                     <InputText v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
-                        placeholder="photogrammetry_output" @input="destPathError = ''" />
-                    <Button @click="openOutputFolderPicker" icon="fa-regular fa-folder-open"
-                        severity="secondary" title="Browse dataset" />
+                               placeholder="photogrammetry_output" @input="destPathError = ''" />
+                    <Button icon="fa-regular fa-folder-open" severity="secondary"
+                            title="Browse dataset" @click="openOutputFolderPicker" />
                 </div>
                 <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
                 <small v-else class="muted">Extracted files will be placed in this folder.</small>
@@ -144,81 +144,76 @@
                 <div class="mb-3">
                     <label class="d-block mb-1"><strong>New dataset name</strong></label>
                     <InputText v-model="photogrammetryForm.newDatasetName" class="w-100"
-                        placeholder="photogrammetry-results" />
+                               placeholder="photogrammetry-results" />
                     <small class="muted">Kebab-case slug, max 128 chars.</small>
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1"><strong>Visibility</strong></label>
                     <Select v-model="photogrammetryForm.newDatasetVisibility"
-                        :options="visibilityOptions" optionLabel="label" optionValue="value"
-                        class="w-100" />
+                            :options="visibilityOptions" option-label="label" option-value="value"
+                            class="w-100" />
                 </div>
             </template>
 
             <template #footer>
                 <Button label="Cancel" severity="secondary" @click="photogrammetryDialogOpen = false" />
                 <Button label="Check Node" icon="fa-solid fa-heart-pulse" severity="secondary"
-                    :loading="checkingNode" @click="checkNode" />
+                        :loading="checkingNode" @click="checkNode" />
                 <Button label="Start" icon="fa-solid fa-play" :loading="submitting" @click="submitPhotogrammetry" />
             </template>
         </Dialog>
 
         <!-- Log viewer -->
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
-            :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
+                       :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
         <ConfirmDialog v-if="clearDialogOpen"
-            title="Clear Concluded Tasks"
-            :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`"
-            confirmText="Clear" cancelText="Cancel" confirmButtonClass="danger"
-            warningTitle="Warning" warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
-            @onClose="handleClearDialogClose">
-        </ConfirmDialog>
+                       title="Clear Concluded Tasks"
+                       :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`"
+                       confirm-text="Clear" cancel-text="Cancel" confirm-button-class="danger"
+                       warning-title="Warning" warning-message="This action cannot be undone. Any task results still available for download will be deleted."
+                       @on-close="handleClearDialogClose" />
 
         <!-- Invalid path error (#5) -->
         <ConfirmDialog v-if="errorDialogOpen"
-            title="Invalid path"
-            :message="errorDialogMessage"
-            confirmText="OK" cancelText="Close" confirmButtonClass="primary"
-            @onClose="errorDialogOpen = false">
-        </ConfirmDialog>
+                       title="Invalid path"
+                       :message="errorDialogMessage"
+                       confirm-text="OK" cancel-text="Close" confirm-button-class="primary"
+                       @on-close="errorDialogOpen = false" />
 
         <!-- Unreachable node confirmation before starting (#6) -->
         <ConfirmDialog v-if="unreachableConfirmOpen"
-            title="Processing node unreachable"
-            :message="`The selected processing node did not respond${nodeStatus && nodeStatus.errorMessage ? ` (${nodeStatus.errorMessage})` : ''}.<br/>Do you want to start the task anyway?`"
-            confirmText="Start anyway" cancelText="Cancel" confirmButtonClass="primary"
-            warningTitle="Warning" warningMessage="The task may fail immediately if the node is offline."
-            @onClose="handleUnreachableConfirmClose">
-        </ConfirmDialog>
+                       title="Processing node unreachable"
+                       :message="`The selected processing node did not respond${nodeStatus && nodeStatus.errorMessage ? ` (${nodeStatus.errorMessage})` : ''}.<br/>Do you want to start the task anyway?`"
+                       confirm-text="Start anyway" cancel-text="Cancel" confirm-button-class="primary"
+                       warning-title="Warning" warning-message="The task may fail immediately if the node is offline."
+                       @on-close="handleUnreachableConfirmClose" />
 
         <!-- Cancel task confirmation -->
         <ConfirmDialog v-if="cancelDialogOpen"
-            title="Cancel Task"
-            :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, tools)}</strong>${cancellingTask.path ? ' (path: ' + cancellingTask.path + ')' : ''} will be stopped.`"
-            confirmText="Cancel Task" cancelText="Don't Cancel" confirmButtonClass="danger"
-            @onClose="handleCancelDialogClose">
-        </ConfirmDialog>
+                       title="Cancel Task"
+                       :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, tools)}</strong>${cancellingTask.path ? ' (path: ' + cancellingTask.path + ')' : ''} will be stopped.`"
+                       confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
+                       @on-close="handleCancelDialogClose" />
 
         <!-- Delete task confirmation -->
         <ConfirmDialog v-if="deleteDialogOpen"
-            title="Delete Task"
-            :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, tools)}</strong> will be removed together with any downloadable results it produced.`"
-            confirmText="Delete" cancelText="Cancel" confirmButtonClass="danger"
-            warningTitle="Warning"
-            warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
-            @onClose="handleDeleteDialogClose">
-        </ConfirmDialog>
+                       title="Delete Task"
+                       :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, tools)}</strong> will be removed together with any downloadable results it produced.`"
+                       confirm-text="Delete" cancel-text="Cancel" confirm-button-class="danger"
+                       warning-title="Warning"
+                       warning-message="This action cannot be undone. Any task results still available for download will be deleted."
+                       @on-close="handleDeleteDialogClose" />
 
         <!-- Folder picker for output folder -->
         <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
-            :initialPath="photogrammetryForm.destPath || ''" title="Select output folder"
-            @onClose="handleOutputFolderPickerClose" />
+                      :initial-path="photogrammetryForm.destPath || ''" title="Select output folder"
+                      @on-close="handleOutputFolderPickerClose" />
 
         <!-- Folder picker for image folder -->
         <FolderPicker v-if="imageFolderPickerOpen" :dataset="dataset" mode="folder"
-            :initialPath="photogrammetryForm.folder || ''" title="Select image folder"
-            @onClose="handleImageFolderPickerClose" />
+                      :initial-path="photogrammetryForm.folder || ''" title="Select image folder"
+                      @on-close="handleImageFolderPickerClose" />
     </div>
 </template>
 
@@ -294,10 +289,15 @@ const ODM_PRESETS = [
 ];
 
 export default {
-    mixins: [useHeavyTask, useTaskFormatting],
 
     components: {
         ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
+    },
+    mixins: [useHeavyTask, useTaskFormatting],
+
+    inject: {
+        registerTabChild: { default: null },
+        unregisterTabChild: { default: null }
     },
 
     props: {
@@ -362,11 +362,6 @@ export default {
             outputFolderPickerOpen: false,
             imageFolderPickerOpen: false
         };
-    },
-
-    inject: {
-        registerTabChild: { default: null },
-        unregisterTabChild: { default: null }
     },
 
     computed: {

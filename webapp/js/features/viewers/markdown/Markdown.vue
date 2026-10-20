@@ -1,19 +1,19 @@
 <template>
     <div class="markdown">
-        <TabViewLoader @loaded="handleLoad" titleSuffix="Markdown" />
+        <TabViewLoader title-suffix="Markdown" @loaded="handleLoad" />
 
-        <Message bindTo="error" />
+        <Message bind-to="error" />
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
         <div v-else class="md-container">
             <div v-if="editing && editable" class="edit-container">
-                <textarea ref="editTextarea" v-model="rawContent"></textarea>
-                <Button @click="save" severity="secondary" outlined class="save" icon="fa-solid fa-floppy-disk" />
+                <textarea ref="editTextarea" v-model="rawContent" />
+                <Button severity="secondary" outlined class="save" icon="fa-solid fa-floppy-disk" @click="save" />
             </div>
             <template v-else>
-                <Button v-if="editable" @click="edit" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" />
-                <div v-html="content" class="content" />
+                <Button v-if="editable" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" @click="edit" />
+                <div class="content" v-html="content" />
             </template>
         </div>
     </div>

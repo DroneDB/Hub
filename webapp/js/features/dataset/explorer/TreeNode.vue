@@ -1,25 +1,25 @@
 <template>
     <div class="tree-node">
         <div class="entry"
-            :draggable="!node.root && canWrite"
-            @dragstart="onDragStart($event, node)"
-            @drop="onItemDrop($event, node)"
-            @dragover="itemDragOver($event, node)"
-            @dragenter="itemDragEnter($event, node)"
-            @dragleave="itemDragLeave($event, node)"
-            @click="onClick" @dblclick="handleOpenDblClick" @contextmenu="onRightClick"
-            :class="{ selected: selected, 'drop-target': dropTargetPath === node.entry.path }">
-            <i class="fa-solid fa-circle-notch fa-spin" v-if="loading" />
-            <i class="icon" @click="handleOpenCaret" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
-                v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
-            <i class="icon nonexistent" v-if="!isExpandable || (empty && loadedChildren)" />
+             :draggable="!node.root && canWrite"
+             :class="{ selected: selected, 'drop-target': dropTargetPath === node.entry.path }"
+             @dragstart="onDragStart($event, node)"
+             @drop="onItemDrop($event, node)"
+             @dragover="itemDragOver($event, node)"
+             @dragenter="itemDragEnter($event, node)"
+             @dragleave="itemDragLeave($event, node)" @click="onClick" @dblclick="handleOpenDblClick"
+             @contextmenu="onRightClick">
+            <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
+            <i v-if="isExpandable && !loading && (!empty || !loadedChildren)" class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
+               @click="handleOpenCaret" />
+            <i v-if="!isExpandable || (empty && loadedChildren)" class="icon nonexistent" />
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
-        </div>        <div class="children" v-show="expanded">
-            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" :node="node" ref="nodes"
-                :getChildren="getChildren" :canWrite="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
-                @opened="(n, sender) => $emit('opened', n, sender)" />
+        </div>        <div v-show="expanded" class="children">
+            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" ref="nodes" :node="node"
+                      :get-children="getChildren" :can-write="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
+                      @opened="(n, sender) => $emit('opened', n, sender)" />
         </div>
     </div>
 </template>
@@ -34,7 +34,6 @@ import emitter from '@/libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
-    emits: ['opened', 'selected'],
     mixins: [itemDnDMixin],
     props: {
         node: {
@@ -50,6 +49,7 @@ export default {
             default: true
         }
     },
+    emits: ['opened', 'selected'],
     components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
     data: function () {
         return {

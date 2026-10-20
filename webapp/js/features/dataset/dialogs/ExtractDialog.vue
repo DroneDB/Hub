@@ -1,7 +1,7 @@
 <template>
-    <Window title="Extract Archive" id="extractDialog" @onClose="close('close')" modal maxWidth="600px" fixedSize>
+    <Window id="extractDialog" title="Extract Archive" modal max-width="600px" fixed-size @on-close="close('close')">
         <div class="extract-dialog">
-            <form v-on:submit.prevent>
+            <form @submit.prevent>
 
                 <!-- Error Message -->
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -18,22 +18,22 @@
                     <label class="d-block mb-1 fw-semibold">Extract to</label>
                     <div class="dest-path-row">
                         <InputText v-model="destPath" placeholder="root folder" :disabled="isExtracting"
-                            :invalid="!!destPathError" @input="onDestPathInput" fluid />
+                                   :invalid="!!destPathError" fluid @input="onDestPathInput" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-folder-open"
-                            :disabled="isExtracting" @click="openFolderPicker" title="Browse folders"
-                            aria-label="Browse folders" />
+                                :disabled="isExtracting" title="Browse folders" aria-label="Browse folders"
+                                @click="openFolderPicker" />
                     </div>
                     <small v-if="destPathError" class="dest-error">{{ destPathError }}</small>
-                    <small v-else-if="destPathChecking" class="help-text"><i class="fa-solid fa-circle-notch fa-spin"></i> Checking destination…</small>
-                    <small v-else-if="destPathExists === true" class="dest-exists"><i class="fa-solid fa-folder-open"></i> This folder already exists; extracted files will be added to it.</small>
-                    <small v-else-if="destPathExists === false" class="dest-create"><i class="fa-solid fa-folder-plus"></i> This folder will be created.</small>
+                    <small v-else-if="destPathChecking" class="help-text"><i class="fa-solid fa-circle-notch fa-spin" /> Checking destination…</small>
+                    <small v-else-if="destPathExists === true" class="dest-exists"><i class="fa-solid fa-folder-open" /> This folder already exists; extracted files will be added to it.</small>
+                    <small v-else-if="destPathExists === false" class="dest-create"><i class="fa-solid fa-folder-plus" /> This folder will be created.</small>
                     <small v-else class="help-text">Destination folder (leave empty for the dataset root).</small>
                 </div>
 
                 <!-- Overwrite Checkbox -->
                 <div class="mb-2">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="overwrite" :binary="true" inputId="extractOverwrite" :disabled="isExtracting" />
+                        <Checkbox v-model="overwrite" :binary="true" input-id="extractOverwrite" :disabled="isExtracting" />
                         <label for="extractOverwrite">Overwrite existing files</label>
                     </div>
                 </div>
@@ -41,14 +41,14 @@
                 <!-- Delete Archive Checkbox -->
                 <div class="mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="deleteArchive" :binary="true" inputId="extractDeleteArchive" :disabled="isExtracting" />
+                        <Checkbox v-model="deleteArchive" :binary="true" input-id="extractDeleteArchive" :disabled="isExtracting" />
                         <label for="extractDeleteArchive">Delete archive after extraction</label>
                     </div>
                 </div>
 
                 <!-- Progress Bar -->
                 <div v-if="isExtracting" class="progress-section">
-                    <ProgressBar :value="progress" :showValue="true" />
+                    <ProgressBar :value="progress" :show-value="true" />
                     <div class="progress-label">{{ statusMessage }}</div>
                 </div>
 
@@ -56,15 +56,15 @@
 
             <!-- Buttons -->
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" :disabled="isExtracting" label="Close" />
-                <Button @click="extract" :disabled="isExtracting || !!destPathError" :loading="isExtracting"
-                    severity="primary" icon="fa-solid fa-box-open" label="Extract" />
+                <Button severity="secondary" :disabled="isExtracting" label="Close" @click="close('close')" />
+                <Button :disabled="isExtracting || !!destPathError" :loading="isExtracting" severity="primary"
+                        icon="fa-solid fa-box-open" label="Extract" @click="extract" />
             </div>
         </div>
 
         <!-- Guided folder browser -->
-        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initialPath="destPath"
-            @onClose="handleFolderPickerClose" />
+        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initial-path="destPath"
+                            @on-close="handleFolderPickerClose" />
     </Window>
 </template>
 

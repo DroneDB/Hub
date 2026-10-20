@@ -1,7 +1,7 @@
 <template>
-    <Window title="Transfer to Dataset" id="transferDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size @on-close="close('close')">
         <div class="transfer-dialog">
-            <form v-on:submit.prevent :class="{ error: hasError }">
+            <form :class="{ error: hasError }" @submit.prevent>
 
                 <!-- Error Message -->
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -16,15 +16,15 @@
                 <!-- Destination Organization -->
                 <div class="my-3">
                     <label class="d-block mb-1 fw-semibold">Destination Organization</label>
-                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label"
-                        optionValue="value" placeholder="Select organization" class="w-100" data-autofocus />
+                    <Select v-model="destOrg" :options="organizationOptions" option-label="label" option-value="value"
+                            placeholder="Select organization" class="w-100" data-autofocus @change="onOrgChange" />
                 </div>
 
                 <!-- Destination Dataset -->
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Destination Dataset</label>
-                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label"
-                        optionValue="value" optionDisabled="disabled" placeholder="Select dataset" class="w-100" />
+                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" option-label="label"
+                            option-value="value" option-disabled="disabled" placeholder="Select dataset" class="w-100" />
                 </div>
 
                 <!-- Destination Path -->
@@ -37,14 +37,14 @@
                 <!-- Overwrite Checkbox -->
                 <div class="mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="overwrite" :binary="true" inputId="overwriteCheckbox" />
+                        <Checkbox v-model="overwrite" :binary="true" input-id="overwriteCheckbox" />
                         <label for="overwriteCheckbox">Overwrite existing files</label>
                     </div>
                 </div>
 
                 <!-- Progress Bar -->
                 <div v-if="isTransferring" class="progress-section">
-                    <ProgressBar :value="progress" :showValue="true" />
+                    <ProgressBar :value="progress" :show-value="true" />
                     <div class="progress-label">{{ statusMessage }}</div>
                 </div>
 
@@ -52,9 +52,9 @@
 
             <!-- Buttons -->
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" :disabled="isTransferring" label="Close" />
-                <Button @click="transfer" :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left"
-                    label="Transfer" />
+                <Button severity="secondary" :disabled="isTransferring" label="Close" @click="close('close')" />
+                <Button :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left" label="Transfer"
+                        @click="transfer" />
             </div>
         </div>
     </Window>

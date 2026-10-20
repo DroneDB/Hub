@@ -1,39 +1,39 @@
 <template>
-    <Window title="Change Password" id="changePasswordDialog" @onClose="close" modal maxWidth="50%" fixedSize>
+    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size @on-close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message bind-to="error" />
 
             <PrimeMessage severity="info" :closable="false" class="mb-3">
                 Changing password for user: <strong>{{ user.userName }}</strong>
             </PrimeMessage>
 
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+            <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Current Password</label>
-                    <Password ref="txtCurrentPassword" @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="currentPassword" placeholder="Enter current password" :feedback="false" toggleMask class="w-100" />
+                    <Password ref="txtCurrentPassword" v-model="currentPassword" placeholder="Enter current password"
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmChange()" />
                     <small>Leave empty if you don't know the current password (admin override)</small>
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="newPassword" placeholder="Enter new password" :feedback="false" toggleMask class="w-100" />
+                    <Password v-model="newPassword" placeholder="Enter new password"
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmChange()" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="confirmPassword" placeholder="Confirm new password" :feedback="false" toggleMask class="w-100" />
+                    <Password v-model="confirmPassword" placeholder="Confirm new password"
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmChange()" />
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="changing" label="Cancel" />
-                <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
-                    severity="primary" label="Change Password" />
+                <Button severity="secondary" :disabled="changing" label="Cancel" @click="close()" />
+                <Button :disabled="changing || !isValid()" :loading="changing" severity="primary"
+                        label="Change Password" @click="confirmChange()" />
             </div>
         </div>
     </Window>

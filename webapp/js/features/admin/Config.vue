@@ -7,10 +7,10 @@
                 <h1>Configuration</h1>
             </div>
             <div class="d-flex gap-2">
-                <Button @click="resetToDefaults" severity="secondary" icon="fa-solid fa-rotate-left"
-                    label="Reset to Defaults" :disabled="loading" />
-                <Button @click="copyToClipboard" severity="primary" icon="fa-solid fa-copy"
-                    label="Copy AppSettings JSON" :disabled="loading" />
+                <Button severity="secondary" icon="fa-solid fa-rotate-left" label="Reset to Defaults"
+                        :disabled="loading" @click="resetToDefaults" />
+                <Button severity="primary" icon="fa-solid fa-copy" label="Copy AppSettings JSON"
+                        :disabled="loading" @click="copyToClipboard" />
             </div>
         </div>
 
@@ -20,135 +20,135 @@
         </div>
 
         <div v-else class="config-scroll-container">
-            <Accordion :activeIndex="activeIndex" class="config-accordion">
-            <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx">
-                <template #header>
-                    <span class="section-header">
-                        {{ section.title }}
-                        <Tag v-if="isSectionActive(sIdx)" value="Custom" severity="warning" size="small" class="ms-2" />
-                        <Tag v-else value="Default" severity="secondary" size="small" class="ms-2" />
-                    </span>
-                </template>
-                <div :class="['config-section-content', isSectionActive(sIdx) ? '' : 'config-section-inactive']">
-                    <p class="section-description">{{ section.description }}</p>
+            <Accordion :active-index="activeIndex" class="config-accordion">
+                <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx">
+                    <template #header>
+                        <span class="section-header">
+                            {{ section.title }}
+                            <Tag v-if="isSectionActive(sIdx)" value="Custom" severity="warning" size="small" class="ms-2" />
+                            <Tag v-else value="Default" severity="secondary" size="small" class="ms-2" />
+                        </span>
+                    </template>
+                    <div :class="['config-section-content', isSectionActive(sIdx) ? '' : 'config-section-inactive']">
+                        <p class="section-description">{{ section.description }}</p>
 
-                    <div class="config-fields-grid">
-                        <div v-for="(field, fIdx) in section.fields" :key="fIdx"
-                            class="config-field">
-                            <div class="field-header">
-                                <label :for="`field-${sIdx}-${fIdx}`">{{ field.displayName }}</label>
-                                <div class="field-tags">
-                                    <Tag v-if="field.sensitive && isFieldModified(sIdx, fIdx)"
-                                        value="Modified" severity="warning" size="small" />
-                                    <Tag v-else-if="field.sensitive && field.isSet"
-                                        value="Set (masked)" severity="info" size="small" />
-                                    <Tag v-else-if="field.sensitive && !field.isSet"
-                                        value="Not set" severity="secondary" size="small" />
-                                    <Tag v-else-if="isFieldModified(sIdx, fIdx)"
-                                        value="Modified" severity="warning" size="small" />
-                                    <Tag v-else value="Default" severity="success" size="small" />
+                        <div class="config-fields-grid">
+                            <div v-for="(field, fIdx) in section.fields" :key="fIdx"
+                                 class="config-field">
+                                <div class="field-header">
+                                    <label :for="`field-${sIdx}-${fIdx}`">{{ field.displayName }}</label>
+                                    <div class="field-tags">
+                                        <Tag v-if="field.sensitive && isFieldModified(sIdx, fIdx)"
+                                             value="Modified" severity="warning" size="small" />
+                                        <Tag v-else-if="field.sensitive && field.isSet"
+                                             value="Set (masked)" severity="info" size="small" />
+                                        <Tag v-else-if="field.sensitive && !field.isSet"
+                                             value="Not set" severity="secondary" size="small" />
+                                        <Tag v-else-if="isFieldModified(sIdx, fIdx)"
+                                             value="Modified" severity="warning" size="small" />
+                                        <Tag v-else value="Default" severity="success" size="small" />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <!-- text -->
-                            <InputText v-if="field.fieldType === 'text' && !field.sensitive"
-                                :id="`field-${sIdx}-${fIdx}`"
-                                :modelValue="getFieldValue(sIdx, fIdx, field)"
-                                @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
+                                <!-- text -->
+                                <InputText v-if="field.fieldType === 'text' && !field.sensitive"
+                                           :id="`field-${sIdx}-${fIdx}`"
+                                           :model-value="getFieldValue(sIdx, fIdx, field)"
+                                           :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                           @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
 
-                            <!-- password / sensitive -->
-                            <template v-else-if="field.fieldType === 'password' || field.sensitive">
-                                <div v-if="!isFieldModified(sIdx, fIdx)" class="sensitive-display">
-                                    <span v-if="field.isSet" class="sensitive-set">
-                                        <i class="fa-solid fa-lock me-1" /> (set, masked)
-                                    </span>
-                                    <span v-else class="sensitive-not-set">
-                                        <i class="fa-solid fa-lock-open me-1" /> (not set)
-                                    </span>
-                                    <Button @click="onSensitiveChange(sIdx, fIdx)" severity="secondary"
-                                        size="small" text class="ms-2">Change</Button>
+                                <!-- password / sensitive -->
+                                <template v-else-if="field.fieldType === 'password' || field.sensitive">
+                                    <div v-if="!isFieldModified(sIdx, fIdx)" class="sensitive-display">
+                                        <span v-if="field.isSet" class="sensitive-set">
+                                            <i class="fa-solid fa-lock me-1" /> (set, masked)
+                                        </span>
+                                        <span v-else class="sensitive-not-set">
+                                            <i class="fa-solid fa-lock-open me-1" /> (not set)
+                                        </span>
+                                        <Button severity="secondary" size="small"
+                                                text class="ms-2" @click="onSensitiveChange(sIdx, fIdx)">Change</Button>
+                                    </div>
+                                    <Password v-else :id="`field-${sIdx}-${fIdx}`"
+                                              :model-value="getFieldValue(sIdx, fIdx, field)"
+                                              :feedback="false"
+                                              toggle-mask placeholder="Enter value..."
+                                              :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                              @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                </template>
+
+                                <!-- number -->
+                                <div v-else-if="field.fieldType === 'number'" class="number-input-wrapper">
+                                    <InputNumber :id="`field-${sIdx}-${fIdx}`"
+                                                 :model-value="getFieldNumber(sIdx, fIdx, field)"
+                                                 :min="field.minValue"
+                                                 :max="field.maxValue" mode="decimal"
+                                                 :use-grouping="false" :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                                 @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                    <span v-if="field.unit" class="input-unit">{{ field.unit }}</span>
                                 </div>
-                                <Password v-else :id="`field-${sIdx}-${fIdx}`"
-                                    :modelValue="getFieldValue(sIdx, fIdx, field)"
-                                    @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                    :feedback="false" toggleMask
-                                    placeholder="Enter value..."
-                                    :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
-                            </template>
 
-                            <!-- number -->
-                            <div v-else-if="field.fieldType === 'number'" class="number-input-wrapper">
-                                <InputNumber :id="`field-${sIdx}-${fIdx}`"
-                                    :modelValue="getFieldNumber(sIdx, fIdx, field)"
-                                    @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                    :min="field.minValue" :max="field.maxValue"
-                                    mode="decimal" :useGrouping="false"
-                                    :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
-                                <span v-if="field.unit" class="input-unit">{{ field.unit }}</span>
+                                <!-- bool -->
+                                <ToggleSwitch v-else-if="field.fieldType === 'bool'"
+                                              :id="`field-${sIdx}-${fIdx}`"
+                                              :model-value="getFieldBool(sIdx, fIdx, field)"
+                                              @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                <!-- enum -->
+                                <Select v-else-if="field.fieldType === 'enum'"
+                                        :id="`field-${sIdx}-${fIdx}`"
+                                        :model-value="getFieldValue(sIdx, fIdx, field)"
+                                        :options="field.enumOptions"
+                                        :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                        @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                <!-- timespan -->
+                                <div v-else-if="field.fieldType === 'timespan'" class="timespan-input-wrapper">
+                                    <InputText :id="`field-${sIdx}-${fIdx}`"
+                                               :model-value="getFieldValue(sIdx, fIdx, field)"
+                                               placeholder="dd:hh:mm:ss"
+                                               :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                               @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                    <small class="timespan-hint">Format: dd:hh:mm:ss (e.g. 00:30:00 = 30 min)</small>
+                                </div>
+
+                                <!-- cron -->
+                                <div v-else-if="field.fieldType === 'cron'" class="cron-input-wrapper">
+                                    <InputText :id="`field-${sIdx}-${fIdx}`"
+                                               :model-value="getFieldValue(sIdx, fIdx, field)"
+                                               placeholder="0 * * * *"
+                                               :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                               @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+                                    <small class="cron-hint">
+                                        Cron expression. Validate at
+                                        <a href="https://crontab.guru" target="_blank" rel="noopener">crontab.guru</a>
+                                    </small>
+                                </div>
+
+                                <!-- array -->
+                                <Chips v-else-if="field.fieldType === 'array'"
+                                       :id="`field-${sIdx}-${fIdx}`"
+                                       :model-value="getFieldArray(sIdx, fIdx, field)"
+                                       @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                <!-- json (fallback) -->
+                                <Textarea v-else
+                                          :id="`field-${sIdx}-${fIdx}`"
+                                          :model-value="getFieldValue(sIdx, fIdx, field)"
+                                          :rows="3"
+                                          :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
+                                          @update:model-value="onFieldChange(sIdx, fIdx, $event)" />
+
+                                <small class="field-description">{{ field.description }}</small>
                             </div>
+                        </div>
 
-                            <!-- bool -->
-                            <ToggleSwitch v-else-if="field.fieldType === 'bool'"
-                                :id="`field-${sIdx}-${fIdx}`"
-                                :modelValue="getFieldBool(sIdx, fIdx, field)"
-                                @update:modelValue="onFieldChange(sIdx, fIdx, $event)" />
-
-                            <!-- enum -->
-                            <Select v-else-if="field.fieldType === 'enum'"
-                                :id="`field-${sIdx}-${fIdx}`"
-                                :modelValue="getFieldValue(sIdx, fIdx, field)"
-                                @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                :options="field.enumOptions"
-                                :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
-
-                            <!-- timespan -->
-                            <div v-else-if="field.fieldType === 'timespan'" class="timespan-input-wrapper">
-                                <InputText :id="`field-${sIdx}-${fIdx}`"
-                                    :modelValue="getFieldValue(sIdx, fIdx, field)"
-                                    @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                    placeholder="dd:hh:mm:ss"
-                                    :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
-                                <small class="timespan-hint">Format: dd:hh:mm:ss (e.g. 00:30:00 = 30 min)</small>
-                            </div>
-
-                            <!-- cron -->
-                            <div v-else-if="field.fieldType === 'cron'" class="cron-input-wrapper">
-                                <InputText :id="`field-${sIdx}-${fIdx}`"
-                                    :modelValue="getFieldValue(sIdx, fIdx, field)"
-                                    @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                    placeholder="0 * * * *"
-                                    :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
-                                <small class="cron-hint">
-                                    Cron expression. Validate at
-                                    <a href="https://crontab.guru" target="_blank" rel="noopener">crontab.guru</a>
-                                </small>
-                            </div>
-
-                            <!-- array -->
-                            <Chips v-else-if="field.fieldType === 'array'"
-                                :id="`field-${sIdx}-${fIdx}`"
-                                :modelValue="getFieldArray(sIdx, fIdx, field)"
-                                @update:modelValue="onFieldChange(sIdx, fIdx, $event)" />
-
-                            <!-- json (fallback) -->
-                            <Textarea v-else
-                                :id="`field-${sIdx}-${fIdx}`"
-                                :modelValue="getFieldValue(sIdx, fIdx, field)"
-                                @update:modelValue="onFieldChange(sIdx, fIdx, $event)"
-                                :rows="3"
-                                :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }" />
-
-                            <small class="field-description">{{ field.description }}</small>
+                        <div class="section-actions mt-3">
+                            <Button severity="secondary" size="small" icon="fa-solid fa-rotate-left"
+                                    label="Reset Section" @click="resetSection(sIdx)" />
                         </div>
                     </div>
-
-                    <div class="section-actions mt-3">
-                        <Button @click="resetSection(sIdx)" severity="secondary" size="small"
-                            icon="fa-solid fa-rotate-left" label="Reset Section" />
-                    </div>
-                </div>
-            </AccordionTab>
+                </AccordionTab>
             </Accordion>
         </div>
     </div>

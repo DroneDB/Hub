@@ -1,10 +1,10 @@
 <template>
     <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
             modal
             header="Vegetation index formulas"
             :style="{ width: '640px' }"
-            :draggable="false">
+            :draggable="false"
+            @update:visible="onVisibleChange">
         <div class="info-dialog-body">
             <p class="info-intro">
                 Each formula combines spectral bands to highlight a specific
@@ -12,24 +12,24 @@
                 matches what you want to inspect.
             </p>
 
-            <div class="formula-card" v-for="entry in entries" :key="entry.id">
+            <div v-for="entry in entries" :key="entry.id" class="formula-card">
                 <h4>
                     <span class="formula-id">{{ entry.id }}</span>
                     <span class="formula-name">{{ entry.name }}</span>
                 </h4>
                 <p class="line"><b>What it measures:</b> {{ entry.measures }}</p>
-                <p class="line" v-if="entry.expression">
+                <p v-if="entry.expression" class="line">
                     <b>Formula:</b> <code>{{ entry.expression }}</code>
                 </p>
                 <p class="line"><b>Bands required:</b> {{ entry.bands }}</p>
                 <p class="line"><b>When to use:</b> {{ entry.when }}</p>
-                <p class="line unavailable" v-if="entry.disabled">
-                    <i class="fas fa-ban"></i>
+                <p v-if="entry.disabled" class="line unavailable">
+                    <i class="fas fa-ban" />
                     Not available on this raster: {{ entry.disabledReason }}
                 </p>
             </div>
 
-            <p class="empty-hint" v-if="entries.length === 0">
+            <p v-if="entries.length === 0" class="empty-hint">
                 No formulas are available for this raster.
             </p>
         </div>

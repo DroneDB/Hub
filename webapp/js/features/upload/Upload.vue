@@ -1,9 +1,9 @@
 <template>
     <div id="upload">
         <div v-if="error" class="error-msg">
-            <Message bindTo="error" />
+            <Message bind-to="error" />
         </div>
-        <div class="container" v-if="uploading || url">
+        <div v-if="uploading || url" class="container">
             <div v-if="uploading" class="uploading">
                 <div v-if="totalBytes === 0">
                     <i class="fa-solid fa-circle-notch fa-spin" />
@@ -11,29 +11,29 @@
 
                 <Card v-if="totalBytes > 0">
                     <template #content>
-                    <div v-if="Object.keys(fileUploadStatus).length === 0">
-                        <i class="fa-solid fa-circle-notch fa-spin" />
-                    </div>
-                    <template v-if="!inIframe">
-                    <div v-for="f in Object.keys(fileUploadStatus)" :key="f" class="progress-indicator">
-                        <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :showValue="false" style="height: 0.75rem; margin-bottom: 0.25rem;" />
-                        <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
-                    </div>
-                    </template>
-                    <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
-                        <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
-                    </div>
-                    <ProgressBar :value="parseFloat(totalProgress)" style="height: 0.5rem; margin-top: 0.5rem;" :showValue="false" />
+                        <div v-if="Object.keys(fileUploadStatus).length === 0">
+                            <i class="fa-solid fa-circle-notch fa-spin" />
+                        </div>
+                        <template v-if="!inIframe">
+                            <div v-for="f in Object.keys(fileUploadStatus)" :key="f" class="progress-indicator">
+                                <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :show-value="false" style="height: 0.75rem; margin-bottom: 0.25rem;" />
+                                <div class="label">{{ (fileUploadStatus[f]).toFixed(2) }}% - {{ f }}</div>
+                            </div>
+                        </template>
+                        <div v-if="totalBytes - totalBytesSent > 0" class="remaining">
+                            <span>Remaining: {{ filesCount - uploadedFiles }} files ({{ humanRemainingBytes }})</span>
+                        </div>
+                        <ProgressBar :value="parseFloat(totalProgress)" style="height: 0.5rem; margin-top: 0.5rem;" :show-value="false" />
                     </template>
                 </Card>
 
-                <Button severity="danger" size="large" @click="handleCancel" icon="fa-solid fa-circle-stop" label="Cancel" />
+                <Button severity="danger" size="large" icon="fa-solid fa-circle-stop" label="Cancel" @click="handleCancel" />
             </div>
         </div>
 
-        <div class="droparea" :class="{ hidden: url || uploading }" ref="droparea"
-            @dragover.prevent @drop.prevent="handleDrop">
-            <Button ref="btnUpload" @click="handleUpload" severity="info" size="large" icon="fa-solid fa-cloud-arrow-up" label="Upload Files" />
+        <div ref="droparea" class="droparea" :class="{ hidden: url || uploading }"
+             @dragover.prevent @drop.prevent="handleDrop">
+            <Button ref="btnUpload" severity="info" size="large" icon="fa-solid fa-cloud-arrow-up" label="Upload Files" @click="handleUpload" />
         </div>
 
     </div>

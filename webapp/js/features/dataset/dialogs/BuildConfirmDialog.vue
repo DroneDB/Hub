@@ -1,5 +1,5 @@
 <template>
-    <Window title="Rebuild File" id="build-confirm" @onClose="close('cancel')" modal sizeClass="dialog-md" fixedSize>
+    <Window id="build-confirm" title="Rebuild File" modal size-class="dialog-md" fixed-size @on-close="close('cancel')">
         <div class="build-confirm-body">
             <PrimeMessage severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                 <strong>This file is already ready for visualization.</strong>
@@ -17,8 +17,8 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="close('confirm')" severity="danger" label="Rebuild Anyway" />
+            <Button severity="secondary" label="Cancel" @click="close('cancel')" />
+            <Button severity="danger" label="Rebuild Anyway" @click="close('confirm')" />
         </div>
     </Window>
 </template>

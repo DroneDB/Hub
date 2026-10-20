@@ -1,5 +1,5 @@
 <template>
-    <div class="split-overlay" ref="overlay">
+    <div ref="overlay" class="split-overlay">
         <!-- Per-band top label -->
         <div
             v-for="(band, i) in bands"

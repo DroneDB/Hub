@@ -1,10 +1,10 @@
 <template>
-    <Window :title="dialogTitle" id="addToDataset" @onClose="close" modal :closable="closable" :fixedSize="true">
+    <Window id="addToDataset" :title="dialogTitle" modal :closable="closable" :fixed-size="true" @on-close="close">
         <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
-            @onUpload="onUploaded" @done="done" :filesToUpload="filesToUpload"
-            @update:closable="updateClosable" @onClose="close"
-            @update:waitingForFiles="updateWaitingForFiles"
-            @importFromUrl="$emit('importFromUrl')"></DatasetUpload>
+                       :files-to-upload="filesToUpload" @on-upload="onUploaded" @done="done"
+                       @update:closable="updateClosable" @on-close="close"
+                       @update:waiting-for-files="updateWaitingForFiles"
+                       @import-from-url="$emit('importFromUrl')" />
     </Window>
 </template>
 

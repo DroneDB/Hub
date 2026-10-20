@@ -1,12 +1,12 @@
 <template>
     <div id="explorer-container">
         <ContextMenu :items="contextMenu" />
-        <Toolbar :tools="tools" v-if="tools" />
+        <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
             <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="mt-3 ms-3">
                 <template #item="{ item }">
                     <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon"></i>
+                        <i v-if="item.icon" :class="item.icon" />
                         <template v-else>{{ item.label }}</template>
                     </a>
                     <span v-else class="bc-active">{{ item.label }}</span>
@@ -15,38 +15,38 @@
             </Breadcrumb>
             <!--<div class="ui divider"></div>-->
         </div>
-        <div ref="explorer" id="explorer" @click="onClick" :class="{ loading, dropping, virtual: virtualGrid }"
-            @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
-            @dragenter="explorerDragEnter($event)" @dragover.prevent>
+        <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }" @click="onClick"
+             @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
+             @dragenter="explorerDragEnter($event)" @dragover.prevent>
             <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment m-3 w-100">
-                <div class="ui active centered inline loader"></div>
+                <div class="ui active centered inline loader" />
             </div>
             <div v-else-if="files.length === 0" class="ui placeholder segment m-3 w-100">
                 <div class="ui icon header">
-                    <i class="fa-regular fa-folder-open icon"></i>
+                    <i class="fa-regular fa-folder-open icon" />
                     This folder is empty
                 </div>
             </div>
             <!-- Large folders: only the rows on screen are rendered (HUB-03) -->
-            <VirtualScroller v-else-if="virtualGrid" ref="grid" class="thumbnail-grid" :items="gridRows"
-                :item-size="gridRowHeight" :min-height="0" v-slot="{ item: row }">
+            <VirtualScroller v-else-if="virtualGrid" ref="grid" v-slot="{ item: row }" class="thumbnail-grid"
+                             :items="gridRows" :item-size="gridRowHeight" :min-height="0">
                 <div class="thumbnail-row">
-                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" :draggable="canWrite" @dragstart="startDrag($event, f)"
-                        @drop="onDrop($event, f)" @dragenter="itemDragEnter($event, f)"
-                        @dragover="itemDragOver($event, f)" @dragleave="itemDragLeave($event, f)"
-                        :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }">
-                        <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
-                            :lazyLoad="true" :dataset="dataset" />
+                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
+                         @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
+                         @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
+                         @dragleave="itemDragLeave($event, f)">
+                        <Thumbnail ref="thumbs" :file="f" :data-idx="idx" :lazy-load="true" :dataset="dataset"
+                                   @clicked="handleSelection" @open="handleOpen" />
                     </div>
                 </div>
             </VirtualScroller>
             <template v-else>
-                <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="canWrite" @dragstart="startDrag($event, f)"
-                    @drop="onDrop($event, f)" @dragenter="itemDragEnter($event, f)"
-                    @dragover="itemDragOver($event, f)" @dragleave="itemDragLeave($event, f)"
-                    :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }">
-                    <Thumbnail :file="f" :data-idx="idx" ref="thumbs" @clicked="handleSelection" @open="handleOpen"
-                        :lazyLoad="true" :dataset="dataset" />
+                <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
+                     @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
+                     @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
+                     @dragleave="itemDragLeave($event, f)">
+                    <Thumbnail ref="thumbs" :file="f" :data-idx="idx" :lazy-load="true" :dataset="dataset"
+                               @clicked="handleSelection" @open="handleOpen" />
                 </div>
             </template>
         </div>
@@ -82,10 +82,10 @@ import Breadcrumb from 'primevue/breadcrumb';
 
 export default {
     name: 'DatasetExplorer',
-    mixins: [dragDropMixin],
     components: {
         Thumbnail, Toolbar, ContextMenu, Breadcrumb, VirtualScroller
     },
+    mixins: [dragDropMixin],
     // Thumbnails load as they come into view, a few at a time (HUB-03)
     provide: function () {
         this.thumbnailLoader ??= {
@@ -95,9 +95,9 @@ export default {
         };
         return { thumbnailLoader: this.thumbnailLoader };
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
     inject: { showBuildConfirm: { default: null } },
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'canWrite', 'isLoadingFiles'],
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
     data: function () {
         const self = this;
         const ctx = {

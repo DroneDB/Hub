@@ -1,10 +1,10 @@
 <template>
     <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
             modal
             header="Base plane methods"
             :style="{ width: '560px' }"
-            :draggable="false">
+            :draggable="false"
+            @update:visible="onVisibleChange">
         <div class="info-dialog-body">
             <p class="info-intro">
                 The <b>base plane</b> is the reference surface used to compute
@@ -12,8 +12,8 @@
                 best matches the terrain around your pile.
             </p>
 
-            <div class="method-card" v-for="m in methods" :key="m.id">
-                <h4><i :class="m.icon"></i> {{ m.name }}</h4>
+            <div v-for="m in methods" :key="m.id" class="method-card">
+                <h4><i :class="m.icon" /> {{ m.name }}</h4>
                 <p class="method-line"><b>What it does:</b> {{ m.what }}</p>
                 <p class="method-line"><b>When to use it:</b> {{ m.when }}</p>
                 <p class="method-line"><b>Output:</b> {{ m.output }}</p>
@@ -22,13 +22,13 @@
             <h4 class="params-title">Detection parameters</h4>
             <div class="param-card">
                 <p><b>Search radius (m):</b> the distance, in meters, that the
-                detector explores around your click looking for the pile edges.
-                Increase it for large piles or when nothing is detected; decrease
-                it to constrain the search to a small area.</p>
+                    detector explores around your click looking for the pile edges.
+                    Increase it for large piles or when nothing is detected; decrease
+                    it to constrain the search to a small area.</p>
                 <p><b>Sensitivity (0 - 1):</b> how aggressively the edge detector
-                separates the pile from the surrounding ground. Higher values
-                find subtler piles but may include unrelated terrain; lower values
-                stay closer to clearly elevated areas.</p>
+                    separates the pile from the surrounding ground. Higher values
+                    find subtler piles but may include unrelated terrain; lower values
+                    stay closer to clearly elevated areas.</p>
             </div>
         </div>
 

@@ -1,5 +1,5 @@
 <template>
-    <div class="raster-profile-chart" v-if="profile && hasSamples">
+    <div v-if="profile && hasSamples" class="raster-profile-chart">
         <!-- Summary stats -->
         <div class="profile-summary" :class="{ 'thermal': isThermal }">
             <span v-if="profile.min !== null && profile.min !== undefined">Min: {{ formatValue(profile.min) }}</span>
@@ -10,23 +10,23 @@
 
         <!-- Inline SVG chart (no external dependencies) -->
         <svg class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
-            @mousemove="onHover" @mouseleave="hoverIdx = null" @touchmove.prevent="onTouchHover">
+             @mousemove="onHover" @mouseleave="hoverIdx = null" @touchmove.prevent="onTouchHover">
             <!-- Axis grid lines (5 horizontal bands) -->
             <g class="grid">
                 <line v-for="i in 4" :key="'h' + i"
-                    :x1="padLeft" :x2="width - padRight"
-                    :y1="padTop + (i * chartHeight) / 5"
-                    :y2="padTop + (i * chartHeight) / 5" />
+                      :x1="padLeft" :x2="width - padRight"
+                      :y1="padTop + (i * chartHeight) / 5"
+                      :y2="padTop + (i * chartHeight) / 5" />
             </g>
 
             <!-- Profile polyline -->
             <polyline class="profile-line" :class="{ 'thermal': isThermal }"
-                :points="polyPoints" fill="none" stroke-width="1.5" />
+                      :points="polyPoints" fill="none" stroke-width="1.5" />
 
             <!-- Invalid-sample markers (null values, e.g. nodata) -->
             <g v-if="nullBands.length" class="null-bands">
                 <rect v-for="(band, i) in nullBands" :key="'n' + i"
-                    :x="band.x" :y="padTop" :width="band.w" :height="chartHeight" />
+                      :x="band.x" :y="padTop" :width="band.w" :height="chartHeight" />
             </g>
 
             <!-- Axes -->
@@ -46,20 +46,20 @@
             <g v-if="hoverIdx !== null && hoveredSample">
                 <line class="hover-line" :x1="hoverX" :x2="hoverX" :y1="padTop" :y2="height - padBottom" />
                 <circle v-if="hoveredSample.value !== null"
-                    class="hover-dot" :class="{ 'thermal': isThermal }"
-                    :cx="hoverX" :cy="hoverY" r="3" />
+                        class="hover-dot" :class="{ 'thermal': isThermal }"
+                        :cx="hoverX" :cy="hoverY" r="3" />
             </g>
         </svg>
 
         <!-- Tooltip + CSV export -->
         <div class="profile-actions">
-            <span class="hover-info" v-if="hoveredSample">
+            <span v-if="hoveredSample" class="hover-info">
                 d: {{ formatLength(hoveredSample.distance) }} ·
                 v: {{ hoveredSample.value === null ? 'n/d' : formatValue(hoveredSample.value) }}
             </span>
-            <span class="hover-info placeholder" v-else>Hover the chart for details</span>
-            <button class="btn btn-secondary btn-sm" @click="exportCsv" title="Export CSV">
-                <i class="fas fa-file-csv"></i>
+            <span v-else class="hover-info placeholder">Hover the chart for details</span>
+            <button class="btn btn-secondary btn-sm" title="Export CSV" @click="exportCsv">
+                <i class="fas fa-file-csv" />
             </button>
         </div>
     </div>
@@ -165,6 +165,9 @@ export default {
             return this.yFor(this.hoveredSample.value);
         }
     },
+    watch: {
+        profile() { this.hoverIdx = null; }
+    },
     methods: {
         xFor(i) {
             const n = this.samples.length;
@@ -230,9 +233,6 @@ export default {
             // Revoke on next tick to avoid cancelling the download on slow browsers.
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
-    },
-    watch: {
-        profile() { this.hoverIdx = null; }
     }
 };
 </script>

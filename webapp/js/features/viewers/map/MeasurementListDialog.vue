@@ -1,5 +1,5 @@
 <template>
-    <Window title="Measurements" id="measurement-list" @onClose="$emit('onClose')" modal fixedSize sizeClass="dialog-md">
+    <Window id="measurement-list" title="Measurements" modal fixed-size size-class="dialog-md" @on-close="$emit('onClose')">
         <div class="measurement-list-content">
             <div v-if="measurements.length === 0" class="no-measurements">
                 No measurements on the map.
@@ -9,44 +9,44 @@
                 <template v-for="group in groupedStructure.groups" :key="group.id">
                     <!-- Group header row -->
                     <div class="group-row" :style="{ borderLeftColor: group.color }">
-                        <button class="btn-icon btn-collapse" @click="toggleGroupCollapse(group.id)"
-                            :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'">
-                            <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
+                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'"
+                                @click="toggleGroupCollapse(group.id)">
+                            <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                         </button>
-                        <button class="btn-icon btn-visibility" @click="$emit('toggleGroupVisibility', group.id)"
-                            :title="group.visible ? 'Hide group' : 'Show group'">
-                            <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'"></i>
+                        <button class="btn-icon btn-visibility" :title="group.visible ? 'Hide group' : 'Show group'"
+                                @click="$emit('toggleGroupVisibility', group.id)">
+                            <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" />
                         </button>
                         <span class="group-name" @dblclick="startRenameGroup(group)">{{ group.name }}</span>
                         <span class="group-count">({{ group.items.length }})</span>
                         <div class="group-actions">
-                            <button class="btn-icon btn-rename" @click="startRenameGroup(group)" title="Rename group">
-                                <i class="fa-solid fa-pencil"></i>
+                            <button class="btn-icon btn-rename" title="Rename group" @click="startRenameGroup(group)">
+                                <i class="fa-solid fa-pencil" />
                             </button>
-                            <button class="btn-icon btn-delete-group" @click="confirmDeleteGroup(group)" title="Delete group and its measurements">
-                                <i class="fa-solid fa-trash"></i>
+                            <button class="btn-icon btn-delete-group" title="Delete group and its measurements" @click="confirmDeleteGroup(group)">
+                                <i class="fa-solid fa-trash" />
                             </button>
                         </div>
                     </div>
                     <!-- Group measurements -->
                     <template v-if="!collapsedGroups.has(group.id)">
                         <div v-for="m in group.items" :key="'g-' + group.id + '-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
-                            class="measurement-row measurement-row--nested">
-                            <i :class="typeIcon(m.type)" class="type-icon"></i>
+                             class="measurement-row measurement-row--nested">
+                            <i :class="typeIcon(m.type)" class="type-icon" />
                             <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
                             <span class="measurement-value">{{ m.value || '' }}</span>
                             <div class="measurement-actions">
                                 <select class="group-select" :value="m.groupId || ''"
-                                    @change="$emit('moveMeasurementToGroup', m, $event.target.value)"
-                                    title="Move to group">
+                                        title="Move to group"
+                                        @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <button class="btn-icon btn-edit" @click="$emit('editMeasurement', m)" title="Edit">
-                                    <i class="fa-solid fa-pencil"></i>
+                                <button class="btn-icon btn-edit" title="Edit" @click="$emit('editMeasurement', m)">
+                                    <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" @click="confirmDelete(m)" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
+                                <button class="btn-icon btn-delete" title="Delete" @click="confirmDelete(m)">
+                                    <i class="fa-solid fa-trash" />
                                 </button>
                             </div>
                         </div>
@@ -56,31 +56,31 @@
                 <!-- Ungrouped measurements -->
                 <template v-if="groupedStructure.ungrouped.length > 0">
                     <div v-if="groups.length > 0" class="group-row group-row--ungrouped">
-                        <button class="btn-icon btn-collapse" @click="toggleGroupCollapse('__ungrouped__')"
-                            :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'">
-                            <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"></i>
+                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'"
+                                @click="toggleGroupCollapse('__ungrouped__')">
+                            <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                         </button>
                         <span class="group-name group-name--dim">Ungrouped</span>
                         <span class="group-count">({{ groupedStructure.ungrouped.length }})</span>
                     </div>
                     <template v-if="!collapsedGroups.has('__ungrouped__') || groups.length === 0">
                         <div v-for="m in groupedStructure.ungrouped" :key="'ung-' + (m.feature && m.feature.ol_uid != null ? m.feature.ol_uid : m.name + m.type)"
-                            class="measurement-row" :class="{ 'measurement-row--nested': groups.length > 0 }">
-                            <i :class="typeIcon(m.type)" class="type-icon"></i>
+                             class="measurement-row" :class="{ 'measurement-row--nested': groups.length > 0 }">
+                            <i :class="typeIcon(m.type)" class="type-icon" />
                             <span class="measurement-name">{{ m.name || typeLabel(m.type) }}</span>
                             <span class="measurement-value">{{ m.value || '' }}</span>
                             <div class="measurement-actions">
                                 <select v-if="groups.length > 0" class="group-select" :value="m.groupId || ''"
-                                    @change="$emit('moveMeasurementToGroup', m, $event.target.value)"
-                                    title="Move to group">
+                                        title="Move to group"
+                                        @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <button class="btn-icon btn-edit" @click="$emit('editMeasurement', m)" title="Edit">
-                                    <i class="fa-solid fa-pencil"></i>
+                                <button class="btn-icon btn-edit" title="Edit" @click="$emit('editMeasurement', m)">
+                                    <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" @click="confirmDelete(m)" title="Delete">
-                                    <i class="fa-solid fa-trash"></i>
+                                <button class="btn-icon btn-delete" title="Delete" @click="confirmDelete(m)">
+                                    <i class="fa-solid fa-trash" />
                                 </button>
                             </div>
                         </div>
@@ -91,30 +91,30 @@
 
         <!-- Footer toolbar -->
         <div class="measurement-list-footer">
-            <button class="btn-new-group" @click="$emit('createGroup')" title="Create a new group">
-                <i class="fa-solid fa-folder-plus"></i>
+            <button class="btn-new-group" title="Create a new group" @click="$emit('createGroup')">
+                <i class="fa-solid fa-folder-plus" />
                 New Group
             </button>
-            <Button label="Close" @click="$emit('onClose')" severity="secondary" />
+            <Button label="Close" severity="secondary" @click="$emit('onClose')" />
         </div>
 
         <!-- Confirm delete measurement -->
         <ConfirmDialog v-if="deleteConfirmOpen"
-            title="Delete Measurement"
-            :message="deleteConfirmMessage"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteConfirm" />
+                       title="Delete Measurement"
+                       :message="deleteConfirmMessage"
+                       confirm-text="Delete"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="handleDeleteConfirm" />
 
         <!-- Confirm delete group -->
         <ConfirmDialog v-if="deleteGroupConfirmOpen"
-            title="Delete Group"
-            :message="deleteGroupConfirmMessage"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteGroupConfirm" />
+                       title="Delete Group"
+                       :message="deleteGroupConfirmMessage"
+                       confirm-text="Delete"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="handleDeleteGroupConfirm" />
     </Window>
 </template>
 
@@ -125,16 +125,6 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 
 export default {
     components: { Window, Button, ConfirmDialog },
-    emits: [
-        'onClose',
-        'deleteMeasurement',
-        'editMeasurement',
-        'createGroup',
-        'renameGroup',
-        'deleteGroup',
-        'toggleGroupVisibility',
-        'moveMeasurementToGroup'
-    ],
     props: {
         measurements: {
             type: Array,
@@ -145,6 +135,16 @@ export default {
             default: () => []
         }
     },
+    emits: [
+        'onClose',
+        'deleteMeasurement',
+        'editMeasurement',
+        'createGroup',
+        'renameGroup',
+        'deleteGroup',
+        'toggleGroupVisibility',
+        'moveMeasurementToGroup'
+    ],
     data() {
         return {
             deleteConfirmOpen: false,

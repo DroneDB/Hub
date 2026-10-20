@@ -1,16 +1,16 @@
 <template>
-    <Window title="Settings" id="settings" @onClose="close('close')" modal maxWidth="70%" fixedSize fixedPosition
-        closeModalOnClick>
-        <Message bindTo="error" />
+    <Window id="settings" title="Settings" modal max-width="70%" fixed-size fixed-position close-modal-on-click
+            @on-close="close('close')">
+        <Message bind-to="error" />
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
-        <div class="settings-body" v-else>
+        <div v-else class="settings-body">
             <div class="settings-section">
                 <div class="mb-2">
-                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
-                    Visibility: <Select v-model="visibility" @change="setVisibility" :options="visibilityOptions" optionLabel="label" optionValue="value" />
+                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }" />
+                    Visibility: <Select v-model="visibility" :options="visibilityOptions" option-label="label" option-value="value" @change="setVisibility" />
                 </div>
                 <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
                     <span v-html="safeDescription" />
@@ -19,61 +19,61 @@
 
             <div class="settings-section">
                 <div>
-                    <i class="fa-solid fa-scale-balanced"></i>
-                    License: <Select v-model="license" @change="setLicense" :options="licenseOptions" optionLabel="label" optionValue="value" class="license-dropdown" :title="Licenses[license].name" />
+                    <i class="fa-solid fa-scale-balanced" />
+                    License: <Select v-model="license" :options="licenseOptions" option-label="label" option-value="value" class="license-dropdown" :title="Licenses[license].name" @change="setLicense" />
                 </div>
             </div>
 
-            <div class="settings-section" v-if="canWrite">
+            <div v-if="canWrite" class="settings-section">
                 <div class="mb-2">
-                    <i class="fa-solid fa-tag"></i>
+                    <i class="fa-solid fa-tag" />
                     Tagline
                 </div>
                 <div class="tagline-field">
                     <InputText v-model="tagline" maxlength="256"
-                        placeholder="Brief description of your dataset (max 256 chars)"
-                        @change="setTagline" fluid />
+                               placeholder="Brief description of your dataset (max 256 chars)"
+                               fluid @change="setTagline" />
                     <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
                 </div>
             </div>
 
-            <div class="settings-section" v-if="canWrite">
+            <div v-if="canWrite" class="settings-section">
                 <div class="mb-2">
-                    <i class="fa-solid fa-image"></i>
+                    <i class="fa-solid fa-image" />
                     Thumbnail
                 </div>
                 <div class="thumbnail-upload">
                     <div class="thumbnail-preview-container">
                         <img v-if="thumbnailPreview && !thumbnailError"
-                            :src="thumbnailPreview"
-                            class="thumbnail-preview"
-                            @error="thumbnailError = true" />
+                             :src="thumbnailPreview"
+                             class="thumbnail-preview"
+                             @error="thumbnailError = true">
                         <img v-else
-                            src="/images/dataset-placeholder.svg"
-                            class="thumbnail-preview thumbnail-placeholder" />
+                             src="/images/dataset-placeholder.svg"
+                             class="thumbnail-preview thumbnail-placeholder">
                     </div>
                     <div class="thumbnail-actions">
-                        <input type="file" ref="thumbnailInput"
-                            @change="handleThumbnailSelect"
-                            accept="image/webp,image/jpeg,image/png"
-                            style="display: none" />
-                        <Button @click="$refs.thumbnailInput.click()"
-                            :loading="thumbnailUploading" icon="fa-solid fa-upload" label="Upload" />
+                        <input ref="thumbnailInput" type="file"
+                               accept="image/webp,image/jpeg,image/png"
+                               style="display: none"
+                               @change="handleThumbnailSelect">
+                        <Button :loading="thumbnailUploading"
+                                icon="fa-solid fa-upload" label="Upload" @click="$refs.thumbnailInput.click()" />
                         <Button v-if="thumbnailPreview && !thumbnailError"
-                            severity="danger"
-                            @click="removeThumbnail"
-                            :loading="thumbnailRemoving" icon="fa-solid fa-trash" label="Remove" />
+                                severity="danger"
+                                :loading="thumbnailRemoving"
+                                icon="fa-solid fa-trash" label="Remove" @click="removeThumbnail" />
                     </div>
                 </div>
             </div>
 
-            <div class="settings-section" v-if="readme == null">
-                <Button @click="addDocument('README.md')" icon="fa-solid fa-book" label="Add Readme" />
+            <div v-if="readme == null" class="settings-section">
+                <Button icon="fa-solid fa-book" label="Add Readme" @click="addDocument('README.md')" />
             </div>
 
-            <div class="settings-section settings-maintenance" v-if="canWrite">
+            <div v-if="canWrite" class="settings-section settings-maintenance">
                 <div class="mb-2">
-                    <i class="fa-solid fa-gear"></i>
+                    <i class="fa-solid fa-gear" />
                     Maintenance
                 </div>
                 <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-2">
@@ -81,7 +81,7 @@
                     (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
                     or if file metadata appears outdated or incorrect.
                 </PrimeMessage>
-                <Button @click="$emit('rescanRequested')" icon="fa-solid fa-rotate" label="Rescan Dataset" />
+                <Button icon="fa-solid fa-rotate" label="Rescan Dataset" @click="$emit('rescanRequested')" />
             </div>
         </div>
     </Window>
@@ -99,6 +99,9 @@ import ddb from 'ddb';
 import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
+    components: {
+        Message, Window, Button, Select, InputText, PrimeMessage
+    },
     props: {
         dataset: {
             required: true,
@@ -110,9 +113,6 @@ export default {
         }
     },
     emits: ['onClose'],
-    components: {
-        Message, Window, Button, Select, InputText, PrimeMessage
-    },
     data: function () {
         return {
             error: "",
@@ -133,29 +133,6 @@ export default {
             },
             visibility: ddb.Visibility.PRIVATE
         }
-    },
-    mounted: async function () {
-        try {
-            const info = await this.dataset.info();
-            this.properties = info[0].properties;
-
-            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
-            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
-            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
-            this.tagline = this.properties?.meta?.tagline?.data ?? '';
-
-            // Load existing dataset thumbnail preview
-            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
-            this.thumbnailError = false;
-
-            console.log(this.Visibilities);
-        } catch (e) {
-            this.error = e.message;
-        }
-
-        this.loading = false;
-    },
-    beforeUnmount: function () {
     },
     computed: {
         currentUrl: function () {
@@ -188,6 +165,29 @@ export default {
                 label: v.name
             }));
         }
+    },
+    mounted: async function () {
+        try {
+            const info = await this.dataset.info();
+            this.properties = info[0].properties;
+
+            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
+            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
+            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
+            this.tagline = this.properties?.meta?.tagline?.data ?? '';
+
+            // Load existing dataset thumbnail preview
+            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
+            this.thumbnailError = false;
+
+            console.log(this.Visibilities);
+        } catch (e) {
+            this.error = e.message;
+        }
+
+        this.loading = false;
+    },
+    beforeUnmount: function () {
     },
     methods: {
         close: function (buttonId) {

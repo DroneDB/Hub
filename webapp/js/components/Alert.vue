@@ -1,10 +1,10 @@
 <template>
-    <Window :title="title" id="alert" @onClose="dismiss('cancel')" modal maxWidth="70%" fixedSize>
+    <Window id="alert" :title="title" modal max-width="70%" fixed-size @on-close="dismiss('cancel')">
 
         <slot />
 
         <div class="text-center mt-3">
-            <Button severity="secondary" label="Close" @click="dismiss('ok')" v-if="buttons.indexOf('ok') !== -1" />
+            <Button v-if="buttons.indexOf('ok') !== -1" severity="secondary" label="Close" @click="dismiss('ok')" />
         </div>
     </Window>
 </template>

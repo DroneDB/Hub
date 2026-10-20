@@ -5,13 +5,13 @@
         <template v-if="waitingForFiles">
             <div class="file-selection-screen">
                 <div class="selection-content">
-                    <i class="fa-solid fa-cloud-arrow-up huge"></i>
+                    <i class="fa-solid fa-cloud-arrow-up huge" />
                     <h3>Select files to upload</h3>
                     <p>Choose files or folders to upload to this dataset</p>
                     <div class="selection-buttons">
-                        <Button severity="info" @click="openFilePicker" icon="fa-solid fa-file" label="Select Files" />
-                        <Button severity="secondary" @click="openFolderPicker" icon="fa-solid fa-folder" label="Select Folder" />
-                        <Button severity="secondary" @click="$emit('importFromUrl')" icon="fa-solid fa-link" label="Import from URL" />
+                        <Button severity="info" icon="fa-solid fa-file" label="Select Files" @click="openFilePicker" />
+                        <Button severity="secondary" icon="fa-solid fa-folder" label="Select Folder" @click="openFolderPicker" />
+                        <Button severity="secondary" icon="fa-solid fa-link" label="Import from URL" @click="$emit('importFromUrl')" />
                     </div>
                 </div>
             </div>
@@ -19,106 +19,106 @@
 
         <!-- Upload progress view -->
         <template v-else>
-        <div class="upload-header">
-            <div class="upload-filters">
-                <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'"
-                    text :severity="activeFilter === 'all' ? 'secondary' : 'secondary'">
-                    <i class="fa-solid fa-file"></i>
-                    <span class="filter-label">All</span>
-                    <span class="filter-count">{{ counts.total }}</span>
-                </Button>
-                <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'"
-                    text :severity="activeFilter === 'uploading' ? 'info' : 'secondary'">
-                    <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading + counts.processing > 0 }"></i>
-                    <span class="filter-label">In Progress</span>
-                    <span class="filter-count">{{ counts.uploading + counts.processing + counts.pending }}</span>
-                </Button>
-                <Button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'"
-                    text :severity="activeFilter === 'done' ? 'success' : 'secondary'">
-                    <i class="fa-solid fa-check"></i>
-                    <span class="filter-label">Done</span>
-                    <span class="filter-count">{{ counts.done }}</span>
-                </Button>
-                <Button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'"
-                    text :severity="activeFilter === 'error' ? 'danger' : 'secondary'">
-                    <i class="fa-solid fa-xmark"></i>
-                    <span class="filter-label">Errors</span>
-                    <span class="filter-count">{{ counts.error }}</span>
-                </Button>
-            </div>
-        </div>
-
-        <div class="upload-body">
-            <VirtualScroller
-                class="file-list-scroller"
-                :items="filteredFiles"
-                :item-size="48"
-                key-field="id"
-                v-slot="{ item }"
-            >
-                <FileUploadRow :file="item" @retry="retryFile" />
-            </VirtualScroller>
-        </div>
-
-        <div class="upload-footer">
-            <div class="total-progress-container" v-if="uploading">
-                <div class="progress-info">
-                    <span>{{ humanBytesSent }} / {{ humanTotalBytes }}</span>
-                    <span>{{ totalProgress.toFixed(1) }}%</span>
-                </div>
-                <div class="progress-speed-info">
-                    <span><i class="fa-solid fa-gauge"></i> {{ currentSpeedFormatted }}</span>
-                    <span v-if="allSent && counts.processing > 0"><i class="fa-solid fa-gears"></i> Processing on server...</span>
-                    <span v-else><i class="fa-regular fa-clock"></i> {{ etaFormatted }}</span>
-                </div>
-                <div class="total-progress-bar">
-                    <div class="progress-fill" :style="{ width: totalProgress + '%' }"></div>
+            <div class="upload-header">
+                <div class="upload-filters">
+                    <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" text
+                            :severity="activeFilter === 'all' ? 'secondary' : 'secondary'" @click="activeFilter = 'all'">
+                        <i class="fa-solid fa-file" />
+                        <span class="filter-label">All</span>
+                        <span class="filter-count">{{ counts.total }}</span>
+                    </Button>
+                    <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" text
+                            :severity="activeFilter === 'uploading' ? 'info' : 'secondary'" @click="activeFilter = 'uploading'">
+                        <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading + counts.processing > 0 }" />
+                        <span class="filter-label">In Progress</span>
+                        <span class="filter-count">{{ counts.uploading + counts.processing + counts.pending }}</span>
+                    </Button>
+                    <Button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" text
+                            :severity="activeFilter === 'done' ? 'success' : 'secondary'" @click="activeFilter = 'done'">
+                        <i class="fa-solid fa-check" />
+                        <span class="filter-label">Done</span>
+                        <span class="filter-count">{{ counts.done }}</span>
+                    </Button>
+                    <Button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" text
+                            :severity="activeFilter === 'error' ? 'danger' : 'secondary'" @click="activeFilter = 'error'">
+                        <i class="fa-solid fa-xmark" />
+                        <span class="filter-label">Errors</span>
+                        <span class="filter-count">{{ counts.error }}</span>
+                    </Button>
                 </div>
             </div>
 
-            <!-- Upload summary stats (shown when done) -->
-            <div class="upload-summary" v-if="done">
-                <div class="summary-stats">
-                    <div class="summary-stat">
-                        <i class="fa-regular fa-clock"></i>
-                        <span class="stat-label">Duration:</span>
-                        <span class="stat-value">{{ uploadDuration }}</span>
+            <div class="upload-body">
+                <VirtualScroller
+                    v-slot="{ item }"
+                    class="file-list-scroller"
+                    :items="filteredFiles"
+                    :item-size="48"
+                    key-field="id"
+                >
+                    <FileUploadRow :file="item" @retry="retryFile" />
+                </VirtualScroller>
+            </div>
+
+            <div class="upload-footer">
+                <div v-if="uploading" class="total-progress-container">
+                    <div class="progress-info">
+                        <span>{{ humanBytesSent }} / {{ humanTotalBytes }}</span>
+                        <span>{{ totalProgress.toFixed(1) }}%</span>
                     </div>
-                    <div class="summary-stat">
-                        <i class="fa-solid fa-database"></i>
-                        <span class="stat-label">Transferred:</span>
-                        <span class="stat-value">{{ humanTotalBytes }}</span>
+                    <div class="progress-speed-info">
+                        <span><i class="fa-solid fa-gauge" /> {{ currentSpeedFormatted }}</span>
+                        <span v-if="allSent && counts.processing > 0"><i class="fa-solid fa-gears" /> Processing on server...</span>
+                        <span v-else><i class="fa-regular fa-clock" /> {{ etaFormatted }}</span>
                     </div>
-                    <div class="summary-stat">
-                        <i class="fa-solid fa-gauge"></i>
-                        <span class="stat-label">Average speed:</span>
-                        <span class="stat-value">{{ averageSpeed }}</span>
+                    <div class="total-progress-bar">
+                        <div class="progress-fill" :style="{ width: totalProgress + '%' }" />
                     </div>
                 </div>
-                <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
-                    <template v-if="counts.error === 0">
-                        <i class="fa-solid fa-circle-check"></i> All {{ counts.done }} files uploaded successfully!
+
+                <!-- Upload summary stats (shown when done) -->
+                <div v-if="done" class="upload-summary">
+                    <div class="summary-stats">
+                        <div class="summary-stat">
+                            <i class="fa-regular fa-clock" />
+                            <span class="stat-label">Duration:</span>
+                            <span class="stat-value">{{ uploadDuration }}</span>
+                        </div>
+                        <div class="summary-stat">
+                            <i class="fa-solid fa-database" />
+                            <span class="stat-label">Transferred:</span>
+                            <span class="stat-value">{{ humanTotalBytes }}</span>
+                        </div>
+                        <div class="summary-stat">
+                            <i class="fa-solid fa-gauge" />
+                            <span class="stat-label">Average speed:</span>
+                            <span class="stat-value">{{ averageSpeed }}</span>
+                        </div>
+                    </div>
+                    <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
+                        <template v-if="counts.error === 0">
+                            <i class="fa-solid fa-circle-check" /> All {{ counts.done }} files uploaded successfully!
+                        </template>
+                        <template v-else>
+                            <i class="fa-solid fa-triangle-exclamation" /> {{ counts.done }} succeeded, {{ counts.error }} failed
+                        </template>
+                    </div>
+                    <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
+                        <i class="fa-solid fa-stethoscope" /> Uploads slower than expected? Test the connection
+                    </router-link>
+                </div>
+
+                <div class="upload-actions">
+                    <Button v-if="uploading" severity="danger" icon="fa-regular fa-circle-stop" label="Cancel Upload" :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : ''"
+                            @click="handleCancel" />
+
+                    <template v-if="done">
+                        <Button v-if="counts.error > 0" severity="warn" icon="fa-solid fa-rotate-right"
+                                :label="'Retry Failed (' + counts.error + ')'" @click="retryAllFailed" />
+                        <Button severity="secondary" icon="fa-solid fa-check" label="Close" @click="finishUpload" />
                     </template>
-                    <template v-else>
-                        <i class="fa-solid fa-triangle-exclamation"></i> {{ counts.done }} succeeded, {{ counts.error }} failed
-                    </template>
                 </div>
-                <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
-                    <i class="fa-solid fa-stethoscope"></i> Uploads slower than expected? Test the connection
-                </router-link>
             </div>
-
-            <div class="upload-actions">
-                <Button v-if="uploading" severity="danger" @click="handleCancel" icon="fa-regular fa-circle-stop" label="Cancel Upload"
-                    :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : ''" />
-
-                <template v-if="done">
-                    <Button v-if="counts.error > 0" severity="warn" @click="retryAllFailed"
-                        icon="fa-solid fa-rotate-right" :label="'Retry Failed (' + counts.error + ')'" />
-                    <Button severity="secondary" @click="finishUpload" icon="fa-solid fa-check" label="Close" />
-                </template>
-            </div>
-        </div>
         </template><!-- end upload progress view -->
     </div>
 </template>

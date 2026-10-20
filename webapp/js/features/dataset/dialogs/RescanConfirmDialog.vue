@@ -1,5 +1,5 @@
 <template>
-    <Window title="Rescan Dataset" id="rescan-confirm" @onClose="close('cancel')" modal sizeClass="dialog-md" fixedSize>
+    <Window id="rescan-confirm" title="Rescan Dataset" modal size-class="dialog-md" fixed-size @on-close="close('cancel')">
         <div class="rescan-confirm-body">
             <PrimeMessage severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                 <strong>Are you sure you want to rescan this dataset?</strong>
@@ -19,8 +19,8 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="close('confirm')" severity="danger" label="Rescan" />
+            <Button severity="secondary" label="Cancel" @click="close('cancel')" />
+            <Button severity="danger" label="Rescan" @click="close('confirm')" />
         </div>
     </Window>
 </template>

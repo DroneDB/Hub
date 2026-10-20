@@ -26,7 +26,17 @@ export default [
         rules: {
             'hub/paired-listeners': 'error',
             // SFC templates are case-sensitive: <Button> (PrimeVue) is not <button>
-            'vue/no-reserved-component-names': ['error', { htmlElementCaseSensitive: true }]
+            'vue/no-reserved-component-names': ['error', { htmlElementCaseSensitive: true }],
+            // House style: 4-space template indent (.editorconfig). Line layout is left to the
+            // author: these rules only move attributes and tags between lines.
+            'vue/html-indent': ['warn', 4],
+            'vue/max-attributes-per-line': 'off',
+            'vue/first-attribute-linebreak': 'off',
+            'vue/html-closing-bracket-newline': 'off',
+            'vue/singleline-html-element-content-newline': 'off',
+            'vue/multiline-html-element-content-newline': 'off',
+            // Listener names follow the attribute rule (kebab-case in templates)
+            'vue/v-on-event-hyphenation': ['warn', 'always', { autofix: true }]
         }
     },
     {

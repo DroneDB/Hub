@@ -1,5 +1,5 @@
 <template>
-    <Window title="Point Annotation" id="point-annotation" @onClose="discard" modal fixedSize sizeClass="dialog-sm">
+    <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" @on-close="discard">
         <div class="point-annotation-form">
             <div class="mb-3">
                 <label class="d-block mb-1 fw-semibold">Color</label>
@@ -11,24 +11,24 @@
                         :class="{ selected: formData.color === color }"
                         :style="{ backgroundColor: color }"
                         @click="formData.color = color"
-                    ></div>
+                    />
                     <input
-                        type="color"
                         v-model="formData.color"
+                        type="color"
                         class="color-picker-custom"
                         title="Custom color"
-                    />
+                    >
                 </div>
             </div>
 
             <div class="mb-3">
                 <label class="d-block mb-1 fw-semibold" for="pa-description">Description</label>
-                <Textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3" autoResize class="w-100" />
+                <Textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3" auto-resize class="w-100" />
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="discard" severity="secondary" label="Discard" />
-                <Button @click="save" severity="primary" label="Save" />
+                <Button severity="secondary" label="Discard" @click="discard" />
+                <Button severity="primary" label="Save" @click="save" />
             </div>
         </div>
     </Window>

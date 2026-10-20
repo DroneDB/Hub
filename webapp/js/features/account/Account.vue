@@ -1,6 +1,6 @@
 <template>
     <div id="account">
-        <Message bindTo="error" />
+        <Message bind-to="error" />
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -13,7 +13,7 @@
             <!-- User Info Section -->
             <Card class="account-card">
                 <template #content>
-                    <h3><i class="fa-solid fa-user"></i> User Information</h3>
+                    <h3><i class="fa-solid fa-user" /> User Information</h3>
                     <div class="info-grid">
                         <div class="info-item">
                             <label>Username</label>
@@ -23,9 +23,9 @@
                             <label>Email</label>
                             <p>{{ email || 'Not set' }}</p>
                         </div>
-                        <div class="info-item" v-if="isAdmin">
+                        <div v-if="isAdmin" class="info-item">
                             <label>Role</label>
-                            <p><Tag severity="danger"><i class="fa-solid fa-shield"></i> Administrator</Tag></p>
+                            <p><Tag severity="danger"><i class="fa-solid fa-shield" /> Administrator</Tag></p>
                         </div>
                         <div class="info-item">
                             <label>Organizations</label>
@@ -38,18 +38,18 @@
             <!-- Storage Section -->
             <Card class="account-card">
                 <template #content>
-                    <h3><i class="fa-solid fa-database"></i> Storage</h3>
+                    <h3><i class="fa-solid fa-database" /> Storage</h3>
                     <div class="storage-bar-container">
                         <div class="storage-details">
                             <span class="used">{{ formatBytes(storageUsed) }} used</span>
-                            <span class="available" v-if="storageTotal">of {{ formatBytes(storageTotal) }}</span>
-                            <span class="available" v-else>Unlimited</span>
+                            <span v-if="storageTotal" class="available">of {{ formatBytes(storageTotal) }}</span>
+                            <span v-else class="available">Unlimited</span>
                         </div>
-                        <ProgressBar v-if="storageTotal" :value="storagePercentage" :showValue="true" />
-                        <ProgressBar v-else :value="100" :showValue="false" />
+                        <ProgressBar v-if="storageTotal" :value="storagePercentage" :show-value="true" />
+                        <ProgressBar v-else :value="100" :show-value="false" />
                     </div>
                     <div class="mt-3">
-                        <Button @click="handleUpload" severity="success" icon="fa-solid fa-upload" label="Upload Files" />
+                        <Button severity="success" icon="fa-solid fa-upload" label="Upload Files" @click="handleUpload" />
                     </div>
                 </template>
             </Card>
@@ -58,14 +58,14 @@
             <UploadDiagnostics />
 
             <!-- Security Section (only if account management is enabled) -->
-            <Card class="account-card action-card" v-if="accountManagement" @click="handleChangePwd">
+            <Card v-if="accountManagement" class="account-card action-card" @click="handleChangePwd">
                 <template #content>
                     <div class="action-row">
                         <div class="main">
-                            <i class="fa-solid fa-lock"></i> Security
+                            <i class="fa-solid fa-lock" /> Security
                         </div>
                         <div>
-                            <Button @click.stop="handleChangePwd" severity="info" size="small" icon="fa-solid fa-pencil" label="Change Password" />
+                            <Button severity="info" size="small" icon="fa-solid fa-pencil" label="Change Password" @click.stop="handleChangePwd" />
                         </div>
                     </div>
                 </template>
@@ -76,17 +76,17 @@
                 <template #content>
                     <div class="action-row">
                         <div class="main">
-                            <i class="fa-solid fa-right-from-bracket"></i> Session
+                            <i class="fa-solid fa-right-from-bracket" /> Session
                         </div>
                         <div>
-                            <Button @click.stop="handleLogout" severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" />
+                            <Button severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" @click.stop="handleLogout" />
                         </div>
                     </div>
                 </template>
             </Card>
         </div>
 
-        <ChangePwdDialog @onClose="showChangePwd = false" v-if="showChangePwd" />
+        <ChangePwdDialog v-if="showChangePwd" @on-close="showChangePwd = false" />
     </div>
 </template>
 

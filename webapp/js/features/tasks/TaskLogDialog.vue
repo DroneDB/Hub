@@ -1,6 +1,6 @@
 <template>
-    <Dialog :visible="visible" @update:visible="$emit('update:visible', $event)" modal
-        :header="`Log - ${title}`" :style="{ width: '48rem' }" @show="onShow">
+    <Dialog :visible="visible" modal :header="`Log - ${title}`"
+            :style="{ width: '48rem' }" @update:visible="$emit('update:visible', $event)" @show="onShow">
         <pre ref="logContainer" class="task-log">{{ logText || 'No log output.' }}</pre>
         <template #footer>
             <!-- Toggles on the left -->
@@ -15,11 +15,11 @@
                 </div>
             </div>
             <!-- Spacer to push buttons to the right -->
-            <div style="flex-grow: 1;"></div>
+            <div style="flex-grow: 1;" />
             <!-- Buttons on the right -->
             <div class="d-flex align-items-center gap-2">
                 <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
-                    @click="$emit('refresh')" />
+                        @click="$emit('refresh')" />
                 <Button label="Close" @click="$emit('update:visible', false)" />
             </div>
         </template>
@@ -63,12 +63,6 @@ export default {
         };
     },
 
-    // Instance state, not reactive (Vue does not proxy data keys that start with "_")
-    created() {
-        this._refreshInterval = null;
-        this._wasNearBottom = true; // whether the user was near the bottom before the last change
-    },
-
     watch: {
         visible(val) {
             if (!val) {
@@ -88,6 +82,16 @@ export default {
         logText() {
             this.handleLogTextChange();
         }
+    },
+
+    // Instance state, not reactive (Vue does not proxy data keys that start with "_")
+    created() {
+        this._refreshInterval = null;
+        this._wasNearBottom = true; // whether the user was near the bottom before the last change
+    },
+
+    beforeUnmount() {
+        this.clearRefreshInterval();
     },
 
     methods: {
@@ -161,10 +165,6 @@ export default {
                 }
             });
         }
-    },
-
-    beforeUnmount() {
-        this.clearRefreshInterval();
     }
 };
 </script>

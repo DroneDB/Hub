@@ -11,30 +11,30 @@
  *   fallback - Optional custom fallback component (default: built-in error card)
  */
 <template>
-  <div v-if="hasError" class="error-boundary">
-    <slot name="fallback" :error="error">
-      <div class="error-boundary-card">
-        <i class="fa-solid fa-triangle-exclamation error-icon"></i>
-        <h3>{{ title }}</h3>
-        <p>{{ message }}</p>
-        <div class="error-actions">
-          <button class="retry-btn" @click="retry">
-            <i class="fa-solid fa-rotate-right"></i> Retry
-          </button>
-          <button class="reload-btn" @click="reloadPage">
-            <i class="fa-solid fa-arrows-rotate"></i> Reload Page
-          </button>
-        </div>
-        <details v-if="!isProduction" class="error-details">
-          <summary>Details</summary>
-          <pre class="error-stack">{{ error?.stack || error?.message || 'Unknown error' }}</pre>
-        </details>
-      </div>
-    </slot>
-  </div>
-  <div v-else>
-    <slot />
-  </div>
+    <div v-if="hasError" class="error-boundary">
+        <slot name="fallback" :error="error">
+            <div class="error-boundary-card">
+                <i class="fa-solid fa-triangle-exclamation error-icon" />
+                <h3>{{ title }}</h3>
+                <p>{{ message }}</p>
+                <div class="error-actions">
+                    <button class="retry-btn" @click="retry">
+                        <i class="fa-solid fa-rotate-right" /> Retry
+                    </button>
+                    <button class="reload-btn" @click="reloadPage">
+                        <i class="fa-solid fa-arrows-rotate" /> Reload Page
+                    </button>
+                </div>
+                <details v-if="!isProduction" class="error-details">
+                    <summary>Details</summary>
+                    <pre class="error-stack">{{ error?.stack || error?.message || 'Unknown error' }}</pre>
+                </details>
+            </div>
+        </slot>
+    </div>
+    <div v-else>
+        <slot />
+    </div>
 </template>
 
 <script>
@@ -43,6 +43,12 @@ const isProduction = typeof __APP_PRODUCTION__ !== 'undefined' ? __APP_PRODUCTIO
 
 export default {
     name: 'ErrorBoundary',
+
+    provide() {
+        return {
+            errorBoundaryReset: this.reset
+        };
+    },
 
     props: {
         title: {
@@ -59,12 +65,6 @@ export default {
         return {
             hasError: false,
             error: null
-        };
-    },
-
-    provide() {
-        return {
-            errorBoundaryReset: this.reset
         };
     },
 

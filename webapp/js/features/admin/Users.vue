@@ -1,7 +1,7 @@
 <template>
     <div id="users">
         <Toast position="bottom-left" />
-        <Message bindTo="error" />
+        <Message bind-to="error" />
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -12,7 +12,7 @@
                     <h1>User Management</h1>
                 </div>
                 <div>
-                    <Button @click.stop="showAddUserDialog = true" severity="primary" icon="fa-solid fa-plus" label="New User" />
+                    <Button severity="primary" icon="fa-solid fa-plus" label="New User" @click.stop="showAddUserDialog = true" />
                 </div>
             </div>
 
@@ -27,23 +27,23 @@
                     </div>
                     <!-- align right -->
                     <div class="actions-col d-flex gap-2">
-                        <Button @click="showRoleManagement = true" severity="secondary" icon="fa-solid fa-gears" label="Manage Roles" />
-                        <Button @click="showOrganizationManagement = true" severity="secondary" icon="fa-solid fa-building" label="Manage Organizations" />
-                        <Button @click="refreshUsers" severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" />
+                        <Button severity="secondary" icon="fa-solid fa-gears" label="Manage Roles" @click="showRoleManagement = true" />
+                        <Button severity="secondary" icon="fa-solid fa-building" label="Manage Organizations" @click="showOrganizationManagement = true" />
+                        <Button severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" @click="refreshUsers" />
                     </div>
                 </div>
             </div>
 
             <!-- Users Table -->
-            <DataTable :value="filteredUsers" dataKey="userName"
-                paginator :rows="10" :rowsPerPageOptions="[5, 10, 25, 50, 100]"
-                :alwaysShowPaginator="false"
-                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-                sortField="userName" :sortOrder="1"
-                stripedRows rowHover>
+            <DataTable :value="filteredUsers" data-key="userName"
+                       paginator :rows="10" :rows-per-page-options="[5, 10, 25, 50, 100]"
+                       :always-show-paginator="false"
+                       paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                       sort-field="userName" :sort-order="1"
+                       striped-rows row-hover>
                 <Column field="userName" :sortable="true">
                     <template #header>
-                        <i class="fa-solid fa-user"></i> Username
+                        <i class="fa-solid fa-user" /> Username
                     </template>
                     <template #body="slotProps">
                         <strong>{{ slotProps.data.userName }}</strong>
@@ -64,8 +64,8 @@
                 </Column>
                 <Column field="organizationCount" header="Organizations" :sortable="true">
                     <template #body="slotProps">
-                        <Button @click="showUserOrganizations(slotProps.data)" size="small" title="Manage Organizations" severity="secondary"
-                            icon="fa-solid fa-sitemap" :label="String(slotProps.data.organizationCount)" />
+                        <Button size="small" title="Manage Organizations" severity="secondary" icon="fa-solid fa-sitemap"
+                                :label="String(slotProps.data.organizationCount)" @click="showUserOrganizations(slotProps.data)" />
                     </template>
                 </Column>
                 <Column field="datasetCount" header="Datasets" :sortable="true" />
@@ -88,16 +88,16 @@
                 <Column header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }">
                     <template #body="slotProps">
                         <div class="d-flex gap-1 justify-content-center">
-                            <Button @click.stop="editUser(slotProps.data)" severity="info" size="small"
-                                :loading="slotProps.data.editing" :disabled="slotProps.data.editing || slotProps.data.deleting"
-                                title="Edit User" icon="fa-solid fa-pen-to-square" />
-                            <Button @click.stop="changePassword(slotProps.data)" severity="warn" size="small"
-                                :disabled="slotProps.data.editing || slotProps.data.deleting" title="Change Password"
-                                icon="fa-solid fa-key" />
-                            <Button @click.stop="handleDelete(slotProps.data)" severity="danger" size="small"
-                                :loading="slotProps.data.deleting"
-                                :disabled="slotProps.data.deleting || slotProps.data.editing || slotProps.data.userName === 'admin'"
-                                title="Delete User" icon="fa-solid fa-trash" />
+                            <Button severity="info" size="small" :loading="slotProps.data.editing"
+                                    :disabled="slotProps.data.editing || slotProps.data.deleting" title="Edit User"
+                                    icon="fa-solid fa-pen-to-square" @click.stop="editUser(slotProps.data)" />
+                            <Button severity="warn" size="small" :disabled="slotProps.data.editing || slotProps.data.deleting"
+                                    title="Change Password" icon="fa-solid fa-key"
+                                    @click.stop="changePassword(slotProps.data)" />
+                            <Button severity="danger" size="small" :loading="slotProps.data.deleting"
+                                    :disabled="slotProps.data.deleting || slotProps.data.editing || slotProps.data.userName === 'admin'"
+                                    title="Delete User"
+                                    icon="fa-solid fa-trash" @click.stop="handleDelete(slotProps.data)" />
                         </div>
                     </template>
                 </Column>
@@ -111,30 +111,30 @@
         </div>
 
         <!-- Dialogs -->
-        <AddUserDialog v-if="showAddUserDialog" @onClose="handleCloseAddUser" :availableRoles="availableRoles" />
-        <EditUserDialog v-if="showEditUserDialog" @onClose="handleCloseEditUser"
-                        :user="currentUser" :availableRoles="availableRoles" />
-        <ChangePasswordDialog v-if="showChangePasswordDialog" @onClose="handleCloseChangePassword"
-                              :user="currentUser" />
-        <OrganizationsDialog v-if="showOrganizationsDialog" @onClose="handleCloseOrganizations"
-                             :user="currentUser" />
-        <RoleManagementDialog v-if="showRoleManagement" @onClose="handleCloseRoleManagement"
-                              :roles="availableRoles" @onRolesChanged="refreshRoles" />
-        <OrganizationManagementDialog v-if="showOrganizationManagement" @onClose="handleCloseOrganizationManagement" />
+        <AddUserDialog v-if="showAddUserDialog" :available-roles="availableRoles" @on-close="handleCloseAddUser" />
+        <EditUserDialog v-if="showEditUserDialog" :user="currentUser"
+                        :available-roles="availableRoles" @on-close="handleCloseEditUser" />
+        <ChangePasswordDialog v-if="showChangePasswordDialog" :user="currentUser"
+                              @on-close="handleCloseChangePassword" />
+        <OrganizationsDialog v-if="showOrganizationsDialog" :user="currentUser"
+                             @on-close="handleCloseOrganizations" />
+        <RoleManagementDialog v-if="showRoleManagement" :roles="availableRoles"
+                              @on-close="handleCloseRoleManagement" @on-roles-changed="refreshRoles" />
+        <OrganizationManagementDialog v-if="showOrganizationManagement" @on-close="handleCloseOrganizationManagement" />
 
         <!-- Delete User Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
-            title="Delete User"
-            :message="deleteDialogMessage"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteDialogClose">
+                       title="Delete User"
+                       :message="deleteDialogMessage"
+                       confirm-text="Delete"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="handleDeleteDialogClose">
             <template #extra>
                 <div class="delete-options">
                     <div class="field">
                         <label>Transfer data to successor (optional)</label>
-                        <Select v-model="deleteSuccessor" :options="successorOptions" optionLabel="label" optionValue="value" placeholder="-- Delete all data --" showClear class="w-full" />
+                        <Select v-model="deleteSuccessor" :options="successorOptions" option-label="label" option-value="value" placeholder="-- Delete all data --" show-clear class="w-full" />
                         <small class="text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
                     </div>
 
@@ -142,26 +142,26 @@
                         <label>Conflict Resolution Strategy</label>
                         <div class="radio-group">
                             <div class="radio-item">
-                                <input type="radio" v-model="deleteConflictResolution" value="Rename" id="conflict-rename">
+                                <input id="conflict-rename" v-model="deleteConflictResolution" type="radio" value="Rename">
                                 <label for="conflict-rename">Rename conflicting datasets</label>
                             </div>
                             <div class="radio-item">
-                                <input type="radio" v-model="deleteConflictResolution" value="Overwrite" id="conflict-overwrite">
+                                <input id="conflict-overwrite" v-model="deleteConflictResolution" type="radio" value="Overwrite">
                                 <label for="conflict-overwrite">Overwrite existing datasets</label>
                             </div>
                             <div class="radio-item">
-                                <input type="radio" v-model="deleteConflictResolution" value="HaltOnConflict" id="conflict-halt">
+                                <input id="conflict-halt" v-model="deleteConflictResolution" type="radio" value="HaltOnConflict">
                                 <label for="conflict-halt">Stop if conflict detected</label>
                             </div>
                         </div>
                     </div>
 
                     <PrimeMessage v-if="!deleteSuccessor" severity="warn" :closable="false">
-                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <i class="fa-solid fa-triangle-exclamation" />
                         <strong>Warning:</strong> All user data (organizations, datasets, files) will be permanently deleted.
                     </PrimeMessage>
                     <PrimeMessage v-else severity="info" :closable="false">
-                        <i class="fa-solid fa-circle-info"></i>
+                        <i class="fa-solid fa-circle-info" />
                         Organizations and datasets will be transferred to <strong>{{ deleteSuccessor }}</strong>.
                     </PrimeMessage>
                 </div>
@@ -169,38 +169,38 @@
         </ConfirmDialog>
 
         <!-- Delete Result Dialog -->
-        <Window v-if="showDeleteResultDialog" title="User Deleted Successfully" id="deleteResultDialog" @onClose="closeDeleteResultDialog" modal maxWidth="50%" fixedSize>
+        <Window v-if="showDeleteResultDialog" id="deleteResultDialog" title="User Deleted Successfully" modal max-width="50%" fixed-size @on-close="closeDeleteResultDialog">
             <p>User <strong>{{ deleteResult && deleteResult.userName }}</strong> has been deleted.</p>
 
             <div v-if="deleteResult" class="delete-result-details">
                 <div v-if="deleteResult.successor" class="result-item">
-                    <i class="fa-solid fa-user"></i>
+                    <i class="fa-solid fa-user" />
                     Data transferred to: <strong>{{ deleteResult.successor }}</strong>
                 </div>
                 <div class="result-item">
-                    <i class="fa-solid fa-building"></i>
+                    <i class="fa-solid fa-building" />
                     Organizations transferred: <strong>{{ deleteResult.organizationsTransferred || 0 }}</strong>
                 </div>
                 <div class="result-item">
-                    <i class="fa-solid fa-trash"></i>
+                    <i class="fa-solid fa-trash" />
                     Organizations deleted: <strong>{{ deleteResult.organizationsDeleted || 0 }}</strong>
                 </div>
                 <div class="result-item">
-                    <i class="fa-solid fa-database"></i>
+                    <i class="fa-solid fa-database" />
                     Datasets transferred: <strong>{{ deleteResult.datasetsTransferred || 0 }}</strong>
                 </div>
                 <div class="result-item">
-                    <i class="fa-solid fa-trash"></i>
+                    <i class="fa-solid fa-trash" />
                     Datasets deleted: <strong>{{ deleteResult.datasetsDeleted || 0 }}</strong>
                 </div>
                 <div class="result-item">
-                    <i class="fa-solid fa-clock"></i>
+                    <i class="fa-solid fa-clock" />
                     Batches deleted: <strong>{{ deleteResult.batchesDeleted || 0 }}</strong>
                 </div>
             </div>
 
             <div class="buttons mt-3 text-end">
-                <Button @click="closeDeleteResultDialog" severity="info" icon="fa-solid fa-check" label="OK" />
+                <Button severity="info" icon="fa-solid fa-check" label="OK" @click="closeDeleteResultDialog" />
             </div>
         </Window>
     </div>
@@ -287,9 +287,6 @@ export default {
             searchQuery: ""
         }
     },
-    mounted: async function () {
-        await this.loadData();
-    },
     computed: {
         // Filtering
         filteredUsers: function () {
@@ -312,6 +309,9 @@ export default {
             if (!this.userToDelete) return '';
             return `Are you sure you want to delete user <strong>${this.userToDelete.userName}</strong>?`;
         }
+    },
+    mounted: async function () {
+        await this.loadData();
     },
 
     methods: {

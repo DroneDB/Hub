@@ -1,23 +1,23 @@
 <template>
     <Teleport to="body">
-        <div v-if="visible" class="video-lightbox-overlay" @click.self="close" @keydown.esc="close" tabindex="-1"
-            ref="overlay">
+        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" tabindex="-1" @click.self="close"
+             @keydown.esc="close">
             <div class="video-lightbox-toolbar">
-                <div class="video-lightbox-name" v-if="entry">{{ entryName }}</div>
+                <div v-if="entry" class="video-lightbox-name">{{ entryName }}</div>
                 <div class="video-lightbox-actions">
                     <a class="video-lightbox-action" :href="src" target="_blank" rel="noopener" title="Open in new tab">
-                        <i class="fa-solid fa-up-right-from-square"></i>
+                        <i class="fa-solid fa-up-right-from-square" />
                     </a>
-                    <div class="video-lightbox-action" @click="close" title="Close">
-                        <i class="fa-solid fa-xmark"></i>
+                    <div class="video-lightbox-action" title="Close" @click="close">
+                        <i class="fa-solid fa-xmark" />
                     </div>
                 </div>
             </div>
             <div class="video-lightbox-content" @click.self="close">
                 <video ref="videoEl" :src="src" controls preload="metadata" class="video-lightbox-player"
-                    @error="handleError"></video>
+                       @error="handleError" />
                 <div v-if="error" class="video-lightbox-error">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <i class="fa-solid fa-triangle-exclamation" />
                     Could not play video. Your browser may not support this format.
                 </div>
             </div>
@@ -32,12 +32,12 @@ const { pathutils } = ddb;
 
 export default {
     name: 'VideoLightbox',
-    emits: ['close'],
     props: {
         visible: { type: Boolean, default: false },
         src: { type: String, default: '' },
         entry: { type: Object, default: null }
     },
+    emits: ['close'],
     data() {
         return {
             error: false

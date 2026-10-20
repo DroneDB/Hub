@@ -1,18 +1,18 @@
 <template>
     <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
             modal
             header="Generate Contour Lines"
             :style="{ width: '460px' }"
             :draggable="false"
             :closable="!loading"
-            :closeOnEscape="!loading">
+            :close-on-escape="!loading"
+            @update:visible="onVisibleChange">
 
         <!-- Full-dialog loading overlay - teleported above the PrimeVue dialog z-index -->
         <Teleport to="body">
             <div v-if="loading && visible" class="contour-gen-overlay">
                 <div class="contour-gen-spinner">
-                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <i class="fas fa-spinner fa-spin fa-2x" />
                     <span>Generating contour lines…</span>
                 </div>
             </div>
@@ -30,35 +30,35 @@
                 <label class="form-label">Spacing</label>
                 <div class="mode-toggle">
                     <label>
-                        <input type="radio" value="interval" v-model="mode" />
+                        <input v-model="mode" type="radio" value="interval">
                         Fixed interval
                     </label>
                     <label>
-                        <input type="radio" value="count" v-model="mode" />
+                        <input v-model="mode" type="radio" value="count">
                         Target count
                     </label>
                 </div>
             </div>
 
             <!-- Interval -->
-            <div class="form-row" v-if="mode === 'interval'">
+            <div v-if="mode === 'interval'" class="form-row">
                 <label class="form-label">Interval ({{ unit || 'units' }})</label>
                 <InputNumber v-model="interval"
                              :min="0.0001"
                              :max-fraction-digits="4"
                              :min-fraction-digits="0"
-                             showButtons buttonLayout="horizontal" :step="1"
+                             show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
             </div>
 
             <!-- Count -->
-            <div class="form-row" v-else>
+            <div v-else class="form-row">
                 <label class="form-label">Number of levels</label>
                 <InputNumber v-model="count"
                              :min="2" :max="500"
-                             showButtons buttonLayout="horizontal" :step="1"
+                             show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
-                <small class="form-hint" v-if="rangeHint">
+                <small v-if="rangeHint" class="form-hint">
                     Spacing ≈ {{ rangeHint }} {{ unit || '' }}
                 </small>
             </div>
@@ -68,7 +68,7 @@
                 <label class="form-label">Base elevation</label>
                 <InputNumber v-model="baseOffset"
                              :max-fraction-digits="3"
-                             showButtons buttonLayout="horizontal" :step="1"
+                             show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
             </div>
 
@@ -96,14 +96,14 @@
                 <InputNumber v-model="simplifyTolerance"
                              :min="0"
                              :max-fraction-digits="4"
-                             showButtons buttonLayout="horizontal" :step="0.5"
+                             show-buttons button-layout="horizontal" :step="0.5"
                              class="form-input" />
                 <small class="form-hint">0 disables simplification.</small>
             </div>
 
             <!-- Validation error -->
-            <div class="form-error" v-if="validationError">
-                <i class="fas fa-exclamation-triangle"></i> {{ validationError }}
+            <div v-if="validationError" class="form-error">
+                <i class="fas fa-exclamation-triangle" /> {{ validationError }}
             </div>
         </div>
 

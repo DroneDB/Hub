@@ -1,21 +1,21 @@
 <template>
-    <Window title="Change Password" id="changePwdDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size @on-close="close">
         <div class="dialog">
-            <form v-on:submit.prevent>
+            <form @submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
                 <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Old Password</label>
-                    <Password ref="oldPwd" @keydown="clearError()" @keyup.enter="changePwd()"
-                        v-model="oldPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
+                    <Password ref="oldPwd" v-model="oldPwd" :feedback="false"
+                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" @keyup.enter="changePwd()" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="changePwd()" v-model="newPwd"
-                        :feedback="false" toggleMask @input="onPasswordInput" class="w-100" inputClass="w-100" />
+                    <Password v-model="newPwd" :feedback="false" toggle-mask
+                              class="w-100" input-class="w-100" @keydown="clearError()" @keyup.enter="changePwd()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && newPwd" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
-                            :class="{ met: isRequirementMet(req) }">
+                               :class="{ met: isRequirementMet(req) }">
                             <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
                             {{ req }}
                         </small>
@@ -23,14 +23,14 @@
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="changePwd()"
-                        v-model="confirmPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
+                    <Password v-model="confirmPwd" :feedback="false"
+                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" @keyup.enter="changePwd()" />
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="changing" label="Close" />
-                <Button @click="changePwd()" :disabled="changing || !isFilled()" :loading="changing"
-                    severity="info" label="Change Password" />
+                <Button severity="secondary" :disabled="changing" label="Close" @click="close()" />
+                <Button :disabled="changing || !isFilled()" :loading="changing" severity="info"
+                        label="Change Password" @click="changePwd()" />
             </div>
         </div>
     </Window>

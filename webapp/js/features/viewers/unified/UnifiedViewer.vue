@@ -1,20 +1,20 @@
 <template>
     <div id="unified-viewer">
-        <TabViewLoader @loaded="handleLoad" titleSuffix="3D Viewer" />
+        <TabViewLoader title-suffix="3D Viewer" @loaded="handleLoad" />
 
-        <Message bindTo="error" noDismiss />
+        <Message bind-to="error" no-dismiss />
         <Toast position="bottom-left" />
         <div v-if="loading" class="loading">
             <p>{{ loadingText }}</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
             <div v-if="progress !== null" class="progress-track">
-                <div class="progress-fill" :style="{ width: Math.round(progress * 100) + '%' }"></div>
+                <div class="progress-fill" :style="{ width: Math.round(progress * 100) + '%' }" />
             </div>
             <p v-if="progress !== null" class="progress-text">{{ Math.round(progress * 100) }}%</p>
         </div>
 
         <div class="container-wrapper">
-            <div ref="view" class="giro3d-view"></div>
+            <div ref="view" class="giro3d-view" />
 
             <!-- Local coordinates badge (top-center) -->
             <div v-if="ready && (isLocalPointCloud || isLocalDrawing)" class="local-coords-badge"
@@ -24,16 +24,16 @@
 
             <!-- Measurement toolbar (top-left) -->
             <div v-if="ready" class="toolbar">
-                <button :class="{ active: activeTool === 'point' }" @click="measure('point')" title="Measure point" aria-label="Measure point">
+                <button :class="{ active: activeTool === 'point' }" title="Measure point" aria-label="Measure point" @click="measure('point')">
                     <i class="fa-solid fa-location-dot" />
                 </button>
-                <button :class="{ active: activeTool === 'distance' }" @click="measure('distance')" title="Measure distance" aria-label="Measure distance">
+                <button :class="{ active: activeTool === 'distance' }" title="Measure distance" aria-label="Measure distance" @click="measure('distance')">
                     <i class="fa-solid fa-ruler" />
                 </button>
-                <button :class="{ active: activeTool === 'area' }" @click="measure('area')" title="Measure area" aria-label="Measure area">
+                <button :class="{ active: activeTool === 'area' }" title="Measure area" aria-label="Measure area" @click="measure('area')">
                     <i class="fa-solid fa-draw-polygon" />
                 </button>
-                <button :disabled="measureCount === 0" @click="clearMeasurements" title="Clear measurements" aria-label="Clear measurements">
+                <button :disabled="measureCount === 0" title="Clear measurements" aria-label="Clear measurements" @click="clearMeasurements">
                     <i class="fa-solid fa-trash" />
                 </button>
             </div>
@@ -42,7 +42,7 @@
             <div v-if="ready && layers.length" class="layer-panel">
                 <div class="layer-panel-title">Layers</div>
                 <label v-for="l in layers" :key="l.id" class="layer-row">
-                    <input type="checkbox" :checked="l.visible" @change="toggleLayer(l)" />
+                    <input type="checkbox" :checked="l.visible" @change="toggleLayer(l)">
                     <i :class="l.icon" /> <span>{{ l.name }}</span>
                 </label>
             </div>
@@ -50,41 +50,41 @@
             <!-- Navigation toolbar (bottom-left): one navigation mode in every scene, so Home
                  is the only control it needs. -->
             <div v-if="ready" class="nav-toolbar">
-                <button @click="goHome" title="Home - return to the framed view (Home key)" aria-label="Home">
+                <button title="Home - return to the framed view (Home key)" aria-label="Home" @click="goHome">
                     <i class="fa-solid fa-house" />
                 </button>
             </div>
 
             <!-- Settings gear (bottom-right) -->
-            <button v-if="ready" class="btn-settings" @click="toggleSettings" title="Display settings" aria-label="Display settings">
+            <button v-if="ready" class="btn-settings" title="Display settings" aria-label="Display settings" @click="toggleSettings">
                 <i class="fa-solid fa-gear" />
             </button>
         </div>
 
         <!-- Lighting / navigation settings -->
-        <Window v-if="showSettings" title="Display settings" id="unified-settings" @onClose="toggleSettings" fixedSize
-            sizeClass="dialog-xs">
+        <Window v-if="showSettings" id="unified-settings" title="Display settings" fixed-size size-class="dialog-xs"
+                @on-close="toggleSettings">
             <div class="settings-content">
                 <div class="form-group">
                     <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100" type="range" v-model.number="ambientIntensity" min="0" max="5" step="0.1"
-                        @input="updateLighting" /></div>
+                    <div><input v-model.number="ambientIntensity" class="w-100" type="range" min="0" max="5" step="0.1"
+                                @input="updateLighting"></div>
                 </div>
 
                 <div class="form-group">
                     <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100" type="range" v-model.number="directionalIntensity" min="0" max="5"
-                        step="0.1" @input="updateLighting" /></div>
+                    <div><input v-model.number="directionalIntensity" class="w-100" type="range" min="0" max="5"
+                                step="0.1" @input="updateLighting"></div>
                 </div>
 
                 <div class="form-group">
                     <div><label>Sky / ground fill: {{ hemisphereIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100" type="range" v-model.number="hemisphereIntensity" min="0" max="5"
-                        step="0.1" @input="updateLighting" /></div>
+                    <div><input v-model.number="hemisphereIntensity" class="w-100" type="range" min="0" max="5"
+                                step="0.1" @input="updateLighting"></div>
                 </div>
 
-                <Button label="Reset" @click="resetSettings" text />
-                <Button label="Close" severity="secondary" @click="toggleSettings" text />
+                <Button label="Reset" text @click="resetSettings" />
+                <Button label="Close" severity="secondary" text @click="toggleSettings" />
             </div>
         </Window>
     </div>

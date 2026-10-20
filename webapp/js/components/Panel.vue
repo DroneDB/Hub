@@ -1,10 +1,10 @@
 <template>
-    <Splitter :layout="layout" @resizeend="onResizeEnd" class="panel-splitter"
-        :pt="{ gutter: { class: 'panel-gutter' } }">
-        <SplitterPanel :size="size0" :minSize="2">
+    <Splitter :layout="layout" class="panel-splitter" :pt="{ gutter: { class: 'panel-gutter' } }"
+              @resizeend="onResizeEnd">
+        <SplitterPanel :size="size0" :min-size="2">
             <slot name="first" />
         </SplitterPanel>
-        <SplitterPanel :size="size1" :minSize="2">
+        <SplitterPanel :size="size1" :min-size="2">
             <slot name="second" />
         </SplitterPanel>
     </Splitter>
@@ -30,6 +30,13 @@ export default {
         Splitter,
         SplitterPanel
     },
+
+    provide() {
+        return {
+            registerPanelChild: this.registerChild,
+            unregisterPanelChild: this.unregisterChild
+        };
+    },
     props: {
         split: {
             type: String,
@@ -47,13 +54,6 @@ export default {
             type: String,
             default: ""
         }
-    },
-
-    provide() {
-        return {
-            registerPanelChild: this.registerChild,
-            unregisterPanelChild: this.unregisterChild
-        };
     },
     data: function () {
         const size = parseFloat(this.panelSize());

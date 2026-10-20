@@ -1,8 +1,8 @@
 <template>
     <div class="text-editor-wrapper">
-        <Window :title="windowTitle" id="textEditorDialog" @onClose="close" :autofocus="false" modal width="80%" height="80%">
+        <Window id="textEditorDialog" :title="windowTitle" :autofocus="false" modal width="80%" height="80%" @on-close="close">
             <div class="text-editor-dialog">
-                <Message bindTo="error" />
+                <Message bind-to="error" />
 
                 <div v-if="loading" class="loading-container">
                     <i class="fa-solid fa-circle-notch fa-spin" />
@@ -13,13 +13,13 @@
                     <p>File is too large to edit ({{ formattedSize }})</p>
                     <p class="text-muted">Maximum size: {{ formattedMaxSize }}</p>
                     <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                        <Button @click="close" severity="secondary" label="Close" />
-                        <Button @click="downloadFile" severity="primary" icon="fa-solid fa-download" label="Download Instead" />
+                        <Button severity="secondary" label="Close" @click="close" />
+                        <Button severity="primary" icon="fa-solid fa-download" label="Download Instead" @click="downloadFile" />
                     </div>
                 </PrimeMessage>
 
                 <template v-else>
-                    <div class="editor-container" ref="editorContainer"></div>
+                    <div ref="editorContainer" class="editor-container" />
 
                     <PrimeMessage v-if="!readonly && isModified" severity="info" :closable="false" icon="fa-solid fa-circle-info">
                         You have unsaved changes
@@ -27,15 +27,15 @@
 
                     <div class="footer-actions">
                         <div class="footer-left">
-                            <Button v-if="!readonly && canFormatFile" @click="formatDocument" :disabled="saving"
-                                severity="secondary" title="Format document (Shift+Alt+F)"
-                                icon="fa-solid fa-code" label="Format" />
+                            <Button v-if="!readonly && canFormatFile" :disabled="saving" severity="secondary"
+                                    title="Format document (Shift+Alt+F)" icon="fa-solid fa-code"
+                                    label="Format" @click="formatDocument" />
                         </div>
                         <div class="footer-right">
-                            <Button v-if="!readonly && isModified" @click="save" :disabled="saving"
-                                severity="info"
-                                icon="fa-solid fa-floppy-disk" :label="saving ? 'Saving...' : 'Save'" />
-                            <Button @click="close" severity="secondary" label="Close" />
+                            <Button v-if="!readonly && isModified" :disabled="saving" severity="info"
+                                    icon="fa-solid fa-floppy-disk"
+                                    :label="saving ? 'Saving...' : 'Save'" @click="save" />
+                            <Button severity="secondary" label="Close" @click="close" />
                         </div>
                     </div>
                 </template>
@@ -45,12 +45,12 @@
             v-if="showConfirmClose"
             title="Unsaved Changes"
             message="You have unsaved changes. Are you sure you want to close?"
-            confirmText="Discard and Close"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            secondaryText="Save and Close"
-            secondaryButtonClass="success"
-            @onClose="handleConfirmClose"
+            confirm-text="Discard and Close"
+            cancel-text="Cancel"
+            confirm-button-class="danger"
+            secondary-text="Save and Close"
+            secondary-button-class="success"
+            @on-close="handleConfirmClose"
         />
     </div>
 </template>

@@ -1,10 +1,10 @@
 <template>
     <div>
         <Toast position="bottom-left" />
-        <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal width="43.75rem" fixedSize>
+        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @on-close="close">
             <div class="members-dialog">
                 <!-- Loading state -->
-                <div v-if="loading" class="ui active centered inline loader"></div>
+                <div v-if="loading" class="ui active centered inline loader" />
 
                 <!-- Error message -->
                 <PrimeMessage v-if="error" severity="error" @close="error = null">
@@ -20,27 +20,27 @@
                 <!-- Members list -->
                 <div v-if="featureEnabled">
                     <!-- Add member section -->
-                    <div class="mb-3" v-if="canManageMembers">
+                    <div v-if="canManageMembers" class="mb-3">
                         <h3>Add Member</h3>
                         <div class="d-flex gap-3 flex-wrap align-items-end">
                             <div style="flex: 7;">
                                 <label class="d-block mb-1 fw-semibold">User</label>
-                                <Select v-model="newMember.userName" :options="availableUsers" optionLabel="displayName" optionValue="userName" filter placeholder="Search user..." class="w-100" />
+                                <Select v-model="newMember.userName" :options="availableUsers" option-label="displayName" option-value="userName" filter placeholder="Search user..." class="w-100" />
                             </div>
                             <div style="flex: 5;">
                                 <label class="d-block mb-1 fw-semibold">Permissions</label>
-                                <Select v-model="newMember.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                                <Select v-model="newMember.permissions" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                             </div>
                             <div style="flex: 4;">
                                 <label class="d-block mb-1">&nbsp;</label>
-                                <Button severity="info" @click="addMember" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" />
+                                <Button severity="info" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" @click="addMember" />
                             </div>
                         </div>
                     </div>
 
                     <!-- Current members table -->
                     <h3>Current Members</h3>
-                    <table class="ui celled table" v-if="members.length > 0">
+                    <table v-if="members.length > 0" class="ui celled table">
                         <thead>
                             <tr>
                                 <th>Username</th>
@@ -58,10 +58,10 @@
                                     <Select v-if="canManageMembers"
                                             v-model="member.permissions"
                                             :options="permissionsOptions"
-                                            optionLabel="label"
-                                            optionValue="value"
-                                            @change="updatePermission(member)"
-                                            class="w-full" />
+                                            option-label="label"
+                                            option-value="value"
+                                            class="w-full"
+                                            @change="updatePermission(member)" />
                                     <span v-else>{{ member.permissionName }}</span>
                                 </td>
                                 <td>
@@ -72,7 +72,7 @@
                                     <span v-else>-</span>
                                 </td>
                                 <td v-if="canManageMembers">
-                                    <Button severity="danger" size="small" @click="removeMember(member)" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" />
+                                    <Button severity="danger" size="small" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" @click="removeMember(member)" />
                                 </td>
                             </tr>
                         </tbody>
@@ -87,18 +87,17 @@
 
                 <!-- Footer -->
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <Button @click="close" severity="secondary" label="Close" />
+                    <Button severity="secondary" label="Close" @click="close" />
                 </div>
             </div>
 
             <ConfirmDialog v-if="removeMemberDialogOpen"
-                title="Remove Member"
-                :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
-                confirmText="Remove"
-                cancelText="Cancel"
-                confirmButtonClass="danger"
-                @onClose="handleRemoveMemberDialogClose">
-            </ConfirmDialog>
+                           title="Remove Member"
+                           :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
+                           confirm-text="Remove"
+                           cancel-text="Cancel"
+                           confirm-button-class="danger"
+                           @on-close="handleRemoveMemberDialogClose" />
         </Window>
     </div>
 </template>

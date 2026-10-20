@@ -1,5 +1,5 @@
 <template>
-    <Window title="Paste Conflict" id="paste-conflict" @onClose="cancel" modal sizeClass="dialog-md" fixedSize>
+    <Window id="paste-conflict" title="Paste Conflict" modal size-class="dialog-md" fixed-size @on-close="cancel">
         <div class="paste-conflict-content">
             <p>
                 <strong>{{ items.length }}</strong> file<span v-if="items.length !== 1">s</span>
@@ -8,16 +8,16 @@
             </p>
             <ul class="file-list">
                 <li v-for="it in items" :key="it.path" class="file-item">
-                    <i class="fa-solid fa-triangle-exclamation amber"></i>
+                    <i class="fa-solid fa-triangle-exclamation amber" />
                     <span class="file-path">{{ basename(it.path) }}</span>
                 </li>
             </ul>
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100 flex-wrap">
-            <Button @click="cancel" severity="secondary" label="Cancel" />
-            <Button @click="choose('skip')" severity="info" label="Skip All" icon="fa-solid fa-forward" />
-            <Button @click="choose('overwrite')" severity="danger" label="Overwrite All" icon="fa-solid fa-pen-to-square" />
+            <Button severity="secondary" label="Cancel" @click="cancel" />
+            <Button severity="info" label="Skip All" icon="fa-solid fa-forward" @click="choose('skip')" />
+            <Button severity="danger" label="Overwrite All" icon="fa-solid fa-pen-to-square" @click="choose('overwrite')" />
         </div>
     </Window>
 </template>

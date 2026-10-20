@@ -1,25 +1,25 @@
 <template>
-    <Window title="Rescan Results" id="rescan-results" @onClose="close" modal sizeClass="dialog-lg" fixedSize>
+    <Window id="rescan-results" title="Rescan Results" modal size-class="dialog-lg" fixed-size @on-close="close">
         <div class="rescan-results-content">
             <!-- Summary -->
             <div class="summary">
                 <span class="summary-item">
                     <strong>{{ result.totalProcessed }}</strong> entries processed
                 </span>
-                <span class="summary-item success-count" v-if="result.successCount > 0">
-                    <i class="fa-solid fa-circle-check green"></i> {{ result.successCount }} successful
+                <span v-if="result.successCount > 0" class="summary-item success-count">
+                    <i class="fa-solid fa-circle-check green" /> {{ result.successCount }} successful
                 </span>
-                <span class="summary-item error-count" v-if="result.errorCount > 0">
-                    <i class="fa-solid fa-circle-exclamation red"></i> {{ result.errorCount }} errors
+                <span v-if="result.errorCount > 0" class="summary-item error-count">
+                    <i class="fa-solid fa-circle-exclamation red" /> {{ result.errorCount }} errors
                 </span>
             </div>
 
             <!-- Success section -->
             <div v-if="successEntries.length > 0" class="result-section success-section">
-                <h4><i class="fa-solid fa-circle-check green"></i> Successfully Rescanned ({{ successEntries.length }})</h4>
+                <h4><i class="fa-solid fa-circle-check green" /> Successfully Rescanned ({{ successEntries.length }})</h4>
                 <ul class="file-list">
                     <li v-for="entry in successEntries" :key="entry.path" class="file-item success">
-                        <i class="fa-solid fa-check green"></i>
+                        <i class="fa-solid fa-check green" />
                         <span class="file-path">{{ entry.path }}</span>
                     </li>
                 </ul>
@@ -27,10 +27,10 @@
 
             <!-- Failure section -->
             <div v-if="errorEntries.length > 0" class="result-section error-section">
-                <h4><i class="fa-solid fa-circle-exclamation red"></i> Failed to Rescan ({{ errorEntries.length }})</h4>
+                <h4><i class="fa-solid fa-circle-exclamation red" /> Failed to Rescan ({{ errorEntries.length }})</h4>
                 <ul class="file-list">
                     <li v-for="entry in errorEntries" :key="entry.path" class="file-item error">
-                        <i class="fa-solid fa-xmark red"></i>
+                        <i class="fa-solid fa-xmark red" />
                         <span class="file-path">{{ entry.path }}</span>
                         <span class="error-message">{{ entry.error }}</span>
                     </li>
@@ -39,7 +39,7 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="close" />
         </div>
     </Window>
 </template>

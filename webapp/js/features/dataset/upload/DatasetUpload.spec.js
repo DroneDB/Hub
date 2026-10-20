@@ -54,7 +54,7 @@ describe('DatasetUpload', () => {
         app.use(PrimeVue);
         app.config.errorHandler = err => errors.push(err);
         app.config.globalProperties.$router = { push: () => {} };
-        app.component('router-link', { render: () => null });
+        app.component('RouterLink', { render: () => null });
         app.mount(el);
     }
 

@@ -1,16 +1,16 @@
 <template>
-    <Window title="Organization Management" id="organizationManagementDialog" @onClose="close" modal maxWidth="80%" fixedSize>
+    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size @on-close="close">
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message bind-to="error" />
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="list"><i class="fa-solid fa-list me-1"></i>Organizations List</Tab>
-                    <Tab value="create"><i class="fa-solid fa-plus me-1"></i>Create Organization</Tab>
+                    <Tab value="list"><i class="fa-solid fa-list me-1" />Organizations List</Tab>
+                    <Tab value="create"><i class="fa-solid fa-plus me-1" />Create Organization</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="list">
@@ -21,10 +21,10 @@
                                     <InputText v-model="searchQuery" placeholder="Search organizations" class="w-100" />
                                 </IconField>
                             </div>
-                            <Button @click="loadOrganizations" severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" />
+                            <Button severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" @click="loadOrganizations" />
                         </div>
 
-                        <table class="ui celled table" v-if="filteredOrganizations.length > 0">
+                        <table v-if="filteredOrganizations.length > 0" class="ui celled table">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -39,12 +39,12 @@
                                     <td><code>{{ org.slug }}</code></td>
                                     <td>{{ org.description || '-' }}</td>
                                     <td>
-                                        <Button @click="confirmDeleteOrganization(org)"
-                                                severity="danger" size="small"
-                                                :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
+                                        <Button severity="danger"
+                                                size="small" :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
                                                 :loading="deleting === org.slug"
-                                                icon="fa-solid fa-trash" label="Delete"
-                                                title="Delete Organization" />
+                                                icon="fa-solid fa-trash"
+                                                label="Delete" title="Delete Organization"
+                                                @click="confirmDeleteOrganization(org)" />
                                     </td>
                                 </tr>
                             </tbody>
@@ -58,34 +58,34 @@
                         </div>
                     </TabPanel>
                     <TabPanel value="create">
-                        <form v-on:submit.prevent v-bind:class="{ error: !!createError }">
+                        <form :class="{ error: !!createError }" @submit.prevent>
                             <div class="mb-3">
                                 <label class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
-                                <InputText ref="txtOrgName" @keydown="clearCreateError()" @keyup.enter="createOrganization()"
-                                       v-model="newOrgName" placeholder="Enter organization name" class="w-100" />
+                                <InputText ref="txtOrgName" v-model="newOrgName" placeholder="Enter organization name"
+                                           class="w-100" @keydown="clearCreateError()" @keyup.enter="createOrganization()" />
                                 <small>Organization names should be descriptive and will be converted to a valid slug</small>
                             </div>
 
                             <div class="mb-3">
                                 <label class="d-block mb-1 fw-semibold">Organization Slug</label>
-                                <InputText :modelValue="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-100" />
+                                <InputText :model-value="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-100" />
                                 <small>This is automatically generated from the name and cannot be changed later</small>
                             </div>
 
                             <div class="mb-3">
                                 <label class="d-block mb-1 fw-semibold">Description (Optional)</label>
-                                <Textarea v-model="newOrgDescription" placeholder="Brief description of the organization" rows="3" autoResize class="w-100" />
+                                <Textarea v-model="newOrgDescription" placeholder="Brief description of the organization" rows="3" auto-resize class="w-100" />
                             </div>
 
-                            <div class="mb-3" v-if="createError">
+                            <div v-if="createError" class="mb-3">
                                 <PrimeMessage severity="error" :closable="false">
                                     {{ createError }}
                                 </PrimeMessage>
                             </div>
 
                             <div class="mb-3">
-                                <Button @click="createOrganization()" :disabled="creating || !newOrgName.trim()"
-                                        :loading="creating" severity="primary" icon="fa-solid fa-plus" label="Create Organization" />
+                                <Button :disabled="creating || !newOrgName.trim()" :loading="creating"
+                                        severity="primary" icon="fa-solid fa-plus" label="Create Organization" @click="createOrganization()" />
                             </div>
                         </form>
                     </TabPanel>
@@ -93,19 +93,18 @@
             </Tabs>
 
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="close()" />
             </div>
         </div>
 
         <!-- Delete Organization Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
-            title="Delete Organization"
-            :message="`Are you sure you want to delete the organization <strong>${orgToDelete && (orgToDelete.name || orgToDelete.slug)}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. All data associated with this organization will be permanently removed.`"
-            confirmText="Delete Organization"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteDialogClose">
-        </ConfirmDialog>
+                       title="Delete Organization"
+                       :message="`Are you sure you want to delete the organization <strong>${orgToDelete && (orgToDelete.name || orgToDelete.slug)}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. All data associated with this organization will be permanently removed.`"
+                       confirm-text="Delete Organization"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="handleDeleteDialogClose" />
     </Window>
 </template>
 

@@ -11,38 +11,37 @@
 
         <div class="right">
 
-            <Button v-if="showBackToOrg" @click="goToOrganization" severity="secondary" size="small" text
-                title="Back to organization">
-                <i class="fa-solid fa-sitemap"></i>
+            <Button v-if="showBackToOrg" severity="secondary" size="small" text title="Back to organization"
+                    @click="goToOrganization">
+                <i class="fa-solid fa-sitemap" />
             </Button>
-            <Button v-if="showDownload && onFilesTab" @click="handleDownload" severity="secondary" size="small" text
-                :title="downloadTitle" :disabled="isDownloading || downloadBlocked || activeBulkDownload">
-                <i class="fa-solid fa-download"></i>
+            <Button v-if="showDownload && onFilesTab" severity="secondary" size="small" text :title="downloadTitle"
+                    :disabled="isDownloading || downloadBlocked || activeBulkDownload" @click="handleDownload">
+                <i class="fa-solid fa-download" />
                 <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
-            <Button v-if="showShare && onFilesTab && selectedFiles.length === 1" @click="handleShare" severity="secondary" size="small" text
-                :title="shareTitle">
-                <i class="fa-solid fa-share-nodes"></i>
+            <Button v-if="showShare && onFilesTab && selectedFiles.length === 1" severity="secondary" size="small" text :title="shareTitle"
+                    @click="handleShare">
+                <i class="fa-solid fa-share-nodes" />
             </Button>
-            <Button v-if="showSettings" @click="handleSettings" severity="secondary" size="small" text title="Settings">
-                <i class="fa-solid fa-wrench"></i>
+            <Button v-if="showSettings" severity="secondary" size="small" text title="Settings" @click="handleSettings">
+                <i class="fa-solid fa-wrench" />
             </Button>
 
             <ConfirmDialog v-if="downloadConfirmOpen"
-                title="Download"
-                :message="downloadConfirmMessage"
-                confirmText="Download"
-                cancelText="Cancel"
-                confirmButtonClass="primary"
-                @onClose="handleDownloadConfirmClose">
-            </ConfirmDialog>
+                           title="Download"
+                           :message="downloadConfirmMessage"
+                           confirm-text="Download"
+                           cancel-text="Cancel"
+                           confirm-button-class="primary"
+                           @on-close="handleDownloadConfirmClose" />
 
-            <Alert title="Storage Info" v-if="storageInfoDialogOpen" @onClose="handleStorageInfoDialogClose">
+            <Alert v-if="storageInfoDialogOpen" title="Storage Info" @on-close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
                     <template v-if="storageInfo.used > 0">
-                        <ProgressBar :value="storagePercent" :showValue="false"
-                            :pt="{ value: { style: { background: storageBarColor } } }"
-                            class="storage-progress-bar" />
+                        <ProgressBar :value="storagePercent" :show-value="false"
+                                     :pt="{ value: { style: { background: storageBarColor } } }"
+                                     class="storage-progress-bar" />
                         <div class="storage-percentage" :style="{ color: storageBarColor }">
                             {{ percent(storageInfo.usedPercentage, 1) }}
                         </div>
@@ -76,16 +75,16 @@
             </Alert>
 
             <Button v-if="!loggedIn" severity="info" size="small" @click="login">
-                <i class="fa-solid fa-lock"></i><span class="mobile hide"> Sign In</span>
+                <i class="fa-solid fa-lock" /><span class="mobile hide"> Sign In</span>
             </Button>
             <Button v-else severity="secondary" size="small" text
-                @click="toggleUserMenu" :title="username" aria-haspopup="true" aria-controls="user_menu">
-                <i class="fa-solid fa-user"></i>
+                    :title="username" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
+                <i class="fa-solid fa-user" />
             </Button>
-            <Menu ref="userMenu" id="user_menu" :model="userMenuItems" :popup="true" />
+            <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" />
         </div>
 
-        <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
+        <ShareEmbed v-if="shareFile" :file="shareFile" @on-close="handleCloseShareEmbed" />
     </div>
 </template>
 
@@ -317,6 +316,21 @@ export default {
             return items;
         }
     },
+    watch: {
+        $route: function (to) {
+            const { params } = to;
+
+            this.showDownload = !!params.ds;
+            this.showShare = !!params.ds;
+            this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
+
+            // Reset tab gating; ViewDataset re-broadcasts the active tab on mount.
+            if (!params.ds) this.activeTab = null;
+
+            this.params = params;
+            this.updateBackToOrgVisibility();
+        }
+    },
     mounted: function () {
         reg.addEventListener('login', this.onRegLogin);
         reg.addEventListener('logout', this.onRegLogout);
@@ -348,21 +362,6 @@ export default {
         this.refreshStorageInfo();
         this.checkUserManagement();
         this.updateBackToOrgVisibility();
-    },
-    watch: {
-        $route: function (to) {
-            const { params } = to;
-
-            this.showDownload = !!params.ds;
-            this.showShare = !!params.ds;
-            this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
-
-            // Reset tab gating; ViewDataset re-broadcasts the active tab on mount.
-            if (!params.ds) this.activeTab = null;
-
-            this.params = params;
-            this.updateBackToOrgVisibility();
-        }
     },
     beforeUnmount: function () {
         reg.removeEventListener('login', this.onRegLogin);

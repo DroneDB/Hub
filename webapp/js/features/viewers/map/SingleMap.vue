@@ -1,43 +1,43 @@
 <template>
     <div class="singleMap" @mouseover="setMouseInside(true)" @mouseleave="setMouseInside(false)">
-        <TabViewLoader @loaded="loadMap" titleSuffix="Map" />
+        <TabViewLoader title-suffix="Map" @loaded="loadMap" />
 
         <div ref="map-container" class="map-container">
             <OpacityControl v-model="rasterOpacity" :visible="hasRasters" />
             <PlantHealthPanel
                 :visible="plantHealthVisible"
                 :dataset="dataset"
-                :filePath="plantHealthFilePath"
-                :initialParams="plantHealthInitialParams"
+                :file-path="plantHealthFilePath"
+                :initial-params="plantHealthInitialParams"
                 @close="closePlantHealth"
-                @vizParamsChanged="handleVizParamsChanged" />
+                @viz-params-changed="handleVizParamsChanged" />
             <RasterAnalysisControls
                 :visible="rasterPanelVisible"
                 :dataset="dataset"
-                :filePath="rasterFilePath"
-                :initialParams="rasterInitialParams"
-                :spotInfo="rasterSpotInfo"
-                :areaStats="rasterAreaStats"
+                :file-path="rasterFilePath"
+                :initial-params="rasterInitialParams"
+                :spot-info="rasterSpotInfo"
+                :area-stats="rasterAreaStats"
                 :profile="rasterProfile"
-                :profileLoading="rasterProfileLoading"
-                :profileError="rasterProfileError"
-                :drawingProfile="rasterProfileDrawing"
-                :inspectActive="rasterInspectActive"
+                :profile-loading="rasterProfileLoading"
+                :profile-error="rasterProfileError"
+                :drawing-profile="rasterProfileDrawing"
+                :inspect-active="rasterInspectActive"
                 @close="closeRasterAnalysis"
-                @vizParamsChanged="handleRasterVizParamsChanged"
-                @pickProfile="handlePickProfile"
-                @clearProfile="handleClearProfile"
-                @cancelDrawProfile="cancelRasterProfileDrawing"
-                @toggleInspectValue="toggleRasterInspect"
-                @profileHover="handleProfileHover"
-                @openContourDialog="openContourDialog" />
+                @viz-params-changed="handleRasterVizParamsChanged"
+                @pick-profile="handlePickProfile"
+                @clear-profile="handleClearProfile"
+                @cancel-draw-profile="cancelRasterProfileDrawing"
+                @toggle-inspect-value="toggleRasterInspect"
+                @profile-hover="handleProfileHover"
+                @open-contour-dialog="openContourDialog" />
             <ContourOptionsDialog
                 v-model:visible="contourDialogVisible"
                 :loading="contourLoading"
                 :unit="contourUnit"
-                :rasterMin="contourRasterMin"
-                :rasterMax="contourRasterMax"
-                :initialOptions="contourLastOptions"
+                :raster-min="contourRasterMin"
+                :raster-max="contourRasterMax"
+                :initial-options="contourLastOptions"
                 @generate="generateContourLines"
                 @cancel="closeContourDialog" />
             <StockpileVolumePanel
@@ -45,64 +45,63 @@
                 :loading="stockpileLoading"
                 :error="stockpileError"
                 :result="stockpileResult"
-                :baseMethod="stockpileBaseMethod"
+                :base-method="stockpileBaseMethod"
                 :sensitivity="stockpileSensitivity"
                 :radius="stockpileRadius"
                 :material="stockpileMaterial"
                 :materials="stockpileMaterials"
                 :mode="stockpileMode"
-                :customDensity="stockpileCustomDensity"
-                :customCostPerTon="stockpileCustomCostPerTon"
-                :unitPref="currentUnitPref"
+                :custom-density="stockpileCustomDensity"
+                :custom-cost-per-ton="stockpileCustomCostPerTon"
+                :unit-pref="currentUnitPref"
                 :title="stockpileTitle"
                 :description="stockpileDescription"
                 @close="closeStockpileVolume"
-                @clickOnMap="startStockpileClickMode"
-                @drawPolygon="startStockpilePolygonDrawing"
-                @clearOverlay="clearStockpileOverlay"
-                @cancelMode="_stopStockpileInteractions"
-                @exportGeoJson="exportStockpileGeoJson"
-                @update:baseMethod="stockpileBaseMethod = $event"
+                @click-on-map="startStockpileClickMode"
+                @draw-polygon="startStockpilePolygonDrawing"
+                @clear-overlay="clearStockpileOverlay"
+                @cancel-mode="_stopStockpileInteractions"
+                @export-geo-json="exportStockpileGeoJson"
+                @update:base-method="stockpileBaseMethod = $event"
                 @update:sensitivity="stockpileSensitivity = $event"
                 @update:radius="stockpileRadius = $event"
                 @update:material="stockpileMaterial = $event"
-                @update:customDensity="stockpileCustomDensity = $event"
-                @update:customCostPerTon="stockpileCustomCostPerTon = $event"
+                @update:custom-density="stockpileCustomDensity = $event"
+                @update:custom-cost-per-ton="stockpileCustomCostPerTon = $event"
                 @update:title="stockpileTitle = $event"
                 @update:description="stockpileDescription = $event" />
         </div>
         <MapSettingsDialog v-if="mapSettingsDialogOpen"
-            :basemaps="basemaps"
-            :selectedBasemap="selectedBasemap"
-            :customBasemapConfig="customBasemapConfig"
-            @onClose="mapSettingsDialogOpen = false"
-            @basemapChanged="handleBasemapChanged"
-            @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
-        </MapSettingsDialog>
+                           :basemaps="basemaps"
+                           :selected-basemap="selectedBasemap"
+                           :custom-basemap-config="customBasemapConfig"
+                           @on-close="mapSettingsDialogOpen = false"
+                           @basemap-changed="handleBasemapChanged"
+                           @custom-basemap-config-changed="handleCustomBasemapConfigChanged" />
         <MapDialogs
-            :alertDialogOpen="alertDialogOpen"
-            :alertTitle="alertTitle"
-            :alertMessage="alertMessage"
-            :clearMeasurementsDialogOpen="clearMeasurementsDialogOpen"
-            :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen"
-            @alertClose="handleAlertDialogClose"
-            @clearMeasurementsClose="handleClearMeasurementsDialogClose"
-            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
+            :alert-dialog-open="alertDialogOpen"
+            :alert-title="alertTitle"
+            :alert-message="alertMessage"
+            :clear-measurements-dialog-open="clearMeasurementsDialogOpen"
+            :delete-saved-measurements-dialog-open="deleteSavedMeasurementsDialogOpen"
+            @alert-close="handleAlertDialogClose"
+            @clear-measurements-close="handleClearMeasurementsDialogClose"
+            @delete-saved-measurements-close="handleDeleteSavedMeasurementsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen"
-            :measurements="measurementListItems"
-            :groups="measurementGroups"
-            @onClose="measurementListDialogOpen = false"
-            @deleteMeasurement="handleDeleteMeasurementFromList"
-            @editMeasurement="handleEditMeasurementFromList"
-            @createGroup="openCreateGroupDialog"
-            @renameGroup="openRenameGroupDialog"
-            @deleteGroup="deleteGroup"
-            @toggleGroupVisibility="toggleGroupVisibility"
-            @moveMeasurementToGroup="moveMeasurementToGroup" />
+                               :measurements="measurementListItems"
+                               :groups="measurementGroups"
+                               @on-close="measurementListDialogOpen = false"
+                               @delete-measurement="handleDeleteMeasurementFromList"
+                               @edit-measurement="handleEditMeasurementFromList"
+                               @create-group="openCreateGroupDialog"
+                               @rename-group="openRenameGroupDialog"
+                               @delete-group="deleteGroup"
+                               @toggle-group-visibility="toggleGroupVisibility"
+                               @move-measurement-to-group="moveMeasurementToGroup" />
         <MeasurementGroupDialog v-if="measurementGroupDialogOpen"
-            :group="pendingGroupForRename"
-            @onClose="measurementGroupDialogOpen = false"
-            @onSave="handleGroupDialogSave" />
+                                :group="pendingGroupForRename"
+                                @on-close="measurementGroupDialogOpen = false"
+                                @on-save="handleGroupDialogSave" />
         <Toast position="bottom-left" />
     </div>
 </template>
@@ -186,9 +185,6 @@ export default {
             currentUnitPref: localStorage.getItem('measureUnitPref') || 'metric'
         };
     },
-    mounted: async function () {
-
-    },
     watch: {
         rasterOpacity: function (newVal) {
             if (this.rasterLayer) {
@@ -197,6 +193,9 @@ export default {
                 });
             }
         }
+    },
+    mounted: async function () {
+
     },
     beforeUnmount: function () {
         // Clean up keyboard event handlers

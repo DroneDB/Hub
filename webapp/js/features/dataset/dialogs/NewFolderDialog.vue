@@ -1,12 +1,12 @@
 <template>
-    <Window title="Create folder" id="newFolder" @onClose="onWindowClose" modal maxWidth="70%" fixedSize>
+    <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size @on-close="onWindowClose">
 
-        <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close('close')"
-            v-model="newFolderPath" :invalid="!newFolderPath" :disabled="busy" placeholder="Folder name" />
+        <InputText ref="newFolderInput" v-model="newFolderPath" class="newFolderInput" :invalid="!newFolderPath"
+                   :disabled="busy" placeholder="Folder name" @keyup.enter="createFolder" @keyup.esc="close('close')" />
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" :disabled="busy" severity="secondary" label="Close" />
-            <Button @click="createFolder" :disabled="!newFolderPath || busy" :loading="busy" severity="primary" label="Create folder" />
+            <Button :disabled="busy" severity="secondary" label="Close" @click="close('close')" />
+            <Button :disabled="!newFolderPath || busy" :loading="busy" severity="primary" label="Create folder" @click="createFolder" />
         </div>
     </Window>
 </template>

@@ -1,8 +1,8 @@
 <template>
     <div class="band-selector">
-        <div class="band-channel" v-for="ch in channels" :key="ch.id">
+        <div v-for="ch in channels" :key="ch.id" class="band-channel">
             <label class="channel-label" :style="{ color: ch.color }">{{ ch.label }}</label>
-            <select v-model="selected[ch.id]" @change="emitChange" class="channel-select">
+            <select v-model="selected[ch.id]" class="channel-select" @change="emitChange">
                 <option v-for="b in bands" :key="b.index" :value="b.index">
                     {{ b.index }} - {{ b.name }}
                 </option>

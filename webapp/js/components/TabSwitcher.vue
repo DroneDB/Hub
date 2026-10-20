@@ -1,25 +1,25 @@
 <template>
     <div class="tab-switcher" :class="{ 'position-top': position === 'top' }">
-        <div class="tab-buttons-strip" v-if="!hideSingle || dynTabs.length > 1">
+        <div v-if="!hideSingle || dynTabs.length > 1" class="tab-buttons-strip">
             <Tabs :value="activeTab" @update:value="onTabChange">
                 <TabList>
                     <Tab v-for="t in dynTabs" :key="t.key" :value="t.key">
                         <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
-                            style="margin-right: 0.5rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
-                                t.label }}</span>
-                        <span @click.stop="removeTab(t.key)" v-if="!!t.canClose" class="close-btn"><i
-                                class="fa-solid fa-xmark"></i></span>
+                           style="margin-right: 0.5rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
+                               t.label }}</span>
+                        <span v-if="!!t.canClose" class="close-btn" @click.stop="removeTab(t.key)"><i
+                            class="fa-solid fa-xmark" /></span>
                     </Tab>
                 </TabList>
             </Tabs>
         </div>
         <div class="tabs">
-            <div class="tab" v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }"
-                :class="{ hidden: t.key !== activeTab }">
+            <div v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }" class="tab"
+                 :class="{ hidden: t.key !== activeTab }">
                 <slot :name="t.key" />
-                <component v-if="dynamicComponents[t.key]" :is="dynamicComponents[t.key].component"
-                    v-bind="dynamicComponents[t.key].props"
-                    :ref="el => { if (el) dynamicChildRefs[t.key] = el; }" />
+                <component :is="dynamicComponents[t.key].component" v-if="dynamicComponents[t.key]"
+                           v-bind="dynamicComponents[t.key].props"
+                           :ref="el => { if (el) dynamicChildRefs[t.key] = el; }" />
             </div>
         </div>
     </div>
@@ -50,6 +50,12 @@ export default {
         TabList,
         Tab
     },
+    provide() {
+        return {
+            registerTabChild: this.registerTabChild,
+            unregisterTabChild: this.unregisterTabChild
+        };
+    },
     props: {
         tabs: {
             type: Array,
@@ -73,12 +79,6 @@ export default {
         }
     },
     emits: ['tabChange'],
-    provide() {
-        return {
-            registerTabChild: this.registerTabChild,
-            unregisterTabChild: this.unregisterTabChild
-        };
-    },
     data: function () {
         return {
             activeTab: this.selectedTab != null ? this.selectedTab : this.tabs[0].key,

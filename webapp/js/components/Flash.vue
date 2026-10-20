@@ -1,6 +1,6 @@
 <template>
     <div class="flash" @mouseup="closeMouseUp">
-        <PrimeMessage :severity="primeSeverity" :closable="true" @close="closeMouseUp" :icon="icon || undefined">
+        <PrimeMessage :severity="primeSeverity" :closable="true" :icon="icon || undefined" @close="closeMouseUp">
             <slot />
         </PrimeMessage>
     </div>

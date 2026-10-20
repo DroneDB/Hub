@@ -1,10 +1,10 @@
 <template>
-    <Window :title="title" id="folderPicker" modal fixedSize maxWidth="80%" @onClose="handleClose">
+    <Window id="folderPicker" :title="title" modal fixed-size max-width="80%" @on-close="handleClose">
         <div v-if="currentPath" class="folder-picker-breadcrumb mt-3 ms-3">
             <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems">
                 <template #item="{ item }">
                     <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon"></i>
+                        <i v-if="item.icon" :class="item.icon" />
                         <template v-else>{{ item.label }}</template>
                     </a>
                     <span v-else class="bc-active">{{ item.label }}</span>
@@ -15,27 +15,27 @@
 
         <div class="folder-picker-body">
             <div v-if="loading" class="text-center p-4">
-                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                <i class="fa-solid fa-circle-notch fa-spin" />
             </div>
             <div v-else-if="sortedFiles.length === 0" class="text-center p-4">
-                <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;"></i>
+                <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
                 <p class="mt-2">This folder is empty</p>
             </div>
-            <DataTable v-else :value="sortedFiles" :paginator="false" scrollable scrollHeight="flex"
-                size="small" dataKey="path" stripedRows :rowClass="rowClass"
-                @row-click="onRowClick" @row-dblclick="onRowDblClick">
+            <DataTable v-else :value="sortedFiles" :paginator="false" scrollable scroll-height="flex"
+                       size="small" data-key="path" striped-rows :row-class="rowClass"
+                       @row-click="onRowClick" @row-dblclick="onRowDblClick">
                 <Column header="" style="width: 3rem; text-align: center;">
                     <template #body="{ data }">
                         <i class="icon" :class="data.icon"
-                            :style="!canSelect(data) ? 'opacity: 0.4;' : ''"></i>
+                           :style="!canSelect(data) ? 'opacity: 0.4;' : ''" />
                     </template>
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span @click="sortBy('name')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('name')">
                             Name
                             <i v-if="sortColumn === 'name'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -44,10 +44,10 @@
                 </Column>
                 <Column style="width: 7.5rem;">
                     <template #header>
-                        <span @click="sortBy('type')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('type')">
                             Type
                             <i v-if="sortColumn === 'type'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -56,10 +56,10 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span @click="sortBy('size')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('size')">
                             Size
                             <i v-if="sortColumn === 'size'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -68,10 +68,10 @@
                 </Column>
                 <Column style="width: 12rem">
                     <template #header>
-                        <span @click="sortBy('modified')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('modified')">
                             Modified
                             <i v-if="sortColumn === 'modified'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -87,31 +87,30 @@
 
         <div class="folder-picker-selected">
             <span class="folder-picker-selected-label">{{ mode === 'file' ? 'Selected file:' : 'Selected folder:' }}</span>
-            <InputText class="folder-picker-selected-input" v-model="selectedPath"
-                v-on:keyup.enter="onConfirm" :placeholder="selectedPathPlaceholder" />
+            <InputText v-model="selectedPath" class="folder-picker-selected-input"
+                       :placeholder="selectedPathPlaceholder" @keyup.enter="onConfirm" />
         </div>
 
         <div class="folder-picker-new-folder">
             <span class="folder-picker-new-folder-label">New folder:</span>
-            <InputText class="folder-picker-new-folder-input" ref="newFolderInput"
-                v-on:keyup.enter="createFolder" v-model="newFolderName"
-                :disabled="creatingFolder" placeholder="Folder name" />
-            <Button @click="createFolder" :disabled="!newFolderName || creatingFolder"
-                :loading="creatingFolder" severity="secondary" label="Create" size="small" />
+            <InputText ref="newFolderInput" v-model="newFolderName"
+                       class="folder-picker-new-folder-input" :disabled="creatingFolder"
+                       placeholder="Folder name" @keyup.enter="createFolder" />
+            <Button :disabled="!newFolderName || creatingFolder" :loading="creatingFolder"
+                    severity="secondary" label="Create" size="small" @click="createFolder" />
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="onConfirm" :disabled="!canConfirm || checkingPath"
-                :loading="checkingPath" severity="primary" label="Confirm" />
+            <Button severity="secondary" label="Cancel" @click="close('cancel')" />
+            <Button :disabled="!canConfirm || checkingPath" :loading="checkingPath"
+                    severity="primary" label="Confirm" @click="onConfirm" />
         </div>
 
         <ConfirmDialog v-if="confirmCreateOpen"
-            title="Folder does not exist"
-            :message="createFolderMessage"
-            confirmText="Create" cancelText="Cancel" confirmButtonClass="primary"
-            @onClose="handleCreateConfirmClose">
-        </ConfirmDialog>
+                       title="Folder does not exist"
+                       :message="createFolderMessage"
+                       confirm-text="Create" cancel-text="Cancel" confirm-button-class="primary"
+                       @on-close="handleCreateConfirmClose" />
     </Window>
 </template>
 

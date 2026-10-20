@@ -1,27 +1,27 @@
 <template>
     <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
-        :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
+         :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
-                @load="handleImageLoad" @error="handleImageError" :src="thumbnail"
-                style="max-width: 100%; max-height: 100%;" />
+                 :src="thumbnail" style="max-width: 100%; max-height: 100%;" @load="handleImageLoad"
+                 @error="handleImageError">
 
             <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
             <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
 
             <!-- Build loading spinner (highest priority) -->
-            <i class="fa-solid fa-circle-notch fa-spin loading" v-if="buildLoading" />
+            <i v-if="buildLoading" class="fa-solid fa-circle-notch fa-spin loading" />
 
             <!-- Regular loading spinner (when loading thumbnails) -->
-            <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="loading" />
+            <i v-else-if="loading" class="fa-solid fa-circle-notch fa-spin loading" />
 
             <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
-            <i class="fa-solid fa-circle-notch fa-spin loading" v-else-if="!thumbnail && !icon" />
+            <i v-else-if="!thumbnail && !icon" class="fa-solid fa-circle-notch fa-spin loading" />
 
             <!-- Build Status Badges: only for non-default states (queued/pending/failed) -->
             <div v-if="!buildLoading && !loading && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
-                <i class="icon" :class="buildBadgeIcon"></i>
+                <i class="icon" :class="buildBadgeIcon" />
             </div>
         </div>
         {{ label }}
@@ -42,7 +42,6 @@ export default {
     name: 'EntryThumbnail',
     components: {
     },
-    emits: ['clicked', 'open'],
     // Provided by the Explorer: load when visible, a few at a time (HUB-03)
     inject: { thumbnailLoader: { default: null } },
     props: {
@@ -64,6 +63,7 @@ export default {
             required: false
         }
     },
+    emits: ['clicked', 'open'],
     data: function () {
         const label = this.file.label;
 

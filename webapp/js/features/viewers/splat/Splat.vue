@@ -1,8 +1,8 @@
 <template>
     <div id="splat">
-        <TabViewLoader @loaded="handleLoad" titleSuffix="Gaussian Splat" />
+        <TabViewLoader title-suffix="Gaussian Splat" @loaded="handleLoad" />
 
-        <Message bindTo="error" noDismiss />
+        <Message bind-to="error" no-dismiss />
         <Toast position="bottom-left" />
         <div v-if="loading" class="loading">
             <p>Loading Gaussian Splat...</p>
@@ -10,7 +10,7 @@
         </div>
 
         <div class="container-wrapper">
-            <canvas ref="canvas"></canvas>
+            <canvas ref="canvas" />
 
             <!-- Top-right stack: current camera view + CRS badge -->
             <div class="top-right-stack">
@@ -33,19 +33,19 @@
             <!-- Bottom-left buttons -->
             <div v-if="loaded" class="btn-stack">
                 <button class="btn-overlay" :class="{ active: navMode === 'fly' }"
-                    @click="setNavMode('fly')"
-                    title="Fly navigation: drag to look around, WASD/QE to move">
+                        title="Fly navigation: drag to look around, WASD/QE to move"
+                        @click="setNavMode('fly')">
                     <i class="fa-solid fa-plane" />
                 </button>
                 <button class="btn-overlay" :class="{ active: navMode === 'earth' }"
-                    @click="setNavMode('earth')"
-                    title="Earth navigation: drag to pan, right-drag to orbit, wheel to zoom">
+                        title="Earth navigation: drag to pan, right-drag to orbit, wheel to zoom"
+                        @click="setNavMode('earth')">
                     <i class="fa-solid fa-earth-americas" />
                 </button>
-                <button class="btn-overlay" @click="toggleSettings" title="View settings">
+                <button class="btn-overlay" title="View settings" @click="toggleSettings">
                     <i class="fa-solid fa-gear" />
                 </button>
-                <button class="btn-overlay" @click="toggleCameraManager" title="Manage camera views">
+                <button class="btn-overlay" title="Manage camera views" @click="toggleCameraManager">
                     <i class="fa-solid fa-camera" />
                 </button>
             </div>
@@ -55,25 +55,25 @@
             <div v-if="loaded" class="camera-rail">
                 <div v-if="cameras.length" class="rail-cameras">
                     <button v-for="(cam, i) in cameras" :key="cam.id" class="rail-btn cam"
-                        :class="{ active: i === activeCameraIndex }"
-                        :title="cam.name || `Camera ${i + 1}`"
-                        @click="animateToCamera(i)">{{ i + 1 }}</button>
+                            :class="{ active: i === activeCameraIndex }"
+                            :title="cam.name || `Camera ${i + 1}`"
+                            @click="animateToCamera(i)">{{ i + 1 }}</button>
                 </div>
-                <div v-if="cameras.length" class="rail-sep"></div>
+                <div v-if="cameras.length" class="rail-sep" />
                 <button class="rail-btn" :class="{ active: isOrbiting }"
-                    :title="isOrbiting ? 'Stop orbit' : 'Start orbit'" @click="toggleOrbit">
+                        :title="isOrbiting ? 'Stop orbit' : 'Start orbit'" @click="toggleOrbit">
                     <i :class="isOrbiting ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
                 </button>
                 <button v-if="cameras.length" class="rail-btn" :class="{ active: isTouring }"
-                    :title="isTouring ? 'Stop cycling' : 'Start cycling'" @click="toggleTour">
+                        :title="isTouring ? 'Stop cycling' : 'Start cycling'" @click="toggleTour">
                     <i class="fa-solid fa-camera-rotate" />
                 </button>
                 <button v-if="canWrite" class="rail-btn" title="Save current view as a camera"
-                    @click="addCurrentCamera">
+                        @click="addCurrentCamera">
                     <i class="fa-solid fa-camera" />
                 </button>
                 <button v-if="canWrite" class="rail-btn" :class="{ dirty: camerasDirty }"
-                    :disabled="!camerasDirty" title="Save cameras to dataset" @click="saveCameras">
+                        :disabled="!camerasDirty" title="Save cameras to dataset" @click="saveCameras">
                     <i class="fa-solid fa-floppy-disk" />
                 </button>
             </div>
@@ -83,13 +83,13 @@
             <div v-if="loaded" class="nav-controls" :class="{ touch: isTouch }">
                 <div class="nav-grid">
                     <button v-for="k in navKeys" :key="k.code" class="nav-key"
-                        :class="{ active: pressed[k.code] }"
-                        :title="`${k.label} (${k.letter})`"
-                        @pointerdown.prevent="pressDir(k.code, $event)"
-                        @pointerup="releaseDir(k.code)"
-                        @pointerleave="releaseDir(k.code)"
-                        @pointercancel="releaseDir(k.code)"
-                        @contextmenu.prevent>
+                            :class="{ active: pressed[k.code] }"
+                            :title="`${k.label} (${k.letter})`"
+                            @pointerdown.prevent="pressDir(k.code, $event)"
+                            @pointerup="releaseDir(k.code)"
+                            @pointerleave="releaseDir(k.code)"
+                            @pointercancel="releaseDir(k.code)"
+                            @contextmenu.prevent>
                         <i :class="k.icon" />
                         <span class="letter">{{ k.letter }}</span>
                     </button>
@@ -98,11 +98,11 @@
         </div>
 
         <!-- View settings dialog -->
-        <Window v-if="showSettings" title="View settings" id="splat-settings" @onClose="toggleSettings" fixedSize sizeClass="dialog-xs">
+        <Window v-if="showSettings" id="splat-settings" title="View settings" fixed-size size-class="dialog-xs" @on-close="toggleSettings">
             <div class="settings-content">
                 <div class="form-group">
                     <label class="checkbox-row">
-                        <input type="checkbox" v-model="flipped" @change="onFlipChange" />
+                        <input v-model="flipped" type="checkbox" @change="onFlipChange">
                         <span>Flip up axis</span>
                     </label>
                     <small>Toggle if the scene appears upside down.</small>
@@ -110,14 +110,14 @@
 
                 <div class="form-group">
                     <div><label>Point size: {{ pointScale.toFixed(2) }}x</label></div>
-                    <div><input class="w-100"
-                        type="range"
-                        v-model.number="pointScale"
-                        min="0.25"
-                        max="3"
-                        step="0.05"
-                        @input="updatePointScale"
-                    /></div>
+                    <div><input v-model.number="pointScale"
+                                class="w-100"
+                                type="range"
+                                min="0.25"
+                                max="3"
+                                step="0.05"
+                                @input="updatePointScale"
+                    ></div>
                 </div>
 
                 <div class="form-group">
@@ -128,36 +128,36 @@
                     <small>Drag until vertical lines (walls, doors) look vertical.</small>
                     <div class="calib-row">
                         <label>Roll: {{ tiltRoll.toFixed(1) }}&deg;</label>
-                        <input class="w-100" type="range" v-model.number="tiltRoll"
-                            min="-45" max="45" step="0.5" @input="updateSceneUp" />
+                        <input v-model.number="tiltRoll" class="w-100" type="range"
+                               min="-45" max="45" step="0.5" @input="updateSceneUp">
                     </div>
                     <div class="calib-row">
                         <label>Pitch: {{ tiltPitch.toFixed(1) }}&deg;</label>
-                        <input class="w-100" type="range" v-model.number="tiltPitch"
-                            min="-45" max="45" step="0.5" @input="updateSceneUp" />
+                        <input v-model.number="tiltPitch" class="w-100" type="range"
+                               min="-45" max="45" step="0.5" @input="updateSceneUp">
                     </div>
                 </div>
 
                 <div class="settings-actions">
-                    <Button label="Close" severity="secondary" @click="toggleSettings" text />
+                    <Button label="Close" severity="secondary" text @click="toggleSettings" />
                 </div>
             </div>
         </Window>
 
         <!-- Camera management dialog -->
         <CameraManager v-if="showCameraManager"
-            :cameras="cameras"
-            :canWrite="canWrite"
-            :dirty="camerasDirty"
-            :activeIndex="activeCameraIndex"
-            @goto="animateToCamera"
-            @add-current="addCurrentCamera"
-            @update-current="updateCameraToCurrent"
-            @delete="deleteCamera"
-            @move="moveCamera"
-            @rename="renameCamera"
-            @save="saveCameras"
-            @close="toggleCameraManager" />
+                       :cameras="cameras"
+                       :can-write="canWrite"
+                       :dirty="camerasDirty"
+                       :active-index="activeCameraIndex"
+                       @goto="animateToCamera"
+                       @add-current="addCurrentCamera"
+                       @update-current="updateCameraToCurrent"
+                       @delete="deleteCamera"
+                       @move="moveCamera"
+                       @rename="renameCamera"
+                       @save="saveCameras"
+                       @close="toggleCameraManager" />
     </div>
 </template>
 

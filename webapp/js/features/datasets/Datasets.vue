@@ -1,17 +1,17 @@
 <template>
     <div id="datasets">
         <Toast position="bottom-left" />
-        <Message bindTo="error" />
+        <Message bind-to="error" />
 
         <div v-if="loading" class="ds-content">
             <div class="p-3">
                 <Skeleton width="16rem" height="2rem" class="mb-3" />
-                <DataTable :value="skeletonRows" stripedRows class="ds-table">
+                <DataTable :value="skeletonRows" striped-rows class="ds-table">
                     <Column header="" style="width: 3.75rem;">
                         <template #body><Skeleton width="2.5rem" height="2.5rem" /></template>
                     </Column>
                     <Column>
-                        <template #header><i class="fa-solid fa-database"></i> Dataset</template>
+                        <template #header><i class="fa-solid fa-database" /> Dataset</template>
                         <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
                     </Column>
                     <Column header="Creation Date">
@@ -24,7 +24,7 @@
                         <template #body><Skeleton width="4rem" /></template>
                     </Column>
                     <Column header="Visibility">
-                        <template #body><Skeleton width="5rem" height="1.5rem" borderRadius="1rem" /></template>
+                        <template #body><Skeleton width="5rem" height="1.5rem" border-radius="1rem" /></template>
                     </Column>
                 </DataTable>
             </div>
@@ -37,12 +37,12 @@
                     <div class="org-identity">
                         <div class="d-flex align-items-center gap-3">
                             <div class="org-icon-wrapper d-flex align-items-center justify-content-center">
-                                <i class="fa-solid fa-sitemap"></i>
+                                <i class="fa-solid fa-sitemap" />
                             </div>
                             <div>
                                 <div class="org-title-row">
                                     <h1 class="my-0">{{ orgName }}</h1>
-                                    <Button v-if="canManageOrg" @click.stop="openOrgDialog()" severity="secondary" text rounded size="small" title="Edit Organization" icon="fa-solid fa-pencil" />
+                                    <Button v-if="canManageOrg" severity="secondary" text rounded size="small" title="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
                                     <div class="org-tags d-flex align-items-center gap-2 flex-wrap">
                                         <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                             {{ orgInfo.owner }}
@@ -65,9 +65,9 @@
                     <!-- Right: actions -->
                     <div class="org-actions">
                         <div class="d-flex align-items-center gap-2">
-                            <Button v-if="memberManagementEnabled && canManageOrg" @click.stop="openMembersDialog()" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" />
-                            <Button v-if="canCreateDataset" @click.stop="openImportDialog()" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" />
-                            <Button v-if="canCreateDataset" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" />
+                            <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
+                            <Button v-if="canCreateDataset" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" @click.stop="openImportDialog()" />
+                            <Button v-if="canCreateDataset" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" @click.stop="handleNew()" />
                         </div>
                         <IconField class="mt-2">
                             <InputIcon class="fa-solid fa-magnifying-glass" />
@@ -78,21 +78,21 @@
             </div>
 
             <!-- Datasets Table -->
-            <DataTable :value="datasets" :paginator="false" stripedRows
-                @row-click="onRowClick" @row-contextmenu="onRowContextMenu" rowHover class="ds-table"
-                scrollable scrollHeight="flex"
-                :sortField="sortColumn" :sortOrder="sortOrderPrimevue" @sort="onSort"
-                :pt="{ bodyRow: { style: 'cursor: pointer' } }">
+            <DataTable :value="datasets" :paginator="false" striped-rows
+                       row-hover class="ds-table" scrollable scroll-height="flex"
+                       :sort-field="sortColumn" :sort-order="sortOrderPrimevue"
+                       :pt="{ bodyRow: { style: 'cursor: pointer' } }" @row-click="onRowClick" @row-contextmenu="onRowContextMenu"
+                       @sort="onSort">
                 <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
-                        <ProgressSpinner v-if="slotProps.data.loading" class="ds-row-spinner" strokeWidth="4" />
+                        <ProgressSpinner v-if="slotProps.data.loading" class="ds-row-spinner" stroke-width="4" />
                         <img v-else :src="slotProps.data.thumbUrl" class="ds-thumb-img"
-                            :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }" />
+                             :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }">
                     </template>
                 </Column>
                 <Column field="name" :sortable="true">
                     <template #header>
-                        <i class="fa-solid fa-database"></i> Dataset
+                        <i class="fa-solid fa-database" /> Dataset
                     </template>
                     <template #body="slotProps">
                         <span class="ds-name">{{ slotProps.data.name || slotProps.data.slug }}</span>
@@ -100,7 +100,7 @@
                     </template>
                 </Column>
                 <Column field="creationDate" header="Creation Date" :sortable="true"
-                    :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
                         <div class="file-date">
                             <div>{{ formatDate(slotProps.data.creationDate) }}</div>
@@ -109,9 +109,9 @@
                     </template>
                 </Column>
                 <Column field="entries" header="Files" :sortable="true"
-                    :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
                 <Column field="size" header="Size" :sortable="true"
-                    :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
                 </Column>
                 <Column field="visibility" header="Visibility" :sortable="true" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
@@ -124,13 +124,13 @@
                 <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7.5rem;">
                     <template #body="slotProps">
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
-                            @click.stop="handleEdit(slotProps.data)" severity="secondary" outlined size="small"
-                            :loading="slotProps.data.editing" :disabled="slotProps.data.editing || slotProps.data.deleting"
-                            icon="fa-solid fa-pencil" />
+                                severity="secondary" outlined size="small" :loading="slotProps.data.editing"
+                                :disabled="slotProps.data.editing || slotProps.data.deleting" icon="fa-solid fa-pencil"
+                                @click.stop="handleEdit(slotProps.data)" />
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canDelete && canDeleteGlobal"
-                            @click.stop="handleDelete(slotProps.data)" severity="danger" size="small"
-                            :loading="slotProps.data.deleting" :disabled="slotProps.data.deleting || slotProps.data.editing"
-                            icon="fa-solid fa-trash" class="ms-1" />
+                                severity="danger" size="small" :loading="slotProps.data.deleting"
+                                :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
+                                class="ms-1" @click.stop="handleDelete(slotProps.data)" />
                     </template>
                 </Column>
                 <template #empty>
@@ -150,32 +150,30 @@
                     {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ totalDatasets }} datasets
                 </span>
                 <Paginator v-if="totalPages > 1"
-                    :rows="Number(itemsPerPage)" :totalRecords="totalDatasets"
-                    :first="(currentPage - 1) * itemsPerPage"
-                    @page="onPageChange" :rowsPerPageOptions="[5, 10, 25, 50, 100]" />
+                           :rows="Number(itemsPerPage)" :total-records="totalDatasets"
+                           :first="(currentPage - 1) * itemsPerPage"
+                           :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
             </div>
         </div>
 
-        <DeleteDatasetDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :dsSlug="currentDsSlug">
-        </DeleteDatasetDialog>
-        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
-        <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbiddenSlugs="forbiddenSlugs"
-            @onClose="handleDatasetClose"></DatasetDialog>
+        <DeleteDatasetDialog v-if="deleteDialogOpen" :ds-slug="currentDsSlug" @on-close="handleDeleteClose" />
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @on-close="handleMessageClose" />
+        <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
+                       @on-close="handleDatasetClose" />
 
-        <ImportDatasetDialog v-if="importDialogOpen" :orgSlug="$route.params.org" :forbiddenSlugs="forbiddenSlugs"
-            @onClose="handleImportClose"></ImportDatasetDialog>
+        <ImportDatasetDialog v-if="importDialogOpen" :org-slug="$route.params.org" :forbidden-slugs="forbiddenSlugs"
+                             @on-close="handleImportClose" />
 
         <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel"
-            @onClose="handleOrgDialogClose"></OrganizationDialog>
+                            @on-close="handleOrgDialogClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
-            :orgSlug="$route.params.org"
-            :canManageMembers="orgInfo?.permissions?.canManageMembers || false"
-            @onClose="closeMembersDialog">
-        </OrganizationMembersDialog>
+                                   :org-slug="$route.params.org"
+                                   :can-manage-members="orgInfo?.permissions?.canManageMembers || false"
+                                   @on-close="closeMembersDialog" />
 
         <!-- Full-screen feedback while a new dataset is being created -->
         <div v-if="creatingDataset" class="ds-overlay-wrapper">
-            <Loader></Loader>
+            <Loader />
         </div>
 
     </div>
@@ -289,30 +287,6 @@ export default {
             searchQuery: "",
             searchTerm: ""
         }
-    },
-    mounted: async function () {
-        try {
-            this.org = reg.Organization(this.$route.params.org);
-            const orgInfo = await this.org.info();
-            this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
-            this.orgInfo = orgInfo;
-            setTitle(this.orgName);
-
-            await this.loadPage();
-        } catch (e) {
-            if (e.status === 401) {
-                this.$router.push({ name: "Login" }).catch(() => { });
-            } else if (e.status === 404) {
-                this.$router.push({ name: "Organizations" }).catch(() => { });
-            } else {
-                this.error = e.message;
-            }
-        }
-        this.loading = false;
-    },
-    beforeUnmount() {
-        clearTimeout(this._searchTimer);
-        this._listRequest?.abort();
     },
     computed: {
         canDeleteGlobal: function () {
@@ -454,6 +428,30 @@ export default {
             this.currentPage = 1;
             this.savePreferences();
         }
+    },
+    mounted: async function () {
+        try {
+            this.org = reg.Organization(this.$route.params.org);
+            const orgInfo = await this.org.info();
+            this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
+            this.orgInfo = orgInfo;
+            setTitle(this.orgName);
+
+            await this.loadPage();
+        } catch (e) {
+            if (e.status === 401) {
+                this.$router.push({ name: "Login" }).catch(() => { });
+            } else if (e.status === 404) {
+                this.$router.push({ name: "Organizations" }).catch(() => { });
+            } else {
+                this.error = e.message;
+            }
+        }
+        this.loading = false;
+    },
+    beforeUnmount() {
+        clearTimeout(this._searchTimer);
+        this._listRequest?.abort();
     }, methods: {
         /**
          * Save table preferences to Local Storage

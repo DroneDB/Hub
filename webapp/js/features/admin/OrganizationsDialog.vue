@@ -1,8 +1,8 @@
 <template>
-    <Window title="Manage User Organizations" id="organizationsDialog" @onClose="close" modal sizeClass="dialog-xl" fixedSize>
+    <Window id="organizationsDialog" title="Manage User Organizations" modal size-class="dialog-xl" fixed-size @on-close="close">
         <div class="organizations-dialog">
             <!-- Loading state -->
-            <div v-if="loading" class="ui active centered inline loader"></div>
+            <div v-if="loading" class="ui active centered inline loader" />
 
             <!-- Error message -->
             <PrimeMessage v-if="error" severity="error" @close="error = null">
@@ -14,19 +14,19 @@
             </PrimeMessage>
 
             <!-- Add organization section -->
-            <div class="add-org-section" v-if="!loading">
+            <div v-if="!loading" class="add-org-section">
                 <h4>Add Organization</h4>
                 <div class="d-flex gap-3 flex-wrap align-items-end">
                     <div class="flex-grow-1" style="min-width: 12rem;">
                         <label class="d-block mb-1 fw-semibold">Organization</label>
-                        <Select v-model="newOrg.slug" :options="availableOrganizations" optionLabel="displayName" optionValue="slug" filter placeholder="Search organization..." class="w-100" />
+                        <Select v-model="newOrg.slug" :options="availableOrganizations" option-label="displayName" option-value="slug" filter placeholder="Search organization..." class="w-100" />
                     </div>
                     <div style="min-width: 10rem;">
                         <label class="d-block mb-1 fw-semibold">Permissions</label>
-                        <Select v-model="newOrg.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                        <Select v-model="newOrg.permissions" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                     </div>
                     <div>
-                        <Button severity="primary" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
+                        <Button severity="primary" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" @click="addOrganization" />
                     </div>
                 </div>
             </div>
@@ -35,7 +35,7 @@
 
             <!-- User organizations table -->
             <h4 v-if="!loading">User Organizations</h4>
-            <table class="ui celled table" v-if="!loading && userOrganizations.length > 0">
+            <table v-if="!loading && userOrganizations.length > 0" class="ui celled table">
                 <thead>
                     <tr>
                         <th>Organization</th>
@@ -54,10 +54,10 @@
                             <Select v-if="!org.isOwner"
                                     v-model="org.permissions"
                                     :options="permissionsOptions"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    @change="updatePermission(org)"
-                                    class="w-full" />
+                                    option-label="label"
+                                    option-value="value"
+                                    class="w-full"
+                                    @change="updatePermission(org)" />
                             <Tag v-else severity="info" value="Full Access" />
                         </td>
                         <td>
@@ -71,9 +71,9 @@
                         <td>
                             <Button v-if="!org.isOwner"
                                     severity="danger" size="small"
-                                    @click="confirmRemoveOrganization(org)"
                                     :disabled="removingOrg === org.slug"
-                                    icon="fa-solid fa-trash" label="Remove" />
+                                    icon="fa-solid fa-trash"
+                                    label="Remove" @click="confirmRemoveOrganization(org)" />
                             <span v-else>-</span>
                         </td>
                     </tr>
@@ -88,18 +88,17 @@
 
             <!-- Footer -->
             <div class="buttons">
-                <Button @click="close" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="close" />
             </div>
         </div>
 
         <ConfirmDialog v-if="removeOrgDialogOpen"
-            title="Remove from Organization"
-            :message="`Are you sure you want to remove <strong>${user.userName}</strong> from organization <strong>${orgToRemove ? (orgToRemove.name || orgToRemove.slug) : ''}</strong>?`"
-            confirmText="Remove"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleRemoveOrgDialogClose">
-        </ConfirmDialog>
+                       title="Remove from Organization"
+                       :message="`Are you sure you want to remove <strong>${user.userName}</strong> from organization <strong>${orgToRemove ? (orgToRemove.name || orgToRemove.slug) : ''}</strong>?`"
+                       confirm-text="Remove"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="handleRemoveOrgDialogClose" />
     </Window>
 </template>
 

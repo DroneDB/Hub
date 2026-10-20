@@ -19,16 +19,16 @@
         <!-- Toolbar -->
         <div class="odm-editor-toolbar">
             <div class="odm-toolbar-left">
-                <Button type="button" severity="secondary" text @click="toggleSearch"
-                    :icon="showSearch ? 'fa-solid fa-xmark' : 'fa-solid fa-magnifying-glass'"
-                    :label="showSearch ? 'Close Search' : 'Search'" class="odm-toolbar-btn" />
-                <Button type="button" severity="secondary" text @click="toggleViewMode"
-                    :icon="viewMode === 'grouped' ? 'fa-solid fa-list' : 'fa-solid fa-layer-group'"
-                    :label="viewMode === 'grouped' ? 'Flat View' : 'Grouped View'" class="odm-toolbar-btn" />
-                <Button v-if="viewMode === 'grouped'" type="button" severity="secondary" text @click="expandAll"
-                    icon="fa-solid fa-up-right-and-down-left-from-center" label="Expand All" class="odm-toolbar-btn" />
-                <Button v-if="viewMode === 'grouped'" type="button" severity="secondary" text @click="collapseAll"
-                    icon="fa-solid fa-down-left-and-up-right-to-center" label="Collapse All" class="odm-toolbar-btn" />
+                <Button type="button" severity="secondary" text :icon="showSearch ? 'fa-solid fa-xmark' : 'fa-solid fa-magnifying-glass'"
+                        :label="showSearch ? 'Close Search' : 'Search'"
+                        class="odm-toolbar-btn" @click="toggleSearch" />
+                <Button type="button" severity="secondary" text :icon="viewMode === 'grouped' ? 'fa-solid fa-list' : 'fa-solid fa-layer-group'"
+                        :label="viewMode === 'grouped' ? 'Flat View' : 'Grouped View'"
+                        class="odm-toolbar-btn" @click="toggleViewMode" />
+                <Button v-if="viewMode === 'grouped'" type="button" severity="secondary" text icon="fa-solid fa-up-right-and-down-left-from-center"
+                        label="Expand All" class="odm-toolbar-btn" @click="expandAll" />
+                <Button v-if="viewMode === 'grouped'" type="button" severity="secondary" text icon="fa-solid fa-down-left-and-up-right-to-center"
+                        label="Collapse All" class="odm-toolbar-btn" @click="collapseAll" />
             </div>
             <div class="odm-toolbar-right">
                 <span class="muted" style="font-size: 0.8rem;">{{ changedCount }} changed</span>
@@ -47,7 +47,7 @@
                 <div v-for="group in groupsWithContent" :key="group.id" class="odm-option-group">
                     <div class="odm-option-group-header" @click="toggleGroup(group.id)">
                         <i :class="collapsedGroups[group.id] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"
-                            class="odm-toggle-icon" />
+                           class="odm-toggle-icon" />
                         <i :class="group.icon" class="odm-group-icon" />
                         <span class="odm-group-name">{{ group.name }}</span>
                         <span class="odm-option-count">({{ groupOptionCount(group) }})</span>
@@ -59,7 +59,7 @@
                             </div>
                             <div class="odm-option-subgroup-content">
                                 <OdxOptionRow v-for="opt in getOptions(group, subgroup)" :key="opt.name"
-                                    :option="opt" @update:value="(val) => onOptionChange(opt.name, val)" />
+                                              :option="opt" @update:value="(val) => onOptionChange(opt.name, val)" />
                             </div>
                         </div>
                     </div>
@@ -68,7 +68,7 @@
                 <div v-if="ungroupedOptions.length > 0" class="odm-option-group">
                     <div class="odm-option-group-header" @click="toggleGroup('ungrouped')">
                         <i :class="collapsedGroups['ungrouped'] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"
-                            class="odm-toggle-icon" />
+                           class="odm-toggle-icon" />
                         <i class="fa-solid fa-circle-question odm-group-icon" />
                         <span class="odm-group-name">Other Options</span>
                         <span class="odm-option-count">({{ ungroupedOptions.length }})</span>
@@ -76,7 +76,7 @@
                     <div v-show="!collapsedGroups['ungrouped']" class="odm-option-group-content">
                         <div class="odm-option-subgroup-content">
                             <OdxOptionRow v-for="opt in ungroupedOptions" :key="opt.name" :option="opt"
-                                @update:value="(val) => onOptionChange(opt.name, val)" />
+                                          @update:value="(val) => onOptionChange(opt.name, val)" />
                         </div>
                     </div>
                 </div>
@@ -86,7 +86,7 @@
             <template v-else>
                 <div class="odm-flat-list">
                     <OdxOptionRow v-for="opt in allMergedOptions" :key="opt.name" :option="opt"
-                        @update:value="(val) => onOptionChange(opt.name, val)" />
+                                  @update:value="(val) => onOptionChange(opt.name, val)" />
                 </div>
             </template>
         </div>

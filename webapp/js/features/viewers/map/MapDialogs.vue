@@ -1,24 +1,22 @@
 <template>
     <div>
-        <Alert :title="alertTitle" v-if="alertDialogOpen" @onClose="$emit('alertClose')">
+        <Alert v-if="alertDialogOpen" :title="alertTitle" @on-close="$emit('alertClose')">
             {{ alertMessage }}
         </Alert>
         <ConfirmDialog v-if="clearMeasurementsDialogOpen"
-            title="Clear All Measurements"
-            message="Are you sure you want to clear all measurements?"
-            confirmText="Clear"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="$emit('clearMeasurementsClose', $event)">
-        </ConfirmDialog>
+                       title="Clear All Measurements"
+                       message="Are you sure you want to clear all measurements?"
+                       confirm-text="Clear"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="$emit('clearMeasurementsClose', $event)" />
         <ConfirmDialog v-if="deleteSavedMeasurementsDialogOpen"
-            title="Delete Saved Measurements"
-            message="Are you sure you want to delete saved measurements?"
-            confirmText="Delete"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="$emit('deleteSavedMeasurementsClose', $event)">
-        </ConfirmDialog>
+                       title="Delete Saved Measurements"
+                       message="Are you sure you want to delete saved measurements?"
+                       confirm-text="Delete"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="$emit('deleteSavedMeasurementsClose', $event)" />
     </div>
 </template>
 

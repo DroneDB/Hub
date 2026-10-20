@@ -1,39 +1,39 @@
 <template>
-    <div class="detail-panel" v-if="file">
+    <div v-if="file" class="detail-panel">
         <div class="detail-header">
             <h3 class="ui header">
-                <i class="icon" :class="file.icon"></i>
+                <i class="icon" :class="file.icon" />
                 <div class="content">
                     {{ file.label }}
                 </div>
             </h3>
-            <Button severity="secondary" outlined @click="handleClose" title="Close" icon="fa-solid fa-xmark" />
+            <Button severity="secondary" outlined title="Close" icon="fa-solid fa-xmark" @click="handleClose" />
         </div>
 
         <div class="detail-content">
             <!-- Thumbnail section -->
-            <div class="thumbnail-section" v-if="hasThumbnailSupport">
+            <div v-if="hasThumbnailSupport" class="thumbnail-section">
                 <div class="thumbnail-container">
                     <img v-if="thumbnail && !loading && !buildLoading"
-                        @error="handleImageError"
-                        :src="thumbnail"
-                        class="detail-thumbnail" />
+                         :src="thumbnail"
+                         class="detail-thumbnail"
+                         @error="handleImageError">
 
                     <i v-else-if="file.icon && !loading && !buildLoading"
-                        class="icon massive"
-                        :class="file.icon" />
+                       class="icon massive"
+                       :class="file.icon" />
 
-                    <i class="fa-solid fa-circle-notch fa-spin loading massive" v-if="buildLoading || loading" />
+                    <i v-if="buildLoading || loading" class="fa-solid fa-circle-notch fa-spin loading massive" />
 
                     <div v-if="shouldShowBuildBadge" class="build-status" :class="buildBadgeClass">
-                        <i class="icon" :class="buildBadgeIcon"></i>
+                        <i class="icon" :class="buildBadgeIcon" />
                         <span>{{ buildBadgeLabel }}</span>
                     </div>
                 </div>
             </div>
 
             <!-- Build status explanation (queued/pending/failed) -->
-            <div class="build-explanation-section" v-if="buildExplanation">
+            <div v-if="buildExplanation" class="build-explanation-section">
                 <Message :severity="buildExplanation.severity" :closable="false">
                     {{ buildExplanation.text }}
                 </Message>
@@ -42,27 +42,27 @@
             <!-- Properties section -->
             <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
-                <PropsTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" :copyableValues="copyableValues" />
+                <PropsTable v-if="allProperties" :obj="allProperties" :preserve-order="true" :copyable-values="copyableValues" />
             </div>
 
             <!-- Actions section -->
             <div class="actions-section">
                 <h4 class="ui dividing header">Actions</h4>
                 <div class="action-buttons">
-                    <Button severity="secondary" @click="handleOpen" icon="fa-regular fa-folder-open" label="Open" />
-                    <Button severity="secondary" @click="handleShare" v-if="!isDirectory" icon="fa-solid fa-share-nodes" label="Share/Embed" />
-                    <Button severity="secondary" @click="handleBuild"
-                        v-if="isBuildableFile && !hasActiveBuild" icon="fa-solid fa-gear" label="Build" />
+                    <Button severity="secondary" icon="fa-regular fa-folder-open" label="Open" @click="handleOpen" />
+                    <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
+                    <Button v-if="isBuildableFile && !hasActiveBuild" severity="secondary"
+                            icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
                 </div>
             </div>
         </div>
         <BuildConfirmDialog v-if="buildConfirmDialogOpen"
-            @confirm="handleBuildConfirmOk"
-            @cancel="buildConfirmDialogOpen = false" />
+                            @confirm="handleBuildConfirmOk"
+                            @cancel="buildConfirmDialogOpen = false" />
     </div>
-    <div class="detail-panel-empty" v-else>
+    <div v-else class="detail-panel-empty">
         <Message severity="info" :closable="false" icon="fa-solid fa-circle-info">
-            <strong>No Selection</strong><br />
+            <strong>No Selection</strong><br>
             Select an item to view its details
         </Message>
     </div>
@@ -81,7 +81,6 @@ import BuildConfirmDialog from '@/features/dataset/dialogs/BuildConfirmDialog.vu
 
 export default {
     components: { PropsTable, Button, Message, BuildConfirmDialog },
-    emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
     props: {
         file: {
             type: Object,
@@ -93,6 +92,7 @@ export default {
             required: false
         }
     },
+    emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
     data: function () {
         return {
             thumbnail: null,

@@ -1,12 +1,12 @@
 <template>
     <div id="table-view-container">
         <ContextMenu :items="contextMenu" />
-        <Toolbar :tools="tools" v-if="tools" />
+        <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
             <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-3">
                 <template #item="{ item }">
                     <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon"></i>
+                        <i v-if="item.icon" :class="item.icon" />
                         <template v-else>{{ item.label }}</template>
                     </a>
                     <span v-else class="bc-active">{{ item.label }}</span>
@@ -15,35 +15,35 @@
             </Breadcrumb>
             <!--<div class="ui divider"></div>-->
         </div>
-        <div ref="tableview" id="table-view" :class="{ dropping }"
-            @drop="explorerDropHandler($event)"
-            @dragleave="explorerDragLeave($event)"
-            @dragenter="explorerDragEnter($event)"
-            @dragover.prevent
-            @click="onClick">
-            <DataTable :value="sortedFiles" :paginator="false" scrollable scrollHeight="flex" size="small"
-                dataKey="path" stripedRows
-                :rowClass="rowClass"
-                :pt="{ bodyRow: rowPt }"
-                @row-click="onRowClick"
-                @row-dblclick="onRowDblClick"
-                @row-contextmenu="onRowContextMenu">
+        <div id="table-view" ref="tableview" :class="{ dropping }"
+             @drop="explorerDropHandler($event)"
+             @dragleave="explorerDragLeave($event)"
+             @dragenter="explorerDragEnter($event)"
+             @dragover.prevent
+             @click="onClick">
+            <DataTable :value="sortedFiles" :paginator="false" scrollable scroll-height="flex" size="small"
+                       data-key="path" striped-rows
+                       :row-class="rowClass"
+                       :pt="{ bodyRow: rowPt }"
+                       @row-click="onRowClick"
+                       @row-dblclick="onRowDblClick"
+                       @row-contextmenu="onRowContextMenu">
                 <Column header="" style="width: 3rem; text-align: center;">
                     <template #body="{ data }">
-                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
+                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon" />
                         <template v-else-if="expandedGrid">
-                            <img v-if="getThumbnail(data)" class="thumb-preview" loading="lazy" decoding="async" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)" />
-                            <i v-else class="icon" :class="data.icon"></i>
+                            <img v-if="getThumbnail(data)" class="thumb-preview" loading="lazy" decoding="async" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)">
+                            <i v-else class="icon" :class="data.icon" />
                         </template>
-                        <i v-else class="icon" :class="data.icon"></i>
-                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)"></i>
+                        <i v-else class="icon" :class="data.icon" />
+                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)" />
                     </template>
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span @click="sortBy('name')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('name')">
                             Name
-                            <i v-if="sortColumn === 'name'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                            <i v-if="sortColumn === 'name'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -52,9 +52,9 @@
                 </Column>
                 <Column style="width: 7.5rem;">
                     <template #header>
-                        <span @click="sortBy('type')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('type')">
                             Type
-                            <i v-if="sortColumn === 'type'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                            <i v-if="sortColumn === 'type'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -63,9 +63,9 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span @click="sortBy('size')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('size')">
                             Size
-                            <i v-if="sortColumn === 'size'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                            <i v-if="sortColumn === 'size'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -74,9 +74,9 @@
                 </Column>
                 <Column style="width: 12rem">
                     <template #header>
-                        <span @click="sortBy('modified')" class="sortable-header">
+                        <span class="sortable-header" @click="sortBy('modified')">
                             Modified
-                            <i v-if="sortColumn === 'modified'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
+                            <i v-if="sortColumn === 'modified'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
                         </span>
                     </template>
                     <template #body="{ data }">
@@ -88,10 +88,10 @@
                 </Column>
                 <template #empty>
                     <div v-if="isLoadingFiles" class="text-center p-4">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <i class="fa-solid fa-circle-notch fa-spin" />
                     </div>
                     <div v-else class="text-center p-4">
-                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;"></i>
+                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
                         <p class="mt-2">This folder is empty</p>
                     </div>
                 </template>
@@ -125,13 +125,13 @@ import Column from 'primevue/column';
  * drag-and-drop support, and a context menu for file operations.
  */
 export default {
-    mixins: [dragDropMixin],
     components: {
         Toolbar, ContextMenu, Breadcrumb, DataTable, Column
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'expandedGrid', 'canWrite', 'isLoadingFiles'],
+    mixins: [dragDropMixin],
     inject: { showBuildConfirm: { default: null } },
+    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'expandedGrid', 'canWrite', 'isLoadingFiles'],
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
     data: function () {
         const self = this;
         const ctx = {
@@ -165,32 +165,6 @@ export default {
             // stick for this list without cross-dataset poisoning (Fix 1 Q7).
             failedThumbs: new Set()
         };
-    },
-    watch: {
-        files: {
-            handler() {
-                // Reset loading state when files change (folder opened)
-                this.loading = false;
-                if (this.expandedGrid) this.prepareThumbnails();
-            }
-        },
-        expandedGrid: {
-            handler(enabled) {
-                if (enabled) this.prepareThumbnails();
-                else this.thumbnailCache.clear();
-            },
-            immediate: true
-        },
-        dataset: {
-            handler() {
-                // Dataset switch: reset the failed set so entries heal on the new dataset.
-                this.failedThumbs.clear();
-            }
-        }
-    },
-    mounted: function () {
-        // Failed-thumbnail tracking is component-scoped: fresh set per mount.
-        this.failedThumbs.clear();
     },
     computed: {
         selectedFiles: function () {
@@ -314,6 +288,32 @@ export default {
                 draggable: this.canWrite
             };
         }
+    },
+    watch: {
+        files: {
+            handler() {
+                // Reset loading state when files change (folder opened)
+                this.loading = false;
+                if (this.expandedGrid) this.prepareThumbnails();
+            }
+        },
+        expandedGrid: {
+            handler(enabled) {
+                if (enabled) this.prepareThumbnails();
+                else this.thumbnailCache.clear();
+            },
+            immediate: true
+        },
+        dataset: {
+            handler() {
+                // Dataset switch: reset the failed set so entries heal on the new dataset.
+                this.failedThumbs.clear();
+            }
+        }
+    },
+    mounted: function () {
+        // Failed-thumbnail tracking is component-scoped: fresh set per mount.
+        this.failedThumbs.clear();
     },
     methods: {
         rowClass(data) {

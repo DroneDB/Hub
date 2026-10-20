@@ -1,29 +1,29 @@
 <template>
-    <Window :title="dialogTitle" id="annotation-properties" @onClose="cancel" modal fixedSize sizeClass="dialog-sm">
+    <Window id="annotation-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @on-close="cancel">
         <div class="measurement-properties-form">
             <div class="form-group">
                 <label for="ap-name">Name</label>
-                <input type="text" id="ap-name" v-model="formData.name" placeholder="Enter a name..." />
+                <input id="ap-name" v-model="formData.name" type="text" placeholder="Enter a name...">
             </div>
 
             <div class="form-group">
                 <label for="ap-description">Description</label>
-                <textarea id="ap-description" v-model="formData.description" placeholder="Enter a description..." rows="3"></textarea>
+                <textarea id="ap-description" v-model="formData.description" placeholder="Enter a description..." rows="3" />
             </div>
 
             <div class="form-group">
                 <label>Position</label>
                 <div class="coords-row">
                     <code class="coords-text">{{ coordsText }}</code>
-                    <button type="button" class="btn-copy-coords" @click="copyCoordinates" :title="copyTooltip">
-                        <i :class="copyIconClass"></i>
+                    <button type="button" class="btn-copy-coords" :title="copyTooltip" @click="copyCoordinates">
+                        <i :class="copyIconClass" />
                     </button>
                 </div>
             </div>
 
             <div class="buttons">
-                <button v-if="showDelete" class="btn-delete" @click="deleteAnnotation" title="Delete this annotation">
-                    <i class="fa-solid fa-trash"></i>
+                <button v-if="showDelete" class="btn-delete" title="Delete this annotation" @click="deleteAnnotation">
+                    <i class="fa-solid fa-trash" />
                     Delete
                 </button>
                 <button class="btn-cancel" @click="cancel">Cancel</button>

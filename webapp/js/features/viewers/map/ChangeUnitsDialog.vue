@@ -1,5 +1,5 @@
 <template>
-    <Window title="Change Units" id="changeUnitsDialog" @onClose="close('cancel')" modal sizeClass="dialog-sm" fixedSize>
+    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size @on-close="close('cancel')">
         <div class="change-units-content">
             <p>
                 Convert <strong>{{ measurementsCount }}</strong> measurement{{ measurementsCount !== 1 ? 's' : '' }}
@@ -11,8 +11,8 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="close('confirm')" severity="primary" label="Convert" />
+            <Button severity="secondary" label="Cancel" @click="close('cancel')" />
+            <Button severity="primary" label="Convert" @click="close('confirm')" />
         </div>
     </Window>
 </template>
@@ -40,14 +40,14 @@ export default {
     },
     emits: ['onClose'],
 
+    data: function () {
+        return {};
+    },
+
     computed: {
         targetUnitLabel() {
             return this.targetUnit === 'metric' ? 'Metric' : 'Imperial';
         }
-    },
-
-    data: function () {
-        return {};
     },
 
     mounted: function () {

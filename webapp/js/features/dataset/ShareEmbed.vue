@@ -1,42 +1,42 @@
 <template>
-    <Window :title="windowTitle" id="share-embed" modal fixedSize @onClose="$emit('onClose')">
+    <Window id="share-embed" :title="windowTitle" modal fixed-size @on-close="$emit('onClose')">
         <div class="content">
-            <Message bindTo="error" noDismiss />
+            <Message bind-to="error" no-dismiss />
             <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
             <template v-else>
                 <div class="share-type">
                     <label for="share-mode" class="me-2 fw-semibold">Share: </label>
                     <Select id="share-mode" v-model="shareMode" :options="shareModeGroups"
-                        optionLabel="label" optionValue="value"
-                        optionGroupLabel="label" optionGroupChildren="items"
-                        style="min-width: 9rem;" />
-                    <Button v-if="hintsService" @click="hintsOpen = true" severity="secondary" text
-                        icon="fa-solid fa-circle-question" title="How to use this service" class="ms-1" />
+                            option-label="label" option-value="value"
+                            option-group-label="label" option-group-children="items"
+                            style="min-width: 9rem;" />
+                    <Button v-if="hintsService" severity="secondary" text icon="fa-solid fa-circle-question"
+                            title="How to use this service" class="ms-1" @click="hintsOpen = true" />
                 </div>
 
                 <!-- QGIS (legacy single-entry mode) -->
                 <div v-if="shareMode === 'qgis'" class="mt-3">
                     <template v-if="qgisUrl">
-                        <div class="ui icon positive message" v-if="!error">
-                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <div v-if="!error" class="ui icon positive message">
+                            <i class="fa-solid fa-cloud-arrow-up" />
                             <div class="content">
                                 <div class="header">From QGIS</div>
                                 <div v-if="typeIs('POINTCLOUD')">
-                                    Layer <i class="fa-solid fa-arrow-right"></i> Add Point Cloud Layer <i
-                                        class="fa-solid fa-arrow-right"></i> Source Type Protocol: HTTP(s) <i
-                                        class="fa-solid fa-arrow-right"></i> copy/paste the URL below.
+                                    Layer <i class="fa-solid fa-arrow-right" /> Add Point Cloud Layer <i
+                                        class="fa-solid fa-arrow-right" /> Source Type Protocol: HTTP(s) <i
+                                        class="fa-solid fa-arrow-right" /> copy/paste the URL below.
                                 </div>
                                 <div v-if="typeIs('GEORASTER')">
-                                    Layer <i class="fa-solid fa-arrow-right"></i> Add Raster Layer <i
-                                        class="fa-solid fa-arrow-right"></i> Source Type Protocol: HTTP(s) <i
-                                        class="fa-solid fa-arrow-right"></i> copy/paste the URL below.
+                                    Layer <i class="fa-solid fa-arrow-right" /> Add Raster Layer <i
+                                        class="fa-solid fa-arrow-right" /> Source Type Protocol: HTTP(s) <i
+                                        class="fa-solid fa-arrow-right" /> copy/paste the URL below.
                                 </div>
-                                <div class="auth-note" v-if="needsAuth">
-                                    <i class="fa-solid fa-lock"></i> For Authentication choose Basic and use your username and password.
+                                <div v-if="needsAuth" class="auth-note">
+                                    <i class="fa-solid fa-lock" /> For Authentication choose Basic and use your username and password.
                                 </div>
                             </div>
                         </div>
-                        <UrlRow :value="qgisUrl" @copy="copyToClipboard(qgisUrl)" :copyIcon="copyIcon" />
+                        <UrlRow :value="qgisUrl" :copy-icon="copyIcon" @copy="copyToClipboard(qgisUrl)" />
                     </template>
                     <PrimeMessage v-else severity="info" :closable="false">
                         <strong>Not supported</strong> - This file cannot be streamed directly into QGIS (download it instead).
@@ -46,8 +46,8 @@
                 <!-- Link / Embed / TMS (legacy single-entry modes) -->
                 <div v-else-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" class="mt-3">
                     <div v-if="needsAuth">
-                        <Button severity="info" @click="handleSetUnlisted" icon="fa-solid fa-unlock"
-                            label="Allow access to anyone with the link" />
+                        <Button severity="info" icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
+                                @click="handleSetUnlisted" />
                     </div>
                     <template v-else>
                         <PrimeMessage v-if="!legacyUrl" severity="info" :closable="false">
@@ -55,12 +55,12 @@
                         </PrimeMessage>
                         <template v-else>
                             <div v-if="shareMode === 'embed'" class="share-embed-row">
-                                <Textarea readonly :modelValue="legacyUrl"
-                                    @click="copyToClipboard(legacyUrl)" class="share-textarea" />
-                                <Button @click="copyToClipboard(legacyUrl)" title="Copy to clipboard"
-                                    :icon="copyIcon" text />
+                                <Textarea readonly :model-value="legacyUrl"
+                                          class="share-textarea" @click="copyToClipboard(legacyUrl)" />
+                                <Button title="Copy to clipboard" :icon="copyIcon"
+                                        text @click="copyToClipboard(legacyUrl)" />
                             </div>
-                            <UrlRow v-else :value="legacyUrl" @copy="copyToClipboard(legacyUrl)" :copyIcon="copyIcon" />
+                            <UrlRow v-else :value="legacyUrl" :copy-icon="copyIcon" @copy="copyToClipboard(legacyUrl)" />
                         </template>
                     </template>
                 </div>
@@ -68,19 +68,19 @@
                 <!-- OGC modes (WMS/WMTS/WFS/WCS/OGC API) -->
                 <div v-else-if="currentOgcService" class="mt-3">
                     <div v-if="needsAuth">
-                        <Button severity="info" @click="handleSetUnlisted" icon="fa-solid fa-unlock"
-                            label="Allow access to anyone with the link" />
+                        <Button severity="info" icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
+                                @click="handleSetUnlisted" />
                     </div>
                     <template v-else>
                         <PrimeMessage v-if="!ogcDescriptor || !ogcDescriptor.supported" severity="info"
-                            :closable="false">
+                                      :closable="false">
                             <strong>Not supported</strong>
                             <template v-if="ogcDescriptor && ogcDescriptor.reason"> - {{ ogcDescriptor.reason }}</template>
                         </PrimeMessage>
                         <template v-else>
                             <div v-for="row in ogcRows" :key="row.label">
                                 <div class="ogc-row-label">{{ row.label }}</div>
-                                <UrlRow :value="row.url" @copy="copyToClipboard(row.url)" :copyIcon="copyIcon" />
+                                <UrlRow :value="row.url" :copy-icon="copyIcon" @copy="copyToClipboard(row.url)" />
                             </div>
                         </template>
                     </template>
@@ -88,12 +88,12 @@
             </template>
 
             <div class="d-flex justify-content-end mt-3">
-                <Button @click="$emit('onClose')" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="$emit('onClose')" />
             </div>
         </div>
 
         <OgcUsageHints v-if="hintsOpen && hintsService" :service="hintsService"
-            :url="primaryHintUrl" @onClose="hintsOpen = false" />
+                       :url="primaryHintUrl" @on-close="hintsOpen = false" />
     </Window>
 </template>
 

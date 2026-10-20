@@ -4,16 +4,16 @@
             <template v-for="(tool, index) in startTools" :key="tool.id || 'start-' + index">
                 <Divider v-if="tool.id === 'separator'" layout="vertical" />
                 <Button v-else :icon="tool.icon" :title="tool.title" :disabled="tool.disabled"
-                    :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
-                    @click="toggleTool(tool.id)" />
+                        :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
+                        @click="toggleTool(tool.id)" />
             </template>
         </template>
         <template #end>
             <template v-for="(tool, index) in endTools" :key="tool.id || 'end-' + index">
                 <Divider v-if="tool.id === 'separator'" layout="vertical" />
                 <Button v-else :icon="tool.icon" :title="tool.title" :disabled="tool.disabled"
-                    :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
-                    @click="toggleTool(tool.id)" />
+                        :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
+                        @click="toggleTool(tool.id)" />
             </template>
         </template>
     </PvToolbar>
@@ -58,6 +58,14 @@ export default {
         endTools: function () {
             if (this.spacerIndex === -1) return [];
             return this.dataTools.slice(this.spacerIndex + 1);
+        }
+    },
+
+    watch: {
+        tools: function (newVal, oldVal) {
+            if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+                this.refreshTools();
+            }
         }
     },
     beforeMount: function () {
@@ -148,14 +156,6 @@ export default {
 
             if (tool.selected) this.deselectTool(toolId);
             else this.selectTool(toolId);
-        }
-    },
-
-    watch: {
-        tools: function (newVal, oldVal) {
-            if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
-                this.refreshTools();
-            }
         }
     }
 }

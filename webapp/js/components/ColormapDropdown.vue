@@ -1,16 +1,16 @@
 <template>
-    <div class="colormap-dropdown" ref="dropdownRef">
-        <button class="colormap-trigger" @click="toggleOpen" type="button">
-            <span class="colormap-preview" v-if="selectedItem" :style="gradientStyle(selectedItem.colors)"></span>
+    <div ref="dropdownRef" class="colormap-dropdown">
+        <button class="colormap-trigger" type="button" @click="toggleOpen">
+            <span v-if="selectedItem" class="colormap-preview" :style="gradientStyle(selectedItem.colors)" />
             <span class="colormap-label">{{ selectedItem ? selectedItem.name : 'Select...' }}</span>
-            <i class="fas fa-chevron-down colormap-arrow"></i>
+            <i class="fas fa-chevron-down colormap-arrow" />
         </button>
-        <div class="colormap-menu" v-if="open">
+        <div v-if="open" class="colormap-menu">
             <div v-for="cm in items" :key="cm.id"
-                class="colormap-option"
-                :class="{ selected: cm.id === modelValue }"
-                @click="select(cm)">
-                <span class="colormap-preview" :style="gradientStyle(cm.colors)"></span>
+                 class="colormap-option"
+                 :class="{ selected: cm.id === modelValue }"
+                 @click="select(cm)">
+                <span class="colormap-preview" :style="gradientStyle(cm.colors)" />
                 <span class="colormap-label">{{ cm.name }}</span>
             </div>
         </div>
@@ -44,6 +44,12 @@ export default {
             return this.items.find(cm => cm.id === this.modelValue) || null;
         }
     },
+    mounted() {
+        document.addEventListener('click', this.onClickOutside);
+    },
+    beforeUnmount() {
+        document.removeEventListener('click', this.onClickOutside);
+    },
     methods: {
         toggleOpen() {
             this.open = !this.open;
@@ -61,12 +67,6 @@ export default {
                 this.open = false;
             }
         }
-    },
-    mounted() {
-        document.addEventListener('click', this.onClickOutside);
-    },
-    beforeUnmount() {
-        document.removeEventListener('click', this.onClickOutside);
     }
 };
 </script>

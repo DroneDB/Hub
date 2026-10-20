@@ -6,128 +6,126 @@
         }">
             <olMeasure ref="measure" />
             <OpacityControl v-if="rasterLayerList.length <= 1 && !splitMode" v-model="rasterOpacity" :visible="hasRasters"
-                :showPlantHealthBtn="rasterLayerList.length === 1 && !!rasterLayerList[0]?.plantHealthCapable"
-                :plantHealthActive="plantHealthVisible"
-                @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" />
+                            :show-plant-health-btn="rasterLayerList.length === 1 && !!rasterLayerList[0]?.plantHealthCapable"
+                            :plant-health-active="plantHealthVisible"
+                            @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" />
             <RasterLayerOpacityPanel v-else-if="!splitMode" v-model:layers="rasterLayerList"
-                :activePlantHealthPath="plantHealthVisible ? plantHealthFilePath : null"
-                @reorder="handleRasterLayerReorder"
-                @plant-health="handleLayerPlantHealth" />
+                                     :active-plant-health-path="plantHealthVisible ? plantHealthFilePath : null"
+                                     @reorder="handleRasterLayerReorder"
+                                     @plant-health="handleLayerPlantHealth" />
             <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" @update:positions="onSplitPositionsChange" />
-            <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :filePath="plantHealthFilePath"
-                :initialParams="plantHealthInitialParams" @close="closePlantHealth"
-                @vizParamsChanged="handleVizParamsChanged" />
-            <RasterAnalysisControls :visible="rasterPanelVisible" :dataset="dataset" :filePath="rasterFilePath"
-                :initialParams="rasterInitialParams" :spotInfo="rasterSpotInfo" :areaStats="rasterAreaStats"
-                :profile="rasterProfile" :profileLoading="rasterProfileLoading" :profileError="rasterProfileError"
-                :drawingProfile="rasterProfileDrawing" :inspectActive="rasterInspectActive" @close="closeRasterAnalysis"
-                @vizParamsChanged="handleRasterVizParamsChanged" @pickProfile="handlePickProfile"
-                @clearProfile="handleClearProfile" @cancelDrawProfile="cancelRasterProfileDrawing"
-                @toggleInspectValue="toggleRasterInspect" @profileHover="handleProfileHover"
-                @openContourDialog="openContourDialog" />
+            <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :file-path="plantHealthFilePath"
+                              :initial-params="plantHealthInitialParams" @close="closePlantHealth"
+                              @viz-params-changed="handleVizParamsChanged" />
+            <RasterAnalysisControls :visible="rasterPanelVisible" :dataset="dataset" :file-path="rasterFilePath"
+                                    :initial-params="rasterInitialParams" :spot-info="rasterSpotInfo" :area-stats="rasterAreaStats"
+                                    :profile="rasterProfile" :profile-loading="rasterProfileLoading" :profile-error="rasterProfileError"
+                                    :drawing-profile="rasterProfileDrawing" :inspect-active="rasterInspectActive" @close="closeRasterAnalysis"
+                                    @viz-params-changed="handleRasterVizParamsChanged" @pick-profile="handlePickProfile"
+                                    @clear-profile="handleClearProfile" @cancel-draw-profile="cancelRasterProfileDrawing"
+                                    @toggle-inspect-value="toggleRasterInspect" @profile-hover="handleProfileHover"
+                                    @open-contour-dialog="openContourDialog" />
             <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
-                :rasterMin="contourRasterMin" :rasterMax="contourRasterMax" :initialOptions="contourLastOptions"
-                @generate="generateContourLines" @cancel="closeContourDialog" />
+                                  :raster-min="contourRasterMin" :raster-max="contourRasterMax" :initial-options="contourLastOptions"
+                                  @generate="generateContourLines" @cancel="closeContourDialog" />
             <StockpileVolumePanel :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
-                :result="stockpileResult" :baseMethod="stockpileBaseMethod" :sensitivity="stockpileSensitivity"
-                :radius="stockpileRadius" :material="stockpileMaterial" :materials="stockpileMaterials"
-                :mode="stockpileMode" :customDensity="stockpileCustomDensity"
-                :customCostPerTon="stockpileCustomCostPerTon" :unitPref="currentUnitPref" :title="stockpileTitle"
-                :description="stockpileDescription" @close="closeStockpileVolume" @clickOnMap="startStockpileClickMode"
-                @drawPolygon="startStockpilePolygonDrawing" @clearOverlay="clearStockpileOverlay"
-                @cancelMode="_stopStockpileInteractions" @exportGeoJson="exportStockpileGeoJson"
-                @update:baseMethod="stockpileBaseMethod = $event" @update:sensitivity="stockpileSensitivity = $event"
-                @update:radius="stockpileRadius = $event" @update:material="stockpileMaterial = $event"
-                @update:customDensity="stockpileCustomDensity = $event"
-                @update:customCostPerTon="stockpileCustomCostPerTon = $event" @update:title="stockpileTitle = $event"
-                @update:description="stockpileDescription = $event" />
+                                  :result="stockpileResult" :base-method="stockpileBaseMethod" :sensitivity="stockpileSensitivity"
+                                  :radius="stockpileRadius" :material="stockpileMaterial" :materials="stockpileMaterials"
+                                  :mode="stockpileMode" :custom-density="stockpileCustomDensity"
+                                  :custom-cost-per-ton="stockpileCustomCostPerTon" :unit-pref="currentUnitPref" :title="stockpileTitle"
+                                  :description="stockpileDescription" @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
+                                  @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
+                                  @cancel-mode="_stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson"
+                                  @update:base-method="stockpileBaseMethod = $event" @update:sensitivity="stockpileSensitivity = $event"
+                                  @update:radius="stockpileRadius = $event" @update:material="stockpileMaterial = $event"
+                                  @update:custom-density="stockpileCustomDensity = $event"
+                                  @update:custom-cost-per-ton="stockpileCustomCostPerTon = $event" @update:title="stockpileTitle = $event"
+                                  @update:description="stockpileDescription = $event" />
         </div>
-        <MapDialogs :alertDialogOpen="alertDialogOpen" :alertTitle="alertTitle" :alertMessage="alertMessage"
-            :clearMeasurementsDialogOpen="clearMeasurementsDialogOpen"
-            :deleteSavedMeasurementsDialogOpen="deleteSavedMeasurementsDialogOpen" @alertClose="handleAlertDialogClose"
-            @clearMeasurementsClose="handleClearMeasurementsDialogClose"
-            @deleteSavedMeasurementsClose="handleDeleteSavedMeasurementsDialogClose" />
-        <ChangeUnitsDialog v-if="changeUnitsDialogOpen" :targetUnit="changeUnitsTargetUnit"
-            :measurementsCount="changeUnitsMeasurementsCount" @onClose="handleChangeUnitsDialogClose">
-        </ChangeUnitsDialog>
+        <MapDialogs :alert-dialog-open="alertDialogOpen" :alert-title="alertTitle" :alert-message="alertMessage"
+                    :clear-measurements-dialog-open="clearMeasurementsDialogOpen"
+                    :delete-saved-measurements-dialog-open="deleteSavedMeasurementsDialogOpen" @alert-close="handleAlertDialogClose"
+                    @clear-measurements-close="handleClearMeasurementsDialogClose"
+                    @delete-saved-measurements-close="handleDeleteSavedMeasurementsDialogClose" />
+        <ChangeUnitsDialog v-if="changeUnitsDialogOpen" :target-unit="changeUnitsTargetUnit"
+                           :measurements-count="changeUnitsMeasurementsCount" @on-close="handleChangeUnitsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
-            :groups="measurementGroups"
-            @onClose="measurementListDialogOpen = false"
-            @deleteMeasurement="handleDeleteMeasurementFromList"
-            @editMeasurement="handleEditMeasurementFromList"
-            @createGroup="openCreateGroupDialog"
-            @renameGroup="openRenameGroupDialog"
-            @deleteGroup="deleteGroup"
-            @toggleGroupVisibility="toggleGroupVisibility"
-            @moveMeasurementToGroup="moveMeasurementToGroup" />
+                               :groups="measurementGroups"
+                               @on-close="measurementListDialogOpen = false"
+                               @delete-measurement="handleDeleteMeasurementFromList"
+                               @edit-measurement="handleEditMeasurementFromList"
+                               @create-group="openCreateGroupDialog"
+                               @rename-group="openRenameGroupDialog"
+                               @delete-group="deleteGroup"
+                               @toggle-group-visibility="toggleGroupVisibility"
+                               @move-measurement-to-group="moveMeasurementToGroup" />
         <MeasurementGroupDialog v-if="measurementGroupDialogOpen"
-            :group="pendingGroupForRename"
-            @onClose="measurementGroupDialogOpen = false"
-            @onSave="handleGroupDialogSave" />
-        <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selectedBasemap="selectedBasemap"
-            :unitPref="currentUnitPref" :customBasemapConfig="customBasemapConfig"
-            @onClose="mapSettingsDialogOpen = false" @basemapChanged="handleBasemapChanged"
-            @unitsChanged="handleUnitsChanged" @customBasemapConfigChanged="handleCustomBasemapConfigChanged">
-        </MapSettingsDialog>
-        <div ref="imagePopup" class="image-popup" v-show="imagePopupVisible">
+                                :group="pendingGroupForRename"
+                                @on-close="measurementGroupDialogOpen = false"
+                                @on-save="handleGroupDialogSave" />
+        <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selected-basemap="selectedBasemap"
+                           :unit-pref="currentUnitPref" :custom-basemap-config="customBasemapConfig"
+                           @on-close="mapSettingsDialogOpen = false" @basemap-changed="handleBasemapChanged"
+                           @units-changed="handleUnitsChanged" @custom-basemap-config-changed="handleCustomBasemapConfigChanged" />
+        <div v-show="imagePopupVisible" ref="imagePopup" class="image-popup">
             <div class="image-popup-header">
                 <span class="image-popup-title">{{ imagePopupFileName }}</span>
                 <div class="image-popup-actions">
                     <a :href="imagePopupOpenUrl" target="_blank" class="image-popup-btn" title="Open in new tab">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-image"></i>
+                        <i style="margin: 0; height: auto" class="fa-solid fa-image" />
                     </a>
                     <a :href="imagePopupDownloadUrl" download class="image-popup-btn" title="Download">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-download"></i>
+                        <i style="margin: 0; height: auto" class="fa-solid fa-download" />
                     </a>
-                    <button class="image-popup-btn image-popup-close" @click="closeImagePopup" title="Close">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark"></i>
+                    <button class="image-popup-btn image-popup-close" title="Close" @click="closeImagePopup">
+                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark" />
                     </button>
                 </div>
             </div>
             <div class="image-popup-body">
                 <div v-if="imagePopupLoading" class="image-popup-loading"><i
-                        class="fa-solid fa-circle-notch fa-spin"></i></div>
+                    class="fa-solid fa-circle-notch fa-spin" /></div>
                 <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail"
-                    :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded"
-                    @error="onImagePopupError" />
+                     :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded"
+                     @error="onImagePopupError">
             </div>
-            <div class="image-popup-footer" v-if="imagePopupCoords">
+            <div v-if="imagePopupCoords" class="image-popup-footer">
                 <span class="image-popup-coords" :title="imagePopupCoords">{{ imagePopupCoords }}</span>
-                <button class="image-popup-btn image-popup-copy" @click="copyCoordinates"
-                    :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
+                <button class="image-popup-btn image-popup-copy" :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'"
+                        @click="copyCoordinates">
                     <i style="margin: 0"
-                        :class="imagePopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
+                       :class="imagePopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'" />
                 </button>
             </div>
         </div>
-        <div ref="videoPopup" class="image-popup" v-show="videoPopupVisible">
+        <div v-show="videoPopupVisible" ref="videoPopup" class="image-popup">
             <div class="image-popup-header">
                 <span class="image-popup-title">{{ videoPopupFileName }}</span>
                 <div class="image-popup-actions">
                     <a :href="videoPopupDownloadUrl" download class="image-popup-btn" title="Download">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-download"></i>
+                        <i style="margin: 0; height: auto" class="fa-solid fa-download" />
                     </a>
-                    <button class="image-popup-btn" @click="openVideoFromPopup" title="Play video">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-play"></i>
+                    <button class="image-popup-btn" title="Play video" @click="openVideoFromPopup">
+                        <i style="margin: 0; height: auto" class="fa-solid fa-play" />
                     </button>
-                    <button class="image-popup-btn image-popup-close" @click="closeVideoPopup" title="Close">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark"></i>
+                    <button class="image-popup-btn image-popup-close" title="Close" @click="closeVideoPopup">
+                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark" />
                     </button>
                 </div>
             </div>
             <div class="image-popup-body image-popup-video-info">
-                <i class="fa-solid fa-film video-popup-icon"></i>
+                <i class="fa-solid fa-film video-popup-icon" />
                 <div class="video-popup-details">
                     <div v-if="videoPopupResolution" class="video-popup-row">{{ videoPopupResolution }}</div>
                     <div v-if="videoPopupDate" class="video-popup-row">{{ videoPopupDate }}</div>
                 </div>
             </div>
-            <div class="image-popup-footer" v-if="videoPopupCoords">
+            <div v-if="videoPopupCoords" class="image-popup-footer">
                 <span class="image-popup-coords" :title="videoPopupCoords">{{ videoPopupCoords }}</span>
-                <button class="image-popup-btn image-popup-copy" @click="copyVideoCoordinates"
-                    :title="videoPopupCoordsCopied ? 'Copied!' : 'Copy coordinates'">
+                <button class="image-popup-btn image-popup-copy" :title="videoPopupCoordsCopied ? 'Copied!' : 'Copy coordinates'"
+                        @click="copyVideoCoordinates">
                     <i style="margin: 0"
-                        :class="videoPopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'"></i>
+                       :class="videoPopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'" />
                 </button>
             </div>
         </div>
@@ -207,7 +205,6 @@ export default {
     components: {
         olMeasure, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
-    emits: ['scrollTo', 'openItem'],
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     inject: {
         registerTabChild: { default: null },
@@ -235,6 +232,7 @@ export default {
             default: true
         }
     },
+    emits: ['scrollTo', 'openItem'],
     data: function () {
         const savedDirectionIndicators = localStorage.getItem('showDirectionIndicators') === 'true';
         const savedFlightPath = localStorage.getItem('showFlightPath') !== 'false';
@@ -295,6 +293,49 @@ export default {
             measurementListItems: []
         };
     },
+    computed: {
+        // Names of each band in display order (left → right), mirroring rasterLayerList order.
+        splitBands: function () {
+            return this.rasterLayerList.map(r => r.name);
+        }
+    },
+    watch: {
+        rasterOpacity: function () {
+            this.updateRastersOpacity();
+        },
+        rasterLayerList: {
+            deep: true,
+            handler: function () {
+                this.updateRastersOpacity();
+            }
+        },
+        files: {
+            deep: true,
+            handler: function (newVal, oldVal) {
+                // Prevent multiple updates
+                if (this._updateMap) {
+                    clearTimeout(this._updateMap);
+                    this._updateMap = null;
+                }
+
+                this._updateMap = setTimeout(() => {
+                    // Do we need to redraw the features?
+                    // Count has changed or first or last items are different
+                    if (newVal.length !== oldVal.length ||
+                        newVal[0] !== oldVal[0] ||
+                        newVal[newVal.length - 1] !== oldVal[oldVal.length - 1]) {
+                        this.reloadFileLayers();
+                    } else {
+                        // Just update (selection change)
+                        if (typeof this.fileLayer !== 'undefined') {
+                            this.fileLayer.changed();
+                            this.updateRastersOpacity();
+                        }
+                    }
+                }, 5);
+            }
+        }
+    },
     mounted: function () {
         if (this.registerTabChild) this.registerTabChild('map', this);
         if (!this.lazyload) this.loadMap();
@@ -349,49 +390,6 @@ export default {
 
         // Clean up split-screen clip listeners
         this._detachSplitClip();
-    },
-    watch: {
-        rasterOpacity: function () {
-            this.updateRastersOpacity();
-        },
-        rasterLayerList: {
-            deep: true,
-            handler: function () {
-                this.updateRastersOpacity();
-            }
-        },
-        files: {
-            deep: true,
-            handler: function (newVal, oldVal) {
-                // Prevent multiple updates
-                if (this._updateMap) {
-                    clearTimeout(this._updateMap);
-                    this._updateMap = null;
-                }
-
-                this._updateMap = setTimeout(() => {
-                    // Do we need to redraw the features?
-                    // Count has changed or first or last items are different
-                    if (newVal.length !== oldVal.length ||
-                        newVal[0] !== oldVal[0] ||
-                        newVal[newVal.length - 1] !== oldVal[oldVal.length - 1]) {
-                        this.reloadFileLayers();
-                    } else {
-                        // Just update (selection change)
-                        if (typeof this.fileLayer !== 'undefined') {
-                            this.fileLayer.changed();
-                            this.updateRastersOpacity();
-                        }
-                    }
-                }, 5);
-            }
-        }
-    },
-    computed: {
-        // Names of each band in display order (left → right), mirroring rasterLayerList order.
-        splitBands: function () {
-            return this.rasterLayerList.map(r => r.name);
-        }
     },
     methods: {
         // Generate a unique color based on the file name or index
@@ -792,7 +790,7 @@ export default {
 
                 flightPath: new Style({
                     stroke: new Stroke({
-                        color: 'rgba(75, 150, 243, 1)', //'rgba(253, 226, 147, 1)',
+                        color: 'rgba(75, 150, 243, 1)', // 'rgba(253, 226, 147, 1)',
                         width: 4
                     })
                 }),

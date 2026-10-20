@@ -1,14 +1,14 @@
 <template>
-    <Window :title="dialogTitle" id="measurement-properties" @onClose="cancel" modal fixedSize sizeClass="dialog-sm">
+    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @on-close="cancel">
         <div class="measurement-properties-form">
             <div class="form-group">
                 <label for="mp-name">Name</label>
-                <input type="text" id="mp-name" v-model="formData.name" placeholder="Enter a name..." />
+                <input id="mp-name" v-model="formData.name" type="text" placeholder="Enter a name...">
             </div>
 
             <div class="form-group">
                 <label for="mp-description">Description</label>
-                <textarea id="mp-description" v-model="formData.description" placeholder="Enter a description..." rows="3"></textarea>
+                <textarea id="mp-description" v-model="formData.description" placeholder="Enter a description..." rows="3" />
             </div>
 
             <div class="form-group">
@@ -21,17 +21,17 @@
                         :class="{ selected: formData.stroke === color }"
                         :style="{ backgroundColor: color }"
                         @click="formData.stroke = color"
-                    ></div>
+                    />
                     <input
-                        type="color"
                         v-model="formData.stroke"
+                        type="color"
                         class="color-picker-custom"
                         title="Custom color"
-                    />
+                    >
                 </div>
             </div>
 
-            <div class="form-group" v-if="showFill">
+            <div v-if="showFill" class="form-group">
                 <label>Fill Color</label>
                 <div class="color-palette">
                     <div
@@ -41,46 +41,46 @@
                         :class="{ selected: formData.fill === color }"
                         :style="{ backgroundColor: color }"
                         @click="formData.fill = color"
-                    ></div>
+                    />
                     <input
-                        type="color"
                         v-model="formData.fill"
+                        type="color"
                         class="color-picker-custom"
                         title="Custom color"
-                    />
+                    >
                 </div>
             </div>
 
             <div class="form-group">
                 <label for="mp-stroke-width">Stroke Width: {{ formData['stroke-width'] }}px</label>
                 <input
-                    type="range"
                     id="mp-stroke-width"
                     v-model.number="formData['stroke-width']"
+                    type="range"
                     min="1"
                     max="10"
                     step="1"
-                />
+                >
             </div>
 
-            <div class="form-group" v-if="showFill">
+            <div v-if="showFill" class="form-group">
                 <label for="mp-fill-opacity">Fill Opacity: {{ Math.round(formData['fill-opacity'] * 100) }}%</label>
                 <input
-                    type="range"
                     id="mp-fill-opacity"
                     v-model.number="formData['fill-opacity']"
+                    type="range"
                     min="0"
                     max="1"
                     step="0.1"
-                />
+                >
             </div>
 
             <div v-if="isPoint" class="form-group">
                 <label>Coordinates</label>
                 <div class="coords-row">
                     <code class="coords-text">{{ coordsText }}</code>
-                    <button type="button" class="btn-copy-coords" @click="copyCoordinates" :title="copyTooltip">
-                        <i :class="copyIconClass"></i>
+                    <button type="button" class="btn-copy-coords" :title="copyTooltip" @click="copyCoordinates">
+                        <i :class="copyIconClass" />
                     </button>
                 </div>
             </div>
@@ -94,8 +94,8 @@
             </div>
 
             <div class="buttons">
-                <button v-if="showDelete" class="btn-delete" @click="deleteMeasurement" title="Delete this measurement">
-                    <i class="fa-solid fa-trash"></i>
+                <button v-if="showDelete" class="btn-delete" title="Delete this measurement" @click="deleteMeasurement">
+                    <i class="fa-solid fa-trash" />
                     Delete
                 </button>
                 <button class="btn-cancel" @click="cancel">Cancel</button>

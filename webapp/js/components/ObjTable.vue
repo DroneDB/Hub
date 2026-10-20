@@ -2,7 +2,7 @@
     <div>
         <ul v-if="Array.isArray(tObj)">
             <li v-for="(item, index) in tObj" :key="index">
-                <ObjTable :obj="item"></ObjTable>
+                <ObjTable :obj="item" />
             </li>
         </ul>
         <div v-else-if="tObj !== null && typeof tObj === 'object'">
@@ -17,7 +17,7 @@
                                 {{ new Date(val) }}
                             </div>
                             <div v-else-if="key === 'bands' && Array.isArray(val)">
-                                {{val.map(b => b && b.colorInterp ? b.colorInterp : '').join(", ")}}
+                                {{ val.map(b => b && b.colorInterp ? b.colorInterp : '').join(", ") }}
                             </div>
                             <div v-else-if="key === 'dimensions' && Array.isArray(val)">
                                 {{ val.join(", ") }}
@@ -28,7 +28,7 @@
                                 <a v-if="isUrl(val)" :href="val" target="_blank" rel="noopener noreferrer">{{ val }}</a>
                                 <template v-else>{{ val }}</template>
                             </div>
-                            <ObjTable v-else-if="val !== null" :obj="val"></ObjTable>
+                            <ObjTable v-else-if="val !== null" :obj="val" />
                             <span v-else>-</span>
                         </td>
                     </tr>
@@ -75,9 +75,6 @@ export default {
             tObj: null
         };
     },
-    created() {
-        this.processObject();
-    },
     watch: {
         obj: {
             handler() {
@@ -85,6 +82,9 @@ export default {
             },
             deep: true
         }
+    },
+    created() {
+        this.processObject();
     },
     methods: {
         processObject() {

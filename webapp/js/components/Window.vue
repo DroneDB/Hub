@@ -1,8 +1,8 @@
 <template>
     <Dialog :visible="true" :header="title" :modal="modal" :closable="closable"
-        :draggable="!fixedPosition" :style="dialogStyle" :contentStyle="contentStyle"
-        :dismissableMask="closeModalOnClick" :closeOnEscape="closable"
-        :pt="dialogPt" @update:visible="handleClose" @show="handleShow">
+            :draggable="!fixedPosition" :style="dialogStyle" :content-style="contentStyle"
+            :dismissable-mask="closeModalOnClick" :close-on-escape="closable"
+            :pt="dialogPt" @update:visible="handleClose" @show="handleShow">
         <div ref="contentRoot" style="display: contents;">
             <slot />
         </div>
@@ -32,7 +32,6 @@ export default {
     components: {
         Dialog
     },
-    emits: ['onClose', 'show'],
     props: {
         title: {
             type: String,
@@ -83,6 +82,7 @@ export default {
             default: true
         },
     },
+    emits: ['onClose', 'show'],
     computed: {
         dialogStyle() {
             const style = {};

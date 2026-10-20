@@ -1,6 +1,6 @@
 <template>
     <div class="pdf-viewer-wrapper">
-        <Window :title="windowTitle" id="pdfViewerDialog" @onClose="close" modal width="85%" height="90%">
+        <Window id="pdfViewerDialog" :title="windowTitle" modal width="85%" height="90%" @on-close="close">
             <div class="pdf-viewer-dialog">
                 <div class="pdf-container">
                     <iframe
@@ -8,7 +8,7 @@
                         :src="pdfUrl"
                         frameborder="0"
                         class="pdf-iframe"
-                    ></iframe>
+                    />
                 </div>
             </div>
         </Window>

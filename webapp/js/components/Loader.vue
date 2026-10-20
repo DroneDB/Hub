@@ -1,10 +1,10 @@
 <template>
-  <div>
-    <div id="loader-backdrop"></div>
-    <div id="loader-container">
-      <div class="loader">Loading...</div>
+    <div>
+        <div id="loader-backdrop" />
+        <div id="loader-container">
+            <div class="loader">Loading...</div>
+        </div>
     </div>
-  </div>
 </template>
 
 <script>

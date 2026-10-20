@@ -1,23 +1,23 @@
 <template>
-    <div class="histogram-chart" ref="container">
+    <div ref="container" class="histogram-chart">
         <Chart type="bar" :data="chartData" :options="chartOptions" :height="height" />
         <!-- Drag handles for min/max rescale -->
-        <div class="handles-overlay" ref="overlay"
-            @mousedown="onOverlayMouseDown"
-            @touchstart.prevent="onOverlayTouchStart">
+        <div ref="overlay" class="handles-overlay"
+             @mousedown="onOverlayMouseDown"
+             @touchstart.prevent="onOverlayTouchStart">
             <div class="handle handle-min" :style="{ left: minHandlePos + '%' }"
-                @mousedown.stop="startDrag('min', $event)"
-                @touchstart.stop.prevent="startDragTouch('min', $event)">
+                 @mousedown.stop="startDrag('min', $event)"
+                 @touchstart.stop.prevent="startDragTouch('min', $event)">
                 <div class="handle-label">{{ formatVal(currentMin) }}</div>
             </div>
             <div class="handle handle-max" :style="{ left: maxHandlePos + '%' }"
-                @mousedown.stop="startDrag('max', $event)"
-                @touchstart.stop.prevent="startDragTouch('max', $event)">
+                 @mousedown.stop="startDrag('max', $event)"
+                 @touchstart.stop.prevent="startDragTouch('max', $event)">
                 <div class="handle-label">{{ formatVal(currentMax) }}</div>
             </div>
             <!-- Shaded regions outside the range -->
-            <div class="shade shade-left" :style="{ width: minHandlePos + '%' }"></div>
-            <div class="shade shade-right" :style="{ left: maxHandlePos + '%', width: (100 - maxHandlePos) + '%' }"></div>
+            <div class="shade shade-left" :style="{ width: minHandlePos + '%' }" />
+            <div class="shade shade-right" :style="{ left: maxHandlePos + '%', width: (100 - maxHandlePos) + '%' }" />
         </div>
     </div>
 </template>

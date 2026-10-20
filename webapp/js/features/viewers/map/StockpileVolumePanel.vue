@@ -1,10 +1,10 @@
 <template>
-    <div class="stockpile-panel" v-if="visible" data-testid="stockpile-panel">
+    <div v-if="visible" class="stockpile-panel" data-testid="stockpile-panel">
         <div class="panel-header">
             <span class="panel-title">
-                <i class="fa-solid fa-layer-group"></i> Stockpile Volume
+                <i class="fa-solid fa-layer-group" /> Stockpile Volume
             </span>
-            <button class="close-btn" @click="$emit('close')" title="Close"><i class="fas fa-times"></i></button>
+            <button class="close-btn" title="Close" @click="$emit('close')"><i class="fas fa-times" /></button>
         </div>
 
         <div class="panel-body">
@@ -12,10 +12,10 @@
                 <label class="section-label">
                     Base Plane Method
                     <button type="button" class="info-icon-btn"
-                            @click="showBaseMethodsInfo = true"
                             :title="baseMethodTooltip"
-                            data-testid="stockpile-base-method-info">
-                        <i class="fas fa-info-circle"></i>
+                            data-testid="stockpile-base-method-info"
+                            @click="showBaseMethodsInfo = true">
+                        <i class="fas fa-info-circle" />
                     </button>
                 </label>
                 <select v-model="localBaseMethod" class="panel-select" data-testid="stockpile-base-method">
@@ -28,17 +28,17 @@
 
             <div class="section">
                 <label class="section-label">Detection Sensitivity: <strong>{{ localSensitivity.toFixed(2) }}</strong></label>
-                <input type="range" min="0" max="1" step="0.05" v-model.number="localSensitivity"
-                       class="panel-range" data-testid="stockpile-sensitivity" />
+                <input v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
+                       class="panel-range" data-testid="stockpile-sensitivity">
             </div>
 
             <div class="section">
                 <label class="section-label">Search Radius (m)</label>
-                <input type="number" min="5" step="5" v-model.number="localRadius"
-                       class="panel-input" data-testid="stockpile-radius" />
+                <input v-model.number="localRadius" type="number" min="5" step="5"
+                       class="panel-input" data-testid="stockpile-radius">
             </div>
 
-            <div class="section" v-if="materials && materials.length">
+            <div v-if="materials && materials.length" class="section">
                 <label class="section-label">Material (optional)</label>
                 <select v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
                     <option :value="null">- none -</option>
@@ -50,67 +50,67 @@
                 <div v-if="localMaterial === customSlug" class="custom-material-grid">
                     <label>
                         <span>Density (t/m³)</span>
-                        <input type="number" min="0" step="0.05" v-model.number="localCustomDensity"
-                               class="panel-input" data-testid="stockpile-custom-density" />
+                        <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
+                               class="panel-input" data-testid="stockpile-custom-density">
                     </label>
                     <label>
                         <span>Cost / ton</span>
-                        <input type="number" min="0" step="1" v-model.number="localCustomCostPerTon"
-                               class="panel-input" data-testid="stockpile-custom-cost" />
+                        <input v-model.number="localCustomCostPerTon" type="number" min="0" step="1"
+                               class="panel-input" data-testid="stockpile-custom-cost">
                     </label>
                 </div>
             </div>
 
             <div class="section actions">
                 <button class="btn btn-primary btn-sm action-btn" :class="{ active: mode === 'click' }"
-                        @click="$emit('clickOnMap')"
-                        :disabled="loading" data-testid="stockpile-click-btn"
-                        title="Click on the map to detect a pile at that point">
-                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'"></i>
+                        :disabled="loading"
+                        data-testid="stockpile-click-btn" title="Click on the map to detect a pile at that point"
+                        @click="$emit('clickOnMap')">
+                    <i :class="loading ? 'fas fa-spinner fa-spin' : 'fa-solid fa-crosshairs'" />
                     <span class="action-label">{{ mode === 'click' ? 'Click map…' : 'Click map' }}</span>
                 </button>
                 <button class="btn btn-secondary btn-sm action-btn" :class="{ active: mode === 'draw' }"
-                        @click="$emit('drawPolygon')"
-                        :disabled="loading" data-testid="stockpile-draw-btn"
-                        title="Draw a polygon around the pile to compute its volume">
-                    <i class="fa-solid fa-draw-polygon"></i>
+                        :disabled="loading"
+                        data-testid="stockpile-draw-btn" title="Draw a polygon around the pile to compute its volume"
+                        @click="$emit('drawPolygon')">
+                    <i class="fa-solid fa-draw-polygon" />
                     <span class="action-label">{{ mode === 'draw' ? 'Drawing…' : 'Draw' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm action-btn" @click="$emit('clearOverlay')"
-                        :disabled="!canClear" data-testid="stockpile-clear-btn"
-                        title="Clear the overlay, exit any active mode and reset the panel">
-                    <i class="fa-solid fa-eraser"></i>
+                <button class="btn btn-secondary btn-sm action-btn" :disabled="!canClear"
+                        data-testid="stockpile-clear-btn" title="Clear the overlay, exit any active mode and reset the panel"
+                        @click="$emit('clearOverlay')">
+                    <i class="fa-solid fa-eraser" />
                     <span class="action-label">Clear</span>
                 </button>
             </div>
 
-            <div class="section click-banner" v-if="mode === 'click'" data-testid="stockpile-click-banner">
-                <i class="fa-solid fa-crosshairs"></i>
+            <div v-if="mode === 'click'" class="section click-banner" data-testid="stockpile-click-banner">
+                <i class="fa-solid fa-crosshairs" />
                 <span>Click on the map to detect a pile (ESC to cancel).</span>
-                <button class="banner-cancel" @click="$emit('cancelMode')" title="Cancel">
-                    <i class="fas fa-times"></i>
+                <button class="banner-cancel" title="Cancel" @click="$emit('cancelMode')">
+                    <i class="fas fa-times" />
                 </button>
             </div>
-            <div class="section click-banner" v-else-if="mode === 'draw'" data-testid="stockpile-draw-banner">
-                <i class="fa-solid fa-draw-polygon"></i>
+            <div v-else-if="mode === 'draw'" class="section click-banner" data-testid="stockpile-draw-banner">
+                <i class="fa-solid fa-draw-polygon" />
                 <span>Draw a polygon around the pile (double-click to finish, ESC to cancel).</span>
-                <button class="banner-cancel" @click="$emit('cancelMode')" title="Cancel">
-                    <i class="fas fa-times"></i>
+                <button class="banner-cancel" title="Cancel" @click="$emit('cancelMode')">
+                    <i class="fas fa-times" />
                 </button>
             </div>
 
-            <div class="section error" v-if="error" data-testid="stockpile-error">
-                <i class="fas fa-exclamation-triangle"></i> {{ error }}
+            <div v-if="error" class="section error" data-testid="stockpile-error">
+                <i class="fas fa-exclamation-triangle" /> {{ error }}
             </div>
 
-            <div class="section result" v-if="result" data-testid="stockpile-result">
+            <div v-if="result" class="section result" data-testid="stockpile-result">
                 <label class="section-label">Identification</label>
-                <input type="text" v-model="localTitle" class="panel-input"
+                <input v-model="localTitle" type="text" class="panel-input"
                        placeholder="Title (e.g. North pile)" maxlength="120"
-                       data-testid="stockpile-title" />
+                       data-testid="stockpile-title">
                 <textarea v-model="localDescription" class="panel-input panel-textarea"
                           rows="2" placeholder="Description (optional)" maxlength="500"
-                          data-testid="stockpile-description"></textarea>
+                          data-testid="stockpile-description" />
 
                 <label class="section-label">Result</label>
                 <div class="result-grid">
@@ -154,14 +154,14 @@
                     </template>
                 </div>
                 <div v-if="!showFillRow" class="fill-hint" data-testid="stockpile-fill-hint">
-                    <i class="fas fa-info-circle"></i>
+                    <i class="fas fa-info-circle" />
                     Fill volume is not applicable for the selected base plane method.
                 </div>
                 <div class="result-actions">
-                    <button class="btn btn-secondary btn-sm" @click="$emit('exportGeoJson')"
-                            data-testid="stockpile-export-btn"
-                            title="Download the pile contour as GeoJSON">
-                        <i class="fa-solid fa-file-export"></i>
+                    <button class="btn btn-secondary btn-sm" data-testid="stockpile-export-btn"
+                            title="Download the pile contour as GeoJSON"
+                            @click="$emit('exportGeoJson')">
+                        <i class="fa-solid fa-file-export" />
                         Export GeoJSON
                     </button>
                 </div>

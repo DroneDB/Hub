@@ -1,5 +1,5 @@
 <template>
-    <Window title="Camera views" id="splat-cameras" @onClose="$emit('close')" fixedSize sizeClass="dialog-md">
+    <Window id="splat-cameras" title="Camera views" fixed-size size-class="dialog-md" @on-close="$emit('close')">
         <div class="cameras-manager">
             <p v-if="!cameras.length" class="empty">
                 No camera views yet. Move to a viewpoint and add it below.
@@ -9,27 +9,27 @@
                 <li v-for="(cam, i) in cameras" :key="cam.id"
                     class="camera-row" :class="{ active: i === activeIndex }">
                     <span class="idx" :title="`Press ${i} to jump here`">{{ i }}</span>
-                    <input class="name" type="text" v-model.trim="cam.name"
-                        :readonly="!canWrite"
-                        @change="$emit('rename', { index: i, name: cam.name })" />
+                    <input v-model.trim="cam.name" class="name" type="text"
+                           :readonly="!canWrite"
+                           @change="$emit('rename', { index: i, name: cam.name })">
                     <div class="actions">
-                        <button class="act" @click="$emit('goto', i)" title="Go to this view">
+                        <button class="act" title="Go to this view" @click="$emit('goto', i)">
                             <i class="fa-solid fa-eye" />
                         </button>
-                        <button v-if="canWrite" class="act" @click="$emit('update-current', i)"
-                            title="Replace with the current view">
+                        <button v-if="canWrite" class="act" title="Replace with the current view"
+                                @click="$emit('update-current', i)">
                             <i class="fa-solid fa-camera-rotate" />
                         </button>
-                        <button v-if="canWrite" class="act" @click="$emit('move', { index: i, dir: -1 })"
-                            :disabled="i === 0" title="Move up">
+                        <button v-if="canWrite" class="act" :disabled="i === 0"
+                                title="Move up" @click="$emit('move', { index: i, dir: -1 })">
                             <i class="fa-solid fa-arrow-up" />
                         </button>
-                        <button v-if="canWrite" class="act" @click="$emit('move', { index: i, dir: 1 })"
-                            :disabled="i === cameras.length - 1" title="Move down">
+                        <button v-if="canWrite" class="act" :disabled="i === cameras.length - 1"
+                                title="Move down" @click="$emit('move', { index: i, dir: 1 })">
                             <i class="fa-solid fa-arrow-down" />
                         </button>
-                        <button v-if="canWrite" class="act danger" @click="$emit('delete', i)"
-                            title="Remove this view">
+                        <button v-if="canWrite" class="act danger" title="Remove this view"
+                                @click="$emit('delete', i)">
                             <i class="fa-solid fa-trash" />
                         </button>
                     </div>
@@ -42,11 +42,11 @@
 
             <div class="manager-footer">
                 <Button v-if="canWrite" label="Add current view" icon="fa-solid fa-plus"
-                    @click="$emit('add-current')" text />
-                <span class="spacer"></span>
+                        text @click="$emit('add-current')" />
+                <span class="spacer" />
                 <Button v-if="canWrite" :label="dirty ? 'Save *' : 'Save'"
-                    :disabled="!dirty" @click="$emit('save')" />
-                <Button label="Close" severity="secondary" @click="$emit('close')" text />
+                        :disabled="!dirty" @click="$emit('save')" />
+                <Button label="Close" severity="secondary" text @click="$emit('close')" />
             </div>
 
             <small v-if="!canWrite" class="readonly-note">

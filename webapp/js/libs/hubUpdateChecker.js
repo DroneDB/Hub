@@ -47,7 +47,7 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
     // up (stale proxy, mid-deploy, etc.).
     try {
         if (sessionStorage.getItem(SESSION_GUARD_KEY) === serverVersion) {
-            // eslint-disable-next-line no-console
+             
             console.warn(
                 `[hub-update] Mismatch persists after reload (bundle=${BUNDLE_VERSION}, server=${serverVersion}). Skipping further reloads in this session.`
             );
@@ -74,7 +74,7 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
         // best-effort
     }
 
-    // eslint-disable-next-line no-console
+     
     console.info(
         `[hub-update] Server Hub ${serverVersion} differs from bundle ${BUNDLE_VERSION}. Reloading...`
     );

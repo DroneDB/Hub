@@ -1,29 +1,29 @@
 <template>
-    <Window title="Set Coordinate System" id="setCrsDialog" @onClose="close('close')" modal maxWidth="560px" fixedSize>
+    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size @on-close="close('close')">
         <div class="set-crs-dialog">
-            <form v-on:submit.prevent="apply">
+            <form @submit.prevent="apply">
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
                     {{ errorMessage }}
                 </PrimeMessage>
 
                 <PrimeMessage severity="info" :closable="false">
-                    <strong>Drawing:</strong> {{ drawingName }}<br />
+                    <strong>Drawing:</strong> {{ drawingName }}<br>
                     <strong>Now:</strong> {{ currentCrs }}
                 </PrimeMessage>
 
                 <div class="my-3 d-flex flex-column gap-2">
                     <div class="d-flex align-items-center gap-2">
-                        <RadioButton v-model="mode" inputId="crsModeSystem" value="system" :disabled="saving" />
+                        <RadioButton v-model="mode" input-id="crsModeSystem" value="system" :disabled="saving" />
                         <label for="crsModeSystem">Coordinate system</label>
                     </div>
                     <InputText v-model="crs" placeholder="EPSG:32632, or WKT" :disabled="saving || mode !== 'system'"
-                        :invalid="showCrsError" @input="touched = true" fluid />
+                               :invalid="showCrsError" fluid @input="touched = true" />
                     <small v-if="showCrsError" class="crs-error">{{ crsError }}</small>
                     <small v-else class="help-text">The coordinate system of the drawing's coordinates: an EPSG
                         code (a number is read as one) or a WKT definition.</small>
 
                     <div class="d-flex align-items-center gap-2 mt-2">
-                        <RadioButton v-model="mode" inputId="crsModeLocal" value="local" :disabled="saving" />
+                        <RadioButton v-model="mode" input-id="crsModeLocal" value="local" :disabled="saving" />
                         <label for="crsModeLocal">Local drawing coordinates (not placed on the map)</label>
                     </div>
                 </div>
@@ -33,9 +33,9 @@
             </form>
 
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" :disabled="saving" label="Close" />
-                <Button @click="apply" :disabled="saving || !canApply" :loading="saving" severity="primary"
-                    icon="fa-solid fa-earth-europe" label="Apply" />
+                <Button severity="secondary" :disabled="saving" label="Close" @click="close('close')" />
+                <Button :disabled="saving || !canApply" :loading="saving" severity="primary" icon="fa-solid fa-earth-europe"
+                        label="Apply" @click="apply" />
             </div>
         </div>
     </Window>

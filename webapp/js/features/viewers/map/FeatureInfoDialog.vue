@@ -1,26 +1,26 @@
 <template>
-    <Window :title="title" id="feature-info" @onClose="close('close')" modal closeModalOnClick maxWidth="70%" fixedSize>
+    <Window id="feature-info" :title="title" modal close-modal-on-click max-width="70%" fixed-size @on-close="close('close')">
         <div class="feature-info-content">
             <template v-for="(categoryProps, category) in categorizedProperties" :key="category">
-            <div class="category-section" v-if="categoryProps && Object.keys(categoryProps).length > 0">
-                <h3 class="category-title">{{ category }}</h3>
-                <table class="properties-table">
-                    <tr v-for="(value, key) in categoryProps" :key="key">
-                        <td class="property-name">{{ key }}</td>
-                        <td class="property-value">
-                            <div class="empty-value" v-if="value === null || value === undefined"><i>(Empty)</i></div>
-                            <div class="date-value" v-else-if="isDateString(value)">{{ formatDate(value) }}</div>
-                            <ObjTable v-else-if="isComplex(value)" :obj="parseComplexValue(value)"></ObjTable>
-                            <div class="plain-value" v-else>{{ value }}</div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+                <div v-if="categoryProps && Object.keys(categoryProps).length > 0" class="category-section">
+                    <h3 class="category-title">{{ category }}</h3>
+                    <table class="properties-table">
+                        <tr v-for="(value, key) in categoryProps" :key="key">
+                            <td class="property-name">{{ key }}</td>
+                            <td class="property-value">
+                                <div v-if="value === null || value === undefined" class="empty-value"><i>(Empty)</i></div>
+                                <div v-else-if="isDateString(value)" class="date-value">{{ formatDate(value) }}</div>
+                                <ObjTable v-else-if="isComplex(value)" :obj="parseComplexValue(value)" />
+                                <div v-else class="plain-value">{{ value }}</div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             </template>
         </div>
 
         <div class="text-end mt-3">
-            <Button @click="close('close')" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="close('close')" />
         </div>
     </Window>
 </template>

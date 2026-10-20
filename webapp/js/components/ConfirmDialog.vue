@@ -1,20 +1,20 @@
 <template>
-    <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
-        <div v-html="safeMessage"></div>
+    <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('cancel')">
+        <div v-html="safeMessage" />
 
         <PrimeMessage v-if="warningMessage" severity="warn" :closable="false" class="mt-3">
             <template v-if="warningTitle" #default>
-                <strong>{{ warningTitle }}</strong><br />{{ warningMessage }}
+                <strong>{{ warningTitle }}</strong><br>{{ warningMessage }}
             </template>
             <template v-else #default>{{ warningMessage }}</template>
         </PrimeMessage>
 
-        <slot name="extra"></slot>
+        <slot name="extra" />
 
         <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button :label="cancelText" @click="close('cancel')" severity="secondary" />
-            <Button v-if="secondaryText" :label="secondaryText" @click="close('secondary')" :severity="secondaryButtonClass" />
-            <Button :label="confirmText" @click="close('confirm')" :severity="confirmButtonClass" />
+            <Button :label="cancelText" severity="secondary" @click="close('cancel')" />
+            <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="close('secondary')" />
+            <Button :label="confirmText" :severity="confirmButtonClass" @click="close('confirm')" />
         </div>
     </Window>
 </template>

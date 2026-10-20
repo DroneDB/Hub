@@ -7,48 +7,46 @@
                 <h1>Tasks</h1>
             </div>
             <div>
-                <Button @click="refreshData" severity="secondary" icon="fa-solid fa-arrows-rotate"
-                    label="Refresh" :loading="loading" />
+                <Button severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh"
+                        :loading="loading" @click="refreshData" />
             </div>
         </div>
 
         <div class="filters d-flex gap-2 flex-wrap mb-3">
-            <Select v-model="selectedUser" :options="userOptions" optionLabel="label" optionValue="value"
-                placeholder="All users" filter showClear class="filter-select" @change="onFilterChange" />
-            <Select v-model="selectedTool" :options="toolOptions" optionLabel="label" optionValue="value"
-                placeholder="All tools" showClear class="filter-select" @change="onFilterChange" />
-            <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value"
-                placeholder="All States" class="filter-select" @change="onFilterChange" />
+            <Select v-model="selectedUser" :options="userOptions" option-label="label" option-value="value"
+                    placeholder="All users" filter show-clear class="filter-select" @change="onFilterChange" />
+            <Select v-model="selectedTool" :options="toolOptions" option-label="label" option-value="value"
+                    placeholder="All tools" show-clear class="filter-select" @change="onFilterChange" />
+            <Select v-model="selectedState" :options="stateOptions" option-label="label" option-value="value"
+                    placeholder="All States" class="filter-select" @change="onFilterChange" />
         </div>
 
         <TasksTable :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
-            :total-records="total" :rows="pageSize"
-            :downloading-task-id="downloadingTaskId"
-            style="flex: 1; min-height: 0;"
-            empty-message="No tasks match the current filters."
-            @page="onPage" @view-log="openLog" @download-result="downloadResult"
-            @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
+                    :total-records="total" :rows="pageSize"
+                    :downloading-task-id="downloadingTaskId"
+                    style="flex: 1; min-height: 0;"
+                    empty-message="No tasks match the current filters."
+                    @page="onPage" @view-log="openLog" @download-result="downloadResult"
+                    @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
 
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
-            :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
+                       :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
         <!-- Cancel task confirmation -->
         <ConfirmDialog v-if="cancelDialogOpen"
-            title="Cancel Task"
-            :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
-            confirmText="Cancel Task" cancelText="Don't Cancel" confirmButtonClass="danger"
-            @onClose="handleCancelDialogClose">
-        </ConfirmDialog>
+                       title="Cancel Task"
+                       :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
+                       confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
+                       @on-close="handleCancelDialogClose" />
 
         <!-- Delete task confirmation -->
         <ConfirmDialog v-if="deleteDialogOpen"
-            title="Delete Task"
-            :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, taskTools)}</strong> will be removed together with any downloadable results it produced.`"
-            confirmText="Delete" cancelText="Cancel" confirmButtonClass="danger"
-            warningTitle="Warning"
-            warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
-            @onClose="handleDeleteDialogClose">
-        </ConfirmDialog>
+                       title="Delete Task"
+                       :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, taskTools)}</strong> will be removed together with any downloadable results it produced.`"
+                       confirm-text="Delete" cancel-text="Cancel" confirm-button-class="danger"
+                       warning-title="Warning"
+                       warning-message="This action cannot be undone. Any task results still available for download will be deleted."
+                       @on-close="handleDeleteDialogClose" />
     </div>
 </template>
 
@@ -69,9 +67,9 @@ import reg from '@/libs/api/sharedRegistry';
  */
 export default {
     name: 'TasksPage',
-    mixins: [useTaskFormatting],
 
     components: { Button, Select, Toast, TasksTable, TaskLogDialog, ConfirmDialog },
+    mixins: [useTaskFormatting],
 
     data() {
         return {

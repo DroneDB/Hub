@@ -109,17 +109,17 @@ window.addEventListener('load', function () {
                     ddbVersion: features ? features.ddbVersion : null
                 };
             },
-            methods: {
-                onHubUpdateDismissed() {
-                    this.hubUpdateNotice = null;
-                }
-            },
             computed: {
                 // Forces a remount when switching dataset: /r/:org/:ds is a single route
                 // record, so without a key Vue would reuse the instance and skip its hooks.
                 contentKey() {
                     const p = this.$route.params;
                     return p.org && p.ds ? `${p.org}/${p.ds}` : this.$route.path;
+                }
+            },
+            methods: {
+                onHubUpdateDismissed() {
+                    this.hubUpdateNotice = null;
                 }
             },
             template:

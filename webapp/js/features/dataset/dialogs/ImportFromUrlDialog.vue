@@ -1,7 +1,7 @@
 <template>
-    <Window title="Import from URL" id="importFromUrlDialog" @onClose="close('close')" modal maxWidth="640px" fixedSize>
+    <Window id="importFromUrlDialog" title="Import from URL" modal max-width="640px" fixed-size @on-close="close('close')">
         <div class="import-url-dialog">
-            <form v-on:submit.prevent="importing ? undefined : runImport()">
+            <form @submit.prevent="importing ? undefined : runImport()">
 
                 <!-- Error -->
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -13,10 +13,10 @@
                     <label class="d-block mb-1 fw-semibold">File URL <span class="text-danger">*</span></label>
                     <div class="url-row">
                         <InputText v-model="url" placeholder="https://example.com/file.tif" :disabled="importing"
-                            :invalid="urlTouched && !urlValid" fluid @input="onUrlInput" />
+                                   :invalid="urlTouched && !urlValid" fluid @input="onUrlInput" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-magnifying-glass"
-                            label="Verify" :loading="verifying" :disabled="importing || verifying || !urlValid"
-                            @click="verify" />
+                                label="Verify" :loading="verifying" :disabled="importing || verifying || !urlValid"
+                                @click="verify" />
                     </div>
                     <small v-if="urlTouched && !urlValid" class="text-danger">Enter a valid http/https URL.</small>
                 </div>
@@ -24,16 +24,16 @@
                 <!-- Verification result -->
                 <div v-if="verifyResult" class="verify-result mb-3">
                     <PrimeMessage v-if="!verifyResult.reachable" severity="error" :closable="false">
-                        <i class="fa-solid fa-circle-xmark"></i> URL not reachable<span v-if="verifyResult.note"> - {{ verifyResult.note }}</span>
+                        <i class="fa-solid fa-circle-xmark" /> URL not reachable<span v-if="verifyResult.note"> - {{ verifyResult.note }}</span>
                     </PrimeMessage>
                     <PrimeMessage v-else-if="verifyResult.blocked" severity="warn" :closable="false">
-                        <i class="fa-solid fa-ban"></i> This file type is not allowed for import.
+                        <i class="fa-solid fa-ban" /> This file type is not allowed for import.
                     </PrimeMessage>
                     <PrimeMessage v-else-if="verifyResult.sizeExceedsLimit" severity="warn" :closable="false">
-                        <i class="fa-solid fa-triangle-exclamation"></i> File too large<span v-if="verifyResult.note"> - {{ verifyResult.note }}</span>
+                        <i class="fa-solid fa-triangle-exclamation" /> File too large<span v-if="verifyResult.note"> - {{ verifyResult.note }}</span>
                     </PrimeMessage>
                     <PrimeMessage v-else severity="success" :closable="false">
-                        <i class="fa-solid fa-circle-check"></i>
+                        <i class="fa-solid fa-circle-check" />
                         Reachable
                         <span v-if="verifyResult.sizeBytes"> - {{ humanSize(verifyResult.sizeBytes) }}</span>
                         <span v-if="verifyResult.note" class="verify-note"> - {{ verifyResult.note }}</span>
@@ -44,7 +44,7 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">File name</label>
                     <InputText v-model="fileName" :placeholder="derivedFileName || 'Derived from URL after verify'" fluid
-                        :disabled="importing" />
+                               :disabled="importing" />
                     <small class="help-text">Leave empty to use the name from the URL.</small>
                 </div>
 
@@ -54,7 +54,7 @@
                     <div class="url-row">
                         <InputText v-model="folder" placeholder="root folder" fluid :disabled="importing" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-folder-open"
-                            :disabled="importing" @click="folderPickerOpen = true" title="Browse folders" />
+                                :disabled="importing" title="Browse folders" @click="folderPickerOpen = true" />
                     </div>
                     <small class="help-text">Destination folder inside the dataset (empty = root).</small>
                 </div>
@@ -62,7 +62,7 @@
                 <!-- Overwrite -->
                 <div class="mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="overwrite" :binary="true" inputId="importOverwrite" :disabled="importing" />
+                        <Checkbox v-model="overwrite" :binary="true" input-id="importOverwrite" :disabled="importing" />
                         <label for="importOverwrite">Overwrite existing file</label>
                     </div>
                 </div>
@@ -70,7 +70,7 @@
                 <!-- Advanced: basic-auth -->
                 <div class="mb-3">
                     <span class="advanced-toggle" @click="showAuth = !showAuth">
-                        <i :class="showAuth ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'"></i>
+                        <i :class="showAuth ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" />
                         Authentication (optional)
                     </span>
                     <div v-if="showAuth" class="auth-fields mt-2">
@@ -83,27 +83,27 @@
 
                 <!-- Progress -->
                 <div v-if="importing" class="progress-section mb-2">
-                    <ProgressBar :value="importProgress" :showValue="true" />
+                    <ProgressBar :value="importProgress" :show-value="true" />
                     <div class="progress-label">{{ importStatus }}</div>
                 </div>
 
                 <!-- Success -->
                 <PrimeMessage v-if="importDone" severity="success" :closable="false">
-                    <i class="fa-solid fa-circle-check"></i> Import completed. The file will appear in the dataset shortly.
+                    <i class="fa-solid fa-circle-check" /> Import completed. The file will appear in the dataset shortly.
                 </PrimeMessage>
 
             </form>
 
             <!-- Action buttons -->
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" label="Close" />
-                <Button @click="runImport" :disabled="!canImport" :loading="importing"
-                    severity="primary" icon="fa-solid fa-cloud-arrow-down" label="Import" />
+                <Button severity="secondary" label="Close" @click="close('close')" />
+                <Button :disabled="!canImport" :loading="importing" severity="primary"
+                        icon="fa-solid fa-cloud-arrow-down" label="Import" @click="runImport" />
             </div>
         </div>
 
-        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initialPath="folder"
-            @onClose="handleFolderPickerClose" />
+        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initial-path="folder"
+                            @on-close="handleFolderPickerClose" />
     </Window>
 </template>
 

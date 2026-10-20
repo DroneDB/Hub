@@ -1,34 +1,34 @@
 <template>
-    <Window title="Add User" id="addUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size @on-close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message bind-to="error" />
 
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+            <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Username</label>
-                    <InputText ref="txtUsername" @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="username" placeholder="" class="w-100" />
+                    <InputText ref="txtUsername" v-model="username" placeholder=""
+                               class="w-100" @keydown="clearError()" @keyup.enter="confirmAddUser()" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Email</label>
-                    <InputText @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="email" placeholder="user@example.com" class="w-100" />
+                    <InputText v-model="email" placeholder="user@example.com"
+                               class="w-100" @keydown="clearError()" @keyup.enter="confirmAddUser()" />
                     <div v-if="email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Password</label>
-                    <Password ref="txtPassword" @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="password" placeholder="" :feedback="false" toggleMask class="w-100" @input="onPasswordInput" />
+                    <Password ref="txtPassword" v-model="password" placeholder=""
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmAddUser()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && password" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
-                            :class="{ met: isRequirementMet(req) }">
+                               :class="{ met: isRequirementMet(req) }">
                             <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
                             {{ req }}
                         </small>
@@ -36,13 +36,13 @@
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Roles</label>
-                    <MultiSelect v-model="roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
+                    <MultiSelect v-model="roles" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="adding" label="Close" />
-                <Button @click="confirmAddUser()" :disabled="adding || !isFilled()" :loading="adding"
-                    severity="primary" label="Add User" />
+                <Button severity="secondary" :disabled="adding" label="Close" @click="close()" />
+                <Button :disabled="adding || !isFilled()" :loading="adding" severity="primary"
+                        label="Add User" @click="confirmAddUser()" />
             </div>
         </div>
     </Window>

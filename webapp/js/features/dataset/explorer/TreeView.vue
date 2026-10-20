@@ -1,15 +1,15 @@
 <template>
-    <div class="tree-view" ref="treeView"
-        tabindex="0"
-        :class="{ dropping }"
-        @keydown="onKeyDown"
-        @drop="explorerDropHandler($event)"
-        @dragenter="explorerDragEnter($event)"
-        @dragleave="explorerDragLeave($event)"
-        @dragover.prevent>
-        <TreeNode v-for="(node, index) in nodes" :node="node" :key="node.path + ',' + index" ref="treeNodes"
-            :canWrite="canWrite"
-            @selected="handleSelection" @opened="handleOpen" :getChildren="getChildren" />
+    <div ref="treeView" class="tree-view"
+         tabindex="0"
+         :class="{ dropping }"
+         @keydown="onKeyDown"
+         @drop="explorerDropHandler($event)"
+         @dragenter="explorerDragEnter($event)"
+         @dragleave="explorerDragLeave($event)"
+         @dragover.prevent>
+        <TreeNode v-for="(node, index) in nodes" :key="node.path + ',' + index" ref="treeNodes" :node="node"
+                  :can-write="canWrite"
+                  :get-children="getChildren" @selected="handleSelection" @opened="handleOpen" />
     </div>
 </template>
 
@@ -28,7 +28,6 @@ export default {
         TreeNode
     },
     mixins: [dragDropMixin],
-    emits: ['opened', 'selectionChanged'],
     props: {
         nodes: {
             type: Array,
@@ -50,6 +49,7 @@ export default {
             default: null
         }
     },
+    emits: ['opened', 'selectionChanged'],
     data() {
         return {
             dropping: false,

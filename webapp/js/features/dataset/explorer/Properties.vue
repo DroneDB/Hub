@@ -1,12 +1,12 @@
 <template>
-    <Window height="80%" width="40%" title="Properties" id="properties"
-        @onClose="$emit('onClose', $event, arguments[1])">
+    <Window id="properties" height="80%" width="40%" title="Properties"
+            @on-close="$emit('onClose', $event, arguments[1])">
         <div v-if="files.length === 1" class="text-selectable">
-            <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserveOrder="true" />
+            <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserve-order="true" />
         </div>
         <div v-if="files.length >= 2">
             <div class="multi-count">{{ files.length }} items</div>
-            <DataTable :value="multiFileRows" size="small" :showGridlines="true" class="multi-props-datatable">
+            <DataTable :value="multiFileRows" size="small" :show-gridlines="true" class="multi-props-datatable">
                 <Column field="key" style="font-weight: 600; width: 40%; white-space: nowrap;" />
                 <Column field="value" />
             </DataTable>

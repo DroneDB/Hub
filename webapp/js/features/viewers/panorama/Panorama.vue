@@ -1,11 +1,10 @@
 <template>
     <div id="panorama">
-        <TabViewLoader @loaded="handleLoad" titleSuffix="Panorama" loadingText="Loading viewer..." />
+        <TabViewLoader title-suffix="Panorama" loading-text="Loading viewer..." @loaded="handleLoad" />
 
-        <Message bindTo="error" noDismiss />
+        <Message bind-to="error" no-dismiss />
 
-        <div class="viewer" ref="viewer">
-        </div>
+        <div ref="viewer" class="viewer" />
     </div>
 </template>
 

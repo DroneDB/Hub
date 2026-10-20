@@ -7,7 +7,7 @@
                 <div class="org-identity">
                     <div class="d-flex align-items-center gap-3">
                         <div class="org-icon-wrapper d-flex align-items-center justify-content-center">
-                            <i class="fa-solid fa-sitemap"></i>
+                            <i class="fa-solid fa-sitemap" />
                         </div>
                         <div>
                             <div class="org-title-row">
@@ -29,8 +29,8 @@
                         <InputIcon class="fa-solid fa-magnifying-glass" />
                         <InputText v-model="searchQuery" small placeholder="Search organizations" />
                     </IconField>
-                    <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" class="d-inline-flex d-sm-none" />
-                    <Button v-if="!readyOnly" @click.stop="handleNew()" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" class="d-none d-sm-inline-flex" />
+                    <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" class="d-inline-flex d-sm-none" @click.stop="handleNew()" />
+                    <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" class="d-none d-sm-inline-flex" @click.stop="handleNew()" />
                 </div>
             </div>
         </div>
@@ -45,7 +45,7 @@
                             <Skeleton width="12rem" height="1.25rem" />
                         </div>
                         <div class="me-3">
-                            <Skeleton width="4.5rem" height="1.5rem" borderRadius="1rem" />
+                            <Skeleton width="4.5rem" height="1.5rem" border-radius="1rem" />
                         </div>
                         <div class="d-flex gap-1">
                             <Skeleton width="2rem" height="2rem" />
@@ -65,13 +65,13 @@
                 <p v-else>You can create a new organization by clicking the create organization button.</p>
             </div>
             <div v-for="org in paginatedOrganizations" :key="org.slug"
-                 class="org-card" @click="viewOrganization(org)" style="cursor: pointer;">
+                 class="org-card" style="cursor: pointer;" @click="viewOrganization(org)">
                 <Card>
                     <template #content>
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center gap-2">
-                                    <i class="fa-solid fa-sitemap"></i>
+                                    <i class="fa-solid fa-sitemap" />
                                     <strong class="org-name">{{ org.name ? org.name : org.slug }}</strong>
                                 </div>
                                 <div v-if="org.description" class="org-card-description mt-1">{{ org.description }}</div>
@@ -85,16 +85,16 @@
                             </div>
                             <div class="org-card-actions d-flex gap-1 ms-3">
                                 <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
-                                    @click.stop="openMembersDialog(org)" severity="secondary" outlined size="small"
-                                    icon="fa-solid fa-users" title="Manage Members" />
+                                        severity="secondary" outlined size="small" icon="fa-solid fa-users"
+                                        title="Manage Members" @click.stop="openMembersDialog(org)" />
                                 <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
-                                    @click.stop="handleEdit(org)" severity="secondary" outlined size="small"
-                                    :loading="org.editing" :disabled="org.editing || org.deleting"
-                                    icon="fa-solid fa-pencil" />
+                                        severity="secondary" outlined size="small" :loading="org.editing"
+                                        :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
+                                        @click.stop="handleEdit(org)" />
                                 <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
-                                    @click.stop="handleDelete(org)" severity="danger" size="small"
-                                    :loading="org.deleting" :disabled="org.deleting || org.editing"
-                                    icon="fa-solid fa-trash" />
+                                        severity="danger" size="small" :loading="org.deleting"
+                                        :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
+                                        @click.stop="handleDelete(org)" />
                             </div>
                         </div>
                     </template>
@@ -104,21 +104,19 @@
 
         <!-- Sticky paginator -->
         <div v-if="!loading" class="org-pagination">
-            <Paginator :rows="Number(itemsPerPage)" :totalRecords="filteredOrganizations.length"
-                :first="(currentPage - 1) * itemsPerPage"
-                @page="onPageChange" :rowsPerPageOptions="[5, 10, 25, 50, 100]" />
+            <Paginator :rows="Number(itemsPerPage)" :total-records="filteredOrganizations.length"
+                       :first="(currentPage - 1) * itemsPerPage"
+                       :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
         </div>
 
-        <DeleteOrganizationDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :orgSlug="currentOrgSlug">
-        </DeleteOrganizationDialog>
-        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @onClose="handleMessageClose"></MessageDialog>
+        <DeleteOrganizationDialog v-if="deleteDialogOpen" :org-slug="currentOrgSlug" @on-close="handleDeleteClose" />
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @on-close="handleMessageClose" />
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
-            @onClose="handleOrganizationClose"></OrganizationDialog>
+                            @on-close="handleOrganizationClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
-            :orgSlug="selectedOrgForMembers.slug"
-            :canManageMembers="selectedOrgForMembers.permissions?.canManageMembers || false"
-            @onClose="closeMembersDialog">
-        </OrganizationMembersDialog>
+                                   :org-slug="selectedOrgForMembers.slug"
+                                   :can-manage-members="selectedOrgForMembers.permissions?.canManageMembers || false"
+                                   @on-close="closeMembersDialog" />
 
     </div>
 </template>
@@ -195,20 +193,29 @@ export default {
             itemsPerPage: prefs?.itemsPerPage || 10
         }
     },
-    mounted: async function () {
-        setTitle("Organizations");
-        await this.fetchOrganizations();
-        const prefs = getOrgPagePreferences();
-        if (prefs?.scrollTop) {
-            this.$nextTick(() => {
-                if (this.$refs.cardsArea) {
-                    this.$refs.cardsArea.scrollTop = prefs.scrollTop;
-                }
+
+    computed: {
+        readyOnly: function () {
+            return HubOptions.readOnlyOrgs;
+        },
+        memberManagementEnabled() {
+            return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+        },
+        filteredOrganizations() {
+            if (!this.searchQuery) return this.organizations;
+            const query = this.searchQuery.toLowerCase();
+            return this.organizations.filter(org => {
+                const name = (org.name || org.slug).toLowerCase();
+                const slug = org.slug.toLowerCase();
+                const description = (org.description || '').toLowerCase();
+                const owner = (org.owner || '').toLowerCase();
+                return name.includes(query) || slug.includes(query) || description.includes(query) || owner.includes(query);
             });
+        },
+        paginatedOrganizations() {
+            const start = (this.currentPage - 1) * this.itemsPerPage;
+            return this.filteredOrganizations.slice(start, start + this.itemsPerPage);
         }
-    },
-    beforeUnmount() {
-        this.savePreferences();
     },
     watch: {
         showAll: async function () {
@@ -223,6 +230,21 @@ export default {
         searchQuery: function () {
             this.currentPage = 1;
         }
+    },
+    mounted: async function () {
+        setTitle("Organizations");
+        await this.fetchOrganizations();
+        const prefs = getOrgPagePreferences();
+        if (prefs?.scrollTop) {
+            this.$nextTick(() => {
+                if (this.$refs.cardsArea) {
+                    this.$refs.cardsArea.scrollTop = prefs.scrollTop;
+                }
+            });
+        }
+    },
+    beforeUnmount() {
+        this.savePreferences();
     },
     methods: {
 
@@ -432,30 +454,6 @@ export default {
 
         upload: function () {
             this.$router.push({ name: "Upload" });
-        }
-    },
-
-    computed: {
-        readyOnly: function () {
-            return HubOptions.readOnlyOrgs;
-        },
-        memberManagementEnabled() {
-            return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
-        },
-        filteredOrganizations() {
-            if (!this.searchQuery) return this.organizations;
-            const query = this.searchQuery.toLowerCase();
-            return this.organizations.filter(org => {
-                const name = (org.name || org.slug).toLowerCase();
-                const slug = org.slug.toLowerCase();
-                const description = (org.description || '').toLowerCase();
-                const owner = (org.owner || '').toLowerCase();
-                return name.includes(query) || slug.includes(query) || description.includes(query) || owner.includes(query);
-            });
-        },
-        paginatedOrganizations() {
-            const start = (this.currentPage - 1) * this.itemsPerPage;
-            return this.filteredOrganizations.slice(start, start + this.itemsPerPage);
         }
     }
 }

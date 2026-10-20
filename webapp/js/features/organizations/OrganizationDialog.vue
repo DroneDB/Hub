@@ -1,26 +1,26 @@
 <template>
-    <Window v-bind:title="title" id="organizationDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('close')">
         <div class="org-dialog">
-            <form v-on:submit.prevent>
+            <form @submit.prevent>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Name</label>
                     <InputText ref="name"
-                        @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name"
-                        placeholder="Name" class="w-100" />
+                               v-model="org.name" placeholder="Name"
+                               class="w-100" @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Description</label>
-                    <Textarea v-model="org.description" placeholder="Description" rows="3" autoResize class="w-100" />
+                    <Textarea v-model="org.description" placeholder="Description" rows="3" auto-resize class="w-100" />
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-2">
-                    <Checkbox v-model="org.isPublic" :binary="true" inputId="orgPublic" />
+                    <Checkbox v-model="org.isPublic" :binary="true" input-id="orgPublic" />
                     <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" label="Close" />
-                <Button v-if="mode == 'new'" @click="close('create')" severity="primary" :disabled="!isValid()" label="Create" />
-                <Button v-else @click="close('save')" severity="primary" :disabled="!isValid()" label="Save" />
+                <Button severity="secondary" label="Close" @click="close('close')" />
+                <Button v-if="mode == 'new'" severity="primary" :disabled="!isValid()" label="Create" @click="close('create')" />
+                <Button v-else severity="primary" :disabled="!isValid()" label="Save" @click="close('save')" />
             </div>
         </div>
     </Window>

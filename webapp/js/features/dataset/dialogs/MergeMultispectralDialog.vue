@@ -1,21 +1,21 @@
 <template>
-    <Window title="Merge Multispectral Bands" id="merge-multispectral" @onClose="close" modal width="900px" height="auto" fixedPosition>
+    <Window id="merge-multispectral" title="Merge Multispectral Bands" modal width="900px" height="auto" fixed-position @on-close="close">
         <div class="merge-ms-dialog">
             <!-- 3-column layout -->
             <div class="columns-row">
                 <!-- Column 1: Band order -->
                 <div class="col-bands">
                     <label class="section-label">Band Order (drag to reorder)</label>
-                    <div class="band-list" ref="bandList">
+                    <div ref="bandList" class="band-list">
                         <div v-for="(item, index) in orderedFiles" :key="item.entry.path"
-                            class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
-                            draggable="true"
-                            @dragstart="onDragStart(index, $event)"
-                            @dragover.prevent="onDragOver(index)"
-                            @dragleave="onDragLeave"
-                            @drop.prevent="onDrop(index)"
-                            @dragend="onDragEnd">
-                            <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                             class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
+                             draggable="true"
+                             @dragstart="onDragStart(index, $event)"
+                             @dragover.prevent="onDragOver(index)"
+                             @dragleave="onDragLeave"
+                             @drop.prevent="onDrop(index)"
+                             @dragend="onDragEnd">
+                            <span class="drag-handle"><i class="fa-solid fa-grip-vertical" /></span>
                             <span class="band-index">{{ index + 1 }}.</span>
                             <span class="band-name" :title="item.entry.path">{{ item.label }}</span>
                             <span v-if="bandInfo[item.entry.path]" class="band-meta">
@@ -28,25 +28,25 @@
                 <!-- Column 2: Validation info -->
                 <div class="col-info">
                     <div v-if="validating" class="status-info">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Validating...
+                        <i class="fa-solid fa-spinner fa-spin" /> Validating...
                     </div>
 
                     <template v-if="validationResult">
                         <!-- Errors -->
                         <div v-if="validationResult.errors && validationResult.errors.length > 0" class="validation-errors">
                             <div v-for="(err, i) in validationResult.errors" :key="'e'+i" class="validation-msg error">
-                                <i class="fa-solid fa-circle-xmark"></i> {{ err }}
+                                <i class="fa-solid fa-circle-xmark" /> {{ err }}
                             </div>
                         </div>
                         <!-- Warnings (filtered to remove misalignment duplicates) -->
                         <div v-if="filteredWarnings.length > 0" class="validation-warnings">
                             <div v-for="(warn, i) in filteredWarnings" :key="'w'+i" class="validation-msg warning">
-                                <i class="fa-solid fa-triangle-exclamation"></i> {{ warn }}
+                                <i class="fa-solid fa-triangle-exclamation" /> {{ warn }}
                             </div>
                         </div>
                         <!-- Alignment banner -->
                         <div v-if="alignmentWarning" class="alignment-warning">
-                            <i class="fa-solid fa-circle-info"></i>
+                            <i class="fa-solid fa-circle-info" />
                             <div>
                                 <strong>Band misalignment detected</strong>
                                 <p>
@@ -59,7 +59,7 @@
                         </div>
                         <!-- Summary -->
                         <div v-if="validationResult.ok || (validationResult.errors && validationResult.errors.length === 0)" class="merge-summary">
-                            <div class="summary-row" v-if="validationResult.summary">
+                            <div v-if="validationResult.summary" class="summary-row">
                                 <div class="d-flex gap-3 flex-wrap">
                                     <div v-if="validationResult.summary.crs"><strong>CRS:</strong> {{ validationResult.summary.crs }}</div>
                                     <div><strong>Size:</strong> {{ validationResult.summary.width }}×{{ validationResult.summary.height }}</div>
@@ -72,8 +72,8 @@
                 </div>
 
                 <!-- Column 3: Preview -->
-                <div class="col-preview" v-if="previewUrl">
-                    <img :src="previewUrl" class="preview-thumb" alt="Merge preview" />
+                <div v-if="previewUrl" class="col-preview">
+                    <img :src="previewUrl" class="preview-thumb" alt="Merge preview">
                 </div>
             </div>
 
@@ -83,20 +83,20 @@
                     <div class="section">
                         <label class="section-label">Output path</label>
                         <InputText v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
-                            @input="validateOutputName" placeholder="merged.tif" />
+                                   placeholder="merged.tif" @input="validateOutputName" />
                         <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="deleteSource" :binary="true" inputId="deleteSrcCheckbox" />
+                        <Checkbox v-model="deleteSource" :binary="true" input-id="deleteSrcCheckbox" />
                         <label for="deleteSrcCheckbox">Delete source files after merge</label>
                     </div>
                     <div v-if="deleteSource" class="delete-warning">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Source files will be permanently deleted after merge.
+                        <i class="fa-solid fa-triangle-exclamation" /> Source files will be permanently deleted after merge.
                     </div>
                 </div>
                 <div class="bottom-actions">
-                    <Button @click="close" severity="secondary" label="Cancel" />
-                    <Button @click="merge" :disabled="!canMerge" severity="primary" label="Merge" />
+                    <Button severity="secondary" label="Cancel" @click="close" />
+                    <Button :disabled="!canMerge" severity="primary" label="Merge" @click="merge" />
                 </div>
             </div>
         </div>
@@ -177,6 +177,12 @@ export default {
     mounted() {
         this.generateOutputName();
         this.validate();
+    },
+
+    beforeUnmount() {
+        if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(this.previewUrl);
+        }
     },
 
     methods: {
@@ -336,12 +342,6 @@ export default {
                 URL.revokeObjectURL(this.previewUrl);
             }
             this.$emit('onClose', 'close');
-        }
-    },
-
-    beforeUnmount() {
-        if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(this.previewUrl);
         }
     }
 };

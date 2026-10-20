@@ -1,5 +1,5 @@
 <template>
-    <Window v-if="show" :title="title" id="fileAvailabilityDialog" @onClose="handleClose" modal sizeClass="dialog-lg" fixedSize>
+    <Window v-if="show" id="fileAvailabilityDialog" :title="title" modal size-class="dialog-lg" fixed-size @on-close="handleClose">
         <div class="file-availability-dialog">
             <div class="content">
                 <div class="description">
@@ -9,7 +9,7 @@
 
                     <!-- Progress indicator for build in progress -->
                     <div v-if="status === 'building' && waitingForBuild" class="build-progress">
-                        <div class="ui active inline loader small"></div>
+                        <div class="ui active inline loader small" />
                         <span class="ms-2">Waiting for build completion...</span>
                         <div class="progress-timer">{{ formatWaitTime() }}</div>
                     </div>
@@ -47,21 +47,21 @@
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button v-if="hasAction('close')" @click="handleClose" severity="secondary" label="Close" />
-                <Button v-if="hasAction('cancel')" @click="handleClose" severity="secondary" label="Cancel" />
-                <Button v-if="hasAction('details')" @click="toggleDetails"
-                    :label="showDetails ? 'Hide Details' : 'Show Details'" />
+                <Button v-if="hasAction('close')" severity="secondary" label="Close" @click="handleClose" />
+                <Button v-if="hasAction('cancel')" severity="secondary" label="Cancel" @click="handleClose" />
+                <Button v-if="hasAction('details')" :label="showDetails ? 'Hide Details' : 'Show Details'"
+                        @click="toggleDetails" />
                 <Button v-if="hasAction('start-build')" severity="info"
-                        @click="handleStartBuild" :disabled="processing"
-                        icon="fa-solid fa-play" label="Start Processing" />
+                        :disabled="processing" icon="fa-solid fa-play"
+                        label="Start Processing" @click="handleStartBuild" />
                 <Button v-if="hasAction('retry-build')" severity="warn"
-                        @click="handleRetryBuild" :disabled="processing"
-                        icon="fa-solid fa-rotate-right" label="Retry Processing" />
-                <Button v-if="hasAction('wait')" @click="handleClose" label="Wait" />
+                        :disabled="processing" icon="fa-solid fa-rotate-right"
+                        label="Retry Processing" @click="handleRetryBuild" />
+                <Button v-if="hasAction('wait')" label="Wait" @click="handleClose" />
                 <Button v-if="hasAction('wait-and-open')" severity="success"
-                        @click="handleWaitAndOpen" :disabled="waitingForBuild"
-                        icon="fa-solid fa-hourglass-half"
-                        :label="waitingForBuild ? 'Waiting...' : 'Wait and Open'" />
+                        :disabled="waitingForBuild" icon="fa-solid fa-hourglass-half"
+                        :label="waitingForBuild ? 'Waiting...' : 'Wait and Open'"
+                        @click="handleWaitAndOpen" />
             </div>
         </div>
     </Window>

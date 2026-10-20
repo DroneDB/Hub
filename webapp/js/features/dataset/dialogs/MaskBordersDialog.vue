@@ -1,21 +1,21 @@
 <template>
-    <Window title="Mask Borders" id="mask-borders-dialog" @onClose="close('cancel')" modal width="600px" height="auto" fixedPosition>
+    <Window id="mask-borders-dialog" title="Mask Borders" modal width="600px" height="auto" fixed-position @on-close="close('cancel')">
         <div class="mask-borders-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-3">
                 <div>
                     Makes the black or white border pixels of the GeoTIFF transparent, producing a clean
-                    orthomosaic without empty areas around the survey footprint. <br />The masked result is
-                    added to the dataset as a <em>new</em> COG file with the <i>_masked</i> suffix, the original file is never modified.<br />
+                    orthomosaic without empty areas around the survey footprint. <br>The masked result is
+                    added to the dataset as a <em>new</em> COG file with the <i>_masked</i> suffix, the original file is never modified.<br>
                     See the <a href="https://docs.dronedb.app/docs/features/georaster-processing#border-masking"
-                        target="_blank" rel="noopener">Border Masking documentation</a> for details.
+                               target="_blank" rel="noopener">Border Masking documentation</a> for details.
                 </div>
             </PrimeMessage>
 
             <!-- Source (read-only) -->
             <div class="section">
                 <label class="section-label" for="mask-borders-source">Source file</label>
-                <InputText id="mask-borders-source" :modelValue="entry.entry.path" readonly fluid class="w-100" />
+                <InputText id="mask-borders-source" :model-value="entry.entry.path" readonly fluid class="w-100" />
             </div>
 
             <!-- Actions -->

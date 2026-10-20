@@ -1,170 +1,166 @@
 <template>
     <div id="browser" class="cui app">
-        <Message bindTo="error" />
-        <Panel split="vertical" class="main" amount="23.6%" mobileAmount="0%" tabletAmount="30%"
-            mobileCollapsed>
+        <Message bind-to="error" />
+        <Panel split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%"
+               mobile-collapsed>
             <template #first>
-            <div class="sidebar">
-                <FileBrowser v-show="!isMobile" ref="fileBrowser" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
-                    @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
-                    @openProperties="handleFileBrowserOpenProperties"
-                    @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
-                    @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
-                    @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
-                    @setAsCover="setAsCover"
-                    @downloadItems="handleDownloadItems"
-                    @shareEmbed="handleShareEmbed"
-                    @createFolder="handleCreateFolder"
-                    @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
-                    @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
-            </div>
+                <div class="sidebar">
+                    <FileBrowser v-show="!isMobile" ref="fileBrowser" :root-nodes="rootNodes" :can-write="canWrite" :dataset="dataset" @open-item="handleOpenItem"
+                                 @selection-changed="handleFileSelectionChanged" @current-uri-changed="handleCurrentUriChanged"
+                                 @open-properties="handleFileBrowserOpenProperties"
+                                 @delete-selecteditems="openDeleteItemsDialogFromFileBrowser"
+                                 @move-selected-items="openRenameItemsDialogFromFileBrowser"
+                                 @transfer-selected-items="openTransferItemsDialogFromFileBrowser"
+                                 @set-as-cover="setAsCover"
+                                 @download-items="handleDownloadItems"
+                                 @share-embed="handleShareEmbed"
+                                 @create-folder="handleCreateFolder"
+                                 @select-all="handleSelectAll"
+                                 @open-as-text="handleOpenAsText" @error="handleError" @merge-multispectral="openMergeMultispectralDialog" @mask-borders="openMaskBordersDialog" @align-geo-raster="openAlignDialog" @extract-item="openExtractDialog" @set-crs="openSetCrsDialog"
+                                 @copy-selected-items="clipboardCopySelected" @cut-selected-items="clipboardCutSelected" @paste-from-clipboard="clipboardPaste" @download-build-artifact="handleDownloadBuildArtifact" />
+                </div>
             </template>
             <template #second>
-            <TabSwitcher :tabs="mainTabs" :selectedTab="startTab" position="top" buttonWidth="auto" :hideSingle="false"
-                ref="mainTabSwitcher" @tabChange="handleMainTabChange">
-                <template v-if="isMobile" v-slot:filebrowser>
-                    <FileBrowser ref="mobileFileBrowser" :rootNodes="rootNodes" :canWrite="canWrite" :dataset="dataset" @openItem="handleOpenItem"
-                        @selectionChanged="handleFileSelectionChanged" @currentUriChanged="handleCurrentUriChanged"
-                        @openProperties="handleFileBrowserOpenProperties"
-                        @deleteSelecteditems="openDeleteItemsDialogFromFileBrowser"
-                        @moveSelectedItems="openRenameItemsDialogFromFileBrowser"
-                        @transferSelectedItems="openTransferItemsDialogFromFileBrowser"
-                        @setAsCover="setAsCover"
-                        @downloadItems="handleDownloadItems"
-                        @shareEmbed="handleShareEmbed"
-                        @createFolder="handleCreateFolder"
-                        @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
-                        @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
-                </template>
-                <template v-slot:map>
-                    <Map v-if="openedTabs.map" ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :canWrite="canWrite" :canDelete="canDelete" @scrollTo="handleScrollTo"
-                        @openItem="handleOpenItem" @vue:mounted="handleLazyTabMounted('map')" />
-                </template>
-                <template v-slot:explorer>
-                    <!-- Grid View (Explorer) with optional Detail Panel -->
-                    <div v-if="viewMode === 'grid'" class="detail-layout">
-                        <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
-                            <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                                :dataset="dataset" :viewMode="viewMode" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
-                                @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
-                                @transferSelectedItems="openTransferItemsDialog"
-                                @setAsCover="setAsCover"
-                                @openProperties="handleExplorerOpenProperties"
-                                @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
-                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
+                <TabSwitcher ref="mainTabSwitcher" :tabs="mainTabs" :selected-tab="startTab" position="top" button-width="auto"
+                             :hide-single="false" @tab-change="handleMainTabChange">
+                    <template v-if="isMobile" #filebrowser>
+                        <FileBrowser ref="mobileFileBrowser" :root-nodes="rootNodes" :can-write="canWrite" :dataset="dataset" @open-item="handleOpenItem"
+                                     @selection-changed="handleFileSelectionChanged" @current-uri-changed="handleCurrentUriChanged"
+                                     @open-properties="handleFileBrowserOpenProperties"
+                                     @delete-selecteditems="openDeleteItemsDialogFromFileBrowser"
+                                     @move-selected-items="openRenameItemsDialogFromFileBrowser"
+                                     @transfer-selected-items="openTransferItemsDialogFromFileBrowser"
+                                     @set-as-cover="setAsCover"
+                                     @download-items="handleDownloadItems"
+                                     @share-embed="handleShareEmbed"
+                                     @create-folder="handleCreateFolder"
+                                     @select-all="handleSelectAll"
+                                     @open-as-text="handleOpenAsText" @error="handleError" @merge-multispectral="openMergeMultispectralDialog" @mask-borders="openMaskBordersDialog" @align-geo-raster="openAlignDialog" @extract-item="openExtractDialog" @set-crs="openSetCrsDialog"
+                                     @copy-selected-items="clipboardCopySelected" @cut-selected-items="clipboardCutSelected" @paste-from-clipboard="clipboardPaste" @download-build-artifact="handleDownloadBuildArtifact" />
+                    </template>
+                    <template #map>
+                        <Map v-if="openedTabs.map" ref="mapViewer" lazyload :files="fileBrowserFiles" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" @scroll-to="handleScrollTo"
+                             @open-item="handleOpenItem" @vue:mounted="handleLazyTabMounted('map')" />
+                    </template>
+                    <template #explorer>
+                        <!-- Grid View (Explorer) with optional Detail Panel -->
+                        <div v-if="viewMode === 'grid'" class="detail-layout">
+                            <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
+                                <Explorer ref="explorer" :files="fileBrowserFiles" :tools="explorerTools" :current-path="currentPath"
+                                          :dataset="dataset" :view-mode="viewMode" :can-write="canWrite" :is-loading-files="isLoadingFiles" @open-item="handleOpenItem" @create-folder="handleCreateFolder"
+                                          @delete-selecteditems="openDeleteItemsDialog" @move-selected-items="openRenameItemsDialog"
+                                          @transfer-selected-items="openTransferItemsDialog"
+                                          @set-as-cover="setAsCover"
+                                          @open-properties="handleExplorerOpenProperties"
+                                          @share-embed="handleShareEmbed" @download-items="handleDownloadItems" @build-started="handleBuildStarted" @build-error="handleBuildError"
+                                          @open-as-text="handleOpenAsText" @selection-changed="handleTableSelectionChanged" @merge-multispectral="openMergeMultispectralDialog" @mask-borders="openMaskBordersDialog" @align-geo-raster="openAlignDialog" @extract-item="openExtractDialog" @set-crs="openSetCrsDialog"
+                                          @copy-selected-items="clipboardCopySelected" @cut-selected-items="clipboardCutSelected" @paste-from-clipboard="clipboardPaste" @download-build-artifact="handleDownloadBuildArtifact" />
+                            </div>
+                            <div v-if="selectedDetailFile && !isMobile" class="detail-side">
+                                <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                                             @close="handleDetailPanelClose"
+                                             @open="handleDetailPanelOpen"
+                                             @share="handleDetailPanelShare"
+                                             @build-started="handleBuildStarted"
+                                             @build-error="handleBuildError" />
+                            </div>
                         </div>
-                        <div v-if="selectedDetailFile && !isMobile" class="detail-side">
-                            <DetailPanel :file="selectedDetailFile" :dataset="dataset"
-                                @close="handleDetailPanelClose"
-                                @open="handleDetailPanelOpen"
-                                @share="handleDetailPanelShare"
-                                @buildStarted="handleBuildStarted"
-                                @buildError="handleBuildError" />
-                        </div>
-                    </div>
 
-                    <!-- Table View with optional Detail Panel -->
-                    <div v-else class="detail-layout">
-                        <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
-                            <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :currentPath="currentPath"
-                                :dataset="dataset" :viewMode="viewMode" :expandedGrid="expandedGrid" :canWrite="canWrite" :isLoadingFiles="isLoadingFiles" @openItem="handleOpenItem" @createFolder="handleCreateFolder"
-                                @deleteSelecteditems="openDeleteItemsDialog" @moveSelectedItems="openRenameItemsDialog"
-                                @transferSelectedItems="openTransferItemsDialog"
-                                @setAsCover="setAsCover"
-                                @openProperties="handleExplorerOpenProperties"
-                                @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
-                                @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
+                        <!-- Table View with optional Detail Panel -->
+                        <div v-else class="detail-layout">
+                            <div class="detail-main" :class="{ 'with-detail': selectedDetailFile && !isMobile }">
+                                <TableView ref="tableview" :files="fileBrowserFiles" :tools="explorerTools" :current-path="currentPath"
+                                           :dataset="dataset" :view-mode="viewMode" :expanded-grid="expandedGrid" :can-write="canWrite" :is-loading-files="isLoadingFiles" @open-item="handleOpenItem" @create-folder="handleCreateFolder"
+                                           @delete-selecteditems="openDeleteItemsDialog" @move-selected-items="openRenameItemsDialog"
+                                           @transfer-selected-items="openTransferItemsDialog"
+                                           @set-as-cover="setAsCover"
+                                           @open-properties="handleExplorerOpenProperties"
+                                           @share-embed="handleShareEmbed" @download-items="handleDownloadItems" @build-started="handleBuildStarted" @build-error="handleBuildError"
+                                           @open-as-text="handleOpenAsText"
+                                           @selection-changed="handleTableSelectionChanged" @merge-multispectral="openMergeMultispectralDialog" @mask-borders="openMaskBordersDialog" @align-geo-raster="openAlignDialog" @extract-item="openExtractDialog" @set-crs="openSetCrsDialog"
+                                           @copy-selected-items="clipboardCopySelected" @cut-selected-items="clipboardCutSelected" @paste-from-clipboard="clipboardPaste" @download-build-artifact="handleDownloadBuildArtifact" />
+                            </div>
+                            <div v-if="selectedDetailFile && !isMobile" class="detail-side">
+                                <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                                             @close="handleDetailPanelClose"
+                                             @open="handleDetailPanelOpen"
+                                             @share="handleDetailPanelShare"
+                                             @build-started="handleBuildStarted"
+                                             @build-error="handleBuildError" />
+                            </div>
                         </div>
-                        <div v-if="selectedDetailFile && !isMobile" class="detail-side">
-                            <DetailPanel :file="selectedDetailFile" :dataset="dataset"
-                                @close="handleDetailPanelClose"
-                                @open="handleDetailPanelOpen"
-                                @share="handleDetailPanelShare"
-                                @buildStarted="handleBuildStarted"
-                                @buildError="handleBuildError" />
-                        </div>
-                    </div>
-                </template>
-                <template v-slot:tasks>
-                    <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :canWrite="canWrite" />
-                </template>
-                <template v-if="isMobile" v-slot:properties>
-                    <DetailPanel :file="selectedDetailFile" :dataset="dataset"
-                        @close="handleDetailPanelClose"
-                        @open="handleDetailPanelOpen"
-                        @share="handleDetailPanelShare"
-                        @buildStarted="handleBuildStarted"
-                        @buildError="handleBuildError" />
-                </template>
-            </TabSwitcher>
+                    </template>
+                    <template #tasks>
+                        <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :can-write="canWrite" />
+                    </template>
+                    <template v-if="isMobile" #properties>
+                        <DetailPanel :file="selectedDetailFile" :dataset="dataset"
+                                     @close="handleDetailPanelClose"
+                                     @open="handleDetailPanelOpen"
+                                     @share="handleDetailPanelShare"
+                                     @build-started="handleBuildStarted"
+                                     @build-error="handleBuildError" />
+                    </template>
+                </TabSwitcher>
             </template>
         </Panel>
-        <Properties v-if="showProperties" :files="contextMenuFiles" @onClose="handleCloseProperties" />
-        <SettingsDialog v-if="showSettings" :dataset="dataset" :canWrite="canWrite" @onClose="handleSettingsClose"
-            @addMarkdown="handleAddMarkdown" @rescanRequested="handleRescanRequested" />
-        <AddToDatasetDialog v-if="uploadDialogOpen" @onClose="handleAddClose" @importFromUrl="handleUploadImportFromUrl" :path="currentPath"
-            :organization="dataset.org" :dataset="dataset.ds" :filesToUpload="filesToUpload" :open="true">
-        </AddToDatasetDialog>
-        <DeleteDialog v-if="deleteDialogOpen" @onClose="handleDeleteClose" :files="contextMenuFiles"></DeleteDialog>
+        <Properties v-if="showProperties" :files="contextMenuFiles" @on-close="handleCloseProperties" />
+        <SettingsDialog v-if="showSettings" :dataset="dataset" :can-write="canWrite" @on-close="handleSettingsClose"
+                        @add-markdown="handleAddMarkdown" @rescan-requested="handleRescanRequested" />
+        <AddToDatasetDialog v-if="uploadDialogOpen" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"
+                            :files-to-upload="filesToUpload" :open="true" @on-close="handleAddClose" @import-from-url="handleUploadImportFromUrl" />
+        <DeleteDialog v-if="deleteDialogOpen" :files="contextMenuFiles" @on-close="handleDeleteClose" />
         <DeleteResultDialog v-if="deleteResultDialogOpen"
-            :deleted="deleteResultData.deleted"
-            :failed="deleteResultData.failed"
-            @onClose="handleDeleteResultClose">
-        </DeleteResultDialog>
+                            :deleted="deleteResultData.deleted"
+                            :failed="deleteResultData.failed"
+                            @on-close="handleDeleteResultClose" />
         <RescanResultDialog v-if="rescanResultDialogOpen"
-            :result="rescanResultData"
-            @onClose="handleRescanResultClose">
-        </RescanResultDialog>
+                            :result="rescanResultData"
+                            @on-close="handleRescanResultClose" />
         <RescanConfirmDialog v-if="rescanConfirmDialogOpen"
-            @onClose="handleRescanConfirmClose">
-        </RescanConfirmDialog>
+                             @on-close="handleRescanConfirmClose" />
         <BuildConfirmDialog v-if="buildConfirmDialogOpen"
-            @confirm="handleBuildConfirmOk"
-            @cancel="buildConfirmDialogOpen = false" />
+                            @confirm="handleBuildConfirmOk"
+                            @cancel="buildConfirmDialogOpen = false" />
         <ConfirmDialog v-if="setCoverDialogOpen"
-            title="Replace Dataset Cover"
-            message="A dataset cover already exists. Do you want to replace it? This action is irreversible."
-            confirmText="Replace"
-            confirmButtonClass="danger"
-            @onClose="handleSetCoverClose" />
-        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" @onClose="handleRenameClose" :file="fileToRename" :all-entries="fileBrowserFiles"></RenameDialog>
-        <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" @onClose="handleMergeMultispectralClose" :files="mergeMultispectralFiles" :dataset="dataset" />
-        <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
-        <MaskBordersDialog v-if="maskBordersDialogOpen" @onClose="handleMaskBordersDialogClose" :entry="maskBordersDialogEntry" />
-        <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
-        <SetCrsDialog v-if="setCrsDialogOpen" @onClose="handleSetCrsClose" :file="setCrsFile" :dataset="dataset" />
-        <ImportFromUrlDialog v-if="importUrlDialogOpen" @onClose="handleImportUrlClose"
-            :dataset="dataset" :initial-url="importUrlInitial" :initial-folder="currentPath || ''" />
+                       title="Replace Dataset Cover"
+                       message="A dataset cover already exists. Do you want to replace it? This action is irreversible."
+                       confirm-text="Replace"
+                       confirm-button-class="danger"
+                       @on-close="handleSetCoverClose" />
+        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" :file="fileToRename" :all-entries="fileBrowserFiles" @on-close="handleRenameClose" />
+        <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" :files="mergeMultispectralFiles" :dataset="dataset" @on-close="handleMergeMultispectralClose" />
+        <AlignDialog v-if="alignDialogOpen" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" @on-close="handleAlignClose" />
+        <MaskBordersDialog v-if="maskBordersDialogOpen" :entry="maskBordersDialogEntry" @on-close="handleMaskBordersDialogClose" />
+        <ExtractDialog v-if="extractDialogOpen" :file="extractFile" :dataset="dataset" @on-close="handleExtractClose" />
+        <SetCrsDialog v-if="setCrsDialogOpen" :file="setCrsFile" :dataset="dataset" @on-close="handleSetCrsClose" />
+        <ImportFromUrlDialog v-if="importUrlDialogOpen" :dataset="dataset"
+                             :initial-url="importUrlInitial" :initial-folder="currentPath || ''" @on-close="handleImportUrlClose" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
-            title="Mask Borders"
-            :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
-            confirmText="Overwrite"
-            confirmButtonClass="danger"
-            @onClose="handleMaskBordersConfirm" />
-        <NewFolderDialog v-if="createFolderDialogOpen" :busy="isBusy" @onClose="handleNewFolderClose"></NewFolderDialog>
-        <TransferDialog v-if="transferDialogOpen" @onClose="handleTransferClose" :files="contextMenuFiles"
-            :sourceOrg="dataset.org" :sourceDs="dataset.ds"></TransferDialog>
+                       title="Mask Borders"
+                       :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
+                       confirm-text="Overwrite"
+                       confirm-button-class="danger"
+                       @on-close="handleMaskBordersConfirm" />
+        <NewFolderDialog v-if="createFolderDialogOpen" :busy="isBusy" @on-close="handleNewFolderClose" />
+        <TransferDialog v-if="transferDialogOpen" :files="contextMenuFiles" :source-org="dataset.org"
+                        :source-ds="dataset.ds" @on-close="handleTransferClose" />
         <PasteConflictDialog v-if="pasteConflictDialogOpen"
-            :items="pasteConflictData ? pasteConflictData.items : []"
-            @resolve="handlePasteConflictResolve" />
+                             :items="pasteConflictData ? pasteConflictData.items : []"
+                             @resolve="handlePasteConflictResolve" />
         <PasteResultDialog v-if="pasteResultDialogOpen"
-            :mode="pasteResultData ? pasteResultData.mode : 'copy'"
-            :succeeded="pasteResultData ? pasteResultData.succeeded : []"
-            :failed="pasteResultData ? pasteResultData.failed : {}"
-            :skipped="pasteResultData ? pasteResultData.skipped : []"
-            @onClose="handlePasteResultClose" />
+                           :mode="pasteResultData ? pasteResultData.mode : 'copy'"
+                           :succeeded="pasteResultData ? pasteResultData.succeeded : []"
+                           :failed="pasteResultData ? pasteResultData.failed : {}"
+                           :skipped="pasteResultData ? pasteResultData.skipped : []"
+                           @on-close="handlePasteResultClose" />
         <ClipboardPanel v-if="dataset" />
-        <Alert :title="errorMessageTitle" v-if="errorDialogOpen" @onClose="handleErrorDialogClose">
+        <Alert v-if="errorDialogOpen" :title="errorMessageTitle" @on-close="handleErrorDialogClose">
             {{ errorMessage }}
         </Alert>
-        <Loader v-if="isBusy"></Loader>
+        <Loader v-if="isBusy" />
         <Toast position="bottom-left" />
-        <ShareEmbed v-if="shareFile" @onClose="handleCloseShareEmbed" :file="shareFile" />
+        <ShareEmbed v-if="shareFile" :file="shareFile" @on-close="handleCloseShareEmbed" />
         <FileAvailabilityDialog
             v-if="showAvailabilityDialog"
             :show="showAvailabilityDialog"
@@ -172,7 +168,7 @@
             :message="availabilityDialogData.message"
             :status="availabilityDialogData.status"
             :actions="availabilityDialogData.actions"
-            :buildState="availabilityDialogData.buildState"
+            :build-state="availabilityDialogData.buildState"
             :dataset="dataset"
             :entry="availabilityDialogData.entry"
             @close="handleAvailabilityDialogClose"
@@ -187,7 +183,7 @@
             :dataset="dataset"
             :entry="textEditorEntry"
             :readonly="textEditorReadonly"
-            @onClose="handleTextEditorClose"
+            @on-close="handleTextEditorClose"
             @saved="handleTextEditorSaved"
         />
         <PdfViewerDialog
@@ -202,28 +198,28 @@
             :toggler="lightboxToggler"
             :slide="lightboxSlide"
             :sources="lightboxSources"
-            :onOpen="handleLightboxOpen"
-            :onClose="handleLightboxClose"
-            :onShow="handleLightboxShow"
+            :on-open="handleLightboxOpen"
+            :on-close="handleLightboxClose"
+            :on-show="handleLightboxShow"
             type="image"
-            :loadOnlyCurrentSource="true"
+            :load-only-current-source="true"
         />
         <div v-if="lightboxOpen" class="lightbox-toolbar-extra">
-            <div class="lightbox-open-fullsize" @click="openLightboxDirectLink" title="Open in new tab">
-                <i class="fa-solid fa-up-right-from-square"></i>
+            <div class="lightbox-open-fullsize" title="Open in new tab" @click="openLightboxDirectLink">
+                <i class="fa-solid fa-up-right-from-square" />
             </div>
         </div>
         <div v-if="lightboxOpen && lightboxCurrentEntry" class="lightbox-info-overlay">
             <div class="lightbox-info-name">{{ lightboxCurrentEntry.name }}</div>
             <div v-if="lightboxCurrentEntry.coords" class="lightbox-info-coords">
-                <i class="fa-solid fa-location-dot me-1"></i>{{ lightboxCurrentEntry.coords }}
+                <i class="fa-solid fa-location-dot me-1" />{{ lightboxCurrentEntry.coords }}
             </div>
             <div v-if="lightboxCurrentEntry.altitude !== null" class="lightbox-info-altitude">
-                <i class="fa-solid fa-arrows-up-down me-1"></i>{{ lightboxCurrentEntry.altitude }} m
+                <i class="fa-solid fa-arrows-up-down me-1" />{{ lightboxCurrentEntry.altitude }} m
             </div>
         </div>
         <VideoLightbox v-if="videoLightboxVisible || videoLightboxSrc" :visible="videoLightboxVisible" :src="videoLightboxSrc" :entry="videoLightboxEntry"
-            @close="closeVideoLightbox" />
+                       @close="closeVideoLightbox" />
     </div>
 </template>
 
@@ -307,12 +303,6 @@ import { Features } from '@/libs/features';
  * build monitoring, settings, and all context-menu operations.
  */
 export default {
-    mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask, requestScopeMixin],
-    provide: function () {
-        return {
-            showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm)
-        };
-    },
     components: {
         
         Message,
@@ -354,6 +344,12 @@ export default {
         ImportFromUrlDialog,
         FsLightbox,
         VideoLightbox
+    },
+    mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask, requestScopeMixin],
+    provide: function () {
+        return {
+            showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm)
+        };
     },
     data: function () {
         const mobile = isMobile();
@@ -467,6 +463,80 @@ export default {
             renameDataset: renameDataset
         };
     },
+    computed: {
+        selectedFiles: function () {
+            return this.fileBrowserFiles.filter(f => f.selected);
+        },
+        contextMenuFiles: function () {
+            if (this.selectedUsingFileBrowserList) {
+                return this.fileBrowserFiles;
+            } else {
+                return this.selectedFiles;
+            }
+        },
+        // Dataset permissions from backend
+        datasetPermissions: function () {
+            // Get permissions from the root dataset entry
+            if (this.rootDatasetEntry &&
+                this.rootDatasetEntry.properties &&
+                this.rootDatasetEntry.properties.permissions) {
+                return this.rootDatasetEntry.properties.permissions;
+            }
+            // Default to no permissions if not available
+            return { canRead: false, canWrite: false, canDelete: false };
+        },
+        canRead: function () {
+            return this.datasetPermissions.canRead;
+        },
+        canWrite: function () {
+            return this.datasetPermissions.canWrite;
+        },
+        canDelete: function () {
+            return this.datasetPermissions.canDelete;
+        },
+        lightboxCurrentEntry: function () {
+            const idx = this.lightboxCurrentSlide - 1;
+            if (idx < 0 || idx >= this.lightboxEntries.length) return null;
+            const item = this.lightboxEntries[idx];
+            const name = pathutils.basename(item.path);
+            let coords = null;
+            let altitude = null;
+            if (item.entry && item.entry.point_geom) {
+                try {
+                    const c = coordAll(item.entry.point_geom)[0];
+                    if (c && c.length >= 2) {
+                        coords = `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`;
+                        if (c.length >= 3 && c[2] !== 0) {
+                            altitude = c[2].toFixed(1);
+                        }
+                    }
+                } catch { /* no geo data */ }
+            }
+            return { name, coords, altitude };
+        }
+    },
+    watch: {
+        viewMode: function() {
+            // When viewMode changes, rebuild explorerTools to show the correct icon
+            this.updateExplorerTools();
+
+            // The grid's thumbnails load as they become visible (HUB-03): nothing to trigger
+        },
+
+        fileBrowserFiles: {
+            deep: true,
+            handler: function () {
+                if (!this.$embed)
+                    emitter.emit('setSelectedFiles', this.selectedFiles);
+            }
+        },
+
+        selectedFiles: {
+            handler: function () {
+                this.updateExplorerTools();
+            }
+        }
+    },
     mounted: function () {
         document.getElementById("app").classList.add("fullpage");
         setTitle(this.$route.params.ds);
@@ -546,58 +616,6 @@ export default {
 
         // Cleanup BuildManager
         BuildManager.unregisterDataset(this.dataset);
-    },
-    computed: {
-        selectedFiles: function () {
-            return this.fileBrowserFiles.filter(f => f.selected);
-        },
-        contextMenuFiles: function () {
-            if (this.selectedUsingFileBrowserList) {
-                return this.fileBrowserFiles;
-            } else {
-                return this.selectedFiles;
-            }
-        },
-        // Dataset permissions from backend
-        datasetPermissions: function () {
-            // Get permissions from the root dataset entry
-            if (this.rootDatasetEntry &&
-                this.rootDatasetEntry.properties &&
-                this.rootDatasetEntry.properties.permissions) {
-                return this.rootDatasetEntry.properties.permissions;
-            }
-            // Default to no permissions if not available
-            return { canRead: false, canWrite: false, canDelete: false };
-        },
-        canRead: function () {
-            return this.datasetPermissions.canRead;
-        },
-        canWrite: function () {
-            return this.datasetPermissions.canWrite;
-        },
-        canDelete: function () {
-            return this.datasetPermissions.canDelete;
-        },
-        lightboxCurrentEntry: function () {
-            const idx = this.lightboxCurrentSlide - 1;
-            if (idx < 0 || idx >= this.lightboxEntries.length) return null;
-            const item = this.lightboxEntries[idx];
-            const name = pathutils.basename(item.path);
-            let coords = null;
-            let altitude = null;
-            if (item.entry && item.entry.point_geom) {
-                try {
-                    const c = coordAll(item.entry.point_geom)[0];
-                    if (c && c.length >= 2) {
-                        coords = `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`;
-                        if (c.length >= 3 && c[2] !== 0) {
-                            altitude = c[2].toFixed(1);
-                        }
-                    }
-                } catch { /* no geo data */ }
-            }
-            return { name, coords, altitude };
-        }
     },
     methods: {
         // Handle Delete key press to delete selected files
@@ -1476,28 +1494,6 @@ export default {
                         this.toggleViewMode();
                     }
                 });
-            }
-        }
-    },
-    watch: {
-        viewMode: function() {
-            // When viewMode changes, rebuild explorerTools to show the correct icon
-            this.updateExplorerTools();
-
-            // The grid's thumbnails load as they become visible (HUB-03): nothing to trigger
-        },
-
-        fileBrowserFiles: {
-            deep: true,
-            handler: function () {
-                if (!this.$embed)
-                    emitter.emit('setSelectedFiles', this.selectedFiles);
-            }
-        },
-
-        selectedFiles: {
-            handler: function () {
-                this.updateExplorerTools();
             }
         }
     }

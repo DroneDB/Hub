@@ -1,14 +1,14 @@
 <template>
-    <Window title="Align GeoTIFF to Reference" id="align-georaster" @onClose="close" modal width="600px" height="auto" fixedPosition>
+    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @on-close="close">
         <div class="align-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="align-info">
                 <div>
                     Aligns the source GeoTIFF to the selected reference by template matching, correcting
-                    georeferencing offsets (GPS drift, rotation, scale drift) between two surveys.<br />
-                    <strong>Similarity</strong> mode corrects translation, rotation and uniform scale; <br />
-                    <strong>Translation</strong> mode corrects position only and is faster for small offsets.<br />
-                    The aligned result is added to the dataset as a <em>new</em> GeoTIFF file with the <i>_aligned</i> suffix, the original source is never modified.<br />
+                    georeferencing offsets (GPS drift, rotation, scale drift) between two surveys.<br>
+                    <strong>Similarity</strong> mode corrects translation, rotation and uniform scale; <br>
+                    <strong>Translation</strong> mode corrects position only and is faster for small offsets.<br>
+                    The aligned result is added to the dataset as a <em>new</em> GeoTIFF file with the <i>_aligned</i> suffix, the original source is never modified.<br>
                     See the <a href="https://docs.dronedb.app/docs/features/raster-alignment" target="_blank" rel="noopener">Raster Alignment documentation</a> for details.
                 </div>
             </PrimeMessage>
@@ -16,14 +16,14 @@
             <!-- Source (read-only) -->
             <div class="section">
                 <label class="section-label">Source file</label>
-                <InputText :modelValue="sourceEntry.entry.path" readonly fluid class="w-100" />
+                <InputText :model-value="sourceEntry.entry.path" readonly fluid class="w-100" />
             </div>
 
             <!-- Reference picker -->
             <div class="section">
                 <label class="section-label">Reference GeoTIFF</label>
-                <Select v-model="selectedReference" :options="referenceOptions" optionLabel="label" optionValue="value"
-                    placeholder="Select reference..." class="w-100" fluid @change="onReferenceChange" />
+                <Select v-model="selectedReference" :options="referenceOptions" option-label="label" option-value="value"
+                        placeholder="Select reference..." class="w-100" fluid @change="onReferenceChange" />
                 <small v-if="referenceOptions.length === 0" class="hint-error">
                     No other GeoTIFF in this dataset to use as reference.
                 </small>
@@ -32,20 +32,20 @@
             <!-- Mode -->
             <div class="section">
                 <label class="section-label">Alignment mode</label>
-                <Select v-model="mode" :options="modeOptions" optionLabel="label" optionValue="value" class="w-100" fluid />
+                <Select v-model="mode" :options="modeOptions" option-label="label" option-value="value" class="w-100" fluid />
             </div>
 
             <!-- Output name -->
             <div class="section">
                 <label class="section-label">Output file name</label>
                 <InputText v-model="outputName" fluid class="w-100" :invalid="!isOutputValid"
-                    @input="validateOutputName" placeholder="aligned.tif" />
+                           placeholder="aligned.tif" @input="validateOutputName" />
                 <small v-if="outputNameError" class="hint-error">{{ outputNameError }}</small>
             </div>
 
             <!-- Validation result -->
             <div v-if="validating" class="status-info">
-                <i class="fa-solid fa-spinner fa-spin"></i> Validating...
+                <i class="fa-solid fa-spinner fa-spin" /> Validating...
             </div>
             <div v-else-if="validationResult">
                 <div v-if="!validationResult.ok" class="result-msg error">
@@ -62,7 +62,7 @@
 
             <!-- Align task progress -->
             <div v-if="alignTaskId" class="task-row" :class="alignTaskState">
-                <i :class="taskIcon(alignTaskState)"></i>
+                <i :class="taskIcon(alignTaskState)" />
                 <span class="task-label">Align</span>
                 <span class="task-phase">{{ alignPhase || alignTaskState }}</span>
                 <span v-if="alignPct !== null" class="task-pct">{{ alignPct }}%</span>
@@ -70,7 +70,7 @@
 
             <!-- Build task progress -->
             <div v-if="buildTaskId" class="task-row" :class="buildTaskState">
-                <i :class="taskIcon(buildTaskState)"></i>
+                <i :class="taskIcon(buildTaskState)" />
                 <span class="task-label">Build</span>
                 <span class="task-phase">{{ buildPhase || buildTaskState }}</span>
                 <span v-if="buildPct !== null" class="task-pct">{{ buildPct }}%</span>
@@ -92,9 +92,9 @@
             <!-- Actions -->
             <div class="actions">
                 <Button label="Validate" icon="fa-solid fa-check" severity="secondary"
-                    :disabled="!selectedReference || validating || running" @click="validate" />
+                        :disabled="!selectedReference || validating || running" @click="validate" />
                 <Button label="Align" icon="fa-solid fa-crosshairs" severity="primary"
-                    :disabled="!canAlign" @click="startAlign" />
+                        :disabled="!canAlign" @click="startAlign" />
                 <Button label="Close" severity="secondary" :disabled="running" @click="close" />
             </div>
         </div>

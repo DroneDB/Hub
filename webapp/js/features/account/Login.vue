@@ -13,19 +13,19 @@
                             <IconField>
                                 <InputIcon class="fa-solid fa-user" />
                                 <InputText v-model="username" placeholder="Username" autocomplete="off"
-                                    autocorrect="off" autocapitalize="none" @keyup.enter="login" fluid />
+                                           autocorrect="off" autocapitalize="none" fluid @keyup.enter="login" />
                             </IconField>
                             <IconField>
                                 <InputIcon class="fa-solid fa-key" />
                                 <Password v-model="password" placeholder="Password" :feedback="false"
-                                    toggleMask @keyup.enter="login" fluid inputClass="w-100" />
+                                          toggle-mask fluid input-class="w-100" @keyup.enter="login" />
                             </IconField>
-                            <Button label="Login" :loading="loggingIn" @click="login" severity="info" class="w-100" size="large" />
+                            <Button label="Login" :loading="loggingIn" severity="info" class="w-100" size="large" @click="login" />
                         </div>
                     </template>
                 </Card>
                 <div v-if="showRegistrationLink" style="margin-top:1rem">If you don't have an account, you can register for free on <a
-                        target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
+                    target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
             </div>
             <Message v-if="error" severity="error" :closable="false" class="login-error">{{ error }}</Message>
         </div>

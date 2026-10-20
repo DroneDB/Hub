@@ -1,12 +1,12 @@
 <template>
-    <Window title="Information" id="info" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="info" title="Information" modal max-width="70%" fixed-size @on-close="close('close')">
 
         {{ message }}
 
-        <br />
+        <br>
 
         <div class="text-end mt-3">
-            <Button @click="close('close')" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="close('close')" />
         </div>
     </Window>
 </template>

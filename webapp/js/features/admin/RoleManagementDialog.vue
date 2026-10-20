@@ -1,17 +1,17 @@
 <template>
-    <Window title="Role Management" id="roleManagementDialog" @onClose="close" modal maxWidth="60%" fixedSize>
+    <Window id="roleManagementDialog" title="Role Management" modal max-width="60%" fixed-size @on-close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message bind-to="error" />
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="view"><i class="fa-solid fa-eye me-1"></i>View Roles</Tab>
-                    <Tab value="add"><i class="fa-solid fa-plus me-1"></i>Add Role</Tab>
+                    <Tab value="view"><i class="fa-solid fa-eye me-1" />View Roles</Tab>
+                    <Tab value="add"><i class="fa-solid fa-plus me-1" />Add Role</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="view">
@@ -24,7 +24,7 @@
                         <div v-else class="role-list">
                             <div v-for="role in currentRoles" :key="role" class="role-item">
                                 <div class="role-info">
-                                    <i class="fa-solid fa-users"></i>
+                                    <i class="fa-solid fa-users" />
                                     <div>
                                         <div class="role-name">{{ role }}</div>
                                         <div class="role-description">
@@ -33,10 +33,10 @@
                                     </div>
                                 </div>
                                 <div class="role-actions">
-                                    <Button v-if="role !== 'Admin'" @click="deleteRole(role)"
-                                            severity="danger" size="small" :disabled="deletingRole === role"
-                                            icon="fa-solid fa-trash"
-                                            :label="deletingRole === role ? 'Deleting...' : 'Delete'" />
+                                    <Button v-if="role !== 'Admin'" severity="danger"
+                                            size="small" :disabled="deletingRole === role" icon="fa-solid fa-trash"
+                                            :label="deletingRole === role ? 'Deleting...' : 'Delete'"
+                                            @click="deleteRole(role)" />
                                     <Tag v-else severity="secondary" value="System Role" />
                                 </div>
                             </div>
@@ -44,36 +44,35 @@
                     </TabPanel>
                     <TabPanel value="add">
                         <h4>Add New Role</h4>
-                        <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
+                        <form class="form" :class="{ error: !!error }" @submit.prevent>
                             <div class="field">
                                 <label>Role Name</label>
-                                <InputText ref="txtRoleName" @keydown="clearError()" @keyup.enter="confirmAddRole()"
-                                       v-model="newRoleName" placeholder="Enter role name" class="w-full" />
+                                <InputText ref="txtRoleName" v-model="newRoleName" placeholder="Enter role name"
+                                           class="w-full" @keydown="clearError()" @keyup.enter="confirmAddRole()" />
                                 <small>Role names should be descriptive (e.g., "Editor", "Viewer", "Manager")</small>
                             </div>
                         </form>
                         <div class="add-role-actions">
-                            <Button @click="confirmAddRole()" :disabled="addingRole || !newRoleName.trim()"
-                                    :loading="addingRole" severity="primary" icon="fa-solid fa-plus" label="Add Role" />
+                            <Button :disabled="addingRole || !newRoleName.trim()" :loading="addingRole"
+                                    severity="primary" icon="fa-solid fa-plus" label="Add Role" @click="confirmAddRole()" />
                         </div>
                     </TabPanel>
                 </TabPanels>
             </Tabs>
 
             <div class="dialog-buttons">
-                <Button @click="close()" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="close()" />
             </div>
         </div>
 
         <!-- Delete Role Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
-            title="Delete Role"
-            :message="`Are you sure you want to delete the role <strong>${roleToDelete}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. Users with this role will lose associated permissions.`"
-            confirmText="Delete Role"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteDialogClose">
-        </ConfirmDialog>
+                       title="Delete Role"
+                       :message="`Are you sure you want to delete the role <strong>${roleToDelete}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. Users with this role will lose associated permissions.`"
+                       confirm-text="Delete Role"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @on-close="handleDeleteDialogClose" />
     </Window>
 </template>
 
@@ -118,19 +117,19 @@ export default {
             roleToDelete: null
         };
     },
-    mounted: function () {
-        this.$nextTick(() => {
-            if (this.activeTab === 'add') {
-                this.focusRoleInput();
-            }
-        });
-    },
     watch: {
         activeTab: function(newTab) {
             if (newTab === 'add') {
                 this.$nextTick(() => this.focusRoleInput());
             }
         }
+    },
+    mounted: function () {
+        this.$nextTick(() => {
+            if (this.activeTab === 'add') {
+                this.focusRoleInput();
+            }
+        });
     },
     methods: {
         focusRoleInput() {

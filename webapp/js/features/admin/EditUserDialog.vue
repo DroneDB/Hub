@@ -1,35 +1,35 @@
 <template>
-    <Window title="Edit User" id="editUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size @on-close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message bind-to="error" />
 
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+            <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Username</label>
                     <InputText v-model="editUser.userName" disabled class="w-100" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Email</label>
-                    <InputText @keydown="clearError()" @keyup.enter="confirmUpdate()"
-                           v-model="editUser.email" placeholder="user@example.com" class="w-100" />
+                    <InputText v-model="editUser.email" placeholder="user@example.com"
+                               class="w-100" @keydown="clearError()" @keyup.enter="confirmUpdate()" />
                     <div v-if="editUser.email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Roles</label>
-                    <MultiSelect v-model="editUser.roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
+                    <MultiSelect v-model="editUser.roles" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="updating" label="Cancel" />
-                <Button @click="confirmUpdate()" :disabled="updating || !isValid()" :loading="updating"
-                    severity="primary" label="Update User" />
+                <Button severity="secondary" :disabled="updating" label="Cancel" @click="close()" />
+                <Button :disabled="updating || !isValid()" :loading="updating" severity="primary"
+                        label="Update User" @click="confirmUpdate()" />
             </div>
         </div>
     </Window>

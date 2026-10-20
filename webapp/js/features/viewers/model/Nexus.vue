@@ -1,63 +1,63 @@
 <template>
     <div id="nexus">
-        <TabViewLoader @loaded="handleLoad" titleSuffix="Model" />
+        <TabViewLoader title-suffix="Model" @loaded="handleLoad" />
 
-        <Message bindTo="error" noDismiss />
+        <Message bind-to="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p>Loading model...</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
 
         <div class="container-wrapper">
-            <canvas ref="canvas"></canvas>
+            <canvas ref="canvas" />
 
             <!-- Settings gear button (bottom-left) -->
-            <button v-if="loaded" class="btn-settings" @click="toggleSettings" title="Lighting settings">
+            <button v-if="loaded" class="btn-settings" title="Lighting settings" @click="toggleSettings">
                 <i class="fa-solid fa-gear" />
             </button>
         </div>
 
         <!-- Lighting settings Window dialog -->
-        <Window v-if="showSettings" title="Lighting" id="nexus-lighting" @onClose="toggleSettings" fixedSize sizeClass="dialog-xs">
+        <Window v-if="showSettings" id="nexus-lighting" title="Lighting" fixed-size size-class="dialog-xs" @on-close="toggleSettings">
             <div class="lighting-content">
                 <div class="form-group">
                     <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100"
-                        type="range"
-                        v-model.number="ambientIntensity"
-                        min="0"
-                        max="3"
-                        step="0.1"
-                        @input="updateAmbient"
-                    /></div>
+                    <div><input v-model.number="ambientIntensity"
+                                class="w-100"
+                                type="range"
+                                min="0"
+                                max="3"
+                                step="0.1"
+                                @input="updateAmbient"
+                    ></div>
                 </div>
 
                 <div class="form-group">
                     <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
-                    <div><input class="w-100"
-                        type="range"
-                        v-model.number="directionalIntensity"
-                        min="0"
-                        max="3"
-                        step="0.1"
-                        @input="updateDirectional"
-                    /></div>
+                    <div><input v-model.number="directionalIntensity"
+                                class="w-100"
+                                type="range"
+                                min="0"
+                                max="3"
+                                step="0.1"
+                                @input="updateDirectional"
+                    ></div>
                 </div>
 
                 <div v-if="!modelInfo.hasTexture" class="form-group">
                     <div><label>Shininess: {{ shininess }}</label></div>
-                    <div><input class="w-100"
-                        type="range"
-                        v-model.number="shininess"
-                        min="0"
-                        max="100"
-                        step="5"
-                        @input="updateShininess"
-                    /></div>
+                    <div><input v-model.number="shininess"
+                                class="w-100"
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                @input="updateShininess"
+                    ></div>
                 </div>
 
-                <Button label="Reset" @click="resetDefaults" text />
-                <Button label="Close" severity="secondary" @click="toggleSettings" text />
+                <Button label="Reset" text @click="resetDefaults" />
+                <Button label="Close" severity="secondary" text @click="toggleSettings" />
             </div>
         </Window>
     </div>

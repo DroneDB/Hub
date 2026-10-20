@@ -3,15 +3,15 @@
         <!-- Array at root level: render each item as a sub-table -->
         <div v-if="Array.isArray(tObj)" class="props-array-list">
             <div v-for="(item, index) in tObj" :key="index">
-                <PropsTable :obj="item" :depth="depth" :maxDepth="maxDepth" :copyableValues="copyableValues" />
+                <PropsTable :obj="item" :depth="depth" :max-depth="maxDepth" :copyable-values="copyableValues" />
             </div>
         </div>
 
         <!-- Object: render as DataTable -->
         <DataTable v-else-if="tObj !== null && typeof tObj === 'object'"
-            :value="rows"
-            size="small"
-            class="props-datatable">
+                   :value="rows"
+                   size="small"
+                   class="props-datatable">
             <Column field="displayKey" header="Property" style="white-space: nowrap; width: 40%;" />
             <Column header="Value">
                 <template #body="{ data }">
@@ -30,29 +30,29 @@
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
                         <template v-else>{{ data.rawValue }}</template>
                         <Button v-if="copyableValues && copyableValues[data.key]"
-                            icon="fa-regular fa-copy"
-                            size="small"
-                            text
-                            class="copy-btn"
-                            title="Copy hash to clipboard"
-                            @click="copyValue(copyableValues[data.key])" />
+                                icon="fa-regular fa-copy"
+                                size="small"
+                                text
+                                class="copy-btn"
+                                title="Copy hash to clipboard"
+                                @click="copyValue(copyableValues[data.key])" />
                     </div>
                     <div v-else-if="typeof data.rawValue === 'number'">
                         {{ data.rawValue.toLocaleString() }}
                     </div>
                     <!-- Object/array beyond max depth: show drill-down button -->
                     <Button v-else-if="shouldCollapse(data.rawValue)"
-                        :label="collapsedLabel(data.rawValue)"
-                        icon="fa-solid fa-arrow-up-right-from-square"
-                        size="small"
-                        severity="secondary"
-                        style="cursor: pointer"
-                        @click="openDrillDown(data.displayKey, data.rawValue)" />
+                            :label="collapsedLabel(data.rawValue)"
+                            icon="fa-solid fa-arrow-up-right-from-square"
+                            size="small"
+                            severity="secondary"
+                            style="cursor: pointer"
+                            @click="openDrillDown(data.displayKey, data.rawValue)" />
                     <PropsTable v-else-if="data.rawValue !== null && data.rawValue !== undefined"
-                        :obj="data.rawValue"
-                        :depth="depth + 1"
-                        :maxDepth="maxDepth"
-                        :copyableValues="copyableValues" />
+                                :obj="data.rawValue"
+                                :depth="depth + 1"
+                                :max-depth="maxDepth"
+                                :copyable-values="copyableValues" />
                     <span v-else>-</span>
                 </template>
             </Column>
@@ -70,18 +70,18 @@
 
         <!-- Drill-down dialog: only mounted from the top-level instance to avoid stacking -->
         <Dialog v-if="depth === 0"
-            v-model:visible="drillDownVisible"
-            :header="drillDownTitle"
-            modal
-            dismissable-mask
-            :style="{ width: '75vw', maxWidth: '1100px' }"
-            :contentStyle="{ maxHeight: '75vh', overflow: 'auto' }">
+                v-model:visible="drillDownVisible"
+                :header="drillDownTitle"
+                modal
+                dismissable-mask
+                :style="{ width: '75vw', maxWidth: '1100px' }"
+                :content-style="{ maxHeight: '75vh', overflow: 'auto' }">
             <PropsTable v-if="drillDownVisible"
-                :obj="drillDownData"
-                :depth="0"
-                :maxDepth="Infinity"
-                :preserveOrder="preserveOrder"
-                :copyableValues="copyableValues" />
+                        :obj="drillDownData"
+                        :depth="0"
+                        :max-depth="Infinity"
+                        :preserve-order="preserveOrder"
+                        :copyable-values="copyableValues" />
         </Dialog>
     </div>
 </template>
@@ -114,6 +114,19 @@ export default {
         Dialog,
         PropsTable: () => import('./PropsTable.vue')
     },
+    // Root instance exposes a drill-down opener that any nested PropsTable can
+    // call via inject, regardless of how deep PrimeVue cells nest the tree.
+    provide() {
+        if (this.depth === 0) {
+            return {
+                propsTableOpenDrillDown: (title, value) => this.openDrillDownRoot(title, value)
+            };
+        }
+        return {};
+    },
+    inject: {
+        propsTableOpenDrillDown: { default: null }
+    },
     props: {
         obj: {
             required: true,
@@ -144,30 +157,6 @@ export default {
             drillDownData: null
         };
     },
-    // Root instance exposes a drill-down opener that any nested PropsTable can
-    // call via inject, regardless of how deep PrimeVue cells nest the tree.
-    provide() {
-        if (this.depth === 0) {
-            return {
-                propsTableOpenDrillDown: (title, value) => this.openDrillDownRoot(title, value)
-            };
-        }
-        return {};
-    },
-    inject: {
-        propsTableOpenDrillDown: { default: null }
-    },
-    created() {
-        this.processObject();
-    },
-    watch: {
-        obj: {
-            handler() {
-                this.processObject();
-            },
-            deep: true
-        }
-    },
     computed: {
         rows() {
             if (!this.tObj || typeof this.tObj !== 'object' || Array.isArray(this.tObj)) return [];
@@ -177,6 +166,17 @@ export default {
                 rawValue: val
             }));
         }
+    },
+    watch: {
+        obj: {
+            handler() {
+                this.processObject();
+            },
+            deep: true
+        }
+    },
+    created() {
+        this.processObject();
     },
     methods: {
         processObject() {

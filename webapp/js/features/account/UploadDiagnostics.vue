@@ -1,7 +1,7 @@
 <template>
-    <Card class="account-card" id="upload-diagnostics">
+    <Card id="upload-diagnostics" class="account-card">
         <template #content>
-            <h3><i class="fa-solid fa-stethoscope"></i> Upload diagnostics</h3>
+            <h3><i class="fa-solid fa-stethoscope" /> Upload diagnostics</h3>
             <p class="intro">
                 Sends 8 MB of random data to the Registry (discarded on arrival), first on one connection,
                 then on six at once, and shows what the connection to this server can carry.
@@ -34,8 +34,8 @@
             </Message>
             <p v-if="error" class="error">{{ error }}</p>
 
-            <Button @click="run" :loading="running" :disabled="running" severity="secondary" icon="fa-solid fa-gauge-high"
-                :label="result ? 'Run again' : 'Run test'" />
+            <Button :loading="running" :disabled="running" severity="secondary" icon="fa-solid fa-gauge-high" :label="result ? 'Run again' : 'Run test'"
+                    @click="run" />
         </template>
     </Card>
 </template>

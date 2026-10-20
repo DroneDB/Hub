@@ -4,21 +4,21 @@
         <div id="search-box">
             <IconField style="flex: 1; min-width: 0;">
                 <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" @keyup.enter="search()" placeholder="Search files" style="width: 100%;" />
+                <InputText v-model="filterRaw" placeholder="Search files" style="width: 100%;" @keyup.enter="search()" />
             </IconField>
-            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" v-on:click="clearSearch()">
-                <i class="fa-solid fa-xmark"></i>
+            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" @click="clearSearch()">
+                <i class="fa-solid fa-xmark" />
             </div>
             <Button
                 :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
                 :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
                 severity="secondary" text size="small"
-                @click="toggleSortDirection"
                 style="flex-shrink: 0;"
+                @click="toggleSortDirection"
             />
         </div>
-        <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
-            :getChildren="getChildren" :canWrite="canWrite" ref="treeView" />
+        <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
+                  :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
@@ -49,12 +49,11 @@ import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
 const { pathutils } = ddb;
 
 export default {
-    // Listings in flight are aborted when the browser goes away (HUB-06)
-    mixins: [requestScopeMixin],
     components: {
         TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    // Listings in flight are aborted when the browser goes away (HUB-06)
+    mixins: [requestScopeMixin],
     inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {
@@ -70,6 +69,7 @@ export default {
             default: null
         }
     },
+    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
         const self = this;

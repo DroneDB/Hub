@@ -1,11 +1,11 @@
 <template>
-    <Window title="Map Settings" id="map-settings" @onClose="close" modal sizeClass="dialog-sm" fixedSize>
+    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @on-close="close">
         <div class="map-settings-content">
             <div class="setting-row">
                 <label class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-map"></i> Basemap
+                    <i class="fa-solid fa-map" /> Basemap
                 </label>
-                <Select :modelValue="selectedBasemap" @update:modelValue="onBasemapChange" :options="basemapOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                <Select :model-value="selectedBasemap" :options="basemapOptions" option-label="label" option-value="value" class="setting-select" @update:model-value="onBasemapChange" />
             </div>
 
             <div v-if="selectedBasemap === 'custom'" class="custom-basemap-fields">
@@ -13,51 +13,51 @@
                     <label class="setting-label align-items-baseline">
                         Source Type
                     </label>
-                    <Select v-model="customSourceType" @change="onSourceTypeChanged" :options="sourceTypeOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                    <Select v-model="customSourceType" :options="sourceTypeOptions" option-label="label" option-value="value" class="setting-select" @change="onSourceTypeChanged" />
                 </div>
                 <div class="setting-row">
                     <label class="setting-label align-items-baseline">
                         URL
                     </label>
                     <InputText v-model="customUrl" class="setting-input"
-                        :placeholder="customSourceType === 'wms' ? 'https://example.com/wms' : 'https://example.com/{z}/{x}/{y}.png'"
-                        @input="onUrlChanged" />
+                               :placeholder="customSourceType === 'wms' ? 'https://example.com/wms' : 'https://example.com/{z}/{x}/{y}.png'"
+                               @input="onUrlChanged" />
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
                     <label class="setting-label align-items-baseline">
                         Layer
                     </label>
                     <div class="layer-select-wrapper">
-                        <Select v-model="customLayerName" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" optionLabel="label" optionValue="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
-                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" @click="fetchLayers" title="Fetch layers"
-                            :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'" text />
+                        <Select v-model="customLayerName" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" option-label="label" option-value="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
+                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" title="Fetch layers" :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'"
+                                text @click="fetchLayers" />
                     </div>
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
                     <label class="setting-label align-items-baseline">
                         Tile Size
                     </label>
-                    <Select v-model="customTileSize" :options="tileSizeOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                    <Select v-model="customTileSize" :options="tileSizeOptions" option-label="label" option-value="value" class="setting-select" />
                 </div>
                 <PrimeMessage v-if="customError" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
                     {{ customError }}
                 </PrimeMessage>
                 <div class="setting-row" style="justify-content: flex-end;">
-                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" @click="applyCustomConfig"
-                        :icon="customLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" :label="customLoading ? 'Checking...' : 'Apply'" />
+                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" :icon="customLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'"
+                            :label="customLoading ? 'Checking...' : 'Apply'" @click="applyCustomConfig" />
                 </div>
             </div>
 
             <div class="setting-row">
                 <label class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-pencil"></i> Measurement Units
+                    <i class="fa-solid fa-pencil" /> Measurement Units
                 </label>
-                <Select :modelValue="unitPref" @update:modelValue="onUnitsChange" :options="unitOptions" optionLabel="label" optionValue="value" class="setting-select ms-3" />
+                <Select :model-value="unitPref" :options="unitOptions" option-label="label" option-value="value" class="setting-select ms-3" @update:model-value="onUnitsChange" />
             </div>
 
         </div>
         <div class="d-flex justify-content-end mt-3" style="padding: 0 0.75rem;">
-            <Button @click="close" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="close" />
         </div>
     </Window>
 </template>

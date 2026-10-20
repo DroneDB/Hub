@@ -1,7 +1,7 @@
 <template>
-    <Window v-bind:title="title" id="datasetDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('close')">
         <div class="ds-dialog">
-            <form v-on:submit.prevent class="me-2" v-bind:class="{ error: !isValid() }">
+            <form class="me-2" :class="{ error: !isValid() }" @submit.prevent>
                 <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
                     This dataset name is already in use. It will generate a duplicate slug.
                 </PrimeMessage>
@@ -10,14 +10,14 @@
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="d-block mb-1 fw-semibold">Dataset Name</label>
-                            <InputText ref="name" @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')"
-                                v-model="ds.name" placeholder="Dataset Name" class="w-100" />
+                            <InputText ref="name" v-model="ds.name"
+                                       placeholder="Dataset Name" class="w-100" @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" />
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
                             <label class="d-block mb-1 fw-semibold">Visibility</label>
-                            <Select v-model="ds.visibility" :options="visibilityOptions" optionLabel="label" optionValue="value" placeholder="Select visibility" class="w-100" />
+                            <Select v-model="ds.visibility" :options="visibilityOptions" option-label="label" option-value="value" placeholder="Select visibility" class="w-100" />
                         </div>
                     </div>
                 </div>
@@ -30,21 +30,21 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Tagline</label>
                     <InputText v-model="ds.tagline" maxlength="256"
-                        placeholder="Brief description of your dataset (max 256 chars)" class="w-100" />
+                               placeholder="Brief description of your dataset (max 256 chars)" class="w-100" />
                     <small class="char-count">{{ ds.tagline ? ds.tagline.length : 0 }}/256</small>
                 </div>
 
             </form>
             <div v-if="mode == 'new'" class="mb-3">
                 <div class="d-flex align-items-center gap-2">
-                    <Checkbox v-model="openAfterCreate" :binary="true" inputId="openAfterCreate" />
+                    <Checkbox v-model="openAfterCreate" :binary="true" input-id="openAfterCreate" />
                     <label for="openAfterCreate">Open dataset after creation</label>
                 </div>
             </div>
             <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" label="Close" />
-                <Button v-if="mode == 'new'" @click="close('create')" severity="primary" :disabled="!isValid()" label="Create" />
-                <Button v-else @click="close('save')" severity="primary" :disabled="!isValid()" label="Save" />
+                <Button severity="secondary" label="Close" @click="close('close')" />
+                <Button v-if="mode == 'new'" severity="primary" :disabled="!isValid()" label="Create" @click="close('create')" />
+                <Button v-else severity="primary" :disabled="!isValid()" label="Save" @click="close('save')" />
             </div>
         </div>
     </Window>

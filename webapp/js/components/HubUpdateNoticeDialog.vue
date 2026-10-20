@@ -1,15 +1,15 @@
 <template>
     <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
             modal
             header="DroneDB Hub updated"
             :style="{ width: '480px' }"
             :draggable="false"
-            :closable="true">
+            :closable="true"
+            @update:visible="onVisibleChange">
 
         <div class="hub-update-body">
             <p>
-                <i class="fas fa-circle-check text-success me-2"></i>
+                <i class="fas fa-circle-check text-success me-2" />
                 <span v-if="notice && notice.from && notice.to">
                     DroneDB Hub has been updated from
                     <b>{{ notice.from }}</b> to <b>{{ notice.to }}</b>.
@@ -22,19 +22,19 @@
             <p class="mb-2">Component versions on this server:</p>
             <ul class="component-list">
                 <li v-if="hubVersion">
-                    <i class="fab fa-vuejs me-2"></i>
+                    <i class="fab fa-vuejs me-2" />
                     <a :href="hubReleaseUrl" target="_blank" rel="noopener">
                         Hub <b>{{ hubVersion }}</b>
                     </a>
                 </li>
                 <li v-if="registryVersion">
-                    <i class="fas fa-server me-2"></i>
+                    <i class="fas fa-server me-2" />
                     <a :href="registryReleaseUrl" target="_blank" rel="noopener">
                         Registry <b>{{ registryVersion }}</b>
                     </a>
                 </li>
                 <li v-if="ddbVersion">
-                    <i class="fas fa-database me-2"></i>
+                    <i class="fas fa-database me-2" />
                     <a :href="ddbReleaseUrl" target="_blank" rel="noopener">
                         DroneDB <b>{{ ddbVersion }}</b>
                     </a>
@@ -43,7 +43,7 @@
         </div>
 
         <template #footer>
-            <Button label="OK" icon="fas fa-check" @click="dismiss" autofocus />
+            <Button label="OK" icon="fas fa-check" autofocus @click="dismiss" />
         </template>
     </Dialog>
 </template>
@@ -86,11 +86,6 @@ export default {
             visible: !!this.notice
         };
     },
-    watch: {
-        notice(val) {
-            this.visible = !!val;
-        }
-    },
     computed: {
         hubReleaseUrl() {
             return this.hubVersion ? RELEASE_BASE.hub + this.hubVersion : '#';
@@ -100,6 +95,11 @@ export default {
         },
         ddbReleaseUrl() {
             return this.ddbVersion ? RELEASE_BASE.ddb + this.ddbVersion : '#';
+        }
+    },
+    watch: {
+        notice(val) {
+            this.visible = !!val;
         }
     },
     methods: {
