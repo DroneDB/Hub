@@ -8,7 +8,12 @@
     "build": "npx webpack",
     "build:prod": "cross-env NODE_ENV=production npx webpack",
     "pub-dev": "node scripts/pub-dev.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest run",
+    "build:stats": "cross-env NODE_ENV=production npx webpack --json=stats.json",
+    "check:bundle": "node scripts/check_bundle_budget.mjs stats.json build",
+    "check:listeners": "node scripts/audit_listeners.mjs",
+    "lint": "eslint .",
+    "lint:ratchet": "node scripts/lint_ratchet.mjs"
   },
   "repository": {
     "type": "git",
@@ -71,11 +76,13 @@
     "@babel/plugin-transform-optional-chaining": "^7.27.1",
     "@babel/plugin-transform-private-methods": "^7.27.1",
     "@babel/plugin-transform-private-property-in-object": "^7.27.1",
+    "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^5.0.0",
     "compression-webpack-plugin": "^12.0.0",
     "cross-env": "^10.1.0",
     "eslint": "^10.5.0",
     "eslint-plugin-vue": "^10.9.2",
+    "globals": "^17.13.0",
     "happy-dom": "^17.0.0",
     "html-webpack-plugin": "^5.6.6",
     "jsdom": "^26.0.0",
