@@ -135,9 +135,6 @@ const definition = {
         async openStockpileVolume(file) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path || !this.dataset) return;
-            // Mutually-exclusive panels: ensure other analysis panels are closed.
-            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
-            if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
 
             this.rasterFilePath = path;
             this.stockpilePanelVisible = true;

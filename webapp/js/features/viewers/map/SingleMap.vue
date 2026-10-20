@@ -1,23 +1,23 @@
 <template>
     <div class="single-map">
         <TabViewLoader title-suffix="Map" @loaded="onLoaded" />
-        <MapViewer v-if="files.length" :files="files" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" standalone />
+        <MapCore v-if="files.length" :files="files" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" standalone />
     </div>
 </template>
 
 <script>
 /**
  * SingleMap - the map of one file (route /r/:org/:ds/view/:encodedPath/map).
- * The map itself is MapViewer (Map.vue) in standalone mode (HQ-07): this view only
+ * The map itself is MapCore in standalone mode (HQ-07): this view only
  * loads the entry and its permissions.
  */
 import ddb from 'ddb';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
-import MapViewer from './Map.vue';
+import MapCore from './MapCore.vue';
 
 export default {
     name: 'SingleMap',
-    components: { TabViewLoader, MapViewer },
+    components: { TabViewLoader, MapCore },
     props: {
         uri: { type: String, default: null }
     },

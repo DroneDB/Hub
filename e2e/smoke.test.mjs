@@ -204,6 +204,16 @@ test('dataset Map tab renders and measures', async () => {
     await measureLength();
 });
 
+test('dataset page: Plant Health from the context menu opens the Map tab with the panel', async () => {
+    await page.click('text=Files');
+    const name = path.basename(FILES.raster);
+    await page.click(`#explorer >> text=${name}`, { button: 'right' });
+    await page.click('.p-contextmenu >> text=Plant Health');
+    await page.waitForSelector('.plant-health-panel', { timeout: 15000 });
+    await page.click('.plant-health-panel button[title="Close"]');
+    await page.waitForSelector('.plant-health-panel', { state: 'hidden', timeout: 10000 });
+});
+
 test('dataset Map tab: split compare and the display toggles', async () => {
     // Root holds the orthophoto, the DEM and the point cloud: three georasters
     const compare = 'button[aria-label="Compare georasters side by side"]';

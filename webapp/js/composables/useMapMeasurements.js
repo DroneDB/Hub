@@ -1,15 +1,15 @@
 /**
- * Mixin for measurement management (save, export, delete, clear).
- * Shared between Map.vue and SingleMap.vue.
+ * The map's measurements: where they are saved (the first georaster / point cloud on
+ * show, else the folder's measurements.geojson), load, save, export, delete, clear,
+ * the measurement list, groups and the units change.
  *
- * The consuming component must provide:
- *   - this.measureControls   (MeasureControls instance)
- *   - this.canWrite          (boolean)
- *   - this.canDelete         (boolean)
- *   - this.getActiveMeasurementEntry()  → the entry whose path is used for export/save
- *   - this.initMeasurementStorage()     → (re)initialize this.measurementStorage if needed
+ * Externals: measureControls, files, dataset, canWrite, canDelete, currentUnitPref,
+ * showAlert, showFlash.
  */
+import ddb from 'ddb';
 import { newId } from '@/libs/ids';
+import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
 
@@ -18,7 +18,16 @@ const definition = {
         return {
             measuring: false,
             measurementStorage: null,
+            // The entry the measurements belong to (its storage path is derived from it)
+            activeMeasurementEntry: null,
             hasSavedMeasurements: false,
+            // Group create/rename dialog
+            measurementGroupDialogOpen: false,
+            pendingGroupForRename: null,
+            // Units change confirmation (with measurements on the map)
+            changeUnitsDialogOpen: false,
+            changeUnitsTargetUnit: 'metric',
+            changeUnitsMeasurementsCount: 0,
             clearMeasurementsDialogOpen: false,
             deleteSavedMeasurementsDialogOpen: false,
             // Measurement groups (array of { id, name, color, visible, collapsed })
@@ -35,6 +44,118 @@ const definition = {
         };
     },
     methods: {
+        /**
+         * Creates the measure control (into the `measureControls` external), wired to this
+         * feature's save/clear/export/delete/list actions.
+         * @param {{ openDialog: Function, onToolSelected?: Function, onFeatureRemoved?: Function }} host
+         */
+        createMeasureControls({ openDialog, onToolSelected = () => {}, onFeatureRemoved = () => {} }) {
+            this.measureControls = new MeasureControls({
+                openDialog,
+                onToolSelected: () => { this.measuring = true; onToolSelected(); },
+                onToolDeselected: () => { this.measuring = false; },
+                onSave: () => { this.saveMeasurements(); },
+                onClearAll: () => { this.onClearAllMeasurements(); },
+                onExport: () => { this.exportMeasurementsToFile(); },
+                onDeleteSaved: () => { this.deleteSavedMeasurements(); },
+                onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
+                onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
+                onListOpen: () => { this.openMeasurementListDialog(); },
+                onMeasurementDeleted: feature => {
+                    if (!feature) return;
+                    const id = feature.get && feature.get('id');
+                    if (id) this.deletedMeasurementIds.add(id);
+                    onFeatureRemoved(feature);
+                },
+                canWrite: this.canWrite,
+                canDelete: this.canDelete
+            });
+            return this.measureControls;
+        },
+
+        // measurements.geojson in the folder on show (the measurements of a view without rasters)
+        standaloneMeasurementEntry() {
+            const first = this.files.find(f => f.entry && f.entry.path);
+            const folder = first ? ddb.pathutils.getParentFolder(first.entry.path) || '' : '';
+            return { path: folder ? `${folder}/measurements.geojson` : 'measurements.geojson' };
+        },
+
+        /**
+         * Loads the saved measurements: those of the first georaster / point cloud on show,
+         * else the folder's measurements.geojson.
+         */
+        async loadSavedMeasurements() {
+            if (!this.dataset || !this.measureControls) return;
+            const T = ddb.entry.type;
+            const anchor = this.files.find(f => f.entry && (f.entry.type === T.GEORASTER || f.entry.type === T.POINTCLOUD));
+            this.activeMeasurementEntry = anchor ? anchor.entry : this.standaloneMeasurementEntry();
+            this.measurementStorage = new MeasurementStorage(this.dataset, this.activeMeasurementEntry);
+
+            let geojson = null;
+            try {
+                geojson = await this.measurementStorage.load();
+            } catch (e) {
+                if (anchor) console.error('Error loading measurements:', e);
+            }
+            this.hasSavedMeasurements = !!(geojson && geojson.features && geojson.features.length);
+            if (this.hasSavedMeasurements) {
+                const result = this.measureControls.importFromGeoJSON(geojson);
+                if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
+                this.measureControls.updateButtonsVisibility(true, true);
+            } else if (!anchor) {
+                // No standalone file yet: initMeasurementStorage creates it on the first save
+                this.activeMeasurementEntry = null;
+                this.measurementStorage = null;
+            }
+        },
+
+        // (Re)creates the storage, with the folder's file as the fallback
+        async initMeasurementStorage() {
+            await this.loadSavedMeasurements();
+            if (!this.measurementStorage && this.dataset) {
+                this.activeMeasurementEntry = this.standaloneMeasurementEntry();
+                this.measurementStorage = new MeasurementStorage(this.dataset, this.activeMeasurementEntry);
+            }
+        },
+
+        // Units from the settings dialog: confirm first when measurements are on the map
+        handleUnitsChanged(newUnit) {
+            if (this.measureControls && this.measureControls.hasMeasurements()) {
+                this.changeUnitsTargetUnit = newUnit;
+                this.changeUnitsMeasurementsCount = this.measureControls.getMeasurementsCount();
+                this.changeUnitsDialogOpen = true;
+            } else {
+                this.measureControls.applyUnitsChange(newUnit);
+                this.currentUnitPref = newUnit;
+            }
+        },
+
+        async handleChangeUnitsDialogClose(result) {
+            this.changeUnitsDialogOpen = false;
+            if (result !== 'confirm') return;
+            this.measureControls.applyUnitsChange(this.changeUnitsTargetUnit);
+            this.currentUnitPref = this.changeUnitsTargetUnit;
+            // Save the measurements in the new units
+            await this.saveMeasurements();
+        },
+
+        openCreateGroupDialog() {
+            this.pendingGroupForRename = null;
+            this.measurementGroupDialogOpen = true;
+        },
+
+        openRenameGroupDialog(group) {
+            this.pendingGroupForRename = group;
+            this.measurementGroupDialogOpen = true;
+        },
+
+        handleGroupDialogSave(groupData) {
+            if (this.pendingGroupForRename) this.renameGroup(this.pendingGroupForRename, groupData);
+            else this.createGroup(groupData);
+            this.pendingGroupForRename = null;
+            this.measurementGroupDialogOpen = false;
+        },
+
         /**
          * Handle clear all measurements
          */
@@ -74,7 +195,7 @@ const definition = {
                 }
             }
 
-            const activeEntry = this.getActiveMeasurementEntry();
+            const activeEntry = this.activeMeasurementEntry;
             if (!activeEntry) {
                 this.showAlert('Error', 'Cannot save: no entry found');
                 return;
@@ -111,7 +232,7 @@ const definition = {
          * Export measurements to file
          */
         exportMeasurementsToFile() {
-            const activeEntry = this.getActiveMeasurementEntry();
+            const activeEntry = this.activeMeasurementEntry;
             if (!this.measureControls || !activeEntry) return;
 
             if (!this.measureControls.hasMeasurements()) {

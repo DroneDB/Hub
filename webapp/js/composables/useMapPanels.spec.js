@@ -19,4 +19,14 @@ describe('useMapPanels', () => {
         toggle('b');
         expect(b.state.entry).toBeNull();
     });
+
+    it('opens with every argument and closes the others', () => {
+        const a = panel(), b = panel();
+        const seen = [];
+        const { open } = useMapPanels({ a, b: { ...b, open: (...args) => { seen.push(args); b.open(args[0]); } } });
+        open('a', 'x');
+        open('b', 'y', { opt: 1 });
+        expect(a.state.entry).toBeNull();
+        expect(seen).toEqual([['y', { opt: 1 }]]);
+    });
 });

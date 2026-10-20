@@ -9,29 +9,35 @@
  *       plantHealth: { visible: () => ..., open: e => ..., close: () => ... },
  *       rasterAnalysis: { ... }, stockpile: { ... }
  *   });
+ *   panels.open('plantHealth', file, options);   // closes the others first
  *   panels.toggle('rasterAnalysis', entry);
  */
 
 /**
- * @typedef {{ visible: () => boolean, open: (entry: any) => void, close: () => void }} Panel
+ * @typedef {{ visible: () => boolean, open: (...args: any[]) => void, close: () => void }} Panel
  * @param {Record<string, Panel>} panels
  */
 export function useMapPanels(panels) {
     /**
-     * Closes `kind` when open; else closes the others and opens it for `entry`.
+     * Closes the other panels and opens `kind` with `args`.
      * @param {string} kind
-     * @param {any} entry
+     * @param {...any} args
      */
-    function toggle(kind, entry) {
-        const panel = panels[kind];
-        if (panel.visible()) {
-            panel.close();
-            return;
-        }
+    function open(kind, ...args) {
         for (const [name, other] of Object.entries(panels)) {
             if (name !== kind && other.visible()) other.close();
         }
-        panel.open(entry);
+        return panels[kind].open(...args);
     }
-    return { toggle };
+
+    /**
+     * Closes `kind` when open, else opens it (closing the others).
+     * @param {string} kind
+     * @param {...any} args
+     */
+    function toggle(kind, ...args) {
+        if (panels[kind].visible()) panels[kind].close();
+        else open(kind, ...args);
+    }
+    return { open, toggle };
 }

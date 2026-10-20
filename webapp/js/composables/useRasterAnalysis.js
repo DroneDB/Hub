@@ -77,9 +77,6 @@ const definition = {
         openRasterAnalysis(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path) return;
-            // Mutually-exclusive analysis panels.
-            if (typeof this.closeStockpileVolume === 'function') this.closeStockpileVolume();
-            if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
             this.rasterFilePath = path;
             this.rasterPanelVisible = true;
             // Restore previously-applied viz params for this file so the
