@@ -11,7 +11,8 @@ let contextMenus = [];
 /**
  * ContextMenu - Right-click context menu backed by PrimeVue ContextMenu.
  *
- * Manages a global stack so only one menu is visible at a time.
+ * Opens on right clicks inside the element it is placed in. Manages a global stack so
+ * only one menu is visible at a time.
  * Closes on Escape via the Keyboard utility.
  *
  * Props:
@@ -47,13 +48,15 @@ export default {
     },
 
     mounted: function () {
-        this.$parent.$el.addEventListener('contextmenu', this.openContextMenu, false);
+        // The menu opens on right clicks in the element it is placed in (the host's root)
+        this._target = this.$el.parentElement;
+        this._target.addEventListener('contextmenu', this.openContextMenu, false);
         Keyboard.onKeyDown(this.handleKeyDown);
         contextMenus.push(this);
     },
 
     beforeUnmount: function () {
-        this.$parent.$el.removeEventListener('contextmenu', this.openContextMenu);
+        this._target.removeEventListener('contextmenu', this.openContextMenu);
         Keyboard.offKeyDown(this.handleKeyDown);
         contextMenus = contextMenus.filter(cm => cm !== this);
     },

@@ -1,56 +1,26 @@
 <template>
-    <div class="single-map">
-        <TabViewLoader title-suffix="Map" @loaded="onLoaded" />
+    <ViewerShell v-model:error="error" class="single-map" :loading="loading">
         <MapCore v-if="files.length" :files="files" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" standalone />
-    </div>
+    </ViewerShell>
 </template>
 
-<script>
+<script setup>
 /**
- * SingleMap - the map of one file (route /r/:org/:ds/view/:encodedPath/map).
- * The map itself is MapCore in standalone mode (HQ-07): this view only
- * loads the entry and its permissions.
+ * SingleMap - the map of one file (route /r/:org/:ds/view/:encodedPath/map): MapCore in
+ * standalone mode (HQ-07) on the viewer shell (HQ-08).
  */
+import { computed } from 'vue';
 import ddb from 'ddb';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
+import ViewerShell from '@/components/ViewerShell.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
 import MapCore from './MapCore.vue';
 
-export default {
-    name: 'SingleMap',
-    components: { TabViewLoader, MapCore },
-    props: {
-        uri: { type: String, default: null }
-    },
-    data: function () {
-        return {
-            // Filled by TabViewLoader
-            ddbURI: null,
-            entry: null,
-            dataset: null,
-            canWrite: false,
-            canDelete: false,
-            canRead: false,
-            files: []
-        };
-    },
-    methods: {
-        onLoaded: function () {
-            this.files = [{
-                path: this.ddbURI,
-                entry: this.entry,
-                label: ddb.pathutils.basename(this.entry.path),
-                selected: false
-            }];
-        }
-    }
-};
-</script>
+const { entry, dataset, ddbURI, canWrite, canDelete, loading, error } = useViewerEntry({ title: 'Map' });
 
-<style scoped>
-.single-map {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-</style>
+const files = computed(() => entry.value ? [{
+    path: ddbURI.value,
+    entry: entry.value,
+    label: ddb.pathutils.basename(entry.value.path),
+    selected: false
+}] : []);
+</script>

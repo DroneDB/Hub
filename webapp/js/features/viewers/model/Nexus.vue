@@ -1,401 +1,164 @@
 <template>
-    <div id="nexus">
-        <TabViewLoader title-suffix="Model" @loaded="handleLoad" />
-
-        <Message v-model="error" no-dismiss />
-        <div v-if="loading" class="loading">
-            <p>Loading model...</p>
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
-
-        <div class="container-wrapper">
-            <canvas ref="canvas" />
-
-            <!-- Settings gear button (bottom-left) -->
-            <button v-if="loaded" class="btn-settings" title="Lighting settings" @click="toggleSettings">
-                <i class="fa-solid fa-gear" />
-            </button>
-        </div>
-
-        <!-- Lighting settings Window dialog -->
-        <Window v-if="showSettings" id="nexus-lighting" title="Lighting" fixed-size size-class="dialog-xs" @on-close="toggleSettings">
-            <div class="lighting-content">
-                <div class="form-group">
-                    <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
-                    <div><input v-model.number="ambientIntensity"
-                                class="w-100"
-                                type="range"
-                                min="0"
-                                max="3"
-                                step="0.1"
-                                @input="updateAmbient"
-                    ></div>
-                </div>
-
-                <div class="form-group">
-                    <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
-                    <div><input v-model.number="directionalIntensity"
-                                class="w-100"
-                                type="range"
-                                min="0"
-                                max="3"
-                                step="0.1"
-                                @input="updateDirectional"
-                    ></div>
-                </div>
-
-                <div v-if="!modelInfo.hasTexture" class="form-group">
-                    <div><label>Shininess: {{ shininess }}</label></div>
-                    <div><input v-model.number="shininess"
-                                class="w-100"
-                                type="range"
-                                min="0"
-                                max="100"
-                                step="5"
-                                @input="updateShininess"
-                    ></div>
-                </div>
-
-                <Button label="Reset" text @click="resetDefaults" />
-                <Button label="Close" severity="secondary" text @click="toggleSettings" />
-            </div>
-        </Window>
-    </div>
+    <ViewerShell id="nexus" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
+                 loading-text="Loading model..." :ready="loaded" settings-button="bottom-left" settings-title="Lighting"
+                 settings-id="nexus-lighting">
+        <canvas ref="canvas" />
+        <template #settings>
+            <RangeSetting v-model="settings.ambientIntensity" label="Ambient" :max="3" />
+            <RangeSetting v-model="settings.directionalIntensity" label="Directional" :max="3" />
+            <RangeSetting v-if="!modelInfo.hasTexture" v-model="settings.shininess" label="Shininess" :max="100" :step="5"
+                          :format="v => String(v)" />
+            <Button label="Reset" text @click="resetSettings" />
+            <Button label="Close" severity="secondary" text @click="showSettings = false" />
+        </template>
+    </ViewerShell>
 </template>
 
-<script>
-import ddb from 'ddb';
-import Message from '@/components/Message';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
-import Window from '@/components/Window.vue';
+<script setup>
+/**
+ * NexusViewer - a Nexus (.nxz) multiresolution model with arcball controls and MeshLab-style
+ * lighting (HQ-08: on ViewerShell, useViewerEntry and useViewerSettings).
+ */
+import { ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';
+import ddb from 'ddb';
+import ViewerShell from '@/components/ViewerShell.vue';
+import RangeSetting from '@/components/RangeSetting.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
+import { useViewerSettings } from '@/composables/useViewerSettings';
 import { loadResources } from '@/libs/lazy';
-import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
+import { PREF } from '@/libs/preferences';
 
+defineOptions({ name: 'NexusViewer' });
 
-function loadSettings() {
-    return getPref(PREF.NEXUS_LIGHTING, null);
+const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({
+    types: [ddb.entry.type.MODEL], typeLabel: 'a 3D model', title: 'Model'
+});
+const { settings, resetSettings } = useViewerSettings(PREF.NEXUS_LIGHTING, {
+    ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25
+});
+
+const canvas = ref(null);
+const loaded = ref(false);
+const showSettings = ref(false);
+const modelInfo = reactive({ hasTexture: false, hasColors: false, hasNormals: false });
+
+// three.js objects (not reactive)
+let lights = null;
+let material = null;
+let renderer = null;
+let controls = null;
+let frame = 0;
+let disposed = false;
+
+function applyLighting() {
+    if (!lights) return;
+    lights.ambient.intensity = settings.ambientIntensity;
+    lights.key.intensity = settings.directionalIntensity;
+    lights.back.intensity = settings.directionalIntensity;
+    material.shininess = settings.shininess;
+    material.needsUpdate = true;
+}
+watch(settings, applyLighting, { deep: true });
+
+async function loadNexus() {
+    if (typeof THREE === 'undefined') throw new Error('Error loading THREE.js library');
+    if (typeof NexusObject === 'undefined') throw new Error('Error loading Nexus library');
+
+    const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
+    camera.position.z = 4.0;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+    scene.fog = new THREE.Fog(0x1a1a2e, 2000, 3500);
+
+    lights = {
+        ambient: new THREE.AmbientLight(0xffffff, settings.ambientIntensity),
+        // Natural sky/ground fill
+        hemisphere: new THREE.HemisphereLight(0xffffff, 0x444444, 0.4),
+        key: new THREE.DirectionalLight(0xffffff, settings.directionalIntensity),
+        back: new THREE.DirectionalLight(0xffffff, settings.directionalIntensity)
+    };
+    lights.key.position.set(1, 1, -1);
+    lights.back.position.set(-1, -1, 1);
+    Object.values(lights).forEach(light => scene.add(light));
+
+    renderer = new THREE.WebGLRenderer({ canvas: canvas.value, antialias: false });
+    renderer.setClearColor(scene.fog.color);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    // MeshLab-style shading for models without a texture
+    material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0x444444, shininess: settings.shininess });
+
+    const model = await dataset.value.Entry(entry.value).getNxz();
+    if (disposed) return;
+    const nexusObj = new NexusObject(model, () => {
+        const s = 1 / nexusObj.geometry.boundingSphere.radius;
+        const p = nexusObj.geometry.boundingBox.getCenter(new THREE.Vector3()).negate();
+        nexusObj.position.set(p.x * s, p.y * s, p.z * s);
+        nexusObj.scale.set(s, s, s);
+
+        const vertex = nexusObj.geometry.instance?.mesh?.vertex;
+        if (vertex) {
+            modelInfo.hasTexture = !!vertex.texCoord;
+            modelInfo.hasColors = !!vertex.color;
+            modelInfo.hasNormals = !!vertex.normal;
+        }
+        if (!modelInfo.hasTexture) nexusObj.material = material;
+        loaded.value = true;
+    }, () => {}, renderer, false);
+    scene.add(nexusObj);
+
+    controls = new THREE.ArcballControls(camera, renderer.domElement, scene);
+    controls.setGizmosVisible(false);
+
+    const fitCanvas = () => {
+        const el = renderer.domElement;
+        if (el.width !== el.clientWidth || el.height !== el.clientHeight) {
+            renderer.setSize(el.clientWidth, el.clientHeight, false);
+            camera.aspect = el.clientWidth / el.clientHeight;
+            camera.updateProjectionMatrix();
+        }
+    };
+    const animate = () => {
+        // lifetime: paired (cancelled in onBeforeUnmount)
+        frame = requestAnimationFrame(animate);
+        fitCanvas();
+        renderer.render(scene, camera);
+        controls.update();
+    };
+    animate();
 }
 
-function saveSettings(ambient, directional, shininess) {
-    setPref(PREF.NEXUS_LIGHTING, {
-        ambientIntensity: ambient,
-        directionalIntensity: directional,
-        shininess: shininess
-    });
-}
-
-export default {
-    name: 'NexusViewer',
-    components: {
-        Message, TabViewLoader, Window, Button
-    },
-    props: {
-        uri: { type: String, default: null }
-    },
-    data: function () {
-        const DEFAULT_AMBIENT = 0.4;
-        const DEFAULT_DIRECTIONAL = 0.7;
-        const DEFAULT_SHININESS = 25;
-        const saved = loadSettings();
-
-        return {
-            error: "",
-            loading: false,
-            loaded: false,
-            showSettings: false,
-            // Default lighting values (MeshLab style)
-            DEFAULT_AMBIENT,
-            DEFAULT_DIRECTIONAL,
-            DEFAULT_SHININESS,
-            // Reactive controls (restored from the stored settings if available)
-            ambientIntensity: saved ? saved.ambientIntensity : DEFAULT_AMBIENT,
-            directionalIntensity: saved ? saved.directionalIntensity : DEFAULT_DIRECTIONAL,
-            shininess: saved ? saved.shininess : DEFAULT_SHININESS,
-            // Model info
-            modelInfo: {
-                hasTexture: false,
-                hasColors: false,
-                hasNormals: false
-            },
-            // Three.js references (set in loadNexus)
-            ambientLight: null,
-            hemisphereLight: null,
-            light1: null,
-            light2: null,
-            material: null,
-            nexusObj: null
-        };
-    },
-    mounted: function () {
-    },
-
-    methods: {
-        handleLoad: async function () {
-            try {
-                // Quick type check
-                if (this.entry.type !== ddb.entry.type.MODEL)
-                  throw new Error(`${this.entry.path} cannot be opened as a 3D model`);
-
-                this.loading = true;
-
-                await loadResources("/potree/libs/three.js/build/three.min.js");
-                await loadResources("/nexus/nexus.js");
-                await loadResources("/nexus/nexusThree.js");
-                await loadResources("/nexus/arcballControls.js");
-
-                await this.loadNexus();
-
-            } catch (e) {
-                this.error = e.message;
-            } finally {
-                this.loading = false;
-            }
-        },
-        loadNexus: async function () {
-            this.error = "";
-
-            // Check that libraries are loaded
-            if (typeof THREE === 'undefined') {
-                throw new Error('Error loading THREE.js library');
-            }
-            if (typeof NexusObject === 'undefined') {
-                throw new Error('Error loading Nexus library');
-            }
-
-            const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
-            camera.position.z = 4.0;
-
-            const scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x1a1a2e);
-            scene.fog = new THREE.Fog(0x1a1a2e, 2000, 3500);
-
-            // Lighting setup
-            this.ambientLight = new THREE.AmbientLight(0xffffff, this.ambientIntensity);
-            scene.add(this.ambientLight);
-
-            // Hemisphere light for natural sky/ground fill
-            this.hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.4);
-            scene.add(this.hemisphereLight);
-
-            this.light1 = new THREE.DirectionalLight(0xffffff, this.directionalIntensity);
-            this.light1.position.set(1, 1, -1);
-            scene.add(this.light1);
-
-            this.light2 = new THREE.DirectionalLight(0xffffff, this.directionalIntensity);
-            this.light2.position.set(-1, -1, 1);
-            scene.add(this.light2);
-
-            const renderer = new THREE.WebGLRenderer({ canvas: this.$refs.canvas, antialias: false });
-            renderer.setClearColor(scene.fog.color);
-            renderer.setPixelRatio(window.devicePixelRatio);
-
-            // Create MeshPhongMaterial for models without texture (MeshLab-style shading)
-            this.material = new THREE.MeshPhongMaterial({
-                color: 0xaaaaaa,
-                specular: 0x444444,
-                shininess: this.shininess
-            });
-
-            // Will be set after loading based on model info
-            let material = false;
-
-            const self = this;
-
-            let nexusObj = null;
-
-            const onNexusLoad = () => {
-                const s = 1 / nexusObj.geometry.boundingSphere.radius;
-                const target = new THREE.Vector3();
-                const p = nexusObj.geometry.boundingBox.getCenter(target).negate();
-
-                nexusObj.position.set(p.x * s, p.y * s, p.z * s);
-                nexusObj.scale.set(s, s, s);
-
-                // Detect model info from Nexus geometry
-                const instance = nexusObj.geometry.instance;
-                if (instance && instance.mesh && instance.mesh.vertex) {
-                    self.modelInfo.hasTexture = !!instance.mesh.vertex.texCoord;
-                    self.modelInfo.hasColors = !!instance.mesh.vertex.color;
-                    self.modelInfo.hasNormals = !!instance.mesh.vertex.normal;
-                }
-
-                // Apply MeshPhongMaterial only for models without texture
-                if (!self.modelInfo.hasTexture) {
-                    nexusObj.material = self.material;
-                }
-
-                self.nexusObj = nexusObj;
-                self.loaded = true;
-            }
-
-            const resizeCanvasToDisplaySize = () => {
-                const canvas = renderer.domElement;
-                const width = canvas.clientWidth;
-                const height = canvas.clientHeight;
-                if (canvas.width !== width || canvas.height !== height) {
-                    renderer.setSize(width, height, false);
-                    camera.aspect = width / height;
-                    camera.updateProjectionMatrix();
-                }
-            }
-
-            const entry = this.dataset.Entry(this.entry);
-            var model = await entry.getNxz();
-
-            nexusObj = new NexusObject(model, onNexusLoad, () => { }, renderer, material);
-            scene.add(nexusObj);
-
-            const controls = new THREE.ArcballControls(camera, renderer.domElement, scene);
-            controls.setGizmosVisible(false);
-
-            const animate = () => {
-                requestAnimationFrame(animate);
-                resizeCanvasToDisplaySize();
-                renderer.render(scene, camera);
-                controls.update();
-            }
-
-            animate();
-        },
-
-        handleGoToDataset: function () {
-            this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
-        },
-
-        toggleSettings: function () {
-            this.showSettings = !this.showSettings;
-        },
-
-        persistSettings: function () {
-            saveSettings(this.ambientIntensity, this.directionalIntensity, this.shininess);
-        },
-
-        updateAmbient: function () {
-            if (this.ambientLight) {
-                this.ambientLight.intensity = this.ambientIntensity;
-            }
-            this.persistSettings();
-        },
-
-        updateDirectional: function () {
-            if (this.light1) {
-                this.light1.intensity = this.directionalIntensity;
-            }
-            if (this.light2) {
-                this.light2.intensity = this.directionalIntensity;
-            }
-            this.persistSettings();
-        },
-
-        updateShininess: function () {
-            if (this.material) {
-                this.material.shininess = this.shininess;
-                this.material.needsUpdate = true;
-            }
-            this.persistSettings();
-        },
-
-        resetDefaults: function () {
-            this.ambientIntensity = this.DEFAULT_AMBIENT;
-            this.directionalIntensity = this.DEFAULT_DIRECTIONAL;
-            this.shininess = this.DEFAULT_SHININESS;
-            this.updateAmbient();
-            this.updateDirectional();
-            this.updateShininess();
-            removePref(PREF.NEXUS_LIGHTING);
-        },
+onMounted(async () => {
+    if (!await entryLoaded) return;
+    loading.value = true;
+    try {
+        await loadResources('/potree/libs/three.js/build/three.min.js');
+        await loadResources('/nexus/nexus.js');
+        await loadResources('/nexus/nexusThree.js');
+        await loadResources('/nexus/arcballControls.js');
+        await loadNexus();
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        loading.value = false;
     }
-}
+});
+
+// The render loop and the WebGL context used to outlive the page
+onBeforeUnmount(() => {
+    disposed = true;
+    cancelAnimationFrame(frame);
+    if (controls && controls.dispose) controls.dispose();
+    if (renderer) renderer.dispose();
+});
 </script>
 
 <style scoped>
-#nexus {
-    background: var(--ddb-viewer-bg);
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-#nexus .ui.message {
-    margin: 0.5rem;
-}
-
-#nexus .container-wrapper {
+canvas {
     display: flex;
     width: 100%;
     height: 100%;
-    position: relative;
-}
-
-#nexus .container-wrapper canvas {
-    display: flex;
-    width: 100%;
-    height: 100%;
-}
-
-#nexus .loading {
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    margin: 0.5rem;
-    text-align: center;
-}
-
-#nexus .loading .circle.notch {
-    height: 1.25rem;
-    width: 1.25rem;
-}
-
-#nexus .btn-settings {
-    position: absolute;
-    bottom: var(--ddb-spacing-md);
-    left: var(--ddb-spacing-md);
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    background: var(--ddb-overlay-bg);
-    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    cursor: pointer;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: background 0.2s, border-color 0.2s;
-}
-
-#nexus .btn-settings:hover {
-    background: rgba(0, 0, 0, 0.85);
-    border-color: rgba(255, 255, 255, 0.5);
-}
-
-#nexus .btn-settings .icon.cog {
-    margin: 0;
-    width: auto;
-    height: auto;
-}
-
-#nexus .lighting-content {
-    padding: 0.25rem 0;
-}
-
-#nexus .lighting-content .form-group {
-    margin-bottom: 0.75rem;
-}
-
-#nexus .lighting-content .form-group label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--ddb-viewer-label-color);
-}
-
-#nexus .lighting-content .form-group input[type="range"] {
-    width: 100%;
-    cursor: pointer;
 }
 </style>

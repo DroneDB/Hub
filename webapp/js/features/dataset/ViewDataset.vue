@@ -283,6 +283,7 @@ import { coordAll } from '@turf/meta';
 const { pathutils, utils } = ddb;
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
+import { permissionsOf } from '@/libs/datasetPermissions';
 import { isArchiveFile } from '@/libs/entryTypes';
 import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 
@@ -487,14 +488,7 @@ export default {
         },
         // Dataset permissions from backend
         datasetPermissions: function () {
-            // Get permissions from the root dataset entry
-            if (this.rootDatasetEntry &&
-                this.rootDatasetEntry.properties &&
-                this.rootDatasetEntry.properties.permissions) {
-                return this.rootDatasetEntry.properties.permissions;
-            }
-            // Default to no permissions if not available
-            return { canRead: false, canWrite: false, canDelete: false };
+            return permissionsOf(this.rootDatasetEntry);
         },
         canRead: function () {
             return this.datasetPermissions.canRead;
@@ -1060,26 +1054,6 @@ export default {
             this.showError("Timeout while waiting for build completion. Please try again later.", "Timeout");
             this.showAvailabilityDialog = false;
         },
-
-
-        addComponentTab: function (uri, label, icon, component, view) {
-            if (!this.$refs.mainTabSwitcher.hasTab(label)) {
-                this.$refs.mainTabSwitcher.addTab({
-                    label,
-                    icon,
-                    key: `${uri}-${view}`,
-                    hideLabel: false,
-                    canClose: true,
-                    component,
-                    props: {
-                        uri
-                    }
-                }, { activate: true });
-            } else {
-                this.$refs.mainTabSwitcher.activateTab(label);
-            }
-        },
-
 
 
         handleFileSelectionChanged: function (fileBrowserFiles) {

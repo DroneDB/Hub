@@ -1,13 +1,6 @@
 <template>
-    <div id="potree">
+    <ViewerShell id="potree" v-model:error="error" dark :loading="loading" loading-text="Loading point cloud...">
         <DialogHost :dialogs="dialogs" />
-        <TabViewLoader title-suffix="Point Cloud" @loaded="handleLoad" />
-
-        <Message v-model="error" no-dismiss />
-        <div v-if="loading" class="loading">
-            <p>Loading point cloud...</p>
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
 
         <div class="potree-container" :class="{ loading }">
             <!-- Top-left toolbar area -->
@@ -81,13 +74,13 @@
                        warning-title="Warning"
                        warning-message="This action cannot be undone."
                        @on-close="handleDeleteMeasurementsDialogClose" />
-    </div>
+    </ViewerShell>
 </template>
 
 <script>
 import ddb from 'ddb';
-import Message from '@/components/Message';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
+import ViewerShell from '@/components/ViewerShell.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.vue';
@@ -110,18 +103,17 @@ import { flash } from '@/composables/useMapAlerts';
 export default {
     name: 'PotreeViewer',
     components: {
-        DialogHost, Message, TabViewLoader, ConfirmDialog
-    },
-    props: {
-        uri: { type: String, default: null }
+        ViewerShell, DialogHost, ConfirmDialog
     },
     setup() {
-        return { later: useTimerGroup(), dialogs: useDialogs() };
+        return {
+            ...useViewerEntry({ types: [ddb.entry.type.POINTCLOUD], typeLabel: 'a point cloud', title: 'Point Cloud' }),
+            later: useTimerGroup(),
+            dialogs: useDialogs()
+        };
     },
     data: function () {
         return {
-            error: "",
-            loading: false,
             loaded: false,
             measurementStorage: null,
             coordinateSystem: null,
@@ -130,11 +122,6 @@ export default {
 
             // Confirm dialog
             deleteMeasurementsDialogOpen: false,
-
-            // Dataset permissions (set by TabViewLoader)
-            canRead: false,
-            canWrite: false,
-            canDelete: false,
 
             // Track measurement count for reactivity
             measurementCount: 0,
@@ -168,6 +155,9 @@ export default {
         // Replaced by each viewer (loadViewer); one exists from the start so the listener
         // helpers always have a session to register with
         this.session = new PotreeSession();
+    },
+    mounted: function () {
+        this.entryLoaded.then(ok => { if (ok) this.handleLoad(); });
     },
 
     beforeUnmount: function() {
@@ -866,9 +856,6 @@ export default {
 
         handleLoad: async function () {
             try {
-                // Quick type check
-                if (this.entry.type !== ddb.entry.type.POINTCLOUD) throw new Error(`${this.entry.path} cannot be opened as a point cloud`);
-
                 this.loading = true;
 
                 // One request wave: every file downloads in parallel, the scripts run in this
@@ -1455,28 +1442,6 @@ export default {
 
 <style>
 #potree {
-    .ui.message {
-        margin: 0.5rem;
-    }
-
-    background: var(--ddb-viewer-bg);
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-
-    .loading {
-        color: var(--ddb-text-on-dark);
-        font-size: 120%;
-        margin: var(--ddb-spacing-sm);
-        text-align: center;
-
-        .circle.notch {
-            height: 1.25rem;
-            width: 1.25rem;
-        }
-    }
-
     #potree_quick_buttons {
         left: auto !important;
         right: 3rem !important;

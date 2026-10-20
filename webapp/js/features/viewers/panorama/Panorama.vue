@@ -1,136 +1,90 @@
 <template>
-    <div id="panorama">
-        <TabViewLoader title-suffix="Panorama" loading-text="Loading viewer..." @loaded="handleLoad" />
-
-        <Message v-model="error" no-dismiss />
-
-        <div ref="viewer" class="viewer" />
-    </div>
+    <ViewerShell id="panorama" v-model:error="error" dark :loading="loading" loading-text="Loading viewer...">
+        <div ref="container" class="viewer" />
+    </ViewerShell>
 </template>
 
-<script>
+<script setup>
+/**
+ * PanoramaViewer - a 360° photo in Photo Sphere Viewer, posed from the entry's XMP
+ * properties (HQ-08: on ViewerShell and useViewerEntry; the viewer is destroyed on leave).
+ */
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
-import Message from '@/components/Message';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
+import ViewerShell from '@/components/ViewerShell.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
 import { loadResources } from '@/libs/lazy';
 
-export default {
-    name: 'PanoramaViewer',
-    components: {
-        Message, TabViewLoader
-    },
-    props: {
-        uri: { type: String, default: null }
-    },
-    data: function () {
-        return {
-            error: "",
-            loading: false,
-            loaded: false
-        };
-    },
-    mounted: function () {
-    },
+defineOptions({ name: 'PanoramaViewer' });
 
-    methods: {
+const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({
+    types: [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA], typeLabel: 'a panorama', title: 'Panorama'
+});
+const container = ref(null);
+let viewer = null;
+let left = false;
 
-        handleLoad: async function () {
-            try {
-                // Quick type check
-                if (this.entry.type !== ddb.entry.type.PANORAMA && this.entry.type !== ddb.entry.type.GEOPANORAMA)
-                    throw new Error(`${this.entry.path} cannot be opened as a panorama`);
-
-                this.loading = true;
-
-                await loadResources("/potree/libs/three.js/build/three.min.js");
-                await loadResources("/photosphereviewer/browser.min.js");
-                await loadResources("/photosphereviewer/photo-sphere-viewer.min.css");
-                await loadResources("/photosphereviewer/photo-sphere-viewer.min.js");
-
-                await this.loadViewer();
-
-            } catch (e) {
-                this.error = e.message;
-            } finally {
-                this.loading = false;
+onMounted(async () => {
+    if (!await entryLoaded) return;
+    loading.value = true;
+    try {
+        await loadResources('/potree/libs/three.js/build/three.min.js');
+        await loadResources('/photosphereviewer/browser.min.js');
+        await loadResources('/photosphereviewer/photo-sphere-viewer.min.css');
+        await loadResources('/photosphereviewer/photo-sphere-viewer.min.js');
+        if (left) return;
+        const p = entry.value.properties;
+        viewer = new PhotoSphereViewer.Viewer({
+            container: container.value,
+            panorama: dataset.value.downloadUrl(entry.value.path, { inline: true }),
+            loadingTxt: 'Loading ...',
+            useXmpData: false,
+            canvasBackground: '#030A03',
+            minFov: 1,
+            defaultZoomLvl: 60,
+            panoData: {
+                fullWidth: p.width,
+                fullHeight: p.height,
+                croppedWidth: p.croppedWidth,
+                croppedHeight: p.croppedHeight,
+                croppedX: p.croppedX,
+                croppedY: p.croppedY,
+                poseHeading: p.poseHeading,
+                posePitch: p.posePitch,
+                poseRoll: p.poseRoll
             }
-        },
-        loadViewer: async function () {
-            this.error = "";
-
-            const panoUrl = this.dataset.downloadUrl(this.entry.path, { inline: true });
-            const p = this.entry.properties;
-
-            this.viewer = new PhotoSphereViewer.Viewer({
-                container: this.$refs.viewer,
-                panorama: panoUrl,
-                loadingTxt: "Loading ...",
-                useXmpData: false,
-                canvasBackground: "#030A03",
-                minFov: 1,
-                defaultZoomLvl: 60,
-                panoData: {
-                    fullWidth: p.width,
-                    fullHeight: p.height,
-                    croppedWidth: p.croppedWidth,
-                    croppedHeight: p.croppedHeight,
-                    croppedX: p.croppedX,
-                    croppedY: p.croppedY,
-                    poseHeading: p.poseHeading,
-                    posePitch: p.posePitch,
-                    poseRoll: p.poseRoll
-                }
-            });
-        },
-
-        handleHistoryBack: function () {
-            this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
-        },
+        });
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        loading.value = false;
     }
-}
+});
+
+onBeforeUnmount(() => {
+    left = true;
+    if (viewer) viewer.destroy();
+    viewer = null;
+});
 </script>
 
-<style>
-#panorama {
-    .ui.message {
-        margin: 0.5rem;
-    }
-
-    background: var(--ddb-viewer-bg);
+<style scoped>
+.viewer {
+    position: relative;
+    display: flex;
     width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
+}
 
-    .loading {
-        color: var(--ddb-text-on-dark);
-        font-size: var(--ddb-font-size-base);
-        margin: 0.5rem;
-        text-align: center;
+.viewer :deep(.psv-loader) {
+    color: var(--ddb-text-on-dark);
+}
 
-        .circle.notch {
-            height: 1.25rem;
-            width: 1.25rem;
-        }
-    }
+.viewer :deep(.psv-container) {
+    background: var(--ddb-viewer-bg);
+}
 
-    .viewer {
-        position: relative;
-        display: flex;
-        width: 100%;
-        height: 100%;
-
-        .psv-loader {
-            color: var(--ddb-text-on-dark);
-        }
-
-        .psv-container {
-            background: var(--ddb-viewer-bg);
-        }
-    }
-
-    .psv-download-button {
-        display: none;
-    }
+.viewer :deep(.psv-download-button) {
+    display: none;
 }
 </style>

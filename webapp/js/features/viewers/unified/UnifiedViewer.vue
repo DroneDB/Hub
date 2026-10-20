@@ -1,99 +1,72 @@
 <template>
-    <div id="unified-viewer">
-        <TabViewLoader title-suffix="3D Viewer" @loaded="handleLoad" />
-
-        <Message v-model="error" no-dismiss />
-        <div v-if="loading" class="loading">
+    <ViewerShell id="unified-viewer" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
+                 :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings">
+        <template #loading>
             <p>{{ loadingText }}</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
             <div v-if="progress !== null" class="progress-track">
                 <div class="progress-fill" :style="{ width: Math.round(progress * 100) + '%' }" />
             </div>
             <p v-if="progress !== null" class="progress-text">{{ Math.round(progress * 100) }}%</p>
+        </template>
+
+        <div ref="view" class="giro3d-view" />
+
+        <!-- Local coordinates badge (top-center) -->
+        <div v-if="ready && (isLocalPointCloud || isLocalDrawing)" class="local-coords-badge"
+             :title="isLocalDrawing ? 'This drawing has no coordinate system: it is shown in its own coordinates, without a map. Add a .prj file with the same name to place it on the map.' : ''">
+            <i class="fa-solid fa-unlock" /> Local coordinates<span v-if="isLocalDrawing && localUnits">&nbsp;({{ localUnits }})</span>
         </div>
 
-        <div class="container-wrapper">
-            <div ref="view" class="giro3d-view" />
-
-            <!-- Local coordinates badge (top-center) -->
-            <div v-if="ready && (isLocalPointCloud || isLocalDrawing)" class="local-coords-badge"
-                 :title="isLocalDrawing ? 'This drawing has no coordinate system: it is shown in its own coordinates, without a map. Add a .prj file with the same name to place it on the map.' : ''">
-                <i class="fa-solid fa-unlock" /> Local coordinates<span v-if="isLocalDrawing && localUnits">&nbsp;({{ localUnits }})</span>
-            </div>
-
-            <!-- Measurement toolbar (top-left) -->
-            <div v-if="ready" class="toolbar">
-                <button :class="{ active: activeTool === 'point' }" title="Measure point" aria-label="Measure point" @click="measure('point')">
-                    <i class="fa-solid fa-location-dot" />
-                </button>
-                <button :class="{ active: activeTool === 'distance' }" title="Measure distance" aria-label="Measure distance" @click="measure('distance')">
-                    <i class="fa-solid fa-ruler" />
-                </button>
-                <button :class="{ active: activeTool === 'area' }" title="Measure area" aria-label="Measure area" @click="measure('area')">
-                    <i class="fa-solid fa-draw-polygon" />
-                </button>
-                <button :disabled="measureCount === 0" title="Clear measurements" aria-label="Clear measurements" @click="clearMeasurements">
-                    <i class="fa-solid fa-trash" />
-                </button>
-            </div>
-
-            <!-- Layer panel (top-right) -->
-            <div v-if="ready && layers.length" class="layer-panel">
-                <div class="layer-panel-title">Layers</div>
-                <label v-for="l in layers" :key="l.id" class="layer-row">
-                    <input type="checkbox" :checked="l.visible" @change="toggleLayer(l)">
-                    <i :class="l.icon" /> <span>{{ l.name }}</span>
-                </label>
-            </div>
-
-            <!-- Navigation toolbar (bottom-left): one navigation mode in every scene, so Home
-                 is the only control it needs. -->
-            <div v-if="ready" class="nav-toolbar">
-                <button title="Home - return to the framed view (Home key)" aria-label="Home" @click="goHome">
-                    <i class="fa-solid fa-house" />
-                </button>
-            </div>
-
-            <!-- Settings gear (bottom-right) -->
-            <button v-if="ready" class="btn-settings" title="Display settings" aria-label="Display settings" @click="toggleSettings">
-                <i class="fa-solid fa-gear" />
+        <!-- Measurement toolbar (top-left) -->
+        <div v-if="ready" class="toolbar">
+            <button :class="{ active: activeTool === 'point' }" title="Measure point" aria-label="Measure point" @click="measure('point')">
+                <i class="fa-solid fa-location-dot" />
+            </button>
+            <button :class="{ active: activeTool === 'distance' }" title="Measure distance" aria-label="Measure distance" @click="measure('distance')">
+                <i class="fa-solid fa-ruler" />
+            </button>
+            <button :class="{ active: activeTool === 'area' }" title="Measure area" aria-label="Measure area" @click="measure('area')">
+                <i class="fa-solid fa-draw-polygon" />
+            </button>
+            <button :disabled="measureCount === 0" title="Clear measurements" aria-label="Clear measurements" @click="clearMeasurements">
+                <i class="fa-solid fa-trash" />
             </button>
         </div>
 
-        <!-- Lighting / navigation settings -->
-        <Window v-if="showSettings" id="unified-settings" title="Display settings" fixed-size size-class="dialog-xs"
-                @on-close="toggleSettings">
-            <div class="settings-content">
-                <div class="form-group">
-                    <div><label>Ambient: {{ ambientIntensity.toFixed(1) }}</label></div>
-                    <div><input v-model.number="ambientIntensity" class="w-100" type="range" min="0" max="5" step="0.1"
-                                @input="updateLighting"></div>
-                </div>
+        <!-- Layer panel (top-right) -->
+        <div v-if="ready && layers.length" class="layer-panel">
+            <div class="layer-panel-title">Layers</div>
+            <label v-for="l in layers" :key="l.id" class="layer-row">
+                <input type="checkbox" :checked="l.visible" @change="toggleLayer(l)">
+                <i :class="l.icon" /> <span>{{ l.name }}</span>
+            </label>
+        </div>
 
-                <div class="form-group">
-                    <div><label>Directional: {{ directionalIntensity.toFixed(1) }}</label></div>
-                    <div><input v-model.number="directionalIntensity" class="w-100" type="range" min="0" max="5"
-                                step="0.1" @input="updateLighting"></div>
-                </div>
+        <!-- Navigation toolbar (bottom-left): one navigation mode in every scene, so Home
+                 is the only control it needs. -->
+        <div v-if="ready" class="nav-toolbar">
+            <button title="Home - return to the framed view (Home key)" aria-label="Home" @click="goHome">
+                <i class="fa-solid fa-house" />
+            </button>
+        </div>
 
-                <div class="form-group">
-                    <div><label>Sky / ground fill: {{ hemisphereIntensity.toFixed(1) }}</label></div>
-                    <div><input v-model.number="hemisphereIntensity" class="w-100" type="range" min="0" max="5"
-                                step="0.1" @input="updateLighting"></div>
-                </div>
-
-                <Button label="Reset" text @click="resetSettings" />
-                <Button label="Close" severity="secondary" text @click="toggleSettings" />
-            </div>
-        </Window>
-    </div>
+        <template #settings>
+            <RangeSetting v-model="settings.ambientIntensity" label="Ambient" :max="5" />
+            <RangeSetting v-model="settings.directionalIntensity" label="Directional" :max="5" />
+            <RangeSetting v-model="settings.hemisphereIntensity" label="Sky / ground fill" :max="5" />
+            <Button label="Reset" text @click="resetSettings" />
+            <Button label="Close" severity="secondary" text @click="showSettings = false" />
+        </template>
+    </ViewerShell>
 </template>
 
 <script>
 import ddb from 'ddb';
-import Message from '@/components/Message';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
-import Window from '@/components/Window.vue';
+import ViewerShell from '@/components/ViewerShell.vue';
+import RangeSetting from '@/components/RangeSetting.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
+import { useViewerSettings } from '@/composables/useViewerSettings';
 import Button from 'primevue/button';
 import keyboard from '@/libs/keyboard';
 import {
@@ -104,7 +77,7 @@ import { alignContentUpAxis } from './contentOrientation';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
-import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
+import { PREF } from '@/libs/preferences';
 
 
 // Screen-space error target (pixels) for the DroneDB-built 3D Tiles of models. Obj2Tiles >= 1.8.0
@@ -116,15 +89,12 @@ import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
 // their finest LOD at this value, exactly as before.
 const MODEL_TILES_ERROR_TARGET = 6;
 
-const DEFAULTS = {
+// Lighting defaults (persisted per user with useViewerSettings)
+const LIGHTING = {
     ambientIntensity: 3,
     directionalIntensity: 1.8,
     hemisphereIntensity: 3
 };
-
-function loadSettings() {
-    return { ...DEFAULTS, ...getPref(PREF.UNIFIED_VIEWER, {}) };
-}
 
 /**
  * UnifiedViewer - a single georeferenced Giro3D scene that can render any of the build
@@ -146,16 +116,17 @@ function loadSettings() {
  */
 export default {
     components: {
-        Message, TabViewLoader, Window, Button
+        ViewerShell, RangeSetting, Button
     },
-    props: {
-        uri: { type: String, default: null }
+    setup() {
+        return {
+            // Type checks are the viewer's own (several types, .3tz indexed as generic)
+            ...useViewerEntry({ title: '3D Viewer' }),
+            ...useViewerSettings(PREF.UNIFIED_VIEWER, LIGHTING)
+        };
     },
     data: function () {
-        const saved = loadSettings();
         return {
-            error: "",
-            loading: false,
             // Set by loadPointCloud when the COPC carries no CRS: the cloud is shown in its
             // local metric coordinates and a badge explains that (no basemap is added).
             isLocalPointCloud: false,
@@ -170,14 +141,13 @@ export default {
             activeTool: null,
             measureCount: 0,
             showSettings: false,
-            // Lighting, restored from the stored settings when present.
-            ambientIntensity: saved.ambientIntensity,
-            directionalIntensity: saved.directionalIntensity,
-            hemisphereIntensity: saved.hemisphereIntensity,
             // Reactive metadata for the layer panel; the heavy Giro3D objects are kept
             // out of the reactive tree (see created()).
             layers: []
         };
+    },
+    watch: {
+        settings: { deep: true, handler: 'updateLighting' }
     },
     // Giro3D / three.js objects are stored as plain (non-reactive) instance fields. They must
     // NOT live in data(): Vue's reactive proxy around WebGL/three objects breaks internal
@@ -234,6 +204,9 @@ export default {
             }
         };
         keyboard.onKeyDown(this._onHomeKey);
+    },
+    mounted: function () {
+        this.entryLoaded.then(ok => { if (ok) this.handleLoad(); });
     },
     beforeUnmount: function () {
         keyboard.offKeyDown(this._onHomeKey);
@@ -452,18 +425,18 @@ export default {
             const { THREE } = this.libs;
             const lights = this._lights;
 
-            lights.ambient = new THREE.AmbientLight(0xffffff, this.ambientIntensity);
+            lights.ambient = new THREE.AmbientLight(0xffffff, this.settings.ambientIntensity);
             instance.scene.add(lights.ambient);
 
-            lights.hemisphere = new THREE.HemisphereLight(0xffffff, 0x444444, this.hemisphereIntensity);
+            lights.hemisphere = new THREE.HemisphereLight(0xffffff, 0x444444, this.settings.hemisphereIntensity);
             instance.scene.add(lights.hemisphere);
 
-            lights.sun = new THREE.DirectionalLight(0xffffff, this.directionalIntensity);
+            lights.sun = new THREE.DirectionalLight(0xffffff, this.settings.directionalIntensity);
             lights.sun.position.set(1, 1, 2);
             instance.scene.add(lights.sun);
 
             if (fill) {
-                lights.fill = new THREE.DirectionalLight(0xffffff, this.directionalIntensity * 0.35);
+                lights.fill = new THREE.DirectionalLight(0xffffff, this.settings.directionalIntensity * 0.35);
                 lights.fill.position.set(-1, -1, 1);
                 instance.scene.add(lights.fill);
             }
@@ -1198,34 +1171,14 @@ export default {
 
         // --- Display settings ------------------------------------------------------------
 
-        toggleSettings: function () {
-            this.showSettings = !this.showSettings;
-        },
-
+        // Retunes the scene lights to the settings (watched)
         updateLighting: function () {
             const { ambient, hemisphere, sun, fill } = this._lights;
-            if (ambient) ambient.intensity = this.ambientIntensity;
-            if (hemisphere) hemisphere.intensity = this.hemisphereIntensity;
-            if (sun) sun.intensity = this.directionalIntensity;
-            if (fill) fill.intensity = this.directionalIntensity * 0.35;
-            this.persistSettings();
+            if (ambient) ambient.intensity = this.settings.ambientIntensity;
+            if (hemisphere) hemisphere.intensity = this.settings.hemisphereIntensity;
+            if (sun) sun.intensity = this.settings.directionalIntensity;
+            if (fill) fill.intensity = this.settings.directionalIntensity * 0.35;
             if (this.instance) this.instance.notifyChange();
-        },
-
-        resetSettings: function () {
-            this.ambientIntensity = DEFAULTS.ambientIntensity;
-            this.directionalIntensity = DEFAULTS.directionalIntensity;
-            this.hemisphereIntensity = DEFAULTS.hemisphereIntensity;
-            this.updateLighting();
-            removePref(PREF.UNIFIED_VIEWER);
-        },
-
-        persistSettings: function () {
-            setPref(PREF.UNIFIED_VIEWER, {
-                ambientIntensity: this.ambientIntensity,
-                directionalIntensity: this.directionalIntensity,
-                hemisphereIntensity: this.hemisphereIntensity
-            });
         },
 
         // A simple OpenLayers style for MVT features (points, lines, polygons).
@@ -1374,26 +1327,6 @@ export default {
 </script>
 
 <style scoped>
-#unified-viewer {
-    background: var(--ddb-viewer-bg);
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-#unified-viewer .ui.message {
-    margin: 0.5rem;
-}
-
-#unified-viewer .container-wrapper {
-    display: flex;
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
 #unified-viewer .giro3d-view {
     position: absolute;
     top: 0;
@@ -1406,19 +1339,7 @@ export default {
     touch-action: none;
 }
 
-#unified-viewer .loading {
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    margin: 0.5rem;
-    text-align: center;
-}
-
-#unified-viewer .loading .fa-circle-notch {
-    height: 1.25rem;
-    width: 1.25rem;
-}
-
-#unified-viewer .loading .progress-track {
+#unified-viewer .progress-track {
     width: 12rem;
     height: 0.4rem;
     margin: 0.5rem auto 0;
@@ -1427,13 +1348,13 @@ export default {
     overflow: hidden;
 }
 
-#unified-viewer .loading .progress-fill {
+#unified-viewer .progress-fill {
     height: 100%;
     background: var(--ddb-primary, #2978b4);
     transition: width 0.2s ease;
 }
 
-#unified-viewer .loading .progress-text {
+#unified-viewer .progress-text {
     margin: 0.25rem 0 0;
     font-size: 0.85em;
 }
@@ -1547,31 +1468,6 @@ export default {
     background: rgba(255, 255, 255, 0.15);
 }
 
-#unified-viewer .btn-settings {
-    position: absolute;
-    bottom: var(--ddb-spacing-md);
-    right: var(--ddb-spacing-md);
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    background: var(--ddb-overlay-bg);
-    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    cursor: pointer;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: background 0.2s, border-color 0.2s;
-}
-
-#unified-viewer .btn-settings:hover {
-    background: rgba(0, 0, 0, 0.85);
-    border-color: rgba(255, 255, 255, 0.5);
-}
-
 #unified-viewer .local-coords-badge {
     position: absolute;
     top: var(--ddb-spacing-md);
@@ -1588,25 +1484,5 @@ export default {
     color: var(--ddb-text-on-dark);
     font-size: 0.85rem;
     pointer-events: none;
-}
-
-#unified-viewer .settings-content {
-    padding: 0.25rem 0;
-}
-
-#unified-viewer .settings-content .form-group {
-    margin-bottom: 0.75rem;
-}
-
-#unified-viewer .settings-content .form-group label {
-    display: block;
-    margin-bottom: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--ddb-viewer-label-color);
-}
-
-#unified-viewer .settings-content .form-group input[type="range"] {
-    width: 100%;
-    cursor: pointer;
 }
 </style>

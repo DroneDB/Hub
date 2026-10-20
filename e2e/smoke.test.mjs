@@ -27,7 +27,8 @@ const FILES = {
     photo: path.join(DATA, 'images', 'DJI_0018.JPG'),
     raster: path.join(DATA, 'ortho', 'brighton-beach-cog.tif'),
     cloud: path.join(DATA, 'point-clouds', 'brighton-beach.laz'),
-    dem: path.join(DATA, 'dem', 'test_dem.tiff')
+    dem: path.join(DATA, 'dem', 'test_dem.tiff'),
+    markdown: path.join(DATA, 'README.md')
 };
 const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 
@@ -248,6 +249,17 @@ test('dataset Map tab: clicking a photo opens its popup', async () => {
 test('point cloud viewer renders a canvas', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.cloud))}/pointcloud`);
     await page.waitForSelector('canvas', { timeout: 60000 });
+});
+
+test('markdown viewer renders and offers editing to a writer', async () => {
+    await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.markdown))}/markdown`);
+    await page.waitForSelector('.markdown .content h1, .markdown .content p', { timeout: 20000 });
+    await page.waitForSelector('button[aria-label="Edit"]', { timeout: 5000 });
+});
+
+test('a viewer refuses a file of another type', async () => {
+    await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.raster))}/markdown`);
+    await page.waitForSelector('text=cannot be opened as markdown', { timeout: 20000 });
 });
 
 test('admin pages render for an admin', async () => {

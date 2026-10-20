@@ -1,103 +1,93 @@
 <template>
-    <div id="splat">
-        <TabViewLoader title-suffix="Gaussian Splat" @loaded="handleLoad" />
+    <ViewerShell id="splat" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
+                 loading-text="Loading Gaussian Splat..." settings-title="View settings" settings-id="splat-settings">
+        <canvas ref="canvas" />
 
-        <Message v-model="error" no-dismiss />
-        <div v-if="loading" class="loading">
-            <p>Loading Gaussian Splat...</p>
-            <i class="fa-solid fa-circle-notch fa-spin" />
+        <!-- Top-right stack: current camera view + CRS badge -->
+        <div class="top-right-stack">
+            <!-- Current camera preset (only when a preset is active) -->
+            <div v-if="loaded && activeCameraName" class="camera-hud" title="Current camera view">
+                <i class="fa-solid fa-camera" /> {{ activeCameraName }}
+            </div>
+
+            <!-- CRS badge (only when the splat is georeferenced) -->
+            <div v-if="loaded && crs" class="crs-badge" :title="`Coordinate reference system: ${crs}`">
+                <i class="fa-solid fa-location-crosshairs" /> {{ crs }}
+            </div>
         </div>
 
-        <div class="container-wrapper">
-            <canvas ref="canvas" />
+        <!-- LOD streaming badge (only when serving a paged .rad) -->
+        <div v-if="loaded && streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
+            <i class="fa-solid fa-tower-broadcast m-0" />
+        </div>
 
-            <!-- Top-right stack: current camera view + CRS badge -->
-            <div class="top-right-stack">
-                <!-- Current camera preset (only when a preset is active) -->
-                <div v-if="loaded && activeCameraName" class="camera-hud" title="Current camera view">
-                    <i class="fa-solid fa-camera" /> {{ activeCameraName }}
-                </div>
+        <!-- Bottom-left buttons -->
+        <div v-if="loaded" class="btn-stack">
+            <button class="btn-overlay" :class="{ active: navMode === 'fly' }"
+                    title="Fly navigation: drag to look around, WASD/QE to move"
+                    @click="setNavMode('fly')">
+                <i class="fa-solid fa-plane" />
+            </button>
+            <button class="btn-overlay" :class="{ active: navMode === 'earth' }"
+                    title="Earth navigation: drag to pan, right-drag to orbit, wheel to zoom"
+                    @click="setNavMode('earth')">
+                <i class="fa-solid fa-earth-americas" />
+            </button>
+            <button class="btn-overlay" title="View settings" @click="toggleSettings">
+                <i class="fa-solid fa-gear" />
+            </button>
+            <button class="btn-overlay" title="Manage camera views" @click="toggleCameraManager">
+                <i class="fa-solid fa-camera" />
+            </button>
+        </div>
 
-                <!-- CRS badge (only when the splat is georeferenced) -->
-                <div v-if="loaded && crs" class="crs-badge" :title="`Coordinate reference system: ${crs}`">
-                    <i class="fa-solid fa-location-crosshairs" /> {{ crs }}
-                </div>
-            </div>
-
-            <!-- LOD streaming badge (only when serving a paged .rad) -->
-            <div v-if="loaded && streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
-                <i class="fa-solid fa-tower-broadcast m-0" />
-            </div>
-
-            <!-- Bottom-left buttons -->
-            <div v-if="loaded" class="btn-stack">
-                <button class="btn-overlay" :class="{ active: navMode === 'fly' }"
-                        title="Fly navigation: drag to look around, WASD/QE to move"
-                        @click="setNavMode('fly')">
-                    <i class="fa-solid fa-plane" />
-                </button>
-                <button class="btn-overlay" :class="{ active: navMode === 'earth' }"
-                        title="Earth navigation: drag to pan, right-drag to orbit, wheel to zoom"
-                        @click="setNavMode('earth')">
-                    <i class="fa-solid fa-earth-americas" />
-                </button>
-                <button class="btn-overlay" title="View settings" @click="toggleSettings">
-                    <i class="fa-solid fa-gear" />
-                </button>
-                <button class="btn-overlay" title="Manage camera views" @click="toggleCameraManager">
-                    <i class="fa-solid fa-camera" />
-                </button>
-            </div>
-
-            <!-- Left-edge camera rail: jump between saved cameras, toggle the auto-orbit,
+        <!-- Left-edge camera rail: jump between saved cameras, toggle the auto-orbit,
                  save the current view as a camera, and persist all cameras to the dataset. -->
-            <div v-if="loaded" class="camera-rail">
-                <div v-if="cameras.length" class="rail-cameras">
-                    <button v-for="(cam, i) in cameras" :key="cam.id" class="rail-btn cam"
-                            :class="{ active: i === activeCameraIndex }"
-                            :title="cam.name || `Camera ${i + 1}`"
-                            @click="animateToCamera(i)">{{ i + 1 }}</button>
-                </div>
-                <div v-if="cameras.length" class="rail-sep" />
-                <button class="rail-btn" :class="{ active: isOrbiting }"
-                        :title="isOrbiting ? 'Stop orbit' : 'Start orbit'" @click="toggleOrbit">
-                    <i :class="isOrbiting ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
-                </button>
-                <button v-if="cameras.length" class="rail-btn" :class="{ active: isTouring }"
-                        :title="isTouring ? 'Stop cycling' : 'Start cycling'" @click="toggleTour">
-                    <i class="fa-solid fa-camera-rotate" />
-                </button>
-                <button v-if="canWrite" class="rail-btn" title="Save current view as a camera"
-                        @click="addCurrentCamera">
-                    <i class="fa-solid fa-camera" />
-                </button>
-                <button v-if="canWrite" class="rail-btn" :class="{ dirty: camerasDirty }"
-                        :disabled="!camerasDirty" title="Save cameras to dataset" @click="saveCameras">
-                    <i class="fa-solid fa-floppy-disk" />
-                </button>
+        <div v-if="loaded" class="camera-rail">
+            <div v-if="cameras.length" class="rail-cameras">
+                <button v-for="(cam, i) in cameras" :key="cam.id" class="rail-btn cam"
+                        :class="{ active: i === activeCameraIndex }"
+                        :title="cam.name || `Camera ${i + 1}`"
+                        @click="animateToCamera(i)">{{ i + 1 }}</button>
             </div>
+            <div v-if="cameras.length" class="rail-sep" />
+            <button class="rail-btn" :class="{ active: isOrbiting }"
+                    :title="isOrbiting ? 'Stop orbit' : 'Start orbit'" @click="toggleOrbit">
+                <i :class="isOrbiting ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
+            </button>
+            <button v-if="cameras.length" class="rail-btn" :class="{ active: isTouring }"
+                    :title="isTouring ? 'Stop cycling' : 'Start cycling'" @click="toggleTour">
+                <i class="fa-solid fa-camera-rotate" />
+            </button>
+            <button v-if="canWrite" class="rail-btn" title="Save current view as a camera"
+                    @click="addCurrentCamera">
+                <i class="fa-solid fa-camera" />
+            </button>
+            <button v-if="canWrite" class="rail-btn" :class="{ dirty: camerasDirty }"
+                    :disabled="!camerasDirty" title="Save cameras to dataset" @click="saveCameras">
+                <i class="fa-solid fa-floppy-disk" />
+            </button>
+        </div>
 
-            <!-- Navigation controls recap (bottom-right). Doubles as press-and-hold
+        <!-- Navigation controls recap (bottom-right). Doubles as press-and-hold
                  touch/mouse buttons that drive the same movement as the keyboard. -->
-            <div v-if="loaded" class="nav-controls" :class="{ touch: isTouch }">
-                <div class="nav-grid">
-                    <button v-for="k in navKeys" :key="k.code" class="nav-key"
-                            :class="{ active: pressed[k.code] }"
-                            :title="`${k.label} (${k.letter})`"
-                            @pointerdown.prevent="pressDir(k.code, $event)"
-                            @pointerup="releaseDir(k.code)"
-                            @pointerleave="releaseDir(k.code)"
-                            @pointercancel="releaseDir(k.code)"
-                            @contextmenu.prevent>
-                        <i :class="k.icon" />
-                        <span class="letter">{{ k.letter }}</span>
-                    </button>
-                </div>
+        <div v-if="loaded" class="nav-controls" :class="{ touch: isTouch }">
+            <div class="nav-grid">
+                <button v-for="k in navKeys" :key="k.code" class="nav-key"
+                        :class="{ active: pressed[k.code] }"
+                        :title="`${k.label} (${k.letter})`"
+                        @pointerdown.prevent="pressDir(k.code, $event)"
+                        @pointerup="releaseDir(k.code)"
+                        @pointerleave="releaseDir(k.code)"
+                        @pointercancel="releaseDir(k.code)"
+                        @contextmenu.prevent>
+                    <i :class="k.icon" />
+                    <span class="letter">{{ k.letter }}</span>
+                </button>
             </div>
         </div>
 
-        <!-- View settings dialog -->
-        <Window v-if="showSettings" id="splat-settings" title="View settings" fixed-size size-class="dialog-xs" @on-close="toggleSettings">
+        <template #settings>
             <div class="settings-content">
                 <div class="form-group">
                     <label class="checkbox-row">
@@ -141,7 +131,7 @@
                     <Button label="Close" severity="secondary" text @click="toggleSettings" />
                 </div>
             </div>
-        </Window>
+        </template>
 
         <!-- Camera management dialog -->
         <CameraManager v-if="showCameraManager"
@@ -157,14 +147,13 @@
                        @rename="renameCamera"
                        @save="saveCameras"
                        @close="toggleCameraManager" />
-    </div>
+    </ViewerShell>
 </template>
 
 <script>
 import ddb from 'ddb';
-import Message from '@/components/Message';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
-import Window from '@/components/Window.vue';
+import ViewerShell from '@/components/ViewerShell.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
 import Button from 'primevue/button';
 import CameraManager from './CameraManager.vue';
 import { getPref, setPref, PREF } from '@/libs/preferences';
@@ -191,15 +180,13 @@ const NAV_KEYS = [
 export default {
     name: 'SplatViewer',
     components: {
-        Message, TabViewLoader, Window, Button, CameraManager
+        ViewerShell, Button, CameraManager
     },
-    props: {
-        uri: { type: String, default: null }
+    setup() {
+        return useViewerEntry({ types: [ddb.entry.type.GAUSSIAN_SPLAT], typeLabel: 'a Gaussian Splat', title: 'Gaussian Splat' });
     },
     data: function () {
         return {
-            error: "",
-            loading: false,
             loaded: false,
             showSettings: false,
             showCameraManager: false,
@@ -218,10 +205,6 @@ export default {
             // camera's "up" so a scene reconstructed off-gravity (e.g. COLMAP/3DGS) reads level.
             tiltRoll: 0,
             tiltPitch: 0,
-            // Dataset permissions, populated by TabViewLoader before @loaded fires.
-            canWrite: false,
-            canDelete: false,
-            canRead: false,
             // Camera presets loaded from / saved to the <basename>_cameras.json sidecar.
             cameras: [],
             activeCameraIndex: null,
@@ -316,6 +299,7 @@ export default {
         window.addEventListener('keydown', this.onKeyDownBound);
         window.addEventListener('keyup', this.onKeyUpBound);
         window.addEventListener('blur', this.onWindowBlurBound);
+        this.entryLoaded.then(ok => { if (ok) this.handleLoad(); });
     },
     beforeUnmount: function () {
         window.removeEventListener('keydown', this.onKeyDownBound);
@@ -326,9 +310,6 @@ export default {
     methods: {
         handleLoad: async function () {
             try {
-                if (this.entry.type !== ddb.entry.type.GAUSSIAN_SPLAT)
-                    throw new Error(`${this.entry.path} cannot be opened as a Gaussian Splat`);
-
                 this.loading = true;
                 await this.loadSplat();
             } catch (e) {
@@ -1639,39 +1620,12 @@ export default {
 </script>
 
 <style scoped>
-#splat {
-    background: var(--ddb-viewer-bg);
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-#splat .ui.message {
-    margin: 0.5rem;
-}
-
-#splat .container-wrapper {
-    display: flex;
-    width: 100%;
-    height: 100%;
-    position: relative;
-}
-
-#splat .container-wrapper canvas {
+#splat canvas {
     display: flex;
     width: 100%;
     height: 100%;
     /* Let our pointer handlers own touch gestures (earth pan/orbit/pinch) on touch devices. */
     touch-action: none;
-}
-
-#splat .loading {
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    margin: 0.5rem;
-    text-align: center;
 }
 
 #splat .top-right-stack {

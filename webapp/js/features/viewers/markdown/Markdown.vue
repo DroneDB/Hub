@@ -1,156 +1,117 @@
 <template>
-    <div class="markdown">
-        <TabViewLoader title-suffix="Markdown" @loaded="handleLoad" />
-
-        <Message v-model="error" />
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
-        <div v-else class="md-container">
-            <div v-if="editing && editable" class="edit-container">
-                <textarea ref="editTextarea" v-model="rawContent" />
-                <Button severity="secondary" outlined class="save" icon="fa-solid fa-floppy-disk" @click="save" />
+    <ViewerShell v-model:error="error" class="markdown" :loading="loading">
+        <div v-if="!loading" class="md-container">
+            <div v-if="editing" class="edit-container">
+                <textarea ref="editor" v-model="rawContent" aria-label="Markdown source" />
+                <Button severity="secondary" outlined class="save" icon="fa-solid fa-floppy-disk" aria-label="Save" @click="save" />
             </div>
             <template v-else>
-                <Button v-if="editable" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" @click="edit" />
+                <Button v-if="canWrite" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" aria-label="Edit"
+                        @click="edit" />
                 <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
                 <div class="content" v-html="content" />
             </template>
         </div>
-    </div>
+    </ViewerShell>
 </template>
 
-<script>
-import Message from '@/components/Message';
+<script setup>
+/**
+ * MarkdownViewer - renders a markdown file; users who can write edit it in place
+ * (HQ-08: on ViewerShell and useViewerEntry; the edit button no longer shows to readers).
+ */
+import { ref, computed, nextTick, onMounted } from 'vue';
 import Button from 'primevue/button';
-import TabViewLoader from '@/features/viewers/TabViewLoader';
-import ddb from 'ddb';
 import MarkdownIt from 'markdown-it';
+import ddb from 'ddb';
+import ViewerShell from '@/components/ViewerShell.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
 import { sanitizeHtml } from '@/libs/sanitize';
 
-export default {
-    name: 'MarkdownViewer',
-    components: {
-        TabViewLoader, Message, Button
-    },
-    props: {
-        uri: { // DDB uri
-            type: String,
-            default: null
-        },
-        editable: {
-            type: Boolean,
-            required: false,
-            default: true
-        }
-    },
-    data: function () {
-        return {
-            loading: true,
-            error: "",
-            content: "",
-            rawContent: "",
-            editing: false,
-        }
-    },
+defineOptions({ name: 'MarkdownViewer' });
 
-    methods: {
-        handleLoad: async function () {
-            // Quick type check
-            if (this.entry.type !== ddb.entry.type.MARKDOWN) throw new Error(`${this.entry.path} cannot be opened as markdown`);
+const { entry, dataset, canWrite, loading, error, entryLoaded } = useViewerEntry({
+    types: [ddb.entry.type.MARKDOWN], typeLabel: 'markdown', title: 'Markdown'
+});
 
-            const [dataset, path] = ddb.utils.datasetPathFromUri(this.ddbURI);
-            this.dataset = dataset;
-            this.path = path;
+const rawContent = ref('');
+const editing = ref(false);
+const editor = ref(null);
+const md = new MarkdownIt();
+const content = computed(() => sanitizeHtml(md.render(rawContent.value)));
 
-            try {
-                this.rawContent = await dataset.getFileContents(path);
-                this.updateMarkdown();
-            } catch (e) {
-                this.error = `Cannot fetch ${this.ddbURI}: ${e}`;
-            }
-            this.loading = false;
-        },
-        updateMarkdown: function () {
-            const md = new MarkdownIt();
-            this.content = sanitizeHtml(md.render(this.rawContent));
-        },
+onMounted(async () => {
+    if (!await entryLoaded) return;
+    loading.value = true;
+    try {
+        rawContent.value = await dataset.value.getFileContents(entry.value.path);
+    } catch (e) {
+        error.value = `Cannot fetch ${entry.value.path}: ${e}`;
+    } finally {
+        loading.value = false;
+    }
+});
 
-        edit: function () {
-            this.editing = true;
-            this.$nextTick(() => {
-                this.$refs.editTextarea.focus();
-                this.$refs.editTextarea.scrollTo(0, 0);
-            });
-        },
+async function edit() {
+    editing.value = true;
+    await nextTick();
+    editor.value.focus();
+    editor.value.scrollTo(0, 0);
+}
 
-        save: async function () {
-            this.loading = true;
-            try {
-                await this.dataset.writeObj(this.path, this.rawContent);
-                this.updateMarkdown();
-                this.editing = false;
-            } catch (e) {
-                this.error = e.message;
-            } finally {
-                this.loading = false;
-            }
-        }
-
+async function save() {
+    loading.value = true;
+    try {
+        await dataset.value.writeObj(entry.value.path, rawContent.value);
+        editing.value = false;
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        loading.value = false;
     }
 }
 </script>
 
-<style>
-.markdown {
-    .loading {
-        margin-top: var(--ddb-spacing-md);
-        text-align: center;
-    }
-
-    display: flex;
-    flex-direction: column;
-
-    width: 100%;
+<style scoped>
+.md-container {
+    flex: 1;
+    min-width: 0;
     height: 100%;
+    overflow: auto;
+}
 
-    .md-container {
-        height: 100%;
+.edit-container {
+    position: relative;
+    height: 100%;
+    display: flex;
+}
 
-        .edit-container {
-            position: relative;
-            height: 100%;
-            display: flex;
-        }
+.edit {
+    float: right;
+    margin: var(--ddb-spacing-md);
+}
 
-        button.edit {
-            float: right;
-            margin: var(--ddb-spacing-md);
-        }
+.save {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-sm);
+}
 
-        button.save {
-            position: absolute;
-            top: var(--ddb-spacing-md);
-            right: var(--ddb-spacing-sm);
-        }
+textarea {
+    padding: var(--ddb-spacing-md);
+    width: 100%;
+    flex-grow: 1;
+    border: none;
+    resize: none;
+    font-family: monospace;
+    outline: none;
+}
 
-        textarea {
-            padding: var(--ddb-spacing-md);
-            width: 100%;
-            flex-grow: 1;
-            border: none;
-            resize: none;
-            font-family: monospace;
-            outline: none;
-        }
-    }
+.content {
+    padding: var(--ddb-spacing-md);
+}
 
-    .content {
-        padding: var(--ddb-spacing-md);
-
-        img {
-            max-width: 100%;
-        }
-    }
+.content :deep(img) {
+    max-width: 100%;
 }
 </style>
