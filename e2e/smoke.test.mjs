@@ -204,6 +204,37 @@ test('dataset Map tab renders and measures', async () => {
     await measureLength();
 });
 
+test('dataset Map tab: split compare and the display toggles', async () => {
+    // Root holds the orthophoto, the DEM and the point cloud: three georasters
+    const compare = 'button[aria-label="Compare georasters side by side"]';
+    await page.waitForSelector(`${compare}:not([disabled])`, { timeout: 15000 });
+    await page.click(compare);
+    await page.waitForSelector('.split-overlay', { timeout: 10000 });
+    await page.click(compare);
+    await page.waitForSelector('.split-overlay', { state: 'detached', timeout: 10000 });
+    const flight = 'button[aria-label="Show drone flight path"]';
+    const before = await page.locator(flight).getAttribute('aria-pressed');
+    await page.click(flight);
+    assert.notEqual(await page.locator(flight).getAttribute('aria-pressed'), before);
+    await page.click(flight);
+});
+
+test('dataset Map tab: clicking a photo opens its popup', async () => {
+    const name = path.basename(FILES.photo);
+    // sub/ holds only the photo: the map fits it at the centre
+    await page.click('text=Files');
+    await page.dblclick('#explorer >> text=sub');
+    await page.waitForSelector(`#explorer >> text=${name}`, { timeout: 20000 });
+    await page.click('text=Map');
+    await page.waitForTimeout(1500);
+    const box = await page.locator('.ol-viewport').boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForSelector(`.image-popup >> text=${name}`, { timeout: 10000 });
+    // The thumbnail grows the popup after the map panned it into view: it can end under the tabs
+    await page.locator('.image-popup button[aria-label="Close"]').dispatchEvent('click');
+    await page.waitForSelector('.image-popup', { state: 'hidden', timeout: 10000 });
+});
+
 test('point cloud viewer renders a canvas', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.cloud))}/pointcloud`);
     await page.waitForSelector('canvas', { timeout: 60000 });

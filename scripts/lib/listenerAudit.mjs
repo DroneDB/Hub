@@ -27,14 +27,33 @@ export const HELPER_FILES = new Set(['libs/listenerBag.js']);
 const HELPER_CALL = /(useEventListener|useEmitter|\.track|bag\.(?:add|ol|bus)|_listenerBag\.(?:add|ol|bus)|listeners\.(?:add|ol|bus)|useTimeout|useInterval|useDebounceFn|\blater|\bapplyLater)\(/;
 const LIFETIME = /\/\/\s*lifetime:\s*(app|element|owner|paired|defer)\b/;
 
+// Net open parentheses on a line, from `from` on (strings are not parsed: good enough here)
+function parenDepth(line, from = 0) {
+    let depth = 0;
+    for (const ch of line.slice(from)) {
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+    }
+    return depth;
+}
+
 // Lines covered by a lifetime annotation (up to the next blank line) or a helper call
+// (up to the line that closes it, so `listeners.ol([\n map.on(...),\n ...])` counts)
 function exemptLines(lines) {
     const exempt = new Set();
     let active = false;
+    let helperDepth = 0;
     lines.forEach((line, i) => {
+        if (helperDepth > 0) {
+            exempt.add(i);
+            helperDepth += parenDepth(line);
+            return;
+        }
         if (line.trim() === '') { active = false; return; }
         if (LIFETIME.test(line)) active = true;
-        if (active || HELPER_CALL.test(line)) exempt.add(i);
+        const helper = HELPER_CALL.exec(line);
+        if (helper) helperDepth = Math.max(0, parenDepth(line, helper.index));
+        if (active || helper) exempt.add(i);
     });
     return exempt;
 }

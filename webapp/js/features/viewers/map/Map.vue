@@ -67,127 +67,62 @@
                            :unit-pref="currentUnitPref" :custom-basemap-config="customBasemapConfig"
                            @on-close="mapSettingsDialogOpen = false" @basemap-changed="handleBasemapChanged"
                            @units-changed="handleUnitsChanged" @custom-basemap-config-changed="handleCustomBasemapConfigChanged" />
-        <div v-show="imagePopupVisible" ref="imagePopup" class="image-popup">
-            <div class="image-popup-header">
-                <span class="image-popup-title">{{ imagePopupFileName }}</span>
-                <div class="image-popup-actions">
-                    <a :href="imagePopupOpenUrl" target="_blank" class="image-popup-btn" title="Open in new tab">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-image" />
-                    </a>
-                    <a :href="imagePopupDownloadUrl" download class="image-popup-btn" title="Download">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-download" />
-                    </a>
-                    <button class="image-popup-btn image-popup-close" title="Close" @click="closeImagePopup">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark" />
-                    </button>
-                </div>
-            </div>
-            <div class="image-popup-body">
-                <div v-if="imagePopupLoading" class="image-popup-loading"><i
-                    class="fa-solid fa-circle-notch fa-spin" /></div>
-                <img v-show="!imagePopupLoading && imagePopupThumbnail" :src="imagePopupThumbnail"
-                     :alt="imagePopupFileName" class="image-popup-img" @load="onImagePopupLoaded"
-                     @error="onImagePopupError">
-            </div>
-            <div v-if="imagePopupCoords" class="image-popup-footer">
-                <span class="image-popup-coords" :title="imagePopupCoords">{{ imagePopupCoords }}</span>
-                <button class="image-popup-btn image-popup-copy" :title="imagePopupCoordsCopied ? 'Copied!' : 'Copy coordinates'"
-                        @click="copyCoordinates">
-                    <i style="margin: 0"
-                       :class="imagePopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'" />
-                </button>
-            </div>
-        </div>
-        <div v-show="videoPopupVisible" ref="videoPopup" class="image-popup">
-            <div class="image-popup-header">
-                <span class="image-popup-title">{{ videoPopupFileName }}</span>
-                <div class="image-popup-actions">
-                    <a :href="videoPopupDownloadUrl" download class="image-popup-btn" title="Download">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-download" />
-                    </a>
-                    <button class="image-popup-btn" title="Play video" @click="openVideoFromPopup">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-play" />
-                    </button>
-                    <button class="image-popup-btn image-popup-close" title="Close" @click="closeVideoPopup">
-                        <i style="margin: 0; height: auto" class="fa-solid fa-xmark" />
-                    </button>
-                </div>
-            </div>
-            <div class="image-popup-body image-popup-video-info">
-                <i class="fa-solid fa-film video-popup-icon" />
-                <div class="video-popup-details">
-                    <div v-if="videoPopupResolution" class="video-popup-row">{{ videoPopupResolution }}</div>
-                    <div v-if="videoPopupDate" class="video-popup-row">{{ videoPopupDate }}</div>
-                </div>
-            </div>
-            <div v-if="videoPopupCoords" class="image-popup-footer">
-                <span class="image-popup-coords" :title="videoPopupCoords">{{ videoPopupCoords }}</span>
-                <button class="image-popup-btn image-popup-copy" :title="videoPopupCoordsCopied ? 'Copied!' : 'Copy coordinates'"
-                        @click="copyVideoCoordinates">
-                    <i style="margin: 0"
-                       :class="videoPopupCoordsCopied ? 'fa-solid fa-check' : 'fa-regular fa-copy'" />
-                </button>
-            </div>
-        </div>
+        <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
+        <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :display-options="!standalone"
+                    :analysis-entry="analysisFile" :raster-count="rasterLayerList.length"
+                    :direction-indicators="showDirectionIndicators" :flight-path="showFlightPath"
+                    :split-mode="splitMode" :can-compare="canCompare"
+                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen"
+                    @analysis="kind => toggleAnalysisPanel(kind, analysisFile)"
+                    @update:direction-indicators="setDirectionIndicators" @update:flight-path="setFlightPath"
+                    @toggle-split="toggleSplit" />
     </div>
 </template>
 
 <script>
+/**
+ * MapViewer - the dataset map (Map tab) and, with `standalone`, the single-file map.
+ * HQ-07: the view wires OpenLayers to the map features (composables), the file-layer
+ * helpers (libs/map/*) and its child components (toolbar, popup, panels, dialogs).
+ */
 import 'ol/ol.css';
 import { Map, View } from 'ol';
-import { Tile as TileLayer, Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
+import { Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
 import { Vector as VectorSource, Cluster } from 'ol/source';
-import { Control } from 'ol/control';
-import Collection from 'ol/Collection';
 import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
 import { transformExtent, toLonLat } from 'ol/proj';
-
 import Feature from 'ol/Feature';
-import { coordAll } from '@turf/meta';
-import bbox from '@turf/bbox';
 import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
-import Polygon from 'ol/geom/Polygon';
-import { fromExtent } from 'ol/geom/Polygon';
-import Overlay from 'ol/Overlay';
-import { unByKey } from 'ol/Observable';
-import { useListenerBag } from '@/composables/useEventListener';
-import emitter from '@/libs/eventBus';
-import { markRaw, shallowRef, ref, getCurrentInstance } from 'vue';
+import Polygon, { fromExtent } from 'ol/geom/Polygon';
+import { coordAll } from '@turf/meta';
+import bbox from '@turf/bbox';
+import { markRaw, shallowRef, ref, computed, getCurrentInstance } from 'vue';
 
 import ddb from 'ddb';
-import { thumbs } from 'ddb';
-import HybridXYZ from '@/libs/map/olHybridXYZ';
-import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles, SOURCE_MIN_ZOOM } from '@/libs/map/rasterZoom';
+import emitter from '@/libs/eventBus';
+import Keyboard from '@/libs/keyboard';
+import { requestFullScreen, exitFullScreen, isFullScreenCurrently } from '@/libs/utils';
+import { EPSG } from '@/libs/constants';
+import { formatSpeed } from '@/libs/format';
+import { getPref, setPref, PREF } from '@/libs/preferences';
+import { sanitizeHtml } from '@/libs/sanitize';
+import { isPlantHealthCapable, isRasterAnalysisCapable } from '@/libs/entryTypes';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import SelectionControl from '@/libs/map/controls/selectionControl';
 import SettingsControl from '@/libs/map/controls/settingsControl';
-import OpacityControl from './OpacityControl.vue';
-import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
-import PlantHealthPanel from './PlantHealthPanel.vue';
-import RasterAnalysisControls from './RasterAnalysisControls.vue';
-import ContourOptionsDialog from './ContourOptionsDialog.vue';
-import StockpileVolumePanel from './StockpileVolumePanel.vue';
-import MapDialogs from './MapDialogs.vue';
-import Keyboard from '@/libs/keyboard';
-import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
-import { isMobile } from '@/libs/responsive';
-import { MeasurementStorage } from '@/libs/map/measurementStorage';
-import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
-import MapSettingsDialog from './MapSettingsDialog.vue';
-import MeasurementListDialog from './MeasurementListDialog.vue';
-import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
+import { createControlZones, moveToZone } from '@/libs/map/controlZones';
+import { createFileLayerStyles } from '@/libs/map/fileLayerStyles';
+import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
+import { orderFlightPath } from '@/libs/map/flightPath';
+import { createRasterTileLayer, ViewZoomCap } from '@/libs/map/rasterLayers';
+import { MeasurementStorage, isMeasurementFile } from '@/libs/map/measurementStorage';
 import { getVectorColor } from '@/libs/map/mapUtils';
-import { sanitizeHtml } from '@/libs/sanitize';
 import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
-import { isPlantHealthCapable } from '@/libs/entryTypes';
-import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 
-import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
-import { getRenderPixel } from 'ol/render';
-import RasterSplitOverlay from './RasterSplitOverlay.vue';
-
-// Mixins
+import { useListenerBag } from '@/composables/useEventListener';
+import { useTimerGroup } from '@/composables/useTimers';
+import { useDialogs } from '@/composables/useDialogs';
 import { useMapAlerts } from '@/composables/useMapAlerts';
 import { useMapBasemap } from '@/composables/useMapBasemap';
 import { useMapTooltip } from '@/composables/useMapTooltip';
@@ -196,19 +131,35 @@ import { usePlantHealth } from '@/composables/usePlantHealth';
 import { useRasterAnalysis } from '@/composables/useRasterAnalysis';
 import { useStockpileVolume } from '@/composables/useStockpileVolume';
 import { useContourLines } from '@/composables/useContourLines';
-import { useMapAnalysisButtons } from '@/composables/useMapAnalysisButtons';
-import { useCopyText } from '@/composables/useCopyText';
-import { EPSG } from '@/libs/constants';
-import { getPref, setPref, PREF } from '@/libs/preferences';
-import { useDialogs } from '@/composables/useDialogs';
-import { useTimerGroup } from '@/composables/useTimers';
-import DialogHost from '@/components/DialogHost.vue';
+import { useMapPanels } from '@/composables/useMapPanels';
+import { useMapSplitCompare } from '@/composables/useMapSplitCompare';
 
+import DialogHost from '@/components/DialogHost.vue';
+import MapToolbar from './MapToolbar.vue';
+import MapFilePopup from './MapFilePopup.vue';
+import OpacityControl from './OpacityControl.vue';
+import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
+import RasterSplitOverlay from './RasterSplitOverlay.vue';
+import PlantHealthPanel from './PlantHealthPanel.vue';
+import RasterAnalysisControls from './RasterAnalysisControls.vue';
+import ContourOptionsDialog from './ContourOptionsDialog.vue';
+import StockpileVolumePanel from './StockpileVolumePanel.vue';
+import MapDialogs from './MapDialogs.vue';
+import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
+import MapSettingsDialog from './MapSettingsDialog.vue';
+import MeasurementListDialog from './MeasurementListDialog.vue';
+import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
+
+// Pointer over one of these: no feature tooltip
+const MAP_CONTROLS = '.ol-map-display-buttons, .ol-map-buttons, .ol-measure-control, .ol-selection, .ol-zoom, .ol-settings';
+const FIT_OPTIONS = { padding: [40, 40, 40, 40], duration: 500, minResolution: 0.5, maxZoom: 22 };
 
 export default {
     name: 'MapViewer',
     components: {
-        DialogHost, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
+        DialogHost, MapToolbar, MapFilePopup, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel,
+        RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog,
+        MeasurementListDialog, MeasurementGroupDialog
     },
     inject: {
         registerTabChild: { default: null },
@@ -249,13 +200,14 @@ export default {
         const measureControls = shallowRef(null);
         const rasterLayer = shallowRef(null);
         const vectorLayers = shallowRef([]);
+        const zones = shallowRef(null);
+        // Georasters, top first: [{ name, path, olLayer, opacity, plantHealthCapable }]
+        const rasterLayerList = ref([]);
         const currentUnitPref = ref(getPref(PREF.MEASURE_UNIT, 'metric'));
         const dialogs = useDialogs();
         const alerts = useMapAlerts();
         // Map methods some features call back into
         const host = getCurrentInstance().proxy;
-        const imageCopy = useCopyText();
-        const videoCopy = useCopyText();
 
         // Features (HQ-07); `f` resolves their cross references lazily
         const f = {};
@@ -293,30 +245,27 @@ export default {
             showAlert: () => alerts.showAlert, showFlash: () => alerts.showFlash
         });
         f.tooltip = useMapTooltip({ map, vectorLayers, dialogs: () => dialogs });
-        f.analysisButtons = useMapAnalysisButtons({
-            map, files: () => props.files, entry: () => null,
-            openPlantHealth: () => f.plantHealth.openPlantHealth, closePlantHealth: () => f.plantHealth.closePlantHealth,
-            openRasterAnalysis: () => f.raster.openRasterAnalysis, closeRasterAnalysis: () => f.raster.closeRasterAnalysis,
-            openStockpileVolume: () => f.stockpile.openStockpileVolume, closeStockpileVolume: () => f.stockpile.closeStockpileVolume,
-            plantHealthVisible: f.plantHealth.plantHealthVisible, rasterPanelVisible: f.raster.rasterPanelVisible,
-            stockpilePanelVisible: f.stockpile.stockpilePanelVisible
+        const panels = useMapPanels({
+            plantHealth: { visible: () => f.plantHealth.plantHealthVisible.value, open: e => f.plantHealth.openPlantHealth(e), close: () => f.plantHealth.closePlantHealth() },
+            rasterAnalysis: { visible: () => f.raster.rasterPanelVisible.value, open: e => f.raster.openRasterAnalysis(e), close: () => f.raster.closeRasterAnalysis() },
+            stockpile: { visible: () => f.stockpile.stockpilePanelVisible.value, open: e => f.stockpile.openStockpileVolume(e), close: () => f.stockpile.closeStockpileVolume() }
         });
+        const split = useMapSplitCompare({ map, rasterLayers: rasterLayerList, onChange: () => host.updateRastersOpacity() });
 
         return {
-            map, measureControls, rasterLayer, vectorLayers, currentUnitPref, dialogs,
+            map, measureControls, rasterLayer, vectorLayers, zones, rasterLayerList, currentUnitPref, dialogs,
             ...alerts,
             ...useMapBasemap(map),
-            ...f.measurements, ...f.plantHealth, ...f.raster, ...f.stockpile, ...f.contours, ...f.tooltip, ...f.analysisButtons,
-            copyImageCoords: imageCopy.copy, imagePopupCoordsCopied: imageCopy.copied,
-            copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied,
+            ...f.measurements, ...f.plantHealth, ...f.raster, ...f.stockpile, ...f.contours, ...f.tooltip,
+            ...split,
+            toggleAnalysisPanel: panels.toggle,
+            // The file the toolbar's Raster Analysis / Stockpile tools open for
+            analysisFile: computed(() => props.files.find(x => x.entry && isRasterAnalysisCapable(x.entry)) || null),
             later: useTimerGroup(),
             listeners: useListenerBag()
         };
     },
     data: function () {
-        const savedDirectionIndicators = getPref(PREF.SHOW_DIRECTION_INDICATORS, false);
-        const savedFlightPath = getPref(PREF.SHOW_FLIGHT_PATH, true);
-
         return {
             selectSingle: false,
             selectPolygon: false,
@@ -324,8 +273,8 @@ export default {
             vectorLayerColors: {},
             currentOrthophotoEntry: null,
             mapSettingsDialogOpen: false,
-            showFlightPath: savedFlightPath,
-            showDirectionIndicators: savedDirectionIndicators,
+            showFlightPath: getPref(PREF.SHOW_FLIGHT_PATH, true),
+            showDirectionIndicators: getPref(PREF.SHOW_DIRECTION_INDICATORS, false),
 
             // Measurement group dialog
             measurementGroupDialogOpen: false,
@@ -337,33 +286,8 @@ export default {
             changeUnitsPreviousUnit: 'metric',
             changeUnitsMeasurementsCount: 0,
 
-            // Image popup
-            imagePopupVisible: false,
-            imagePopupLoading: true,
-            imagePopupFileName: '',
-            imagePopupThumbnail: null,
-            imagePopupOpenUrl: '',
-            imagePopupDownloadUrl: '',
-            imagePopupCoords: '',
-            imagePopupOverlay: null,
-            // Bounded retry state for the popup thumbnail (libs/build/thumbRetryPolicy)
-            imagePopupRetry: 0,
-            imagePopupRetryTimeout: null,
-
-            // Video popup
-            videoPopupVisible: false,
-            videoPopupFileName: '',
-            videoPopupResolution: '',
-            videoPopupDate: '',
-            videoPopupDownloadUrl: '',
-            videoPopupCoords: '',
-            videoPopupOverlay: null,
-            videoPopupFile: null,
             rasterOpacity: 1.0,
-            hasRasters: false,
-            rasterLayerList: [],
-            splitMode: false,
-            splitPositions: []
+            hasRasters: false
         };
     },
     computed: {
@@ -371,10 +295,6 @@ export default {
         // rebuilds the layers; anything else is a selection change
         filesKey: function () {
             return this.files.map(f => f.path || (f.entry && f.entry.path)).join('\n');
-        },
-        // Names of each band in display order (left → right), mirroring rasterLayerList order.
-        splitBands: function () {
-            return this.rasterLayerList.map(r => r.name);
         }
     },
     watch: {
@@ -409,57 +329,19 @@ export default {
             this.loadMap();
             this.reloadFileLayers();
         }
-    }, beforeUnmount: function () {
+    },
+    beforeUnmount: function () {
         if (this.unregisterTabChild) this.unregisterTabChild('map');
         Keyboard.offKeyDown(this.handleKeyDown);
         Keyboard.offKeyUp(this.handleKeyUp);
-
-        // Clean up event bus listener
-
-        // Clean up OL map event listeners
-
-        // Clean up vectorSource listeners
-        if (this._vectorSourceListenerKeys) {
-            this._vectorSourceListenerKeys.forEach(key => unByKey(key));
-            this._vectorSourceListenerKeys = [];
+        if (this.viewZoomCap) this.viewZoomCap.dispose();
+        if (this.map) {
+            if (this.tooltipOverlay) this.map.removeOverlay(this.tooltipOverlay);
+            this.vectorLayers.forEach(layer => this.map.removeLayer(layer));
         }
-
-        // Clean up View maxZoom cap collection listeners
-        if (this._viewCapDeferredKey) {
-            unByKey(this._viewCapDeferredKey);
-            this._viewCapDeferredKey = null;
-            this._viewCapDeferred = false;
-        }
-
-        // Clean up the tooltip overlay
-        if (this.tooltipOverlay && this.map) {
-            this.map.removeOverlay(this.tooltipOverlay);
-            this.tooltipOverlay = null;
-            this.tooltipElement = null;
-        }
-
-        // Clean up image popup overlay
-        if (this.imagePopupOverlay && this.map) {
-            this.map.removeOverlay(this.imagePopupOverlay);
-            this.imagePopupOverlay = null;
-        }
-
-        // Clean up video popup overlay
-        if (this.videoPopupOverlay && this.map) {
-            this.map.removeOverlay(this.videoPopupOverlay);
-            this.videoPopupOverlay = null;
-        }
-
-        // Clean up vector layers
-        if (this.vectorLayers && this.map) {
-            this.vectorLayers.forEach(layer => {
-                this.map.removeLayer(layer);
-            });
-            this.vectorLayers = [];
-        }
-
-        // Clean up split-screen clip listeners
-        this._detachSplitClip();
+        this.tooltipOverlay = null;
+        this.tooltipElement = null;
+        this.vectorLayers = [];
     },
     methods: {
         // Generate a unique color based on the file name or index
@@ -469,471 +351,32 @@ export default {
 
         // Returns current map view center as [lon, lat] in WGS84, or null if unavailable.
         getMapCenterLatLon: function () {
-            if (!this.map) return null;
-            const view = this.map.getView();
-            const center = view && view.getCenter();
-            if (!center) return null;
-            return toLonLat(center);
-        },
-
-
-        // Show image popup overlay on the map
-        showImagePopup: function (file, coordinate) {
-            this.imagePopupFileName = ddb.pathutils.basename(file.entry.path);
-
-            // Reset loading state, retry budget and thumbnail for new image
-            this.imagePopupLoading = true;
-            this.imagePopupThumbnail = null;
-            this.imagePopupRetry = 0;
-            if (this.imagePopupRetryTimeout) {
-                clearTimeout(this.imagePopupRetryTimeout);
-                this.imagePopupRetryTimeout = null;
-            }
-
-            // Get thumbnail URL (set after nextTick so v-show hides the img while loading)
-            this.$nextTick(() => {
-                if (thumbs.supportedForType(file.entry.type)) {
-                    this.imagePopupThumbnail = thumbs.fetch(file.path, 512, file.entry.hash);
-                } else {
-                    this.imagePopupLoading = false;
-                }
-            });
-
-            // Build download and open URLs
-            const [dataset, path] = ddb.utils.datasetPathFromUri(file.path);
-            this.imagePopupDownloadUrl = dataset.downloadUrl(path);
-            this.imagePopupOpenUrl = dataset.downloadUrl(path, { inline: true });
-
-            // Extract WGS84 coordinates from entry
-            if (file.entry.point_geom) {
-                const coords = coordAll(file.entry.point_geom)[0];
-                if (coords && coords.length >= 2) {
-                    const lon = coords[0].toFixed(6);
-                    const lat = coords[1].toFixed(6);
-                    this.imagePopupCoords = `${lat}, ${lon}`;
-                } else {
-                    this.imagePopupCoords = '';
-                }
-            } else {
-                this.imagePopupCoords = '';
-            }
-            this.imagePopupCoordsCopied = false;
-
-            this.imagePopupVisible = true;
-
-            // Position the overlay on the map
-            this.$nextTick(() => {
-                if (!this.imagePopupOverlay) {
-                    this.imagePopupOverlay = new Overlay({
-                        element: this.$refs.imagePopup,
-                        autoPan: true,
-                        autoPanAnimation: { duration: 250 },
-                        offset: [150, -150],
-                        positioning: 'bottom-left'
-                    });
-                    this.map.addOverlay(this.imagePopupOverlay);
-                }
-                this.imagePopupOverlay.setPosition(coordinate);
-            });
-        },
-
-        // Called when popup image successfully loads
-        onImagePopupLoaded: function () {
-            this.imagePopupLoading = false;
-        },
-
-        // Popup thumbnail failed: bounded retry with the shared policy, then a
-        // filename-only fallback (v-show hides the image, download stays).
-        onImagePopupError: function () {
-            if (this.imagePopupThumbnail && this.imagePopupThumbnail.startsWith("/orgs") &&
-                shouldRetry(this.imagePopupRetry)) {
-                if (this.imagePopupRetryTimeout) {
-                    clearTimeout(this.imagePopupRetryTimeout);
-                }
-                const nextRetry = this.imagePopupRetry + 1;
-                this.imagePopupRetryTimeout = setTimeout(() => {
-                    // Cache-buster: fresh &retry=N busts the browser cache of the
-                    // failed response (server ignores the param).
-                    this.imagePopupThumbnail = `${stripRetryParam(this.imagePopupThumbnail)}&retry=${nextRetry}`;
-                    this.imagePopupRetry = nextRetry;
-                }, retryDelayMs(this.imagePopupRetry));
-                return;
-            }
-
-            // Terminal: drop the image, keep filename + download button visible.
-            if (this.imagePopupRetryTimeout) {
-                clearTimeout(this.imagePopupRetryTimeout);
-                this.imagePopupRetryTimeout = null;
-            }
-            this.imagePopupLoading = false;
-            this.imagePopupThumbnail = null;
-        },
-
-        // Close image popup
-        closeImagePopup: function () {
-            this.imagePopupVisible = false;
-            this.imagePopupLoading = true;
-            this.imagePopupCoordsCopied = false;
-            if (this.imagePopupRetryTimeout) {
-                clearTimeout(this.imagePopupRetryTimeout);
-                this.imagePopupRetryTimeout = null;
-            }
-            if (this.imagePopupOverlay) {
-                this.imagePopupOverlay.setPosition(undefined);
-            }
-        },
-
-        // Copy coordinates to clipboard
-        copyCoordinates: function () {
-            if (this.imagePopupCoords) this.copyImageCoords(this.imagePopupCoords);
-        },
-
-        // Show video info popup overlay on the map
-        showVideoPopup: function (file, coordinate) {
-            this.videoPopupFileName = ddb.pathutils.basename(file.entry.path);
-            this.videoPopupFile = file;
-
-            // Resolution
-            const w = file.entry.properties && file.entry.properties.width;
-            const h = file.entry.properties && file.entry.properties.height;
-            this.videoPopupResolution = (w && h) ? `${w} x ${h}` : '';
-
-            // Capture date
-            const ct = file.entry.properties && file.entry.properties.captureTime;
-            this.videoPopupDate = ct ? new Date(ct).toLocaleString() : '';
-
-            // Download URL
-            const [dataset, path] = ddb.utils.datasetPathFromUri(file.path);
-            this.videoPopupDownloadUrl = dataset.downloadUrl(path);
-
-            // Coordinates
-            if (file.entry.point_geom) {
-                const coords = coordAll(file.entry.point_geom)[0];
-                if (coords && coords.length >= 2) {
-                    const lon = coords[0].toFixed(6);
-                    const lat = coords[1].toFixed(6);
-                    this.videoPopupCoords = `${lat}, ${lon}`;
-                } else {
-                    this.videoPopupCoords = '';
-                }
-            } else {
-                this.videoPopupCoords = '';
-            }
-            this.videoPopupCoordsCopied = false;
-
-            this.videoPopupVisible = true;
-
-            this.$nextTick(() => {
-                if (!this.videoPopupOverlay) {
-                    this.videoPopupOverlay = new Overlay({
-                        element: this.$refs.videoPopup,
-                        autoPan: true,
-                        autoPanAnimation: { duration: 250 },
-                        offset: [150, -150],
-                        positioning: 'bottom-left'
-                    });
-                    this.map.addOverlay(this.videoPopupOverlay);
-                }
-                this.videoPopupOverlay.setPosition(coordinate);
-            });
-        },
-
-        // Close video popup
-        closeVideoPopup: function () {
-            this.videoPopupVisible = false;
-            this.videoPopupFile = null;
-            this.videoPopupCoordsCopied = false;
-            if (this.videoPopupOverlay) {
-                this.videoPopupOverlay.setPosition(undefined);
-            }
-        },
-
-        // Play button inside video popup
-        openVideoFromPopup: function () {
-            if (this.videoPopupFile) {
-                this.$emit('openItem', this.videoPopupFile);
-                this.closeVideoPopup();
-            }
-        },
-
-        // Copy coordinates from video popup
-        copyVideoCoordinates: function () {
-            if (this.videoPopupCoords) this.copyVideoCoords(this.videoPopupCoords);
+            const center = this.map && this.map.getView().getCenter();
+            return center ? toLonLat(center) : null;
         },
 
         loadMap: function () {
             if (this.loaded) return;
-
             this.loaded = true;
             this.vectorLayers = [];
 
-            const genShotStyle = (fill, stroke, size) => {
-                let text = null;
-                if (size > 1) {
-                    text = new Text({
-                        text: size.toString(),
-                        font: 'bold 1rem sans-serif',
-                        fill: new Fill({
-                            color: 'rgba(252, 252, 255, 1)'
-                        })
-                    });
-                }
-
-                return new Style({
-                    image: new CircleStyle({
-                        radius: isMobile() ? 10 : 8,
-                        fill: new Fill({
-                            color: fill
-                        }),
-                        stroke: new Stroke({
-                            color: stroke,
-                            width: 2
-                        })
-                    }),
-                    text
-                });
-            };
-
-            const genDirectionStyle = (svgName, yawDegrees, size) => {
-                if (size > 1) {
-                    // Cluster: show numbered circle, not arrow
-                    return genShotStyle('rgba(75, 150, 243, 1)', 'rgba(252, 252, 255, 1)', size);
-                }
-
-                return new Style({
-                    image: new Icon({
-                        src: `/images/${svgName}`,
-                        rotation: yawDegrees * (Math.PI / 180),
-                        rotateWithView: false,
-                        anchor: [0.5, 0.5],
-                        anchorXUnits: 'fraction',
-                        anchorYUnits: 'fraction',
-                        scale: isMobile() ? 1.2 : 1.0,
-                    })
-                });
-            };
-
-            this.styles = {
-                shot: feats => {
-                    let styleId = `_shot-${feats.length}`;
-                    let selected = false;
-
-                    for (let i = 0; i < feats.length; i++) {
-                        if (feats[i].file && feats[i].file.selected) {
-                            styleId = `_shot-selected-${feats.length}`;
-                            selected = true;
-                            break;
-                        }
-                    }
-
-                    // Memoize
-                    if (!this.styles[styleId]) {
-                        if (selected) this.styles[styleId] = genShotStyle('rgba(255, 158, 103, 1)', 'rgba(252, 252, 255, 1)', feats.length);
-                        else this.styles[styleId] = genShotStyle('rgba(75, 150, 243, 1)', 'rgba(252, 252, 255, 1)', feats.length);
-                    }
-
-                    return this.styles[styleId];
-                },
-
-                'shot-outlined': feats => {
-                    let styleId = `_shot-outlined-${feats.length}`;
-
-                    // Memoize
-                    if (!this.styles[styleId]) {
-                        this.styles[styleId] = genShotStyle('rgba(253, 226, 147, 1)', 'rgba(252, 252, 255, 1)', feats.length);
-                    }
-
-                    return this.styles[styleId];
-                },
-
-                direction: feats => {
-                    const size = feats.length;
-                    if (size > 1) {
-                        // Cluster: fallback to numbered circle
-                        return this.styles.shot(feats);
-                    }
-
-                    const feat = feats[0];
-                    const yaw = feat.file?.entry?.properties?.cameraYaw ?? 0;
-                    const hasCameraOri = feat.file?.entry?.properties?.hasCameraOrientation;
-
-                    // If orientation is not available, use circle
-                    if (!hasCameraOri) {
-                        return this.styles.shot(feats);
-                    }
-
-                    const selected = feat.file?.selected;
-                    const svgName = selected ? 'direction-arrow-selected.svg' : 'direction-arrow.svg';
-                    const styleId = `_direction-${selected ? 'sel' : 'def'}-${Math.round(yaw)}`;
-
-                    if (!this.styles[styleId]) {
-                        this.styles[styleId] = genDirectionStyle(svgName, yaw, 1);
-                    }
-                    return this.styles[styleId];
-                },
-
-                'direction-outlined': feats => {
-                    if (feats.length > 1) return this.styles['shot-outlined'](feats);
-
-                    const feat = feats[0];
-                    const yaw = feat.file?.entry?.properties?.cameraYaw ?? 0;
-                    const hasCameraOri = feat.file?.entry?.properties?.hasCameraOrientation;
-
-                    if (!hasCameraOri) return this.styles['shot-outlined'](feats);
-
-                    const styleId = `_direction-out-${Math.round(yaw)}`;
-                    if (!this.styles[styleId]) {
-                        this.styles[styleId] = genDirectionStyle('direction-arrow-outlined.svg', yaw, 1);
-                    }
-                    return this.styles[styleId];
-                },
-
-                outline: new Style({
-                    stroke: new Stroke({
-                        color: 'rgba(253, 226, 147, 1)',
-                        width: 6
-                    })
-                }),
-
-                invisible: new Style({
-                    fill: new Fill({
-                        color: 'rgba(0, 0, 0, 0)'
-                    })
-                }),
-
-                startFlag: new Style({
-                    image: new Icon({
-                        anchor: [0.05, 1],
-                        anchorXUnits: 'fraction',
-                        anchorYUnits: 'fraction',
-                        src: '/images/start-flag.svg',
-                    })
-                }),
-
-                finishFlag: new Style({
-                    image: new Icon({
-                        anchor: [0.05, 1],
-                        anchorXUnits: 'fraction',
-                        anchorYUnits: 'fraction',
-                        src: '/images/finish-flag.svg',
-                    })
-                }),
-
-                flightPath: new Style({
-                    stroke: new Stroke({
-                        color: 'rgba(75, 150, 243, 1)', // 'rgba(253, 226, 147, 1)',
-                        width: 4
-                    })
-                }),
-
-                pano: feats => {
-                    let styleId = 'panoDeselected';
-
-                    for (let i = 0; i < feats.length; i++) {
-                        if (feats[i].file && feats[i].file.selected) {
-                            styleId = 'panoSelected';
-                            break;
-                        }
-                    }
-
-                    return this.styles[styleId];
-                },
-
-                panoDeselected: new Style({
-                    image: new Icon({
-                        anchor: [0.5, 0.5],
-                        anchorXUnits: 'fraction',
-                        anchorYUnits: 'fraction',
-                        src: '/images/pano.svg'
-                    })
-                }), panoSelected: new Style({
-                    image: new Icon({
-                        anchor: [0.5, 0.5],
-                        anchorXUnits: 'fraction',
-                        anchorYUnits: 'fraction',
-                        src: '/images/pano-selected.svg'
-                    })
-                }),
-
-                // Vector file styles
-                vectorPoint: new Style({
-                    image: new CircleStyle({
-                        radius: 5,
-                        fill: new Fill({
-                            color: 'rgba(30, 144, 255, 0.8)'
-                        }),
-                        stroke: new Stroke({
-                            color: 'rgba(0, 0, 139, 1)',
-                            width: 1.5
-                        })
-                    })
-                }),
-
-                vectorLine: new Style({
-                    stroke: new Stroke({
-                        color: 'rgba(30, 144, 255, 0.8)',
-                        width: 3
-                    })
-                }),
-
-                vectorPolygon: new Style({
-                    fill: new Fill({
-                        color: 'rgba(30, 144, 255, 0.2)'
-                    }),
-                    stroke: new Stroke({
-                        color: 'rgba(30, 144, 255, 0.8)',
-                        width: 2
-                    })
-                })
-            };
-
-            this.fileFeatures = new VectorSource();
-            const clusterSource = new Cluster({
-                distance: 0.0001,
-                source: this.fileFeatures
-            });
-            this.fileLayer = new VectorLayer({
-                source: clusterSource,
-                style: cluster => {
-                    const feats = cluster.get('features');
-                    const s = this.styles[feats[0].style];
-                    if (typeof s === "function") return s(feats);
-                    else return s;
-                }
-            });
+            // File layers, bottom to top: rasters, clicked footprints, invisible raster
+            // extents (to click rasters), then flight path, shots and flags
+            this.styles = createFileLayerStyles();
             this.rasterLayer = new LayerGroup();
-
-            this.extentsFeatures = new VectorSource();
-            this.extentLayer = new VectorLayer({
-                source: this.extentsFeatures,
-                style: this.styles.invisible
-            });
-
-            this.outlineFeatures = new VectorSource();
-            this.outlineLayer = new VectorLayer({
-                source: this.outlineFeatures,
-                style: this.styles.outline
-            });
             this.footprintRastersLayer = new LayerGroup();
-
+            this.extentsFeatures = new VectorSource();
+            this.extentLayer = new VectorLayer({ source: this.extentsFeatures, style: this.styles.invisible });
+            this.fileFeatures = new VectorSource();
+            this.fileLayer = new VectorLayer({
+                source: new Cluster({ distance: 0.0001, source: this.fileFeatures }),
+                style: this.styles.forCluster
+            });
             this.flightPathFeatures = new VectorSource();
-            this.flightPathLayer = new VectorLayer({
-                source: this.flightPathFeatures
-            });
+            this.flightPathLayer = new VectorLayer({ source: this.flightPathFeatures, visible: this.showFlightPath });
             this.markerFeatures = new VectorSource();
-            this.markerLayer = new VectorLayer({
-                source: this.markerFeatures
-            });
-
-            this.topLayers = new LayerGroup();
-            this.topLayers.setLayers(new Collection([
-                this.flightPathLayer,
-                this.fileLayer,
-                this.markerLayer
-            ]));
-
-
-            const basemapLayer = this.createBasemapLayer();
+            this.markerLayer = new VectorLayer({ source: this.markerFeatures, visible: this.showFlightPath });
+            const topLayers = new LayerGroup({ layers: [this.flightPathLayer, this.fileLayer, this.markerLayer] });
 
             this.selectionControl = this.standalone ? null : new SelectionControl({
                 onSelectionComplete: (polygon) => { this.handlePolygonSelection(polygon); },
@@ -972,495 +415,188 @@ export default {
                 },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
-            }); this.map = new Map({
+            });
+
+            this.map = new Map({
                 target: this.$refs['map-container'],
                 layers: [
-                    basemapLayer,
+                    this.createBasemapLayer(),
                     this.rasterLayer,
                     this.footprintRastersLayer,
                     this.extentLayer,
-                    this.outlineLayer,
-                    this.topLayers,
+                    topLayers,
                     this.measureControls.getLayer()
                 ],
-                view: new View({
-                    center: [0, 0],
-                    zoom: 2
-                })
+                view: new View({ center: [0, 0], zoom: 2 })
             });
 
-            // Setup tooltip overlay for vector features
             this.setupTooltipOverlay();
             this.map.addOverlay(this.tooltipOverlay);
-
-            this.map.once("postrender", () => {
-                this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
+            this.map.once('postrender', () => {
+                this.map.getTargetElement().querySelector('canvas').style.cursor = 'inherit';
             });
+
+            // The View's max zoom follows the deepest native zoom of the loaded rasters
+            this.viewZoomCap = new ViewZoomCap(this.map, [this.rasterLayer, this.footprintRastersLayer]);
+
             // Map listeners are removed with the component (this.listeners)
-
-            // Keep the View maxZoom capped to the deepest native raster zoom
-            // currently loaded (plus a small magnification allowance). The View
-            // exists here (created with `new Map(...)` above), so bind the
-            // collection listeners now; they are removed with the component.
-            this._lastAppliedViewCap = null;
-            this._viewCapPending = false;
-            this._viewCapDeferred = false;
-            this._viewCapDeferredKey = null;
-            const scheduleViewCap = () => this._scheduleViewCapUpdate();
-            [this.rasterLayer.getLayers(), this.footprintRastersLayer.getLayers()].forEach(collection => {
-                this.listeners.ol([collection.on('add', scheduleViewCap), collection.on('remove', scheduleViewCap)]);
-            });
-
-            this.listeners.ol(this.map.on('pointermove', (e) => {
-                if (e.dragging || this.measuring) {
-                    this.hideFeatureTooltip();
-                    return;
-                }
-
-                // Check if pointer is over UI controls - hide tooltip if so
-                const domElement = document.elementFromPoint(e.pixel[0], e.pixel[1]);
-                if (domElement && (
-                    domElement.closest('.ol-map-display-buttons') ||
-                    domElement.closest('.ol-map-buttons') ||
-                    domElement.closest('.ol-measure-control') ||
-                    domElement.closest('.ol-selection') ||
-                    domElement.closest('.ol-zoom') ||
-                    domElement.closest('.ol-settings')
-                )) {
-                    this.hideFeatureTooltip();
-                    return;
-                }
-
-                // Check if we're hovering over a vector feature or image marker
-                const hitVector = this.map.hasFeatureAtPixel(e.pixel, {
-                    layerFilter: layer => this.vectorLayers.includes(layer)
-                });
-                const hitImage = this.map.hasFeatureAtPixel(e.pixel, {
-                    layerFilter: layer => layer === this.fileLayer
-                });
-                const hit = hitVector || hitImage;
-
-                // Update cursor style based on whether we're hovering over a feature
-                this.map.getTargetElement().style.cursor = hit ? 'pointer' : 'inherit';
-
-                if (hitVector) {
-                    let hoveredFeature = null;
-                    let hoveredLayer = null;
-
-                    // Find the first vector feature at this pixel
-                    this.map.forEachFeatureAtPixel(e.pixel,
-                        (feature, layer) => {
-                            if (this.vectorLayers.includes(layer) && !hoveredFeature) {
-                                hoveredFeature = feature;
-                                hoveredLayer = layer;
-                                return true; // Stop looking after finding the first feature
-                            }
-                            return false;
-                        }, {
-                        layerFilter: layer => this.vectorLayers.includes(layer)
-                    });
-
-                    if (hoveredFeature) {
-                        // Show tooltip for this feature
-                        this.showFeatureTooltip(hoveredFeature, e.pixel, hoveredLayer);
-                    } else {
-                        this.hideFeatureTooltip();
-                    }
-                } else if (hitImage) {
-                    // Show tooltip for image markers (GEOIMAGE cluster)
-                    let imageFeature = null;
-                    this.map.forEachFeatureAtPixel(e.pixel,
-                        (feature) => {
-                            if (!imageFeature) {
-                                imageFeature = feature;
-                                return true;
-                            }
-                            return false;
-                        }, {
-                        layerFilter: layer => layer === this.fileLayer
-                    });
-
-                    if (imageFeature) {
-                        const clusterFeatures = imageFeature.get('features');
-                        if (clusterFeatures && clusterFeatures.length > 0) {
-                            let label;
-                            if (clusterFeatures.length === 1) {
-                                const file = clusterFeatures[0].file;
-                                const feat = clusterFeatures[0];
-                                label = ddb.pathutils.basename(file.entry.path);
-
-                                // Append speed info when direction indicators are active
-                                if (this.showDirectionIndicators) {
-                                    const speed = feat.computedSpeed;
-                                    if (speed !== undefined && speed !== null) {
-                                        let speedDisplay, speedUnit;
-                                        if (this.currentUnitPref === 'imperial') {
-                                            speedDisplay = (speed * 2.23694).toFixed(1);
-                                            speedUnit = 'mph';
-                                        } else {
-                                            speedDisplay = (speed * 3.6).toFixed(1);
-                                            speedUnit = 'km/h';
-                                        }
-                                        label += ` - ${speedDisplay} ${speedUnit}`;
-                                    }
-                                }
-                            } else {
-                                label = `${clusterFeatures.length} images`;
-                            }
-                            this.tooltipElement.innerHTML = sanitizeHtml(label);
-                            this.tooltipElement.style.display = 'block';
-                            this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(e.pixel));
-                        } else {
-                            this.hideFeatureTooltip();
-                        }
-                    } else {
-                        this.hideFeatureTooltip();
-                    }
-                } else {
-                    this.hideFeatureTooltip();
-                }
-            }));
-            // Add double-click handler for showing feature properties
-            this.listeners.ol(this.map.on('dblclick', (e) => {
-                if (this.measuring) return;
-
-                // Check if we clicked on a vector feature
-                let dblClickedFeature = null;
-                let dblClickedLayer = null;
-
-                // First try to find a vector feature at this pixel
-                this.map.forEachFeatureAtPixel(e.pixel,
-                    (feature, layer) => {
-                        if (this.vectorLayers.includes(layer) && !dblClickedFeature) {
-                            dblClickedFeature = feature;
-                            dblClickedLayer = layer;
-                            // Prevent further processing
-                            e.stopPropagation();
-                            return true; // Stop looking for more features
-                        }
-                        return false;
-                    }, {
-                    layerFilter: layer => this.vectorLayers.includes(layer)
-                });
-
-                if (dblClickedFeature) {
-                    this.showFeaturePropertiesDialog(dblClickedFeature, dblClickedLayer);
-                }
-            }));
+            this.listeners.ol([
+                this.map.on('pointermove', e => this.onPointerMove(e)),
+                this.map.on('click', e => this.onMapClick(e)),
+                this.map.on('dblclick', e => this.onMapDoubleClick(e)),
+                this.map.on('contextmenu', e => {
+                    this.selectAt(e.pixel);
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return false;
+                })
+            ]);
+            this.listeners.bus(emitter, 'addItems', () => this.reloadFileLayers());
 
             if (this.selectionControl) this.map.addControl(this.selectionControl);
             this.map.addControl(this.measureControls);
-
             this.settingsControl = new SettingsControl({
                 onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
             });
             this.map.addControl(this.settingsControl);
 
-            // Group the controls into toolbar zones so they stack without overlapping.
-            const zones = this.createControlZones();
-            if (this.selectionControl) this.moveControlToZone(this.selectionControl, zones.topLeft);
-            this.moveControlToZone(this.measureControls, zones.topRight);
-            this.moveControlToZone(this.settingsControl, zones.bottomLeft);
-
-            // Utility cluster top-right: Reset View + Fullscreen + analysis buttons.
-            // Matches the SingleMap.vue pattern (appendAnalysisButtonsToContainer).
-            const utilContainer = document.createElement('div');
-            utilContainer.className = 'ol-map-buttons ol-unselectable ol-control';
-
-            if (this.standalone && this.dataset) {
-                const backBtn = document.createElement('button');
-                backBtn.title = 'Back to Dataset';
-                backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
-                // lifetime: element (the map's own control buttons)
-                backBtn.addEventListener('click', () => {
-                    this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
-                });
-                utilContainer.appendChild(backBtn);
-            }
-
-            const resetBtn = document.createElement('button');
-            resetBtn.title = 'Reset View (H)';
-            resetBtn.innerHTML = '<i class="fa-solid fa-house"></i>';
-            // lifetime: element (the map's own control buttons)
-            resetBtn.addEventListener('click', () => { this.resetToInitialView(); });
-            utilContainer.appendChild(resetBtn);
-
-            if (supportsFullScreen()) {
-                const fsBtn = document.createElement('button');
-                fsBtn.title = 'Fullscreen (F11)';
-                fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
-                // lifetime: element (the map's own control buttons)
-                fsBtn.addEventListener('click', () => {
-                    if (isFullScreenCurrently()) { exitFullScreen(); }
-                    else { requestFullScreen(this.$el); this.later(() => this.map.updateSize(), 500); }
-                });
-                utilContainer.appendChild(fsBtn);
-            }
-
-            this.appendAnalysisButtonsToContainer(utilContainer, predicate => {
-                const f = (this.files || []).find(x => x.entry && predicate(x.entry));
-                return f || null;
-            }, { skipPlantHealth: true });
-            utilContainer.style.order = '-1';
-            this.map.addControl(new Control({ element: utilContainer, target: zones.topRight }));
-
-            // Display options cluster (top-center): direction, flight path, split-compare.
-            const displayContainer = document.createElement('div');
-            displayContainer.className = 'ol-map-display-buttons ol-unselectable ol-control';
-
-            const dirBtn = document.createElement('button');
-            dirBtn.title = 'Show direction and speed indicators';
-            dirBtn.innerHTML = '<i class="fa-solid fa-location-arrow"></i>';
-            if (this.showDirectionIndicators) dirBtn.classList.add('active');
-            // lifetime: element (the map's own control buttons)
-            dirBtn.addEventListener('click', () => {
-                this.showDirectionIndicators = !this.showDirectionIndicators;
-                setPref(PREF.SHOW_DIRECTION_INDICATORS, this.showDirectionIndicators);
-                this.applyDirectionStyles();
-                dirBtn.classList.toggle('active', this.showDirectionIndicators);
-            });
-            displayContainer.appendChild(dirBtn);
-
-            const flightBtn = document.createElement('button');
-            flightBtn.title = 'Show drone flight path';
-            flightBtn.innerHTML = '<i class="fa-solid fa-signs-post"></i>';
-            if (this.showFlightPath) flightBtn.classList.add('active');
-            // lifetime: element (the map's own control buttons)
-            flightBtn.addEventListener('click', () => {
-                this.showFlightPath = !this.showFlightPath;
-                setPref(PREF.SHOW_FLIGHT_PATH, this.showFlightPath);
-                if (this.flightPathLayer) this.flightPathLayer.setVisible(this.showFlightPath);
-                if (this.markerLayer) this.markerLayer.setVisible(this.showFlightPath);
-                flightBtn.classList.toggle('active', this.showFlightPath);
-            });
-            displayContainer.appendChild(flightBtn);
-
-            const splitBtn = document.createElement('button');
-            splitBtn.title = 'Need at least 2 georasters to compare';
-            splitBtn.innerHTML = '<i class="fa-solid fa-table-columns"></i>';
-            splitBtn.disabled = true;
-            // lifetime: element (the map's own control buttons)
-            splitBtn.addEventListener('click', () => {
-                if (this.splitMode) this.exitSplitMode();
-                else this.enterSplitMode();
-            });
-            displayContainer.appendChild(splitBtn);
-            this._splitBtn = splitBtn;
-
-            if (!this.standalone) this.map.addControl(new Control({ element: displayContainer, target: zones.topCenter }));
-
-            // Apply flight path visibility preference
-            this.flightPathLayer.setVisible(this.showFlightPath);
-            this.markerLayer.setVisible(this.showFlightPath);
-
-            const doSelectSingle = e => {
-                let first = true;
-                let vectorLayerClicked = false;
-
-                // First check vector features, since they might be on top
-                // Loop through all vector layers
-                for (let i = 0; i < this.vectorLayers.length; i++) {
-                    const vectorLayer = this.vectorLayers[i];
-
-                    // Use OpenLayers' built-in feature detection at pixel
-                    // This works well with the streamed features
-                    let foundFeature = false;
-
-                    this.map.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
-                        if (layer === vectorLayer && !foundFeature) {
-                            foundFeature = true;
-                            vectorLayerClicked = true;
-
-                            if (vectorLayer.file) {
-                                vectorLayer.file.selected = !vectorLayer.file.selected;
-
-                                // Inform other components we should scroll to this file
-                                if (vectorLayer.file.selected) {
-                                    this.$emit("scrollTo", vectorLayer.file);
-                                }
-
-                                // Update the vector layer's style to reflect selection
-                                this.updateRastersOpacity();
-                                this.updateClearSelectionButton();
-                            }
-                        }
-                    });
-
-                    if (vectorLayerClicked) break;
-                }
-
-                // If no vector feature was clicked, check other features
-                if (!vectorLayerClicked) {
-                    this.map.forEachFeatureAtPixel(e.pixel, feat => {
-                        // Only select the first entry
-                        if (!first) return;
-                        first = false;
-
-                        const feats = feat.get('features');
-                        if (feats) {
-                            // Geoimage point cluster
-                            let selected = false;
-                            for (let i = 0; i < feats.length; i++) {
-                                if (feats[i].file && feats[i].file.selected) {
-                                    selected = true;
-                                    break;
-                                }
-                            }
-
-                            for (let i = 0; i < feats.length; i++) {
-                                if (feats[i].file) feats[i].file.selected = !selected;
-                            }
-
-                            // Inform other components we should scroll to this file
-                            if (!selected && feats.length && feats[0].file) {
-                                this.$emit("scrollTo", feats[0].file);
-                            }
-                        } else {
-                            // Extents selection
-                            if (feat.file) feat.file.selected = !feat.file.selected;
-                        }
-                    });
-                }
-
-                this.updateClearSelectionButton();
-            };
-
-            this.listeners.ol(this.map.on('click', e => {
-                if (this.measuring) return;
-                if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
-
-                // Single selection
-                if (this.selectSingle) {
-                    doSelectSingle(e);
-                } else {
-                    // Close any open image popup
-                    this.closeImagePopup();
-
-                    // Close any open video popup
-                    this.closeVideoPopup();
-
-                    // Clear any previously displayed raster footprints
-                    this.clearLayerGroup(this.footprintRastersLayer);
-
-                    // Handle the topmost clicked feature
-                    let stop = false;
-                    this.map.forEachFeatureAtPixel(e.pixel, feat => {
-                        if (stop) return;
-                        stop = true;
-
-                        // Extent features (orthophoto footprints) no longer trigger
-                        // a selection highlight: the yellow outline mode was removed.
-                        if (!feat.get('features')) return;
-
-                        // Geoimage (point cluster)
-                        const file = feat.get('features')[0].file;
-
-                        // Clicked on panorama
-                        if ([ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA].indexOf(file.entry.type) !== -1) {
-                            // Open panorama view
-                            this.$emit('openItem', file, 'panorama');
-                            return;
-                        }
-
-                        // Clicked on geoimage - show image popup
-                        if (file.entry.type === ddb.entry.type.GEOIMAGE) {
-                            this.showImagePopup(file, e.coordinate);
-                        }
-
-                        // Clicked on geovideo - show video info popup
-                        if (file.entry.type === ddb.entry.type.GEOVIDEO) {
-                            this.showVideoPopup(file, e.coordinate);
-                            return;
-                        }
-
-                        // Without a footprint geometry there is nothing left to draw
-                        if (!file.entry.polygon_geom) return;
-
-                        const coords = coordAll(file.entry.polygon_geom);
-                        const footprintGeom = new Polygon([coords]);
-                        footprintGeom.transform(EPSG.WGS84, EPSG.WEB_MERCATOR);
-
-                        // Add geoprojected raster footprint
-                        const footprintRetina = useRetinaTiles();
-                        const footprintNative = computeNativeZoom(file.entry);
-                        const rasterFootprint = new TileLayer({
-                            extent: footprintGeom.getExtent(),
-                            source: new HybridXYZ({
-                                url: file.path,
-                                hash: file.entry.hash,
-                                tileSize: 256,
-                                transition: 200,
-                                minZoom: 14,
-                                retina: footprintRetina,
-                                maxZoom: sourceMaxZoom(footprintNative, footprintRetina)
-                            })
-                        });
-                        rasterFootprint.set('rasterNativeZoom', footprintNative);
-                        this.footprintRastersLayer.getLayers().push(rasterFootprint);
-                        this._scheduleViewCapUpdate();
-                    }, {
-                        layerFilter: layer => {
-                            return layer.getVisible() &&
-                                (layer === this.fileLayer ||
-                                    layer === this.extentLayer);
-                        }
-                    });
-
-                    // Update styles
-                    this.fileLayer.changed();
-                }
-            }));
-
-            // Right click
-            this.listeners.ol(this.map.on('contextmenu', e => {
-                // Single selection
-                doSelectSingle(e);
-
-                e.stopPropagation();
-                e.preventDefault();
-                return false;
-            }));
-
-            // Double click on geovideo marker - open video player directly
-            this.listeners.ol(this.map.on('dblclick', e => {
-                if (this.measuring) return;
-                if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
-
-                let handled = false;
-                this.map.forEachFeatureAtPixel(e.pixel, feat => {
-                    if (handled) return;
-                    if (!feat.get('features')) return;
-
-                    const file = feat.get('features')[0].file;
-                    if (file && file.entry.type === ddb.entry.type.GEOVIDEO) {
-                        handled = true;
-                        this.closeVideoPopup();
-                        this.$emit('openItem', file);
-                    }
-                }, {
-                    layerFilter: layer => layer.getVisible() && layer === this.fileLayer
-                });
-
-                if (handled) {
-                    e.preventDefault();
-                }
-            }));
-
-            this.listeners.bus(emitter, 'addItems', () => {
-                this.reloadFileLayers();
-            });
+            // Toolbar zones: the controls stack without overlapping; MapToolbar teleports in
+            const zones = createControlZones(this.map);
+            if (this.selectionControl) moveToZone(this.selectionControl, zones.topLeft);
+            moveToZone(this.measureControls, zones.topRight);
+            moveToZone(this.settingsControl, zones.bottomLeft);
+            this.zones = zones;
 
             Keyboard.onKeyDown(this.handleKeyDown);
             Keyboard.onKeyUp(this.handleKeyUp);
 
-            // Redraw, otherwise openlayers does not draw
-            // the map correctly
+            // Redraw, otherwise openlayers does not draw the map correctly
             this.later(() => this.map.updateSize(), 1);
         },
+
+        isSelecting: function () {
+            return this.selectPolygon || !!(this.selectionControl && this.selectionControl.isActive());
+        },
+
+        // Tooltip over vector features and shots; pointer cursor over anything clickable
+        onPointerMove: function (e) {
+            const target = e.originalEvent && e.originalEvent.target;
+            if (e.dragging || this.measuring || (target instanceof Element && target.closest(MAP_CONTROLS))) {
+                this.hideFeatureTooltip();
+                return;
+            }
+            const vectorHit = featureAt(this.map, e.pixel, l => this.vectorLayers.includes(l));
+            const shotHit = vectorHit ? null : featureAt(this.map, e.pixel, l => l === this.fileLayer);
+            this.map.getTargetElement().style.cursor = vectorHit || shotHit ? 'pointer' : 'inherit';
+
+            const shots = shotHit && shotHit.feature.get('features');
+            if (vectorHit) this.showFeatureTooltip(vectorHit.feature, e.pixel, vectorHit.layer);
+            else if (shots && shots.length) this.showTextTooltip(this.shotsLabel(shots), e.pixel);
+            else this.hideFeatureTooltip();
+        },
+
+        // "name - 12.3 km/h" for one shot (speed with the direction indicators), "N images" for a cluster
+        shotsLabel: function (shots) {
+            if (shots.length !== 1) return `${shots.length} images`;
+            const label = ddb.pathutils.basename(shots[0].file.entry.path);
+            const speed = shots[0].computedSpeed;
+            return this.showDirectionIndicators && speed !== undefined && speed !== null
+                ? `${label} - ${formatSpeed(speed, this.currentUnitPref)}`
+                : label;
+        },
+
+        showTextTooltip: function (text, pixel) {
+            this.tooltipElement.innerHTML = sanitizeHtml(text);
+            this.tooltipElement.style.display = 'block';
+            this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
+        },
+
+        onMapClick: function (e) {
+            if (this.measuring || this.isSelecting()) return;
+            if (this.selectSingle) {
+                this.selectAt(e.pixel);
+                return;
+            }
+            this.$refs.filePopup.close();
+            this.clearLayerGroup(this.footprintRastersLayer);
+
+            // Raster extents no longer highlight on click (the outline mode was removed)
+            const hit = featureAt(this.map, e.pixel, l => l.getVisible() && (l === this.fileLayer || l === this.extentLayer));
+            const shots = hit && hit.feature.get('features');
+            if (shots) this.openShot(shots[0].file, e.coordinate);
+            this.fileLayer.changed();
+        },
+
+        // A clicked shot: panoramas open, photos and videos get the popup, photos their footprint
+        openShot: function (file, coordinate) {
+            const T = ddb.entry.type;
+            const type = file.entry.type;
+            if (type === T.PANORAMA || type === T.GEOPANORAMA) {
+                this.$emit('openItem', file, 'panorama');
+                return;
+            }
+            if (type === T.GEOIMAGE || type === T.GEOVIDEO) this.$refs.filePopup.show(file, coordinate);
+            if (type === T.GEOVIDEO || !file.entry.polygon_geom) return;
+
+            const footprint = new Polygon([coordAll(file.entry.polygon_geom)]);
+            footprint.transform(EPSG.WGS84, EPSG.WEB_MERCATOR);
+            this.footprintRastersLayer.getLayers().push(createRasterTileLayer(file, footprint.getExtent()));
+        },
+
+        // Double click: a vector feature's properties, or play a video
+        onMapDoubleClick: function (e) {
+            if (this.measuring) return;
+            const vectorHit = featureAt(this.map, e.pixel, l => this.vectorLayers.includes(l));
+            if (vectorHit) {
+                e.stopPropagation();
+                this.showFeaturePropertiesDialog(vectorHit.feature, vectorHit.layer);
+                return;
+            }
+            if (this.isSelecting()) return;
+            const hit = featureAt(this.map, e.pixel, l => l.getVisible() && l === this.fileLayer);
+            const file = hit && hit.feature.get('features') && hit.feature.get('features')[0].file;
+            if (file && file.entry.type === ddb.entry.type.GEOVIDEO) {
+                this.$refs.filePopup.close();
+                this.$emit('openItem', file);
+                e.preventDefault();
+            }
+        },
+
+        // Ctrl+click / right click: toggle the selection of what is under the pointer
+        selectAt: function (pixel) {
+            const file = toggleSelectionAt(this.map, pixel, this.vectorLayers);
+            if (file) this.$emit('scrollTo', file);
+            this.updateRastersOpacity();
+            this.updateClearSelectionButton();
+        },
+
+        handlePolygonSelection: function (polygon) {
+            this.selectPolygon = true;
+            const files = filesInPolygon(polygon, {
+                shots: this.fileFeatures.getFeatures(),
+                extents: this.extentsFeatures.getFeatures(),
+                vectorLayers: this.vectorLayers
+            });
+            files.forEach(file => { file.selected = true; });
+            if (files.length) this.$emit('scrollTo', files[0]);
+            this.updateRastersOpacity();
+            this.updateClearSelectionButton();
+        },
+
+        clearSelection: function () {
+            this.files.forEach(f => f.selected = false);
+            this.updateClearSelectionButton();
+        },
+
+        updateClearSelectionButton: function () {
+            if (this.selectionControl) this.selectionControl.setClearButtonVisible(this.files.some(f => f.selected));
+        },
+
         onPanelResized: function () {
             // Redraw when map is resized (via panels)
             if (this.map) this.map.updateSize();
         },
+
         onTabActivated: function () {
             if (!this.loaded) {
                 this.loadMap();
@@ -1470,413 +606,195 @@ export default {
                     if (this.map) this.map.updateSize();
                 });
             }
-        }, zoomToFilesExtent: function () {
+        },
+
+        zoomToFilesExtent: function () {
             const ext = this.getSelectedFilesExtent();
             if (!isEmptyExtent(ext)) {
-                // Save initial extent on first zoom
-                if (!this.initialExtent) {
-                    this.initialExtent = ext.slice(); // Clone the extent array
-                }
-                // Zoom to it
-                setTimeout(() => {
-                    this.map.getView().fit(ext, {
-                        padding: [40, 40, 40, 40],
-                        duration: 500,
-                        minResolution: 0.5,
-                        maxZoom: 22  // Prevent zooming in too much on single points
-                    });
-                }, 10);
-            } else {
-                // If we have no content to zoom to, check if we'll get vector data later
-                // In this case, an event listener in reloadFileLayers will handle zooming
-                // when vector features are loaded
+                // Remember the first extent for Reset view
+                if (!this.initialExtent) this.initialExtent = ext.slice();
+                this.later(() => this.map.getView().fit(ext, FIT_OPTIONS), 10);
+            } else if (this.vectorLayers.length === 0 && this.files.length === 0) {
+                this.map.getView().setCenter([0, 0]);
+                this.map.getView().setZoom(2);
+            }
+        },
 
-                // If no vector layers expected and no extent, set a default view
-                if (this.vectorLayers.length === 0 && this.files.length === 0) {
-                    // Reset to default view
-                    this.map.getView().setCenter([0, 0]);
-                    this.map.getView().setZoom(2);
-                }
-            }
-        },
         resetToInitialView: function () {
-            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) {
-                this.map.getView().fit(this.initialExtent, {
-                    padding: [40, 40, 40, 40],
-                    duration: 500,
-                    minResolution: 0.5,
-                    maxZoom: 22
-                });
-            } else {
-                // Fallback to recalculating extent
-                this.zoomToFilesExtent();
-            }
+            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) this.map.getView().fit(this.initialExtent, FIT_OPTIONS);
+            else this.zoomToFilesExtent();
         },
+
         getSelectedFilesExtent: function () {
             const ext = createEmptyExtent();
-            if (this.fileFeatures.getFeatures().length) {
-                extendExtent(ext, this.fileFeatures.getExtent());
-            }
-            this.rasterLayer.getLayers().forEach(layer => {
-                extendExtent(ext, layer.getExtent());
+            if (this.fileFeatures.getFeatures().length) extendExtent(ext, this.fileFeatures.getExtent());
+            this.rasterLayer.getLayers().forEach(layer => extendExtent(ext, layer.getExtent()));
+
+            // Vector files: the entry's geometry (a VectorTileSource only knows its loaded tiles)
+            this.files.forEach(f => {
+                if (!f.entry || f.entry.type !== ddb.entry.type.VECTOR) return;
+                const geom = f.entry.polygon_geom || f.entry.point_geom;
+                if (!geom) return;
+                const vExt = transformExtent(bbox(geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
+                if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
             });
-
-            // Include vector layers' extent computed from file metadata
-            // (VectorTileSource.getExtent() only returns the extent of currently
-            // loaded tiles, not the underlying data bbox, so we use polygon_geom
-            // from the entry metadata instead).
-            if (this.files && this.files.length) {
-                this.files.forEach(f => {
-                    if (!f.entry) return;
-                    if (f.entry.type !== ddb.entry.type.VECTOR) return;
-                    if (f.entry.polygon_geom) {
-                        const vExt = transformExtent(bbox(f.entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
-                        if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
-                    } else if (f.entry.point_geom) {
-                        const vExt = transformExtent(bbox(f.entry.point_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
-                        if (!isEmptyExtent(vExt)) extendExtent(ext, vExt);
-                    }
-                });
-            }
-
             return ext;
         },
+
         clearLayerGroup: function (layerGroup) {
-            let count = layerGroup.getLayers().getLength();
-            for (var j = 0; j < count; j++) {
-                layerGroup.getLayers().pop();
-            }
+            layerGroup.getLayers().clear();
         },
+
         setMouseInside: function (flag) {
             this.mouseInside = flag;
         },
+
+        shotStyleKey: function () {
+            return this.showDirectionIndicators ? 'direction' : 'shot';
+        },
+
         reloadFileLayers: function () {
             if (!this.loaded) return;
 
-            this.fileFeatures.clear();
-            this.extentsFeatures.clear();
-            this.outlineFeatures.clear();
-            this.flightPathFeatures.clear();
-            this.markerFeatures.clear();
+            [this.fileFeatures, this.extentsFeatures, this.flightPathFeatures, this.markerFeatures].forEach(s => s.clear());
             this.clearLayerGroup(this.rasterLayer);
-
-            const features = [];
-            const rasters = this.rasterLayer.getLayers();
-
-            // Clear any existing vector layers
-            const vectorLayers = this.vectorLayers || [];
-            vectorLayers.forEach(layer => {
-                if (this.map) {
-                    this.map.removeLayer(layer);
-                }
-            });
+            this.vectorLayers.forEach(layer => this.map.removeLayer(layer));
             this.vectorLayers = [];
 
-            let flightPath = [];
-
-            let vectorFilePromises = [];
-
-            // Create features, add them to map
-            this.files.forEach(f => {
-                if (!f.entry) return;
-
-                const imageAsRaster = this.standalone && f.entry.type === ddb.entry.type.GEOIMAGE && f.entry.polygon_geom;
-                if ((f.entry.type === ddb.entry.type.GEOIMAGE && !imageAsRaster) || f.entry.type === ddb.entry.type.GEOVIDEO) {
-                    const coords = coordAll(f.entry.point_geom)[0];
-                    const point = new Point(coords);
-                    const feat = new Feature(point);
-                    feat.style = this.showDirectionIndicators ? 'direction' : 'shot';
-                    feat.file = f;
+            const T = ddb.entry.type;
+            const shots = [];
+            const stops = [];
+            const vectorLoads = [];
+            for (const f of this.files) {
+                if (!f.entry) continue;
+                const type = f.entry.type;
+                const imageAsRaster = this.standalone && type === T.GEOIMAGE && f.entry.polygon_geom;
+                if ((type === T.GEOIMAGE && !imageAsRaster) || type === T.GEOVIDEO || type === T.GEOPANORAMA) {
+                    const lonLat = coordAll(f.entry.point_geom)[0];
+                    const feat = new Feature(new Point(lonLat));
                     feat.getGeometry().transform(EPSG.WGS84, EPSG.WEB_MERCATOR);
-                    features.push(feat);
-
-                    if (f.entry.type === ddb.entry.type.GEOIMAGE) {
-                        if (f.entry.properties.captureTime) {
-                            flightPath.push({
-                                point,
-                                captureTime: f.entry.properties.captureTime,
-                                feature: feat
-                            });
-                        }
-                    } else if (f.entry.type === ddb.entry.type.GEOVIDEO) {
-                        if (f.entry.properties.captureTime) {
-                            flightPath.push({
-                                point,
-                                captureTime: f.entry.properties.captureTime,
-                                feature: feat
-                            });
-                        }
+                    feat.style = type === T.GEOPANORAMA ? 'pano' : this.shotStyleKey();
+                    feat.file = f;
+                    shots.push(feat);
+                    const props = f.entry.properties || {};
+                    if (type !== T.GEOPANORAMA && props.captureTime) {
+                        stops.push({ coords: lonLat, captureTime: props.captureTime, flightSpeed: props.flightSpeed, feature: feat });
                     }
-                } else if (f.entry.polygon_geom && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.GEOIMAGE || f.entry.type === ddb.entry.type.POINTCLOUD)) {
+                } else if (f.entry.polygon_geom && (type === T.GEORASTER || type === T.GEOIMAGE || type === T.POINTCLOUD)) {
                     const extent = transformExtent(bbox(f.entry.polygon_geom), EPSG.WGS84, EPSG.WEB_MERCATOR);
-                    const rasterRetina = useRetinaTiles();
-                    const native = computeNativeZoom(f.entry);
-                    const tileLayer = new TileLayer({
-                        extent,
-                        source: new HybridXYZ({
-                            url: f.path,
-                            hash: f.entry.hash,
-                            tileSize: 256,
-                            transition: 200,
-                            minZoom: 14,
-                            retina: rasterRetina,
-                            maxZoom: sourceMaxZoom(native, rasterRetina)
-                        })
-                    });
-                    tileLayer.set('rasterNativeZoom', native);
-                    tileLayer.file = f;
-                    rasters.push(tileLayer);
-
-                    // We create "hidden" extents as polygons
-                    // so that we can click raster layers
+                    this.rasterLayer.getLayers().push(createRasterTileLayer(f, extent));
+                    // An invisible extent makes the raster clickable
                     const extentFeat = new Feature(fromExtent(extent));
                     extentFeat.file = f;
                     this.extentsFeatures.addFeature(extentFeat);
-                } else if (f.entry.type === ddb.entry.type.GEOPANORAMA) {
-                    const coords = coordAll(f.entry.point_geom)[0];
-                    const point = new Point(coords);
-                    const feat = new Feature(point);
-                    feat.style = 'pano';
-                    feat.file = f;
-                    feat.getGeometry().transform(EPSG.WGS84, EPSG.WEB_MERCATOR); features.push(feat);
-                } else if (f.entry.type === ddb.entry.type.VECTOR) {
-                    // Skip measurement files (they are loaded separately as measurements)
-                    const fileName = ddb.pathutils.basename(f.entry.path);
-                    if (f.entry.path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
-                        console.log(`Skipping vector layer for measurement file: ${f.entry.path}`);
-                        return;
-                    }
-
-                    // Handle vector files using the precomputed MVT tile pyramid
-                    const loadVectorFile = async () => {
-                        try {
-                            // Resolve the MVT URL template via the dataset's Entry
-                            let mvtTemplate = '';
-
-                            if (!this.dataset)
-                                throw new Error('Dataset not found for vector file');
-
-                            const entry = this.dataset.Entry(f.entry);
-                            mvtTemplate = entry.getMvtUrlTemplate();
-
-                            // Always fetch metadata: maxZoom is needed for VectorTileSource
-                            // (avoids 404 on non-existent high-zoom tiles); bounds is the zoom
-                            // fallback when the C++ indexer left polygon_geom/point_geom unset.
-                            const { maxZoom: mvtMaxZoom, bounds: mvtBounds } = await fetchMvtMetadata(entry);
-                            if (mvtBounds && !f.entry.polygon_geom && !f.entry.point_geom) {
-                                const [minX, minY, maxX, maxY] = mvtBounds;
-                                // Inject as GeoJSON Polygon so getSelectedFilesExtent() → bbox()
-                                // can consume it directly (bbox handles both Feature and Geometry).
-                                f.entry.polygon_geom = {
-                                    type: 'Polygon',
-                                    coordinates: [[[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]]]
-                                };
-                            }
-
-
-                            // Get a unique color for this vector file
-                            const vectorFileIndex = this.vectorLayers.length;
-                            const vectorColor = this.getVectorFileColor(f, vectorFileIndex);
-                            const vectorStyles = createMvtVectorStyles(vectorColor);
-                            const vectorStyleFunction = createMvtStyleFunction({
-                                styles: vectorStyles,
-                                getZoom: () => (this.map ? this.map.getView().getZoom() : 0),
-                                isSelected: () => f.selected
-                            });
-
-                            // Build the VectorTileSource backed by the MVT pyramid served at /mvt/{hash}/{z}/{x}/{y}.pbf
-                            const { layer: vectorLayer, source: vectorTileSource } = createMvtVectorLayer({
-                                urlTemplate: mvtTemplate,
-                                styleFunction: vectorStyleFunction,
-                                useMarkRaw: true,
-                                maxZoom: mvtMaxZoom
-                            });
-
-                            // Add file reference to layer for selection handling
-                            vectorLayer.file = f;
-
-                            // Add layer to the map
-                            this.map.addLayer(vectorLayer);
-
-                            // Store vector layer for later reference
-                            this.vectorLayers.push(vectorLayer);
-
-                            // Expose the underlying source for any legacy code paths that expect it
-                            vectorLayer.vectorSource = vectorTileSource;
-
-                            // Do NOT zoom here: zoom is deferred to after all vector files have
-                            // loaded so that getSelectedFilesExtent() sees all extents at once.
-
-                        } catch (error) {
-                            console.error('Error loading vector file:', error);
-                        }
-                    };
-
-                    // Start loading the vector file asynchronously; collect the
-                    // Promise so we can zoom once after ALL files are ready.
-                    vectorFilePromises.push(loadVectorFile());
+                } else if (type === T.VECTOR && !isMeasurementFile(f.entry.path)) {
+                    // Measurement files are loaded as measurements, not drawn as layers
+                    vectorLoads.push(this.addVectorLayer(f));
                 }
-            });
-
-            if (features.length) this.fileFeatures.addFeatures(features);
-
-            // Add flight path line
-            if (flightPath.length >= 2) {
-                flightPath.sort((a, b) => a.captureTime < b.captureTime ? -1 : (a.captureTime === b.captureTime ? 0 : 1));
-
-                // Compute estimated speed from consecutive positions (fallback)
-                for (let i = 0; i < flightPath.length; i++) {
-                    const fp = flightPath[i];
-                    const feat = fp.feature;
-                    if (!feat) continue;
-
-                    // Priority 1: backend-extracted speed (DJI XMP or EXIF GPS)
-                    const backendSpeed = feat.file?.entry?.properties?.flightSpeed;
-                    if (backendSpeed !== undefined && backendSpeed !== null) {
-                        feat.computedSpeed = backendSpeed; // m/s
-                        continue;
-                    }
-
-                    // Priority 2: calculate from consecutive positions
-                    if (i > 0) {
-                        const prev = flightPath[i - 1];
-                        const coords1 = prev.point.getCoordinates(); // [lon, lat] EPSG:4326
-                        const coords2 = fp.point.getCoordinates();
-
-                        // Haversine distance
-                        const R = 6371000; // Earth radius in meters
-                        const dLat = (coords2[1] - coords1[1]) * Math.PI / 180;
-                        const dLon = (coords2[0] - coords1[0]) * Math.PI / 180;
-                        const a = Math.sin(dLat / 2) ** 2 +
-                            Math.cos(coords1[1] * Math.PI / 180) *
-                            Math.cos(coords2[1] * Math.PI / 180) *
-                            Math.sin(dLon / 2) ** 2;
-                        const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-                        const dt = fp.captureTime - prev.captureTime;
-                        // Only calculate if time gap is reasonable (< 5 minutes)
-                        if (dt > 0 && dt < 300) {
-                            const speed = dist / dt; // m/s
-                            // Sanity check: skip if speed > 200 km/h (~55.6 m/s)
-                            if (speed <= 55.6) {
-                                feat.computedSpeed = speed;
-                            }
-                        }
-                    }
-                }
-
-                const startPoint = flightPath[0].point;
-                const finishPoint = flightPath[flightPath.length - 1].point;
-
-                const addFlag = (point, style) => {
-                    const feat = new Feature({
-                        geometry: point
-                    });
-                    // feat.getGeometry().transform('EPSG:4326', 'EPSG:3857');
-                    feat.setStyle(style);
-                    this.markerFeatures.addFeature(feat);
-                };
-
-                addFlag(startPoint, this.styles.startFlag);
-                addFlag(finishPoint, this.styles.finishFlag);
-
-                // Draw linestring
-                const pathFeat = new Feature({
-                    geometry: new LineString(flightPath.map(fp => fp.point.flatCoordinates))
-                });
-                pathFeat.setStyle(this.styles.flightPath);
-                this.flightPathFeatures.addFeature(pathFeat);
             }
+            if (shots.length) this.fileFeatures.addFeatures(shots);
+            this.drawFlightPath(stops);
 
-            // Zoom once after all vector file metadata has been fetched.
-            // Using Promise.all ensures the extent covers ALL vector files;
-            // for datasets with no vector files vectorFilePromises is empty and
-            // Promise.all([]) resolves immediately as a microtask.
-            Promise.all(vectorFilePromises).then(() => this.zoomToFilesExtent());
+            // Zoom once every vector file's metadata is in (resolves at once without vectors)
+            Promise.all(vectorLoads).then(() => this.zoomToFilesExtent());
             this.syncRasterLayers();
             this.updateRastersOpacity();
-
-            // Load measurements for orthophotos if available
             this.loadMeasurementsForOrthophotos();
-
-            // Restore plant health state from URL hash (once)
-            this.restoreFromHash();
-
-            // Refresh the View maxZoom cap now that the raster set is final for
-            // this pass (collection 'add' events may already have coalesced).
-            this._scheduleViewCapUpdate();
-        },
-
-        /**
-         * Coalesce View maxZoom recomputation into a single microtask, so a
-         * clear+reload burst (which pops then re-pushes every raster layer)
-         * only triggers one setMaxZoom applied against the final layer set.
-         */
-        _scheduleViewCapUpdate: function () {
-            if (this._viewCapPending) return;
-            this._viewCapPending = true;
-            queueMicrotask(() => {
-                this._viewCapPending = false;
-                this._applyViewCapNow();
-            });
-        },
-
-        /**
-         * Recompute the View maxZoom from the native zooms stamped on the
-         * current raster and footprint layers, deferring while the View is
-         * animating or being interacted with so zoom changes never fight the user.
-         */
-        _applyViewCapNow: function () {
-            if (!this.map) return;
-            const natives = [];
-            if (this.rasterLayer) {
-                this.rasterLayer.getLayers().getArray().forEach(layer => natives.push(layer.get('rasterNativeZoom')));
-            }
-            if (this.footprintRastersLayer) {
-                this.footprintRastersLayer.getLayers().getArray().forEach(layer => natives.push(layer.get('rasterNativeZoom')));
-            }
-            const hasRaster = natives.some(n => Number.isFinite(n));
-            let cap = viewMaxZoom(natives);
-            if (hasRaster && cap < SOURCE_MIN_ZOOM) cap = SOURCE_MIN_ZOOM;
-            if (cap === this._lastAppliedViewCap) return;
-            const view = this.map.getView();
-            if (view.getAnimating() || view.getInteracting()) {
-                if (!this._viewCapDeferred) {
-                    this._viewCapDeferred = true;
-                    this._viewCapDeferredKey = view.once('moveend', () => {
-                        this._viewCapDeferred = false;
-                        this._viewCapDeferredKey = null;
-                        this._applyViewCapNow();
-                    });
-                }
-                return;
-            }
-            view.setMaxZoom(cap);
-            this._lastAppliedViewCap = cap;
-        },
-
-        restoreFromHash() {
             this.restorePlantHealthFromHash(this.files);
+            this.viewZoomCap.schedule();
+        },
+
+        // Flight path through the timed shots, start/finish flags, and each shot's speed
+        drawFlightPath: function (stops) {
+            if (stops.length < 2) return;
+            const { ordered, speeds } = orderFlightPath(stops);
+            ordered.forEach((stop, i) => { if (speeds[i] !== null) stop.feature.computedSpeed = speeds[i]; });
+            const points = ordered.map(stop => stop.feature.getGeometry().getCoordinates());
+
+            const flag = (coords, style) => {
+                const feat = new Feature(new Point(coords));
+                feat.setStyle(style);
+                this.markerFeatures.addFeature(feat);
+            };
+            flag(points[0], this.styles.startFlag);
+            flag(points[points.length - 1], this.styles.finishFlag);
+
+            const path = new Feature(new LineString(points));
+            path.setStyle(this.styles.flightPath);
+            this.flightPathFeatures.addFeature(path);
+        },
+
+        // A vector file from its precomputed MVT tile pyramid (/mvt/{hash}/{z}/{x}/{y}.pbf)
+        addVectorLayer: async function (f) {
+            try {
+                if (!this.dataset) throw new Error('Dataset not found for vector file');
+                const entry = this.dataset.Entry(f.entry);
+
+                // maxZoom avoids requests for tiles that do not exist; bounds stand in for
+                // the extent when the indexer left polygon_geom/point_geom unset
+                const { maxZoom, bounds } = await fetchMvtMetadata(entry);
+                if (bounds && !f.entry.polygon_geom && !f.entry.point_geom) {
+                    const [minX, minY, maxX, maxY] = bounds;
+                    f.entry.polygon_geom = {
+                        type: 'Polygon',
+                        coordinates: [[[minX, minY], [maxX, minY], [maxX, maxY], [minX, maxY], [minX, minY]]]
+                    };
+                }
+
+                const styles = createMvtVectorStyles(this.getVectorFileColor(f, this.vectorLayers.length));
+                const { layer, source } = createMvtVectorLayer({
+                    urlTemplate: entry.getMvtUrlTemplate(),
+                    styleFunction: createMvtStyleFunction({
+                        styles,
+                        getZoom: () => (this.map ? this.map.getView().getZoom() : 0),
+                        isSelected: () => f.selected
+                    }),
+                    useMarkRaw: true,
+                    maxZoom
+                });
+                layer.file = f;
+                layer.vectorSource = source;
+                this.map.addLayer(layer);
+                this.vectorLayers.push(layer);
+            } catch (error) {
+                console.error('Error loading vector file:', error);
+            }
         },
 
         applyDirectionStyles: function () {
-            // Update style of all GEOIMAGE/GEOVIDEO features without reloading layers
+            // Restyle the photo/video shots without reloading the layers
             if (!this.fileFeatures) return;
-            const features = this.fileFeatures.getFeatures();
-            features.forEach(feat => {
-                if (feat.file?.entry?.type === ddb.entry.type.GEOIMAGE ||
-                    feat.file?.entry?.type === ddb.entry.type.GEOVIDEO) {
-
-                    if (this.showDirectionIndicators) {
-                        feat.style = 'direction';
-                    } else {
-                        feat.style = 'shot';
-                    }
-                }
+            const T = ddb.entry.type;
+            this.fileFeatures.getFeatures().forEach(feat => {
+                const type = feat.file?.entry?.type;
+                if (type === T.GEOIMAGE || type === T.GEOVIDEO) feat.style = this.shotStyleKey();
             });
-            // Force re-render of the layer
-            if (this.fileLayer) {
-                this.fileLayer.changed();
+            if (this.fileLayer) this.fileLayer.changed();
+        },
+
+        setDirectionIndicators: function (on) {
+            this.showDirectionIndicators = on;
+            setPref(PREF.SHOW_DIRECTION_INDICATORS, on);
+            this.applyDirectionStyles();
+        },
+
+        setFlightPath: function (on) {
+            this.showFlightPath = on;
+            setPref(PREF.SHOW_FLIGHT_PATH, on);
+            if (this.flightPathLayer) this.flightPathLayer.setVisible(on);
+            if (this.markerLayer) this.markerLayer.setVisible(on);
+        },
+
+        goBack: function () {
+            this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
+        },
+
+        toggleFullscreen: function () {
+            if (isFullScreenCurrently()) {
+                exitFullScreen();
+            } else {
+                requestFullScreen(this.$el);
+                this.later(() => this.map.updateSize(), 500);
             }
         },
 
@@ -1885,305 +803,141 @@ export default {
                 this.selectSingle = true;
                 if (this.selectionControl) this.selectionControl.deactivate();
             }
-            // H key for reset view
-            if (e.keyCode === 72 && this.mouseInside) {
-                this.resetToInitialView();
-            }
+            // H: reset view
+            if (e.keyCode === 72 && this.mouseInside) this.resetToInitialView();
         },
+
         handleKeyUp: function (e) {
             // ESC
             if (e.keyCode === 27) {
                 this.selectSingle = false;
                 this.measureControls.deselectCurrent();
-                if (this.selectionControl) {
-                    this.selectionControl.deactivate();
-                }
+                if (this.selectionControl) this.selectionControl.deactivate();
             }
-
-            if (!Keyboard.isCtrlPressed() && this.mouseInside) {
-                this.selectSingle = false;
-            }
+            if (!Keyboard.isCtrlPressed() && this.mouseInside) this.selectSingle = false;
         },
-        handlePolygonSelection: function (polygon) {
-            this.selectPolygon = true;
 
-            let scrolled = false;
-
-            // Check geoimage/geopanorama point features
-            this.fileFeatures.getFeatures().forEach(feat => {
-                const geom = feat.getGeometry();
-                if (geom && polygon.intersectsCoordinate(geom.getCoordinates())) {
-                    if (feat.file) {
-                        feat.file.selected = true;
-                        if (!scrolled) {
-                            this.$emit('scrollTo', feat.file);
-                            scrolled = true;
-                        }
-                    }
-                }
-            });
-
-            // Check raster extent features (polygon geometries)
-            this.extentsFeatures.getFeatures().forEach(feat => {
-                const geom = feat.getGeometry();
-                if (geom && polygon.intersectsExtent(geom.getExtent())) {
-                    if (feat.file) {
-                        feat.file.selected = true;
-                        if (!scrolled) {
-                            this.$emit('scrollTo', feat.file);
-                            scrolled = true;
-                        }
-                    }
-                }
-            });
-
-            // Check vector layers
-            this.vectorLayers.forEach(vectorLayer => {
-                if (!vectorLayer.file) return;
-                const source = vectorLayer.getSource();
-                if (!source) return;
-
-                let hasIntersection = false;
-                const extent = polygon.getExtent();
-                if (source.forEachFeatureInExtent) {
-                    source.forEachFeatureInExtent(extent, feature => {
-                        const featureGeom = feature.getGeometry();
-                        if (featureGeom) {
-                            const featureExtent = featureGeom.getExtent();
-                            if (polygon.intersectsExtent(featureExtent)) {
-                                hasIntersection = true;
-                            }
-                        }
-                    });
-                }
-
-                if (hasIntersection) {
-                    vectorLayer.file.selected = true;
-                    if (!scrolled) {
-                        this.$emit('scrollTo', vectorLayer.file);
-                        scrolled = true;
-                    }
-                }
-            });
-
-            this.updateRastersOpacity();
-            this.updateClearSelectionButton();
-        },
-        clearSelection: function () {
-            this.files.forEach(f => f.selected = false);
-            this.updateClearSelectionButton();
-        },
-        updateClearSelectionButton: function () {
-            if (this.selectionControl) {
-                const hasSelection = this.files.some(f => f.selected);
-                this.selectionControl.setClearButtonVisible(hasSelection);
-            }
-        }, syncRasterLayers: function () {
-            const newList = [];
+        syncRasterLayers: function () {
+            const list = [];
             this.rasterLayer.getLayers().forEach(olLayer => {
                 if (!olLayer.file) return;
-                const name = this.getLayerDisplayName(olLayer) ||
-                    (olLayer.file.entry && olLayer.file.entry.path
-                        ? ddb.pathutils.basename(olLayer.file.entry.path)
-                        : '');
-                const path = (olLayer.file.entry && olLayer.file.entry.path) || name;
-                // Preserve existing opacity for this layer if already tracked
+                const entryPath = olLayer.file.entry && olLayer.file.entry.path;
+                const name = this.getLayerDisplayName(olLayer) || (entryPath ? ddb.pathutils.basename(entryPath) : '');
+                const path = entryPath || name;
+                // Keep the opacity of a layer already in the list
                 const existing = this.rasterLayerList.find(r => r.path === path);
-                newList.push({
+                list.push({
                     name,
                     path,
-                    // markRaw prevents Vue from wrapping the OL layer in a reactive
-                    // proxy (which would break identity checks and hurt performance).
+                    // markRaw: a reactive proxy would break identity checks and slow OpenLayers
                     olLayer: markRaw(olLayer),
                     opacity: existing ? existing.opacity : 1.0,
-                    // Flag for the per-row Plant Health button in the opacity panel.
+                    // Per-row Plant Health button in the opacity panel
                     plantHealthCapable: isPlantHealthCapable(olLayer.file?.entry)
                 });
             });
-            // Reverse so that rasterLayerList[0] = topmost OL layer (rendered last)
-            // matching the standard layer-panel convention (top of list = on top).
-            this.rasterLayerList = newList.reverse();
+            // Top first (the OL collection is bottom first), as in any layer panel
+            this.rasterLayerList = list.reverse();
+        },
 
-            // Update analysis toolbar buttons (Raster Analysis / Stockpile Volume
-            // require exactly one georaster).
-            this.updateAnalysisButtonsForRasterCount(newList.length);
+        handleLayerPlantHealth: function (path) {
+            // The same layer's button again closes the panel
+            if (this.plantHealthVisible && this.plantHealthFilePath === path) this.closePlantHealth();
+            else this.openPlantHealth(path);
+        },
 
-            // Enable / disable the split-compare toolbar button based on layer count.
-            // If already in split mode and layers dropped below 2, auto-exit.
-            this.$nextTick(() => this.updateSplitToolState());
-        }, handleLayerPlantHealth: function (path) {
-            // Toggle Plant Health panel for a specific georaster layer.
-            // Clicking the same layer's button again closes the panel.
-            if (this.plantHealthVisible && this.plantHealthFilePath === path) {
-                this.closePlantHealth();
-            } else {
-                this.openPlantHealth(path);
-            }
-        }, handleRasterLayerReorder: function ({ fromIndex, toIndex }) {
-            // Reorder in the reactive list
+        handleRasterLayerReorder: function ({ fromIndex, toIndex }) {
             const updated = [...this.rasterLayerList];
             const [moved] = updated.splice(fromIndex, 1);
             updated.splice(toIndex, 0, moved);
             this.rasterLayerList = updated;
 
-            // Sync the OL LayerGroup collection.
-            // rasterLayerList[0] = top (OL: last), rasterLayerList[N-1] = bottom (OL: first).
-            // So the OL collection must be the reverse of rasterLayerList.
+            // The OL collection is the reverse of the list (OL draws the last on top)
             const olLayers = this.rasterLayer.getLayers();
-            const count = olLayers.getLength();
-            for (let i = 0; i < count; i++) olLayers.pop();
-            for (let i = updated.length - 1; i >= 0; i--) {
-                olLayers.push(updated[i].olLayer);
-            }
-        }, updateRastersOpacity: function () {
-            // In split mode every raster is shown at full opacity (the canvas clip handles separation)
+            olLayers.clear();
+            for (let i = updated.length - 1; i >= 0; i--) olLayers.push(updated[i].olLayer);
+        },
+
+        updateRastersOpacity: function () {
+            const rasters = this.rasterLayer.getLayers();
+            this.hasRasters = rasters.getLength() > 0;
+            // In split mode every raster is opaque: the clips separate them
             if (this.splitMode) {
-                this.rasterLayer.getLayers().forEach(layer => layer.setOpacity(1));
-                this.hasRasters = this.rasterLayer.getLayers().getLength() > 0;
+                rasters.forEach(layer => layer.setOpacity(1));
                 return;
             }
 
-            const usePerLayer = this.rasterLayerList.length > 1;
-            const baseOpacity = this.rasterOpacity;
-
-            this.rasterLayer.getLayers().forEach(layer => {
-                let opacity;
-                if (usePerLayer) {
-                    // Match by path: OL layers stored in reactive data are proxied,
-                    // so direct object identity comparison is unreliable.
+            const perLayer = this.rasterLayerList.length > 1;
+            rasters.forEach(layer => {
+                let opacity = this.rasterOpacity;
+                if (perLayer) {
+                    // By path: the list holds proxied layers, identity is unreliable
                     const path = layer.file && layer.file.entry ? layer.file.entry.path : null;
                     const entry = this.rasterLayerList.find(r => r.path === path);
                     opacity = entry ? entry.opacity : 1.0;
-                } else {
-                    opacity = baseOpacity;
                 }
                 // Dim selected layers slightly
                 if (layer.file && layer.file.selected) opacity *= 0.8;
                 layer.setOpacity(opacity);
             });
-            this.hasRasters = this.rasterLayer.getLayers().getLength() > 0;
 
-            // For vector layers, no need to update the style manually
-            // since we're using a style function that checks the selection state
-            // Just trigger a redraw of the layer
+            // Vector styles read the selection: a redraw is enough
             this.vectorLayers.forEach(layer => {
-                if (layer.getSource()) {
-                    layer.getSource().changed();
-                }
+                if (layer.getSource()) layer.getSource().changed();
             });
         },
 
-        /**
-         * Get the current folder being viewed based on the files' paths
-         * @returns {string} Current folder path or empty string for root
-         */
-        getCurrentFolder: function () {
-            if (!this.files || this.files.length === 0) return '';
-
-            // Find the first file with a valid path
-            const fileWithPath = this.files.find(f => f.entry && f.entry.path);
-            if (!fileWithPath) return '';
-
-            return ddb.pathutils.getParentFolder(fileWithPath.entry.path) || '';
+        // measurements.geojson in the folder on show (the measurements of a view without rasters)
+        standaloneMeasurementEntry: function () {
+            const first = this.files.find(f => f.entry && f.entry.path);
+            const folder = first ? ddb.pathutils.getParentFolder(first.entry.path) || '' : '';
+            return { path: folder ? `${folder}/measurements.geojson` : 'measurements.geojson' };
         },
 
         /**
-         * Load measurements for orthophoto and point cloud files
+         * Loads the saved measurements: those of the first georaster / point cloud on show,
+         * else the folder's measurements.geojson.
          */
         loadMeasurementsForOrthophotos: async function () {
-            if (!this.dataset || !this.measureControls) {
-                console.log('Cannot load measurements: dataset or measureControls not available');
-                return;
-            }
-
-            // Find the first orthophoto/georaster or point cloud file
-            const orthophotoFile = this.files.find(f =>
-                f.entry && (f.entry.type === ddb.entry.type.GEORASTER || f.entry.type === ddb.entry.type.POINTCLOUD)
-            );
-
-            if (!orthophotoFile) {
-                console.log('No orthophoto/georaster or point cloud files found, trying standalone measurements.geojson');
-                // Determine current folder from the files being displayed
-                const currentFolder = this.getCurrentFolder();
-                const measurementsPath = currentFolder ? `${currentFolder}/measurements.geojson` : 'measurements.geojson';
-                this.currentOrthophotoEntry = { path: measurementsPath };
-                this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
-
-                try {
-                    const geojson = await this.measurementStorage.load();
-                    if (geojson && geojson.features && geojson.features.length > 0) {
-                        const result = this.measureControls.importFromGeoJSON(geojson);
-                        if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
-                        this.hasSavedMeasurements = true;
-                        this.measureControls.updateButtonsVisibility(true, true);
-                        console.log(`Loaded ${geojson.features.length} standalone measurements`);
-                    } else {
-                        this.currentOrthophotoEntry = null;
-                        this.measurementStorage = null;
-                        this.hasSavedMeasurements = false;
-                    }
-                } catch {
-                    this.currentOrthophotoEntry = null;
-                    this.measurementStorage = null;
-                    this.hasSavedMeasurements = false;
-                }
-                return;
-            }
-
-            // Initialize measurement storage even if no saved measurements exist
-            this.currentOrthophotoEntry = orthophotoFile.entry;
+            if (!this.dataset || !this.measureControls) return;
+            const T = ddb.entry.type;
+            const anchor = this.files.find(f => f.entry && (f.entry.type === T.GEORASTER || f.entry.type === T.POINTCLOUD));
+            this.currentOrthophotoEntry = anchor ? anchor.entry : this.standaloneMeasurementEntry();
             this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
-            console.log('Measurement storage initialized for:', this.currentOrthophotoEntry.path);
 
+            let geojson = null;
             try {
-                const geojson = await this.measurementStorage.load();
-
-                if (geojson && geojson.features && geojson.features.length > 0) {
-                    // Import measurements
-                    const result = this.measureControls.importFromGeoJSON(geojson);
-                    if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
-                    this.hasSavedMeasurements = true;
-
-                    // Update button visibility
-                    this.measureControls.updateButtonsVisibility(true, true);
-
-                    console.log(`Loaded ${geojson.features.length} measurements for orthophoto`);
-                } else {
-                    console.log('No saved measurements found for this orthophoto');
-                    this.hasSavedMeasurements = false;
-                }
+                geojson = await this.measurementStorage.load();
             } catch (e) {
-                console.error('Error loading measurements:', e);
-                this.hasSavedMeasurements = false;
+                if (anchor) console.error('Error loading measurements:', e);
+            }
+            this.hasSavedMeasurements = !!(geojson && geojson.features && geojson.features.length);
+            if (this.hasSavedMeasurements) {
+                const result = this.measureControls.importFromGeoJSON(geojson);
+                if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
+                this.measureControls.updateButtonsVisibility(true, true);
+            } else if (!anchor) {
+                // No standalone file yet: initMeasurementStorage creates it on the first save
+                this.currentOrthophotoEntry = null;
+                this.measurementStorage = null;
             }
         },
 
-        /**
-         * Required by mapMeasurements mixin - returns the entry used for measurement export path.
-         */
+        // For useMapMeasurements: the entry the measurements are exported for
         getActiveMeasurementEntry: function () {
             return this.currentOrthophotoEntry;
         },
 
-        /**
-         * Required by mapMeasurements mixin - (re)initializes measurementStorage if needed.
-         */
+        // For useMapMeasurements: (re)creates the storage, the folder's file as a fallback
         initMeasurementStorage: async function () {
             await this.loadMeasurementsForOrthophotos();
-
-            // If still no storage (no orthophoto/point cloud), create a standalone measurements file
             if (!this.measurementStorage && this.dataset) {
-                console.log('No orthophoto found, using standalone measurements.geojson');
-                const currentFolder = this.getCurrentFolder();
-                const measurementsPath = currentFolder ? `${currentFolder}/measurements.geojson` : 'measurements.geojson';
-                this.currentOrthophotoEntry = { path: measurementsPath };
+                this.currentOrthophotoEntry = this.standaloneMeasurementEntry();
                 this.measurementStorage = new MeasurementStorage(this.dataset, this.currentOrthophotoEntry);
             }
         },
 
-        /**
-         * Handle units change request - show confirmation dialog
-         */
+        // Units change with measurements on the map: confirm first
         onUnitsChangeRequested: function (newUnit, oldUnit) {
             this.changeUnitsTargetUnit = newUnit;
             this.changeUnitsPreviousUnit = oldUnit;
@@ -2191,31 +945,21 @@ export default {
             this.changeUnitsDialogOpen = true;
         },
 
-        /**
-         * Handle change units dialog close
-         */
         handleChangeUnitsDialogClose: async function (result) {
             this.changeUnitsDialogOpen = false;
             if (result === 'confirm') {
-                // Apply the unit change
                 this.measureControls.applyUnitsChange(this.changeUnitsTargetUnit);
                 this.currentUnitPref = this.changeUnitsTargetUnit;
-                // Save measurements with new units
+                // Save the measurements in the new units
                 await this.saveMeasurements();
             }
         },
 
-
-
-        /**
-         * Handle units change from settings dialog
-         */
+        // Units from the settings dialog
         handleUnitsChanged: function (newUnit, oldUnit) {
-            // If there are measurements, show confirmation dialog
             if (this.measureControls && this.measureControls.hasMeasurements()) {
                 this.onUnitsChangeRequested(newUnit, oldUnit);
             } else {
-                // No measurements, apply directly
                 this.measureControls.applyUnitsChange(newUnit);
                 this.currentUnitPref = newUnit;
             }
@@ -2234,117 +978,13 @@ export default {
         },
 
         handleGroupDialogSave(groupData) {
-            if (this.pendingGroupForRename) {
-                this.renameGroup(this.pendingGroupForRename, groupData);
-            } else {
-                this.createGroup(groupData);
-            }
+            if (this.pendingGroupForRename) this.renameGroup(this.pendingGroupForRename, groupData);
+            else this.createGroup(groupData);
             this.pendingGroupForRename = null;
             this.measurementGroupDialogOpen = false;
-        },
-
-        // ── Split-screen georaster comparison ─────────────────────────────
-
-        /**
-         * Enable / disable the split-compare toolbar button depending on how
-         * many georaster layers are currently loaded. If the mode is active and
-         * the count drops below 2, auto-deselects the button (which triggers
-         * exitSplitMode via onDeselect).
-         */
-        updateSplitToolState: function () {
-            if (!this._splitBtn) return;
-            const canCompare = this.rasterLayerList.length >= 2;
-            this._splitBtn.disabled = !canCompare;
-            this._splitBtn.title = canCompare
-                ? 'Compare georasters side by side'
-                : 'Need at least 2 georasters to compare';
-            if (this.splitMode && !canCompare) {
-                this.exitSplitMode();
-            }
-        },
-
-        enterSplitMode: function () {
-            const n = this.rasterLayerList.length;
-            if (n < 2) return;
-            this.splitMode = true;
-            // Equidistant starting positions (N-1 dividers)
-            this.splitPositions = Array.from({ length: n - 1 }, (_, i) => (i + 1) / n);
-            this._attachSplitClip();
-            this.updateRastersOpacity();
-            this.map.render();
-            if (this._splitBtn) this._splitBtn.classList.add('active');
-        },
-
-        exitSplitMode: function () {
-            this._detachSplitClip();
-            this.splitMode = false;
-            this.splitPositions = [];
-            this.updateRastersOpacity();
-            this.map.render();
-            if (this._splitBtn) this._splitBtn.classList.remove('active');
-        },
-
-        /**
-         * Attach prerender / postrender canvas-clip listeners to each raster
-         * layer so that band i is only visible in its horizontal strip.
-         * Band i spans from positions[i-1] (or 0) to positions[i] (or 1).
-         * rasterLayerList[0] = leftmost band.
-         */
-        _attachSplitClip: function () {
-            this._detachSplitClip();
-            this._splitListenerKeys = [];
-            const positions = this.splitPositions;
-            const mapRef = this.map;
-
-            this.rasterLayerList.forEach((rasterEntry, i) => {
-                const olLayer = rasterEntry.olLayer;
-                const leftFrac = i === 0 ? 0 : positions[i - 1];
-                const rightFrac = i === this.rasterLayerList.length - 1 ? 1 : positions[i];
-
-                // lifetime: paired (keys kept in _splitListenerKeys, removed by _detachSplitClip)
-                const preKey = olLayer.on('prerender', (event) => {
-                    const ctx = event.context;
-                    const size = mapRef.getSize();
-                    const w = size[0];
-                    const h = size[1];
-                    const tl = getRenderPixel(event, [w * leftFrac, 0]);
-                    const tr = getRenderPixel(event, [w * rightFrac, 0]);
-                    const br = getRenderPixel(event, [w * rightFrac, h]);
-                    const bl = getRenderPixel(event, [w * leftFrac, h]);
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.moveTo(tl[0], tl[1]);
-                    ctx.lineTo(tr[0], tr[1]);
-                    ctx.lineTo(br[0], br[1]);
-                    ctx.lineTo(bl[0], bl[1]);
-                    ctx.closePath();
-                    ctx.clip();
-                });
-
-                // lifetime: paired (keys kept in _splitListenerKeys, removed by _detachSplitClip)
-                const postKey = olLayer.on('postrender', (event) => {
-                    event.context.restore();
-                });
-
-                this._splitListenerKeys.push(preKey, postKey);
-            });
-        },
-
-        _detachSplitClip: function () {
-            if (this._splitListenerKeys && this._splitListenerKeys.length) {
-                this._splitListenerKeys.forEach(k => unByKey(k));
-            }
-            this._splitListenerKeys = [];
-        },
-
-        onSplitPositionsChange: function (newPositions) {
-            this.splitPositions = newPositions;
-            // Re-attach listeners with updated captured fractions
-            this._attachSplitClip();
-            this.map.render();
         }
     }
-}
+};
 </script>
 
 <style scoped>
@@ -2368,140 +1008,5 @@ export default {
     &.cursor-crosshair {
         cursor: crosshair;
     }
-}
-
-.image-popup {
-    background: white;
-    border-radius: var(--ddb-radius-md);
-    box-shadow: var(--ddb-shadow-md);
-    min-width: 16.25rem;
-    max-width: 20rem;
-    overflow: hidden;
-    z-index: 1001;
-    font-family: inherit;
-}
-
-.image-popup-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
-    background: var(--ddb-bg-subtle);
-    border-bottom: var(--ddb-border-width) solid var(--ddb-border-separator);
-}
-
-.image-popup-title {
-    font-size: var(--ddb-font-size-base);
-    font-weight: 600;
-    color: var(--ddb-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 10rem;
-}
-
-.image-popup-actions {
-    display: flex;
-    gap: var(--ddb-spacing-xs);
-    align-items: center;
-}
-
-.image-popup-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
-    border-radius: var(--ddb-radius-sm);
-    color: var(--ddb-text-secondary);
-    font-size: var(--ddb-font-size-base);
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-}
-
-.image-popup-btn:hover {
-    background: var(--ddb-border-separator);
-    color: var(--ddb-text);
-}
-
-.image-popup-close:hover {
-    background: var(--ddb-danger-bg);
-    color: var(--ddb-danger);
-}
-
-.image-popup-body {
-    padding: var(--ddb-spacing-sm);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: 6.25rem;
-}
-
-.image-popup-img {
-    max-width: 100%;
-    max-height: 15rem;
-    border-radius: var(--ddb-radius-sm);
-    object-fit: contain;
-}
-
-.image-popup-loading {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 6.25rem;
-    font-size: var(--ddb-font-size-lg);
-    color: var(--ddb-text-muted);
-}
-
-.image-popup-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
-    border-top: var(--ddb-border-width) solid var(--ddb-border-separator);
-    background: var(--ddb-bg-light);
-    border-radius: 0 0 var(--ddb-radius-md) var(--ddb-radius-md);
-}
-
-.image-popup-coords {
-    font-size: var(--ddb-font-size-sm);
-    font-family: monospace;
-    color: var(--ddb-text-secondary);
-    user-select: all;
-    cursor: text;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.image-popup-copy {
-    flex-shrink: 0;
-    margin-left: var(--ddb-spacing-sm);
-}
-
-.image-popup-copy .icon.check {
-    color: var(--ddb-success);
-}
-
-.image-popup-video-info {
-    gap: var(--ddb-spacing-sm);
-    min-height: 4rem;
-}
-
-.video-popup-icon {
-    font-size: 1.75rem;
-    color: var(--ddb-text-muted);
-    flex-shrink: 0;
-}
-
-.video-popup-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.video-popup-row {
-    font-size: var(--ddb-font-size-sm);
-    color: var(--ddb-text-secondary);
 }
 </style>

@@ -149,3 +149,14 @@ export const formatArea = (squareMeters, units) => areaParts(squareMeters, units
 
 /** @param {number} meters @param {string} [units] */
 export const formatLength = (meters, units) => lengthParts(meters, units).text;
+
+/**
+ * Ground speed in the user's units, one decimal: km/h, or mph for imperial.
+ * @param {number} metersPerSecond
+ * @param {'metric'|'imperial'|string} [units]
+ */
+export function formatSpeed(metersPerSecond, units = 'metric') {
+    return units === 'imperial'
+        ? `${(metersPerSecond * 2.23694).toFixed(1)} mph`
+        : `${(metersPerSecond * 3.6).toFixed(1)} km/h`;
+}

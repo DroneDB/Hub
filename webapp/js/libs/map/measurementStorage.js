@@ -4,6 +4,11 @@
 import { pathutils } from 'ddb';
 import { downloadText } from '@/libs/download';
 
+/** Whether a path is a measurements file (`<name>_measurements.geojson` or `measurements.geojson`). */
+export function isMeasurementFile(path) {
+    return path.endsWith('_measurements.geojson') || pathutils.basename(path) === 'measurements.geojson';
+}
+
 export class MeasurementStorage {
     /**
      * @param {Dataset} dataset - ddb dataset
@@ -23,10 +28,7 @@ export class MeasurementStorage {
         const path = this.entry.path;
 
         // If the path is already a measurements file, use it directly
-        const fileName = pathutils.basename(path);
-        if (path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
-            return path;
-        }
+        if (isMeasurementFile(path)) return path;
 
         // Remove extension and add _measurements.geojson
         return `${pathutils.dropExtension(path)}_measurements.geojson`;
