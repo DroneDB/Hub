@@ -17,8 +17,8 @@
                         <label for="crsModeSystem">Coordinate system</label>
                     </div>
                     <InputText v-model="crs" placeholder="EPSG:32632, or WKT" :disabled="saving || mode !== 'system'"
-                        :invalid="mode === 'system' && !!crsError" fluid />
-                    <small v-if="mode === 'system' && crsError" class="crs-error">{{ crsError }}</small>
+                        :invalid="showCrsError" @input="touched = true" fluid />
+                    <small v-if="showCrsError" class="crs-error">{{ crsError }}</small>
                     <small v-else class="help-text">The coordinate system of the drawing's coordinates: an EPSG
                         code (a number is read as one) or a WKT definition.</small>
 
@@ -68,6 +68,7 @@ export default {
             mode: crs && crs.source === 'prj' && crs.label === 'local' ? 'local' : 'system',
             crs: crs && /^EPSG:\d+$/.test(crs.label || '') ? crs.label : '',
             saving: false,
+            touched: false,
             errorMessage: null
         };
     },
@@ -84,6 +85,10 @@ export default {
         },
         crsError() {
             return crsRequest(this.mode, this.crs).length === 0 ? 'Enter a coordinate system.' : null;
+        },
+        // Only once the user has typed: an empty field is not an error yet
+        showCrsError() {
+            return this.mode === 'system' && this.touched && !!this.crsError;
         },
         canApply() {
             return this.mode === 'local' || !this.crsError;
