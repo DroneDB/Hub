@@ -16,7 +16,7 @@
                     @shareEmbed="handleShareEmbed"
                     @createFolder="handleCreateFolder"
                     @selectAll="handleSelectAll"
-                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                    @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
                     @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
             </div>
             </template>
@@ -35,7 +35,7 @@
                         @shareEmbed="handleShareEmbed"
                         @createFolder="handleCreateFolder"
                         @selectAll="handleSelectAll"
-                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                        @openAsText="handleOpenAsText" @error="handleError" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
                         @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                 </template>
                 <template v-slot:map>
@@ -53,7 +53,7 @@
                                 @setAsCover="setAsCover"
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
-                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                                @openAsText="handleOpenAsText" @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -77,7 +77,7 @@
                                 @openProperties="handleExplorerOpenProperties"
                                 @shareEmbed="handleShareEmbed" @downloadItems="handleDownloadItems" @buildStarted="handleBuildStarted" @buildError="handleBuildError"
                                 @openAsText="handleOpenAsText"
-                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog"
+                                @selectionChanged="handleTableSelectionChanged" @mergeMultispectral="openMergeMultispectralDialog" @maskBorders="openMaskBordersDialog" @alignGeoRaster="openAlignDialog" @extractItem="openExtractDialog" @setCrs="openSetCrsDialog"
                                 @copySelectedItems="clipboardCopySelected" @cutSelectedItems="clipboardCutSelected" @pasteFromClipboard="clipboardPaste" @downloadBuildArtifact="handleDownloadBuildArtifact" />
                         </div>
                         <div v-if="selectedDetailFile && !isMobile" class="detail-side">
@@ -137,6 +137,7 @@
         <AlignDialog v-if="alignDialogOpen" @onClose="handleAlignClose" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" />
         <MaskBordersDialog v-if="maskBordersDialogOpen" @onClose="handleMaskBordersDialogClose" :entry="maskBordersDialogEntry" />
         <ExtractDialog v-if="extractDialogOpen" @onClose="handleExtractClose" :file="extractFile" :dataset="dataset" />
+        <SetCrsDialog v-if="setCrsDialogOpen" @onClose="handleSetCrsClose" :file="setCrsFile" :dataset="dataset" />
         <ImportFromUrlDialog v-if="importUrlDialogOpen" @onClose="handleImportUrlClose"
             :dataset="dataset" :initial-url="importUrlInitial" :initial-folder="currentPath || ''" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
@@ -264,6 +265,7 @@ const MergeMultispectralDialog = lazyComponent(() => import(/* webpackChunkName:
 const AlignDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/AlignDialog.vue'));
 const MaskBordersDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/MaskBordersDialog.vue'));
 const ExtractDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/ExtractDialog.vue'));
+const SetCrsDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/SetCrsDialog.vue'));
 const ImportFromUrlDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-dialogs" */ './dialogs/ImportFromUrlDialog.vue'));
 const FsLightbox = lazyComponent(() => import(/* webpackChunkName: "dataset-lightbox" */ 'fslightbox-vue'), { showLoader: false });
 const VideoLightbox = lazyComponent(() => import(/* webpackChunkName: "dataset-lightbox" */ './VideoLightbox.vue'), { showLoader: false });
@@ -350,6 +352,7 @@ export default {
         AlignDialog,
         MaskBordersDialog,
         ExtractDialog,
+        SetCrsDialog,
         ImportFromUrlDialog,
         FsLightbox,
         VideoLightbox

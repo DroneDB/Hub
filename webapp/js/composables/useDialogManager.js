@@ -45,6 +45,8 @@ export default {
 
             // Extract archive dialog
             extractDialogOpen: false,
+            setCrsDialogOpen: false,
+            setCrsFile: null,
             extractFile: null,
 
             // Import from URL dialog
@@ -594,6 +596,28 @@ export default {
             // Refresh the file browser so the newly imported file appears.
             const destFolder = (result && result.folder) ? result.folder : null;
             await this.revealExtractedFiles(destFolder);
+        },
+
+        // Set Coordinate System Dialog (CAD drawings)
+        openSetCrsDialog(file) {
+            if (!file) return;
+            this.setCrsFile = file;
+            this.setCrsDialogOpen = true;
+        },
+
+        handleSetCrsClose(action, result) {
+            this.setCrsDialogOpen = false;
+            this.setCrsFile = null;
+            if (action !== 'set' || !result) return;
+
+            this.$toast.add({
+                severity: 'success',
+                summary: 'Coordinate System Set',
+                detail: `${result.prjPath} written: the drawing is rebuilt with it`,
+                life: 5000
+            });
+            // The .prj appears next to the drawing, whose properties change once indexed
+            this.handleRefresh();
         },
 
         // Extract Archive Dialog

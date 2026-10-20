@@ -2,6 +2,7 @@ import ddb from 'ddb';
 const { pathutils } = ddb;
 
 import { isLocalVector } from '@/libs/openItemDefaults';
+import { isCadDrawing } from '@/libs/cadCrs';
 import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceeded } from '@/libs/build/buildHelpers';
@@ -502,6 +503,18 @@ function extractItem(ctx) {
     };
 }
 
+function setCoordinateSystemItem(ctx) {
+    return {
+        label: 'Set Coordinate System...',
+        icon: 'fa-solid fa-earth-europe',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite && sel.length === 1 && isCadDrawing(sel[0].entry);
+        },
+        click: () => ctx.emit('setCrs', ctx.getSelectedEntries()[0])
+    };
+}
+
 /**
  * Factory: create a context menu item for downloading a build artifact.
  * @param {string} label - Menu item label (e.g. "Download COG")
@@ -535,6 +548,7 @@ function toolsItem(ctx) {
     const maskBorders = maskBordersItem(ctx);
     const alignGeoRaster = alignGeoRasterItem(ctx);
     const extract = extractItem(ctx);
+    const setCrs = setCoordinateSystemItem(ctx);
     const build = buildItem(ctx);
     const transfer = transferItem(ctx);
 
@@ -546,9 +560,11 @@ function toolsItem(ctx) {
             maskBorders,
             alignGeoRaster,
             extract,
+            setCrs,
             {
                 type: 'separator',
-                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() || extract.isVisible()
+                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() ||
+                    extract.isVisible() || setCrs.isVisible()
             },
             build,
             transfer,
@@ -639,6 +655,7 @@ export {
     mergeMultispectralItem,
     alignGeoRasterItem,
     extractItem,
+    setCoordinateSystemItem,
     deleteItem,
     deleteSeparator,
     selectAllNoneItem,

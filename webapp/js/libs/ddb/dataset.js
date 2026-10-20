@@ -466,6 +466,17 @@ module.exports = class Dataset {
         return response === true ? { success: true } : response;
     }
 
+    // Sets the coordinate system of a CAD drawing (.dxf, .dwg) by writing its .prj:
+    // an EPSG code, WKT or PROJ string, or "local" to keep it in drawing coordinates
+    async setCadCrs(path, crs) {
+        if (!path) throw new Error(`Invalid path ${path}`);
+
+        const formData = new FormData();
+        formData.append('path', path);
+        formData.append('crs', crs);
+        return this.registry.postFormData(`${this.baseApi}/cad/crs`, formData);
+    }
+
     async clearCompletedBuilds() {
         const response = await this.registry.postRequest(`${this.baseApi}/builds/clear`, {});
         return response;

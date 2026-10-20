@@ -125,9 +125,9 @@ export function formatCadCrs(entry) {
         case 'layer':
             return crs.label || 'From the file';
         case 'lonlat':
-            return 'WGS84 (EPSG:4326), assumed: the file has no coordinate system. Upload a .prj with the same name to change it';
+            return 'WGS84 (EPSG:4326), assumed: the file has no coordinate system. Change it with Tools › Set Coordinate System';
         case 'none':
-            return `None: local drawing coordinates${units}. Upload a .prj with the same name to place it on the map`;
+            return `None: local drawing coordinates${units}. Place it on the map with Tools › Set Coordinate System`;
         default:
             return null;
     }
