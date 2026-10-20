@@ -10,7 +10,7 @@
  *   setTimeout / clearTimeout, in components and composables only (HQ-06: a timeout that
  *   outlives its component runs on an unmounted instance).
  * Not counted, because they remove themselves:
- *   registrations through the helpers (ListenerBag add/ol/bus, $listen, $onOl, $onBus,
+ *   registrations through the helpers (ListenerBag add/ol/bus, useListenerBag,
  *   useEventListener, useEmitter, PotreeSession track, and the component timers of
  *   composables/useTimers: useTimeout/useInterval/useDebounceFn and a useTimerGroup()
  *   function such as `this.later(...)`);
@@ -24,7 +24,7 @@
 // The helpers themselves add and remove on behalf of their callers
 export const HELPER_FILES = new Set(['libs/listenerBag.js']);
 
-const HELPER_CALL = /(\$listen|\$onOl|\$onBus|useEventListener|useEmitter|\.track|bag\.(?:add|ol|bus)|_listenerBag\.(?:add|ol|bus)|listeners\.(?:add|ol|bus)|useTimeout|useInterval|useDebounceFn|\blater|\bapplyLater)\(/;
+const HELPER_CALL = /(useEventListener|useEmitter|\.track|bag\.(?:add|ol|bus)|_listenerBag\.(?:add|ol|bus)|listeners\.(?:add|ol|bus)|useTimeout|useInterval|useDebounceFn|\blater|\bapplyLater)\(/;
 const LIFETIME = /\/\/\s*lifetime:\s*(app|element|owner|paired|defer)\b/;
 
 // Lines covered by a lifetime annotation (up to the next blank line) or a helper call

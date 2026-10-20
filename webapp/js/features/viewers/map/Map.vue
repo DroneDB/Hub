@@ -151,7 +151,8 @@ import Polygon from 'ol/geom/Polygon';
 import { fromExtent } from 'ol/geom/Polygon';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
-import { lifecycleListenersMixin } from '@/composables/useEventListener';
+import { useListenerBag } from '@/composables/useEventListener';
+import emitter from '@/libs/eventBus';
 import { markRaw, shallowRef, ref, getCurrentInstance } from 'vue';
 
 import ddb from 'ddb';
@@ -209,7 +210,6 @@ export default {
     components: {
         DialogHost, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
-    mixins: [lifecycleListenersMixin],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -309,7 +309,8 @@ export default {
             ...f.measurements, ...f.plantHealth, ...f.raster, ...f.stockpile, ...f.contours, ...f.tooltip, ...f.analysisButtons,
             copyImageCoords: imageCopy.copy, imagePopupCoordsCopied: imageCopy.copied,
             copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied,
-            later: useTimerGroup()
+            later: useTimerGroup(),
+            listeners: useListenerBag()
         };
     },
     data: function () {
@@ -995,7 +996,7 @@ export default {
             this.map.once("postrender", () => {
                 this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
             });
-            // Map listeners are removed with the component (lifecycleListenersMixin)
+            // Map listeners are removed with the component (this.listeners)
 
             // Keep the View maxZoom capped to the deepest native raster zoom
             // currently loaded (plus a small magnification allowance). The View
@@ -1007,10 +1008,10 @@ export default {
             this._viewCapDeferredKey = null;
             const scheduleViewCap = () => this._scheduleViewCapUpdate();
             [this.rasterLayer.getLayers(), this.footprintRastersLayer.getLayers()].forEach(collection => {
-                this.$onOl([collection.on('add', scheduleViewCap), collection.on('remove', scheduleViewCap)]);
+                this.listeners.ol([collection.on('add', scheduleViewCap), collection.on('remove', scheduleViewCap)]);
             });
 
-            this.$onOl(this.map.on('pointermove', (e) => {
+            this.listeners.ol(this.map.on('pointermove', (e) => {
                 if (e.dragging || this.measuring) {
                     this.hideFeatureTooltip();
                     return;
@@ -1120,7 +1121,7 @@ export default {
                 }
             }));
             // Add double-click handler for showing feature properties
-            this.$onOl(this.map.on('dblclick', (e) => {
+            this.listeners.ol(this.map.on('dblclick', (e) => {
                 if (this.measuring) return;
 
                 // Check if we clicked on a vector feature
@@ -1324,7 +1325,7 @@ export default {
                 this.updateClearSelectionButton();
             };
 
-            this.$onOl(this.map.on('click', e => {
+            this.listeners.ol(this.map.on('click', e => {
                 if (this.measuring) return;
                 if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
 
@@ -1411,7 +1412,7 @@ export default {
             }));
 
             // Right click
-            this.$onOl(this.map.on('contextmenu', e => {
+            this.listeners.ol(this.map.on('contextmenu', e => {
                 // Single selection
                 doSelectSingle(e);
 
@@ -1421,7 +1422,7 @@ export default {
             }));
 
             // Double click on geovideo marker - open video player directly
-            this.$onOl(this.map.on('dblclick', e => {
+            this.listeners.ol(this.map.on('dblclick', e => {
                 if (this.measuring) return;
                 if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
 
@@ -1445,7 +1446,7 @@ export default {
                 }
             }));
 
-            this.$onBus('addItems', () => {
+            this.listeners.bus(emitter, 'addItems', () => {
                 this.reloadFileLayers();
             });
 

@@ -17,8 +17,7 @@ export const GUARDS = [
             message: 'Use a composable from setup(), not a mixin (HQ-06).'
         }],
         allow: [
-            'webapp/js/features/dataset/ViewDataset.vue',
-            'webapp/js/features/viewers/map/Map.vue'
+            'webapp/js/features/dataset/ViewDataset.vue'
         ]
     },
     {

@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { effectScope } from 'vue';
 import { ListenerBag } from '@/libs/listenerBag';
-import { useEventListener, useEmitter, lifecycleListenersMixin } from '@/composables/useEventListener';
+import { useEventListener, useEmitter, useListenerBag } from '@/composables/useEventListener';
 import mitt from 'mitt';
 
 describe('ListenerBag', () => {
@@ -60,16 +60,16 @@ describe('useEventListener / useEmitter', () => {
     });
 });
 
-describe('lifecycleListenersMixin', () => {
+describe('useListenerBag', () => {
     it('balances window listeners over 10 mounts and unmounts', () => {
         const add = vi.spyOn(window, 'addEventListener');
         const remove = vi.spyOn(window, 'removeEventListener');
         for (let i = 0; i < 10; i++) {
-            const vm = { ...lifecycleListenersMixin.methods };
-            lifecycleListenersMixin.beforeCreate.call(vm);
-            vm.$listen(window, 'resize', () => {});
-            vm.$listen(window, 'keydown', () => {});
-            lifecycleListenersMixin.beforeUnmount.call(vm);
+            const scope = effectScope();
+            const listeners = scope.run(() => useListenerBag());
+            listeners.add(window, 'resize', () => {});
+            listeners.add(window, 'keydown', () => {});
+            scope.stop();
         }
         expect(add.mock.calls.length).toBe(20);
         expect(remove.mock.calls.length).toBe(add.mock.calls.length);

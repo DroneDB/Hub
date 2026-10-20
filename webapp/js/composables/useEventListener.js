@@ -8,11 +8,12 @@
  * Composition API (setup or another composable):
  *   useEventListener(window, 'resize', onResize);
  *   useEmitter('folderOpened', onFolderOpened);
- * Options API: `mixins: [lifecycleListenersMixin]`, then
- *   this.$listen(target, 'click', handler)  // DOM / EventDispatcher
- *   this.$onBus('addItems', handler)          // event bus
- *   this.$onOl(map.on('click', handler))      // OpenLayers key
- * Everything is removed when the scope is disposed / the component unmounts.
+ * Options API: `setup() { return { listeners: useListenerBag() }; }`, then
+ *   this.listeners.add(target, 'click', handler)          // DOM / EventDispatcher
+ *   this.listeners.bus(emitter, 'addItems', handler)      // event bus
+ *   this.listeners.ol(map.on('click', handler))           // OpenLayers key
+ * Everything is removed when the scope is disposed / the component unmounts (HQ-06: the
+ * lifecycleListenersMixin twin is gone).
  */
 import { getCurrentScope, onScopeDispose } from 'vue';
 import emitter from '@/libs/eventBus';
@@ -34,22 +35,11 @@ export function useEmitter(event, handler, bus = emitter) {
     return scopedBag().bus(bus, event, handler);
 }
 
-export const lifecycleListenersMixin = {
-    beforeCreate() {
-        this._listenerBag = new ListenerBag();
-    },
-    beforeUnmount() {
-        this._listenerBag.dispose();
-    },
-    methods: {
-        $listen(target, type, handler, options) {
-            return this._listenerBag.add(target, type, handler, options);
-        },
-        $onBus(event, handler, bus = emitter) {
-            return this._listenerBag.bus(bus, event, handler);
-        },
-        $onOl(keys) {
-            return this._listenerBag.ol(keys);
-        }
-    }
-};
+/**
+ * A ListenerBag disposed with the current component / effect scope, for code that
+ * registers from methods (Options API): `setup() { return { listeners: useListenerBag() }; }`
+ * then `this.listeners.ol(map.on('click', fn))`, `this.listeners.bus(emitter, 'addItems', fn)`.
+ */
+export function useListenerBag() {
+    return scopedBag();
+}

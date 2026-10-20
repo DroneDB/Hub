@@ -15,7 +15,7 @@ export default {
         schema: [],
         messages: {
             unpaired: 'Listeners or timers not removed: addEventListener {{add}}/{{rem}}, setInterval {{si}}/{{ci}}, setTimeout {{st}}/{{ct}}, on {{on}}/{{off}}. '
-                + 'Use $listen/$onOl/$onBus/useEventListener or composables/useTimers, remove them on unmount, or add a `// lifetime:` comment.'
+                + 'Use useListenerBag/useEventListener or composables/useTimers, remove them on unmount, or add a `// lifetime:` comment.'
         }
     },
     create(context) {
