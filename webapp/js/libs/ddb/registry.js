@@ -695,6 +695,10 @@ module.exports = class Registry {
             return await this._handleResponse(response, method, options.responseType);
 
         } catch (error) {
+            // The server rejected the session (not a sign-in attempt): tell the app once
+            if (error.status === 401 && this._unauthorizedHandler && !endpoint.startsWith('/users/authenticate')) {
+                this._unauthorizedHandler(error);
+            }
             // Re-throw errors that already have a status (our custom API errors), and aborts
             if (error.status !== undefined || error.name === 'AbortError') {
                 throw error;
@@ -960,6 +964,15 @@ module.exports = class Registry {
 
     Organization(name) {
         return new Organization(this, name);
+    }
+
+    /**
+     * Called with the error when a request (other than sign-in or token refresh) is
+     * rejected with 401. The app decides what to do (HQ-04: end the session, go to Login).
+     * @param {(error: Error) => void} handler
+     */
+    onUnauthorized(handler) {
+        this._unauthorizedHandler = handler;
     }
 
     addEventListener(event, cb) {

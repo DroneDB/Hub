@@ -268,12 +268,8 @@ export default {
                     };
                 });
             } catch (e) {
-                if (isUnauthorized(e)) {
-                    reg.logout();
-                    this.$router.push({ name: "Login" }).catch(() => { });
-                } else {
-                    this.$notify.error(e.message);
-                }
+                // A 401 is handled by reg.onUnauthorized (end the session, sign in)
+                if (!isUnauthorized(e)) this.$notify.error(e.message);
             }
             this.loading = false;
         },

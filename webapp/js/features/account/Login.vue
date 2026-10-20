@@ -43,6 +43,9 @@ import InputIcon from 'primevue/inputicon';
 import ProgressSpinner from 'primevue/progressspinner';
 import reg from '@/libs/api/sharedRegistry';
 import { xAuthAvailable, getXAuthToken } from '@/libs/api/xauth';
+import { mapStores } from 'pinia';
+import { useAuthStore } from '@/stores/auth';
+import { isAppPath } from '@/libs/authRoutes';
 
 export default {
     name: 'LoginPage',
@@ -60,13 +63,14 @@ export default {
         }
     },
     computed: {
+        ...mapStores(useAuthStore),
         showRegistrationLink: function() {
             return HubOptions.showRegistrationLink !== false;
         }
     },
     beforeMount: function () {
         if (reg.ensureLoggedIn()) {
-            this.$router.push({ name: "Organizations" });
+            this.redirectAfterLogin();
         } else if (xAuthAvailable()) {
             this.xAuthInProgress = true;
         }
@@ -74,9 +78,8 @@ export default {
     mounted: async function () {
         if (this.xAuthInProgress) {
             try {
-                await reg.login(null, null, getXAuthToken());
-                await reg.loadFeatures();
-                this.redirectToPrevRoute();
+                await this.authStore.login(null, null, getXAuthToken());
+                this.redirectAfterLogin();
             } catch (e) {
                 console.error(e);
             }
@@ -84,15 +87,10 @@ export default {
         }
     },
     methods: {
-        redirectToPrevRoute: function () {
-            const prev = this.$route.meta.prev;
-            let redirectTo = prev ? prev.path : '/';
-
-            if (['/', '/login'].indexOf(redirectTo) !== -1 && reg.getUsername()) {
-                this.$router.push({ name: "Organizations" });
-            } else {
-                this.$router.push({ path: redirectTo });
-            }
+        // Back to the page that asked for a sign-in (router guard, expired session), else home
+        redirectAfterLogin: function () {
+            const redirect = this.$route.query.redirect;
+            this.$router.replace(isAppPath(redirect) ? redirect : { name: "Organizations" });
         },
         login: async function (e) {
             if (e && e.preventDefault) e.preventDefault();
@@ -100,9 +98,8 @@ export default {
             this.error = "";
 
             try {
-                await reg.login(this.username, this.password);
-                await reg.loadFeatures();
-                this.redirectToPrevRoute();
+                await this.authStore.login(this.username, this.password);
+                this.redirectAfterLogin();
             } catch (e) {
                 this.error = e.message;
             }

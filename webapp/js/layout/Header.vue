@@ -104,6 +104,9 @@ import Menu from 'primevue/menu';
 import ProgressBar from 'primevue/progressbar';
 import PrimeMessage from 'primevue/message';
 import useHeavyTask from '@/composables/useHeavyTask';
+import { mapState } from 'pinia';
+import { useAuthStore } from '@/stores/auth';
+import { loginLocation } from '@/libs/authRoutes';
 
 export default {
     name: 'HubHeader',
@@ -122,9 +125,6 @@ export default {
         const loggedIn = reg.isLoggedIn();
 
         return {
-            username: reg.getUsername(),
-            loggedIn: loggedIn,
-            isAdmin: reg.isAdmin(),
             params: this.$route.params,
             showDownload: !!this.$route.params.ds,
             showShare: !!this.$route.params.ds,
@@ -145,6 +145,7 @@ export default {
     },
 
     computed: {
+        ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
         storageBarColor: function () {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 'var(--ddb-success)';
             const pct = this.storageInfo.usedPercentage * 100;
@@ -317,6 +318,18 @@ export default {
         }
     },
     watch: {
+        loggedIn: function (loggedIn) {
+            if (loggedIn) {
+                this.refreshStorageInfo();
+            } else {
+                this.storageInfo = null;
+                this.usersManagement = false;
+                this.accountManagement = false;
+            }
+        },
+        featuresVersion: function () {
+            this.checkUserManagement();
+        },
         $route: function (to) {
             const { params } = to;
 
@@ -332,8 +345,6 @@ export default {
         }
     },
     mounted: function () {
-        reg.addEventListener('login', this.onRegLogin);
-        reg.addEventListener('logout', this.onRegLogout);
 
         this._onAddItems = () => {
             this.refreshStorageInfo();
@@ -364,8 +375,6 @@ export default {
         this.updateBackToOrgVisibility();
     },
     beforeUnmount: function () {
-        reg.removeEventListener('login', this.onRegLogin);
-        reg.removeEventListener('logout', this.onRegLogout);
 
         emitter.off('addItems', this._onAddItems);
         emitter.off('deleteEntries', this._onDeleteEntries);
@@ -537,28 +546,9 @@ export default {
             this.shareFile = null;
         },
 
-        onRegLogin: async function (username) {
-            this.username = username;
-            this.loggedIn = true;
-            this.isAdmin = reg.isAdmin();
-            this.refreshStorageInfo();
-
-            await reg.loadFeatures();
-            this.checkUserManagement();
-        },
-
-        onRegLogout: function () {
-            this.username = "";
-            this.loggedIn = false;
-            this.isAdmin = false;
-            this.storageInfo = null;
-            this.usersManagement = false;
-            this.accountManagement = false;
-        },
-
         logout: async function () {
             try {
-                reg.logout();
+                useAuthStore().logout();
                 await xAuthLogout();
             } catch (e) {
                 console.warn('Logout error:', e.message);
@@ -568,7 +558,7 @@ export default {
         },
 
         login: function () {
-            this.$router.push({ name: "Login" }).catch(() => { });
+            this.$router.push(loginLocation(this.$route.fullPath)).catch(() => { });
         },
 
         toggleUserMenu: function (event) {

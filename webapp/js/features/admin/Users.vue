@@ -228,6 +228,7 @@ import IconField from 'primevue/iconfield';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
 import { formatDateTime } from '@/libs/format';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 /**
  * Users - Admin panel for managing platform users.
@@ -329,11 +330,7 @@ export default {
                 }));
                 this.availableRoles = rolesData;
             } catch (e) {
-                if (e.status === 401) {
-                    this.$router.push({ name: "Login" }).catch(() => { });
-                } else {
-                    this.error = e.message;
-                }
+                if (!isUnauthorized(e)) this.error = e.message;
             }
             this.loading = false;
         },

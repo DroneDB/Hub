@@ -167,6 +167,7 @@ import Chips from 'primevue/chips';
 import Textarea from 'primevue/textarea';
 import Tag from 'primevue/tag';
 import { copyText } from '@/composables/useCopyText';
+import { isForbidden } from '@/libs/ddb/apiError';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
@@ -193,10 +194,6 @@ export default {
     },
 
     async mounted() {
-        if (!reg.isAdmin()) {
-            this.$router.push('/').catch(() => { });
-            return;
-        }
         await this.loadConfig();
     },
 
@@ -208,8 +205,8 @@ export default {
                 this.sections = data.sections || [];
             } catch (e) {
                 console.error('Failed to load config:', e);
-                if (e.status === 401 || e.status === 403) {
-                    this.$router.push('/').catch(() => { });
+                if (isForbidden(e)) {
+                    this.$router.push({ name: 'Organizations' }).catch(() => { });
                     return;
                 }
             } finally {

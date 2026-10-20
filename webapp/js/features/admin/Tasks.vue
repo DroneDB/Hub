@@ -57,6 +57,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import reg from '@/libs/api/sharedRegistry';
+import { isForbidden } from '@/libs/ddb/apiError';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -118,12 +119,6 @@ export default {
     },
 
     async mounted() {
-        // No global route-guard: gate admin access here (consistent with the rest of the app).
-        if (!reg.isAdmin()) {
-            this.$router.push('/').catch(() => { });
-            return;
-        }
-
         await this.loadUsers();
         await this.loadTasks();
         this.scheduleAutoRefresh();
@@ -157,8 +152,8 @@ export default {
                 this.total = (res && res.total) || 0;
             } catch (e) {
                 console.error('Failed to load tasks:', e);
-                if (e.status === 401 || e.status === 403) {
-                    this.$router.push('/').catch(() => { });
+                if (isForbidden(e)) {
+                    this.$router.push({ name: 'Organizations' }).catch(() => { });
                     return;
                 }
                 this.items = [];

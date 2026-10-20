@@ -1,12 +1,13 @@
 /**
- * HQ-03: a 401 while listing organisations ends the session and goes to Login.
+ * HQ-03/HQ-04: a 401 while listing organisations ends the session and goes to Login.
  * Before, the page tested `e.noRetry` (set only by the upload layer), so it always
- * showed "Temporary authentication issue" and never redirected.
+ * showed "Temporary authentication issue" and never redirected. The page now leaves
+ * 401s to the app's handler (reg.onUnauthorized -> handleUnauthorized).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { ApiError } from '@/libs/ddb/apiError';
 
-const reg = vi.hoisted(() => ({ isAdmin: () => false, getOrganizations: null, logout: null }));
+const reg = vi.hoisted(() => ({ isAdmin: () => false, getOrganizations: null }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: Organizations } = await import('./Organizations.vue');
@@ -20,26 +21,44 @@ function fakeView() {
 }
 
 describe('Organizations.fetchOrganizations', () => {
-    it('logs out and goes to Login when the server rejects the session', async () => {
+    it('leaves a rejected session to the app handler (no error box)', async () => {
         reg.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Token expired', 401)));
-        reg.logout = vi.fn();
         const vm = fakeView();
 
         await Organizations.methods.fetchOrganizations.call(vm);
 
-        expect(reg.logout).toHaveBeenCalledOnce();
-        expect(vm.$router.push).toHaveBeenCalledWith({ name: 'Login' });
         expect(vm.$notify.error).not.toHaveBeenCalled();
     });
 
     it('shows other errors', async () => {
         reg.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Boom', 500)));
-        reg.logout = vi.fn();
         const vm = fakeView();
 
         await Organizations.methods.fetchOrganizations.call(vm);
 
-        expect(reg.logout).not.toHaveBeenCalled();
         expect(vm.$notify.error).toHaveBeenCalledWith('Boom');
+    });
+});
+
+describe('handleUnauthorized', () => {
+    const router = path => ({
+        currentRoute: { value: { name: path === '/login' ? 'Login' : 'Organizations', fullPath: path } },
+        push: vi.fn(() => Promise.resolve())
+    });
+
+    it('ends the session and signs in again, coming back afterwards', async () => {
+        const { handleUnauthorized } = await import('@/libs/authRoutes');
+        const r = router('/r');
+        const auth = { isLoggedIn: true, logout: vi.fn() };
+        handleUnauthorized(r, auth);
+        expect(auth.logout).toHaveBeenCalledOnce();
+        expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r' } });
+    });
+
+    it('does nothing on the Login page', async () => {
+        const { handleUnauthorized } = await import('@/libs/authRoutes');
+        const r = router('/login');
+        handleUnauthorized(r, { isLoggedIn: false, logout: vi.fn() });
+        expect(r.push).not.toHaveBeenCalled();
     });
 });

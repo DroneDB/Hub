@@ -102,6 +102,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { bytesToSize } from '@/libs/utils';
 import { xAuthLogout } from '@/libs/api/xauth';
+import { loginLocation } from '@/libs/authRoutes';
 
 export default {
     name: 'AccountPage',
@@ -211,7 +212,7 @@ export default {
                 console.warn('Logout error:', e.message);
             } finally {
                 this.loggingOut = false;
-                this.$router.push({ name: "Login" }).catch(() => { });
+                this.$router.push(loginLocation()).catch(() => { });
             }
         }
     }

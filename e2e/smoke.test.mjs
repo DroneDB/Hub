@@ -8,8 +8,9 @@
  * HUB_TEST_DATA (/mnt/data/repos/test_data), HUB_HEADED=1 to watch, HUB_CHROME to use a given
  * Chromium binary (otherwise Playwright's own, else the newest one in ~/.cache/ms-playwright).
  * It creates a throw-away dataset in the user's organisation and deletes it at the end.
- * To test a local build: `npm run build`, copy build/* into <storage>/ClientApp, then restart
- * the Registry (it keeps serving the Hub files it read before the copy).
+ * To test a local build: `npm run build`, copy build/* into <storage>/ClientApp, write the
+ * package version into <storage>/ClientApp/version.txt and restart the Registry. Without
+ * version.txt the Registry replaces the folder with the Hub embedded in its own binary.
  */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -73,10 +74,15 @@ after(async () => {
     try { await api('DELETE', `/orgs/${USER}/ds/${DS}`); } catch { /* best effort */ }
 });
 
-test('anonymous admin page goes to Login', async () => {
+test('anonymous admin page goes to Login and back after sign-in', async () => {
     await page.goto(`${URL_}/admin/users`);
     await appReady();
     await page.waitForSelector('input[type=password]', { timeout: 15000 });
+    assert.equal(new URL(page.url()).searchParams.get('redirect'), '/admin/users');
+    await page.fill('input[type=text], input[placeholder*="sername"]', USER);
+    await page.fill('input[type=password]', PASS);
+    await Promise.all([page.waitForURL(/\/admin\/users$/, { timeout: 30000 }), page.click('button:has-text("Login")')]);
+    await page.evaluate(() => { localStorage.clear(); document.cookie = 'jwtToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/'; });
 });
 
 test('login lands on the organisations page', async () => {

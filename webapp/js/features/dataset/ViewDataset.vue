@@ -293,6 +293,7 @@ import buildEvents from '@/composables/useBuildEvents';
 import useHeavyTask from '@/composables/useHeavyTask';
 import { Features } from '@/libs/features';
 import { getPref, setPref, PREF } from '@/libs/preferences';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 /**
  * ViewDataset - Main dataset page hosting the explorer, map viewer, and
@@ -836,11 +837,8 @@ export default {
             } catch (e) {
                 // Left the dataset while it was loading
                 if (isAbort(e)) return [];
-                if (e.status === 401) {
-                    this.$router.push({ name: "Login" }).catch(() => { });
-                } else {
-                    this.showError(e, "Dataset");
-                }
+                // A 401 is handled by reg.onUnauthorized (sign in, then come back)
+                if (!isUnauthorized(e)) this.showError(e, "Dataset");
                 return [];
             }
         },

@@ -113,11 +113,6 @@ export default {
             return reg.url + this.url;
         }
     },
-    beforeMount: function () {
-        if (!reg.ensureLoggedIn()) {
-            this.$router.push({ name: "Login" }).catch(() => { });
-        }
-    },
     beforeUnmount: function () {
         // No ghost uploads: requests in flight and pending retries stop with the view
         this._isUnmounted = true;

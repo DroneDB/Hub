@@ -29,6 +29,9 @@ import { notify, setToastService } from '@/libs/notify';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 
 import { createAppRouter } from './router';
+import { handleUnauthorized } from '@/libs/authRoutes';
+import { createPinia } from 'pinia';
+import { useAuthStore } from '@/stores/auth';
 
 import reg from '@/libs/api/sharedRegistry';
 import { queryParams, inIframe } from '@/libs/utils';
@@ -106,8 +109,15 @@ window.addEventListener('load', function () {
             }
         });
 
+        // Pinia before the router: the route guards read the auth store
+        const pinia = createPinia();
+        app.use(pinia);
         app.use(router);
         app.use(PrimeVue, primeVueOptions);
+
+        // The server rejected the session or a private page needs one: one place
+        // decides (HQ-04) - end the session and sign in, then come back here
+        reg.onUnauthorized(() => handleUnauthorized(router, useAuthStore(pinia)));
         app.use(ToastService);
 
         // The one toast host (root template) and the notifier every component uses (HQ-03)
@@ -119,11 +129,8 @@ window.addEventListener('load', function () {
         app.config.globalProperties.$embed = embed;
 
         app.config.errorHandler = function (err, vm, info) {
-            // Catch unauthorized error globally
-            if (isUnauthorized(err)) {
-                router.push({ name: "Login" }).catch(() => { });
-                return;
-            }
+            // Already handled by reg.onUnauthorized
+            if (isUnauthorized(err)) return;
 
             // Log error with context
             console.error(`Vue error in ${info}:`, err);

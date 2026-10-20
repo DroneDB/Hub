@@ -209,6 +209,7 @@ const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { formatDateTime } from '@/libs/format';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 export default {
     name: 'DatasetsPage',
@@ -436,8 +437,8 @@ export default {
 
             await this.loadPage();
         } catch (e) {
-            if (e.status === 401) {
-                this.$router.push({ name: "Login" }).catch(() => { });
+            if (isUnauthorized(e)) {
+                // reg.onUnauthorized sends the user to Login
             } else if (e.status === 404) {
                 this.$router.push({ name: "Organizations" }).catch(() => { });
             } else {

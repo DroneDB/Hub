@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { setTitle } from '@/libs/utils';
+import { useAuthStore } from '@/stores/auth';
+import { guard } from '@/libs/authRoutes';
 
 // Lazy-loaded route components
 const ViewDataset = () => import(/* webpackChunkName: "dataset" */ '@/features/dataset/ViewDataset.vue');
@@ -43,11 +45,11 @@ export function createAppRouter(embed = false) {
         { path: '/login', name: 'Login', components: viewsFor(Login), meta: { title: 'Login' } },
         { path: '/r/:org', name: 'Datasets', components: viewsFor(Datasets), meta: { title: 'Datasets' } },
         { path: '/r', name: 'Organizations', components: viewsFor(Organizations), meta: { title: 'Organizations' } },
-        { path: '/upload', name: 'Upload', components: viewsFor(Upload), meta: { title: 'Upload' } },
-        { path: '/admin/users', name: 'Users', components: viewsFor(Users), meta: { title: 'Users' } },
-        { path: '/admin/tasks', name: 'AdminTasks', components: viewsFor(AdminTasks), meta: { title: 'Tasks' } },
-        { path: '/admin/config', name: 'AdminConfig', components: viewsFor(AdminConfig), meta: { title: 'Configuration' } },
-        { path: '/account', name: 'Account', components: viewsFor(Account), meta: { title: 'Account' } },
+        { path: '/upload', name: 'Upload', components: viewsFor(Upload), meta: { title: 'Upload', requiresAuth: true } },
+        { path: '/admin/users', name: 'Users', components: viewsFor(Users), meta: { title: 'Users', requiresAdmin: true } },
+        { path: '/admin/tasks', name: 'AdminTasks', components: viewsFor(AdminTasks), meta: { title: 'Tasks', requiresAdmin: true } },
+        { path: '/admin/config', name: 'AdminConfig', components: viewsFor(AdminConfig), meta: { title: 'Configuration', requiresAdmin: true } },
+        { path: '/account', name: 'Account', components: viewsFor(Account), meta: { title: 'Account', requiresAuth: true } },
         { path: '/', name: 'LoginHome', components: viewsFor(Login), meta: { title: 'Login' } },
         { path: '/:pathMatch(.*)*', name: 'NotFound', components: viewsFor(NotFound), meta: { title: 'Not Found' } }
     ];
@@ -57,11 +59,9 @@ export function createAppRouter(embed = false) {
         routes
     });
 
-    // Set titles, keep track of previous routes
-    router.beforeEach((to, prev, next) => {
+    router.beforeEach(to => {
         setTitle(to.meta.title);
-        to.meta.prev = prev;
-        next();
+        return guard(to, useAuthStore());
     });
 
     return router;
