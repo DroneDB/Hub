@@ -41,15 +41,34 @@ function fail(message, status, extra = {}) {
     throw new ApiError(message, status, extra);
 }
 
-/** @param {unknown} json @returns {string|null} */
-function errorMessageOf(json) {
+/**
+ * Error text a 2xx JSON body may carry (some endpoints answer 200 with an error).
+ * @param {unknown} json @returns {string|null}
+ */
+function inlineErrorOf(json) {
     if (!json || typeof json !== 'object') return null;
     const j = /** @type {any} */ (json);
     return j.error || j.message || null;
 }
 
+/**
+ * Error text of a failed (non-2xx) response: an RFC 9457 ProblemDetails body (`detail`,
+ * then `title`) or the legacy `{ error }` body. Reading both lets the Hub run against a
+ * Registry before and after its ProblemDetails switch (plan D1, RQ-05).
+ * @param {unknown} json @returns {string|null}
+ */
+function failureMessageOf(json) {
+    if (!json || typeof json !== 'object') return null;
+    const j = /** @type {any} */ (json);
+    return j.detail || j.error || j.message || j.title || null;
+}
+
 /** @param {Response} response */
 const contentTypeOf = response => (response.headers.get('Content-Type') || '').toLowerCase();
+
+/** `application/json` and structured `+json` types such as `application/problem+json`. */
+const isJsonType = (/** @type {string} */ contentType) =>
+    contentType.includes('application/json') || contentType.includes('+json');
 
 /**
  * Body of a successful response, by content type. A JSON body with an `error` field is
@@ -63,9 +82,9 @@ async function parseBody(response, status, responseType) {
     try {
         if (responseType === 'text') return await response.text();
 
-        if (contentType.includes('application/json')) {
+        if (isJsonType(contentType)) {
             const json = await response.json();
-            const message = errorMessageOf(json);
+            const message = inlineErrorOf(json);
             if (message) fail(message, status, json);
             return json;
         }
@@ -82,7 +101,7 @@ async function parseBody(response, status, responseType) {
                 } catch {
                     return text;
                 }
-                const message = errorMessageOf(json);
+                const message = inlineErrorOf(json);
                 if (message) fail(message, status, json);
                 return json;
             }
@@ -111,9 +130,9 @@ async function throwFor(response, status) {
     const fallback = STATUS_TEXT[status]
         ?? (status >= 500 ? 'Server Error' : status >= 400 ? 'Client Error' : 'Unexpected Response');
     try {
-        if (contentTypeOf(response).includes('application/json')) {
+        if (isJsonType(contentTypeOf(response))) {
             const json = await response.json();
-            fail(errorMessageOf(json) || fallback, status, json);
+            fail(failureMessageOf(json) || fallback, status, json);
         }
         const text = await response.text();
         fail(text || fallback, status);
