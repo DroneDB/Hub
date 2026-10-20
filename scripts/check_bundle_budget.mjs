@@ -27,8 +27,8 @@ const BUDGET_INITIAL_GZIP_KB = arg('--budget-initial-gzip-kb', 1000);
 const LAZY_ONLY_PACKAGES = ['three', '@sparkjsdev/spark', '@giro3d/giro3d', 'ol', 'proj4', '@codemirror/view', 'chart.js', 'markdown-it', 'laz-perf', 'copc'];
 // HUB-02: the dataset page loads the map, the text editor and the upload panel on first use
 const EAGER_VENDORS_FORBIDDEN_IN = { dataset: ['vendor-openlayers', 'vendor-codemirror', 'dataset-map', 'dataset-upload', 'dataset-editor'] };
-// HUB-04 / HUB-09: what the Potree viewer ships
-const POTREE_BUDGET_MB = 15;
+// HUB-04 / HUB-09: what the Potree viewer ships (7.9 MB with its scripts minified at copy time)
+const POTREE_BUDGET_MB = 9;
 
 const st = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
 const sizes = Object.fromEntries(st.assets.map(a => [a.name, a.size]));
@@ -94,12 +94,14 @@ if (fs.existsSync(potree)) {
         for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
             const p = path.join(dir, e.name);
             if (e.isDirectory()) {
-                if (['lazylibs', 'openlayers3'].includes(e.name)) offending.push(path.relative(outDir, p));
+                if (['lazylibs', 'openlayers3', 'vendor'].includes(e.name)) offending.push(path.relative(outDir, p));
                 walk(p);
             } else {
                 // Build-time compressed twins are not shipped twice in the count
                 if (!/\.(br|gz)$/.test(e.name)) bytes += fs.statSync(p).size;
                 if (e.name.endsWith('.map')) offending.push(path.relative(outDir, p));
+                // The viewer loads the minified d3 and jsTree
+                if (['d3.js', 'jstree.js'].includes(e.name)) offending.push(path.relative(outDir, p));
             }
         }
     };

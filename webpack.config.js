@@ -9,6 +9,25 @@ const path = require('path');
 const zlib = require('zlib');
 
 const pkg = require('./package.json');
+const { minify } = require('terser');
+
+// HUB-04: Potree 1.8 ships these unminified. They are minified when copied (production builds):
+// names are kept, as Potree looks up some of its classes by name.
+const POTREE_MINIFIED = [
+    'potree/build/potree/potree.js',
+    'potree/build/potree/workers/LASLAZWorker.js',
+    'potree/build/potree/workers/EptLaszipDecoderWorker.js',
+    'potree/build/potree/workers/2.0/DecoderWorker_brotli.js',
+    'potree/libs/spectrum/spectrum.js',
+    'potree/libs/plasio/js/laslaz.js'
+];
+
+async function minifyPotreeScript(content) {
+    const result = await minify(content.toString(), {
+        compress: true, mangle: true, keep_classnames: true, keep_fnames: true, format: { comments: false }
+    });
+    return result.code;
+}
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Text assets worth a precompressed twin (HUB-09)
@@ -204,10 +223,21 @@ module.exports = {
                             // workers are superseded by workers/LASLAZWorker.js.
                             '**/potree/build/potree/workers/EptZstandardDecoderWorker.js*',
                             '**/potree/build/potree/workers/EptBinaryDecoderWorker.js',
-                            '**/potree/libs/plasio/workers/**'
+                            '**/potree/libs/plasio/workers/**',
+                            // The viewer loads the minified d3 and jsTree that Potree ships, and
+                            // laslaz.js's bluebird import is commented out
+                            '**/potree/libs/d3/d3.js',
+                            '**/potree/libs/jstree/jstree.js',
+                            '**/potree/libs/plasio/vendor/**',
+                            // Copied minified below
+                            ...(isProduction ? POTREE_MINIFIED.map(f => '**/' + f) : [])
                         ]
                     }
                 },
+                ...(isProduction ? POTREE_MINIFIED.map(f => ({
+                    from: 'webapp/public/' + f, to: f,
+                    transform: { transformer: minifyPotreeScript, cache: true }
+                })) : []),
                 // Serve the laz-perf WebAssembly decoder locally (offline-first): the unified
                 // Giro3D viewer configures setLazPerfPath('/wasm') so COPC point clouds decode
                 // without fetching the .wasm from a public CDN.

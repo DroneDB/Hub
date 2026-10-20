@@ -23,10 +23,10 @@ export const POTREE_RESOURCES = [
     '/potree/libs/three.js/extra/lines.js',
     '/potree/libs/other/BinaryHeap.js',
     '/potree/libs/tween/tween.min.js',
-    '/potree/libs/d3/d3.js',
+    '/potree/libs/d3/d3.min.js',
     '/potree/libs/proj4/proj4.js',
     '/potree/libs/i18next/i18next.js',
-    '/potree/libs/jstree/jstree.js',
+    '/potree/libs/jstree/jstree.min.js',
     POTREE_BASE + '/potree.js',
     '/potree/libs/copc/index.js',
     '/potree/libs/plasio/js/laslaz.js'
