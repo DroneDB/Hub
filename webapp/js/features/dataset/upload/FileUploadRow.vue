@@ -3,6 +3,7 @@
         <div class="file-icon">
             <i v-if="file.status === 'pending'" class="fa-regular fa-clock grey"></i>
             <i v-else-if="file.status === 'uploading'" class="fa-solid fa-circle-notch fa-spin blue"></i>
+            <i v-else-if="file.status === 'processing'" class="fa-solid fa-gears blue" title="Processing on server"></i>
             <i v-else-if="file.status === 'done'" class="fa-solid fa-circle-check green"></i>
             <i v-else-if="file.status === 'error'" class="fa-solid fa-circle-xmark red"></i>
         </div>
@@ -14,6 +15,14 @@
             <div v-if="file.status === 'uploading'" class="progress-bar-container">
                 <div class="progress-bar" :style="{ width: file.progress + '%' }"></div>
                 <span class="progress-text">{{ file.progress.toFixed(0) }}%</span>
+            </div>
+            <div v-else-if="file.status === 'processing'" class="progress-bar-container processing"
+                title="Every byte is sent: the server is adding the file to the dataset">
+                <div class="progress-bar indeterminate"></div>
+                <span class="progress-text">Processing on server...</span>
+            </div>
+            <div v-else-if="file.status === 'pending' && file.errorMessage" class="pending-message" :title="file.errorMessage">
+                {{ file.errorMessage }}
             </div>
             <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
                 {{ truncatedError }}
@@ -41,6 +50,7 @@ export default {
             type: Object,
             required: true
             // Expected shape: { id, name, size, status, progress, errorMessage, retryCount, canRetry }
+            // status: pending | uploading | processing (all bytes sent, server adding it) | done | error
         }
     },
     computed: {
@@ -163,4 +173,21 @@ export default {
     font-weight: 500;
 }
 
+.progress-bar.indeterminate {
+    width: 35%;
+    animation: upload-processing 1.4s ease-in-out infinite;
+}
+
+@keyframes upload-processing {
+    0% { margin-left: -35%; }
+    100% { margin-left: 100%; }
+}
+
+.pending-message {
+    font-size: 0.75rem;
+    color: var(--ddb-text-muted, #888);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 </style>

@@ -3,20 +3,27 @@
  * Used by Explorer.vue and TableView.vue to avoid code duplication.
  */
 
+import { createLimiter } from '@/libs/concurrency';
+
+// Browser file-system calls (entry.file(), readEntries()) in flight while walking a drop
+// (UPL-01 B.4): one at a time costs a round trip per file; unbounded floods the browser
+export const TRAVERSAL_CONCURRENCY = 16;
+
 /**
  * Read all entries from a directory reader recursively.
  * Chrome's readEntries() returns max 100 entries per call,
  * so we loop until we get an empty batch.
  * @param {FileSystemDirectoryReader} directoryReader
+ * @param {{run: Function}} limiter
  * @returns {Promise<FileSystemEntry[]>}
  */
-async function readDirectoryEntries(directoryReader) {
+async function readDirectoryEntries(directoryReader, limiter) {
     const entries = [];
     let batch;
     do {
-        batch = await new Promise((resolve, reject) => {
+        batch = await limiter.run(() => new Promise((resolve, reject) => {
             directoryReader.readEntries(resolve, reject);
-        });
+        }));
         entries.push(...batch);
     } while (batch.length > 0);
     return entries;
@@ -25,33 +32,32 @@ async function readDirectoryEntries(directoryReader) {
 /**
  * Recursively traverse a FileSystemEntry and collect all files
  * with their relative paths preserved (for folder structure).
+ * Siblings are walked in parallel through `limiter`; the result keeps the tree order
+ * (a folder's files in reading order, depth first).
  * @param {FileSystemEntry} entry
  * @param {string} basePath
+ * @param {{run: Function}} limiter
  * @returns {Promise<File[]>}
  */
-async function traverseFileSystemEntry(entry, basePath = '') {
-    const files = [];
-
+async function traverseFileSystemEntry(entry, basePath, limiter) {
     if (entry.isFile) {
-        const file = await new Promise((resolve, reject) => {
+        const file = await limiter.run(() => new Promise((resolve, reject) => {
             entry.file(resolve, reject);
-        });
+        }));
         // Set fullPath to preserve folder structure
-        const relativePath = basePath ? basePath + '/' + entry.name : entry.name;
-        file.fullPath = relativePath;
-        files.push(file);
-    } else if (entry.isDirectory) {
-        const dirReader = entry.createReader();
-        const entries = await readDirectoryEntries(dirReader);
-        const newBasePath = basePath ? basePath + '/' + entry.name : entry.name;
-
-        for (const childEntry of entries) {
-            const childFiles = await traverseFileSystemEntry(childEntry, newBasePath);
-            files.push(...childFiles);
-        }
+        file.fullPath = basePath ? basePath + '/' + entry.name : entry.name;
+        return [file];
     }
 
-    return files;
+    if (entry.isDirectory) {
+        const entries = await readDirectoryEntries(entry.createReader(), limiter);
+        const newBasePath = basePath ? basePath + '/' + entry.name : entry.name;
+        const children = await Promise.all(
+            entries.map(childEntry => traverseFileSystemEntry(childEntry, newBasePath, limiter)));
+        return children.flat();
+    }
+
+    return [];
 }
 
 /**
@@ -85,9 +91,10 @@ export async function getFilesFromDrop(ev) {
             }
         }
 
-        // Process all entries in parallel
+        // Walk every dropped entry in parallel, with a bounded number of browser calls in flight
+        const limiter = createLimiter(TRAVERSAL_CONCURRENCY);
         const results = await Promise.all(
-            entries.map(entry => traverseFileSystemEntry(entry))
+            entries.map(entry => traverseFileSystemEntry(entry, '', limiter))
         );
         files.push(...results.flat());
     } else if (ev.dataTransfer.files) {

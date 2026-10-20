@@ -1,9 +1,8 @@
 /**
- * useResilientUpload - Shared retry/backoff/backpressure policy for Dropzone-based uploads.
+ * useResilientUpload - Shared retry/backoff/backpressure policy of the uploads.
  *
- * Consumed by DatasetUpload.vue and Upload.vue, which previously duplicated ad-hoc retry
- * logic. This composable does not touch Dropzone itself (it is a vendored file); callers
- * wire its decisions into their own Dropzone "error"/"complete" handlers.
+ * Consumed by the upload scheduler (libs/upload/uploadScheduler.js), which DatasetUpload.vue
+ * and Upload.vue share.
  *
  * Exposes:
  *   - shouldRetryStatus(status): whether an HTTP status is transient for this purpose
@@ -78,7 +77,9 @@ export function parseRetryAfterSeconds(headerValue) {
 /**
  * Additive-increase / multiplicative-decrease concurrency controller.
  *
- * onFailure(): halves concurrency (floor 2, capped at configured).
+ * onFailure(): halves concurrency (floor min(4, configured), capped at configured). Callers
+ *   apply it only to server-declared backpressure (429/503 with Retry-After, UPL-01 B.3):
+ *   a lone network error says nothing about the server's capacity.
  * onSuccess(): after `successesToGrow` consecutive successes, grows by 1 up to `configured`.
  * Concurrency never exceeds the originally configured value - the goal is cooperating with
  * server backpressure, not permanently raising throughput above what was asked for.
@@ -86,6 +87,7 @@ export function parseRetryAfterSeconds(headerValue) {
 export function createAimdConcurrency(configuredValue, opts = {}) {
     const configured = Math.max(1, configuredValue | 0);
     const successesToGrow = opts.successesToGrow ?? 5;
+    const floor = Math.min(configured, opts.floor ?? 4);
     let current = configured;
     let consecutiveSuccesses = 0;
 
@@ -95,9 +97,8 @@ export function createAimdConcurrency(configuredValue, opts = {}) {
         },
         onFailure() {
             consecutiveSuccesses = 0;
-            // Floor at 2 but never above `configured` - the docstring guarantees
-            // concurrency stays at or below the configured value for any input.
-            current = Math.min(configured, Math.max(2, Math.floor(current / 2)));
+            // Never below the floor, never above `configured`
+            current = Math.max(floor, Math.floor(current / 2));
             return current;
         },
         onSuccess() {

@@ -22,7 +22,6 @@ export default defineConfig({
             reporter: ['text', 'json', 'html'],
             include: ['webapp/js/libs/**/*.js', 'webapp/js/composables/**/*.js'],
             exclude: [
-                'webapp/js/vendor/**',
                 'webapp/js/libs/ddb/**',
                 'webapp/js/libs/map/potree/**'
             ]

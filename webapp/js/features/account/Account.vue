@@ -54,6 +54,9 @@
                 </template>
             </Card>
 
+            <!-- Upload self-test (UPL-01) -->
+            <UploadDiagnostics />
+
             <!-- Security Section (only if account management is enabled) -->
             <Card class="account-card action-card" v-if="accountManagement" @click="handleChangePwd">
                 <template #content>
@@ -90,6 +93,7 @@
 <script>
 import Message from '@/components/Message.vue';
 import ChangePwdDialog from './ChangePwdDialog.vue';
+import UploadDiagnostics from './UploadDiagnostics.vue';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import ProgressBar from 'primevue/progressbar';
@@ -103,7 +107,7 @@ import { xAuthLogout } from '@/libs/api/xauth';
 
 export default {
     components: {
-        Message, ChangePwdDialog, Button, Card, ProgressBar, Tag
+        Message, ChangePwdDialog, UploadDiagnostics, Button, Card, ProgressBar, Tag
     },
     data: function () {
         return {
