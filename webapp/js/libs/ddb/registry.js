@@ -242,8 +242,18 @@ export default class Registry {
         return this.makeRequest(endpoint, "DELETE", body);
     }
 
+    /**
+     * Whether a resource exists: true, or false on 404 (other failures throw). The build
+     * artifact getters (libs/ddb/entry.js) rely on the false: an absent optional artifact
+     * (a splat's georef.json, a model's 3D Tiles) used to fail the whole viewer.
+     */
     async headRequest(endpoint) {
-        return this.makeRequest(endpoint, "HEAD");
+        try {
+            return await this.makeRequest(endpoint, "HEAD");
+        } catch (e) {
+            if (e.status === 404) return false;
+            throw e;
+        }
     }
 
     async patchRequest(endpoint, body = {}) {
