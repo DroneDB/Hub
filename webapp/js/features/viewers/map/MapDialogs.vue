@@ -32,6 +32,7 @@ export default {
         alertMessage: { type: String, default: '' },
         clearMeasurementsDialogOpen: { type: Boolean, default: false },
         deleteSavedMeasurementsDialogOpen: { type: Boolean, default: false }
-    }
+    },
+    emits: ['alertClose', 'clearMeasurementsClose', 'deleteSavedMeasurementsClose']
 };
 </script>

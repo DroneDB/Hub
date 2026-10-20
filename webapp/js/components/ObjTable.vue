@@ -62,8 +62,8 @@ export default {
     },
     props: {
         obj: {
-            required: true,
-            default: null
+            type: [Object, Array],
+            required: true
         },
         preserveOrder: {
             type: Boolean,

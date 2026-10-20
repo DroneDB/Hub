@@ -55,7 +55,7 @@ export default {
             default: ''
         }
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'onSave', 'onDiscard'],
     data() {
         return {
             colorPalette: [

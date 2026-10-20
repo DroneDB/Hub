@@ -34,6 +34,7 @@ export default {
             required: true
         }
     },
+    emits: ['close'],
     computed: {
         fileName() {
             return pathutils.basename(this.entry.path);

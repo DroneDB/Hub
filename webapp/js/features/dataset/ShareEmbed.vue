@@ -102,7 +102,6 @@ import Window from '@/components/Window';
 import Message from '@/components/Message';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
 import Textarea from 'primevue/textarea';
 import copy from 'clipboard-copy';
@@ -112,19 +111,7 @@ import { defaultViewFor } from '@/libs/openItemDefaults';
 import { b64encode } from '@/libs/base64';
 import { buildOgcShareUrls, OGC_SHARE_MODES } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
-
-// Inline URL+copy row component (kept private to ShareEmbed - DRY for legacy & OGC rows).
-const UrlRow = {
-    components: { InputText, Button },
-    props: ['value', 'copyIcon'],
-    emits: ['copy'],
-    template: `
-        <div class="share-url-row">
-            <InputText :modelValue="value" readonly @click="$emit('copy')" title="Copy to clipboard" style="flex: 1;" />
-            <Button @click="$emit('copy')" title="Copy to clipboard" :icon="copyIcon" text />
-        </div>
-    `
-};
+import UrlRow from './ShareUrlRow.vue';
 
 const LEGACY_MODES = [
     { value: 'link',  label: 'Link' },

@@ -41,7 +41,10 @@ export default {
         Window, Button, Checkbox, InputText, Textarea
     },
 
-    props: ["mode", "model"],
+    props: {
+        mode: { type: String, required: true },
+        model: { type: Object, default: null }
+    },
     emits: ['onClose'],
 
     data: function () {

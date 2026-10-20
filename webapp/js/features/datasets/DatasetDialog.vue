@@ -74,7 +74,7 @@ export default {
         },
         model: {
             type: Object,
-            required: false
+            default: null
         },
         forbiddenSlugs: {
             default: () => [],

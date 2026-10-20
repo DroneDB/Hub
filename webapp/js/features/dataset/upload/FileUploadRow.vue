@@ -53,6 +53,7 @@ export default {
             // status: pending | uploading | processing (all bytes sent, server adding it) | done | error
         }
     },
+    emits: ['retry'],
     computed: {
         humanSize() {
             return bytesToSize(this.file.size);

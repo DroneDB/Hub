@@ -41,7 +41,10 @@ export default {
         Button,
         Divider
     },
-    props: ["tools", "className"],
+    props: {
+        tools: { type: Array, required: true },
+        className: { type: String, default: null }
+    },
     data: function () {
         return {
             dataTools: []

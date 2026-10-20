@@ -13,6 +13,7 @@
             </div>
             <template v-else>
                 <Button v-if="editable" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" @click="edit" />
+                <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
                 <div class="content" v-html="content" />
             </template>
         </div>
@@ -35,7 +36,7 @@ export default {
     props: {
         uri: { // DDB uri
             type: String,
-            required: false
+            default: null
         },
         editable: {
             type: Boolean,

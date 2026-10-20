@@ -25,7 +25,9 @@ export default {
         Window, Button, PrimeMessage
     },
 
-    props: ["orgSlug"],
+    props: {
+        orgSlug: { type: String, required: true }
+    },
     emits: ['onClose'],
 
     data: function () {

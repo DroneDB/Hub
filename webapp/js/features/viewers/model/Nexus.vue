@@ -100,7 +100,9 @@ export default {
     components: {
         Message, TabViewLoader, Window, Button
     },
-    props: ['uri'],
+    props: {
+        uri: { type: String, default: null }
+    },
     data: function () {
         const DEFAULT_AMBIENT = 0.4;
         const DEFAULT_DIRECTIONAL = 0.7;

@@ -46,7 +46,14 @@ export default [
     },
     {
         files: ['webapp/**/*.spec.js', 'webapp/**/*.test.js', 'test-setup.js'],
-        languageOptions: { globals: { ...globals.browser, ...globals.node, ...globals.vitest } }
+        languageOptions: { globals: { ...globals.browser, ...globals.node, ...globals.vitest } },
+        // Specs declare small throw-away components next to the one under test
+        rules: { 'vue/one-component-per-file': 'off' }
+    },
+    {
+        // Browser smoke suite (Node + Playwright; page functions run in the browser)
+        files: ['e2e/**/*.mjs'],
+        languageOptions: { globals: { ...globals.node, ...globals.browser } }
     },
     {
         files: ['*.js', '*.mjs', 'scripts/**/*.{js,mjs}', 'eslint-rules/**/*.mjs'],

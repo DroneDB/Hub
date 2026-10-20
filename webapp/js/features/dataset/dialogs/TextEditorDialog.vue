@@ -97,7 +97,7 @@ export default {
             default: false
         }
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'saved'],
 
     data() {
         return {

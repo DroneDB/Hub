@@ -194,7 +194,9 @@ export default {
     components: {
         Message, TabViewLoader, Window, Button, CameraManager, Toast
     },
-    props: ['uri'],
+    props: {
+        uri: { type: String, default: null }
+    },
     data: function () {
         return {
             error: "",

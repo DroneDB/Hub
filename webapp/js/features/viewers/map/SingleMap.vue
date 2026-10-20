@@ -156,7 +156,9 @@ export default {
         TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog, Toast
     },
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
-    props: ["uri"],
+    props: {
+        uri: { type: String, default: null }
+    },
     data: function () {
         return {
             mapSettingsDialogOpen: false,

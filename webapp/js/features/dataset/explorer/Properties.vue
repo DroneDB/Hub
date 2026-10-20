@@ -27,7 +27,9 @@ export default {
     components: {
         Window, PropsTable, DataTable, Column
     },
-    props: ['files'],
+    props: {
+        files: { type: Array, default: () => [] }
+    },
     emits: ['onClose'],
     computed: {
         singleFileProperties() {

@@ -94,7 +94,7 @@ export default {
             default: () => null
         }
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'basemapChanged', 'unitsChanged', 'customBasemapConfigChanged'],
 
     data: function () {
         const config = this.customBasemapConfig;

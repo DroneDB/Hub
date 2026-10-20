@@ -18,7 +18,12 @@ export default {
         DatasetUpload
     },
 
-    props: ['organization', 'dataset', 'path', 'filesToUpload'],
+    props: {
+        organization: { type: String, required: true },
+        dataset: { type: String, required: true },
+        path: { type: String, default: null },
+        filesToUpload: { type: Array, default: null }
+    },
     emits: ['onClose', 'importFromUrl'],
 
     data: function () {

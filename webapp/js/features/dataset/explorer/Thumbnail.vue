@@ -60,7 +60,7 @@ export default {
         },
         dataset: {
             type: Object,
-            required: false
+            default: null
         }
     },
     emits: ['clicked', 'open'],

@@ -13,6 +13,7 @@
                     Visibility: <Select v-model="visibility" :options="visibilityOptions" option-label="label" option-value="value" @change="setVisibility" />
                 </div>
                 <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
+                    <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
                     <span v-html="safeDescription" />
                 </PrimeMessage>
             </div>
@@ -112,7 +113,7 @@ export default {
             default: false
         }
     },
-    emits: ['onClose'],
+    emits: ['onClose', 'rescanRequested', 'addMarkdown'],
     data: function () {
         return {
             error: "",

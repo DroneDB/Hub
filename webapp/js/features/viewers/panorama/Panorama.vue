@@ -19,7 +19,9 @@ export default {
     components: {
         Message, TabViewLoader
     },
-    props: ['uri'],
+    props: {
+        uri: { type: String, default: null }
+    },
     data: function () {
         return {
             error: "",

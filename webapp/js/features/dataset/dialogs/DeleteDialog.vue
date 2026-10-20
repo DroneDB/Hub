@@ -20,7 +20,9 @@ export default {
         Button
     },
 
-    props: ["files"],
+    props: {
+        files: { type: Array, required: true }
+    },
     emits: ['onClose'],
 
     data: function () {

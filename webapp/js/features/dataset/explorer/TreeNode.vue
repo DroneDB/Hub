@@ -16,8 +16,9 @@
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
-        </div>        <div v-show="expanded" class="children">
-            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" ref="nodes" :node="node"
+        </div>
+        <div v-show="expanded" class="children">
+            <TreeNode v-for="(child, index) in children" :key="'N,' + child.path + ',' + index" ref="nodes" :node="child"
                       :get-children="getChildren" :can-write="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
                       @opened="(n, sender) => $emit('opened', n, sender)" />
         </div>
@@ -34,10 +35,12 @@ import emitter from '@/libs/eventBus';
 const { pathutils } = ddb;
 
 export default {
+    components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
     mixins: [itemDnDMixin],
     props: {
         node: {
-            type: Object
+            type: Object,
+            required: true
         },
         getChildren: {
             type: Function,
@@ -50,7 +53,6 @@ export default {
         }
     },
     emits: ['opened', 'selected'],
-    components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
     data: function () {
         return {
             children: [],

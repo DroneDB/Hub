@@ -112,6 +112,7 @@ export default {
             required: true
         }
     },
+    emits: ['close', 'build-started', 'error', 'build-completed', 'build-failed', 'timeout'],
 
     data() {
         return {

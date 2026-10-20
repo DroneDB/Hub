@@ -85,6 +85,7 @@
 </template>
 
 <script>
+/* eslint-disable vue/one-component-per-file -- the createApp() dialogs below move into the app in HQ-08 */
 import ddb from 'ddb';
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
@@ -110,7 +111,9 @@ export default {
     components: {
         Message, TabViewLoader, ConfirmDialog, Toast
     },
-    props: ['uri'],
+    props: {
+        uri: { type: String, default: null }
+    },
     data: function () {
         return {
             error: "",

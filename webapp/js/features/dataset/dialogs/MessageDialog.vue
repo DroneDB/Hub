@@ -20,7 +20,9 @@ export default {
         Window, Button
     },
 
-    props: ["message"],
+    props: {
+        message: { type: String, default: '' }
+    },
     emits: ['onClose'],
 
     data: function () {

@@ -130,7 +130,16 @@ export default {
     },
     mixins: [dragDropMixin],
     inject: { showBuildConfirm: { default: null } },
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'expandedGrid', 'canWrite', 'isLoadingFiles'],
+    props: {
+        files: { type: Array, required: true },
+        currentPath: { type: String, default: null },
+        tools: { type: Array, default: null },
+        dataset: { type: Object, required: true },
+        viewMode: { type: String, default: null },
+        expandedGrid: { type: Boolean, default: false },
+        canWrite: { type: Boolean, default: false },
+        isLoadingFiles: { type: Boolean, default: false }
+    },
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
     data: function () {
         const self = this;

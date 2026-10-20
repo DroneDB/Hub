@@ -50,8 +50,7 @@ import { useVirtualizer } from '@tanstack/vue-virtual';
 const props = defineProps({
   items: {
     type: Array,
-    required: true,
-    default: () => []
+    required: true
   },
   itemSize: {
     type: Number,

@@ -1,4 +1,5 @@
 <script>
+/* eslint-disable vue/one-component-per-file -- the createApp() dialogs below move into the app in HQ-07 */
 import { rootPath } from '@/dynamic/pathutils';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';

@@ -1,5 +1,6 @@
 <template>
     <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('cancel')">
+        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
         <div v-html="safeMessage" />
 
         <PrimeMessage v-if="warningMessage" severity="warn" :closable="false" class="mt-3">

@@ -1,5 +1,6 @@
 <template>
     <PrimeMessage v-if="parentRef[bindTo]" :severity="primeSeverity" :closable="!noDismiss" @close="dismiss">
+        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
         <span v-html="safeContent" />
     </PrimeMessage>
 </template>

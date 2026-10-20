@@ -89,7 +89,7 @@ export default {
         },
         dataset: {
             type: Object,
-            required: false
+            default: null
         }
     },
     emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],

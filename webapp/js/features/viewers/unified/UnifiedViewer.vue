@@ -154,7 +154,9 @@ export default {
     components: {
         Message, TabViewLoader, Window, Button, Toast
     },
-    props: ['uri'],
+    props: {
+        uri: { type: String, default: null }
+    },
     data: function () {
         const saved = loadSettings();
         return {

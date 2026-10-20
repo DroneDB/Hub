@@ -19,7 +19,11 @@ export default {
     components: {
         Message
     },
-    props: ["titleSuffix", "loadingText"],
+    props: {
+        titleSuffix: { type: String, default: null },
+        loadingText: { type: String, default: null }
+    },
+    emits: ['loaded'],
     data: function () {
         return {
             loading: true,

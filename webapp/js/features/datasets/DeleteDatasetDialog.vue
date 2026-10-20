@@ -25,7 +25,9 @@ export default {
         Window, Button, PrimeMessage
     },
 
-    props: ["dsSlug"],
+    props: {
+        dsSlug: { type: String, required: true }
+    },
     emits: ['onClose'],
 
     data: function () {
