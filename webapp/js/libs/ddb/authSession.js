@@ -13,6 +13,9 @@ import { safeStorage as storage } from '../preferences';
 
 const refreshTimers = {};
 
+/** How long sign-in waits for the Registry to expire its auth cookie before going on without it. */
+export const EXPIRE_COOKIE_TIMEOUT_MS = 5000;
+
 const throwError = (msg, status, extraData = {}) => {
     throw new ApiError(msg, status, extraData);
 };
@@ -53,6 +56,9 @@ export default class AuthSession {
             const res = await this.registry.postFormData('/users/authenticate', formData);
 
             if (res && res.token) {
+                // A server-set (HttpOnly) cookie of the previous user would silently win over the
+                // one setCredentials writes: have it expired first
+                await this.expireServerCookie();
                 this.setCredentials(res.username, res.token, res.expires);
                 this.setAutoRefreshToken();
                 this.registry.emit("login", res.username);
@@ -156,13 +162,20 @@ export default class AuthSession {
     }
 
     /**
-     * The server sets the auth cookie HttpOnly on a Basic auth sign-in, and script cannot clear
-     * that one: ask the Registry to expire it. Fire-and-forget: sign-out never waits for or
-     * fails on it.
+     * The server sets the auth cookie HttpOnly on a Basic auth sign-in, and script can neither
+     * clear nor overwrite that one (the browser drops a script-written cookie of the same name):
+     * ask the Registry to expire it. Best effort: the returned promise always resolves, at the
+     * latest after EXPIRE_COOKIE_TIMEOUT_MS (the request is then aborted). Sign-in awaits it
+     * before writing its own cookie; sign-out does not wait.
+     * @returns {Promise<void>}
      */
     expireServerCookie() {
-        if (!this._isSameOrigin()) return;
-        this.registry.fetchRaw('/users/logout', { method: 'POST' }).catch(() => { /* best effort */ });
+        if (!this._isSameOrigin()) return Promise.resolve();
+        const abort = new AbortController();
+        const timer = setTimeout(() => abort.abort(), EXPIRE_COOKIE_TIMEOUT_MS);
+        return this.registry.fetchRaw('/users/logout', { method: 'POST', signal: abort.signal })
+            .then(() => { }, () => { /* best effort */ })
+            .finally(() => clearTimeout(timer));
     }
 
     /** Whether this registry is the page's origin, so the auth cookie is the page's. */
