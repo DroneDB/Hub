@@ -9,8 +9,8 @@ const Registry = require('./registry');
 async function fetchEntries(uri, options = {}) {
     if (isDDBUri(uri)) {
         const { registryUrl, org, ds, path } = parseUri(uri);
-        const dataset = new Registry(registryUrl).Organization(org).Dataset(ds);
-        return dataset.list(path);
+        const dataset = Registry.forUrl(registryUrl).Organization(org).Dataset(ds);
+        return dataset.list(path, { signal: options.signal });
     } else if (uri.startsWith("file://")) {
         // Local file, use ddb.info (if available)
         if (this.info) {

@@ -37,6 +37,7 @@ import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Button from 'primevue/button';
 import env from '@/dynamic/env';
+import shell from '@/dynamic/shell';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
@@ -44,10 +45,13 @@ import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
+import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
 
 const { pathutils } = ddb;
 
 export default {
+    // Listings in flight are aborted when the browser goes away (HUB-06)
+    mixins: [requestScopeMixin],
     components: {
         TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
@@ -295,7 +299,8 @@ export default {
                     withHash: false,
                     recursive: true,
                     maxRecursionDepth: 1,
-                    stopOnError: false
+                    stopOnError: false,
+                    signal: this.requestSignal
                 });
 
                 var res = sortEntriesDirectoriesFirst(
@@ -317,6 +322,8 @@ export default {
                     });
                 return res;
             } catch (e) {
+                // The browser is gone: nobody waits for this listing
+                if (isAbort(e)) return [];
                 console.error("Exception", clone(e));
 
                 if (e.message == "Unauthorized") {
@@ -341,7 +348,8 @@ export default {
 
                 try {
                     const entry = n.entry || (await ddb.fetchEntries(n.path, {
-                        withHash: false
+                        withHash: false,
+                        signal: this.requestSignal
                     }))[0];
 
                     this.nodes.push({

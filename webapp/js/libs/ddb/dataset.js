@@ -309,8 +309,9 @@ module.exports = class Dataset {
         return this.registry.getRequestAsText(url);
     }
 
-    async info() {
-        return this.registry.getRequest(`${this.baseApi}`);
+    /** @param {{signal?: AbortSignal}} [options] */
+    async info(options = {}) {
+        return this.registry.getRequest(`${this.baseApi}`, options);
     }
 
     async update(name, visibility) {
@@ -320,10 +321,14 @@ module.exports = class Dataset {
         return this.registry.putFormData(`${this.baseApi}`, formData);
     }
 
-    async list(path) {
+    /**
+     * @param {string} [path]
+     * @param {{signal?: AbortSignal}} [options] aborting the signal aborts the listing
+     */
+    async list(path, options = {}) {
         const formData = new FormData();
         if (path !== undefined && path !== null) formData.append('path', path);
-        return this.registry.postFormData(`${this.baseApi}/list`, formData);
+        return this.registry.postFormData(`${this.baseApi}/list`, formData, { signal: options.signal, readOnly: true });
     }
 
     async listOne(path){
@@ -340,7 +345,7 @@ module.exports = class Dataset {
     async search(query){
         const formData = new FormData();
         if (query !== undefined && query !== null) formData.append('query', query);
-        return this.registry.postFormData(`${this.baseApi}/search`, formData);
+        return this.registry.postFormData(`${this.baseApi}/search`, formData, { readOnly: true });
     }
 
     async delete() {

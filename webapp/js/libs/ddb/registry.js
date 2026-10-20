@@ -13,6 +13,7 @@
  */
 
 const Organization = require('./organization');
+const RequestCache = require('./requestCache');
 const { DEFAULT_REGISTRY } = require('./constants');
 const { applyHubBranding } = require('../hubBranding');
 
@@ -64,12 +65,32 @@ const storage = {
     removeItem: (key) => hasLocalStorage ? localStorage.removeItem(key) : delete memoryStorage[key]
 };
 
+const registries = new Map();
+
 module.exports = class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
         this.eventListeners = {};
         this._refreshingToken = false;
         this._features = {};
+        // Shared by every client of this origin (HUB-06)
+        this.requestCache = RequestCache.forOrigin(url);
+    }
+
+    /**
+     * The shared client of a Registry URL (one per origin), so helpers do not build a new
+     * client, with its own feature list and token refresh, on every call (HUB-06).
+     * @param {string} url
+     * @returns {Registry}
+     */
+    static forUrl(url) {
+        if (!registries.has(url)) registries.set(url, new Registry(url));
+        return registries.get(url);
+    }
+
+    /** Drops the cached GET answers (all, or the endpoints starting with `prefix`). */
+    invalidateCache(prefix = '') {
+        this.requestCache.invalidate(prefix);
     }
 
     get remote() {
@@ -264,6 +285,8 @@ module.exports = class Registry {
     }
 
     setCredentials(username, token, expires) {
+        // Cached answers belong to the previous identity
+        if (storage.getItem(`${this.url}_username`) !== username) this.invalidateCache();
         storage.setItem(`${this.url}_username`, username);
         storage.setItem(`${this.url}_jwt_token`, token);
         storage.setItem(`${this.url}_jwt_token_expires`, expires);
@@ -512,6 +535,7 @@ module.exports = class Registry {
     }
 
     clearCredentials() {
+        this.invalidateCache();
         storage.removeItem(`${this.url}_jwt_token`);
         storage.removeItem(`${this.url}_jwt_token_expires`);
         storage.removeItem(`${this.url}_username`);
@@ -542,7 +566,24 @@ module.exports = class Registry {
         return loggedIn;
     }
 
-    async makeRequest(endpoint, method = "GET", body = null, contentType = null, responseType = null) {
+    /**
+     * One request to the Registry.
+     *
+     * makeRequest(endpoint, options) with options { method, body, contentType, responseType,
+     * signal, headers, cache, readOnly, onHeaders }; the positional form makeRequest(endpoint, method, body,
+     * contentType, responseType) still works.
+     *
+     * GETs go through the request cache (single flight, short read cache, conditional
+     * requests); with a `signal`, only the reused descriptors do. `cache: false` skips it. Any other method drops the cached answers.
+     * `signal` aborts the request (AbortError); requests time out after 5 minutes.
+     * `onHeaders(headers)` receives the response headers (requests that skip the cache only).
+     */
+    async makeRequest(endpoint, methodOrOptions = "GET", body = null, contentType = null, responseType = null) {
+        const options = typeof methodOrOptions === 'object' && methodOrOptions !== null
+            ? methodOrOptions
+            : { method: methodOrOptions, body, contentType, responseType };
+        const method = (options.method || "GET").toUpperCase();
+
         // Input validation
         if (typeof endpoint !== 'string' || !endpoint) {
             throw new Error('Invalid endpoint: must be a non-empty string');
@@ -555,70 +596,108 @@ module.exports = class Registry {
             throw new Error('Invalid endpoint: contains dangerous characters or patterns');
         }
 
+        if (method !== "GET") {
+            // A write changes what the cached reads saw; a read sent as POST (`readOnly`) does not
+            if (!options.readOnly) this.requestCache.invalidate();
+            return this._send(endpoint, method, options);
+        }
+
+        if (options.cache === false || options.responseType || options.onHeaders)
+            return this._send(endpoint, method, options);
+
+        const load = ({ etag }) => this._send(endpoint, method, { ...options, signal: undefined, etag, withMeta: true });
+        // A caller that can abort: the descriptors that are reused anyway are shared (the caller
+        // stops waiting when it aborts); anything else gets its own request, which the abort
+        // cancels, so aborting it cannot abort another caller
+        if (options.signal) {
+            return this.requestCache.keeps(endpoint)
+                ? this.requestCache.getAbortable(endpoint, load, options.signal)
+                : this._send(endpoint, method, options);
+        }
+        return this.requestCache.get(endpoint, load);
+    }
+
+    // Sends one request; with `withMeta` resolves { value, etag, notModified } (request cache)
+    async _send(endpoint, method, options) {
+        const timeoutMs = 300000;
         try {
-            const headers = {};
+            const headers = { ...(options.headers || {}) };
             const authToken = this.getAuthToken();
 
             if (authToken) headers.Authorization = `Bearer ${authToken}`;
+            if (options.etag) headers['If-None-Match'] = options.etag;
 
-            const options = {
-                method: method.toUpperCase(),
+            const fetchOptions = {
+                method,
                 headers
             };
 
             // Handle request body
+            const body = options.body;
+            const contentType = options.contentType;
             if (body !== null && body !== undefined) {
                 if (contentType) {
                     // Explicit content type override
                     headers['Content-Type'] = contentType;
                     if (contentType === 'application/json') {
-                        options.body = JSON.stringify(body);
+                        fetchOptions.body = JSON.stringify(body);
                     } else {
-                        options.body = body;
+                        fetchOptions.body = body;
                     }
                 } else if (body instanceof FormData) {
                     // Use FormData as-is (don't set Content-Type, let browser handle it)
-                    options.body = body;
+                    fetchOptions.body = body;
                 } else if (typeof body === 'string') {
                     // Send as plain text
                     headers['Content-Type'] = 'text/plain';
-                    options.body = body;
+                    fetchOptions.body = body;
                 } else if (typeof body === 'object') {
                     // Default: send objects as JSON (modern approach)
                     headers['Content-Type'] = 'application/json';
-                    options.body = JSON.stringify(body);
+                    fetchOptions.body = JSON.stringify(body);
                 } else {
                     // For other types, send as-is
-                    options.body = body;
+                    fetchOptions.body = body;
                 }
             }
 
             let response;
+            // Timeout (5 minutes), combined with the caller's signal when there is one
+            const timeout = new AbortController();
+            const timeoutId = setTimeout(() => timeout.abort(), timeoutMs);
+            const signal = options.signal
+                ? (typeof AbortSignal !== 'undefined' && AbortSignal.any ? AbortSignal.any([options.signal, timeout.signal]) : options.signal)
+                : timeout.signal;
             try {
-                // Add timeout to fetch requests (5 minutes default)
-                const controller = new AbortController();
-                const timeoutMs = 300000;
-                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-                try {
-                    response = await fetch(`${this.url}${endpoint}`, { ...options, signal: controller.signal });
-                } finally {
-                    clearTimeout(timeoutId);
-                }
+                response = await fetch(`${this.url}${endpoint}`, { ...fetchOptions, signal });
             } catch (fetchError) {
                 // Only network errors (connection refused, DNS failure, etc.) reach here
                 // fetch() throws TypeError for network failures in standard implementations
-                if (fetchError.name === 'AbortError')
+                if (fetchError.name === 'AbortError') {
+                    // Aborted by the caller: an AbortError, not a failure to report
+                    if (options.signal?.aborted) throw fetchError;
                     throwError(`Request timed out after ${timeoutMs / 1000}s`, 0, { originalError: fetchError });
+                }
 
                 throwError(`Network error: ${fetchError.message}`, 0, { originalError: fetchError });
+            } finally {
+                clearTimeout(timeoutId);
+            }
+
+            options.onHeaders?.(response.headers);
+
+            if (options.withMeta) {
+                if (response.status === 304) return { value: undefined, notModified: true };
+                const value = await this._handleResponse(response, method, options.responseType);
+                return { value, etag: response.headers.get('ETag') || undefined };
             }
 
             // Response handling errors are not caught here - they propagate as-is
-            return await this._handleResponse(response, method, responseType);
+            return await this._handleResponse(response, method, options.responseType);
 
         } catch (error) {
-            // Re-throw errors that already have a status (our custom API errors)
-            if (error.status !== undefined) {
+            // Re-throw errors that already have a status (our custom API errors), and aborts
+            if (error.status !== undefined || error.name === 'AbortError') {
                 throw error;
             }
             // Wrap unexpected errors
@@ -817,8 +896,12 @@ module.exports = class Registry {
         }
     }
 
-    async getRequest(endpoint) {
-        return this.makeRequest(endpoint, "GET");
+    /**
+     * @param {string} endpoint
+     * @param {object} [options] { signal, headers, cache } (see makeRequest)
+     */
+    async getRequest(endpoint, options = {}) {
+        return this.makeRequest(endpoint, { ...options, method: "GET" });
     }
 
     /**
@@ -852,10 +935,10 @@ module.exports = class Registry {
     }
 
     // Methods for explicit FormData usage (for file uploads or when needed)
-    async postFormData(endpoint, formData) {
+    async postFormData(endpoint, formData, options = {}) {
         if (!(formData instanceof FormData))
             throw new Error('Expected FormData instance');
-        return this.makeRequest(endpoint, "POST", formData);
+        return this.makeRequest(endpoint, { ...options, method: "POST", body: formData });
     }
 
     async putFormData(endpoint, formData) {

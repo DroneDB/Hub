@@ -71,7 +71,7 @@ import ProgressBar from 'primevue/progressbar';
 import ddb from 'ddb';
 
 const { Registry } = ddb;
-const reg = new Registry(window.location.origin);
+const reg = Registry.forUrl(window.location.origin);
 
 export default {
     components: {

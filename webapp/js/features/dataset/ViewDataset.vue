@@ -270,6 +270,7 @@ const VideoLightbox = lazyComponent(() => import(/* webpackChunkName: "dataset-l
 
 import emitter from '@/libs/eventBus';
 import { lazyComponent } from '@/libs/lazyComponent';
+import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
 import icons from '@/libs/icons';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
@@ -306,7 +307,7 @@ import { Features } from '@/libs/features';
  * build monitoring, settings, and all context-menu operations.
  */
 export default {
-    mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask],
+    mixins: [dialogManager, fileOperations, buildEvents, useHeavyTask, requestScopeMixin],
     provide: function () {
         return {
             showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm)
@@ -794,7 +795,7 @@ export default {
 
             try {
 
-                const entries = await this.dataset.info();
+                const entries = await this.dataset.info({ signal: this.requestSignal });
 
                 // Save the root dataset entry (contains permissions)
                 if (entries.length > 0) {
@@ -818,6 +819,8 @@ export default {
                 });
 
             } catch (e) {
+                // Left the dataset while it was loading
+                if (isAbort(e)) return [];
                 if (e.status === 401) {
                     this.$router.push({ name: "Login" }).catch(() => { });
                 } else {

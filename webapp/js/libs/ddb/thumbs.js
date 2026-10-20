@@ -21,7 +21,7 @@ module.exports = {
     fetch: function (uri, thumbSize = 256, hash = undefined) {
         if (isDDBUri(uri)) {
             const { registryUrl, org, ds, path } = parseUri(uri);
-            const dataset = new Registry(registryUrl).Organization(org).Dataset(ds);
+            const dataset = Registry.forUrl(registryUrl).Organization(org).Dataset(ds);
             return dataset.thumbUrl(path, thumbSize, hash);
         } else if (uri.startsWith("file://")) {
             // Local file, use getFromUserCache (if available)
