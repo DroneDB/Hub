@@ -8,13 +8,16 @@
  *   const result = await this.dialogs.open(RenameDialog, { entry, onOnSave: ... });
  *   this.dialogs.open('rename', { path }) ... this.dialogs.close('rename', 'b.jpg');   // named, with a component map on DialogHost
  *
+ * Props may be a function returning them (re-read on render: reactive, e.g. `busy`); an
+ * `onClose` among them receives every argument of the event.
+ *
  * A dialog closes (and its promise resolves with the event's first argument) when it
  * emits `close` (Window's contract, HQ-09); the returned promise also has `close(result)`.
  */
 import { shallowRef, markRaw } from 'vue';
 
 /**
- * @typedef {{ id: number, name: string|null, component: object|null, props: Record<string, any>, finish: (result?: any) => void }} DialogEntry
+ * @typedef {{ id: number, name: string|null, component: object|null, props: Record<string, any> | (() => Record<string, any>), finish: (result?: any) => void }} DialogEntry
  * @typedef {Promise<any> & { close: (result?: any) => void }} DialogHandle
  */
 
@@ -25,7 +28,7 @@ export function useDialogs() {
 
     /**
      * @param {string|object} nameOrComponent  a name known to the DialogHost, or a component
-     * @param {Record<string, any>} [props]  props and `on…` listeners
+     * @param {Record<string, any> | (() => Record<string, any>)} [props]  props and `on…` listeners
      * @returns {DialogHandle}
      */
     function open(nameOrComponent, props = {}) {

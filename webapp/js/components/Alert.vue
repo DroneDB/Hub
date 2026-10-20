@@ -1,7 +1,7 @@
 <template>
     <Window id="alert" :title="title" modal max-width="70%" fixed-size @close="dismiss('cancel')">
 
-        <slot />
+        <slot>{{ message }}</slot>
 
         <div class="text-center mt-3">
             <Button v-if="buttons.indexOf('ok') !== -1" severity="secondary" label="Close" @click="dismiss('ok')" />
@@ -18,7 +18,7 @@ import Button from 'primevue/button';
  *
  * Props:
  *   title   - Dialog title.
- *   message - Message text (rarely used; prefer the default slot).
+ *   message - Message text, when there is no slot content.
  *   buttons - Button set to show; supported value: 'ok' (default: ['ok']).
  */
 export default {

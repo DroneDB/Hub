@@ -28,7 +28,9 @@ const FILES = {
     raster: path.join(DATA, 'ortho', 'brighton-beach-cog.tif'),
     cloud: path.join(DATA, 'point-clouds', 'brighton-beach.laz'),
     dem: path.join(DATA, 'dem', 'test_dem.tiff'),
-    markdown: path.join(DATA, 'README.md')
+    markdown: path.join(DATA, 'README.md'),
+    // Renamed, then deleted, by the dialog tests
+    scratch: path.join(DATA, 'LICENSE.md')
 };
 const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 
@@ -149,6 +151,33 @@ test('dialogs: Escape closes, Enter confirms', async () => {
     await page.waitForSelector('#explorer >> text=smoke-folder', { timeout: 15000 });
 });
 
+test('dataset page: rename and delete through the toolbar and the Delete key', async () => {
+    await page.click(`#explorer >> text=${path.basename(FILES.scratch)}`);
+    await page.click('[title="Rename"]');
+    await page.waitForSelector('.p-dialog input', { timeout: 10000 });
+    await page.fill('.p-dialog input', 'smoke-renamed');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('#explorer >> text=smoke-renamed', { timeout: 15000 });
+    await page.click('#explorer >> text=smoke-renamed');
+    await page.keyboard.press('Delete');
+    await page.waitForSelector('.p-dialog >> text=Are you sure', { timeout: 10000 });
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('#explorer >> text=smoke-renamed', { state: 'detached', timeout: 15000 });
+});
+
+test('dataset page: properties and share dialogs open and close', async () => {
+    const name = path.basename(FILES.raster);
+    await page.click(`#explorer >> text=${name}`, { button: 'right' });
+    await page.click('.p-contextmenu >> text=Properties');
+    await page.waitForSelector('.p-dialog', { timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    await page.click('[title="Share/Embed"]');
+    await page.waitForSelector('.p-dialog', { timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+});
+
 test('map tab renders an OpenLayers map', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.raster))}/map`);
     await page.waitForSelector('.ol-viewport canvas', { timeout: 30000 });
@@ -258,6 +287,16 @@ test('dataset Map tab: clicking a photo opens its popup', async () => {
     // The thumbnail grows the popup after the map panned it into view: it can end under the tabs
     await page.locator('.image-popup button[aria-label="Close"]').dispatchEvent('click');
     await page.waitForSelector('.image-popup', { state: 'hidden', timeout: 10000 });
+});
+
+test('dataset page: a photo opens in the lightbox', async () => {
+    // Still in sub/ (previous test)
+    await page.click('text=Files');
+    await page.dblclick(`#explorer >> text=${path.basename(FILES.photo)}`);
+    await page.waitForSelector('.lightbox-info-overlay', { timeout: 15000 });
+    assert.match(await page.locator('.lightbox-info-name').textContent(), /DJI_0018/);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.lightbox-info-overlay', { state: 'detached', timeout: 10000 });
 });
 
 test('point cloud viewer renders a canvas', async () => {

@@ -10,7 +10,9 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { isPathRemoved, liveSelectionEntries, selectionBasePath } from './treeSelection';
 import { setActivePinia, createPinia } from 'pinia';
 import { useClipboardStore } from '@/stores/clipboard';
-import fileOperations from '@/composables/useFileOperations';
+import { ref, computed } from 'vue';
+import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
+import { notify } from '@/libs/notify';
 import ddb from 'ddb';
 
 const FILE = ddb.entry.type.GENERIC;
@@ -166,123 +168,109 @@ describe('FileBrowser.handleTreeKeyDown', () => {
     });
 });
 
+// A dataset page for the clipboard: its folder on show, its files and selection
+function fakePage({ currentPath = 'other', files = [], list = vi.fn(async () => []) } = {}) {
+    const filesRef = ref(files);
+    const listing = { currentPath: ref(currentPath), files: filesRef, selected: computed(() => filesRef.value.filter(f => f.selected)) };
+    const dataset = { org: 'org', ds: 'ds', list };
+    const dialogs = { open: vi.fn(() => Object.assign(Promise.resolve(), { close: vi.fn() })) };
+    const showError = vi.fn();
+    const clip = useDatasetClipboard({ dataset, listing, dialogs, busy: ref(false), canWrite: ref(true), showError });
+    return { clip, dataset, dialogs, showError };
+}
+
 describe('clipboard copy/cut from the tree', () => {
-    const { clipboardCopySelected, clipboardCutSelected, _clipboardSelection, _selectedItemsForClipboard } = fileOperations.methods;
-
-    function fakeView({ currentPath = 'other', selectedFiles = [] } = {}) {
-        const vm = {
-            canWrite: true,
-            currentPath,
-            selectedFiles,
-            contextMenuFiles: selectedFiles,
-            dataset: { org: 'org', ds: 'ds' },
-            $notify: { success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
-        };
-        vm._clipboardSelection = (s) => _clipboardSelection.call(vm, s);
-        vm._selectedItemsForClipboard = () => _selectedItemsForClipboard.call(vm);
-        return vm;
-    }
-
     let clipboard;
     beforeEach(() => {
         sessionStorage.clear(); // the store restores the last clipboard of the tab
         setActivePinia(createPinia());
         clipboard = useClipboardStore();
+        for (const k of ['success', 'info', 'warn']) vi.spyOn(notify, k).mockImplementation(() => {});
     });
 
     it('records a selected folder with its parent as the source folder', () => {
         // Selecting a folder in the tree sets currentPath to the folder itself.
-        const vm = fakeView({ currentPath: 'a/folder' });
-
-        clipboardCopySelected.call(vm, [nodeData('a/folder', DIR)]);
-
+        const { clip } = fakePage({ currentPath: 'a/folder' });
+        clip.copy([nodeData('a/folder', DIR)]);
         expect(clipboard.mode).toBe('copy');
         expect(clipboard.source).toEqual({ orgSlug: 'org', dsSlug: 'ds', basePath: 'a' });
         expect(clipboard.items.map(i => i.path)).toEqual(['a/folder']);
     });
 
     it('cuts explicit items and skips the dataset root', () => {
-        const vm = fakeView();
-
-        clipboardCutSelected.call(vm, [nodeData('', ddb.entry.type.DRONEDB), nodeData('top.jpg')]);
-
+        const { clip } = fakePage();
+        clip.cut([nodeData('', ddb.entry.type.DRONEDB), nodeData('top.jpg')]);
         expect(clipboard.mode).toBe('cut');
         expect(clipboard.source.basePath).toBe('');
         expect(clipboard.items.map(i => i.path)).toEqual(['top.jpg']);
     });
 
     it('still uses the explorer selection and current folder without arguments', () => {
-        const file = nodeData('other/x.jpg');
-        const vm = fakeView({ currentPath: 'other', selectedFiles: [file] });
-
-        clipboardCopySelected.call(vm);
-
+        const file = { ...nodeData('other/x.jpg'), selected: true };
+        const { clip } = fakePage({ currentPath: 'other', files: [file] });
+        clip.copy();
         expect(clipboard.source.basePath).toBe('other');
         expect(clipboard.items.map(i => i.path)).toEqual(['other/x.jpg']);
     });
 
     it('warns when the explicit selection is empty', () => {
-        const vm = fakeView();
-        clipboardCopySelected.call(vm, []);
+        const { clip } = fakePage();
+        clip.copy([]);
         expect(clipboard.mode).toBe(null);
-        expect(vm.$notify.info).toHaveBeenCalledWith('No items selected', { summary: 'Copy' });
+        expect(notify.info).toHaveBeenCalledWith('No items selected', { summary: 'Copy' });
     });
 });
 
 describe('paste conflict detection', () => {
-    const { clipboardPaste, _pasteTargetNames } = fileOperations.methods;
-
-    function fakeView({ list, fileBrowserFiles }) {
-        const vm = {
-            canWrite: true,
-            currentPath: 'dest',
-            fileBrowserFiles,
-            dataset: { org: 'org', ds: 'ds', list },
-            $notify: { success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-            showError: vi.fn(),
-            _askPasteConflict: vi.fn(async () => 'cancel'),
-            _resolveSourceDataset: vi.fn()
-        };
-        vm._pasteTargetNames = (p) => _pasteTargetNames.call(vm, p);
-        return vm;
-    }
-
     let clipboard;
     beforeEach(() => {
-        sessionStorage.clear(); // the store restores the last clipboard of the tab
+        sessionStorage.clear();
         setActivePinia(createPinia());
         clipboard = useClipboardStore();
+        for (const k of ['success', 'info', 'warn']) vi.spyOn(notify, k).mockImplementation(() => {});
+    });
+
+    // The conflict dialog answers "cancel": the paste stops there
+    const cancelConflicts = dialogs => dialogs.open.mockImplementation((component, props) => {
+        queueMicrotask(() => props.onResolve('cancel'));
+        return Object.assign(Promise.resolve(), { close: vi.fn() });
     });
 
     it('asks about conflicts that are not in the loaded file list', async () => {
         clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg')]);
-        // A file selected in the tree leaves only that file in fileBrowserFiles.
-        const vm = fakeView({
+        // A file selected in the tree leaves only that file in the list
+        const { clip, dataset, dialogs } = fakePage({
+            currentPath: 'dest',
             list: vi.fn(async () => [{ path: 'dest/a.jpg' }, { path: 'dest/b.jpg' }]),
-            fileBrowserFiles: [nodeData('dest/b.jpg')]
+            files: [nodeData('dest/b.jpg')]
         });
-
-        await clipboardPaste.call(vm);
-
-        expect(vm.dataset.list).toHaveBeenCalledWith('dest');
-        expect(vm._askPasteConflict).toHaveBeenCalledOnce();
-        expect(vm._askPasteConflict.mock.calls[0][0].map(i => i.path)).toEqual(['src/a.jpg']);
+        cancelConflicts(dialogs);
+        await clip.paste();
+        expect(dataset.list).toHaveBeenCalledWith('dest');
+        expect(dialogs.open).toHaveBeenCalledOnce();
+        expect(dialogs.open.mock.calls[0][1].items.map(i => i.path)).toEqual(['src/a.jpg']);
     });
 
     it('lists the dataset root for a root destination', async () => {
-        const vm = fakeView({ list: vi.fn(async () => [{ path: 'a.jpg' }]), fileBrowserFiles: [] });
-        expect(await vm._pasteTargetNames('')).toEqual(new Set(['a.jpg']));
-        expect(vm.dataset.list).toHaveBeenCalledWith(undefined);
+        clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg')]);
+        const { clip, dataset, dialogs } = fakePage({ currentPath: null, list: vi.fn(async () => [{ path: 'a.jpg' }]) });
+        cancelConflicts(dialogs);
+        await clip.paste();
+        expect(dataset.list).toHaveBeenCalledWith(undefined);
+        expect(dialogs.open).toHaveBeenCalledOnce();
     });
 
     it('falls back to the loaded files of the destination when listing fails', async () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const vm = fakeView({
+        clipboard.copy({ orgSlug: 'org', dsSlug: 'ds', basePath: 'src' }, [nodeData('src/a.jpg'), nodeData('src/b.jpg')]);
+        const { clip, dialogs } = fakePage({
+            currentPath: 'dest',
             list: vi.fn(async () => { throw new Error('offline'); }),
-            fileBrowserFiles: [nodeData('dest/a.jpg'), nodeData('elsewhere/b.jpg')]
+            files: [nodeData('dest/a.jpg'), nodeData('elsewhere/b.jpg')]
         });
-
-        expect(await vm._pasteTargetNames('dest')).toEqual(new Set(['a.jpg']));
+        cancelConflicts(dialogs);
+        await clip.paste();
+        expect(dialogs.open.mock.calls[0][1].items.map(i => i.path)).toEqual(['src/a.jpg']);
         warn.mockRestore();
     });
 });

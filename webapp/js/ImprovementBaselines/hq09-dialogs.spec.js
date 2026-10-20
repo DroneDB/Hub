@@ -43,3 +43,17 @@ describe('useFileSelection', () => {
         expect(files.some(f => 'selected' in f)).toBe(false);
     });
 });
+
+describe('Window.vue keyboard ownership', () => {
+    it('closes on an Escape handled outside the dialog (focus left in a closed menu)', async () => {
+        const Window = (await import('@/components/Window.vue')).default;
+        const w = mount(Window, { props: { visible: true, title: 'T' }, attachTo: document.body, global: { stubs: { teleport: true } } });
+        const outside = document.createElement('a');
+        document.body.appendChild(outside);
+        outside.addEventListener('keydown', e => e.preventDefault());
+        outside.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+        expect(w.emitted('close')).toBeTruthy();
+        outside.remove();
+        w.unmount();
+    });
+});

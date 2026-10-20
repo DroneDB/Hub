@@ -4,7 +4,7 @@
  *
  * Holds the selection captured by Ctrl+C / Ctrl+X / the context menu, and persists it in
  * sessionStorage so it survives a refresh but not closing the tab (like a file manager).
- * Clipboard state only: pasting lives in usePasteStrategy + useFileOperations.
+ * Clipboard state only: pasting lives in usePasteStrategy + useDatasetClipboard.
  */
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';

@@ -3,7 +3,7 @@
  *
  * Public API preserved for backward compatibility with existing consumers:
  * DetailPanel, Thumbnail, buildHelpers, fileAvailabilityChecker,
- * contextMenuItems, FileAvailabilityDialog, useFileOperations, useDialogManager.
+ * contextMenuItems, FileAvailabilityDialog, useDatasetActions, useDatasetListing.
  */
 
 import taskMonitor from '@/libs/tasks/taskMonitor';

@@ -16,9 +16,7 @@ export const GUARDS = [
             selector: "ExportDefaultDeclaration > ObjectExpression > Property[key.name='mixins']",
             message: 'Use a composable from setup(), not a mixin (HQ-06).'
         }],
-        allow: [
-            'webapp/js/features/dataset/ViewDataset.vue'
-        ]
+        allow: []
     },
     {
         id: '$parent',

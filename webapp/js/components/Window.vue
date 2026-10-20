@@ -80,8 +80,12 @@ onBeforeUnmount(() => openWindows.delete(token));
 
 const NOT_FOR_ENTER = 'button, a, textarea, select, [role="button"], [role="menuitem"], [role="option"], [contenteditable="true"]';
 
+// Something inside the dialog that handled the key (a dropdown closing) keeps it; a key
+// handled elsewhere (focus left in a closed context menu) does not
+const handledInside = e => e.defaultPrevented && !!contentRoot.value && !!contentRoot.value.closest('.p-dialog')?.contains(e.target);
+
 useEventListener(document, 'keydown', e => {
-    if (!props.visible || [...openWindows].pop() !== token || e.defaultPrevented || e.isComposing) return;
+    if (!props.visible || [...openWindows].pop() !== token || handledInside(e) || e.isComposing) return;
     if (e.key === 'Escape' && props.closable) {
         e.preventDefault();
         close();
