@@ -5,11 +5,11 @@
             :pt="dialogPt" @update:visible="v => { if (!v) close(); }" @show="onShow">
         <div ref="contentRoot" style="display: contents;">
             <slot />
-            <div v-if="$slots.footer || confirmLabel" class="window-footer d-flex justify-content-end gap-2 mt-3 w-100">
+            <div v-if="$slots.footer || confirmLabel || closeButton" class="window-footer d-flex justify-content-end gap-2 mt-3 w-100">
                 <slot name="footer">
                     <Button :label="cancelLabel" severity="secondary" :disabled="busy" @click="close()" />
-                    <Button :label="confirmLabel" :severity="confirmSeverity" :disabled="busy || confirmDisabled" :loading="busy"
-                            @click="emit('confirm')" />
+                    <Button v-if="confirmLabel" :label="confirmLabel" :severity="confirmSeverity" :icon="confirmIcon"
+                            :disabled="busy || confirmDisabled" :loading="busy" @click="emit('confirm')" />
                 </slot>
             </div>
         </div>
@@ -26,7 +26,8 @@
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
  *   something else). Only the topmost open Window reacts to the keyboard.
  * - `busy` disables closing and the footer buttons.
- * - A footer: the `footer` slot, or Cancel / `confirmLabel` buttons when confirmLabel is set.
+ * - A footer: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
+ *   just the Cancel (`cancelLabel`) button with `closeButton`.
  * - Focuses the first field (or the [data-autofocus] element) when shown.
  *
  *   <Window id="rename" title="Rename" modal confirm-label="Rename" :busy="saving" @confirm="rename" @close="cancel">
@@ -58,7 +59,10 @@ const props = defineProps({
     confirmLabel: { type: String, default: '' },
     cancelLabel: { type: String, default: 'Cancel' },
     confirmSeverity: { type: String, default: 'primary' },
-    confirmDisabled: { type: Boolean, default: false }
+    confirmIcon: { type: String, default: undefined },
+    confirmDisabled: { type: Boolean, default: false },
+    /** A footer with only the Cancel button (labelled cancelLabel) */
+    closeButton: { type: Boolean, default: false }
 });
 const emit = defineEmits(['update:visible', 'close', 'confirm', 'show']);
 const contentRoot = ref(null);

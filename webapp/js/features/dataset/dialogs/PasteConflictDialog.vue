@@ -14,11 +14,11 @@
             </ul>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100 flex-wrap">
+        <template #footer>
             <Button severity="secondary" label="Cancel" @click="cancel" />
             <Button severity="info" label="Skip All" icon="fa-solid fa-forward" @click="choose('skip')" />
             <Button severity="danger" label="Overwrite All" icon="fa-solid fa-pen-to-square" @click="choose('overwrite')" />
-        </div>
+        </template>
     </Window>
 </template>
 

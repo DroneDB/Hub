@@ -1,5 +1,5 @@
 <template>
-    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size @close="close" @confirm="close">
+    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="close" @confirm="close">
         <div class="paste-results-content">
             <div v-if="succeeded.length > 0" class="result-section success-section">
                 <h4>
@@ -42,18 +42,14 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button severity="secondary" label="Close" @click="close" />
-        </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 
 export default {
-    components: { Window, Button },
+    components: { Window },
     props: {
         mode: { type: String, default: 'copy' },
         succeeded: { type: Array, default: () => [] },

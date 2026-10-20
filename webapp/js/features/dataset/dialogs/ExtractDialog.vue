@@ -1,5 +1,5 @@
 <template>
-    <Window id="extractDialog" title="Extract Archive" modal max-width="600px" fixed-size @close="close('close')">
+    <Window id="extractDialog" title="Extract Archive" modal max-width="600px" fixed-size cancel-label="Close" confirm-label="Extract" confirm-icon="fa-solid fa-box-open" :confirm-disabled="!!destPathError" :busy="isExtracting" @confirm="extract" @close="close('close')">
         <div class="extract-dialog">
             <form @submit.prevent>
 
@@ -55,11 +55,6 @@
             </form>
 
             <!-- Buttons -->
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="isExtracting" label="Close" @click="close('close')" />
-                <Button :disabled="isExtracting || !!destPathError" :loading="isExtracting" severity="primary"
-                        icon="fa-solid fa-box-open" label="Extract" @click="extract" />
-            </div>
         </div>
 
         <!-- Guided folder browser -->

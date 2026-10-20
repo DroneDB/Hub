@@ -1,5 +1,5 @@
 <template>
-    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size @close="close('cancel')" @confirm="close('confirm')">
+    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size confirm-label="Convert" @close="close('cancel')" @confirm="close('confirm')">
         <div class="change-units-content">
             <p>
                 Convert <strong>{{ measurementsCount }}</strong> measurement{{ measurementsCount !== 1 ? 's' : '' }}
@@ -10,20 +10,15 @@
             </p>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button severity="secondary" label="Cancel" @click="close('cancel')" />
-            <Button severity="primary" label="Convert" @click="close('confirm')" />
-        </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 
 export default {
     components: {
-        Window, Button
+        Window
     },
 
     props: {

@@ -1,7 +1,7 @@
 <template>
-    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size @close="close('close')">
+    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size cancel-label="Close" confirm-label="Apply" confirm-icon="fa-solid fa-earth-europe" :confirm-disabled="!canApply" :busy="saving" @confirm="apply" @close="close('close')">
         <div class="set-crs-dialog">
-            <form @submit.prevent="apply">
+            <form @submit.prevent>
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
                     {{ errorMessage }}
                 </PrimeMessage>
@@ -32,18 +32,12 @@
                     is then rebuilt. Delete that file to use the drawing's own coordinate system again.</small>
             </form>
 
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="saving" label="Close" @click="close('close')" />
-                <Button :disabled="saving || !canApply" :loading="saving" severity="primary" icon="fa-solid fa-earth-europe"
-                        label="Apply" @click="apply" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import RadioButton from 'primevue/radiobutton';
@@ -54,7 +48,7 @@ import ddb from 'ddb';
 const { pathutils } = ddb;
 
 export default {
-    components: { Window, Button, PrimeMessage, InputText, RadioButton },
+    components: { Window, PrimeMessage, InputText, RadioButton },
 
     props: {
         file: { type: Object, required: true },

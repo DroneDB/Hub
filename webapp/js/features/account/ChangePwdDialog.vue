@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size @close="close">
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" confirm-severity="info" :confirm-disabled="!isFilled()" :busy="changing" @confirm="changePwd()" @close="close">
         <div class="dialog">
             <form @submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
@@ -7,12 +7,12 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Old Password</label>
                     <Password ref="oldPwd" v-model="oldPwd" :feedback="false"
-                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" @keyup.enter="changePwd()" />
+                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">New Password</label>
                     <Password v-model="newPwd" :feedback="false" toggle-mask
-                              class="w-100" input-class="w-100" @keydown="clearError()" @keyup.enter="changePwd()" @input="onPasswordInput" />
+                              class="w-100" input-class="w-100" @keydown="clearError()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && newPwd" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
                                :class="{ met: isRequirementMet(req) }">
@@ -24,21 +24,15 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
                     <Password v-model="confirmPwd" :feedback="false"
-                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" @keyup.enter="changePwd()" />
+                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="changing" label="Close" @click="close()" />
-                <Button :disabled="changing || !isFilled()" :loading="changing" severity="info"
-                        label="Change Password" @click="changePwd()" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import Password from 'primevue/password';
 import Message from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
@@ -48,7 +42,7 @@ import { useTimerGroup } from '@/composables/useTimers';
 
 export default {
     components: {
-        Window, Button, Password, Message
+        Window, Password, Message
     },
     props: {
 

@@ -1,5 +1,5 @@
 <template>
-    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size @close="close('close')">
+    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
         <div class="ds-dialog">
             <form class="me-2" :class="{ error: !isValid() }" @submit.prevent>
                 <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
@@ -11,7 +11,7 @@
                         <div class="mb-3">
                             <label class="d-block mb-1 fw-semibold">Dataset Name</label>
                             <InputText ref="name" v-model="ds.name"
-                                       placeholder="Dataset Name" class="w-100" @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" />
+                                       placeholder="Dataset Name" class="w-100" />
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -41,11 +41,6 @@
                     <label for="openAfterCreate">Open dataset after creation</label>
                 </div>
             </div>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" label="Close" @click="close('close')" />
-                <Button v-if="mode == 'new'" severity="primary" :disabled="!isValid()" label="Create" @click="close('create')" />
-                <Button v-else severity="primary" :disabled="!isValid()" label="Save" @click="close('save')" />
-            </div>
         </div>
     </Window>
 </template>
@@ -54,7 +49,6 @@
 import Window from '@/components/Window.vue';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
-import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '@/libs/api/registryUtils';
@@ -65,7 +59,7 @@ var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window, Select, InputText, Button, PrimeMessage, Checkbox
+        Window, Select, InputText, PrimeMessage, Checkbox
     },
     props: {
         mode: {

@@ -12,11 +12,11 @@
 
         <slot name="extra" />
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+        <template #footer>
             <Button :label="cancelText" severity="secondary" @click="close('cancel')" />
             <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="close('secondary')" />
             <Button :label="confirmText" :severity="confirmButtonClass" @click="close('confirm')" />
-        </div>
+        </template>
     </Window>
 </template>
 

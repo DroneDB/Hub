@@ -1,5 +1,5 @@
 <template>
-    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size @close="close">
+    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size close-button cancel-label="Close" @close="close">
         <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
@@ -90,9 +90,6 @@
                 </TabPanels>
             </Tabs>
 
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" label="Close" @click="close()" />
-            </div>
         </div>
 
         <!-- Delete Organization Confirmation Dialog -->

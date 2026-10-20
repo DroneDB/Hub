@@ -1,5 +1,5 @@
 <template>
-    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size @close="close('close')">
+    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Transfer" confirm-icon="fa-solid fa-right-left" :confirm-disabled="!canTransfer" :busy="isTransferring" @confirm="transfer" @close="close('close')">
         <div class="transfer-dialog">
             <form :class="{ error: hasError }" @submit.prevent>
 
@@ -51,18 +51,12 @@
             </form>
 
             <!-- Buttons -->
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="isTransferring" label="Close" @click="close('close')" />
-                <Button :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left" label="Transfer"
-                        @click="transfer" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
@@ -76,7 +70,7 @@ const reg = Registry.forUrl(window.location.origin);
 
 export default {
     components: {
-        Window, Button, PrimeMessage, Select, InputText, Checkbox, ProgressBar
+        Window, PrimeMessage, Select, InputText, Checkbox, ProgressBar
     },
 
     props: {

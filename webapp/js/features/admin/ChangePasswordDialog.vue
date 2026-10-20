@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size @close="close">
+    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size confirm-label="Change Password" :confirm-disabled="!isValid()" :busy="changing" @confirm="confirmChange()" @close="close">
 
         <LoadingSpinner v-if="loading" />
 
@@ -14,25 +14,20 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Current Password</label>
                     <Password ref="txtCurrentPassword" v-model="currentPassword" placeholder="Enter current password"
-                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmChange()" />
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                     <small>Leave empty if you don't know the current password (admin override)</small>
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">New Password</label>
                     <Password v-model="newPassword" placeholder="Enter new password"
-                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmChange()" />
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
                     <Password v-model="confirmPassword" placeholder="Confirm new password"
-                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmChange()" />
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="changing" label="Cancel" @click="close()" />
-                <Button :disabled="changing || !isValid()" :loading="changing" severity="primary"
-                        label="Change Password" @click="confirmChange()" />
-            </div>
         </div>
     </Window>
 </template>
@@ -41,7 +36,6 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
-import Button from 'primevue/button';
 import Password from 'primevue/password';
 import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
@@ -51,7 +45,7 @@ export default {
     // Password policy validation is intentionally NOT applied here (admin override).
     components: {
         LoadingSpinner,
-        Window, Message, Button, Password, PrimeMessage
+        Window, Message, Password, PrimeMessage
     },
     props: {
         user: {

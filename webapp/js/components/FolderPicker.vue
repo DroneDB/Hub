@@ -98,11 +98,11 @@
                     severity="secondary" label="Create" size="small" @click="createFolder" />
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+        <template #footer>
             <Button severity="secondary" label="Cancel" @click="close('cancel')" />
             <Button :disabled="!canConfirm || checkingPath" :loading="checkingPath"
                     severity="primary" label="Confirm" @click="onConfirm" />
-        </div>
+        </template>
 
         <ConfirmDialog v-if="confirmCreateOpen"
                        title="Folder does not exist"

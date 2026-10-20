@@ -1,5 +1,5 @@
 <template>
-    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size @close="close">
+    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Add User" :confirm-disabled="!isFilled()" :busy="adding" @confirm="confirmAddUser()" @close="close">
 
         <LoadingSpinner v-if="loading" />
 
@@ -10,12 +10,12 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Username</label>
                     <InputText ref="txtUsername" v-model="username" placeholder=""
-                               class="w-100" @keydown="clearError()" @keyup.enter="confirmAddUser()" />
+                               class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Email</label>
                     <InputText v-model="email" placeholder="user@example.com"
-                               class="w-100" @keydown="clearError()" @keyup.enter="confirmAddUser()" />
+                               class="w-100" @keydown="clearError()" />
                     <div v-if="email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
@@ -23,7 +23,7 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Password</label>
                     <Password ref="txtPassword" v-model="password" placeholder=""
-                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @keyup.enter="confirmAddUser()" @input="onPasswordInput" />
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && password" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
                                :class="{ met: isRequirementMet(req) }">
@@ -37,11 +37,6 @@
                     <MultiSelect v-model="roles" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="adding" label="Close" @click="close()" />
-                <Button :disabled="adding || !isFilled()" :loading="adding" severity="primary"
-                        label="Add User" @click="confirmAddUser()" />
-            </div>
         </div>
     </Window>
 </template>
@@ -53,7 +48,6 @@ import Message from '@/components/Message.vue';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
-import Button from 'primevue/button';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
@@ -61,7 +55,7 @@ import { validatePassword, getPasswordRequirements } from '@/libs/passwordValida
 export default {
     components: {
         LoadingSpinner,
-        Window, Message, MultiSelect, InputText, Password, Button
+        Window, Message, MultiSelect, InputText, Password
     },
     props: {
         availableRoles: {

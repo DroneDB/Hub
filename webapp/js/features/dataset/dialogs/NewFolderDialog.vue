@@ -1,24 +1,19 @@
 <template>
-    <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size @close="onWindowClose">
+    <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Create folder" :confirm-disabled="!newFolderPath" :busy="busy" @confirm="createFolder" @close="onWindowClose">
 
         <InputText ref="newFolderInput" v-model="newFolderPath" class="newFolderInput" :invalid="!newFolderPath"
-                   :disabled="busy" placeholder="Folder name" @keyup.enter="createFolder" @keyup.esc="close('close')" />
+                   :disabled="busy" placeholder="Folder name" />
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button :disabled="busy" severity="secondary" label="Close" @click="close('close')" />
-            <Button :disabled="!newFolderPath || busy" :loading="busy" severity="primary" label="Create folder" @click="createFolder" />
-        </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 
 export default {
     components: {
-        Window, Button, InputText
+        Window, InputText
     },
 
     props: {

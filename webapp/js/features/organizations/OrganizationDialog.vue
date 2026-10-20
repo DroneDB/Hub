@@ -1,12 +1,12 @@
 <template>
-    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size @close="close('close')">
+    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
         <div class="org-dialog">
             <form @submit.prevent>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Name</label>
                     <InputText ref="name"
                                v-model="org.name" placeholder="Name"
-                               class="w-100" @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" />
+                               class="w-100" />
                 </div>
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Description</label>
@@ -17,18 +17,12 @@
                     <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" label="Close" @click="close('close')" />
-                <Button v-if="mode == 'new'" severity="primary" :disabled="!isValid()" label="Create" @click="close('create')" />
-                <Button v-else severity="primary" :disabled="!isValid()" label="Save" @click="close('save')" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import Checkbox from 'primevue/checkbox';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
@@ -38,7 +32,7 @@ var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window, Button, Checkbox, InputText, Textarea
+        Window, Checkbox, InputText, Textarea
     },
 
     props: {

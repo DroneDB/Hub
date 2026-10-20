@@ -1,5 +1,5 @@
 <template>
-    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size @close="close" @confirm="close">
+    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="close" @confirm="close">
         <div class="delete-results-content">
             <!-- Success section -->
             <div v-if="deleted.length > 0" class="result-section success-section">
@@ -25,19 +25,15 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button severity="secondary" label="Close" @click="close" />
-        </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 
 export default {
     components: {
-        Window, Button
+        Window
     },
 
     props: {

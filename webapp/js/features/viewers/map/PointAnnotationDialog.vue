@@ -1,5 +1,5 @@
 <template>
-    <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" @close="discard">
+    <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" cancel-label="Discard" confirm-label="Save" @confirm="save" @close="discard">
         <div class="point-annotation-form">
             <div class="mb-3">
                 <label class="d-block mb-1 fw-semibold" for="pa-color">Color</label>
@@ -11,10 +11,6 @@
                 <Textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3" auto-resize class="w-100" />
             </div>
 
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" label="Discard" @click="discard" />
-                <Button severity="primary" label="Save" @click="save" />
-            </div>
         </div>
     </Window>
 </template>
@@ -22,14 +18,12 @@
 <script>
 import Window from '@/components/Window.vue';
 import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
-import Button from 'primevue/button';
 import Textarea from 'primevue/textarea';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
         Window,
-        Button,
         Textarea,
         ColorSwatchPicker
     },

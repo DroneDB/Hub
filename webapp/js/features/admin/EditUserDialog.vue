@@ -1,5 +1,5 @@
 <template>
-    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size @close="close">
+    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size confirm-label="Update User" :confirm-disabled="!isValid()" :busy="updating" @confirm="confirmUpdate()" @close="close">
 
         <LoadingSpinner v-if="loading" />
 
@@ -14,7 +14,7 @@
                 <div class="mb-3">
                     <label class="d-block mb-1 fw-semibold">Email</label>
                     <InputText v-model="editUser.email" placeholder="user@example.com"
-                               class="w-100" @keydown="clearError()" @keyup.enter="confirmUpdate()" />
+                               class="w-100" @keydown="clearError()" />
                     <div v-if="editUser.email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
@@ -24,11 +24,6 @@
                     <MultiSelect v-model="editUser.roles" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button severity="secondary" :disabled="updating" label="Cancel" @click="close()" />
-                <Button :disabled="updating || !isValid()" :loading="updating" severity="primary"
-                        label="Update User" @click="confirmUpdate()" />
-            </div>
         </div>
     </Window>
 </template>
@@ -39,13 +34,12 @@ import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
-import Button from 'primevue/button';
 import reg from '@/libs/api/sharedRegistry';
 
 export default {
     components: {
         LoadingSpinner,
-        Window, Message, MultiSelect, InputText, Button
+        Window, Message, MultiSelect, InputText
     },
     props: {
         user: {

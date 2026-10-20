@@ -1,8 +1,8 @@
 <template>
-    <Window id="rename" title="Rename" modal max-width="70%" fixed-size @close="onWindowClose" @show="focusInput">
+    <Window id="rename" title="Rename" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Rename" :confirm-disabled="!renameText || renameText === file.label" :busy="busy" @confirm="rename" @close="onWindowClose" @show="focusInput">
 
         <InputText ref="renameInput" v-model="renameText" class="renameInput" :invalid="renameText == null || renameText.length == 0"
-                   :disabled="busy" fluid @keyup.enter="rename" @keyup.esc="close('close')" />
+                   :disabled="busy" fluid />
 
         <!-- Checkbox to also rename sidecar files (e.g. _measurements.geojson, _cameras.json) -->
         <div v-if="sidecars.length > 0" class="sidecar-rename-option">
@@ -21,16 +21,11 @@
             </ul>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button :disabled="busy" severity="secondary" label="Close" @click="close('close')" />
-            <Button :disabled="!renameText || renameText === file.label || busy" :loading="busy" severity="primary" label="Rename" @click="rename" />
-        </div>
     </Window>
 </template>
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ddb from 'ddb';
@@ -38,7 +33,7 @@ import { discoverSidecars } from '@/libs/sidecarUtils';
 
 export default {
     components: {
-        Window, Button, InputText, Checkbox
+        Window, InputText, Checkbox
     },
 
     props: {
