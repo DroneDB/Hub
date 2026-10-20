@@ -11,10 +11,45 @@ module.exports = class Organization {
         this.org = org;
     }
 
+    /**
+     * The datasets of the organization.
+     * @param {object} [opts]
+     * @param {boolean} [opts.includeThumbnailCheck] whether each dataset has a cover (costs a
+     *   server-side check per dataset: combine with `slugs` for the rows shown)
+     * @param {string[]} [opts.slugs] only these datasets
+     */
     async datasets(opts) {
-        let url = `/orgs/${this.org}/ds`;
-        if (opts?.includeThumbnailCheck) url += '?includeThumbnailCheck=true';
-        return this.registry.getRequest(url);
+        return this.registry.getRequest(this.datasetsUrl(opts));
+    }
+
+    /**
+     * One page of the datasets, searched and sorted by the server (HUB-07).
+     * @param {{skip: number, take: number, q?: string, sort?: string, desc?: boolean}} query (datasetListQuery)
+     * @param {object} [opts]
+     * @param {boolean} [opts.includeThumbnailCheck] whether each dataset of the page has a cover
+     * @param {AbortSignal} [opts.signal]
+     * @returns {Promise<{items: Array, total: number}>} the page and how many datasets match
+     */
+    async datasetsPage(query, opts = {}) {
+        let total = null;
+        const items = await this.registry.getRequest(this.datasetsUrl({ ...query, includeThumbnailCheck: opts.includeThumbnailCheck }), {
+            cache: false,
+            signal: opts.signal,
+            onHeaders: headers => { total = Number(headers.get('X-Total-Count')); }
+        });
+        return { items, total: Number.isFinite(total) ? total : items.length };
+    }
+
+    datasetsUrl(opts) {
+        const params = new URLSearchParams();
+        if (opts?.includeThumbnailCheck) params.set('includeThumbnailCheck', 'true');
+        if (opts?.slugs?.length) params.set('slugs', opts.slugs.join(','));
+        for (const key of ['skip', 'take', 'q', 'sort']) {
+            if (opts?.[key] !== undefined && opts[key] !== null && opts[key] !== '') params.set(key, String(opts[key]));
+        }
+        if (opts?.desc) params.set('desc', 'true');
+        const query = params.toString();
+        return `/orgs/${this.org}/ds${query ? '?' + query : ''}`;
     }
 
     async info(){

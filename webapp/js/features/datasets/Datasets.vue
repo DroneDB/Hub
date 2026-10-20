@@ -51,7 +51,7 @@
                                             {{ orgInfo?.isPublic ? 'Public' : 'Private' }}
                                         </Tag>
                                         <Tag rounded severity="info" icon="fa-solid fa-database">
-                                            {{ filteredDatasets.length }}
+                                            {{ totalDatasets }}
                                         </Tag>
                                         <Tag v-if="userRole" rounded severity="contrast" icon="fa-solid fa-shield-halved">
                                             {{ userRole }}
@@ -78,7 +78,7 @@
             </div>
 
             <!-- Datasets Table -->
-            <DataTable :value="paginatedDatasets" :paginator="false" stripedRows
+            <DataTable :value="datasets" :paginator="false" stripedRows
                 @row-click="onRowClick" @row-contextmenu="onRowContextMenu" rowHover class="ds-table"
                 scrollable scrollHeight="flex"
                 :sortField="sortColumn" :sortOrder="sortOrderPrimevue" @sort="onSort"
@@ -146,11 +146,11 @@
             <!-- Pagination -->
             <div v-if="totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
                 <span>
-                    Showing {{ paginatedDatasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
-                    {{ Math.min(currentPage * itemsPerPage, filteredDatasets.length) }} of {{ filteredDatasets.length }} datasets
+                    Showing {{ datasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
+                    {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ totalDatasets }} datasets
                 </span>
                 <Paginator v-if="totalPages > 1"
-                    :rows="Number(itemsPerPage)" :totalRecords="filteredDatasets.length"
+                    :rows="Number(itemsPerPage)" :totalRecords="totalDatasets"
                     :first="(currentPage - 1) * itemsPerPage"
                     @page="onPageChange" :rowsPerPageOptions="[5, 10, 25, 50, 100]" />
             </div>
@@ -208,6 +208,10 @@ import Toast from 'primevue/toast';
 import Badge from 'primevue/badge';
 import PrimeContextMenu from 'primevue/contextmenu';
 import reg from '@/libs/api/sharedRegistry';
+import { datasetListQuery } from '@/libs/datasetList';
+
+// Typing in the search box asks the server once the user pauses
+const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 
@@ -244,7 +248,12 @@ export default {
             Visibility,
             skeletonRows: new Array(10).fill({}),
             error: "",
+            // The page shown (the server searches, sorts and pages, HUB-07)
             datasets: [],
+            totalDatasets: 0,
+            // Every slug of the organization, for the create/rename/import dialogs (loaded when
+            // one opens)
+            forbiddenSlugs: [],
             loading: true,
             deleteDialogOpen: false,
             currentDsSlug: null,
@@ -277,8 +286,9 @@ export default {
             currentPage: 1,
             itemsPerPage: prefs?.itemsPerPage || 10,
 
-            // Filtering
-            searchQuery: ""
+            // Filtering: what is typed, and what the server was asked for
+            searchQuery: "",
+            searchTerm: ""
         }
     },
     mounted: async function () {
@@ -289,27 +299,7 @@ export default {
             this.orgInfo = orgInfo;
             setTitle(this.orgName);
 
-            const tmp = await this.org.datasets({ includeThumbnailCheck: true }); this.datasets = tmp.map(ds => {
-                return {
-                    slug: ds.slug,
-                    creationDate: Date.parse(ds.creationDate),
-                    visibility: ds.properties?.meta?.visibility?.data !== undefined ? ds.properties?.meta?.visibility?.data : Visibility.PRIVATE,
-                    entries: ds.properties.entries,
-                    size: ds.size,
-                    editing: false,
-                    deleting: false,
-                    name: ds.properties?.meta?.name?.data,
-                    tagline: ds.properties?.meta?.tagline?.data || '',
-                    permissions: ds.permissions,
-                    hasThumbnail: ds.hasThumbnail === true,
-                    thumbError: false,
-                    thumbLoaded: false,
-                    thumbUrl: '/images/dataset-placeholder.svg'
-                };
-            });
-
-            this.preloadThumbnails();
-
+            await this.loadPage();
         } catch (e) {
             if (e.status === 401) {
                 this.$router.push({ name: "Login" }).catch(() => { });
@@ -321,10 +311,11 @@ export default {
         }
         this.loading = false;
     },
+    beforeUnmount() {
+        clearTimeout(this._searchTimer);
+        this._listRequest?.abort();
+    },
     computed: {
-        forbiddenSlugs: function () {
-            return this.datasets.map(ds => ds.slug);
-        },
         canDeleteGlobal: function () {
             return !HubOptions.disableDatasetCreation;
         },
@@ -391,45 +382,15 @@ export default {
 
             return items;
         },
-        // Filtering
-        filteredDatasets: function () {
-            let filtered = this.datasets;
-
-            // Filter by search query
-            if (this.searchQuery) {
-                const query = this.searchQuery.toLowerCase();
-                filtered = filtered.filter(ds => {
-                    const name = (ds.name || ds.slug).toLowerCase();
-                    const slug = ds.slug.toLowerCase();
-                    const tagline = (ds.tagline || '').toLowerCase();
-                    return name.includes(query) || slug.includes(query) || tagline.includes(query);
-                });
-            }
-
-            // Apply sorting
-            const sortMultiplier = this.sortDirection === 'asc' ? 1 : -1;
-            filtered.sort((a, b) => {
-                if (this.sortColumn === 'name') {
-                    const aName = a.name || a.slug;
-                    const bName = b.name || b.slug;
-                    return aName.localeCompare(bName) * sortMultiplier;
-                } else if (this.sortColumn === 'creationDate' || this.sortColumn === 'size' || this.sortColumn === 'entries' || this.sortColumn === 'visibility') {
-                    return (a[this.sortColumn] - b[this.sortColumn]) * sortMultiplier;
-                } else {
-                    return a[this.sortColumn].localeCompare(b[this.sortColumn]) * sortMultiplier;
-                }
+        // What the server is asked for: changes to any of it load that page
+        listQuery: function () {
+            return datasetListQuery({
+                page: this.currentPage, pageSize: this.itemsPerPage, search: this.searchTerm,
+                sortColumn: this.sortColumn, sortDirection: this.sortDirection
             });
-
-            return filtered;
-        },
-        // Pagination
-        paginatedDatasets: function () {
-            const start = (this.currentPage - 1) * this.itemsPerPage;
-            const end = start + this.itemsPerPage;
-            return this.filteredDatasets.slice(start, end);
         },
         totalPages: function () {
-            return Math.ceil(this.filteredDatasets.length / this.itemsPerPage);
+            return Math.ceil(this.totalDatasets / this.itemsPerPage);
         }, displayedPages: function () {
             if (this.totalPages <= 5) {
                 // If we have 5 or fewer pages, show all pages
@@ -472,6 +433,16 @@ export default {
         }
     },
     watch: {
+        listQuery: function () {
+            this.reloadPage();
+        },
+        searchQuery: function (value) {
+            clearTimeout(this._searchTimer);
+            this._searchTimer = setTimeout(() => {
+                this.currentPage = 1;
+                this.searchTerm = value;
+            }, SEARCH_DELAY_MS);
+        },
         itemsPerPage: function (newValue) {
             this.currentPage = 1; // Reset to first page when items per page changes
             this.savePreferences();
@@ -550,12 +521,8 @@ export default {
                 let ret = await this.org.Dataset(this.currentDsSlug).delete()
 
                 if (ret) {
-                    // Find the index of the dataset to remove
-                    const index = this.datasets.findIndex(o => o.slug === this.currentDsSlug);
-                    if (index !== -1) {
-                        // Only remove the specific dataset instead of recreating the entire array
-                        this.datasets.splice(index, 1);
-                    }
+                    // The next dataset moves into the page
+                    await this.reloadPage();
                     this.$toast.add({ severity: 'success', summary: 'Dataset Deleted', detail: 'Dataset deleted successfully', life: 3000 });
                 } else {
                     this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete dataset "' + this.currentDsSlug + '"', life: 5000 });
@@ -591,11 +558,13 @@ export default {
             };
             this.dsDialogMode = "edit";
             this.dsDialogOpen = true;
+            this.loadForbiddenSlugs();
         },
 
         newDataset() {
             this.dsDialogMode = "new";
             this.dsDialogOpen = true;
+            this.loadForbiddenSlugs();
         },
 
         handleNew() {
@@ -604,6 +573,7 @@ export default {
 
         openImportDialog() {
             this.importDialogOpen = true;
+            this.loadForbiddenSlugs();
         },
 
         // Adds a placeholder row so the importing dataset shows up immediately in the list.
@@ -642,10 +612,7 @@ export default {
             if (action === 'done') {
                 const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === slug);
                 if (payload.success) {
-                    if (index !== -1) {
-                        this.datasets[index] = { ...this.datasets[index], loading: false, isTemporary: false };
-                        this.preloadDatasetThumbnail(this.datasets[index]);
-                    }
+                    this.reloadPage();
                     this.$toast.add({ severity: 'success', summary: 'Import complete', detail: `Dataset "${slug}" imported successfully`, life: 4000 });
                 } else {
                     if (index !== -1) {
@@ -695,27 +662,8 @@ export default {
 
                     let ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility, newds.tagline);
                     if (ret) {
-                        // Find and update the temporary dataset
-                        const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === newds.slug);
-                        if (index !== -1) {
-                            // Replace the temporary entry with final data
-                            this.datasets[index] = {
-                                slug: newds.slug,
-                                creationDate: Date.now(),
-                                visibility: newds.visibility,
-                                entries: 0,
-                                size: 0,
-                                editing: false,
-                                deleting: false,
-                                name: newds.name,
-                                tagline: newds.tagline || '',
-                                permissions: { canRead: true, canWrite: true, canDelete: true },
-                                thumbError: false,
-                                thumbLoaded: false,
-                                thumbUrl: '/images/dataset-placeholder.svg'
-                            };
-                            this.preloadDatasetThumbnail(this.datasets[index]);
-                        }
+                        // The server places the new dataset in the sort order
+                        await this.reloadPage();
 
                         this.$toast.add({ severity: 'success', summary: 'Dataset Created', detail: 'Dataset created successfully', life: 3000 });
 
@@ -817,16 +765,78 @@ export default {
             this.$router.push({ name: "Upload" });
         },
 
-        preloadThumbnails() {
-            this.datasets.forEach(ds => this.preloadDatasetThumbnail(ds));
+        // One server page with the covers checked for its rows only (HUB-07); a newer request
+        // (another page, sort or search) aborts the one in flight
+        async loadPage() {
+            if (!this.org) return;
+            this._listRequest?.abort();
+            const request = new AbortController();
+            this._listRequest = request;
+            try {
+                const { items, total } = await this.org.datasetsPage(this.listQuery,
+                    { includeThumbnailCheck: true, signal: request.signal });
+                if (request.signal.aborted) return;
+                this.datasets = items.map(ds => this.toRow(ds));
+                this.totalDatasets = total;
+                // Past the last page (a dataset was deleted, the search narrowed): show the last one
+                if (this.datasets.length === 0 && total > 0 && this.currentPage > 1)
+                    this.currentPage = Math.max(1, Math.ceil(total / this.itemsPerPage));
+                this.datasets.forEach(ds => this.preloadDatasetThumbnail(ds));
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                throw e;
+            }
         },
+
+        toRow(ds) {
+            return {
+                slug: ds.slug,
+                creationDate: Date.parse(ds.creationDate),
+                visibility: ds.properties?.meta?.visibility?.data !== undefined ? ds.properties?.meta?.visibility?.data : Visibility.PRIVATE,
+                entries: ds.properties.entries,
+                size: ds.size,
+                editing: false,
+                deleting: false,
+                name: ds.properties?.meta?.name?.data,
+                tagline: ds.properties?.meta?.tagline?.data || '',
+                permissions: ds.permissions,
+                hasThumbnail: ds.hasThumbnail === true,
+                thumbError: false,
+                thumbLoaded: false,
+                thumbUrl: '/images/dataset-placeholder.svg'
+            };
+        },
+
+        // The dialogs refuse a slug in use: they need every slug, not the page
+        async loadForbiddenSlugs() {
+            try {
+                this.forbiddenSlugs = (await this.org.datasets()).map(ds => ds.slug);
+            } catch (e) {
+                console.warn('Cannot list the dataset slugs:', e);
+            }
+        },
+
+        // A dataset was added or removed: the page and the total change
+        async reloadPage() {
+            try {
+                await this.loadPage();
+            } catch (e) {
+                this.error = e.message;
+            }
+        },
+
         preloadDatasetThumbnail(ds) {
-            if (!ds.hasThumbnail) return;
+            if (!ds.hasThumbnail || ds.thumbLoaded || ds.thumbLoading) return;
+            ds.thumbLoading = true;
             const url = this.getDatasetThumbUrl(ds);
             const img = new Image();
             img.onload = () => {
                 ds.thumbUrl = url;
                 ds.thumbLoaded = true;
+                ds.thumbLoading = false;
+            };
+            img.onerror = () => {
+                ds.thumbLoading = false;
             };
             img.src = url;
         },
