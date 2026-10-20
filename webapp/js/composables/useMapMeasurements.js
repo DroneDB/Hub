@@ -11,8 +11,9 @@
  */
 import { newId } from '@/libs/ids';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
+import { createFeatureScope } from '@/composables/featureScope';
 
-export default {
+const definition = {
     data() {
         return {
             measuring: false,
@@ -22,6 +23,9 @@ export default {
             deleteSavedMeasurementsDialogOpen: false,
             // Measurement groups (array of { id, name, color, visible, collapsed })
             measurementGroups: [],
+            // Measurement list dialog
+            measurementListDialogOpen: false,
+            measurementListItems: [],
             // Tracks IDs of measurements deleted in the current session via the
             // Measurement List dialog. Used to filter persisted features (e.g.
             // stockpiles) that would otherwise be re-hydrated from the saved
@@ -302,3 +306,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useMapMeasurements(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

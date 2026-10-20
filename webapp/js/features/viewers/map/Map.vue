@@ -35,7 +35,7 @@
                                   :custom-cost-per-ton="stockpileCustomCostPerTon" :unit-pref="currentUnitPref" :title="stockpileTitle"
                                   :description="stockpileDescription" @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
                                   @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
-                                  @cancel-mode="_stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson"
+                                  @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson"
                                   @update:base-method="stockpileBaseMethod = $event" @update:sensitivity="stockpileSensitivity = $event"
                                   @update:radius="stockpileRadius = $event" @update:material="stockpileMaterial = $event"
                                   @update:custom-density="stockpileCustomDensity = $event"
@@ -152,7 +152,7 @@ import { fromExtent } from 'ol/geom/Polygon';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
 import { lifecycleListenersMixin } from '@/composables/useEventListener';
-import { markRaw, shallowRef } from 'vue';
+import { markRaw, shallowRef, ref, getCurrentInstance } from 'vue';
 
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
@@ -189,13 +189,13 @@ import RasterSplitOverlay from './RasterSplitOverlay.vue';
 // Mixins
 import { useMapAlerts } from '@/composables/useMapAlerts';
 import { useMapBasemap } from '@/composables/useMapBasemap';
-import mapTooltip from '@/composables/useMapTooltip';
-import mapMeasurements from '@/composables/useMapMeasurements';
-import mapPlantHealth from '@/composables/usePlantHealth';
-import mapRasterAnalysis from '@/composables/useRasterAnalysis';
-import mapStockpileVolume from '@/composables/useStockpileVolume';
-import mapContourLines from '@/composables/useContourLines';
-import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
+import { useMapTooltip } from '@/composables/useMapTooltip';
+import { useMapMeasurements } from '@/composables/useMapMeasurements';
+import { usePlantHealth } from '@/composables/usePlantHealth';
+import { useRasterAnalysis } from '@/composables/useRasterAnalysis';
+import { useStockpileVolume } from '@/composables/useStockpileVolume';
+import { useContourLines } from '@/composables/useContourLines';
+import { useMapAnalysisButtons } from '@/composables/useMapAnalysisButtons';
 import { useCopyText } from '@/composables/useCopyText';
 import { EPSG } from '@/libs/constants';
 import { getPref, setPref, PREF } from '@/libs/preferences';
@@ -209,7 +209,7 @@ export default {
     components: {
         DialogHost, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
-    mixins: [lifecycleListenersMixin, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
+    mixins: [lifecycleListenersMixin],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -243,18 +243,72 @@ export default {
         }
     },
     emits: ['scrollTo', 'openItem'],
-    setup() {
-        // OpenLayers map, shared with the map composables (assigned in loadMap)
+    setup(props) {
+        // OpenLayers objects shared with the map features (assigned in loadMap)
         const map = shallowRef(null);
+        const measureControls = shallowRef(null);
+        const rasterLayer = shallowRef(null);
+        const vectorLayers = shallowRef([]);
+        const currentUnitPref = ref(getPref(PREF.MEASURE_UNIT, 'metric'));
+        const dialogs = useDialogs();
+        const alerts = useMapAlerts();
+        // Map methods some features call back into
+        const host = getCurrentInstance().proxy;
         const imageCopy = useCopyText();
         const videoCopy = useCopyText();
+
+        // Features (HQ-07); `f` resolves their cross references lazily
+        const f = {};
+        const dataset = () => props.dataset;
+        f.measurements = useMapMeasurements({
+            canWrite: () => props.canWrite, canDelete: () => props.canDelete, measureControls,
+            showAlert: () => alerts.showAlert, showFlash: () => alerts.showFlash,
+            getActiveMeasurementEntry: () => () => host.getActiveMeasurementEntry(),
+            initMeasurementStorage: () => () => host.initMeasurementStorage()
+        });
+        f.plantHealth = usePlantHealth({
+            dataset, rasterLayer, entry: () => null,
+            closeRasterAnalysis: () => f.raster.closeRasterAnalysis,
+            closeStockpileVolume: () => f.stockpile.closeStockpileVolume
+        });
+        f.raster = useRasterAnalysis({
+            dataset, map, measureControls, rasterLayer,
+            currentVizParams: f.plantHealth.currentVizParams, vizParamsByPath: f.plantHealth.vizParamsByPath,
+            refreshRasterLayers: () => f.plantHealth.refreshRasterLayers,
+            onRasterProfileHover: () => undefined,
+            closePlantHealth: () => f.plantHealth.closePlantHealth,
+            closeStockpileVolume: () => f.stockpile.closeStockpileVolume
+        });
+        f.stockpile = useStockpileVolume({
+            dataset, map, measureControls, currentUnitPref,
+            deletedMeasurementIds: f.measurements.deletedMeasurementIds, hasSavedMeasurements: f.measurements.hasSavedMeasurements,
+            rasterFilePath: f.raster.rasterFilePath,
+            getMapCenterLatLon: () => () => host.getMapCenterLatLon(),
+            closePlantHealth: () => f.plantHealth.closePlantHealth,
+            closeRasterAnalysis: () => f.raster.closeRasterAnalysis
+        });
+        f.contours = useContourLines({
+            dataset, measureControls, rasterFilePath: f.raster.rasterFilePath,
+            hasSavedMeasurements: f.measurements.hasSavedMeasurements,
+            showAlert: () => alerts.showAlert, showFlash: () => alerts.showFlash
+        });
+        f.tooltip = useMapTooltip({ map, vectorLayers, dialogs: () => dialogs });
+        f.analysisButtons = useMapAnalysisButtons({
+            map, files: () => props.files, entry: () => null,
+            openPlantHealth: () => f.plantHealth.openPlantHealth, closePlantHealth: () => f.plantHealth.closePlantHealth,
+            openRasterAnalysis: () => f.raster.openRasterAnalysis, closeRasterAnalysis: () => f.raster.closeRasterAnalysis,
+            openStockpileVolume: () => f.stockpile.openStockpileVolume, closeStockpileVolume: () => f.stockpile.closeStockpileVolume,
+            plantHealthVisible: f.plantHealth.plantHealthVisible, rasterPanelVisible: f.raster.rasterPanelVisible,
+            stockpilePanelVisible: f.stockpile.stockpilePanelVisible
+        });
+
         return {
-            map,
-            ...useMapAlerts(),
+            map, measureControls, rasterLayer, vectorLayers, currentUnitPref, dialogs,
+            ...alerts,
             ...useMapBasemap(map),
+            ...f.measurements, ...f.plantHealth, ...f.raster, ...f.stockpile, ...f.contours, ...f.tooltip, ...f.analysisButtons,
             copyImageCoords: imageCopy.copy, imagePopupCoordsCopied: imageCopy.copied,
             copyVideoCoords: videoCopy.copy, videoPopupCoordsCopied: videoCopy.copied,
-            dialogs: useDialogs(),
             later: useTimerGroup()
         };
     },
@@ -266,13 +320,11 @@ export default {
             selectSingle: false,
             selectPolygon: false,
             initialExtent: null,
-            vectorLayers: [],
             vectorLayerColors: {},
             currentOrthophotoEntry: null,
             mapSettingsDialogOpen: false,
             showFlightPath: savedFlightPath,
             showDirectionIndicators: savedDirectionIndicators,
-            currentUnitPref: getPref(PREF.MEASURE_UNIT, 'metric'),
 
             // Measurement group dialog
             measurementGroupDialogOpen: false,
@@ -310,9 +362,7 @@ export default {
             hasRasters: false,
             rasterLayerList: [],
             splitMode: false,
-            splitPositions: [],
-            measurementListDialogOpen: false,
-            measurementListItems: []
+            splitPositions: []
         };
     },
     computed: {
@@ -425,11 +475,6 @@ export default {
             return toLonLat(center);
         },
 
-        // Override tooltip fallback label for Map (uses layer.file)
-        getLayerDisplayName: function (layer) {
-            if (layer && layer.file) return layer.file.name || (layer.file.entry && layer.file.entry.name) || '';
-            return '';
-        },
 
         // Show image popup overlay on the map
         showImagePopup: function (file, coordinate) {
@@ -922,9 +967,7 @@ export default {
                     if (id) this.deletedMeasurementIds.add(id);
                     // Allow the stockpile composable to reset its panel
                     // state when the user erases a draft polygon.
-                    if (typeof this._onStockpileFeatureRemoved === 'function') {
-                        this._onStockpileFeatureRemoved(feature);
-                    }
+                    this.onStockpileFeatureRemoved(feature);
                 },
                 canWrite: this.canWrite,
                 canDelete: this.canDelete
@@ -1113,10 +1156,10 @@ export default {
             this.map.addControl(this.settingsControl);
 
             // Group the controls into toolbar zones so they stack without overlapping.
-            this.createControlZones();
-            if (this.selectionControl) this.moveControlToZone(this.selectionControl, this._zoneTopLeft);
-            this.moveControlToZone(this.measureControls, this._zoneTopRight);
-            this.moveControlToZone(this.settingsControl, this._zoneBottomLeft);
+            const zones = this.createControlZones();
+            if (this.selectionControl) this.moveControlToZone(this.selectionControl, zones.topLeft);
+            this.moveControlToZone(this.measureControls, zones.topRight);
+            this.moveControlToZone(this.settingsControl, zones.bottomLeft);
 
             // Utility cluster top-right: Reset View + Fullscreen + analysis buttons.
             // Matches the SingleMap.vue pattern (appendAnalysisButtonsToContainer).
@@ -1158,7 +1201,7 @@ export default {
                 return f || null;
             }, { skipPlantHealth: true });
             utilContainer.style.order = '-1';
-            this.map.addControl(new Control({ element: utilContainer, target: this._zoneTopRight }));
+            this.map.addControl(new Control({ element: utilContainer, target: zones.topRight }));
 
             // Display options cluster (top-center): direction, flight path, split-compare.
             const displayContainer = document.createElement('div');
@@ -1203,7 +1246,7 @@ export default {
             displayContainer.appendChild(splitBtn);
             this._splitBtn = splitBtn;
 
-            if (!this.standalone) this.map.addControl(new Control({ element: displayContainer, target: this._zoneTopCenter }));
+            if (!this.standalone) this.map.addControl(new Control({ element: displayContainer, target: zones.topCenter }));
 
             // Apply flight path visibility preference
             this.flightPathLayer.setVisible(this.showFlightPath);

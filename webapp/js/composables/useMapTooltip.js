@@ -9,8 +9,9 @@ import Overlay from 'ol/Overlay';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
+import { createFeatureScope } from '@/composables/featureScope';
 
-export default {
+const definition = {
     data() {
         return {
             tooltipElement: null,
@@ -114,3 +115,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useMapTooltip(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

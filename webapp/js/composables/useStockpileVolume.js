@@ -27,6 +27,7 @@ import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
+import { createFeatureScope } from '@/composables/featureScope';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
 const STOCKPILE_STROKE = ANALYSIS_COLOR;
@@ -86,7 +87,7 @@ function resolveSelectedMaterial(slug, customDensity, customCostPerTon) {
     return findStockpileMaterialBySlug(slug);
 }
 
-export default {
+const definition = {
     data() {
         return {
             stockpilePanelVisible: false,
@@ -722,6 +723,10 @@ export default {
          * Export the currently displayed pile contour as a GeoJSON Feature
          * (downloaded as a file). Only available when a polygon has been computed.
          */
+        // Public names for the map view (template and measure control)
+        stopStockpileInteractions() { this._stopStockpileInteractions(); },
+        onStockpileFeatureRemoved(feature) { this._onStockpileFeatureRemoved(feature); },
+
         exportStockpileGeoJson() {
             if (!this.stockpileDetectedPolygon) {
                 this.stockpileError = 'No polygon to export. Detect or draw a stockpile first.';
@@ -742,3 +747,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useStockpileVolume(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

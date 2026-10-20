@@ -10,6 +10,7 @@ import { unByKey } from 'ol/Observable';
 import { getLength as olGetLength } from 'ol/sphere';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
+import { createFeatureScope } from '@/composables/featureScope';
 
 /**
  * Mixin for Raster Analysis panel (thermal + DEM + generic value rasters).
@@ -22,7 +23,7 @@ import { EPSG } from '@/libs/constants';
  * - Component must import and register RasterAnalysisControls component
  * - Component must call `this.refreshRasterLayers()` when vizParams change
  */
-export default {
+const definition = {
     data() {
         return {
             rasterPanelVisible: false,
@@ -734,3 +735,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useRasterAnalysis(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

@@ -17,6 +17,7 @@
  *    stockpilePanelVisible
  */
 import { isPlantHealthCapable, isRasterAnalysisCapable } from '@/libs/entryTypes';
+import { createFeatureScope } from '@/composables/featureScope';
 
 function makeButton(title, iconClass, onClick, testId = null) {
     const btn = document.createElement('button');
@@ -28,7 +29,7 @@ function makeButton(title, iconClass, onClick, testId = null) {
     return btn;
 }
 
-export default {
+const definition = {
     methods: {
         /**
          * Creates the left/right toolbar zone containers inside the map's
@@ -50,6 +51,7 @@ export default {
             this._zoneTopRight = make('ol-zone-top-right');
             this._zoneTopCenter = make('ol-zone-top-center');
             this._zoneBottomLeft = make('ol-zone-bottom-left');
+            return { topLeft: this._zoneTopLeft, topRight: this._zoneTopRight, topCenter: this._zoneTopCenter, bottomLeft: this._zoneBottomLeft };
         },
 
         /**
@@ -155,3 +157,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useMapAnalysisButtons(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

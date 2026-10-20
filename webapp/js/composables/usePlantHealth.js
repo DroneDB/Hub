@@ -10,8 +10,9 @@
  */
 import HybridXYZ from '@/libs/map/olHybridXYZ';
 import { sourceMaxZoom, FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
+import { createFeatureScope } from '@/composables/featureScope';
 
-export default {
+const definition = {
     data() {
         return {
             plantHealthVisible: false,
@@ -206,3 +207,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function usePlantHealth(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

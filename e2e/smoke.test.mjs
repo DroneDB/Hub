@@ -151,8 +151,22 @@ async function measureLength() {
     await page.keyboard.press('Escape');
 }
 
-test('single map: measure a length', async () => {
+test('single map: measure a length, list it and save it', async () => {
     await measureLength();
+    await page.click('button[title^="Measurement List"]');
+    await page.waitForSelector('.p-dialog >> text=Measurements', { timeout: 10000 });
+    assert.equal(await page.locator('.p-dialog >> text=No measurements').count(), 0);
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    await page.click('button[title^="Save Measurements"]');
+    await page.waitForSelector('.p-toast-message', { timeout: 15000 });
+});
+
+test('single map: plant health panel opens from the opacity control', async () => {
+    // The opacity bar sits under the map attribution: dispatch the click on the button itself
+    await page.locator('button[title="Plant Health"]').dispatchEvent('click');
+    await page.waitForSelector('.plant-health-panel', { timeout: 15000 });
+    await page.locator('button[title="Plant Health"]').dispatchEvent('click');
 });
 
 test('single map (DEM): raster analysis and stockpile panels open and close', async () => {
@@ -164,6 +178,14 @@ test('single map (DEM): raster analysis and stockpile panels open and close', as
     await page.waitForSelector('[data-testid="stockpile-panel"]', { timeout: 15000 });
     // One analysis panel at a time
     assert.equal(await page.locator('.raster-panel').count(), 0);
+    // Contours: from the raster panel to its options dialog
+    await page.click('[data-testid="raster-analysis-toolbar-btn"]');
+    await page.waitForSelector('.raster-panel', { timeout: 15000 });
+    await page.click('.raster-panel >> text=Contours');
+    await page.waitForSelector('.p-dialog >> text=Contour', { timeout: 15000 });
+    await page.keyboard.press('Escape');
+    await page.click('[data-testid="stockpile-toolbar-btn"]');
+    await page.waitForSelector('[data-testid="stockpile-panel"]', { timeout: 15000 });
     await page.click('[data-testid="stockpile-toolbar-btn"]');
     await page.waitForSelector('[data-testid="stockpile-panel"]', { state: 'detached', timeout: 15000 });
 });
