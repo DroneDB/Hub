@@ -156,12 +156,12 @@ export default {
                 this.isAdmin = reg.isAdmin();
 
                 // Check if account management is available
-                const isLocalAuth = reg.getFeature(Features.USER_MANAGEMENT);
+                const isLocalAuth = reg.features.get(Features.USER_MANAGEMENT);
                 this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
 
                 // Get user organizations
                 try {
-                    const orgs = await reg.getUserOrganizations(this.username);
+                    const orgs = await reg.admin.getUserOrganizations(this.username);
                     this.organizationsCount = orgs ? orgs.length : 0;
                 } catch (e) {
                     console.warn('Could not load organizations:', e.message);
@@ -170,7 +170,7 @@ export default {
 
                 // Get storage info
                 try {
-                    const storageInfo = await reg.getUserStorageInfo(this.username);
+                    const storageInfo = await reg.admin.getUserStorageInfo(this.username);
                     this.storageUsed = storageInfo.used || 0;
                     this.storageTotal = storageInfo.total || null;
                 } catch (e) {
@@ -180,7 +180,7 @@ export default {
                 // Try to get email from detailed user info if admin
                 if (this.isAdmin) {
                     try {
-                        const users = await reg.usersDetailed();
+                        const users = await reg.admin.usersDetailed();
                         const currentUser = users.find(u => u.userName === this.username);
                         if (currentUser) {
                             this.email = currentUser.email || '';

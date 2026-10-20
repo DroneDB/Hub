@@ -171,8 +171,8 @@ export default {
 
             try {
                 const [userOrgs, allOrgsInstances] = await Promise.all([
-                    reg.getUserOrganizations(this.user.userName),
-                    reg.getOrganizations()
+                    reg.admin.getUserOrganizations(this.user.userName),
+                    reg.orgs.getOrganizations()
                 ]);
 
                 // Extract org data from Organization instances
@@ -194,7 +194,7 @@ export default {
 
             this.addingOrg = true;
             try {
-                await reg.addUserToOrganization(
+                await reg.admin.addUserToOrganization(
                     this.user.userName,
                     this.newOrg.slug,
                     this.newOrg.permissions
@@ -220,7 +220,7 @@ export default {
 
         async updatePermission(org) {
             try {
-                await reg.updateUserOrganizationPermissions(
+                await reg.admin.updateUserOrganizationPermissions(
                     this.user.userName,
                     org.slug,
                     org.permissions
@@ -249,7 +249,7 @@ export default {
 
             this.removingOrg = this.orgToRemove.slug;
             try {
-                await reg.removeUserFromOrganization(this.user.userName, this.orgToRemove.slug);
+                await reg.admin.removeUserFromOrganization(this.user.userName, this.orgToRemove.slug);
                 this.$notify.success(`User removed from organization successfully`, { summary: 'Organization Removed' });
                 this.hasChanges = true;
                 await this.loadData();

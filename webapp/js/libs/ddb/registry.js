@@ -15,39 +15,13 @@
 import Organization from './organization';
 import RequestCache from './requestCache';
 import { DEFAULT_REGISTRY } from './constants';
-import { applyHubBranding } from '../hubBranding';
-import { ApiError } from './apiError';
 import { createHttpClient } from './http/httpClient';
 import SysApi from './sysApi';
-import { safeStorage } from '../preferences';
 import ShareApi from './shareApi';
-
-let refreshTimers = {};
-
-const throwError = (msg, status, extraData = {}) => {
-    throw new ApiError(msg, status, extraData);
-};
-
-// Credit https://stackoverflow.com/a/38552302
-function parseJwt(token) {
-    if (!token) return {};
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return {};
-        const base64Url = parts[1];
-        if (!base64Url) return {};
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(jsonPayload);
-    } catch {
-        return null;
-    }
-}
-
-// Session token and username: localStorage with an in-memory fallback (libs/preferences)
-const storage = safeStorage;
+import AuthSession from './authSession';
+import FeaturesService from './featuresService';
+import AdminApi from './adminApi';
+import OrganizationsApi from './organizationsApi';
 
 const registries = new Map();
 
@@ -55,14 +29,16 @@ export default class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
         this.eventListeners = {};
-        this._refreshingToken = false;
-        this._features = {};
         // Shared by every client of this origin (HUB-06)
         this.requestCache = RequestCache.forOrigin(url);
         // Transport: auth header, timeout, parsing, ApiError (HQ-05)
         this.http = createHttpClient({ baseUrl: url, getToken: () => this.getAuthToken() });
         this.sys = new SysApi(this);
         this.share = new ShareApi(this);
+        this.session = new AuthSession(this);
+        this.features = new FeaturesService(this);
+        this.admin = new AdminApi(this);
+        this.orgs = new OrganizationsApi(this);
     }
 
     /**
@@ -75,6 +51,22 @@ export default class Registry {
         if (!registries.has(url)) registries.set(url, new Registry(url));
         return registries.get(url);
     }
+
+    // ---- session (authSession.js) ----
+
+    login(username, password, xAuthToken = null) { return this.session.login(username, password, xAuthToken); }
+    logout() { return this.session.logout(); }
+    changePwd(oldPassword, newPassword) { return this.session.changePwd(oldPassword, newPassword); }
+    refreshToken() { return this.session.refreshToken(); }
+    setAutoRefreshToken(seconds) { return this.session.setAutoRefreshToken(seconds); }
+    setCredentials(username, token, expires) { return this.session.setCredentials(username, token, expires); }
+    clearCredentials() { return this.session.clearCredentials(); }
+    getAuthToken() { return this.session.getAuthToken(); }
+    getAuthTokenExpiration() { return this.session.getAuthTokenExpiration(); }
+    getUsername() { return this.session.getUsername(); }
+    isAdmin() { return this.session.isAdmin(); }
+    isLoggedIn() { return this.session.isLoggedIn(); }
+    ensureLoggedIn() { return this.session.ensureLoggedIn(); }
 
     /** Drops the cached GET answers (all, or the endpoints starting with `prefix`). */
     invalidateCache(prefix = '') {
@@ -92,35 +84,6 @@ export default class Registry {
 
     get secure() {
         return this.url.startsWith("https://");
-    }
-
-    // Login
-    async login(username, password, xAuthToken = null) {
-        const formData = new FormData();
-        if (username) formData.append('username', username);
-        if (password) formData.append('password', password);
-        if (xAuthToken) formData.append('token', xAuthToken);
-
-        try {
-            const res = await this.postFormData('/users/authenticate', formData);
-
-            if (res && res.token) {
-                this.setCredentials(res.username, res.token, res.expires);
-                this.setAutoRefreshToken();
-                this.emit("login", res.username);
-
-                return res;
-            } else {
-                throw new Error(res?.error || "Cannot login: Invalid response");
-            }
-        } catch (e) {
-            if (e.status) {
-                // Re-throw API errors
-                throw e;
-            } else {
-                throw new Error(`Cannot login: ${e.message}`, { cause: e });
-            }
-        }
     }
 
     async storageInfo() {
@@ -146,354 +109,9 @@ export default class Registry {
         }
     }
 
-    async users() {
-        return await this.getRequest(`/users`);
-    }
-
-    async userRoles() {
-        return await this.getRequest(`/users/roles`);
-    }
-
-    async addUser(username, password, roles = [], email = '') {
-        return await this.postRequest('/users', {
-            userName: username,
-            email: email,
-            password,
-            roles: roles
-        });
-    }
-
-    /**
-     * Deletes a user and optionally transfers their data to a successor.
-     * @param {string} username - The username of the user to delete.
-     * @param {string|null} successor - The username of the successor to transfer data to. If null, all data is deleted.
-     * @param {string} conflictResolution - How to handle conflicts: 'HaltOnConflict' (0), 'Overwrite' (1), or 'Rename' (2). Default is 'Rename'.
-     * @returns {Promise<Object>} Result object with deletion details.
-     */
-    async deleteUser(username, successor = null, conflictResolution = 'Rename') {
-        let url = `/users/${encodeURIComponent(username)}`;
-        const params = new URLSearchParams();
-
-        if (successor) {
-            params.append('successor', successor);
-        }
-        if (conflictResolution) {
-            params.append('conflictResolution', conflictResolution);
-        }
-
-        const queryString = params.toString();
-        if (queryString) {
-            url += `?${queryString}`;
-        }
-
-        return await this.deleteRequest(url);
-    }
-
-    async changePwd(oldPassword, newPassword) {
-        const formData = new FormData();
-        formData.append('oldPassword', oldPassword);
-        formData.append('newPassword', newPassword);
-        const res = await this.postFormData('/users/changePwd', formData);
-        if (res.token) {
-            this.setCredentials(this.getUsername(), res.token, res.expires);
-        } else {
-            throwError(res.error || `Cannot change password: ${JSON.stringify(res)}`, res.status);
-        }
-    }
-
-    async refreshToken() {
-        if (!this.ensureLoggedIn()) {
-            throw new Error("logged out");
-        }
-
-        // If a refresh is already in-flight, return the same promise
-        if (this._refreshPromise) {
-            return this._refreshPromise;
-        }
-
-        this._refreshPromise = this._doRefreshToken();
-
-        try {
-            return await this._refreshPromise;
-        } finally {
-            this._refreshPromise = null;
-        }
-    }
-
-    async _doRefreshToken() {
-        try {
-            const res = await this.postRequest('/users/authenticate/refresh');
-
-            if (res.token) {
-                this.setCredentials(this._getUsernameFromStorage(), res.token, res.expires);
-            } else {
-                throwError(res.error || "Cannot refresh token: Invalid response", res.status || 400);
-            }
-        } catch (error) {
-            if (error.status === 401) {
-                // Token is no longer valid, clear credentials
-                this.clearCredentials();
-                throw new Error("logged out", { cause: error });
-            }
-            throw error;
-        }
-    }
-
-    setAutoRefreshToken(seconds = 3600) {
-        if (refreshTimers[this.url]) {
-            clearTimeout(refreshTimers[this.url]);
-            delete refreshTimers[this.url];
-        }
-
-        refreshTimers[this.url] = setTimeout(async () => {
-            try {
-                await this.refreshToken();
-                this.setAutoRefreshToken(seconds);
-            } catch (e) {
-                console.error(e);
-
-                // Try again later, unless we're logged out
-                if (e.message !== "logged out") {
-                    this.setAutoRefreshToken(seconds);
-                }
-            }
-        }, seconds * 1000);
-    }
-
-    logout() {
-        // Clear the auto-refresh timer
-        if (refreshTimers[this.url]) {
-            clearTimeout(refreshTimers[this.url]);
-            delete refreshTimers[this.url];
-        }
-        // Clear cached features
-        this._features = {};
-        this.clearCredentials();
-        this.emit("logout");
-    }
-
-    setCredentials(username, token, expires) {
-        // Cached answers belong to the previous identity
-        if (storage.getItem(`${this.url}_username`) !== username) this.invalidateCache();
-        storage.setItem(`${this.url}_username`, username);
-        storage.setItem(`${this.url}_jwt_token`, token);
-        storage.setItem(`${this.url}_jwt_token_expires`, expires);
-
-        // Set cookie if the URL matches the current window
-        if (typeof window !== "undefined") {
-            if (window.location.origin === this.url) {
-                const expiresDate = new Date(expires * 1000).toUTCString();
-                const isSecure = window.location.protocol === 'https:';
-                document.cookie = `jwtToken=${token};expires=${expiresDate};path=/;SameSite=Strict${isSecure ? ';Secure' : ''}`;
-            }
-        }
-    }
-
-    getAuthToken() {
-        const expiration = this.getAuthTokenExpiration();
-        if (expiration && expiration > new Date()) {
-            return storage.getItem(`${this.url}_jwt_token`);
-        }
-        return null;
-    }
-
-    /**
-     * Get username from storage without triggering side effects.
-     * Used internally to avoid circular calls with isLoggedIn().
-     */
-    _getUsernameFromStorage() {
-        return storage.getItem(`${this.url}_username`);
-    }
-
-    getUsername() {
-        if (this.ensureLoggedIn()) {
-            return this._getUsernameFromStorage();
-        }
-        return null;
-    }
-
-    isAdmin() {
-        if (this.ensureLoggedIn()) {
-            const token = this.getAuthToken();
-            if (!token)
-                return false;
-
-            const decoded = parseJwt(token);
-            if (!decoded)
-                return false;
-
-            return decoded.admin === true;
-        }
-        return false;
-    }
-
-    getAuthTokenExpiration() {
-        const expires = storage.getItem(`${this.url}_jwt_token_expires`);
-        if (expires) {
-            return new Date(expires * 1000);
-        }
-        return null;
-    }
-
-    async createOrganization(slugOrData, name, description, isPublic) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        const formData = new FormData();
-
-        // Support both old signature (slug, name, desc, isPublic) and new signature (object)
-        if (typeof slugOrData === 'object') {
-            // New signature: createOrganization({slug, name, description, isPublic})
-            if (slugOrData.slug) formData.append('slug', slugOrData.slug);
-            if (slugOrData.name) formData.append('name', slugOrData.name);
-            if (slugOrData.description) formData.append('description', slugOrData.description);
-            if (slugOrData.isPublic !== undefined) formData.append('isPublic', slugOrData.isPublic);
-        } else {
-            // Old signature: createOrganization(slug, name, description, isPublic)
-            if (slugOrData) formData.append('slug', slugOrData);
-            if (name) formData.append('name', name);
-            if (description) formData.append('description', description);
-            if (isPublic !== undefined) formData.append('isPublic', isPublic);
-        }
-
-        return await this.postFormData('/orgs', formData);
-    }
-
-    async updateOrganization(slug, name, description, isPublic) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        const formData = new FormData();
-        formData.append('slug', slug);
-        if (name !== undefined) formData.append('name', name);
-        if (description !== undefined) formData.append('description', description);
-        if (isPublic !== undefined) formData.append('isPublic', isPublic);
-        return await this.putFormData(`/orgs/${slug}`, formData);
-    }
-
-    async getOrganizations(ownedOnly = false) {
-        const res = await this.getRequest(`/orgs${ownedOnly ? '?ownedOnly=true' : ''}`);
-        return res.map(org => new Organization(this, org));
-    }
-
-    async deleteOrganization(orgSlug) {
-
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.deleteRequest(`/orgs/${orgSlug}`);
-    }
-
     // ==================== Features ====================
 
-    /**
-     * Loads all platform feature flags from the server.
-     * Should be called once at app startup after authentication.
-     * @returns {Promise<Object>} The features object
-     */
-    async loadFeatures() {
-        try {
-            this._features = await this.getRequest('/sys/features');
-        } catch (e) {
-            console.error('Failed to load features:', e);
-            this._features = {};
-        }
-
-        // Apply Hub branding (window.HubOptions, document title, favicon links).
-        // The features endpoint is anonymous, so this works pre-login too.
-        try {
-            applyHubBranding(this._features ? this._features.hubOptions : null);
-        } catch (e) {
-            console.error('Failed to apply Hub branding:', e);
-        }
-
-        return this._features;
-    }
-
-    /**
-     * Gets the value of a specific feature flag.
-     * Features must be loaded first via loadFeatures().
-     * @param {string} name - The feature name (e.g. 'OrganizationMemberManagement')
-     * @returns {boolean} Whether the feature is enabled (defaults to false if not loaded)
-     */
-    getFeature(name) {
-        if (!this._features) return false;
-        return this._features[name] === true;
-    }
-
-    /**
-     * Gets the raw value of a feature (supports non-boolean features).
-     * Features must be loaded first via loadFeatures().
-     * @param {string} name - The feature name
-     * @returns {*} The feature value, or null if not loaded/not present
-     */
-    getFeatureValue(name) {
-        if (!this._features) return null;
-        return this._features[name] ?? null;
-    }
-
     // ==================== Organization Member Management ==
-
-    /**
-     * Gets all members of an organization
-     * @param {string} orgSlug - The organization slug
-     * @returns {Promise<Array>} List of organization members
-     */
-    async getOrganizationMembers(orgSlug) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.getRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`);
-    }
-
-    /**
-     * Adds a member to an organization
-     * @param {string} orgSlug - The organization slug
-     * @param {string} userName - The username to add
-     * @param {number} permissions - Permission level (0=ReadOnly, 1=ReadWrite, 2=ReadWriteDelete, 3=Admin)
-     * @returns {Promise<void>}
-     */
-    async addOrganizationMember(orgSlug, userName, permissions = 1) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.postRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`, {
-            userName: userName,
-            permissions: permissions
-        });
-    }
-
-    /**
-     * Updates a member's permission level
-     * @param {string} orgSlug - The organization slug
-     * @param {string} userName - The username to update
-     * @param {number} permissions - New permission level (0-3)
-     * @returns {Promise<void>}
-     */
-    async updateMemberPermissions(orgSlug, userName, permissions) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.putRequest(
-            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userName)}`,
-            { permissions: permissions }
-        );
-    }
-
-    /**
-     * Removes a member from an organization
-     * @param {string} orgSlug - The organization slug
-     * @param {string} userName - The username to remove
-     * @returns {Promise<void>}
-     */
-    async removeOrganizationMember(orgSlug, userName) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.deleteRequest(
-            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userName)}`
-        );
-    }
 
     /**
      * Permission level constants for organization members
@@ -520,38 +138,6 @@ export default class Registry {
             case 3: return 'Admin';
             default: return 'Unknown';
         }
-    }
-
-    clearCredentials() {
-        this.invalidateCache();
-        storage.removeItem(`${this.url}_jwt_token`);
-        storage.removeItem(`${this.url}_jwt_token_expires`);
-        storage.removeItem(`${this.url}_username`);
-
-        // Clear cookie if needed
-        if (typeof window !== "undefined") {
-            if (window.location.origin === this.url) {
-                document.cookie = `jwtToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-            }
-        }
-    }
-
-    /**
-     * Pure check: returns true if the user has a valid, non-expired token.
-     * No side effects.
-     */
-    isLoggedIn() {
-        return this.getAuthToken() !== null && this.getAuthTokenExpiration() > new Date();
-    }
-
-    /**
-     * Check login status and clear stale credentials if expired.
-     * Use this when you want to enforce logout on expiration.
-     */
-    ensureLoggedIn() {
-        const loggedIn = this.isLoggedIn();
-        if (!loggedIn) this.clearCredentials();
-        return loggedIn;
     }
 
     /**
@@ -725,103 +311,5 @@ export default class Registry {
     // ========== Extended User Management Methods ==========
 
 
-
-    // Get detailed user information
-    async usersDetailed() {
-        return await this.getRequest('/users/detailed');
-    }
-
-    /**
-     * Lists all tasks across all users and datasets (admin only).
-     * @param {Object} [filter]
-     * @param {string} [filter.toolId]
-     * @param {string} [filter.state]
-     * @param {string} [filter.userId]
-     * @param {number} [filter.skip]
-     * @param {number} [filter.take]
-     * @returns {Promise<Object>} { items, total, skip, take }
-     */
-    async adminTasks({ toolId, state, userId, skip = 0, take = 50 } = {}) {
-        const q = new URLSearchParams();
-        if (toolId) q.append('toolId', toolId);
-        if (state) q.append('state', state);
-        if (userId) q.append('userId', userId);
-        q.append('skip', String(skip));
-        q.append('take', String(take));
-        return this.getRequest(`/sys/tasks?${q}`);
-    }
-
-    /**
-     * Deletes a concluded task from the global admin task list (admin only).
-     * @param {string} id Task id
-     * @returns {Promise<Object>} { deleted }
-     */
-    async adminDeleteTask(id) {
-        if (!id) throw new Error('Invalid task id');
-        return this.postRequest(`/sys/tasks/${encodeURIComponent(id)}/delete`, {});
-    }
-
-    // User update method (email and roles)
-    async updateUser(userName, email, roles) {
-        return await this.putRequest(`/users/${encodeURIComponent(userName)}`, {
-            email: email,
-            roles: roles
-        });
-    }
-
-    // Role management
-    async createRole(roleName) {
-        return await this.postRequest('/users/roles', {roleName: roleName});
-    }
-
-    async deleteRole(roleName) {
-        return await this.deleteRequest(`/users/roles/${encodeURIComponent(roleName)}`);
-    }
-
-    async updateUserRoles(userName, roles) {
-        const result = await this.putRequest(`/users/${encodeURIComponent(userName)}`, {
-            email: null, // Will be handled by the updateUser method instead
-            roles: roles
-        });
-        // PUT /users/{userName} returns 200 OK with empty body on success
-        return result || {}; // Return empty object if result is null/undefined
-    }
-
-    // User organization management
-    async getUserOrganizations(userName) {
-        return await this.getRequest(`/users/${encodeURIComponent(userName)}/orgs`);
-    }
-
-    async addUserToOrganization(userName, orgSlug, permissions) {
-        return await this.postRequest(`/users/${encodeURIComponent(userName)}/orgs`, {
-            orgSlug,
-            permissions
-        });
-    }
-
-    async removeUserFromOrganization(userName, orgSlug) {
-        return await this.deleteRequest(`/users/${encodeURIComponent(userName)}/orgs/${encodeURIComponent(orgSlug)}`);
-    }
-
-    async updateUserOrganizationPermissions(userName, orgSlug, permissions) {
-        return await this.putRequest(`/users/${encodeURIComponent(userName)}/orgs/${encodeURIComponent(orgSlug)}`, {
-            permissions
-        });
-    }
-
-    // User storage info
-    async getUserStorageInfo(userName) {
-        return await this.getRequest(`/users/${encodeURIComponent(userName)}/storage`);
-    }
-
-    // Change user password (admin function)
-    async changeUserPassword(userName, currentPassword, newPassword) {
-        const result = await this.putRequest(`/users/${encodeURIComponent(userName)}/changepwd`, {
-            currentPassword,
-            newPassword
-        });
-        // PUT /users/{userName}/changepwd returns 200 OK with empty body on success
-        return result || {}; // Return empty object if result is null/undefined
-    }
 
 }

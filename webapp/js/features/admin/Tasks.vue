@@ -131,7 +131,7 @@ export default {
     methods: {
         async loadUsers() {
             try {
-                this.users = await reg.usersDetailed() || [];
+                this.users = await reg.admin.usersDetailed() || [];
             } catch (e) {
                 console.error('Failed to load users:', e);
                 this.users = [];
@@ -141,7 +141,7 @@ export default {
         async loadTasks() {
             this.loading = true;
             try {
-                const res = await reg.adminTasks({
+                const res = await reg.admin.adminTasks({
                     toolId: this.selectedTool || undefined,
                     state: this.selectedState || undefined,
                     userId: this.selectedUser || undefined,
@@ -238,7 +238,7 @@ export default {
             const task = this.deletingTask;
             this.deletingTask = null;
             try {
-                await reg.adminDeleteTask(task.taskId);
+                await reg.admin.adminDeleteTask(task.taskId);
                 await this.loadTasks();
                 this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
             } catch (e) {

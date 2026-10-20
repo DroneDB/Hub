@@ -68,7 +68,7 @@ export default {
         };
     },
     mounted: function () {
-        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+        this.passwordPolicy = reg.features.value(Features.PASSWORD_POLICY);
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {

@@ -92,7 +92,7 @@ export default {
     },
     mounted: function () {
         // Load password policy from features
-        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+        this.passwordPolicy = reg.features.value(Features.PASSWORD_POLICY);
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
@@ -144,7 +144,7 @@ export default {
 
             this.adding = true;
             try {
-                const user = await reg.addUser(this.username, this.password, this.roles, this.email);
+                const user = await reg.admin.addUser(this.username, this.password, this.roles, this.email);
                 this.$notify.success(`User "${this.username}" created successfully`, { summary: 'User Added' });
                 this.adding = false;
                 this.$emit('onClose', user);

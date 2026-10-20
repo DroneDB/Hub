@@ -155,7 +155,7 @@ export default {
     mounted: async function () {
         try {
             // Load organizations - getOrganizations returns Organization instances
-            const orgInstances = await reg.getOrganizations();
+            const orgInstances = await reg.orgs.getOrganizations();
             // Extract the org data from each Organization instance
             this.organizations = orgInstances.map(orgInstance => orgInstance.org);
 

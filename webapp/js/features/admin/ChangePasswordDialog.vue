@@ -92,7 +92,7 @@ export default {
 
             this.changing = true;
             try {
-                await reg.changeUserPassword(
+                await reg.admin.changeUserPassword(
                     this.user.userName,
                     this.currentPassword || null, // Pass null instead of empty string for admin override
                     this.newPassword

@@ -33,6 +33,7 @@ import { createPinia } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 
 import reg from '@/libs/api/sharedRegistry';
+import { loadFeaturesAndBranding } from '@/libs/hubBranding';
 import { queryParams, inIframe } from '@/libs/utils';
 import {
     checkAndHandleUpdate,
@@ -74,7 +75,7 @@ window.addEventListener('load', function () {
         // logo / app name as well.
         let features = null;
         try {
-            features = await reg.loadFeatures();
+            features = await loadFeaturesAndBranding(reg);
         } catch (e) {
             console.log(e.message);
         }

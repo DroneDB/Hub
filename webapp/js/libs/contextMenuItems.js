@@ -225,7 +225,7 @@ function downloadItem(ctx) {
     };
     const isBulkBlocked = () =>
         !reg.isLoggedIn() &&
-        reg.getFeature(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
+        reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
         isBulkSelection();
 
     return {
@@ -344,7 +344,7 @@ function setThumbnailItem(ctx) {
             const file = sel[0];
             const type = file.entry.type;
             if (!isThumbnailCandidate(type)) return false;
-            const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+            const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
             if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
             if (type === ddb.entry.type.GEORASTER || type === ddb.entry.type.GAUSSIAN_SPLAT) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);

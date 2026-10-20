@@ -113,7 +113,7 @@ export default {
             this.error = "";
 
             try {
-                await reg.createOrganization({
+                await reg.orgs.createOrganization({
                     name: this.organizationName.trim(),
                     slug: slug,
                     description: this.organizationDescription.trim() || undefined

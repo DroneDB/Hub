@@ -381,7 +381,7 @@ export default {
         async setAsCover(file) {
             try {
                 // Get the thumbnail candidates from features
-                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+                const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
                 if (!candidates || candidates.length === 0) {
                     this.showError('Dataset thumbnail candidates not configured', 'Error');
                     return;
@@ -419,7 +419,7 @@ export default {
 
         async performSetAsCover() {
             try {
-                const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+                const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
                 const targetFilename = candidates[0];
                 const file = this.setCoverFile;
 

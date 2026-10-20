@@ -152,7 +152,7 @@ export default {
 
             this.addingRole = true;
             try {
-                await reg.createRole(this.newRoleName.trim());
+                await reg.admin.createRole(this.newRoleName.trim());
 
                 this.currentRoles.push(this.newRoleName.trim());
                 this.$notify.success(`Role "${this.newRoleName}" created successfully`, { summary: 'Role Created' });
@@ -186,7 +186,7 @@ export default {
 
             this.deletingRole = this.roleToDelete;
             try {
-                await reg.deleteRole(this.roleToDelete);
+                await reg.admin.deleteRole(this.roleToDelete);
                 // NOTE: DELETE role endpoint returns 204 No Content (empty response)
                 // This is normal and indicates success
 

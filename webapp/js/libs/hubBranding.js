@@ -90,3 +90,19 @@ function applyFavicon(favicon) {
         head.appendChild(meta);
     }
 }
+
+/**
+ * Loads the feature flags of `registry` and applies the branding they carry
+ * (window.HubOptions, title, favicons). The endpoint is anonymous, so this also
+ * works before sign-in. Never throws.
+ * @param {{ features: { load: () => Promise<Record<string, any>> } }} registry
+ */
+export async function loadFeaturesAndBranding(registry) {
+    const features = await registry.features.load();
+    try {
+        applyHubBranding(features ? features.hubOptions : null);
+    } catch (e) {
+        console.error('Failed to apply Hub branding:', e);
+    }
+    return features;
+}

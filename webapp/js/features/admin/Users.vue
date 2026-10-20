@@ -319,8 +319,8 @@ export default {
             try {
                 this.loading = true;
                 const [usersData, rolesData] = await Promise.all([
-                    reg.usersDetailed(),
-                    reg.userRoles()
+                    reg.admin.usersDetailed(),
+                    reg.admin.userRoles()
                 ]);
 
                 this.users = usersData.map(user => ({
@@ -337,7 +337,7 @@ export default {
 
         async refreshRoles() {
             try {
-                this.availableRoles = await reg.userRoles();
+                this.availableRoles = await reg.admin.userRoles();
             } catch (e) {
                 this.error = e.message;
             }
@@ -388,7 +388,7 @@ export default {
                 this.userToDelete.deleting = true;
 
                 // Perform the delete operation with optional successor
-                const result = await reg.deleteUser(
+                const result = await reg.admin.deleteUser(
                     this.userToDelete.userName,
                     this.deleteSuccessor,
                     this.deleteConflictResolution

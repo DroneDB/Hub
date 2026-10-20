@@ -197,7 +197,7 @@ export default {
             return HubOptions.readOnlyOrgs;
         },
         memberManagementEnabled() {
-            return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+            return reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         },
         filteredOrganizations() {
             if (!this.searchQuery) return this.organizations;
@@ -251,7 +251,7 @@ export default {
             try {
                 this.isAdmin = reg.isAdmin();
 
-                let tmp = await reg.getOrganizations(!this.showAll);
+                let tmp = await reg.orgs.getOrganizations(!this.showAll);
 
                 this.organizations = tmp.map(item => {
                     let org = item.org;
@@ -302,7 +302,7 @@ export default {
 
             try {
 
-                let ret = await reg.deleteOrganization(this.currentOrgSlug);
+                let ret = await reg.orgs.deleteOrganization(this.currentOrgSlug);
 
                 if (ret) {
                     this.organizations = this.organizations.filter(o => o.slug !== this.currentOrgSlug);
@@ -354,7 +354,7 @@ export default {
                 this.loading = true;
 
                 try {
-                    let ret = await reg.createOrganization({
+                    let ret = await reg.orgs.createOrganization({
                         slug: neworg.slug,
                         name: neworg.name,
                         description: neworg.description,
@@ -390,7 +390,7 @@ export default {
                 this.loading = true;
 
                 try {
-                    let ret = await reg.updateOrganization(org.slug, neworg.name, neworg.description, neworg.isPublic);
+                    let ret = await reg.orgs.updateOrganization(org.slug, neworg.name, neworg.description, neworg.isPublic);
                     if (ret) {
                         let orgitem = this.organizations.find(o => o.slug == org.slug);
                         orgitem.slug = org.slug;

@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
+import { loadFeaturesAndBranding } from '@/libs/hubBranding';
 
 export const useAuthStore = defineStore('auth', () => {
     const username = ref(reg.getUsername() || '');
@@ -27,7 +28,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     async function refreshFeatures() {
         try {
-            await reg.loadFeatures();
+            await loadFeaturesAndBranding(reg);
         } finally {
             featuresVersion.value++;
         }
@@ -53,7 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
     /** @param {string} name */
     function feature(name) {
         void featuresVersion.value;
-        return reg.getFeature(name);
+        return reg.features.get(name);
     }
 
     const homeOrg = computed(() => username.value);

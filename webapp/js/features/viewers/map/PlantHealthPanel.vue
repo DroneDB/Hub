@@ -209,7 +209,7 @@ export default {
             );
         },
         maxExportSizeBytes() {
-            return reg.getFeatureValue(Features.MAX_EXPORT_SIZE_BYTES);
+            return reg.features.value(Features.MAX_EXPORT_SIZE_BYTES);
         },
         isExportTooLarge() {
             return computeIsExportTooLarge(this.rasterInfo, this.maxExportSizeBytes);

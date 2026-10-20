@@ -107,7 +107,7 @@ export default {
             this.updating = true;
             try {
                 // Update user with both email and roles
-                await reg.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
+                await reg.admin.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
 
                 this.$notify.success(`User "${this.editUser.userName}" updated successfully`, { summary: 'User Updated' });
                 this.updating = false;

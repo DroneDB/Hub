@@ -303,7 +303,7 @@ export default {
             return null;
         },
         memberManagementEnabled: function () {
-            return reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+            return reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
         },
         // Check if user can create datasets in this organization
         // User can create if: dataset creation is not disabled AND at least one dataset has canWrite permission
@@ -857,7 +857,7 @@ export default {
             }
 
             try {
-                const ret = await reg.updateOrganization(
+                const ret = await reg.orgs.updateOrganization(
                     this.$route.params.org,
                     neworg.name,
                     neworg.description,

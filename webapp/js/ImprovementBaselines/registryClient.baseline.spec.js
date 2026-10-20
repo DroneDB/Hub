@@ -34,7 +34,7 @@ describe('HUB-06 Registry client request behaviour', () => {
     it('clients of the same origin share one read cache (features are loaded once)', async () => {
         const a = new Registry('http://registry.test');
         const b = new Registry('http://registry.test');   // e.g. a helper creating its own client
-        await a.loadFeatures(); await b.loadFeatures();
+        await a.features.load(); await b.features.load();
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(Registry.forUrl('http://registry.test')).toBe(Registry.forUrl('http://registry.test'));
     });

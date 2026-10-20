@@ -164,7 +164,7 @@ export default {
 
             try {
                 // Check if feature is enabled
-                this.featureEnabled = reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+                this.featureEnabled = reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
 
                 if (!this.featureEnabled) {
                     this.loading = false;
@@ -172,11 +172,11 @@ export default {
                 }
 
                 // Load members
-                this.members = await reg.getOrganizationMembers(this.orgSlug);
+                this.members = await reg.orgs.getOrganizationMembers(this.orgSlug);
 
                 // Load all users if can manage (for adding new members)
                 if (this.canManageMembers) {
-                    this.allUsers = await reg.users();
+                    this.allUsers = await reg.admin.users();
                 }
 
             } catch (e) {
@@ -192,7 +192,7 @@ export default {
 
             this.addingMember = true;
             try {
-                await reg.addOrganizationMember(
+                await reg.orgs.addOrganizationMember(
                     this.orgSlug,
                     this.newMember.userName,
                     this.newMember.permissions
@@ -216,7 +216,7 @@ export default {
 
         async updatePermission(member) {
             try {
-                await reg.updateMemberPermissions(
+                await reg.orgs.updateMemberPermissions(
                     this.orgSlug,
                     member.userName,
                     member.permissions
@@ -244,7 +244,7 @@ export default {
 
             this.removingMember = this.memberToRemove.userName;
             try {
-                await reg.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
+                await reg.orgs.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
                 await this.loadData();
                 this.$notify.success('Member removed successfully', { summary: 'Member Removed' });
             } catch (e) {

@@ -251,7 +251,7 @@ export default {
         },
         downloadBlocked: function () {
             return !this.loggedIn
-                && reg.getFeature(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS)
+                && reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS)
                 && this.downloadIsBulk;
         },
         downloadTitle: function () {
@@ -452,7 +452,7 @@ export default {
                 await downloadFromDataset({
                     dataset, paths, files: this.selectedFiles,
                     signedIn: this.loggedIn,
-                    thresholdBytes: reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES),
+                    thresholdBytes: reg.features.value(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES),
                     runTask: this.runHeavyTask
                 });
             } catch (err) {
@@ -509,7 +509,7 @@ export default {
             return bytesToSize(value);
         },
         checkUserManagement() {
-            const isLocalAuth = reg.getFeature(Features.USER_MANAGEMENT);
+            const isLocalAuth = reg.features.get(Features.USER_MANAGEMENT);
             this.usersManagement = isLocalAuth;
             this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
         }

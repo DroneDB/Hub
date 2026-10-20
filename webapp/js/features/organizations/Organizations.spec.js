@@ -7,7 +7,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ApiError } from '@/libs/ddb/apiError';
 
-const reg = vi.hoisted(() => ({ isAdmin: () => false, getOrganizations: null }));
+const reg = vi.hoisted(() => ({ isAdmin: () => false, orgs: { getOrganizations: null } }));
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: reg }));
 
 const { default: Organizations } = await import('./Organizations.vue');
@@ -22,7 +22,7 @@ function fakeView() {
 
 describe('Organizations.fetchOrganizations', () => {
     it('leaves a rejected session to the app handler (no error box)', async () => {
-        reg.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Token expired', 401)));
+        reg.orgs.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Token expired', 401)));
         const vm = fakeView();
 
         await Organizations.methods.fetchOrganizations.call(vm);
@@ -31,7 +31,7 @@ describe('Organizations.fetchOrganizations', () => {
     });
 
     it('shows other errors', async () => {
-        reg.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Boom', 500)));
+        reg.orgs.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Boom', 500)));
         const vm = fakeView();
 
         await Organizations.methods.fetchOrganizations.call(vm);

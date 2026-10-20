@@ -38,7 +38,7 @@ export default {
     computed: {
         // Authoritative tool catalog from the server.
         taskTools() {
-            return reg.getFeatureValue('taskTools') || [];
+            return reg.features.value('taskTools') || [];
         },
 
         // Tools visible to the current user (not hidden by feature gating).
@@ -54,7 +54,7 @@ export default {
 
         // Authoritative task state machine from the server.
         taskStates() {
-            return reg.getFeatureValue('taskStates') || [];
+            return reg.features.value('taskStates') || [];
         },
 
         // Terminal state values, derived from the server state machine.

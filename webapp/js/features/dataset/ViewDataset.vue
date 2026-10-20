@@ -1143,7 +1143,7 @@ export default {
                 await downloadFromDataset({
                     dataset: this.dataset, paths, files,
                     signedIn: reg.isLoggedIn(),
-                    thresholdBytes: reg.getFeatureValue(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES),
+                    thresholdBytes: reg.features.value(Features.BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES),
                     runTask: this.runHeavyTask
                 });
             } catch (e) {

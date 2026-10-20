@@ -194,7 +194,7 @@ export default {
         async loadOrganizations() {
             try {
                 this.loading = true;
-                const orgInstances = await reg.getOrganizations();
+                const orgInstances = await reg.orgs.getOrganizations();
                 // Extract org data from Organization instances
                 this.organizations = orgInstances.map(instance => instance.org);
             } catch (e) {
@@ -231,7 +231,7 @@ export default {
             try {
                 this.deleting = this.orgToDelete.slug;
 
-                await reg.deleteOrganization(this.orgToDelete.slug);
+                await reg.orgs.deleteOrganization(this.orgToDelete.slug);
 
                 // Remove organization from list
                 this.organizations = this.organizations.filter(org => org.slug !== this.orgToDelete.slug);
@@ -263,7 +263,7 @@ export default {
             this.createError = "";
 
             try {
-                const newOrg = await reg.createOrganization({
+                const newOrg = await reg.orgs.createOrganization({
                     name: this.newOrgName.trim(),
                     slug: slug,
                     description: this.newOrgDescription.trim() || undefined
