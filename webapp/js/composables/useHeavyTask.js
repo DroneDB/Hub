@@ -77,7 +77,8 @@ export function useHeavyTask() {
         taskMonitor.acquire(dataset);
         datasets[taskId] = dataset;
 
-        let startTick;
+        /** @type {() => Promise<void>} */
+        let startTick = async () => {};
         const promise = new Promise((resolve, reject) => {
             const tick = async () => {
                 if (disposed) return;

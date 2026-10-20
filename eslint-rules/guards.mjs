@@ -17,15 +17,12 @@ export const GUARDS = [
             message: 'Use a composable from setup(), not a mixin (HQ-06).'
         }],
         allow: [
-            'webapp/js/features/admin/Tasks.vue',
-            'webapp/js/features/dataset/TaskHistory.vue',
             'webapp/js/features/dataset/ViewDataset.vue',
             'webapp/js/features/dataset/explorer/Explorer.vue',
             'webapp/js/features/dataset/explorer/FileBrowser.vue',
             'webapp/js/features/dataset/explorer/TableView.vue',
             'webapp/js/features/dataset/explorer/TreeNode.vue',
             'webapp/js/features/dataset/explorer/TreeView.vue',
-            'webapp/js/features/tasks/TasksTable.vue',
             'webapp/js/features/viewers/map/Map.vue',
             'webapp/js/features/viewers/map/SingleMap.vue'
         ]

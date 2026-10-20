@@ -289,7 +289,7 @@ import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 // Import mixins
 import dialogManager from '@/composables/useDialogManager';
 import fileOperations from '@/composables/useFileOperations';
-import buildEvents from '@/composables/useBuildEvents';
+import { useBuildEvents } from '@/composables/useBuildEvents';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { Features } from '@/libs/features';
 import { getPref, setPref, PREF } from '@/libs/preferences';
@@ -347,7 +347,7 @@ export default {
         FsLightbox,
         VideoLightbox
     },
-    mixins: [dialogManager, fileOperations, buildEvents, requestScopeMixin],
+    mixins: [dialogManager, fileOperations, requestScopeMixin],
     provide: function () {
         return {
             showBuildConfirm: (file, onConfirm) => this.showBuildConfirm(file, onConfirm),
@@ -360,7 +360,7 @@ export default {
     },
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask };
+        return { runHeavyTask, ...useBuildEvents() };
     },
     data: function () {
         const mobile = isMobile();
@@ -568,11 +568,8 @@ export default {
         // Listen for OS paste (files and URL text from clipboard)
         document.addEventListener('paste', this.handleOsPaste);
 
-        // Listen to build state change events
-        BuildManager.on('buildStateChanged', this.handleBuildStateNotification);
-        BuildManager.on('buildStarted', this.handleBuildStartedNotification);
-        BuildManager.on('buildError', this.handleBuildErrorNotification);
-        BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
+        // Build notifications (stop with the page)
+        this.watchBuildEvents(() => this.dataset, (message, title) => this.showError(message, title));
     },
     beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
@@ -583,11 +580,6 @@ export default {
         // Remove OS paste listener
         document.removeEventListener('paste', this.handleOsPaste);
 
-        // Cleanup BuildManager listeners
-        BuildManager.off('buildStateChanged', this.handleBuildStateNotification);
-        BuildManager.off('buildStarted', this.handleBuildStartedNotification);
-        BuildManager.off('buildError', this.handleBuildErrorNotification);
-        BuildManager.off('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
         // Cleanup event bus listeners
 

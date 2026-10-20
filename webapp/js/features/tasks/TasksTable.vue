@@ -113,7 +113,7 @@
 </template>
 
 <script>
-import useTaskFormatting from '@/composables/useTaskFormatting';
+import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Tag from 'primevue/tag';
@@ -132,7 +132,6 @@ export default {
 
     components: { Button, PrimeMessage, Tag, DataTable, Column, Skeleton, ProgressBar },
 
-    mixins: [useTaskFormatting],
 
     props: {
         tasks: { type: Array, default: () => [] },
@@ -156,6 +155,9 @@ export default {
 
     emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset'],
 
+    setup() {
+        return { ...useTaskFormatting() };
+    },
     data() {
         return {
             skeletonRows: Array.from({ length: 8 }, (_, i) => ({ id: i }))

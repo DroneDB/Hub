@@ -1,188 +1,48 @@
+// @ts-check
 /**
- * useTaskFormatting
+ * useTaskFormatting - task presentation for task lists (HQ-06: a composable; was an
+ * Options-API mixin). The tool catalog and state machine come from the server's
+ * /sys/features (the single source of truth); `now` ticks every second (shared clock) so
+ * running times and artifact expiries update live.
  *
- * Options-API mixin with the shared presentation helpers for Processing Platform
- * tasks. The authoritative task metadata - the available tools, their
- * titles, result file extensions and the task state machine - is published by the
- * server in the `/sys/features` payload (loaded once at app bootstrap) and read
- * here, so the server stays the single source of truth (no hardcoded catalogs).
- *
- * Server-provided shapes:
- *   taskTools:  [{ id, version, title, requiredAccess, producesArtifact, resultExtension }]
- *   taskStates: [{ value, terminal }]
- *
- * Pure formatting (severity/icon/date/duration) stays client-side.
+ * Returns the same names the mixin had, so templates are unchanged.
  */
+import { computed } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
-import { formatTimeAgo, formatDateTime, formatDuration } from '@/libs/format';
-import { onTick } from '@/libs/clock';
+import { useNow } from '@/composables/useTimers';
+import * as fmt from '@/libs/tasks/taskFormat';
 
-export default {
-    data() {
-        return {
-            now: Date.now()
-        };
-    },
+export function useTaskFormatting() {
+    const now = useNow();
 
-    mounted() {
-        // `now` ticks every second so live running-time columns refresh: one shared
-        // ticker for every consumer, paused while the page is hidden (HUB-05)
-        this._stopTaskClock = onTick(now => { this.now = now; });
-    },
+    /** @type {import('vue').ComputedRef<import('@/libs/tasks/taskFormat').TaskTool[]>} */
+    const taskTools = computed(() => reg.features.value('taskTools') || []);
+    const visibleTaskTools = computed(() => taskTools.value.filter(t => !t.hidden));
+    const accessibleTaskTools = computed(() => taskTools.value.filter(t => !t.hidden && !t.disabled));
+    /** @type {import('vue').ComputedRef<import('@/libs/tasks/taskFormat').TaskState[]>} */
+    const taskStates = computed(() => reg.features.value('taskStates') || []);
+    const terminalStates = computed(() => taskStates.value.filter(s => s.terminal).map(s => s.value));
+    const stateOptions = computed(() => [{ label: 'All States', value: '' }]
+        .concat(taskStates.value.map(s => ({ label: s.value, value: s.value }))));
 
-    beforeUnmount() {
-        this._stopTaskClock?.();
-        this._stopTaskClock = null;
-    },
+    // A live catalog passed by the caller wins over the server's
+    const tools = (list = []) => (Array.isArray(list) && list.length ? list : taskTools.value);
 
-    computed: {
-        // Authoritative tool catalog from the server.
-        taskTools() {
-            return reg.features.value('taskTools') || [];
-        },
+    return {
+        now, taskTools, visibleTaskTools, accessibleTaskTools, taskStates, terminalStates, stateOptions,
+        isActive: state => fmt.isActiveTaskState(state, taskStates.value),
+        getTagSeverity: fmt.tagSeverity,
+        getStateIcon: fmt.stateIcon,
+        formatDateTime: fmt.taskDateTime,
+        getRelativeTime: fmt.taskTimeAgo,
+        runningTime: task => fmt.runningTime(task, now.value),
+        taskDuration: fmt.taskDuration,
+        resultFileName: task => fmt.resultFileName(task, taskTools.value),
+        canDownloadResult: (task, list = []) => fmt.canDownloadResult(task, tools(list), now.value),
+        artifactExpiresAt: fmt.artifactExpiresAt,
+        resultAvailabilityHint: fmt.resultAvailabilityHint,
+        toolTitle: (toolId, list = []) => fmt.toolTitle(toolId, tools(list))
+    };
+}
 
-        // Tools visible to the current user (not hidden by feature gating).
-        // Use for pickers/menus; keep `taskTools` for historical title lookups.
-        visibleTaskTools() {
-            return this.taskTools.filter(t => !t.hidden);
-        },
-
-        // Tools the current user can actually run (neither hidden nor disabled).
-        accessibleTaskTools() {
-            return this.taskTools.filter(t => !t.hidden && !t.disabled);
-        },
-
-        // Authoritative task state machine from the server.
-        taskStates() {
-            return reg.features.value('taskStates') || [];
-        },
-
-        // Terminal state values, derived from the server state machine.
-        terminalStates() {
-            return this.taskStates.filter(s => s.terminal).map(s => s.value);
-        },
-
-        // Options for the state filter Select (built from the server states).
-        stateOptions() {
-            return [{ label: 'All States', value: '' }]
-                .concat(this.taskStates.map(s => ({ label: s.value, value: s.value })));
-        }
-    },
-
-    methods: {
-        isActive(state) {
-            const s = this.taskStates.find(x => x.value === state);
-            // Unknown states (e.g. the transient client-side "Reused") are active.
-            return s ? !s.terminal : true;
-        },
-
-        getTagSeverity(state) {
-            switch (state) {
-                case 'Succeeded': return 'success';
-                case 'Failed': return 'danger';
-                case 'Processing': return 'warn';
-                case 'Enqueued':
-                case 'Scheduled':
-                case 'Reused': return 'info';
-                case 'Deleted': return 'secondary';
-                default: return 'secondary';
-            }
-        },
-
-        getStateIcon(state) {
-            switch (state) {
-                case 'Succeeded': return 'fa-solid fa-check';
-                case 'Failed': return 'fa-solid fa-xmark';
-                case 'Processing': return 'fa-solid fa-gear fa-spin';
-                case 'Deleted': return 'fa-solid fa-ban';
-                default: return 'fa-regular fa-clock';
-            }
-        },
-
-        formatDateTime(dateString) {
-            return formatDateTime(dateString, { seconds: true });
-        },
-
-        getRelativeTime(dateString) {
-            if (!dateString) return '';
-            return formatTimeAgo(new Date(dateString).getTime());
-        },
-
-        // Elapsed time for a task still in flight.
-        runningTime(task) {
-            const start = task.startedAt || task.createdAt;
-            if (!start) return '';
-            // `now` is reactive (ticks every second) so this updates live.
-            return this.formatDurationMs(this.now - new Date(start).getTime());
-        },
-
-        // Total length of a concluded task.
-        taskDuration(task) {
-            if (!task.finishedAt) return '';
-            const start = task.startedAt || task.createdAt;
-            if (!start) return '';
-            const ms = new Date(task.finishedAt).getTime() - new Date(start).getTime();
-            if (ms < 0) return '';
-            return this.formatDurationMs(ms);
-        },
-
-        formatDurationMs(ms) {
-            return formatDuration(ms);
-        },
-
-        // Synthetic download name; the extension comes from the server tool catalog.
-        resultFileName(task) {
-            const tool = this.taskTools.find(t => t.id === task.toolId);
-            const ext = (tool && tool.resultExtension) ? tool.resultExtension : 'bin';
-            return `${task.toolId || 'task'}_${task.taskId}.${ext}`;
-        },
-
-        /**
-         * Whether a succeeded task still exposes a downloadable result. Uses the
-         * server `producesArtifact` flag and the server-computed `artifactExpiresAt`
-         * (the work directory is swept after the retention TTL), so an expired
-         * artifact's download control is hidden instead of offering a 404 link.
-         * Reactive to the 1s `now` clock so the control disappears exactly on expiry.
-         * @param {Object} task
-         * @param {Array} [tools] Optional live tool catalog [{ id, producesArtifact }]
-         */
-        canDownloadResult(task, tools = []) {
-            if (!task || task.state !== 'Succeeded') return false;
-
-            const list = (Array.isArray(tools) && tools.length) ? tools : this.taskTools;
-            const tool = list.find(t => t.id === task.toolId);
-            if (!tool || !tool.producesArtifact) return false;
-
-            // Hide once the server-side retention window has elapsed.
-            const expiresAt = task.artifact ? task.artifact.expiresAt : task.artifactExpiresAt;
-            if (expiresAt && new Date(expiresAt).getTime() <= this.now) return false;
-
-            return true;
-        },
-
-        // Server-computed expiry (TTL sweep) of a task's artifact, or null.
-        artifactExpiresAt(task) {
-            if (!task) return null;
-            return task.artifact ? task.artifact.expiresAt : (task.artifactExpiresAt || null);
-        },
-
-        // Tooltip for the result download button: communicates the retention deadline.
-        resultAvailabilityHint(task) {
-            const expiresAt = this.artifactExpiresAt(task);
-            if (!expiresAt) return 'Download result';
-            return `Download result (available until ${this.formatDateTime(expiresAt)})`;
-        },
-
-        /**
-         * Human-readable tool title from the server catalog (optionally from a
-         * passed-in live catalog), falling back to the raw tool id.
-         * @param {string} toolId
-         * @param {Array} [tools] Optional live tool catalog [{ id, title }]
-         */
-        toolTitle(toolId, tools = []) {
-            const list = (Array.isArray(tools) && tools.length) ? tools : this.taskTools;
-            const tool = list.find(t => t.id === toolId);
-            return (tool && tool.title) ? tool.title : (toolId || 'Task');
-        }
-    }
-};
+export default useTaskFormatting;

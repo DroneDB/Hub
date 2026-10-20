@@ -50,7 +50,7 @@
 </template>
 
 <script>
-import useTaskFormatting from '@/composables/useTaskFormatting';
+import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -68,8 +68,10 @@ export default {
     name: 'TasksPage',
 
     components: { Button, Select, TasksTable, TaskLogDialog, ConfirmDialog },
-    mixins: [useTaskFormatting],
 
+    setup() {
+        return { ...useTaskFormatting() };
+    },
     data() {
         return {
             items: [],

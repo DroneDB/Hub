@@ -219,7 +219,7 @@
 
 <script>
 import { useHeavyTask } from '@/composables/useHeavyTask';
-import useTaskFormatting from '@/composables/useTaskFormatting';
+import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
@@ -293,7 +293,6 @@ export default {
     components: {
         ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
     },
-    mixins: [useTaskFormatting],
 
     inject: {
         registerTabChild: { default: null },
@@ -307,7 +306,7 @@ export default {
 
     setup() {
         const { trackHeavyTask } = useHeavyTask();
-        return { trackHeavyTask };
+        return { trackHeavyTask, ...useTaskFormatting() };
     },
     data() {
         return {
@@ -930,7 +929,7 @@ export default {
             }
         },
 
-        // ---- formatting helpers are provided by the useTaskFormatting mixin ----
+        // ---- formatting helpers come from useTaskFormatting() (setup) ----
 
         // ---- pagination ----
 
