@@ -14,7 +14,8 @@
     "check:listeners": "node scripts/audit_listeners.mjs",
     "lint": "eslint . --quiet",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "vue-tsc --noEmit -p jsconfig.json"
+    "typecheck": "vue-tsc --noEmit -p jsconfig.json",
+    "e2e": "node --test --test-concurrency=1 e2e/*.test.mjs"
   },
   "repository": {
     "type": "git",
