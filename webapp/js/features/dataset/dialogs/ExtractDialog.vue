@@ -63,8 +63,8 @@
         </div>
 
         <!-- Guided folder browser -->
-        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initial-path="destPath"
-                            @close="handleFolderPickerClose" />
+        <FolderPicker v-if="folderPickerOpen" :dataset="dataset" mode="folder" title="Select Destination Folder" :initial-path="destPath"
+                      @close="handleFolderPickerClose" />
     </Window>
 </template>
 
@@ -75,14 +75,14 @@ import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
-import FolderPickerDialog from './FolderPickerDialog.vue';
+import FolderPicker from '@/components/FolderPicker.vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import ddb from 'ddb';
 
 const { pathutils } = ddb;
 
 export default {
-    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPickerDialog },
+    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPicker },
 
     props: {
         file: { type: Object, required: true },
@@ -170,10 +170,11 @@ export default {
             this.folderPickerOpen = true;
         },
 
-        handleFolderPickerClose(action, path) {
+        // FolderPicker: { path, entry }, or null when cancelled
+        handleFolderPickerClose(result) {
             this.folderPickerOpen = false;
-            if (action === 'select') {
-                this.destPath = path || '';
+            if (result) {
+                this.destPath = result.path || '';
                 this.validateDestPath();
                 this.checkDestExistence();
             }

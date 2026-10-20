@@ -30,7 +30,8 @@ const FILES = {
     dem: path.join(DATA, 'dem', 'test_dem.tiff'),
     markdown: path.join(DATA, 'README.md'),
     // Renamed, then deleted, by the dialog tests
-    scratch: path.join(DATA, 'LICENSE.md')
+    scratch: path.join(DATA, 'LICENSE.md'),
+    archive: path.join(DATA, 'delta', 'first.zip')
 };
 const b64 = s => Buffer.from(s, 'utf8').toString('base64');
 
@@ -188,6 +189,20 @@ test('dataset page: properties and share dialogs open and close', async () => {
     await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
     await page.click('[title="Share/Embed"]');
     await page.waitForSelector('.p-dialog', { timeout: 10000 });
+    await page.keyboard.press('Escape');
+    await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+});
+
+test('dataset page: the extract dialog picks a destination folder', async () => {
+    await page.click(`#explorer >> text=${path.basename(FILES.archive)}`, { button: 'right' });
+    await page.hover('.p-contextmenu >> text=Tools');
+    await page.click('.p-contextmenu >> text=Extract');
+    await page.click('.p-dialog button[aria-label="Browse folders"]', { timeout: 10000 });
+    await page.waitForSelector('.p-dialog >> text=Select Destination Folder', { timeout: 10000 });
+    await page.click('.p-dialog:has-text("Select Destination Folder") button:has-text("Confirm")');
+    await page.waitForSelector('.p-dialog >> text=Select Destination Folder', { state: 'detached', timeout: 10000 });
+    // The extract dialog stays, and is now the window Escape closes
+    await page.waitForSelector('.p-dialog >> text=Extract Archive', { timeout: 5000 });
     await page.keyboard.press('Escape');
     await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
 });

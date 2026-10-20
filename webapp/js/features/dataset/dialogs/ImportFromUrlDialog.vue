@@ -102,8 +102,8 @@
             </div>
         </div>
 
-        <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initial-path="folder"
-                            @close="handleFolderPickerClose" />
+        <FolderPicker v-if="folderPickerOpen" :dataset="dataset" mode="folder" title="Select Destination Folder" :initial-path="folder"
+                      @close="handleFolderPickerClose" />
     </Window>
 </template>
 
@@ -129,14 +129,14 @@ import PrimeMessage from 'primevue/message';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
-import FolderPickerDialog from './FolderPickerDialog.vue';
+import FolderPicker from '@/components/FolderPicker.vue';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { bytesToSize } from '@/libs/utils';
 import { isHttpUrl } from '@/libs/dragDropUtils';
 
 export default {
     /** ImportFromUrlDialog - Single-file URL import dialog. */
-    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPickerDialog },
+    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPicker },
 
     props: {
         /** ddb Dataset instance for the target dataset. */
@@ -296,10 +296,11 @@ export default {
             return bytesToSize(bytes);
         },
 
-        handleFolderPickerClose(action, path) {
+        // FolderPicker: { path, entry }, or null when cancelled
+        handleFolderPickerClose(result) {
             this.folderPickerOpen = false;
-            if (action === 'select') {
-                this.folder = path || '';
+            if (result) {
+                this.folder = result.path || '';
             }
         },
 
