@@ -24,6 +24,7 @@ function makeButton(title, iconClass, onClick, testId = null) {
     btn.title = title;
     btn.innerHTML = `<i class="${iconClass}"></i>`;
     if (testId) btn.setAttribute('data-testid', testId);
+    // lifetime: element (the button is created here)
     btn.addEventListener('click', onClick);
     return btn;
 }

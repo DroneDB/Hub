@@ -118,6 +118,7 @@ const clipboard = {
 // Auto-remove deleted entries from clipboard so the panel stays consistent.
 // deleteEntries is emitted with an array of path strings after any deletion
 // (batch delete, transfer, cover replacement, rescan, etc.).
+// lifetime: app (the clipboard store is module-level)
 emitter.on('deleteEntries', (deletedPaths) => {
     if (!deletedPaths || deletedPaths.length === 0 || state.items.length === 0) return;
     const deletedSet = new Set(deletedPaths);

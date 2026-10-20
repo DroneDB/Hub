@@ -116,6 +116,7 @@ class MeasureControls extends Control {
             target: options.target,
         });
 
+        // lifetime: element (the control's own toolbar buttons, dropped with the control)
         btnPoint.addEventListener('click', this.handlePointLocation.bind(this), false);
         btnLength.addEventListener('click', this.handleMeasureLength.bind(this), false);
         btnArea.addEventListener('click', this.handleMeasureArea.bind(this), false);
@@ -147,6 +148,7 @@ class MeasureControls extends Control {
         this.onMeasurementDeleted = options.onMeasurementDeleted || (() => { });
 
         this.source = new VectorSource();
+        // lifetime: owner (the control's own measurement source)
         this.source.on('removefeature', (evt) => {
             try { this.onMeasurementDeleted(evt.feature); } catch (e) { /* noop */ }
         });
@@ -747,12 +749,14 @@ class MeasureControls extends Control {
         map.addInteraction(this.translateInteraction);
 
         // Save original geometry before modification starts (for undo)
+        // lifetime: owner (the interaction is created here and dropped with its listeners when the tool stops)
         this.modifyInteraction.on('modifystart', (evt) => {
             evt.features.forEach(feature => {
                 this.saveToUndoStack(feature);
             });
         });
 
+        // lifetime: owner (the interaction is created here and dropped with its listeners when the tool stops)
         this.translateInteraction.on('translatestart', (evt) => {
             evt.features.forEach(feature => {
                 this.saveToUndoStack(feature);
@@ -760,6 +764,7 @@ class MeasureControls extends Control {
         });
 
         // Update tooltip in real-time during modification
+        // lifetime: owner (the interaction is created here and dropped with its listeners when the tool stops)
         this.modifyInteraction.on('modifyend', (evt) => {
             evt.features.forEach(feature => {
                 this.updateMeasurementValue(feature);
@@ -771,6 +776,7 @@ class MeasureControls extends Control {
             });
         });
 
+        // lifetime: owner (the interaction is created here and dropped with its listeners when the tool stops)
         this.translateInteraction.on('translateend', (evt) => {
             evt.features.forEach(feature => {
                 this.updateTooltipPosition(feature);
@@ -1415,6 +1421,7 @@ class MeasureControls extends Control {
                     })
                 })
             });
+            // lifetime: owner (each Draw interaction is created per tool and dropped on stop)
             this.draw.on('drawstart', function (evt) {
                 sketch = evt.feature;
                 let tooltipCoord = evt.coordinate;
@@ -1433,6 +1440,7 @@ class MeasureControls extends Control {
                     self.measureTooltip.setPosition(tooltipCoord);
                 });
             });
+            // lifetime: owner (each Draw interaction is created per tool and dropped on stop)
             this.draw.on('drawend', function (evt) {
                 const feat = evt.feature;
                 if (tool === 'point') {

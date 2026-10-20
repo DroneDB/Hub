@@ -156,6 +156,7 @@ import { fromExtent } from 'ol/geom/Polygon';
 import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
+import { lifecycleListenersMixin } from '@/composables/useEventListener';
 import { markRaw } from 'vue';
 
 import ddb from 'ddb';
@@ -213,7 +214,7 @@ export default {
         Map, olMeasure, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     emits: ['scrollTo', 'openItem'],
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
+    mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     inject: {
         registerTabChild: { default: null },
         unregisterTabChild: { default: null }
@@ -309,13 +310,8 @@ export default {
         Keyboard.offKeyUp(this.handleKeyUp);
 
         // Clean up event bus listener
-        if (this._addItemsHandler) emitter.off('addItems', this._addItemsHandler);
 
         // Clean up OL map event listeners
-        if (this._olListenerKeys) {
-            this._olListenerKeys.forEach(key => unByKey(key));
-            this._olListenerKeys = [];
-        }
 
         // Clean up vectorSource listeners
         if (this._vectorSourceListenerKeys) {
@@ -324,10 +320,6 @@ export default {
         }
 
         // Clean up View maxZoom cap collection listeners
-        if (this._viewCapListenerKeys) {
-            this._viewCapListenerKeys.forEach(key => unByKey(key));
-            this._viewCapListenerKeys = [];
-        }
         if (this._viewCapDeferredKey) {
             unByKey(this._viewCapDeferredKey);
             this._viewCapDeferredKey = null;
@@ -982,28 +974,22 @@ export default {
             this.map.once("postrender", () => {
                 this.map.getTargetElement().querySelector("canvas").style.cursor = "inherit";
             });
-            // Add pointer move handler for tooltips
-            this._olListenerKeys = [];
+            // Map listeners are removed with the component (lifecycleListenersMixin)
 
             // Keep the View maxZoom capped to the deepest native raster zoom
             // currently loaded (plus a small magnification allowance). The View
             // exists here (created with `new Map(...)` above), so bind the
-            // collection listeners now; they are cleaned up in beforeUnmount
-            // via _viewCapListenerKeys.
+            // collection listeners now; they are removed with the component.
             this._lastAppliedViewCap = null;
             this._viewCapPending = false;
             this._viewCapDeferred = false;
             this._viewCapDeferredKey = null;
-            this._viewCapListenerKeys = [];
             const scheduleViewCap = () => this._scheduleViewCapUpdate();
             [this.rasterLayer.getLayers(), this.footprintRastersLayer.getLayers()].forEach(collection => {
-                this._viewCapListenerKeys.push(
-                    collection.on('add', scheduleViewCap),
-                    collection.on('remove', scheduleViewCap)
-                );
+                this.$onOl([collection.on('add', scheduleViewCap), collection.on('remove', scheduleViewCap)]);
             });
 
-            this._olListenerKeys.push(this.map.on('pointermove', (e) => {
+            this.$onOl(this.map.on('pointermove', (e) => {
                 if (e.dragging || this.measuring) {
                     this.hideFeatureTooltip();
                     return;
@@ -1113,7 +1099,7 @@ export default {
                 }
             }));
             // Add double-click handler for showing feature properties
-            this._olListenerKeys.push(this.map.on('dblclick', (e) => {
+            this.$onOl(this.map.on('dblclick', (e) => {
                 if (this.measuring) return;
 
                 // Check if we clicked on a vector feature
@@ -1162,6 +1148,7 @@ export default {
             const resetBtn = document.createElement('button');
             resetBtn.title = 'Reset View (H)';
             resetBtn.innerHTML = '<i class="fa-solid fa-house"></i>';
+            // lifetime: element (the map's own control buttons)
             resetBtn.addEventListener('click', () => { this.resetToInitialView(); });
             utilContainer.appendChild(resetBtn);
 
@@ -1169,6 +1156,7 @@ export default {
                 const fsBtn = document.createElement('button');
                 fsBtn.title = 'Fullscreen (F11)';
                 fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
+                // lifetime: element (the map's own control buttons)
                 fsBtn.addEventListener('click', () => {
                     if (isFullScreenCurrently()) { exitFullScreen(); }
                     else { requestFullScreen(this.$el); setTimeout(() => { this.map.updateSize(); }, 500); }
@@ -1191,6 +1179,7 @@ export default {
             dirBtn.title = 'Show direction and speed indicators';
             dirBtn.innerHTML = '<i class="fa-solid fa-location-arrow"></i>';
             if (this.showDirectionIndicators) dirBtn.classList.add('active');
+            // lifetime: element (the map's own control buttons)
             dirBtn.addEventListener('click', () => {
                 this.showDirectionIndicators = !this.showDirectionIndicators;
                 localStorage.setItem('showDirectionIndicators', String(this.showDirectionIndicators));
@@ -1203,6 +1192,7 @@ export default {
             flightBtn.title = 'Show drone flight path';
             flightBtn.innerHTML = '<i class="fa-solid fa-signs-post"></i>';
             if (this.showFlightPath) flightBtn.classList.add('active');
+            // lifetime: element (the map's own control buttons)
             flightBtn.addEventListener('click', () => {
                 this.showFlightPath = !this.showFlightPath;
                 localStorage.setItem('showFlightPath', String(this.showFlightPath));
@@ -1216,6 +1206,7 @@ export default {
             splitBtn.title = 'Need at least 2 georasters to compare';
             splitBtn.innerHTML = '<i class="fa-solid fa-table-columns"></i>';
             splitBtn.disabled = true;
+            // lifetime: element (the map's own control buttons)
             splitBtn.addEventListener('click', () => {
                 if (this.splitMode) this.exitSplitMode();
                 else this.enterSplitMode();
@@ -1301,7 +1292,7 @@ export default {
                 this.updateClearSelectionButton();
             };
 
-            this._olListenerKeys.push(this.map.on('click', e => {
+            this.$onOl(this.map.on('click', e => {
                 if (this.measuring) return;
                 if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
 
@@ -1388,7 +1379,7 @@ export default {
             }));
 
             // Right click
-            this._olListenerKeys.push(this.map.on('contextmenu', e => {
+            this.$onOl(this.map.on('contextmenu', e => {
                 // Single selection
                 doSelectSingle(e);
 
@@ -1398,7 +1389,7 @@ export default {
             }));
 
             // Double click on geovideo marker - open video player directly
-            this._olListenerKeys.push(this.map.on('dblclick', e => {
+            this.$onOl(this.map.on('dblclick', e => {
                 if (this.measuring) return;
                 if (this.selectPolygon || (this.selectionControl && this.selectionControl.isActive())) return;
 
@@ -1422,10 +1413,9 @@ export default {
                 }
             }));
 
-            this._addItemsHandler = () => {
+            this.$onBus('addItems', () => {
                 this.reloadFileLayers();
-            };
-            emitter.on('addItems', this._addItemsHandler);
+            });
 
             Keyboard.onKeyDown(this.handleKeyDown);
             Keyboard.onKeyUp(this.handleKeyUp);
@@ -2309,6 +2299,7 @@ export default {
                 const leftFrac = i === 0 ? 0 : positions[i - 1];
                 const rightFrac = i === this.rasterLayerList.length - 1 ? 1 : positions[i];
 
+                // lifetime: paired (keys kept in _splitListenerKeys, removed by _detachSplitClip)
                 const preKey = olLayer.on('prerender', (event) => {
                     const ctx = event.context;
                     const size = mapRef.getSize();
@@ -2328,6 +2319,7 @@ export default {
                     ctx.clip();
                 });
 
+                // lifetime: paired (keys kept in _splitListenerKeys, removed by _detachSplitClip)
                 const postKey = olLayer.on('postrender', (event) => {
                     event.context.restore();
                 });

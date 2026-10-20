@@ -109,6 +109,7 @@ export default {
         attachScrollListener() {
             const el = this.$refs.logContainer;
             if (!el) return;
+            // lifetime: element (the dialog's own log container)
             el.addEventListener('scroll', this.onScroll, { passive: true });
         },
 

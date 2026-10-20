@@ -42,6 +42,7 @@ import HubUpdateNoticeDialog from '@/components/HubUpdateNoticeDialog.vue';
 /* global __APP_PRODUCTION__ */
 const isProduction = typeof __APP_PRODUCTION__ !== 'undefined' ? __APP_PRODUCTION__ : true;
 
+// lifetime: app (bootstrap)
 window.addEventListener('load', function () {
 
     const params = queryParams(window.location);

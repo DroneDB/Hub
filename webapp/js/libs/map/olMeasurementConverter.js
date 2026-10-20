@@ -463,11 +463,13 @@ function createPointPopup(feature, map, source, onEdit) {
     feature.set('measureTooltip', popupOverlay);
 
     // Edit handler
+    // lifetime: element (buttons of the popup created here)
     popupEl.querySelector('.ol-point-popup-edit').addEventListener('click', (e) => {
         e.preventDefault();
         if (onEdit) onEdit(feature, map);
     });
 
+    // lifetime: element (buttons of the popup created here)
     popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
         e.preventDefault();
         const text = `${ddLat}, ${ddLon}`;
@@ -478,6 +480,7 @@ function createPointPopup(feature, map, source, onEdit) {
         });
     });
 
+    // lifetime: element (buttons of the popup created here)
     popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
         e.preventDefault();
         map.removeOverlay(popupOverlay);

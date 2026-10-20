@@ -84,6 +84,7 @@ const fireShortcutEvent = (accelerator) => {
     }
 };
 
+// lifetime: app (module-level keyboard state for the whole page)
 window.addEventListener("keydown", e => {
     // e.key can be undefined on some browsers/devices (e.g. iOS virtual keyboards, synthetic events)
     const key = e.key || "";
@@ -112,6 +113,7 @@ window.addEventListener("keydown", e => {
     keyDownListeners.forEach(l => l(e));
 });
 
+// lifetime: app (module-level keyboard state for the whole page)
 window.addEventListener("keyup", e => {
     const state = {
         ctrlKey: e.ctrlKey,
@@ -128,9 +130,11 @@ window.addEventListener("keyup", e => {
     keyUpListeners.forEach(l => l(e));
 });
 
+// lifetime: app (module-level keyboard state for the whole page)
 window.addEventListener("contextmenuopened", api.resetModifiers, false);
 
 // iOS fix, when keyboard is open it pushes the viewport out
+// lifetime: app (module-level keyboard state for the whole page)
 document.addEventListener('focusout', function (e) {
     if (window.scrollY > 0) window.scrollTo(0, 0);
 });

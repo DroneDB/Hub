@@ -31,6 +31,7 @@ class SettingsControl extends Control {
 
         this.onOpenSettings = options.onOpenSettings || (() => {});
 
+        // lifetime: element (the control's own button)
         btn.addEventListener('click', () => {
             this.onOpenSettings();
         });

@@ -145,6 +145,7 @@ import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { Control } from 'ol/control';
 
 // Mixins
+import { lifecycleListenersMixin } from '@/composables/useEventListener';
 import mapAlertFlash from '@/composables/useMapAlertFlash';
 import mapBasemap from '@/composables/useMapBasemap';
 import mapTooltip from '@/composables/useMapTooltip';
@@ -159,7 +160,7 @@ export default {
     components: {
         Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog, Toast
     },
-    mixins: [mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
+    mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     props: ["uri"],
     data: function () {
         return {
@@ -361,6 +362,7 @@ export default {
             const controlContainer = document.createElement('div');
             controlContainer.className = 'ol-map-buttons ol-unselectable ol-control';
 
+            // lifetime: element (the map's own control buttons, dropped with the map)
             // Back to Dataset button
             const backBtn = document.createElement('button');
             backBtn.title = 'Back to Dataset';
@@ -370,6 +372,7 @@ export default {
             });
             controlContainer.appendChild(backBtn);
 
+            // lifetime: element (the map's own control buttons, dropped with the map)
             // Reset View button
             const resetBtn = document.createElement('button');
             resetBtn.title = 'Reset View (H)';
@@ -381,6 +384,7 @@ export default {
 
             // Fullscreen button
             if (supportsFullScreen()) {
+                // lifetime: element (the map's own control buttons, dropped with the map)
                 const fsBtn = document.createElement('button');
                 fsBtn.title = 'Fullscreen (F11)';
                 fsBtn.innerHTML = '<i class="fa-solid fa-expand"></i>';
@@ -414,7 +418,7 @@ export default {
             this.map.addOverlay(this.tooltipOverlay);
 
             // Add pointer move handler for tooltips
-            this.map.on('pointermove', (e) => {
+            this.$onOl(this.map.on('pointermove', (e) => {
                 if (e.dragging || this.measuring) {
                     this.hideFeatureTooltip();
                     return;
@@ -465,10 +469,10 @@ export default {
                 } else {
                     this.hideFeatureTooltip();
                 }
-            });
+            }));
 
             // Add double-click handler for showing feature properties
-            this.map.on('dblclick', (e) => {
+            this.$onOl(this.map.on('dblclick', (e) => {
                 if (this.measuring) return;
 
                 // Check if we clicked on a vector feature
@@ -493,7 +497,7 @@ export default {
                 if (dblClickedFeature) {
                     this.showFeaturePropertiesDialog(dblClickedFeature, dblClickedLayer);
                 }
-            });
+            }));
 
             setTimeout(() => this.map.updateSize(), 1);
 

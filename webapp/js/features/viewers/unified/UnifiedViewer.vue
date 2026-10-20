@@ -436,6 +436,7 @@ export default {
             instance.view.setControls(controls);
             this.controls = controls;
             this._userInteracted = false;
+            // lifetime: owner (controls and source are created and disposed by this viewer)
             controls.addEventListener('start', () => { this._userInteracted = true; });
             // OrbitControls sets touch-action back to 'auto' in its own disconnect()/dispose(), so
             // re-assert it on every attach: a touch drag must never scroll the page instead.
@@ -1019,6 +1020,7 @@ export default {
             // The COPC header carries the point cloud CRS: initialise the source first so the
             // instance can be created in that CRS, keeping the cloud at full precision.
             const source = new this.libs.COPCSource({ url: copcUrl });
+            // lifetime: owner (controls and source are created and disposed by this viewer)
             source.addEventListener('progress', () => { this.progress = source.progress; });
             await source.initialize();
             const metadata = await source.getMetadata();

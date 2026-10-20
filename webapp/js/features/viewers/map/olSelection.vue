@@ -82,6 +82,7 @@ class SelectionControl extends Control {
             })
         });
 
+        // lifetime: element (the control's own buttons)
         btnRectangle.addEventListener('click', () => {
             if (this.activeMode === 'rectangle') {
                 this.deactivate();
@@ -90,6 +91,7 @@ class SelectionControl extends Control {
             }
         });
 
+        // lifetime: element (the control's own buttons)
         btnPolygon.addEventListener('click', () => {
             if (this.activeMode === 'polygon') {
                 this.deactivate();
@@ -98,6 +100,7 @@ class SelectionControl extends Control {
             }
         });
 
+        // lifetime: element (the control's own buttons)
         btnClear.addEventListener('click', () => {
             this.deactivate();
             this.onClearSelection();
@@ -187,6 +190,7 @@ class SelectionControl extends Control {
         };
         map.getTargetElement().addEventListener('contextmenu', this.contextMenuHandler);
 
+        // lifetime: owner (the Draw interaction is created and dropped by this control)
         this.draw.on('drawend', (e) => {
             const polygon = e.feature.getGeometry();
 
