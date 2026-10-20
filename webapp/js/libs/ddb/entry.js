@@ -2,6 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { ArtifactRole, artifactPath } from './buildArtifacts';
+
+const STILL_PROCESSING = 'The file may still be processing. Return to the file list to check the build status.';
+
 class Entry {
     constructor(dataset, entry) {
         this.dataset = dataset;
@@ -12,110 +16,101 @@ class Entry {
     }
 
     buildUrl(path) {
-        let url = `${this.dataset.baseApi}/build/${this.hash}/${path}`;
-        return url;
+        return `${this.dataset.baseApi}/build/${this.hash}/${path}`;
     }
 
-    async getCopc() {
-        const copcUrl = this.buildUrl("copc/cloud.copc.laz");
-
-        if (await this.dataset.registry.headRequest(copcUrl)) return copcUrl;
-        else throw new Error(`The COPC file is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
+    /** URL of a build artifact by role (see buildArtifacts.js), whether or not it exists. */
+    artifactUrl(role) {
+        return this.buildUrl(artifactPath(role));
     }
 
-    async getCog() {
-        const cogUrl = this.buildUrl("cog/cog.tif");
-
-        if (await this.dataset.registry.headRequest(cogUrl)) return cogUrl;
-        else throw new Error(`The COG file is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
-    }
-
-    async getNxz() {
-        const nxzUrl = this.buildUrl("nxs/model.nxz");
-        if (await this.dataset.registry.headRequest(nxzUrl)) return nxzUrl;
-        else throw new Error(`The 3D model is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
+    /** URL of a build artifact by role when it exists, or null. */
+    async findArtifact(role) {
+        const url = this.artifactUrl(role);
+        return (await this.dataset.registry.headRequest(url)) ? url : null;
     }
 
     /**
-     * Returns the URL of the OGC 3D Tiles root tileset (3dtiles/tileset.json) when present,
-     * or null otherwise. 3D Tiles are produced for MODEL entries alongside the legacy Nexus
-     * output (dual output), so this artifact is optional: datasets built before 3D Tiles
-     * support (or with Obj2Tiles unavailable) only have nxs/model.nxz. Callers must tolerate
-     * a null result and fall back to getNxz().
+     * URL of a build artifact that the caller cannot work without.
+     * @param {string} role
+     * @param {string} label  what the user is told is missing ("The COPC file")
      */
-    async get3DTiles() {
-        const tilesetUrl = this.buildUrl("3dtiles/tileset.json");
-        if (await this.dataset.registry.headRequest(tilesetUrl)) return tilesetUrl;
-        return null;
+    async requireArtifact(role, label) {
+        const url = await this.findArtifact(role);
+        if (url) return url;
+        throw new Error(`${label} is not available.\n\n${STILL_PROCESSING}`);
     }
 
-    async getGsplat() {
-        const spzUrl = this.buildUrl("gsplat/model.spz");
-        if (await this.dataset.registry.headRequest(spzUrl)) return spzUrl;
-        else throw new Error(`The Gaussian Splat is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
-    }
-
-    /**
-     * Returns the URL of the optional level-of-detail artifact (gsplat/model.rad) when present,
-     * or null otherwise. The .rad enables progressive streaming (Spark `paged: true`) so large
-     * scenes load coarse-first and fetch detail on demand instead of downloading the whole .spz.
-     * It is optional: a dataset built without build-lod has no .rad, so callers must tolerate null
-     * and fall back to getGsplat().
-     */
-    async getGsplatLod() {
-        const radUrl = this.buildUrl("gsplat/model.rad");
-        if (await this.dataset.registry.headRequest(radUrl)) return radUrl;
-        return null;
-    }
-
-    /**
-     * Returns the parsed local-space bounding box ({min:[x,y,z], max:[x,y,z]}) written at build
-     * time (gsplat/bounds.json), or null when absent. The viewer uses it to frame the camera
-     * deterministically - essential for the paged .rad path, where the streamed mesh has no
-     * resident splats (and thus no computable bounds) when it first initializes.
-     */
-    async getGsplatBounds() {
-        const boundsUrl = this.buildUrl("gsplat/bounds.json");
-        if (!(await this.dataset.registry.headRequest(boundsUrl))) return null;
+    /** Parsed JSON of an optional artifact, or null when absent or unreadable. */
+    async readArtifactJson(role) {
+        const url = await this.findArtifact(role);
+        if (!url) return null;
         try {
-            const resp = await this.dataset.registry.fetchRaw(boundsUrl);
-            if (!resp.ok) return null;
-            const b = await resp.json();
-            if (b && Array.isArray(b.min) && Array.isArray(b.max)) return b;
-        } catch {
-            // bounds are an optimization; ignore failures and fall back to client-side framing.
-        }
-        return null;
-    }
-
-    /**
-     * Returns the URL of the georeferencing sidecar (gsplat/georef.json) when present,
-     * or null otherwise. The sidecar is optional: a splat without georeferencing renders
-     * in local space, so callers must tolerate a null result.
-     */
-    async getGeoref() {
-        const georefUrl = this.buildUrl("gsplat/georef.json");
-        if (await this.dataset.registry.headRequest(georefUrl)) return georefUrl;
-        return null;
-    }
-
-    /** The parsed georeferencing sidecar, or null when absent or unreadable. */
-    async getGeorefJson() {
-        const georefUrl = await this.getGeoref();
-        if (!georefUrl) return null;
-        try {
-            const resp = await this.dataset.registry.fetchRaw(georefUrl);
+            const resp = await this.dataset.registry.fetchRaw(url);
             return resp.ok ? await resp.json() : null;
         } catch {
             return null;
         }
     }
 
-    async getVector() {
-        const vectorUrl = this.buildUrl("vec/vector.fgb");
+    getCopc() {
+        return this.requireArtifact(ArtifactRole.POINTCLOUD_COPC, 'The COPC file');
+    }
 
-        if (await this.dataset.registry.headRequest(vectorUrl)) return vectorUrl;
-        else throw new Error(`The vector file is not available.\n\nThe file may still be processing. Return to the file list to check the build status.`);
+    getCog() {
+        return this.requireArtifact(ArtifactRole.RASTER_COG, 'The COG file');
+    }
+
+    getNxz() {
+        return this.requireArtifact(ArtifactRole.MODEL_NEXUS, 'The 3D model');
+    }
+
+    /**
+     * URL of the OGC 3D Tiles root tileset when present, or null. 3D Tiles are produced for
+     * MODEL entries alongside the legacy Nexus output, so this artifact is optional: datasets
+     * built before 3D Tiles support (or with Obj2Tiles unavailable) only have the Nexus model.
+     * Callers must tolerate null and fall back to getNxz().
+     */
+    get3DTiles() {
+        return this.findArtifact(ArtifactRole.MODEL_3DTILES);
+    }
+
+    getGsplat() {
+        return this.requireArtifact(ArtifactRole.GSPLAT_SPZ, 'The Gaussian Splat');
+    }
+
+    /**
+     * URL of the optional level-of-detail splat artifact when present, or null. It enables
+     * progressive streaming (Spark `paged: true`): large scenes load coarse-first instead of
+     * downloading the whole .spz. A dataset built without build-lod has none, so callers must
+     * tolerate null and fall back to getGsplat().
+     */
+    getGsplatLod() {
+        return this.findArtifact(ArtifactRole.GSPLAT_LOD);
+    }
+
+    /**
+     * The local-space bounding box ({min:[x,y,z], max:[x,y,z]}) written at build time, or null.
+     * The viewer uses it to frame the camera deterministically - essential for the paged LOD
+     * path, where the streamed mesh has no resident splats when it first initializes.
+     */
+    async getGsplatBounds() {
+        // Bounds are an optimization: on any failure the viewer frames client-side.
+        const b = await this.readArtifactJson(ArtifactRole.GSPLAT_BOUNDS);
+        return b && Array.isArray(b.min) && Array.isArray(b.max) ? b : null;
+    }
+
+    /**
+     * URL of the georeferencing sidecar when present, or null. A splat without
+     * georeferencing renders in local space, so callers must tolerate null.
+     */
+    getGeoref() {
+        return this.findArtifact(ArtifactRole.GSPLAT_GEOREF);
+    }
+
+    /** The parsed georeferencing sidecar, or null when absent or unreadable. */
+    getGeorefJson() {
+        return this.readArtifactJson(ArtifactRole.GSPLAT_GEOREF);
     }
 
     /**

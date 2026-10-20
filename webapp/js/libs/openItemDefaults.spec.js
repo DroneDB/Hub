@@ -38,12 +38,13 @@ describe('defaultViewFor', () => {
     });
 });
 
-describe('FileAvailabilityChecker.getOutputFile', () => {
-    it('gates local drawings on vec/local.json and georeferenced vectors on the MVT pyramid', async () => {
+describe('FileAvailabilityChecker.getRequiredArtifact', () => {
+    it('gates local drawings on the local metadata and georeferenced vectors on the MVT pyramid', async () => {
         const { default: checker } = await import('@/libs/build/fileAvailabilityChecker');
-        expect(checker.getOutputFile(T.VECTOR, 'unified', localDrawing)).toBe('vec/local.json');
-        expect(checker.getOutputFile(T.VECTOR, 'unified', georefDrawing)).toBe('mvt/metadata.json');
-        expect(checker.getOutputFile(T.VECTOR, 'unified')).toBe('mvt/metadata.json');
-        expect(checker.getOutputFile(T.VECTOR, 'map', localDrawing)).toBe('mvt/metadata.json');
+        const { ArtifactRole } = await import('@/libs/ddb/buildArtifacts');
+        expect(checker.getRequiredArtifact(T.VECTOR, 'unified', localDrawing)).toBe(ArtifactRole.VECTOR_LOCAL);
+        expect(checker.getRequiredArtifact(T.VECTOR, 'unified', georefDrawing)).toBe(ArtifactRole.VECTOR_MVT);
+        expect(checker.getRequiredArtifact(T.VECTOR, 'unified')).toBe(ArtifactRole.VECTOR_MVT);
+        expect(checker.getRequiredArtifact(T.VECTOR, 'map', localDrawing)).toBe(ArtifactRole.VECTOR_MVT);
     });
 });

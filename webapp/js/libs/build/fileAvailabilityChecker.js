@@ -10,35 +10,29 @@ import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 import { isLocalVector } from '@/libs/openItemDefaults';
+import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 
-// Mapping between viewer type and required output file
-// NOTE (SSOT): this map is only a client-side view of the server build outputs —
-// server-side ObjectsManager.GetBuildSource + the DroneDB build spec are the single
-// source of truth; entries here must be copied from that spec, never invented.
-const VIEW_OUTPUT_FILES = {
-    'pointcloud': 'copc/cloud.copc.laz',
-    'map-pointcloud': 'copc/cloud.copc.laz',
-    'map-georaster': 'cog/cog.tif',
-    // The map vector renderer draws MVT tiles; gate on the MVT metadata (a successful
-    // DroneDB vector build produces vec/source.gpkg AND mvt/metadata.json — requiring
-    // the exact rendered artifact keeps the gate closed when MVT is missing).
-    // The previous 'vec/vector.fgb' path was never emitted by DroneDB/Registry (dead gate).
-    'map-vector': 'mvt/metadata.json',
-    // A vector without geolocation (CAD drawing, no CRS) has no MVT pyramid: DroneDB writes
-    // vec/source.gpkg in drawing coordinates plus vec/local.json, read by the local viewer.
-    'unified-vector-local': 'vec/local.json',
-    // Models prefer the OGC 3D Tiles artifact (3dtiles/tileset.json) but accept the legacy
-    // Nexus output (nxs/model.nxz) too, so datasets built before 3D Tiles support keep
-    // working (any-of match). The model viewer picks the right renderer per availability.
-    'model': 'nxs/model.nxz',
-    // The UnifiedViewer (georeferenced Giro3D scene) needs the 3D Tiles output specifically,
-    // since it cannot render the legacy Nexus mesh.
-    'unified-model': '3dtiles/tileset.json',
-    // Uploaded OGC 3D Tiles (.3tz) are extracted to the same 3dtiles/ build artifact.
-    'unified-tiles3d': '3dtiles/tileset.json',
-    // Splats prefer the LOD artifact (model.rad) but accept the legacy plain .spz too,
-    // so datasets built before the .rad-only switch keep working (any-of match).
-    'splat': ['gsplat/model.rad', 'gsplat/model.spz'],
+// Build artifact each viewer needs, by role (libs/ddb/buildArtifacts.js owns the paths).
+// An array is an any-of match.
+const VIEW_ARTIFACT_ROLES = {
+    'pointcloud': ArtifactRole.POINTCLOUD_COPC,
+    'map-pointcloud': ArtifactRole.POINTCLOUD_COPC,
+    'map-georaster': ArtifactRole.RASTER_COG,
+    // The map vector renderer draws MVT tiles: requiring the pyramid itself keeps the gate
+    // closed when a vector build produced the GeoPackage but no MVT.
+    'map-vector': ArtifactRole.VECTOR_MVT,
+    // A vector without geolocation (CAD drawing, no CRS) has no MVT pyramid; the local
+    // viewer reads its drawing-coordinate metadata instead.
+    'unified-vector-local': ArtifactRole.VECTOR_LOCAL,
+    // The model viewer renders 3D Tiles when present and the legacy Nexus model otherwise;
+    // every model build produces the Nexus model, so that is the gate.
+    'model': ArtifactRole.MODEL_NEXUS,
+    // The UnifiedViewer (georeferenced Giro3D scene) cannot render the legacy Nexus mesh.
+    'unified-model': ArtifactRole.MODEL_3DTILES,
+    // Uploaded OGC 3D Tiles (.3tz) are extracted to the same artifact.
+    'unified-tiles3d': ArtifactRole.MODEL_3DTILES,
+    // Splats prefer the LOD artifact but accept the plain .spz of older builds.
+    'splat': [ArtifactRole.GSPLAT_LOD, ArtifactRole.GSPLAT_SPZ],
     'panorama': null, // Panoramas use the original file
     'markdown': null  // Markdown files use the original file
 };
@@ -82,14 +76,13 @@ class FileAvailabilityChecker {
         }
 
         // The unified 3D viewer needs its SPECIFIC artifact (3D Tiles for models, COPC for point
-        // clouds, COG for rasters, MVT/FGB for vectors). A generic "Succeeded" build state is not
+        // clouds, COG for rasters, MVT for vectors). A generic "Succeeded" build state is not
         // enough - e.g. a model can have a legacy Nexus build but no 3D Tiles output - so verify
         // the exact artifact directly.
         if (viewType === 'unified') {
-            const outputFile = this.getOutputFile(entry.type, viewType, entry);
-            if (outputFile) {
-                const entryObj = dataset.Entry(entry);
-                const available = await this.checkOutputFileAvailability(entryObj, outputFile);
+            const roles = this.getRequiredArtifact(entry.type, viewType, entry);
+            if (roles) {
+                const available = await this.hasArtifact(dataset.Entry(entry), roles);
                 if (available) {
                     return { available: true, status: 'ready', message: '', title: '', buildState: null, actions: [] };
                 }
@@ -192,10 +185,9 @@ class FileAvailabilityChecker {
                 return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
 
             // 3. No build found - check if output file exists anyway
-            const outputFile = this.getOutputFile(entry.type, viewType, entry);
-            if (outputFile) {
-                const entryObj = dataset.Entry(entry);
-                const isAvailable = await this.checkOutputFileAvailability(entryObj, outputFile);
+            const roles = this.getRequiredArtifact(entry.type, viewType, entry);
+            if (roles) {
+                const isAvailable = await this.hasArtifact(dataset.Entry(entry), roles);
 
                 if (isAvailable) {
                     const syntheticBuildState = {
@@ -292,15 +284,12 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * Checks output file availability
+     * Whether the entry has the artifact (a role, or an any-of list of roles).
      */
-    async checkOutputFileAvailability(entryObj, outputFile) {
+    async hasArtifact(entryObj, roles) {
         try {
-            // outputFile may be a single path or an any-of list (e.g. splat .rad or .spz).
-            const candidates = Array.isArray(outputFile) ? outputFile : [outputFile];
-            for (const candidate of candidates) {
-                const url = entryObj.buildUrl(candidate);
-                if (await entryObj.dataset.registry.headRequest(url)) return true;
+            for (const role of Array.isArray(roles) ? roles : [roles]) {
+                if (await entryObj.findArtifact(role)) return true;
             }
             return false;
         } catch {
@@ -309,10 +298,11 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * Gets the required output file based on type
+     * The artifact role (or any-of list of roles) a viewer needs for this entry, or null
+     * when the viewer reads the original file.
      */
-    getOutputFile(entryType, viewType, entry = null) {
-        // Determine the key for VIEW_OUTPUT_FILES
+    getRequiredArtifact(entryType, viewType, entry = null) {
+        // Determine the key for VIEW_ARTIFACT_ROLES
         let key = viewType;
 
         if (viewType === 'map') {
@@ -338,7 +328,7 @@ class FileAvailabilityChecker {
             }
         }
 
-        return VIEW_OUTPUT_FILES[key];
+        return VIEW_ARTIFACT_ROLES[key];
     }
 
     /**

@@ -109,7 +109,7 @@ import ddb from 'ddb';
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
 import { b64encode } from '@/libs/base64';
-import { buildOgcShareUrls, OGC_SHARE_MODES } from '@/libs/ogcShareUrls';
+import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
 import UrlRow from './ShareUrlRow.vue';
 import { useCopyText } from '@/composables/useCopyText';
@@ -267,9 +267,9 @@ export default {
             if (this.scope === 'entry' && this.file.entry) {
                 const entry = dataset.Entry(this.file.entry);
                 this.entry = entry;
-                if (entry.type === ddb.entry.type.POINTCLOUD)     this.buildUrl = await entry.getCopc();
-                else if (entry.type === ddb.entry.type.GEORASTER) this.buildUrl = await entry.getCog();
-                else if (entry.type === ddb.entry.type.VECTOR)    this.buildUrl = await entry.getVector();
+                // A missing artifact (not built yet) only disables the QGIS mode
+                const role = streamableArtifactRole(entry.type);
+                if (role) this.buildUrl = await entry.findArtifact(role);
             }
 
             this.shareMode = this.pickDefaultMode();
