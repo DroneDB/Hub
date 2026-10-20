@@ -70,7 +70,6 @@ export const A11Y_PENDING = [
     'webapp/js/features/viewers/map/RasterProfileChart.vue',
     'webapp/js/features/viewers/map/StockpileVolumePanel.vue',
     'webapp/js/features/viewers/splat/CameraManager.vue',
-    'webapp/js/features/viewers/splat/Splat.vue',
     'webapp/js/layout/Header.vue'
 ];
 
