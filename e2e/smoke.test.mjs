@@ -251,6 +251,15 @@ test('point cloud viewer renders a canvas', async () => {
     await page.waitForSelector('canvas', { timeout: 60000 });
 });
 
+test('point cloud viewer keeps the chosen units', async () => {
+    await page.waitForSelector('#potree-unit-select', { timeout: 60000 });
+    await page.selectOption('#potree-unit-select', 'imperial');
+    await page.reload();
+    await page.waitForSelector('#potree-unit-select', { timeout: 60000 });
+    assert.equal(await page.inputValue('#potree-unit-select'), 'imperial');
+    await page.selectOption('#potree-unit-select', 'metric');
+});
+
 test('markdown viewer renders and offers editing to a writer', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.markdown))}/markdown`);
     await page.waitForSelector('.markdown .content h1, .markdown .content p', { timeout: 20000 });

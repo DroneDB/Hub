@@ -3,60 +3,38 @@
         <DialogHost :dialogs="dialogs" />
 
         <div class="potree-container" :class="{ loading }">
-            <!-- Top-left toolbar area -->
             <div v-if="loaded" class="top-left-toolbar">
-                <!-- Undo/Redo toolbar -->
                 <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
-                    <button
-                        :disabled="!canUndo"
-                        class="btn-undo-redo"
-                        title="Undo (Ctrl+Z)"
-                        @click="undo">
+                    <button :disabled="!canUndo" class="btn-undo-redo" title="Undo (Ctrl+Z)" aria-label="Undo" @click="undo">
                         <i class="fa-solid fa-rotate-left" />
                     </button>
-                    <button
-                        :disabled="!canRedo"
-                        class="btn-undo-redo"
-                        title="Redo (Ctrl+Y)"
-                        @click="redo">
+                    <button :disabled="!canRedo" class="btn-undo-redo" title="Redo (Ctrl+Y)" aria-label="Redo" @click="redo">
                         <i class="fa-solid fa-rotate-right" />
                     </button>
-                    <button
-                        :class="{ active: deleteToolActive }"
-                        class="btn-undo-redo btn-delete-tool"
-                        title="Delete measurement tool (click on measurement to delete)"
-                        @click="toggleDeleteTool">
+                    <button :class="{ active: deleteToolActive }" class="btn-undo-redo btn-delete-tool"
+                            title="Delete measurement tool (click on measurement to delete)" aria-label="Delete measurement tool"
+                            @click="toggleDeleteTool">
                         <i class="fa-solid fa-trash" />
                     </button>
                 </div>
 
-                <!-- Unit selector toolbar -->
                 <div class="unit-selector-toolbar">
                     <label for="potree-unit-select">Units:</label>
-                    <select id="potree-unit-select" v-model="unitPref" @change="handleUnitChange">
+                    <select id="potree-unit-select" v-model="unitPref">
                         <option value="metric">Metric (m)</option>
                         <option value="imperial">Imperial (ft)</option>
                     </select>
                 </div>
             </div>
 
-            <!-- Toolbar for measurements -->
             <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
-                <button
-                    v-if="hasMeasurements && canWrite"
-                    :disabled="savingMeasurements"
-                    class="btn-measurement"
-                    title="Save measurements"
-                    @click="saveMeasurements">
+                <button v-if="hasMeasurements && canWrite" :disabled="savingMeasurements" class="btn-measurement"
+                        title="Save measurements" @click="saveMeasurements">
                     <i class="fa-solid fa-floppy-disk" />
                     Save Measurements
                 </button>
-
-                <button
-                    v-if="hasSavedMeasurements && canDelete"
-                    class="btn-measurement btn-danger"
-                    title="Delete saved measurements file"
-                    @click="deleteSavedMeasurements">
+                <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-danger"
+                        title="Delete saved measurements file" @click="requestDelete">
                     <i class="fa-solid fa-trash" />
                     Delete Saved
                 </button>
@@ -65,7 +43,7 @@
             <div id="potree_sidebar_container" ref="sidebar" />
             <div id="potree_render_area" ref="container" />
         </div>
-        <ConfirmDialog v-if="deleteMeasurementsDialogOpen"
+        <ConfirmDialog v-if="deleteDialogOpen"
                        title="Delete Saved Measurements"
                        message="Are you sure you want to delete all saved measurements?"
                        confirm-text="Delete"
@@ -73,1660 +51,167 @@
                        confirm-button-class="danger"
                        warning-title="Warning"
                        warning-message="This action cannot be undone."
-                       @on-close="handleDeleteMeasurementsDialogClose" />
+                       @on-close="onDeleteDialogClose" />
     </ViewerShell>
 </template>
 
-<script>
+<script setup>
+/**
+ * PotreeViewer - a point cloud (COPC) in Potree 1.8 with its measuring tools (HQ-08: the
+ * measurements live in usePotreeMeasurements and libs/potree/*; the viewer and everything
+ * it creates belong to a PotreeSession, released on leave, HUB-04).
+ */
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
-import { useViewerEntry } from '@/composables/useViewerEntry';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
-import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useViewerEntry } from '@/composables/useViewerEntry';
+import { useDialogs } from '@/composables/useDialogs';
+import { usePreference } from '@/composables/usePreference';
+import { usePotreeMeasurements } from '@/composables/usePotreeMeasurements';
 import { loadResources } from '@/libs/lazy';
-import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
-import { MeasurementStorage } from '@/libs/map/measurementStorage';
-import { createUndoStack } from '@/libs/undoStack';
-import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { isMobile } from '@/libs/responsive';
+import { PREF } from '@/libs/preferences';
+import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
-import { MEASURE_COLOR } from '@/libs/map/mapUtils';
-import { getPref, setPref, PREF } from '@/libs/preferences';
-import { useTimerGroup } from '@/composables/useTimers';
-import { useDialogs } from '@/composables/useDialogs';
-import DialogHost from '@/components/DialogHost.vue';
-import { flash } from '@/composables/useMapAlerts';
 
+defineOptions({ name: 'PotreeViewer' });
 
+const { entry, dataset, canWrite, canDelete, loading, error, entryLoaded } = useViewerEntry({
+    types: [ddb.entry.type.POINTCLOUD], typeLabel: 'a point cloud', title: 'Point Cloud'
+});
+const dialogs = useDialogs();
+const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs });
+const {
+    hasMeasurements, hasSavedMeasurements, savingMeasurements, deleteDialogOpen, deleteToolActive, canUndo, canRedo,
+    undo, redo, toggleDeleteTool, save: saveMeasurements, requestDelete, onDeleteDialogClose
+} = m;
+// Shared with the map's measure control
+const unitPref = usePreference(PREF.MEASURE_UNIT, 'metric');
 
-export default {
-    name: 'PotreeViewer',
-    components: {
-        ViewerShell, DialogHost, ConfirmDialog
-    },
-    setup() {
+const container = ref(null);
+const sidebar = ref(null);
+const loaded = ref(false);
+// Owns the viewer and everything it creates (released on leave)
+let session = new PotreeSession();
+let viewer = null;
+
+// Lengths in the chosen unit, for the viewer, the scene and every existing measure
+function applyUnits() {
+    if (!viewer) return;
+    viewer.setLengthUnit(unitPref.value === 'metric' ? 'm' : 'ft');
+    viewer.scene.lengthUnit = viewer.lengthUnit;
+    viewer.scene.lengthUnitDisplay = viewer.lengthUnitDisplay;
+    for (const measure of viewer.scene.measurements || []) {
+        measure.lengthUnit = viewer.lengthUnit;
+        measure.lengthUnitDisplay = viewer.lengthUnitDisplay;
+        measure.update();
+    }
+    [...(viewer.scene.profiles || []), ...(viewer.scene.volumes || [])].forEach(item => { if (item.update) item.update(); });
+}
+watch(unitPref, applyUnits);
+
+// Scale, offset, bounds and WKT from the COPC header (copc.js)
+async function coordinateSystemOf(copcUrl) {
+    try {
+        const { Copc, Getter } = window.Copc;
+        const copc = await Copc.create(Getter.http(copcUrl));
+        const header = copc.header || {};
+        const cube = (copc.info || {}).cube;
         return {
-            ...useViewerEntry({ types: [ddb.entry.type.POINTCLOUD], typeLabel: 'a point cloud', title: 'Point Cloud' }),
-            later: useTimerGroup(),
-            dialogs: useDialogs()
+            srs: copc.wkt || null,
+            scale: header.scale ? [...header.scale.slice(0, 3)] : [1, 1, 1],
+            offset: header.offset ? [...header.offset.slice(0, 3)] : [0, 0, 0],
+            bounds: cube ? { minx: cube[0], miny: cube[1], minz: cube[2], maxx: cube[3], maxy: cube[4], maxz: cube[5] } : null
         };
-    },
-    data: function () {
-        return {
-            loaded: false,
-            measurementStorage: null,
-            coordinateSystem: null,
-            hasSavedMeasurements: false,
-            savingMeasurements: false,
-
-            // Confirm dialog
-            deleteMeasurementsDialogOpen: false,
-
-            // Track measurement count for reactivity
-            measurementCount: 0,
-
-            // Properties dialog for editing measurements
-            propertiesDialog: null,
-
-            // Undo/redo availability (the history itself is this.history, created())
-            canUndo: false,
-            canRedo: false,
-
-            // Delete tool state
-            deleteToolActive: false,
-            deleteClickHandler: null,
-            deleteToolIcon: null,
-
-            // Unit preference (shared with the map's measure control)
-            unitPref: getPref(PREF.MEASURE_UNIT, 'metric')
-        };
-    },
-
-    computed: {
-        /**
-         * Check if there are any measurements in the viewer
-         */
-        hasMeasurements: function() {
-            return this.measurementCount > 0;
-        }
-    },
-    created: function () {
-        // Replaced by each viewer (loadViewer); one exists from the start so the listener
-        // helpers always have a session to register with
-        this.session = new PotreeSession();
-        // Measurement deletions, undone/redone from the toolbar or Ctrl+Z / Ctrl+Y
-        this.history = createUndoStack({
-            limit: 50,
-            onChange: h => {
-                this.canUndo = h.canUndo();
-                this.canRedo = h.canRedo();
-            }
-        });
-    },
-    mounted: function () {
-        this.entryLoaded.then(ok => { if (ok) this.handleLoad(); });
-    },
-
-    beforeUnmount: function() {
-        // Everything the viewer created goes with it: listeners, render loop, WebGL context,
-        // the jQuery UI sidebar, window.viewer (HUB-04)
-        this.session.dispose();
-        this.viewer = null;
-    },
-
-    methods: {
-
-        /**
-         * Handle unit preference change - updates viewer and all existing measurements
-         */
-        handleUnitChange: function() {
-            // Shared with the map's measure control
-            setPref(PREF.MEASURE_UNIT, this.unitPref);
-
-            // Update Potree viewer unit
-            const unit = this.unitPref === 'metric' ? 'm' : 'ft';
-            this.viewer.setLengthUnit(unit);
-
-            // Propagate length units to scene so addMeasurement() uses correct units
-            this.viewer.scene.lengthUnit = this.viewer.lengthUnit;
-            this.viewer.scene.lengthUnitDisplay = this.viewer.lengthUnitDisplay;
-
-            // Update all existing measurements to reflect new unit
-            if (this.viewer.scene && this.viewer.scene.measurements) {
-                for (const measure of this.viewer.scene.measurements) {
-                    measure.lengthUnit = this.viewer.lengthUnit;
-                    measure.lengthUnitDisplay = this.viewer.lengthUnitDisplay;
-                    measure.update();
-                }
-            }
-
-            // Update profiles if any
-            if (this.viewer.scene && this.viewer.scene.profiles) {
-                for (const profile of this.viewer.scene.profiles) {
-                    if (profile.update) {
-                        profile.update();
-                    }
-                }
-            }
-
-            // Update volumes if any
-            if (this.viewer.scene && this.viewer.scene.volumes) {
-                for (const volume of this.viewer.scene.volumes) {
-                    if (volume.update) {
-                        volume.update();
-                    }
-                }
-            }
-        },
-
-        /**
-         * Setup listeners to track measurement additions/removals
-         */
-        setupMeasurementListeners: function() {
-            if (!this.viewer || !this.viewer.scene) return;
-
-            const scene = this.viewer.scene;
-            const self = this;
-
-            // Helper to count annotations recursively (only valid ones with position)
-            const countAnnotations = (annotations) => {
-                let count = 0;
-                annotations.traverse((annotation) => {
-                    // Only count if annotation has a valid position
-                    if (annotation && annotation.position) {
-                        count++;
-                    }
-                });
-                return count;
-            };
-
-            // Helper to update measurement count
-            const updateCount = () => {
-                const measurements = (scene.measurements ? scene.measurements.length : 0);
-                const profiles = (scene.profiles ? scene.profiles.length : 0);
-                const volumes = (scene.volumes ? scene.volumes.length : 0);
-                const annotations = countAnnotations(scene.annotations);
-                self.measurementCount = measurements + profiles + volumes + annotations;
-            };
-
-            // Listen to measurement events
-            this.session.track(scene, 'measurement_added', updateCount);
-            this.session.track(scene, 'measurement_removed', updateCount);
-            this.session.track(scene, 'profile_added', updateCount);
-            this.session.track(scene, 'profile_removed', updateCount);
-            this.session.track(scene, 'volume_added', updateCount);
-            this.session.track(scene, 'volume_removed', updateCount);
-
-            // Listen to annotation events
-            this.session.track(scene.annotations, 'annotation_added', updateCount);
-
-            // Initial count
-            updateCount();
-        },
-
-        /**
-         * Setup double-click listeners for editing measurements and annotations
-         */
-        setupMeasurementEditListeners: function() {
-            if (!this.viewer || !this.viewer.scene) return;
-
-            const self = this;
-            const renderer = this.viewer.renderer;
-            const scene = this.viewer.scene;
-
-            // Listen for double-click on the render area for measurements
-            this.measurementDblClickHandler = (event) => {
-                // Check if there's an active measurement being drawn
-                // If so, let Potree handle the double-click to finish the measurement
-                const measuringTool = self.viewer.measuringTool;
-                if (measuringTool && measuringTool.activeMeasurement) {
-                    // A measurement is being drawn, don't open dialog
-                    // Let the event propagate to Potree to finish the measurement
-                    return;
-                }
-
-                // Find if we clicked on a completed measurement sphere
-                const measure = self.findMeasurementAtPoint(event);
-                if (measure) {
-                    // Only open dialog for completed measurements
-                    self.openPropertiesDialog(measure);
-                }
-            };
-            this.session.track(renderer.domElement, 'dblclick', this.measurementDblClickHandler);
-
-            // Setup listeners for annotations (they have HTML domElements)
-            this.setupAnnotationEditListeners();
-
-            // Listen for new annotations being added
-            this.session.track(scene.annotations, 'annotation_added', (e) => {
-                self.addAnnotationEditListener(e.annotation);
-            });
-        },
-
-        /**
-         * Setup double-click listeners for existing annotations
-         */
-        setupAnnotationEditListeners: function() {
-            const self = this;
-            const annotations = this.viewer.scene.annotations;
-
-            // Traverse all annotations and add listeners
-            annotations.traverse(annotation => {
-                self.addAnnotationEditListener(annotation);
-            });
-        },
-
-        /**
-         * Add double-click listener to a single annotation
-         */
-        addAnnotationEditListener: function(annotation) {
-            const self = this;
-
-            // Verify annotation is valid
-            if (!annotation || !annotation.position) {
-                console.warn('Invalid annotation, skipping edit listener');
-                return;
-            }
-
-            // Potree annotations store domElement as a jQuery object — unwrap to get the raw
-            // HTMLElement for querySelector and addEventListener
-            const domElement = annotation.domElement;
-            const el = domElement.jquery ? domElement[0] : domElement;
-            if (!el || !(el instanceof HTMLElement)) return;
-
-            // Look for the title element (usually has class 'annotation-titlebar' or similar)
-            const titleElement = el.querySelector('.annotation-titlebar') ||
-                                 el.querySelector('[id$="-titlebar"]') ||
-                                 el;
-
-            // Remove existing listener to avoid duplicates
-            if (annotation._editHandler) {
-                this.session.untrack(titleElement, 'dblclick', annotation._editHandler);
-            }
-
-            // Create and store handler
-            annotation._editHandler = (event) => {
-                event.stopPropagation();
-                event.preventDefault();
-                self.openAnnotationPropertiesDialog(annotation);
-            };
-
-            this.session.track(titleElement, 'dblclick', annotation._editHandler);
-        },
-
-        /**
-         * Open properties dialog for an annotation (dedicated annotation dialog, not the map measurement one)
-         */
-        openAnnotationPropertiesDialog: function(annotation) {
-            // Close any existing dialog
-            this.closePropertiesDialog();
-
-            const self = this;
-            this._dialog = this.dialogs.open(AnnotationPropertiesDialog, {
-                annotation,
-                showDelete: true,
-                onOnSave: (properties) => {
-                    // Update annotation properties
-                    if (properties.name !== undefined) {
-                        annotation.title = properties.name;
-                    }
-                    if (properties.description !== undefined) {
-                        annotation.description = properties.description;
-                    }
-
-                    // Update visual label for the annotation
-                    self.updateAnnotationLabel(annotation);
-                },
-                onOnClose: () => {
-                    self._dialog = null;
-                },
-                onOnDelete: () => {
-                    self.viewer.scene.annotations.remove(annotation);
-                    self.measurementCount--;
-                },
-            });
-        },
-
-        /**
-         * Find measurement at click point using raycasting
-         */
-        findMeasurementAtPoint: function(event) {
-            const renderer = this.viewer.renderer;
-            const camera = this.viewer.scene.getActiveCamera();
-            const measurements = this.viewer.scene.measurements || [];
-
-            // Get mouse position in normalized device coordinates
-            const rect = renderer.domElement.getBoundingClientRect();
-            const mouse = new THREE.Vector2(
-                ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                -((event.clientY - rect.top) / rect.height) * 2 + 1
-            );
-
-            // Create raycaster
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(mouse, camera);
-            raycaster.params.Points = { threshold: 5 };
-
-            // Check each measurement's spheres
-            for (const measure of measurements) {
-                if (measure.spheres && measure.spheres.length > 0) {
-                    const intersects = raycaster.intersectObjects(measure.spheres, true);
-                    if (intersects.length > 0) {
-                        return measure;
-                    }
-                }
-            }
-
-            return null;
-        },
-
-        /**
-         * Open properties dialog for a measurement
-         */
-        openPropertiesDialog: function(measure) {
-            // Close any existing dialog
-            this.closePropertiesDialog();
-
-            // Determine geometry type based on measurement
-            const geometryType = (measure.showArea && measure.closed) ? 'Polygon' : 'LineString';
-
-            // Create a wrapper object that mimics OpenLayers Feature interface
-            const featureWrapper = {
-                get: (prop) => {
-                    switch(prop) {
-                        case 'name': return measure.name || '';
-                        case 'description': return measure.description || '';
-                        case 'stroke': return '#' + (measure.color ? measure.color.getHexString() : 'ffcc33');
-                        case 'stroke-width': return measure.strokeWidth || 2;
-                        case 'stroke-opacity': return measure.strokeOpacity ?? 1;
-                        case 'fill': return '#' + (measure.fillColor ? measure.fillColor.getHexString() : (measure.color ? measure.color.getHexString() : 'ffcc33'));
-                        case 'fill-opacity': return measure.fillOpacity ?? 0.2;
-                        default: return null;
-                    }
-                }
-            };
-
-            const self = this;
-            this._dialog = this.dialogs.open(MeasurementPropertiesDialog, {
-                feature: featureWrapper,
-                geometryType: geometryType,
-                onOnSave: (properties) => {
-                    // Update measurement properties
-                    if (properties.name !== undefined) {
-                        measure.name = properties.name;
-                    }
-                    if (properties.description !== undefined) {
-                        measure.description = properties.description;
-                    }
-                    if (properties.stroke) {
-                        measure.color = new THREE.Color(properties.stroke);
-                    }
-                    if (properties['stroke-width'] !== undefined) {
-                        measure.strokeWidth = properties['stroke-width'];
-                    }
-                    if (properties['stroke-opacity'] !== undefined) {
-                        measure.strokeOpacity = properties['stroke-opacity'];
-                    }
-                    if (properties['fill-opacity'] !== undefined) {
-                        measure.fillOpacity = properties['fill-opacity'];
-                    }
-                    if (properties.fill) {
-                        measure.fillColor = new THREE.Color(properties.fill);
-                    }
-
-                    // Apply fill color and opacity to area mesh (for polygon measurements)
-                    self.applyAreaFillProperties(measure);
-
-                    // Update the label in the viewer if exists
-                    if (measure.sphereLabels && measure.sphereLabels.length > 0) {
-                        // Potree uses edgeLabels for distances, update color
-                        if (measure.edgeLabels) {
-                            measure.edgeLabels.forEach(label => {
-                                if (label.element) {
-                                    label.element.style.color = properties.stroke;
-                                }
-                            });
-                        }
-                    }
-
-                    // Apply stroke-width to measurement lines
-                    if (measure.edges && properties['stroke-width'] !== undefined) {
-                        measure.edges.forEach(edge => {
-                            if (edge.material && edge.material.linewidth !== undefined) {
-                                edge.material.linewidth = properties['stroke-width'];
-                                edge.material.needsUpdate = true;
-                            }
-                        });
-                    }
-
-                    // Apply color to spheres (for all measurement types including circle, angle, azimuth)
-                    if (measure.spheres && properties.stroke) {
-                        const color = new THREE.Color(properties.stroke);
-                        measure.spheres.forEach(sphere => {
-                            if (sphere.material) {
-                                sphere.material.color = color;
-                                sphere.material.needsUpdate = true;
-                            }
-                        });
-                    }
-
-                    // Apply color and stroke-width to circle geometry (for circle measurements)
-                    if (measure.circleGeometry && properties.stroke) {
-                        const color = new THREE.Color(properties.stroke);
-                        if (measure.circleLine && measure.circleLine.material) {
-                            measure.circleLine.material.color = color;
-                            if (properties['stroke-width'] !== undefined && measure.circleLine.material.linewidth !== undefined) {
-                                measure.circleLine.material.linewidth = properties['stroke-width'];
-                            }
-                            measure.circleLine.material.needsUpdate = true;
-                        }
-                    }
-
-                    // Apply color to angle/azimuth lines
-                    if (measure.angleLine && properties.stroke) {
-                        const color = new THREE.Color(properties.stroke);
-                        if (measure.angleLine.material) {
-                            measure.angleLine.material.color = color;
-                            if (properties['stroke-width'] !== undefined && measure.angleLine.material.linewidth !== undefined) {
-                                measure.angleLine.material.linewidth = properties['stroke-width'];
-                            }
-                            measure.angleLine.material.needsUpdate = true;
-                        }
-                    }
-
-                    // Apply color to all child Line2 objects (generic approach for all measurement types)
-                    measure.traverse((child) => {
-                        if (child.material && child.isLine2) {
-                            if (properties.stroke) {
-                                child.material.color = new THREE.Color(properties.stroke);
-                            }
-                            if (properties['stroke-width'] !== undefined && child.material.linewidth !== undefined) {
-                                child.material.linewidth = properties['stroke-width'];
-                            }
-                            child.material.needsUpdate = true;
-                        }
-                    });
-
-                    // Update visual name label for the measurement
-                    self.updateMeasurementNameLabel(measure);
-                },
-                onOnClose: () => {
-                    self._dialog = null;
-                }
-            });
-        },
-
-        /**
-         * Close properties dialog
-         */
-        closePropertiesDialog: function() {
-            if (this._dialog) {
-                this._dialog.close();
-                this._dialog = null;
-            }
-        },
-
-        /**
-         * Create or update a name label for a measurement
-         * Position depends on type: line→beside center, area→centroid, point→above
-         */
-        updateMeasurementNameLabel: function(measure) {
-            const self = this;
-
-            // Remove existing label if present
-            if (measure._nameLabel) {
-                measure.remove(measure._nameLabel);
-                measure._nameLabel = null;
-            }
-            if (measure._nameLabelTooltip) {
-                document.body.removeChild(measure._nameLabelTooltip);
-                measure._nameLabelTooltip = null;
-            }
-            // Clean up update handler
-            if (measure._labelUpdateHandler && this.viewer) {
-                this.session.untrack(this.viewer, 'update', measure._labelUpdateHandler);
-                measure._labelUpdateHandler = null;
-            }
-            // Clean up tooltip hover handler
-            if (measure._tooltipHoverHandler && this.viewer && this.viewer.renderer) {
-                this.session.untrack(this.viewer.renderer.domElement, 'mousemove', measure._tooltipHoverHandler);
-                measure._tooltipHoverHandler = null;
-            }
-
-            // Only create label if name is set
-            if (!measure.name || measure.name.trim() === '') {
-                return;
-            }
-
-            // Calculate position based on measurement type
-            const points = measure.points;
-            if (!points || points.length === 0) return;
-
-            let labelPosition = new THREE.Vector3();
-            let offset = new THREE.Vector3(0, 0, 0);
-
-            if (measure.showArea && measure.closed && points.length >= 3) {
-                // Area: position at centroid (same height as average of points)
-                points.forEach(p => labelPosition.add(p.position));
-                labelPosition.divideScalar(points.length);
-            } else if (points.length === 1) {
-                // Single point: position slightly beside the point (not above)
-                labelPosition.copy(points[0].position);
-                offset.set(0.5, 0.5, 0); // Small lateral offset, no vertical
-            } else if (points.length >= 2) {
-                // Line: position beside the center point (same height)
-                if (points.length === 2) {
-                    // For 2 points, position at midpoint with small lateral offset
-                    labelPosition.copy(points[0].position).add(points[1].position).divideScalar(2);
-                    // Calculate perpendicular offset (small, in XY plane)
-                    const dir = new THREE.Vector3().subVectors(points[1].position, points[0].position).normalize();
-                    const up = new THREE.Vector3(0, 0, 1);
-                    const lateral = new THREE.Vector3().crossVectors(dir, up).normalize();
-                    offset.copy(lateral).multiplyScalar(0.3); // Small offset
-                } else {
-                    const midIndex = Math.floor(points.length / 2);
-                    labelPosition.copy(points[midIndex].position);
-                    offset.set(0.3, 0, 0); // Small lateral offset
-                }
-            }
-
-            labelPosition.add(offset);
-
-            // Create TextSprite for the name
-            const label = new Potree.TextSprite(measure.name);
-            label.setTextColor({ r: 255, g: 255, b: 255, a: 1.0 });
-            label.setBorderColor({ r: 0, g: 0, b: 0, a: 1.0 });
-            label.setBackgroundColor({ r: 0, g: 0, b: 0, a: 0.7 });
-            label.fontsize = 16;
-            label.material.depthTest = false;
-            label.material.opacity = 1;
-            label.position.copy(labelPosition);
-
-            // Store the base scale factor for constant screen size
-            label._baseScale = 0.30;
-
-            // Function to update scale based on camera distance for constant screen size
-            const updateLabelScale = () => {
-                if (!measure._nameLabel || !self.viewer) return;
-
-                const camera = self.viewer.scene.getActiveCamera();
-                const distance = camera.position.distanceTo(label.position);
-
-                // Scale proportionally to distance to maintain constant screen size
-                const scale = distance * label._baseScale * 0.02; // 0.02 is a tuning factor
-                label.scale.set(scale, scale, scale);
-            };
-
-            // Initial scale
-            updateLabelScale();
-
-            // Store update function for later cleanup
-            measure._labelScaleUpdater = updateLabelScale;
-
-            // Update scale on every frame
-            const updateHandler = () => {
-                if (measure._nameLabel) {
-                    updateLabelScale();
-                }
-            };
-            self.session.track(self.viewer, 'update', updateHandler);
-            measure._labelUpdateHandler = updateHandler;
-
-            measure._nameLabel = label;
-            measure.add(label);
-
-            // Create tooltip for description (popup on hover)
-            if (measure.description && measure.description.trim() !== '') {
-                const tooltip = document.createElement('div');
-                tooltip.className = 'potree-measurement-tooltip ddb-tooltip ddb-tooltip--dark';
-                tooltip.innerHTML = `<strong>${measure.name}</strong><br>${measure.description}`;
-                tooltip.style.cssText = `
-                    position: fixed;
-                    display: none;
-                `;
-                document.body.appendChild(this.session.adopt(tooltip));
-                measure._nameLabelTooltip = tooltip;
-
-                // Update tooltip position on render
-                const updateTooltipPosition = () => {
-                    if (!measure._nameLabel || !measure._nameLabelTooltip) return;
-
-                    const camera = self.viewer.scene.getActiveCamera();
-                    const renderer = self.viewer.renderer;
-
-                    // Project label position to screen
-                    const screenPos = label.position.clone().project(camera);
-                    const rect = renderer.domElement.getBoundingClientRect();
-
-                    const x = ((screenPos.x + 1) / 2) * rect.width + rect.left;
-                    const y = ((-screenPos.y + 1) / 2) * rect.height + rect.top;
-
-                    tooltip.style.left = (x + 15) + 'px';
-                    tooltip.style.top = (y - 10) + 'px';
-                };
-
-                // Show tooltip on hover over label sprite
-                label.onMouseOver = () => {
-                    updateTooltipPosition();
-                    tooltip.style.display = 'block';
-                };
-                label.onMouseOut = () => {
-                    tooltip.style.display = 'none';
-                };
-
-                // Alternative: use mousemove on render area to detect hover
-                const domElement = this.viewer.renderer.domElement;
-                const hoverHandler = (event) => {
-                    if (!measure._nameLabel) return;
-
-                    const camera = self.viewer.scene.getActiveCamera();
-                    const rect = domElement.getBoundingClientRect();
-                    const mouse = new THREE.Vector2(
-                        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-                        -((event.clientY - rect.top) / rect.height) * 2 + 1
-                    );
-
-                    const raycaster = new THREE.Raycaster();
-                    raycaster.setFromCamera(mouse, camera);
-
-                    // Check intersection with label
-                    const intersects = raycaster.intersectObject(measure._nameLabel, true);
-                    if (intersects.length > 0) {
-                        updateTooltipPosition();
-                        tooltip.style.display = 'block';
-                    } else if (tooltip.style.display !== 'none') {
-                        tooltip.style.display = 'none';
-                    }
-                };
-
-                this.session.track(domElement, 'mousemove', hoverHandler);
-                measure._tooltipHoverHandler = hoverHandler;
-            }
-        },
-
-        /**
-         * Update annotation label (annotations already show title, just handle description tooltip)
-         */
-        updateAnnotationLabel: function(annotation) {
-            // Remove existing tooltip
-            if (annotation._descriptionTooltip) {
-                document.body.removeChild(annotation._descriptionTooltip);
-                annotation._descriptionTooltip = null;
-            }
-
-            // Create description tooltip if description is set
-            if (annotation.description && annotation.description.trim() !== '') {
-                // Potree annotations store domElement as a jQuery object — unwrap for native events
-                const domElement = annotation.domElement;
-                const el = domElement.jquery ? domElement[0] : domElement;
-                if (!el || !(el instanceof HTMLElement)) return;
-
-                const tooltip = document.createElement('div');
-                tooltip.className = 'potree-annotation-tooltip ddb-tooltip ddb-tooltip--dark';
-                tooltip.innerHTML = annotation.description;
-                tooltip.style.cssText = `
-                    position: fixed;
-                    display: none;
-                `;
-                document.body.appendChild(this.session.adopt(tooltip));
-                annotation._descriptionTooltip = tooltip;
-
-                // Show on hover
-                this.session.track(el, 'mouseenter', (e) => {
-                    tooltip.style.left = (e.clientX + 15) + 'px';
-                    tooltip.style.top = (e.clientY - 10) + 'px';
-                    tooltip.style.display = 'block';
-                });
-                this.session.track(el, 'mousemove', (e) => {
-                    tooltip.style.left = (e.clientX + 15) + 'px';
-                    tooltip.style.top = (e.clientY - 10) + 'px';
-                });
-                this.session.track(el, 'mouseleave', () => {
-                    tooltip.style.display = 'none';
-                });
-            }
-        },
-
-        /**
-         * Apply visual properties to a loaded measurement (stroke-width, color, name label)
-         */
-        applyMeasurementVisualProperties: function(measure) {
-            // Apply stroke-width to edges
-            if (measure.edges && measure.strokeWidth) {
-                measure.edges.forEach(edge => {
-                    if (edge.material && edge.material.linewidth !== undefined) {
-                        edge.material.linewidth = measure.strokeWidth;
-                        edge.material.needsUpdate = true;
-                    }
-                });
-            }
-
-            // Apply color to spheres (for all measurement types)
-            if (measure.spheres && measure.color) {
-                measure.spheres.forEach(sphere => {
-                    if (sphere.material) {
-                        sphere.material.color = measure.color;
-                        sphere.material.needsUpdate = true;
-                    }
-                });
-            }
-
-            // Apply color and stroke-width to all child Line2 objects
-            if (measure.color || measure.strokeWidth) {
-                measure.traverse((child) => {
-                    if (child.material && child.isLine2) {
-                        if (measure.color) {
-                            child.material.color = measure.color;
-                        }
-                        if (measure.strokeWidth && child.material.linewidth !== undefined) {
-                            child.material.linewidth = measure.strokeWidth;
-                        }
-                        child.material.needsUpdate = true;
-                    }
-                });
-            }
-
-            // Create name label if name is set
-            if (measure.name && measure.name.trim() !== '') {
-                this.updateMeasurementNameLabel(measure);
-            }
-
-            // Apply fill properties to area measurements
-            this.applyAreaFillProperties(measure);
-        },
-
-        /**
-         * Apply fill color and opacity to area mesh (for polygon measurements)
-         */
-        applyAreaFillProperties: function(measure) {
-            // Only apply to area measurements
-            if (!measure.showArea || !measure.closed) {
-                return;
-            }
-
-            const fillColor = measure.fillColor || measure.color;
-            const fillOpacity = measure.fillOpacity ?? 0.2;
-
-            // Find and update the area mesh material
-            measure.traverse((child) => {
-                // Potree area measurements use a Mesh for the filled polygon
-                if (child.isMesh && child.material) {
-                    if (fillColor) {
-                        child.material.color = fillColor.clone();
-                    }
-                    child.material.opacity = fillOpacity;
-                    child.material.transparent = true;
-                    child.material.needsUpdate = true;
-                }
-            });
-        },
-
-        handleLoad: async function () {
-            try {
-                this.loading = true;
-
-                // One request wave: every file downloads in parallel, the scripts run in this
-                // order (they depend on each other) - instead of 18 round trips one after the other
-                await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
-                fixPotreePaths(window.Potree, window.location.origin);
-
-                await this.loadViewer();
-
-            } catch (e) {
-                this.error = e.message;
-            } finally {
-                this.loading = false;
-            }
-        },
-        loadViewer: async function () {
-            this.error = "";
-
-            // A previous viewer of this component is released completely first
-            this.session.dispose();
-            this.viewer = null;
-            this.session = new PotreeSession();
-
-            let viewer = this.session.create(() => new Potree.Viewer(this.$refs.container),
-                [this.$refs.container, this.$refs.sidebar]);
-
-            viewer.toggleSidebar = () => {
-                let renderArea = this.$refs.container;
-                let isVisible = renderArea.style.right === 'var(--ddb-sidebar-width)';
-
-                if (isVisible) {
-                    renderArea.style.right = '0';
-                } else {
-                    renderArea.style.right = 'var(--ddb-sidebar-width)';
-                }
-            };
-            viewer.setEDLEnabled(false);
-            viewer.setFOV(60);
-            viewer.setPointBudget(pointBudgetFor(navigator.deviceMemory, isMobile()));
-
-            // Apply the stored unit preference
-            viewer.setLengthUnit(this.unitPref === 'metric' ? 'm' : 'ft');
-
-            // Propagate length units to scene so addMeasurement() uses correct units
-            viewer.scene.lengthUnit = viewer.lengthUnit;
-            viewer.scene.lengthUnitDisplay = viewer.lengthUnitDisplay;
-
-            // Set Splat Quality based on device: HQ for desktop, Standard for mobile
-            viewer.useHQ = !isMobile();
-
-            const self = this;
-            viewer.loadGUI(() => {
-                viewer.setLanguage('en');
-                $("#menu_tools").next().show();
-                // viewer.toggleSidebar();
-
-                // Add delete measurement tool to the Potree toolbar
-                const elToolbar = $('#tools');
-                if (elToolbar.length > 0) {
-                    /* const deleteIcon = $(`
-                        <img src="${Potree.resourcePath}/icons/remove.svg"
-                            style="width: 32px; height: 32px"
-                            class="button-icon"
-                            title="Delete measurement (click to remove)" />
-                    `);*/
-                    const deleteIcon = $('<div style="width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="fa-solid fa-trash" style="font-size: x-large; margin: 0"></i></div>');
-                    deleteIcon.click(() => {
-                        self.toggleDeleteTool();
-                        // Update visual feedback on the icon
-                        if (self.deleteToolActive) {
-                            deleteIcon.css('background-color', 'rgba(231, 76, 60, 0.5)');
-                            deleteIcon.css('border-radius', 'var(--ddb-radius-sm)');
-                        } else {
-                            deleteIcon.css('background-color', '');
-                        }
-                    });
-                    elToolbar.append(deleteIcon);
-
-                    // Store reference to update icon state from deactivateDeleteTool
-                    self.deleteToolIcon = deleteIcon;
-                }
-            });
-
-            viewer.scene.scene.add(new THREE.AmbientLight(0x404040, 2.0)); // soft white light );
-            viewer.scene.scene.add(new THREE.DirectionalLight(0xcccccc, 0.5));
-
-            const directional = new THREE.DirectionalLight(0xcccccc, 0.5);
-            directional.position.z = 99999999999;
-            viewer.scene.scene.add(directional);
-
-            this.loaded = true;
-            this.viewer = viewer;
-
-            // Setup measurement tracking listeners
-            this.setupMeasurementListeners();
-
-            // Setup double-click listeners for editing measurements
-            this.setupMeasurementEditListeners();
-
-            // Setup undo/redo keyboard shortcuts
-            this.setupUndoRedoKeyboardShortcuts();
-
-            await this.addPointCloud(this.dataset.Entry(this.entry));
-            this.viewer.fitToScreen();
-
-            // Load saved measurements automatically
-            await this.loadMeasurements();
-
-            window.viewer = viewer;
-            // if (pointCloudFiles.length === 0) this.error = "No point cloud files selected. Select one or more point cloud files to display them.";
-        },
-
-        addPointCloud: async function (entry) {
-            let copcUrl;
-            try {
-                copcUrl = await entry.getCopc();
-
-                // Load coordinate system
-                this.coordinateSystem = await this.getCoordinateSystem(copcUrl);
-                console.log('Coordinate system:', this.coordinateSystem);
-            } catch (e) {
-                throw new Error(`${entry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`, { cause: e });
-            }
-
-            const basename = ddb.pathutils.basename(entry.path);
-            await new Promise((resolve, reject) => {
-                Potree.loadPointCloud(copcUrl, basename, e => {
-                    if (e.type == "loading_failed") {
-                        reject(new Error(`Unable to load ${entry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
-                        return;
-                    }
-
-                    this.viewer.scene.addPointCloud(e.pointcloud);
-                    e.pointcloud.material.size = 1;
-
-                    resolve();
-                });
-            });
-        },
-
-        /**
-         * Load the coordinate system from a COPC file by reading its header via copc.js
-         */
-        getCoordinateSystem: async function(copcUrl) {
-            try {
-                const { Copc, Getter } = window.Copc;
-                const getter = Getter.http(copcUrl);
-                const copc = await Copc.create(getter);
-
-                // copc.header has scale/offset; copc.info has cube/gpsTimeRange; wkt comes from copc.wkt
-                const header = copc.header || {};
-                const info = copc.info || {};
-                const cube = info.cube; // [minX, minY, minZ, maxX, maxY, maxZ]
-                const bounds = cube
-                    ? { minx: cube[0], miny: cube[1], minz: cube[2], maxx: cube[3], maxy: cube[4], maxz: cube[5] }
-                    : null;
-
-                return {
-                    srs: copc.wkt || null,
-                    scale: header.scale ? [header.scale[0], header.scale[1], header.scale[2]] : [1, 1, 1],
-                    offset: header.offset ? [header.offset[0], header.offset[1], header.offset[2]] : [0, 0, 0],
-                    bounds: bounds
-                };
-            } catch (e) {
-                console.warn('Could not load coordinate system from COPC:', e);
-                // Fallback
-                return {
-                    srs: null,
-                    scale: [1, 1, 1],
-                    offset: [0, 0, 0],
-                    bounds: null
-                };
-            }
-        },
-
-        /**
-         * Load saved measurements
-         */
-        loadMeasurements: async function() {
-            if (!this.measurementStorage) {
-                this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
-            }
-
-            try {
-                // Check if saved measurements exist
-                const geojson = await this.measurementStorage.load();
-
-                if (geojson && geojson.features && geojson.features.length > 0) {
-                    // Import measurements into viewer
-                    const imported = importMeasurements(geojson, this.viewer, this.coordinateSystem);
-
-                    // Apply visual properties (stroke-width, name labels) to loaded measurements
-                    // Need to wait a bit for Potree to fully initialize the measurement geometry
-                    const self = this;
-                    this.later(() => {
-                        if (imported && imported.length > 0) {
-                            imported.forEach(item => {
-                                // Ensure measurements have correct unit settings from viewer
-                                if (item.edges) {
-                                    // It's a measurement - apply units and visual properties
-                                    item.lengthUnit = self.viewer.lengthUnit;
-                                    item.lengthUnitDisplay = self.viewer.lengthUnitDisplay;
-                                    item.update();
-                                    self.applyMeasurementVisualProperties(item);
-                                } else if (item.description) {
-                                    // It's an annotation with description
-                                    self.updateAnnotationLabel(item);
-                                }
-                            });
-                        }
-                    }, 500);
-
-                    this.hasSavedMeasurements = true;
-                    console.log(`Loaded ${geojson.features.length} measurements`);
-
-                    // Show info message to user
-                    this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} loaded`, 'positive', 'fa-regular fa-circle-check');
-                }
-            } catch (e) {
-                console.error('Error loading measurements:', e);
-                this.error = `Could not load measurements: ${e.message}`;
-            }
-        },
-
-        /**
-         * Save current measurements
-         */
-        saveMeasurements: async function() {
-            // Check write permissions first
-            if (!this.canWrite) {
-                this.error = 'You do not have permission to save measurements in this dataset';
-                return;
-            }
-
-            if (!this.viewer || !this.viewer.scene) {
-                this.error = 'Viewer not ready';
-                return;
-            }
-
-            this.savingMeasurements = true;
-            this.error = '';
-
-            try {
-                // Export measurements in GeoJSON format
-                const geojson = exportMeasurements(
-                    this.viewer,
-                    this.entry.path,
-                    this.coordinateSystem
-                );
-
-                if (!geojson.features || geojson.features.length === 0) {
-                    this.error = 'No measurements to save';
-                    this.savingMeasurements = false;
-                    return;
-                }
-
-                // Save the file
-                if (!this.measurementStorage) {
-                    this.measurementStorage = new MeasurementStorage(this.dataset, this.entry);
-                }
-
-                await this.measurementStorage.save(geojson, {
-                    ownedTypes: MeasurementStorage.POTREE_OWNED_TYPES
-                });
-
-                this.hasSavedMeasurements = true;
-
-                // Show success message
-                this.showFlash(`${geojson.features.length} measurement${geojson.features.length > 1 ? 's' : ''} saved successfully`, 'positive', 'fa-regular fa-circle-check');
-
-                console.log('Measurements saved successfully');
-            } catch (e) {
-                console.error('Error saving measurements:', e);
-                this.error = `Failed to save measurements: ${e.message}`;
-            } finally {
-                this.savingMeasurements = false;
-            }
-        },
-
-        /**
-         * Delete saved measurements
-         */
-        deleteSavedMeasurements: function() {
-            if (!this.measurementStorage) {
-                return;
-            }
-
-            // Open confirmation dialog
-            this.deleteMeasurementsDialogOpen = true;
-        },
-
-        /**
-         * Handle delete measurements dialog close
-         */
-        handleDeleteMeasurementsDialogClose: async function(result) {
-            this.deleteMeasurementsDialogOpen = false;
-
-            if (result !== 'confirm') {
-                return;
-            }
-
-            try {
-                await this.measurementStorage.delete();
-                this.hasSavedMeasurements = false;
-                this.showFlash('Saved measurements deleted successfully', 'positive', 'fa-regular fa-circle-check');
-            } catch (e) {
-                console.error('Error deleting measurements:', e);
-                this.error = `Failed to delete measurements: ${e.message}`;
-            }
-        },
-
-        // Short notice (shared with the map viewers)
-        showFlash: flash,
-
-        // ---- Undo/Redo System ----
-
-        /**
-         * Push a measurement to the undo stack (for deletion operations)
-         * Stores the measurement data needed to recreate it
-         */
-        pushToUndoStack: function(measure, actionType = 'delete') {
-            const measureData = {
-                actionType: actionType,
-                name: measure.name,
-                color: measure.color ? '#' + measure.color.getHexString() : MEASURE_COLOR,
-                showDistances: measure.showDistances,
-                showCoordinates: measure.showCoordinates,
-                showArea: measure.showArea,
-                showAngles: measure.showAngles,
-                showCircle: measure.showCircle,
-                showHeight: measure.showHeight,
-                showEdges: measure.showEdges,
-                closed: measure.closed,
-                points: measure.points.map(p => ({
-                    x: p.position.x,
-                    y: p.position.y,
-                    z: p.position.z
-                }))
-            };
-
-            this.history.push(measureData);
-        },
-
-        /**
-         * Recreate a measurement from stored data
-         */
-        recreateMeasurement: function(measureData) {
-            if (!this.viewer || !this.viewer.scene) return null;
-
-            const measure = new Potree.Measure();
-            measure.name = measureData.name || 'Measure';
-            measure.showDistances = measureData.showDistances !== undefined ? measureData.showDistances : true;
-            measure.showCoordinates = measureData.showCoordinates || false;
-            measure.showArea = measureData.showArea || false;
-            measure.showAngles = measureData.showAngles || false;
-            measure.showCircle = measureData.showCircle || false;
-            measure.showHeight = measureData.showHeight || false;
-            measure.showEdges = measureData.showEdges !== undefined ? measureData.showEdges : true;
-            measure.closed = measureData.closed !== undefined ? measureData.closed : true;
-
-            if (measureData.color) {
-                measure.color = new THREE.Color(measureData.color);
-            }
-
-            // Add points
-            measureData.points.forEach(p => {
-                const position = new THREE.Vector3(p.x, p.y, p.z);
-                measure.addMarker({ position: position });
-            });
-
-            return measure;
-        },
-
-        /**
-         * Undo last action
-         */
-        undo: function() {
-            const measureData = this.history.undo();
-            if (!measureData) return;
-
-            if (measureData.actionType === 'delete') {
-                // Recreate the deleted measurement
-                const measure = this.recreateMeasurement(measureData);
-                if (measure) {
-                    this.viewer.scene.addMeasurement(measure);
-                    this.showFlash('Measurement restored', 'positive', 'fa-solid fa-rotate-left');
-                }
-            }
-
-        },
-
-        /**
-         * Redo last undone action
-         */
-        redo: function() {
-            const measureData = this.history.redo();
-            if (!measureData) return;
-
-            if (measureData.actionType === 'delete') {
-                // Find and delete the measurement again
-                const measurements = this.viewer.scene.measurements || [];
-
-                // Find measurement by matching points (since UUID changes on recreate)
-                for (const measure of measurements) {
-                    if (this.measurementsMatch(measure, measureData)) {
-                        this.viewer.scene.removeMeasurement(measure);
-                        this.showFlash('Measurement deleted', 'positive', 'fa-solid fa-rotate-right');
-                        break;
-                    }
-                }
-            }
-        },
-
-        /**
-         * Check if a measurement matches stored data (by comparing points)
-         */
-        measurementsMatch: function(measure, measureData) {
-            if (!measure.points || measure.points.length !== measureData.points.length) {
-                return false;
-            }
-
-            for (let i = 0; i < measure.points.length; i++) {
-                const p1 = measure.points[i].position;
-                const p2 = measureData.points[i];
-                const epsilon = 0.001;
-
-                if (Math.abs(p1.x - p2.x) > epsilon ||
-                    Math.abs(p1.y - p2.y) > epsilon ||
-                    Math.abs(p1.z - p2.z) > epsilon) {
-                    return false;
-                }
-            }
-
-            return true;
-        },
-
-        // ---- Delete Tool ----
-
-        /**
-         * Toggle the delete measurement tool
-         */
-        toggleDeleteTool: function() {
-            if (this.deleteToolActive) {
-                this.deactivateDeleteTool();
-            } else {
-                this.activateDeleteTool();
-            }
-        },
-
-        /**
-         * Activate the delete measurement tool
-         */
-        activateDeleteTool: function() {
-            if (!this.viewer || !this.viewer.renderer) return;
-
-            // Cancel any active Potree insertion (ruler, profile, clipping, etc.)
-            this.viewer.dispatchEvent({ type: 'cancel_insertions' });
-
-            this.deleteToolActive = true;
-            const renderer = this.viewer.renderer;
-
-            // Change cursor to indicate delete mode
-            renderer.domElement.style.cursor = 'crosshair';
-
-            // Deactivate when any other Potree tool starts
-            const self = this;
-            this.cancelInsertionsHandler = () => self.deactivateDeleteTool();
-            this.session.track(this.viewer, 'cancel_insertions', this.cancelInsertionsHandler);
-
-            // Create click handler
-            this.deleteClickHandler = (event) => {
-                // Prevent if right-click
-                if (event.button !== 0) return;
-
-                const measure = self.findMeasurementAtPoint(event);
-                if (measure) {
-                    // Save to undo stack before deleting
-                    self.pushToUndoStack(measure, 'delete');
-
-                    // Remove the measurement
-                    self.viewer.scene.removeMeasurement(measure);
-                    self.showFlash('Measurement deleted (Ctrl+Z to undo)', 'warning', 'fa-solid fa-trash');
-                }
-                // Tool stays active for multiple deletions
-            };
-
-            this.session.track(renderer.domElement, 'click', this.deleteClickHandler);
-
-            // ESC key to deactivate
-            this.deleteKeyHandler = (event) => {
-                if (event.key === 'Escape') {
-                    self.deactivateDeleteTool();
-                }
-            };
-            this.session.track(document, 'keydown', this.deleteKeyHandler);
-
-            this.showFlash('Delete tool active - Click on measurements to delete. Press ESC to exit.', 'info', 'fa-solid fa-trash');
-        },
-
-        /**
-         * Deactivate the delete measurement tool
-         */
-        deactivateDeleteTool: function() {
-            if (!this.viewer || !this.viewer.renderer) return;
-
-            this.deleteToolActive = false;
-            const renderer = this.viewer.renderer;
-
-            // Reset cursor
-            renderer.domElement.style.cursor = '';
-
-            // Remove click handler
-            if (this.deleteClickHandler) {
-                this.session.untrack(renderer.domElement, 'click', this.deleteClickHandler);
-                this.deleteClickHandler = null;
-            }
-
-            // Remove ESC key handler
-            if (this.deleteKeyHandler) {
-                this.session.untrack(document, 'keydown', this.deleteKeyHandler);
-                this.deleteKeyHandler = null;
-            }
-
-            // Remove cancel_insertions listener
-            if (this.cancelInsertionsHandler) {
-                this.session.untrack(this.viewer, 'cancel_insertions', this.cancelInsertionsHandler);
-                this.cancelInsertionsHandler = null;
-            }
-
-            // Reset Potree toolbar icon state
-            if (this.deleteToolIcon) {
-                this.deleteToolIcon.css('background-color', '');
-            }
-        },
-
-        /**
-         * Setup keyboard shortcuts for undo/redo
-         */
-        setupUndoRedoKeyboardShortcuts: function() {
-            const self = this;
-
-            this.undoRedoKeyHandler = (event) => {
-                // Check if Ctrl (or Cmd on Mac) is pressed
-                if (event.ctrlKey || event.metaKey) {
-                    if (event.key === 'z' || event.key === 'Z') {
-                        event.preventDefault();
-                        self.undo();
-                    } else if (event.key === 'y' || event.key === 'Y') {
-                        event.preventDefault();
-                        self.redo();
-                    }
-                }
-            };
-
-            this.session.track(document, 'keydown', this.undoRedoKeyHandler);
-        },
-
-        handleHistoryBack: function () {
-            this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
-        },
+    } catch (e) {
+        console.warn('Could not load coordinate system from COPC:', e);
+        return { srs: null, scale: [1, 1, 1], offset: [0, 0, 0], bounds: null };
     }
 }
+
+async function addPointCloud(ddbEntry) {
+    let copcUrl;
+    try {
+        copcUrl = await ddbEntry.getCopc();
+    } catch (e) {
+        throw new Error(`${ddbEntry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`, { cause: e });
+    }
+    const coordinateSystem = await coordinateSystemOf(copcUrl);
+    await new Promise((resolve, reject) => {
+        Potree.loadPointCloud(copcUrl, ddb.pathutils.basename(ddbEntry.path), e => {
+            if (e.type === 'loading_failed') {
+                reject(new Error(`Unable to load ${ddbEntry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
+                return;
+            }
+            viewer.scene.addPointCloud(e.pointcloud);
+            e.pointcloud.material.size = 1;
+            resolve();
+        });
+    });
+    return coordinateSystem;
+}
+
+async function loadViewer() {
+    // A previous viewer of this component is released completely first
+    session.dispose();
+    session = new PotreeSession();
+    viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
+
+    viewer.toggleSidebar = () => {
+        const area = container.value;
+        area.style.right = area.style.right === 'var(--ddb-sidebar-width)' ? '0' : 'var(--ddb-sidebar-width)';
+    };
+    viewer.setEDLEnabled(false);
+    viewer.setFOV(60);
+    viewer.setPointBudget(pointBudgetFor(navigator.deviceMemory, isMobile()));
+    // High-quality splats on desktop, standard on phones
+    viewer.useHQ = !isMobile();
+    applyUnits();
+
+    viewer.loadGUI(() => {
+        viewer.setLanguage('en');
+        $('#menu_tools').next().show();
+        m.onGuiLoaded($);
+    });
+
+    viewer.scene.scene.add(new THREE.AmbientLight(0x404040, 2.0));
+    viewer.scene.scene.add(new THREE.DirectionalLight(0xcccccc, 0.5));
+    const top = new THREE.DirectionalLight(0xcccccc, 0.5);
+    top.position.z = 99999999999;
+    viewer.scene.scene.add(top);
+    loaded.value = true;
+
+    const coordinateSystem = await addPointCloud(dataset.value.Entry(entry.value));
+    m.attach(viewer, session, coordinateSystem);
+    viewer.fitToScreen();
+    await m.load();
+    window.viewer = viewer;
+}
+
+onMounted(async () => {
+    if (!await entryLoaded) return;
+    loading.value = true;
+    try {
+        // One request wave: the files download in parallel, the scripts run in order
+        await loadResources(versioned(POTREE_RESOURCES, HUB_VERSION));
+        fixPotreePaths(window.Potree, window.location.origin);
+        await loadViewer();
+    } catch (e) {
+        error.value = e.message;
+    } finally {
+        loading.value = false;
+    }
+});
+
+// Everything the viewer created goes with it: listeners, render loop, WebGL context,
+// the jQuery UI sidebar, window.viewer (HUB-04)
+onBeforeUnmount(() => {
+    session.dispose();
+    viewer = null;
+});
 </script>
 
-<style>
-#potree {
-    #potree_quick_buttons {
-        left: auto !important;
-        right: 3rem !important;
-    }
-
-    .potree-container {
-        &.loading {
-            visibility: hidden;
-        }
-
-        margin: 0 3rem 0 0;
-        display: flex;
-        width: 100%;
-        height: 100%;
-        background: var(--ddb-viewer-gradient-center);
-        background: -moz-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
-        background: -webkit-gradient(radial, center center, 0px, center center, 100%, color-stop(0%, rgba(79, 79, 79, 1)), color-stop(100%, rgba(22, 22, 22, 1)));
-        background: -webkit-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
-        background: -o-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
-        background: -ms-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
-        background: radial-gradient(ellipse at center, var(--ddb-viewer-gradient-center) 0%, var(--ddb-viewer-gradient-edge) 100%);
-        position: relative;
-        padding: 0;
-
-        #potree_render_area {
-            -webkit-transition: right .35s;
-            transition: right .35s;
-        }
-
-        #potree_render_area>canvas {
-            width: 100% !important;
-            height: 100% !important;
-        }
-
-        i.icon {
-            margin: 0 !important;
-        }
-    }
-
-    .dg {
-        &.main {
-            position: absolute;
-            right: 0;
-        }
-
-        .c {
-            select {
-                color: black;
-            }
-        }
-    }
-
-
-    /* Potree specific */
-    #potree_map {
-        position: absolute;
-        left: 3rem;
-        top: 3rem;
-        width: 25rem;
-        height: 25rem;
-        display: none
-    }
-
-    #potree_menu {
-        input {
-            color: buttontext;
-        }
-
-        legend {
-            display: initial !important;
-            width: initial !important;
-            padding: initial !important;
-            margin-bottom: initial !important;
-            font-size: inherit !important;
-            line-height: initial !important;
-            color: inherit !important;
-            border: initial !important;
-            border-bottom: initial !important;
-        }
-
-        #show_2d_profile {
-            color: initial !important;
-        }
-    }
-
-    #potree_map_header {
-        position: absolute;
-        width: 100%;
-        height: 1.5rem;
-        top: 0;
-        background-color: var(--ddb-viewer-toolbar-overlay);
-        z-index: 1000;
-        border-top-left-radius: var(--ddb-radius-sm);
-        border-top-right-radius: var(--ddb-radius-sm);
-    }
-
-    #potree_map_content {
-        position: absolute;
-        z-index: 100;
-        top: 1.5rem;
-        width: 100%;
-        height: calc(100% - 1.5rem);
-        border: var(--ddb-border-width) solid var(--ddb-viewer-toolbar-overlay);
-        box-sizing: border-box;
-    }
-
-    #potree_sidebar_container {
-        overflow-y: auto;
-        overflow-x: hidden;
-        background-color: var(--ddb-viewer-sidebar-bg);
-        right: 0;
-
-        a {
-            color: var(--ddb-text);
-        }
-
-        #sidebar_root {
-            width: var(--ddb-sidebar-width);
-
-            .pv-menu-list {
-                padding-right: 0.75rem;
-
-                .divider {
-                    padding: var(--ddb-spacing-sm) 0 var(--ddb-spacing-lg) 0;
-                }
-
-                a {
-                    color: var(--ddb-viewer-sidebar-link);
-                }
-            }
-
-            .measurement-panel-remove:hover {
-                cursor: pointer;
-            }
-
-            position: absolute;
-            min-height: 100%;
-            height: 100%;
-
-            .potree_sidebar_brand {
-                display: flex;
-                flex-direction: row;
-            }
-
-            #potree_version_number {
-                color: var(--ddb-viewer-sidebar-muted);
-                font-size: 80%;
-                font-weight: 100;
-            }
-        }
-    }
-
-    #profile_window {
-        z-index: 999999999999 !important;
-    }
-
-    /* Top-left toolbar container */
-    .top-left-toolbar {
-        position: absolute;
-        top: var(--ddb-spacing-sm);
-        left: var(--ddb-spacing-sm);
-        z-index: 1001;
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-    }
-
-    /* Undo/Redo toolbar */
-    .undo-redo-toolbar {
-        background: var(--ddb-viewer-toolbar-bg);
-        padding: var(--ddb-spacing-xs);
-        border-radius: var(--ddb-radius-sm);
-        display: flex;
-        gap: 0.25rem;
-        align-items: center;
-    }
-
-    .btn-undo-redo {
-        background: var(--ddb-viewer-btn-bg);
-        color: white;
-        border: none;
-        padding: var(--ddb-spacing-sm) var(--ddb-spacing-sm);
-        border-radius: var(--ddb-radius-sm);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        transition: background 0.2s;
-        min-width: 2.25rem;
-        min-height: 2.25rem;
-    }
-
-    .btn-undo-redo:hover:not(:disabled) {
-        background: var(--ddb-viewer-btn-hover);
-    }
-
-    .btn-undo-redo:disabled {
-        background: var(--ddb-viewer-btn-disabled-bg);
-        color: var(--ddb-viewer-btn-disabled-color);
-        cursor: not-allowed;
-    }
-
-    .btn-undo-redo.btn-delete-tool {
-        background: var(--ddb-viewer-btn-active-bg);
-        margin-left: var(--ddb-spacing-sm);
-    }
-
-    .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
-        background: var(--ddb-viewer-btn-danger);
-    }
-
-    .btn-undo-redo.btn-delete-tool.active {
-        background: var(--ddb-viewer-btn-danger);
-        box-shadow: var(--ddb-shadow-sm);
-    }
-
-    /* Toolbar for measurements */
-    .measurements-toolbar {
-        position: absolute;
-        top: 3.75rem;
-        left: var(--ddb-spacing-sm);
-        z-index: 1000;
-        background: var(--ddb-viewer-toolbar-bg);
-        padding: var(--ddb-spacing-sm);
-        border-radius: var(--ddb-radius-sm);
-        display: flex;
-        gap: var(--ddb-spacing-sm);
-        align-items: center;
-    }
-
-    .btn-measurement {
-        background: var(--ddb-viewer-btn-primary);
-        color: white;
-        border: none;
-        padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
-        border-radius: var(--ddb-radius-sm);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: var(--ddb-spacing-xs);
-        font-size: var(--ddb-font-size-base);
-        transition: background 0.3s;
-    }
-
-    .btn-measurement:hover {
-        background: var(--ddb-viewer-btn-primary-hover);
-    }
-
-    .btn-measurement:disabled {
-        background: var(--ddb-viewer-btn-active-bg);
-        cursor: not-allowed;
-    }
-
-    .btn-measurement.btn-danger {
-        background: var(--ddb-viewer-btn-danger);
-    }
-
-    .btn-measurement.btn-danger:hover {
-        background: var(--ddb-viewer-btn-danger-hover);
-    }
-
-    /* Unit selector toolbar */
-    .unit-selector-toolbar {
-        background: var(--ddb-viewer-toolbar-bg);
-        padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
-        border-radius: var(--ddb-radius-sm);
-        display: flex;
-        gap: 0.5rem;
-        align-items: center;
-        color: white;
-        font-size: var(--ddb-font-size-base);
-    }
-
-    .unit-selector-toolbar label {
-        margin: 0;
-        font-weight: 500;
-    }
-
-    .unit-selector-toolbar select {
-        background: var(--ddb-viewer-select-bg);
-        color: white;
-        border: var(--ddb-border-width) solid var(--ddb-viewer-select-border);
-        padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
-        border-radius: var(--ddb-radius-sm);
-        cursor: pointer;
-        font-size: var(--ddb-font-size-base);
-        outline: none;
-    }
-
-    .unit-selector-toolbar select:hover {
-        background: var(--ddb-viewer-btn-active-bg);
-    }
-
-    .unit-selector-toolbar select:focus {
-        border-color: var(--ddb-viewer-btn-primary);
-    }
-}
-</style>
+<style lang="scss" src="./PotreeViewer.scss"></style>
