@@ -272,7 +272,6 @@ module.exports = {
 
     resolve: {
         alias: {
-            'vue$': 'vue/dist/vue.esm-bundler.js',
             'ddb': path.resolve(__dirname, 'webapp/js/libs/ddb'),
             '@': path.resolve(__dirname, 'webapp/js')
         },

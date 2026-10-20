@@ -17,7 +17,7 @@ import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
-import Lara from '@primevue/themes/lara';
+import { primeVueOptions } from '@/theme';
 import MeasurementPropertiesDialog from './MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from './PointAnnotationDialog.vue';
 import { pointPopupHtml } from '@/libs/map/pointPopup';
@@ -1024,7 +1024,7 @@ class MeasureControls extends Control {
                 this.closePropertiesDialog();
             }
         });
-        this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
+        this.propertiesDialogApp.use(PrimeVue, primeVueOptions);
         this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
     }
 
@@ -1118,7 +1118,7 @@ class MeasureControls extends Control {
                 this.closePropertiesDialog();
             }
         });
-        this.propertiesDialogApp.use(PrimeVue, { theme: { preset: Lara } });
+        this.propertiesDialogApp.use(PrimeVue, primeVueOptions);
         this.propertiesDialog = this.propertiesDialogApp.mount(this._dialogContainer);
     }
 

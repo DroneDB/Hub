@@ -10,7 +10,7 @@ import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
-import Lara from '@primevue/themes/lara';
+import { primeVueOptions } from '@/theme';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
 
 export default {
@@ -123,7 +123,7 @@ export default {
                 console.error('FeatureInfoDialog error:', err);
                 cleanup();
             };
-            dialogApp.use(PrimeVue, { theme: { preset: Lara } });
+            dialogApp.use(PrimeVue, primeVueOptions);
             dialogApp.mount(container);
         },
 

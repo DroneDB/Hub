@@ -22,13 +22,9 @@ import './dynamic/web';
 
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';
-import Lara from '@primevue/themes/lara';
-import { definePreset } from '@primevue/themes';
-import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
-import DialogService from 'primevue/dialogservice';
-import VirtualScroller from '@/components/VirtualScroller.vue';
-import Toast from 'primevue/toast';
+import App from './App.vue';
+import { primeVueOptions } from './theme';
 import { notify, setToastService } from '@/libs/notify';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 
@@ -40,7 +36,6 @@ import {
     checkAndHandleUpdate,
     consumePendingUpdateNotice
 } from '@/libs/hubUpdateChecker';
-import HubUpdateNoticeDialog from '@/components/HubUpdateNoticeDialog.vue';
 
 /* global __APP_PRODUCTION__ */
 const isProduction = typeof __APP_PRODUCTION__ !== 'undefined' ? __APP_PRODUCTION__ : true;
@@ -102,104 +97,26 @@ window.addEventListener('load', function () {
         // surface a one-shot dialog now (versions match again at this point).
         const updateNotice = consumePendingUpdateNotice();
 
-        const app = createApp({
-            components: { HubUpdateNoticeDialog, Toast },
-            data() {
-                return {
-                    hubUpdateNotice: updateNotice,
-                    hubVersion: features ? features.hubVersion : null,
-                    registryVersion: features ? features.registryVersion : null,
-                    ddbVersion: features ? features.ddbVersion : null
-                };
-            },
-            computed: {
-                // Forces a remount when switching dataset: /r/:org/:ds is a single route
-                // record, so without a key Vue would reuse the instance and skip its hooks.
-                contentKey() {
-                    const p = this.$route.params;
-                    return p.org && p.ds ? `${p.org}/${p.ds}` : this.$route.path;
-                }
-            },
-            methods: {
-                onHubUpdateDismissed() {
-                    this.hubUpdateNotice = null;
-                }
-            },
-            template:
-                '<router-view name="header" />' +
-                '<router-view name="content" :key="contentKey" />' +
-                '<Toast position="bottom-left" />' +
-                '<HubUpdateNoticeDialog v-if="hubUpdateNotice"' +
-                '   :notice="hubUpdateNotice"' +
-                '   :hub-version="hubVersion"' +
-                '   :registry-version="registryVersion"' +
-                '   :ddb-version="ddbVersion"' +
-                '   @close="onHubUpdateDismissed" />'
+        const app = createApp(App, {
+            notice: updateNotice,
+            versions: {
+                hubVersion: features?.hubVersion ?? null,
+                registryVersion: features?.registryVersion ?? null,
+                ddbVersion: features?.ddbVersion ?? null
+            }
         });
 
         app.use(router);
-        const DdbPreset = definePreset(Lara, {
-            components: {
-                dataview: {
-                    root: {
-                        borderWidth: '0'
-                    }
-                }
-            },
-            semantic: {
-                primary: {
-                    50:  '#e6f1fd',
-                    100: '#b3d5f9',
-                    200: '#80b8f5',
-                    300: '#4d9cf0',
-                    400: '#2685e8',
-                    500: '#0070e0',
-                    600: '#0060bf',
-                    700: '#004a95',
-                    800: '#00356b',
-                    900: '#001f40',
-                    950: '#001122'
-                },
-                colorScheme: {
-                    light: {
-                        primary: {
-                            color: '#0070e0',
-                            contrastColor: '#ffffff',
-                            hoverColor: '#0060bf',
-                            activeColor: '#004a95'
-                        },
-                        highlight: {
-                            background: '#e8f4ff',
-                            focusBackground: '#d8e8f8',
-                            color: '#0070e0',
-                            focusColor: '#004a95'
-                        }
-                    }
-                }
-            }
-        });
-
-        app.use(PrimeVue, {
-            theme: {
-                preset: DdbPreset,
-                options: {
-                    darkModeSelector: false
-                }
-            }
-        });
-        app.use(ConfirmationService);
+        app.use(PrimeVue, primeVueOptions);
         app.use(ToastService);
-        app.use(DialogService);
 
         // The one toast host (root template) and the notifier every component uses (HQ-03)
         setToastService(app.config.globalProperties.$toast);
         app.config.globalProperties.$notify = notify;
 
-        // Global properties (replaces Vue.prototype)
-        app.config.globalProperties.$embed = params.embed ? true : false;
-
-        // Global component registration
-        app.component('VirtualScroller', VirtualScroller);
+        // Embedded (?embed=1 or inside an iframe): no header, no toolbar relays
+        app.provide('embed', embed);
+        app.config.globalProperties.$embed = embed;
 
         app.config.errorHandler = function (err, vm, info) {
             // Catch unauthorized error globally
