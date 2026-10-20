@@ -106,6 +106,8 @@ import PrimeMessage from 'primevue/message';
 import useHeavyTask from '@/composables/useHeavyTask';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
+import { DOWNLOAD_LIMIT_MESSAGE } from '@/libs/constants';
 import { loginLocation } from '@/libs/authRoutes';
 
 export default {
@@ -131,10 +133,7 @@ export default {
             showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
             showBackToOrg: false,
             orgInfoCache: {},
-            selectedFiles: [],
             isDownloading: false,
-            activeBulkDownload: false,
-            activeTab: null,
             downloadConfirmOpen: false,
             storageInfo: null,
             storageInfoDialogOpen: false,
@@ -146,6 +145,7 @@ export default {
 
     computed: {
         ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
+        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload']),
         storageBarColor: function () {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 'var(--ddb-success)';
             const pct = this.storageInfo.usedPercentage * 100;
@@ -337,8 +337,8 @@ export default {
             this.showShare = !!params.ds;
             this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
 
-            // Reset tab gating; ViewDataset re-broadcasts the active tab on mount.
-            if (!params.ds) this.activeTab = null;
+            // Off the dataset page there is no selection, tab or archive in progress
+            if (!params.ds) useDatasetSessionStore().reset();
 
             this.params = params;
             this.updateBackToOrgVisibility();
@@ -355,20 +355,6 @@ export default {
         emitter.on('addItems', this._onAddItems);
         emitter.on('deleteEntries', this._onDeleteEntries);
 
-        this._onSetSelectedFiles = (files) => {
-            this.selectedFiles = files;
-        };
-        emitter.on('setSelectedFiles', this._onSetSelectedFiles);
-
-        this._onSetActiveBulkDownload = (active) => {
-            this.activeBulkDownload = !!active;
-        };
-        emitter.on('setActiveBulkDownload', this._onSetActiveBulkDownload);
-
-        this._onSetActiveTab = (key) => {
-            this.activeTab = key;
-        };
-        emitter.on('setActiveTab', this._onSetActiveTab);
 
         this.refreshStorageInfo();
         this.checkUserManagement();
@@ -378,9 +364,6 @@ export default {
 
         emitter.off('addItems', this._onAddItems);
         emitter.off('deleteEntries', this._onDeleteEntries);
-        emitter.off('setSelectedFiles', this._onSetSelectedFiles);
-        emitter.off('setActiveBulkDownload', this._onSetActiveBulkDownload);
-        emitter.off('setActiveTab', this._onSetActiveTab);
     },
     methods: {
         handleStorageInfoDialogClose: function () {
@@ -478,7 +461,7 @@ export default {
                 await dataset.downloadWithCheck(paths);
             } catch (err) {
                 if (err.status === 429) {
-                    emitter.emit('downloadLimitReached', err.message);
+                    this.$notify.error(err.message || DOWNLOAD_LIMIT_MESSAGE, { summary: 'Download Limit' });
                 } else {
                     this.$notify.error(err);
                 }
@@ -527,7 +510,7 @@ export default {
         },
 
         handleSettings: function () {
-            emitter.emit("openSettings");
+            useDatasetSessionStore().requestSettings();
         },
 
         handleShare: function () {

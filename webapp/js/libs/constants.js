@@ -7,6 +7,9 @@ export const EPSG = Object.freeze({
     WEB_MERCATOR: 'EPSG:3857'
 });
 
+/** Shown when the server refuses a download because the user's download slots are busy (HTTP 429). */
+export const DOWNLOAD_LIMIT_MESSAGE = 'Download limit reached. Please wait for a download to finish before starting a new one.';
+
 /** How long a toast stays, in milliseconds (HQ-03). */
 export const TOAST_LIFE = Object.freeze({
     short: 3000,

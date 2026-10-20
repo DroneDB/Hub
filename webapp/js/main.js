@@ -126,7 +126,6 @@ window.addEventListener('load', function () {
 
         // Embedded (?embed=1 or inside an iframe): no header, no toolbar relays
         app.provide('embed', embed);
-        app.config.globalProperties.$embed = embed;
 
         app.config.errorHandler = function (err, vm, info) {
             // Already handled by reg.onUnauthorized

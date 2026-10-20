@@ -294,6 +294,9 @@ import useHeavyTask from '@/composables/useHeavyTask';
 import { Features } from '@/libs/features';
 import { getPref, setPref, PREF } from '@/libs/preferences';
 import { isUnauthorized } from '@/libs/ddb/apiError';
+import { mapStores, mapState } from 'pinia';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
+import { DOWNLOAD_LIMIT_MESSAGE } from '@/libs/constants';
 
 /**
  * ViewDataset - Main dataset page hosting the explorer, map viewer, and
@@ -414,7 +417,6 @@ export default {
             // True while a bulk-download task (ZIP compression) is active for this
             // dataset. Set via the global event bus by TaskHistory; disables all
             // download triggers so the server cannot receive concurrent requests.
-            activeBulkDownload: false,
 
             // File availability dialog
             showAvailabilityDialog: false,
@@ -462,6 +464,8 @@ export default {
         };
     },
     computed: {
+        ...mapStores(useDatasetSessionStore),
+        ...mapState(useDatasetSessionStore, ['activeBulkDownload', 'settingsRequests']),
         selectedFiles: function () {
             return this.fileBrowserFiles.filter(f => f.selected);
         },
@@ -514,6 +518,11 @@ export default {
         }
     },
     watch: {
+        // The header toolbar's Settings button
+        settingsRequests: function () {
+            this.showSettings = true;
+        },
+
         viewMode: function() {
             // When viewMode changes, rebuild explorerTools to show the correct icon
             this.updateExplorerTools();
@@ -524,8 +533,7 @@ export default {
         fileBrowserFiles: {
             deep: true,
             handler: function () {
-                if (!this.$embed)
-                    emitter.emit('setSelectedFiles', this.selectedFiles);
+                this.datasetSessionStore.setSelectedFiles(this.selectedFiles);
             }
         },
 
@@ -558,14 +566,6 @@ export default {
         BuildManager.on('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
         // Event bus listeners - saved as named refs for cleanup
-        this._onOpenSettings = () => {
-            this.showSettings = true;
-        };
-
-        this._onDownloadLimitReached = (msg) => {
-            this.$notify.error(msg || 'Download limit reached. Please wait for a download to finish before starting a new one.', { summary: 'Download Limit' });
-        };
-
         this._onUploadItems = (msg) => {
             this.filesToUpload = msg.files;
             this.uploadDialogOpen = true;
@@ -580,15 +580,8 @@ export default {
             this.handleMoveItem(payload.source, payload.dest);
         };
 
-        emitter.on('openSettings', this._onOpenSettings);
-        emitter.on('downloadLimitReached', this._onDownloadLimitReached);
         emitter.on('uploadItems', this._onUploadItems);
         emitter.on('moveItem', this._onMoveItemBus);
-
-        this._onSetActiveBulkDownload = (active) => {
-            this.activeBulkDownload = !!active;
-        };
-        emitter.on('setActiveBulkDownload', this._onSetActiveBulkDownload);
     },
     beforeUnmount: function () {
         document.getElementById("app").classList.remove("fullpage");
@@ -606,11 +599,8 @@ export default {
         BuildManager.off('newBuildableFilesDetected', this.handleNewBuildableFilesNotification);
 
         // Cleanup event bus listeners
-        emitter.off('openSettings', this._onOpenSettings);
-        emitter.off('downloadLimitReached', this._onDownloadLimitReached);
         emitter.off('uploadItems', this._onUploadItems);
         emitter.off('moveItem', this._onMoveItemBus);
-        emitter.off('setActiveBulkDownload', this._onSetActiveBulkDownload);
 
         // Cleanup BuildManager
         BuildManager.unregisterDataset(this.dataset);
@@ -1175,7 +1165,7 @@ export default {
                 await this.dataset.downloadWithCheck(paths);
             } catch (e) {
                 if (e.status === 429) {
-                    this.$notify.error('Download limit reached. Please wait for a download to finish before starting a new one.', { summary: 'Download Limit' });
+                    this.$notify.error(DOWNLOAD_LIMIT_MESSAGE, { summary: 'Download Limit' });
                 } else {
                     this.showError(e.message || e, "Download Error");
                 }
@@ -1205,7 +1195,7 @@ export default {
 
             const checkResp = await fetch(url, { headers });
             if (checkResp.status === 429) {
-                this.$notify.error('Download limit reached. Please wait for a download to finish before starting a new one.', { summary: 'Download Limit' });
+                this.$notify.error(DOWNLOAD_LIMIT_MESSAGE, { summary: 'Download Limit' });
                 return;
             }
 
@@ -1256,7 +1246,7 @@ export default {
         handleMainTabChange: function (key) {
             // Tabs whose code loads on first use (HUB-02) stay mounted once opened
             if (key in this.openedTabs) this.openedTabs[key] = true;
-            if (!this.$embed) emitter.emit('setActiveTab', key);
+            this.datasetSessionStore.setActiveTab(key);
         },
 
         // A lazily loaded tab mounts after its activation was signalled: forward it now

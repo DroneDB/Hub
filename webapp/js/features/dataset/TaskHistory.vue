@@ -220,7 +220,6 @@
 <script>
 import useHeavyTask from '@/composables/useHeavyTask';
 import useTaskFormatting from '@/composables/useTaskFormatting';
-import emitter from '@/libs/eventBus';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
@@ -235,6 +234,7 @@ import PrimeMessage from 'primevue/message';
 import OdxOptionsEditor from '@/components/OdxOptionsEditor.vue';
 import FolderPicker from '@/components/FolderPicker.vue';
 import Paginator from 'primevue/paginator';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 // Curated processing profiles based on standard OpenDroneMap presets.
 const ODM_PRESETS = [
@@ -444,8 +444,8 @@ export default {
         // Unregister from TabSwitcher
         if (this.unregisterTabChild) this.unregisterTabChild('tasks');
 
-        // Clear the global flag so the download button re-enables when leaving the dataset.
-        emitter.emit('setActiveBulkDownload', false);
+        // Clear the flag so the download button re-enables when leaving the dataset.
+        useDatasetSessionStore().setActiveBulkDownload(false);
     },
 
     methods: {
@@ -541,11 +541,10 @@ export default {
                 this.currentPageFirst = Math.max(0, (Math.ceil(filtered.length / this.pageSize) - 1) * this.pageSize);
             }
 
-            // Broadcast whether there is an active (queued/running) bulk-download task so
-            // Header.vue and ViewDataset.vue can disable the download button globally.
-            const hasActiveBulkDownload = this.tasks.some(
-                t => t.toolId === 'bulk-download' && this.isActive(t.state));
-            emitter.emit('setActiveBulkDownload', hasActiveBulkDownload);
+            // An active (queued/running) bulk-download task disables the download buttons
+            // of the header and the dataset page.
+            useDatasetSessionStore().setActiveBulkDownload(this.tasks.some(
+                t => t.toolId === 'bulk-download' && this.isActive(t.state)));
         },
 
 

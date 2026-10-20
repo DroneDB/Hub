@@ -13,7 +13,7 @@ import { b64decode } from '@/libs/base64';
 import { setTitle } from '@/libs/utils';
 import reg from '@/libs/api/sharedRegistry';
 import ddb from 'ddb';
-import emitter from '@/libs/eventBus';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 export default {
     components: {
@@ -78,7 +78,7 @@ export default {
             }
 
             if (this.$route.params.encodedPath) {
-                emitter.emit('setSelectedFiles', [{ path: this.$parent.ddbURI }]);
+                useDatasetSessionStore().setSelectedFiles([{ path: this.$parent.ddbURI }]);
                 setTitle(`${ddb.pathutils.basename(entry.path)} - ${this.titleSuffix}`);
             }
         } catch (e) {

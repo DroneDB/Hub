@@ -103,6 +103,12 @@ test('dataset page lists the uploaded files', async () => {
     for (const p of Object.values(FILES)) await page.waitForSelector(`text=${path.basename(p)}`, { timeout: 20000 });
 });
 
+test('the header Settings button opens the dataset settings', async () => {
+    await page.click('button[title="Settings"]');
+    await page.waitForSelector('text=License:', { timeout: 15000 });
+    await page.keyboard.press('Escape');
+});
+
 test('map tab renders an OpenLayers map', async () => {
     await page.goto(`${URL_}/r/${USER}/${DS}/view/${b64(path.basename(FILES.raster))}/map`);
     await page.waitForSelector('.ol-viewport canvas', { timeout: 30000 });

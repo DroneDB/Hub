@@ -4,8 +4,12 @@
  * - background store refreshes (applyFilters(false)) keep the current page
  * - a shrinking list clamps onto the last valid page
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { setActivePinia, createPinia } from 'pinia';
 import TaskHistory from './TaskHistory.vue';
+
+// applyFilters reports the bulk-download state to the dataset session store
+beforeEach(() => setActivePinia(createPinia()));
 
 const { applyFilters, onFilterChange } = TaskHistory.methods;
 
