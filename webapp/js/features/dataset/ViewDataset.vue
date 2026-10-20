@@ -269,7 +269,7 @@ import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
 import icons from '@/libs/icons';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
-import shell from '@/dynamic/shell';
+import { openInBrowser } from '@/libs/openInBrowser';
 import { isMobile } from '@/libs/responsive';
 import { renameDataset } from '@/libs/api/registryUtils';
 import { b64encode } from '@/libs/base64';
@@ -893,7 +893,7 @@ export default {
                 } else if (entryType === ddb.entry.type.VIDEO || entryType === ddb.entry.type.GEOVIDEO) {
                     this.openVideoLightbox(node);
                 } else {
-                    shell.openItem(node.path);
+                    openInBrowser(node.path);
                 }
             }
         },

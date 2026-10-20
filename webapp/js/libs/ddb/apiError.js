@@ -18,12 +18,14 @@ class ApiError extends Error {
     }
 }
 
-/** @param {unknown} e */
+/** @param {unknown} e @param {number} status */
 const hasStatus = (e, status) => !!e && typeof e === 'object' && /** @type {any} */ (e).status === status;
 
-module.exports = {
-    ApiError,
-    /** @param {unknown} e */ isUnauthorized: e => hasStatus(e, 401),
-    /** @param {unknown} e */ isForbidden: e => hasStatus(e, 403),
-    /** @param {unknown} e */ isNotFound: e => hasStatus(e, 404)
-};
+/** @param {unknown} e */
+export const isUnauthorized = e => hasStatus(e, 401);
+/** @param {unknown} e */
+export const isForbidden = e => hasStatus(e, 403);
+/** @param {unknown} e */
+export const isNotFound = e => hasStatus(e, 404);
+
+export { ApiError };

@@ -1,5 +1,4 @@
 <script>
-import { rootPath } from '@/dynamic/pathutils';
 import { Control } from 'ol/control';
 
 /**
@@ -15,7 +14,7 @@ class SettingsControl extends Control {
 
         const btn = document.createElement('button');
         btn.title = 'Map Settings - Change basemap, units, and display options.';
-        btn.innerHTML = '<img src="' + rootPath("/images/settings.svg") + '"/>';
+        btn.innerHTML = '<img src="' + '/images/settings.svg' + '"/>';
 
         const element = document.createElement('div');
         element.className = 'ol-settings ol-unselectable ol-control';

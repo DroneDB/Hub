@@ -123,7 +123,7 @@ class Entry {
     }
 }
 
-module.exports = {
+const entry = {
     Entry,
     type: {
         UNDEFINED: 0,
@@ -197,3 +197,6 @@ module.exports = {
             entry.type === this.type.DRONEDB;
     }
 };
+
+export { Entry };
+export default entry;

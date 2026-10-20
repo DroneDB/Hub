@@ -75,8 +75,6 @@ import ddb from 'ddb';
 const { pathutils } = ddb;
 
 import { entry } from 'ddb';
-import shell from '@/dynamic/shell';
-import env from '@/dynamic/env';
 import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
 
@@ -126,33 +124,7 @@ export default {
             component: self
         };
 
-        let contextMenu = [];
-
-        if (env.isElectron()) {
-            contextMenu = contextMenu.concat([{
-                label: "Open Item Location",
-                icon: 'fa-regular fa-folder-open',
-                isVisible: () => { return this.selectedFiles.length > 0; },
-                click: () => {
-                    if (this.selectedFiles.length > 0) shell.showItemInFolder(this.selectedFiles[0].path);
-                },
-                accelerator: "Alt+CmdOrCtrl+R",
-            }, {
-                type: 'separator'
-            }, {
-                label: "Share",
-                icon: 'fa-solid fa-share-nodes',
-                accelerator: "CmdOrCtrl+S",
-                isVisible: () => { return this.selectedFiles.length > 0; },
-                click: () => {
-                    if (this.selectedFiles.length > 0) dispatchEvent(new Event("btnShare_Click"));
-                }
-            }, {
-                type: 'separator'
-            }]);
-        }
-
-        contextMenu = contextMenu.concat(buildStandardContextMenu(ctx));
+        const contextMenu = buildStandardContextMenu(ctx);
 
         return {
             loading: false,

@@ -35,8 +35,6 @@ import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Button from 'primevue/button';
-import env from '@/dynamic/env';
-import shell from '@/dynamic/shell';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
@@ -85,22 +83,6 @@ export default {
         };
 
         let contextMenu = [];
-
-        if (env.isElectron()) {
-            contextMenu = contextMenu.concat([{
-                label: "Open Item Location",
-                icon: 'fa-regular fa-folder-open',
-                isVisible: () => {
-                    return this.lastSelectedNode !== null;
-                },
-                click: () => {
-                    if (this.lastSelectedNode !== null) shell.showItemInFolder(this.lastSelectedNode.node.path);
-                }
-            }, {
-                type: 'separator'
-            }
-            ]);
-        }
 
         contextMenu = contextMenu.concat([
         {

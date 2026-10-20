@@ -18,7 +18,6 @@ import '@fontsource/inter/800.css';
 
 import './libs/keyboard';
 import './libs/mouse';
-import './dynamic/web';
 
 import { createApp } from 'vue';
 import PrimeVue from 'primevue/config';

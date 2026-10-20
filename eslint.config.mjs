@@ -46,11 +46,6 @@ export default [
     // HQ-01/HQ-10: accessibility rules; files with findings today are listed in a11y.mjs
     ...a11yConfigs(),
     {
-        // CommonJS modules shared with the Electron/Node build
-        files: ['webapp/js/libs/ddb/**/*.js', 'webapp/js/dynamic/**/*.js', 'webapp/js/libs/map/olMeasurementConverter.js'],
-        languageOptions: { globals: globals.commonjs }
-    },
-    {
         files: ['webapp/**/*.spec.js', 'webapp/**/*.test.js', 'test-setup.js'],
         languageOptions: { globals: { ...globals.browser, ...globals.node, ...globals.vitest } },
         // Specs declare small throw-away components next to the one under test

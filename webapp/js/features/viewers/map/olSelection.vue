@@ -1,5 +1,4 @@
 <script>
-import { rootPath } from '@/dynamic/pathutils';
 import { Control } from 'ol/control';
 import Draw, { createBox } from 'ol/interaction/Draw';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
@@ -24,17 +23,17 @@ class SelectionControl extends Control {
         // Rectangle selection button
         const btnRectangle = document.createElement('button');
         btnRectangle.title = 'Rectangle Selection - Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.';
-        btnRectangle.innerHTML = '<img src="' + rootPath("/images/rectangle-selection.svg") + '"/>';
+        btnRectangle.innerHTML = '<img src="' + '/images/rectangle-selection.svg' + '"/>';
 
         // Polygon selection button
         const btnPolygon = document.createElement('button');
         btnPolygon.title = 'Polygon Selection - Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.';
-        btnPolygon.innerHTML = '<img src="' + rootPath("/images/polygon-selection.svg") + '"/>';
+        btnPolygon.innerHTML = '<img src="' + '/images/polygon-selection.svg' + '"/>';
 
         // Clear selection button (hidden by default, shown when there's an active selection)
         const btnClear = document.createElement('button');
         btnClear.title = 'Clear Selection - Deselect all selected features.';
-        btnClear.innerHTML = '<img src="' + rootPath("/images/clear-selection.svg") + '"/>';
+        btnClear.innerHTML = '<img src="' + '/images/clear-selection.svg' + '"/>';
         btnClear.style.display = 'none';
 
         // Single container for all buttons

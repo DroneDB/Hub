@@ -132,4 +132,4 @@ RequestCache.forOrigin = function (origin) {
     return caches.get(origin);
 };
 
-module.exports = RequestCache;
+export default RequestCache;

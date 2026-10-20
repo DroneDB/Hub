@@ -12,14 +12,13 @@
  * - null and undefined values in objects are preserved correctly in JSON
  */
 
-const Organization = require('./organization');
-const RequestCache = require('./requestCache');
-const { DEFAULT_REGISTRY } = require('./constants');
-const { applyHubBranding } = require('../hubBranding');
+import Organization from './organization';
+import RequestCache from './requestCache';
+import { DEFAULT_REGISTRY } from './constants';
+import { applyHubBranding } from '../hubBranding';
+import { ApiError } from './apiError';
 
 let refreshTimers = {};
-
-const { ApiError } = require('./apiError');
 
 const throwError = (msg, status, extraData = {}) => {
     throw new ApiError(msg, status, extraData);
@@ -66,7 +65,7 @@ const storage = {
 
 const registries = new Map();
 
-module.exports = class Registry {
+export default class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
         this.eventListeners = {};

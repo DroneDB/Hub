@@ -1,9 +1,9 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-const { Entry } = require('./entry');
+import { Entry } from './entry';
 
-module.exports = class Dataset {
+export default class Dataset {
     constructor(registry, org, ds) {
         this.registry = registry;
         this.org = org;

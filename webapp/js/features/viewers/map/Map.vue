@@ -169,7 +169,6 @@ import ContourOptionsDialog from './ContourOptionsDialog.vue';
 import StockpileVolumePanel from './StockpileVolumePanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import Keyboard from '@/libs/keyboard';
-import { rootPath } from '@/dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { isMobile } from '@/libs/responsive';
 import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
@@ -647,7 +646,7 @@ export default {
 
                 return new Style({
                     image: new Icon({
-                        src: rootPath(`images/${svgName}`),
+                        src: `/images/${svgName}`,
                         rotation: yawDegrees * (Math.PI / 180),
                         rotateWithView: false,
                         anchor: [0.5, 0.5],
@@ -751,7 +750,7 @@ export default {
                         anchor: [0.05, 1],
                         anchorXUnits: 'fraction',
                         anchorYUnits: 'fraction',
-                        src: rootPath('images/start-flag.svg'),
+                        src: '/images/start-flag.svg',
                     })
                 }),
 
@@ -760,7 +759,7 @@ export default {
                         anchor: [0.05, 1],
                         anchorXUnits: 'fraction',
                         anchorYUnits: 'fraction',
-                        src: rootPath('images/finish-flag.svg'),
+                        src: '/images/finish-flag.svg',
                     })
                 }),
 
@@ -789,14 +788,14 @@ export default {
                         anchor: [0.5, 0.5],
                         anchorXUnits: 'fraction',
                         anchorYUnits: 'fraction',
-                        src: rootPath('images/pano.svg')
+                        src: '/images/pano.svg'
                     })
                 }), panoSelected: new Style({
                     image: new Icon({
                         anchor: [0.5, 0.5],
                         anchorXUnits: 'fraction',
                         anchorYUnits: 'fraction',
-                        src: rootPath('images/pano-selected.svg')
+                        src: '/images/pano-selected.svg'
                     })
                 }),
 

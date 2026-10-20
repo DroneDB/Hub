@@ -5,6 +5,7 @@
 import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import Feature from 'ol/Feature';
+import Overlay from 'ol/Overlay';
 import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
 import { pointCoordinates, pointPopupHtml } from './pointPopup';
@@ -366,7 +367,6 @@ function createStaticTooltip(feature, text, map) {
     }
 
     if (position) {
-        const Overlay = require('ol/Overlay').default;
         const measureTooltip = new Overlay({
             element: measureTooltipElement,
             offset: [0, -7],
@@ -408,7 +408,6 @@ function createPointPopup(feature, map, source, onEdit) {
         description: feature.get('description') || '', actions: true
     });
 
-    const Overlay = require('ol/Overlay').default;
     const popupOverlay = new Overlay({
         element: popupEl,
         offset: [0, -12],

@@ -29,7 +29,6 @@ let FileBrowser;
 
 beforeAll(async () => {
     // FileBrowser reads the runtime env at import time.
-    window.__env = { isElectron: () => false };
     FileBrowser = (await import('./FileBrowser.vue')).default;
 });
 
