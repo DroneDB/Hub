@@ -3,19 +3,12 @@
         <ContextMenu :items="contextMenu" />
         <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-3">
-                <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon" />
-                        <template v-else>{{ item.label }}</template>
-                    </a>
-                    <span v-else class="bc-active">{{ item.label }}</span>
-                </template>
-                <template #separator> / </template>
-            </Breadcrumb>
+            <PathBreadcrumb :path="currentPath" root-path="/" class="m-3" @navigate="goToPath" />
             <!--<div class="ui divider"></div>-->
         </div>
-        <div id="table-view" ref="tableview" :class="{ dropping }"
+        <!-- A click on the empty area clears the selection, Escape does it from the keyboard -->
+        <div id="table-view" ref="tableview" :class="{ dropping }" role="presentation"
+             @keydown.esc="clearSelection"
              @drop="explorerDropHandler($event)"
              @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)"
@@ -41,10 +34,7 @@
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('name')">
-                            Name
-                            <i v-if="sortColumn === 'name'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-name">{{ data.label }}</span>
@@ -52,10 +42,7 @@
                 </Column>
                 <Column style="width: 7.5rem;">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('type')">
-                            Type
-                            <i v-if="sortColumn === 'type'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-type">{{ getFileType(data) }}</span>
@@ -63,10 +50,7 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('size')">
-                            Size
-                            <i v-if="sortColumn === 'size'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Size" column="size" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-size">{{ getFileSize(data) }}</span>
@@ -74,10 +58,7 @@
                 </Column>
                 <Column style="width: 12rem">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('modified')">
-                            Modified
-                            <i v-if="sortColumn === 'modified'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <div class="file-date">
@@ -113,7 +94,8 @@ import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
 
 import ContextMenu from '@/components/ContextMenu';
-import Breadcrumb from 'primevue/breadcrumb';
+import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { getCurrentInstance } from 'vue';
@@ -129,7 +111,7 @@ import { useFileSelection } from '@/composables/useFileSelection';
 export default {
     components: {
         LoadingSpinner,
-        Toolbar, ContextMenu, Breadcrumb, DataTable, Column
+        Toolbar, ContextMenu, PathBreadcrumb, SortHeader, DataTable, Column
     },
     inject: { showBuildConfirm: { default: null } },
     props: {
@@ -187,48 +169,6 @@ export default {
         selectedFiles: function () {
             return this.files.filter(f => f.selected);
         },
-        breadcrumbs: function () {
-            if (this.currentPath == null || this.currentPath.length == 0) return null;
-
-            var folders = this.currentPath.split('/');
-            var cur = "";
-            var bc = [];
-
-            for (var el of folders) {
-                cur += '/' + el;
-
-                bc.push({
-                    path: cur.substring(1),
-                    name: el
-                });
-            }
-
-            if (bc.length > 0) {
-                bc.unshift({
-                    path: "/",
-                    name: "~"
-                })
-            }
-
-            return bc;
-        },
-        breadcrumbHome: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
-            const home = this.breadcrumbs[0];
-            return {
-                icon: 'fa-solid fa-home',
-                command: () => this.goTo(home)
-            };
-        },
-        breadcrumbItems: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
-            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
-                if (idx < arr.length - 1) {
-                    return { label: b.name, command: () => this.goTo(b) };
-                }
-                return { label: b.name };
-            });
-        },
         sortedFiles: function() {
             const sorted = [...this.files];
 
@@ -262,45 +202,48 @@ export default {
 
             return sorted;
         },
+        // Row events find their file by the row's position (the header is row 0)
         rowPt: function () {
-            const self = this;
+            const fileOf = e => {
+                const row = e.target.closest('tr');
+                return row ? this.sortedFiles[row.rowIndex - 1] : undefined;
+            };
             return {
-                onDragstart(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1; // account for header row
-                    const file = self.sortedFiles[idx];
-                    if (file) self.startDrag(e, file);
+                tabindex: 0,
+                // Enter opens, Space selects (with Shift/Ctrl like a click)
+                onKeydown: e => {
+                    if (e.target.tagName !== 'TR') return;
+                    const file = fileOf(e);
+                    if (!file) return;
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.handleOpen(file);
+                    } else if (e.key === ' ') {
+                        e.preventDefault();
+                        this.handleSelection(e, file);
+                    }
                 },
-                onDrop(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.onDrop(e, file);
+                onDragstart: e => {
+                    const file = fileOf(e);
+                    if (file) this.startDrag(e, file);
                 },
-                onDragenter(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragEnter(e, file);
+                onDrop: e => {
+                    const file = fileOf(e);
+                    if (file) this.onDrop(e, file);
+                },
+                onDragenter: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragEnter(e, file);
                     else e.preventDefault();
                 },
-                onDragover(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) { e.preventDefault(); return; }
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragOver(e, file);
+                onDragover: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragOver(e, file);
                     else e.preventDefault();
                 },
-                onDragleave(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragLeave(e, file);
+                onDragleave: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragLeave(e, file);
                 },
                 draggable: this.canWrite
             };
@@ -352,8 +295,8 @@ export default {
             this.handleRightClick(event.originalEvent, event.data);
         },
 
-        goTo: function (itm) {
-            emitter.emit("folderOpened", pathutils.getTree(itm.path));
+        goToPath: function (path) {
+            emitter.emit("folderOpened", pathutils.getTree(path));
         },
 
         // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
@@ -520,33 +463,6 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-
-    :deep(.p-breadcrumb) {
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-size: 1rem;
-
-        .p-breadcrumb-separator {
-            color: var(--ddb-text-muted);
-            margin: 0 0.25rem;
-        }
-    }
-
-    .bc-link {
-        color: var(--ddb-link);
-        cursor: pointer;
-        text-decoration: none;
-
-        &:hover {
-            text-decoration: underline;
-        }
-    }
-
-    .bc-active {
-        color: inherit;
-        font-weight: 600;
-    }
 }
 
 #table-view {
@@ -573,20 +489,14 @@ export default {
         cursor: pointer;
     }
 
-    .sortable-header {
-        cursor: pointer;
-        user-select: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-
-        &:hover {
-            color: var(--ddb-primary);
-        }
-    }
 
     tr {
         cursor: pointer;
+    }
+
+    tr:focus-visible {
+        outline: 2px solid var(--ddb-primary);
+        outline-offset: -2px;
     }
 
     tr.row-selected {

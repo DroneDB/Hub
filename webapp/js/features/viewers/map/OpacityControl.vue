@@ -1,10 +1,10 @@
 <template>
     <div v-if="visible" class="opacity-control">
         <i class="fa-solid fa-adjust" />
-        <input type="range" min="0" max="1" step="0.05" :value="modelValue" title="Layer opacity" @input="$emit('update:modelValue', parseFloat($event.target.value))">
+        <input type="range" min="0" max="1" step="0.05" :value="modelValue" title="Layer opacity" aria-label="Layer opacity" @input="$emit('update:modelValue', parseFloat($event.target.value))">
         <span class="opacity-value">{{ Math.round(modelValue * 100) }}%</span>
         <button v-if="showPlantHealthBtn" class="ph-btn" :class="{ active: plantHealthActive }"
-                title="Plant Health" @click.stop="$emit('plant-health')">
+                title="Plant Health" aria-label="Plant Health" @click.stop="$emit('plant-health')">
             <i class="fa-solid fa-leaf" />
         </button>
     </div>

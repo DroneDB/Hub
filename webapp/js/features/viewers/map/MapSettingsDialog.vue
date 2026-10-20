@@ -2,42 +2,42 @@
     <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @close="$emit('close')">
         <div class="map-settings-content">
             <div class="setting-row">
-                <label class="setting-label align-items-baseline">
+                <label id="map-settings-dialog-basemap-label" for="map-settings-dialog-basemap" class="setting-label align-items-baseline">
                     <i class="fa-solid fa-map" /> Basemap
                 </label>
-                <Select :model-value="selectedBasemap" :options="basemapOptions" option-label="label" option-value="value" class="setting-select" @update:model-value="onBasemapChange" />
+                <Select input-id="map-settings-dialog-basemap" aria-labelledby="map-settings-dialog-basemap-label" :model-value="selectedBasemap" :options="basemapOptions" option-label="label" option-value="value" class="setting-select" @update:model-value="onBasemapChange" />
             </div>
 
             <div v-if="selectedBasemap === 'custom'" class="custom-basemap-fields">
                 <div class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label id="map-settings-dialog-source-type-label" for="map-settings-dialog-source-type" class="setting-label align-items-baseline">
                         Source Type
                     </label>
-                    <Select v-model="customSourceType" :options="sourceTypeOptions" option-label="label" option-value="value" class="setting-select" @change="onSourceTypeChanged" />
+                    <Select v-model="customSourceType" input-id="map-settings-dialog-source-type" aria-labelledby="map-settings-dialog-source-type-label" :options="sourceTypeOptions" option-label="label" option-value="value" class="setting-select" @change="onSourceTypeChanged" />
                 </div>
                 <div class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label for="map-settings-dialog-url" class="setting-label align-items-baseline">
                         URL
                     </label>
-                    <InputText v-model="customUrl" class="setting-input"
+                    <InputText id="map-settings-dialog-url" v-model="customUrl" class="setting-input"
                                :placeholder="customSourceType === 'wms' ? 'https://example.com/wms' : 'https://example.com/{z}/{x}/{y}.png'"
                                @input="onUrlChanged" />
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label id="map-settings-dialog-layer-label" for="map-settings-dialog-layer" class="setting-label align-items-baseline">
                         Layer
                     </label>
                     <div class="layer-select-wrapper">
-                        <Select v-model="customLayerName" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" option-label="label" option-value="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
+                        <Select v-model="customLayerName" input-id="map-settings-dialog-layer" aria-labelledby="map-settings-dialog-layer-label" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" option-label="label" option-value="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
                         <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" title="Fetch layers" icon="fa-solid fa-arrows-rotate" :loading="wmsLayersLoading" aria-label="Fetch layers"
                                 text @click="fetchLayers" />
                     </div>
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label id="map-settings-dialog-tile-size-label" for="map-settings-dialog-tile-size" class="setting-label align-items-baseline">
                         Tile Size
                     </label>
-                    <Select v-model="customTileSize" :options="tileSizeOptions" option-label="label" option-value="value" class="setting-select" />
+                    <Select v-model="customTileSize" input-id="map-settings-dialog-tile-size" aria-labelledby="map-settings-dialog-tile-size-label" :options="tileSizeOptions" option-label="label" option-value="value" class="setting-select" />
                 </div>
                 <PrimeMessage v-if="customError" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
                     {{ customError }}
@@ -49,10 +49,10 @@
             </div>
 
             <div class="setting-row">
-                <label class="setting-label align-items-baseline">
+                <label id="map-settings-dialog-measurement-units-label" for="map-settings-dialog-measurement-units" class="setting-label align-items-baseline">
                     <i class="fa-solid fa-pencil" /> Measurement Units
                 </label>
-                <Select :model-value="unitPref" :options="unitOptions" option-label="label" option-value="value" class="setting-select ms-3" @update:model-value="onUnitsChange" />
+                <Select input-id="map-settings-dialog-measurement-units" aria-labelledby="map-settings-dialog-measurement-units-label" :model-value="unitPref" :options="unitOptions" option-label="label" option-value="value" class="setting-select ms-3" @update:model-value="onUnitsChange" />
             </div>
 
         </div>

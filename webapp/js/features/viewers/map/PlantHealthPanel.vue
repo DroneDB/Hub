@@ -2,20 +2,20 @@
     <div v-if="visible" class="plant-health-panel">
         <div class="panel-header">
             <span class="panel-title"><i class="fas fa-leaf" /> Plant Health</span>
-            <button class="close-btn" title="Close" @click="close"><i class="fas fa-times" /></button>
+            <button class="close-btn" title="Close" aria-label="Close" @click="close"><i class="fas fa-times" /></button>
         </div>
 
         <div v-if="rasterInfo" class="panel-body">
             <!-- Sensor Info -->
             <div v-if="rasterInfo.detectedSensor" class="section">
-                <label class="section-label">Sensor</label>
+                <span class="section-label">Sensor</span>
                 <span class="sensor-badge">{{ rasterInfo.detectedSensor }}</span>
             </div>
 
             <!-- Preset Selection -->
             <div v-if="rasterInfo.presets && rasterInfo.presets.length > 0" class="section">
-                <label class="section-label">Preset</label>
-                <select v-model="selectedPreset" class="panel-select" @change="onPresetChange">
+                <label for="plant-health-panel-preset" class="section-label">Preset</label>
+                <select id="plant-health-panel-preset" v-model="selectedPreset" class="panel-select" @change="onPresetChange">
                     <option value="">Custom...</option>
                     <option v-for="p in rasterInfo.presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                 </select>
@@ -23,16 +23,16 @@
 
             <!-- Formula Selection -->
             <div class="section">
-                <label class="section-label">
+                <label for="plant-health-panel-formula" class="section-label">
                     Formula
                     <button type="button" class="info-icon-btn"
-                            title="Learn more about each vegetation index"
+                            title="Learn more about each vegetation index" aria-label="Learn more about each vegetation index"
                             data-testid="plant-health-formulas-info"
                             @click="showFormulasInfo = true">
                         <i class="fas fa-info-circle" />
                     </button>
                 </label>
-                <select v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
+                <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
                     <option value="">None (bands only)</option>
                     <option v-for="f in availableFormulas" :key="f.id" :value="f.id"
                             :disabled="f.disabled"
@@ -44,9 +44,10 @@
 
             <!-- Band Mapping (when no formula) -->
             <div v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3" class="section">
-                <label class="section-label">Bands (R,G,B)</label>
+                <span id="plant-health-panel-bands-label" class="section-label">Bands (R,G,B)</span>
                 <BandSelector
                     v-model="customBands"
+                    aria-labelledby="plant-health-panel-bands-label"
                     :bands="rasterInfo.bands"
                     @update:model-value="debouncedApply" />
             </div>
@@ -61,17 +62,18 @@
 
             <!-- Colormap (when formula is active) -->
             <div v-if="selectedFormula" class="section">
-                <label class="section-label">Colormap</label>
+                <label id="plant-health-panel-colormap-label" for="plant-health-panel-colormap" class="section-label">Colormap</label>
                 <ColormapDropdown
                     v-model="selectedColormap"
+                    input-id="plant-health-panel-colormap" aria-labelledby="plant-health-panel-colormap-label"
                     :colormaps="availableColormaps"
                     @update:model-value="debouncedApply" />
             </div>
 
             <!-- Stretch Type -->
             <div v-if="selectedFormula" class="section">
-                <label class="section-label">Stretch</label>
-                <select v-model="selectedStretch" class="panel-select" @change="onStretchChange">
+                <label for="plant-health-panel-stretch" class="section-label">Stretch</label>
+                <select id="plant-health-panel-stretch" v-model="selectedStretch" class="panel-select" @change="onStretchChange">
                     <option value="percentile">Percentile (2%-98%)</option>
                     <option value="minmax">Min / Max</option>
                     <option value="stddev">Std Dev (±2σ)</option>
@@ -81,13 +83,13 @@
 
             <!-- Rescale (when formula is active) -->
             <div v-if="selectedFormula" class="section">
-                <label class="section-label">Rescale</label>
-                <input v-model="rescale" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" @change="onRescaleManualChange">
+                <label for="plant-health-panel-rescale" class="section-label">Rescale</label>
+                <input id="plant-health-panel-rescale" v-model="rescale" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" @change="onRescaleManualChange">
             </div>
 
             <!-- Histogram -->
             <div v-if="histogramData" class="section" style="margin-bottom: 1rem">
-                <label class="section-label">Histogram</label>
+                <span class="section-label">Histogram</span>
                 <HistogramChart
                     :data="histogramData"
                     :min="histogramMin"
@@ -99,7 +101,7 @@
 
             <!-- Statistics -->
             <div v-if="metadata && metadata.statistics" class="section">
-                <label class="section-label">Statistics</label>
+                <span class="section-label">Statistics</span>
                 <div class="stats-grid">
                     <span>Min: {{ formatNum(firstBandStats.min) }}</span>
                     <span>Max: {{ formatNum(firstBandStats.max) }}</span>

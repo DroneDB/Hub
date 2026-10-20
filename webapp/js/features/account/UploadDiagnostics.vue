@@ -7,24 +7,24 @@
                 then on six at once, and shows what the connection to this server can carry.
             </p>
 
-            <div v-if="result" class="results">
+            <dl v-if="result" class="results">
                 <div class="info-item">
-                    <label>Protocol</label>
-                    <p>{{ result.protocol || 'unknown' }}</p>
+                    <dt>Protocol</dt>
+                    <dd>{{ result.protocol || 'unknown' }}</dd>
                 </div>
                 <div class="info-item">
-                    <label>Round trip</label>
-                    <p>{{ result.rttMs.toFixed(0) }} ms</p>
+                    <dt>Round trip</dt>
+                    <dd>{{ result.rttMs.toFixed(0) }} ms</dd>
                 </div>
                 <div class="info-item">
-                    <label>One upload</label>
-                    <p>{{ format(result.singleMBps) }}</p>
+                    <dt>One upload</dt>
+                    <dd>{{ format(result.singleMBps) }}</dd>
                 </div>
                 <div class="info-item">
-                    <label>Six uploads at once</label>
-                    <p>{{ format(result.parallelMBps) }}</p>
+                    <dt>Six uploads at once</dt>
+                    <dd>{{ format(result.parallelMBps) }}</dd>
                 </div>
-            </div>
+            </dl>
 
             <Message v-if="result && result.hint" severity="warn" :closable="false" class="hint">
                 The reverse proxy window is limiting uploads: one upload stream runs at about
@@ -100,7 +100,12 @@ export default {
     margin: var(--ddb-spacing-md, 1rem) 0;
 }
 
-.results label {
+.results dd {
+    margin: 0;
+}
+
+.results dt {
+    font-weight: normal;
     font-size: 0.8rem;
     color: var(--ddb-text-muted, #666);
 }

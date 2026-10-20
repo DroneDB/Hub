@@ -1,19 +1,23 @@
 <template>
     <Teleport to="body">
-        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" tabindex="-1" @click.self="$emit('close')"
-             @keydown.esc="$emit('close')">
+        <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/no-static-element-interactions -- a click beside the video closes it; Escape (document listener) and the Close button are the keyboard way -->
+        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" role="dialog" aria-modal="true"
+             :aria-label="entryName || 'Video'" tabindex="-1" @click="onBackdropClick">
             <div class="video-lightbox-toolbar">
                 <div v-if="entry" class="video-lightbox-name">{{ entryName }}</div>
                 <div class="video-lightbox-actions">
-                    <a class="video-lightbox-action" :href="src" target="_blank" rel="noopener" title="Open in new tab">
-                        <i class="fa-solid fa-up-right-from-square" />
+                    <a class="video-lightbox-action" :href="src" target="_blank" rel="noopener"
+                       title="Open in new tab" aria-label="Open in new tab">
+                        <i class="fa-solid fa-up-right-from-square" aria-hidden="true" />
                     </a>
-                    <div class="video-lightbox-action" title="Close" @click="$emit('close')">
-                        <i class="fa-solid fa-xmark" />
-                    </div>
+                    <button type="button" class="btn-reset video-lightbox-action" title="Close" aria-label="Close"
+                            @click="$emit('close')">
+                        <i class="fa-solid fa-xmark" aria-hidden="true" />
+                    </button>
                 </div>
             </div>
-            <div class="video-lightbox-content" @click.self="$emit('close')">
+            <div ref="content" class="video-lightbox-content">
+                <!-- eslint-disable-next-line vuejs-accessibility/media-has-caption -- uploaded footage comes without caption files -->
                 <video ref="videoEl" :src="src" controls preload="metadata" class="video-lightbox-player"
                        @error="handleError" />
                 <div v-if="error" class="video-lightbox-error">
@@ -75,6 +79,10 @@ export default {
     methods: {
         handleError() {
             this.error = true;
+        },
+        // Only the empty space around the video and toolbar
+        onBackdropClick(e) {
+            if (e.target === this.$refs.overlay || e.target === this.$refs.content) this.$emit('close');
         },
         onKey(e) {
             if (this.visible && e.key === 'Escape') this.$emit('close');

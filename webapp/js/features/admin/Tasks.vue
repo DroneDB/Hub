@@ -12,11 +12,11 @@
         </div>
 
         <div class="filters d-flex gap-2 flex-wrap mb-3">
-            <Select v-model="selectedUser" :options="userOptions" option-label="label" option-value="value"
+            <Select v-model="selectedUser" aria-label="Filter by user" :options="userOptions" option-label="label" option-value="value"
                     placeholder="All users" filter show-clear class="filter-select" @change="onFilterChange" />
-            <Select v-model="selectedTool" :options="toolOptions" option-label="label" option-value="value"
+            <Select v-model="selectedTool" aria-label="Filter by tool" :options="toolOptions" option-label="label" option-value="value"
                     placeholder="All tools" show-clear class="filter-select" @change="onFilterChange" />
-            <Select v-model="selectedState" :options="stateOptions" option-label="label" option-value="value"
+            <Select v-model="selectedState" aria-label="Filter by state" :options="stateOptions" option-label="label" option-value="value"
                     placeholder="All States" class="filter-select" @change="onFilterChange" />
         </div>
 

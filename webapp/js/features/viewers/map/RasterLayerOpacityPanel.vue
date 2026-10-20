@@ -9,12 +9,13 @@
                 step="0.05"
                 :value="layer.opacity"
                 :title="'Opacity: ' + Math.round(layer.opacity * 100) + '%'"
+                :aria-label="'Opacity of ' + layer.name"
                 @input="onInput(layer, $event)"
             >
             <span class="opacity-value">{{ Math.round(layer.opacity * 100) }}%</span>
             <button v-if="layer.plantHealthCapable" class="ph-btn"
                     :class="{ active: activePlantHealthPath === layer.path }"
-                    title="Plant Health"
+                    title="Plant Health" aria-label="Plant Health"
                     @click.stop="$emit('plant-health', layer.path)">
                 <i class="fa-solid fa-leaf" />
             </button>
@@ -30,7 +31,7 @@
                     class="order-btn"
                     :class="{ 'order-btn--hidden': index === layers.length - 1 }"
                     :disabled="index === layers.length - 1"
-                    title="Move layer down"
+                    title="Move layer down" aria-label="Move layer down"
                     @click="index < layers.length - 1 && onReorder(index, index + 1)"
                 ><i class="fa-solid fa-chevron-down" /></button>
             </div>

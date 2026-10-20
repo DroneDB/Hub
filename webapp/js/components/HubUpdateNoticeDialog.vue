@@ -1,11 +1,6 @@
 <template>
-    <Dialog :visible="visible"
-            modal
-            header="DroneDB Hub updated"
-            :style="{ width: '480px' }"
-            :draggable="false"
-            :closable="true"
-            @update:visible="onVisibleChange">
+    <Window id="hubUpdateNotice" title="DroneDB Hub updated" modal fixed-position fixed-size size-class="dialog-md"
+            @close="$emit('close')" @confirm="$emit('close')">
 
         <div class="hub-update-body">
             <p>
@@ -43,13 +38,13 @@
         </div>
 
         <template #footer>
-            <Button label="OK" icon="fas fa-check" autofocus @click="dismiss" />
+            <Button label="OK" icon="fas fa-check" data-autofocus @click="$emit('close')" />
         </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
+import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
 const RELEASE_BASE = {
@@ -64,13 +59,14 @@ const RELEASE_BASE = {
  * Displays the previous and new versions with links to the GitHub release
  * notes for Hub, Registry, and DroneDB.
  *
+ * Mounted while there is a notice; `close` when dismissed.
+ *
  * Props:
- *   visible - Controls dialog visibility.
  *   notice  - Update object with { from, to, at } strings.
  */
 export default {
     name: 'HubUpdateNoticeDialog',
-    components: { Dialog, Button },
+    components: { Window, Button },
     props: {
         notice: {
             type: Object,
@@ -81,11 +77,6 @@ export default {
         ddbVersion: { type: String, default: null }
     },
     emits: ['close'],
-    data() {
-        return {
-            visible: !!this.notice
-        };
-    },
     computed: {
         hubReleaseUrl() {
             return this.hubVersion ? RELEASE_BASE.hub + this.hubVersion : '#';
@@ -97,21 +88,6 @@ export default {
             return this.ddbVersion ? RELEASE_BASE.ddb + this.ddbVersion : '#';
         }
     },
-    watch: {
-        notice(val) {
-            this.visible = !!val;
-        }
-    },
-    methods: {
-        onVisibleChange(v) {
-            this.visible = v;
-            if (!v) this.$emit('close');
-        },
-        dismiss() {
-            this.visible = false;
-            this.$emit('close');
-        }
-    }
 };
 </script>
 

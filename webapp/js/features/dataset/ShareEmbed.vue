@@ -11,7 +11,7 @@
                             option-group-label="label" option-group-children="items"
                             style="min-width: 9rem;" />
                     <Button v-if="hintsService" severity="secondary" text icon="fa-solid fa-circle-question"
-                            title="How to use this service" class="ms-1" @click="hintsOpen = true" />
+                            title="How to use this service" aria-label="How to use this service" class="ms-1" @click="hintsOpen = true" />
                 </div>
 
                 <!-- QGIS (legacy single-entry mode) -->
@@ -36,7 +36,7 @@
                                 </div>
                             </div>
                         </div>
-                        <UrlRow :value="qgisUrl" :copy-icon="copyIcon" @copy="copyToClipboard(qgisUrl)" />
+                        <UrlRow :value="qgisUrl" label="QGIS URL" :copy-icon="copyIcon" @copy="copyToClipboard(qgisUrl)" />
                     </template>
                     <PrimeMessage v-else severity="info" :closable="false">
                         <strong>Not supported</strong> - This file cannot be streamed directly into QGIS (download it instead).
@@ -55,12 +55,12 @@
                         </PrimeMessage>
                         <template v-else>
                             <div v-if="shareMode === 'embed'" class="share-embed-row">
-                                <Textarea readonly :model-value="legacyUrl"
+                                <Textarea readonly :model-value="legacyUrl" aria-label="Embed code"
                                           class="share-textarea" @click="copyToClipboard(legacyUrl)" />
-                                <Button title="Copy to clipboard" :icon="copyIcon"
+                                <Button title="Copy to clipboard" aria-label="Copy to clipboard" :icon="copyIcon"
                                         text @click="copyToClipboard(legacyUrl)" />
                             </div>
-                            <UrlRow v-else :value="legacyUrl" :copy-icon="copyIcon" @copy="copyToClipboard(legacyUrl)" />
+                            <UrlRow v-else :value="legacyUrl" label="Share link" :copy-icon="copyIcon" @copy="copyToClipboard(legacyUrl)" />
                         </template>
                     </template>
                 </div>
@@ -80,7 +80,7 @@
                         <template v-else>
                             <div v-for="row in ogcRows" :key="row.label">
                                 <div class="ogc-row-label">{{ row.label }}</div>
-                                <UrlRow :value="row.url" :copy-icon="copyIcon" @copy="copyToClipboard(row.url)" />
+                                <UrlRow :value="row.url" :label="row.label" :copy-icon="copyIcon" @copy="copyToClipboard(row.url)" />
                             </div>
                         </template>
                     </template>

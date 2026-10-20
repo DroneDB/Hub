@@ -9,27 +9,27 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="d-block mb-1 fw-semibold">Dataset Name</label>
-                            <InputText ref="name" v-model="ds.name"
+                            <label for="dataset-dialog-dataset-name" class="d-block mb-1 fw-semibold">Dataset Name</label>
+                            <InputText id="dataset-dialog-dataset-name" ref="name" v-model="ds.name"
                                        placeholder="Dataset Name" class="w-100" />
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="d-block mb-1 fw-semibold">Visibility</label>
-                            <Select v-model="ds.visibility" :options="visibilityOptions" option-label="label" option-value="value" placeholder="Select visibility" class="w-100" />
+                            <label id="dataset-dialog-visibility-label" for="dataset-dialog-visibility" class="d-block mb-1 fw-semibold">Visibility</label>
+                            <Select v-model="ds.visibility" input-id="dataset-dialog-visibility" aria-labelledby="dataset-dialog-visibility-label" :options="visibilityOptions" option-label="label" option-value="value" placeholder="Select visibility" class="w-100" />
                         </div>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Dataset Slug</label>
+                    <span class="d-block mb-1 fw-semibold">Dataset Slug</span>
                     <PrimeMessage severity="info" :closable="false">
                         <small>{{ ds.name ? slugFromName(ds.name) : "" }}</small>
                     </PrimeMessage>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Tagline</label>
-                    <InputText v-model="ds.tagline" maxlength="256"
+                    <label for="dataset-dialog-tagline" class="d-block mb-1 fw-semibold">Tagline</label>
+                    <InputText id="dataset-dialog-tagline" v-model="ds.tagline" maxlength="256"
                                placeholder="Brief description of your dataset (max 256 chars)" class="w-100" />
                     <small class="char-count">{{ ds.tagline ? ds.tagline.length : 0 }}/256</small>
                 </div>

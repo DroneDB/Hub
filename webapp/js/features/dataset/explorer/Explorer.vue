@@ -3,19 +3,12 @@
         <ContextMenu :items="contextMenu" />
         <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="mt-3 ms-3">
-                <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon" />
-                        <template v-else>{{ item.label }}</template>
-                    </a>
-                    <span v-else class="bc-active">{{ item.label }}</span>
-                </template>
-                <template #separator> / </template>
-            </Breadcrumb>
+            <PathBreadcrumb :path="currentPath" root-path="/" class="mt-3 ms-3" @navigate="goToPath" />
             <!--<div class="ui divider"></div>-->
         </div>
-        <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }" @click="onClick"
+        <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }"
+             role="listbox" aria-label="Files" aria-multiselectable="true" tabindex="-1"
+             @click="onClick" @keydown.esc="clearSelection"
              @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)" @dragover.prevent>
             <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment m-3 w-100">
@@ -31,7 +24,7 @@
             <VirtualScroller v-else-if="virtualGrid" ref="grid" v-slot="{ item: row }" class="thumbnail-grid"
                              :items="gridRows" :item-size="gridRowHeight" :min-height="0">
                 <div class="thumbnail-row">
-                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
+                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" role="presentation" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
                          @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                          @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                          @dragleave="itemDragLeave($event, f)">
@@ -41,7 +34,7 @@
                 </div>
             </VirtualScroller>
             <template v-else>
-                <div v-for="(f, idx) in files" :key="'E,' + f.path" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
+                <div v-for="(f, idx) in files" :key="'E,' + f.path" role="presentation" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
                      @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                      @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                      @dragleave="itemDragLeave($event, f)">
@@ -75,7 +68,7 @@ const { pathutils } = ddb;
 
 import { entry } from 'ddb';
 import ContextMenu from '@/components/ContextMenu';
-import Breadcrumb from 'primevue/breadcrumb';
+import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
 import { getCurrentInstance } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
@@ -83,7 +76,7 @@ import { useFileSelection } from '@/composables/useFileSelection';
 export default {
     name: 'DatasetExplorer',
     components: {
-        Thumbnail, Toolbar, ContextMenu, Breadcrumb, VirtualScroller
+        Thumbnail, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
     },
     // Thumbnails load as they come into view, a few at a time (HUB-03)
     provide: function () {
@@ -144,39 +137,6 @@ export default {
         selectedFiles: function () {
             return this.files.filter(f => f.selected);
         },
-        breadcrumbs: function () {
-            if (this.currentPath == null || this.currentPath.length == 0) return null;
-
-            var folders = this.currentPath.split('/');
-            var cur = "";
-            var bc = [];
-
-            for (var el of folders) {
-                cur += '/' + el;
-
-                bc.push({
-                    path: cur.substring(1),
-                    name: el
-                });
-            }
-
-            if (bc.length > 0) {
-                bc.unshift({
-                    path: "/",
-                    name: "~"
-                })
-            }
-
-            return bc;
-        },
-        breadcrumbHome: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
-            const home = this.breadcrumbs[0];
-            return {
-                icon: 'fa-solid fa-home',
-                command: () => this.goTo(home)
-            };
-        },
         virtualGrid: function () {
             return this.files.length >= VIRTUAL_GRID_MIN_FILES;
         },
@@ -195,15 +155,6 @@ export default {
             }
             return rows;
         },
-        breadcrumbItems: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
-            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
-                if (idx < arr.length - 1) {
-                    return { label: b.name, command: () => this.goTo(b) };
-                }
-                return { label: b.name };
-            });
-        }
     },
     mounted: function () {
         // Columns of the virtual grid follow the explorer's width
@@ -223,8 +174,8 @@ export default {
 
 
 
-        goTo: function (itm) {
-            emitter.emit("folderOpened", pathutils.getTree(itm.path));
+        goToPath: function (path) {
+            emitter.emit("folderOpened", pathutils.getTree(path));
         },
 
         // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
@@ -335,33 +286,6 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-
-    :deep(.p-breadcrumb) {
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-size: 1rem;
-
-        .p-breadcrumb-separator {
-            color: var(--ddb-text-muted);
-            margin: 0 0.25rem;
-        }
-    }
-
-    .bc-link {
-        color: var(--ddb-link);
-        cursor: pointer;
-        text-decoration: none;
-
-        &:hover {
-            text-decoration: underline;
-        }
-    }
-
-    .bc-active {
-        color: inherit;
-        font-weight: 600;
-    }
 }
 #explorer.virtual {
     display: block;

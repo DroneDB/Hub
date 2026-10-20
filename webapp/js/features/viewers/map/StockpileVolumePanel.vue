@@ -4,21 +4,21 @@
             <span class="panel-title">
                 <i class="fa-solid fa-layer-group" /> Stockpile Volume
             </span>
-            <button class="close-btn" title="Close" @click="$emit('close')"><i class="fas fa-times" /></button>
+            <button class="close-btn" title="Close" aria-label="Close" @click="$emit('close')"><i class="fas fa-times" /></button>
         </div>
 
         <div class="panel-body">
             <div class="section">
-                <label class="section-label">
+                <label for="stockpile-volume-panel-base-plane-method" class="section-label">
                     Base Plane Method
                     <button type="button" class="info-icon-btn"
-                            :title="baseMethodTooltip"
+                            :title="baseMethodTooltip" :aria-label="baseMethodTooltip"
                             data-testid="stockpile-base-method-info"
                             @click="showBaseMethodsInfo = true">
                         <i class="fas fa-info-circle" />
                     </button>
                 </label>
-                <select v-model="localBaseMethod" class="panel-select" data-testid="stockpile-base-method">
+                <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select" data-testid="stockpile-base-method">
                     <option value="lowest_perimeter">Lowest perimeter</option>
                     <option value="average_perimeter">Average perimeter</option>
                     <option value="best_fit">Best-fit plane</option>
@@ -27,20 +27,20 @@
             </div>
 
             <div class="section">
-                <label class="section-label">Detection Sensitivity: <strong>{{ localSensitivity.toFixed(2) }}</strong></label>
-                <input v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
+                <label for="stockpile-volume-panel-detection-sensitivity" class="section-label">Detection Sensitivity: <strong>{{ localSensitivity.toFixed(2) }}</strong></label>
+                <input id="stockpile-volume-panel-detection-sensitivity" v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
                        class="panel-range" data-testid="stockpile-sensitivity">
             </div>
 
             <div class="section">
-                <label class="section-label">Search Radius (m)</label>
-                <input v-model.number="localRadius" type="number" min="5" step="5"
+                <label for="stockpile-volume-panel-search-radius" class="section-label">Search Radius (m)</label>
+                <input id="stockpile-volume-panel-search-radius" v-model.number="localRadius" type="number" min="5" step="5"
                        class="panel-input" data-testid="stockpile-radius">
             </div>
 
             <div v-if="materials && materials.length" class="section">
-                <label class="section-label">Material (optional)</label>
-                <select v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
+                <label for="stockpile-volume-panel-material" class="section-label">Material (optional)</label>
+                <select id="stockpile-volume-panel-material" v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
                     <option :value="null">- none -</option>
                     <option v-for="m in materials" :key="m.slug" :value="m.slug">
                         {{ m.name }} ({{ m.densityTonPerM3 }} t/m³)
@@ -87,14 +87,14 @@
             <div v-if="mode === 'click'" class="section click-banner" data-testid="stockpile-click-banner">
                 <i class="fa-solid fa-crosshairs" />
                 <span>Click on the map to detect a pile (ESC to cancel).</span>
-                <button class="banner-cancel" title="Cancel" @click="$emit('cancelMode')">
+                <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
                     <i class="fas fa-times" />
                 </button>
             </div>
             <div v-else-if="mode === 'draw'" class="section click-banner" data-testid="stockpile-draw-banner">
                 <i class="fa-solid fa-draw-polygon" />
                 <span>Draw a polygon around the pile (double-click to finish, ESC to cancel).</span>
-                <button class="banner-cancel" title="Cancel" @click="$emit('cancelMode')">
+                <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
                     <i class="fas fa-times" />
                 </button>
             </div>
@@ -104,15 +104,15 @@
             </div>
 
             <div v-if="result" class="section result" data-testid="stockpile-result">
-                <label class="section-label">Identification</label>
-                <input v-model="localTitle" type="text" class="panel-input"
+                <label for="stockpile-volume-panel-identification" class="section-label">Identification</label>
+                <input id="stockpile-volume-panel-identification" v-model="localTitle" type="text" class="panel-input"
                        placeholder="Title (e.g. North pile)" maxlength="120"
                        data-testid="stockpile-title">
-                <textarea v-model="localDescription" class="panel-input panel-textarea"
+                <textarea v-model="localDescription" class="panel-input panel-textarea" aria-label="Description"
                           rows="2" placeholder="Description (optional)" maxlength="500"
                           data-testid="stockpile-description" />
 
-                <label class="section-label">Result</label>
+                <span class="section-label">Result</span>
                 <div class="result-grid">
                     <span class="result-label">Cut volume</span>
                     <span class="result-value">{{ formatVolume(result.cutVolume) }}</span>

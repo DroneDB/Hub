@@ -4,7 +4,7 @@
             <span class="panel-title">
                 <i :class="panelIconClass" /> {{ panelTitle }}
             </span>
-            <button class="close-btn" title="Close" @click="close"><i class="fas fa-times" /></button>
+            <button class="close-btn" title="Close" aria-label="Close" @click="close"><i class="fas fa-times" /></button>
         </div>
 
         <div v-if="rasterInfo" class="panel-body">
@@ -17,7 +17,7 @@
 
             <!-- Value Range -->
             <div v-if="!loadError" class="section">
-                <label class="section-label">{{ rangeLabel }}</label>
+                <span class="section-label">{{ rangeLabel }}</span>
                 <div class="temp-range" :class="{ 'thermal': isThermal }">
                     <span>{{ formatValue(rasterInfo.valueMin) }}</span>
                     <span>-</span>
@@ -27,41 +27,42 @@
 
             <!-- Sensor Info -->
             <div v-if="rasterInfo.sensorId" class="section">
-                <label class="section-label">Sensor</label>
+                <span class="section-label">Sensor</span>
                 <span class="sensor-badge" :class="{ thermal: isThermal }">{{ rasterInfo.sensorId }}</span>
             </div>
 
             <!-- Unit (thermal: °C/K toggle; generic: free text with autodetected default) -->
             <div v-if="isThermal && rasterInfo.calibration" class="section">
-                <label class="section-label">Unit</label>
-                <select v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
+                <label for="raster-analysis-controls-unit" class="section-label">Unit</label>
+                <select id="raster-analysis-controls-unit" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
                     <option value="CELSIUS">Celsius (°C)</option>
                     <option value="KELVIN">Kelvin (K)</option>
                 </select>
             </div>
             <div v-else-if="!isThermal" class="section">
-                <label class="section-label">Unit</label>
-                <input v-model="unitLabel" class="panel-input" placeholder="e.g. m, ft">
+                <label for="raster-analysis-controls-unit-name" class="section-label">Unit</label>
+                <input id="raster-analysis-controls-unit-name" v-model="unitLabel" class="panel-input" placeholder="e.g. m, ft">
             </div>
 
             <!-- Colormap -->
             <div class="section">
-                <label class="section-label">Colormap</label>
+                <label id="raster-analysis-controls-colormap-label" for="raster-analysis-controls-colormap" class="section-label">Colormap</label>
                 <ColormapDropdown
                     v-model="selectedColormap"
+                    input-id="raster-analysis-controls-colormap" aria-labelledby="raster-analysis-controls-colormap-label"
                     :colormaps="availableColormaps"
                     @update:model-value="debouncedApply" />
             </div>
 
             <!-- Rescale -->
             <div class="section">
-                <label class="section-label">Rescale</label>
-                <input v-model="rescale" class="panel-input" placeholder="e.g. 0,50 (auto if empty)" @change="onRescaleChange">
+                <label for="raster-analysis-controls-rescale" class="section-label">Rescale</label>
+                <input id="raster-analysis-controls-rescale" v-model="rescale" class="panel-input" placeholder="e.g. 0,50 (auto if empty)" @change="onRescaleChange">
             </div>
 
             <!-- Spot Info -->
             <div v-if="spotInfo" class="section">
-                <label class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</label>
+                <span class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</span>
                 <div class="spot-info">
                     <span class="spot-temp" :class="{ thermal: isThermal }">{{ formatValue(spotInfo.value) }}</span>
                     <span class="spot-coords">({{ spotInfo.x }}, {{ spotInfo.y }})</span>
@@ -70,7 +71,7 @@
 
             <!-- Area Stats -->
             <div v-if="areaStats" class="section">
-                <label class="section-label">Area Statistics</label>
+                <span class="section-label">Area Statistics</span>
                 <div class="stats-grid">
                     <span>Min: {{ formatValue(areaStats.min) }}</span>
                     <span>Max: {{ formatValue(areaStats.max) }}</span>
@@ -83,9 +84,9 @@
 
             <!-- Profile (elevation / value along a polyline) -->
             <div v-if="!loadError" class="section">
-                <label class="section-label">
+                <span class="section-label">
                     {{ isThermal ? 'Thermal Profile' : 'Value Profile' }}
-                </label>
+                </span>
                 <div v-if="profileError" class="profile-error">
                     <i class="fas fa-exclamation-triangle" /> {{ profileError }}
                 </div>
@@ -93,7 +94,7 @@
                                     :profile="profile"
                                     :unit="displayUnit"
                                     :is-thermal="isThermal"
-                                    @hover="onProfileHover" />
+                                    @active-sample="onProfileHover" />
             </div>
             <!-- Actions: two rows so each button has room for a short label -->
             <div class="section actions actions-grid">
@@ -110,7 +111,7 @@
                     {{ drawingProfile ? 'Stop' : (profile ? 'Redraw' : 'Profile') }}
                 </button>
                 <button v-if="profile && !drawingProfile" class="btn btn-link btn-sm action-btn"
-                        title="Clear the chart and remove the line from the map"
+                        title="Clear the chart and remove the line from the map" aria-label="Clear the chart and remove the line from the map"
                         @click="clearProfile">
                     <i class="fas fa-eraser" />
                 </button>

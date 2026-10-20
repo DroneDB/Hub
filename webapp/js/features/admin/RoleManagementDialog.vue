@@ -44,8 +44,8 @@
                         <h4>Add New Role</h4>
                         <form class="form" :class="{ error: !!error }" @submit.prevent>
                             <div class="field">
-                                <label>Role Name</label>
-                                <InputText ref="txtRoleName" v-model="newRoleName" placeholder="Enter role name"
+                                <label for="role-management-dialog-role-name">Role Name</label>
+                                <InputText id="role-management-dialog-role-name" ref="txtRoleName" v-model="newRoleName" placeholder="Enter role name"
                                            class="w-full" @keydown="clearError()" @keyup.enter="confirmAddRole()" />
                                 <small>Role names should be descriptive (e.g., "Editor", "Viewer", "Manager")</small>
                             </div>

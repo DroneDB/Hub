@@ -166,6 +166,21 @@ test('dialogs: Escape closes, Enter confirms', async () => {
     await page.waitForSelector('#explorer >> text=smoke-folder', { timeout: 15000 });
 });
 
+test('dataset page: the file grid works from the keyboard', async () => {
+    const tile = page.locator('#explorer [role="option"]', { hasText: 'smoke-folder' });
+    await tile.focus();
+    await page.keyboard.press('Space');
+    assert.equal(await tile.getAttribute('aria-selected'), 'true');
+    await page.keyboard.press('Escape');
+    assert.equal(await tile.getAttribute('aria-selected'), 'false');
+    await tile.focus();
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('#explorer-container [aria-current="location"]:has-text("smoke-folder")', { timeout: 10000 });
+    await page.click('#explorer-container button[aria-label="Root folder"]');
+    await page.waitForSelector('#explorer-container [aria-current="location"]', { state: 'detached', timeout: 10000 });
+    await page.waitForSelector(`#explorer >> text=${path.basename(FILES.scratch)}`, { timeout: 10000 });
+});
+
 test('dataset page: rename and delete through the toolbar and the Delete key', async () => {
     await page.click(`#explorer >> text=${path.basename(FILES.scratch)}`);
     await page.click('[title="Rename"]');

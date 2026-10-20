@@ -2,18 +2,15 @@
     <div ref="container" class="histogram-chart">
         <Chart type="bar" :data="chartData" :options="chartOptions" :height="height" />
         <!-- Drag handles for min/max rescale -->
-        <div ref="overlay" class="handles-overlay"
-             @mousedown="onOverlayMouseDown"
-             @touchstart.prevent="onOverlayTouchStart">
-            <div class="handle handle-min" :style="{ left: minHandlePos + '%' }"
-                 @mousedown.stop="startDrag('min', $event)"
-                 @touchstart.stop.prevent="startDragTouch('min', $event)">
-                <div class="handle-label">{{ formatVal(currentMin) }}</div>
-            </div>
-            <div class="handle handle-max" :style="{ left: maxHandlePos + '%' }"
-                 @mousedown.stop="startDrag('max', $event)"
-                 @touchstart.stop.prevent="startDragTouch('max', $event)">
-                <div class="handle-label">{{ formatVal(currentMax) }}</div>
+        <div ref="overlay" class="handles-overlay">
+            <div v-for="h in handles" :key="h.id" class="handle" :class="'handle-' + h.id" :style="{ left: h.pos + '%' }"
+                 role="slider" tabindex="0" :aria-label="h.label" aria-orientation="horizontal"
+                 :aria-valuemin="dataMin" :aria-valuemax="dataMax" :aria-valuenow="h.value"
+                 :aria-valuetext="formatVal(h.value)"
+                 @mousedown.stop="startDrag(h.id, $event)"
+                 @touchstart.stop.prevent="startDragTouch(h.id, $event)"
+                 @keydown="onHandleKey(h.id, $event)" @keyup="onHandleKeyUp">
+                <div class="handle-label">{{ formatVal(h.value) }}</div>
             </div>
             <!-- Shaded regions outside the range -->
             <div class="shade shade-left" :style="{ width: minHandlePos + '%' }" />
@@ -24,6 +21,8 @@
 
 <script>
 import Chart from 'primevue/chart';
+
+const HANDLE_KEYS = ['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'];
 
 /**
  * HistogramChart - Interactive bar histogram with draggable min/max rescale handles.
@@ -75,6 +74,12 @@ export default {
         },
         maxHandlePos() {
             return ((this.currentMax - this.dataMin) / this.dataRange) * 100;
+        },
+        handles() {
+            return [
+                { id: 'min', label: 'Range minimum', value: this.currentMin, pos: this.minHandlePos },
+                { id: 'max', label: 'Range maximum', value: this.currentMax, pos: this.maxHandlePos }
+            ];
         },
         chartData() {
             const counts = this.data.counts || [];
@@ -208,16 +213,40 @@ export default {
 
         onDragMove(event) {
             if (!this.dragging) return;
-            const val = this.getPositionFromEvent(event);
-            if (this.dragging === 'min') {
-                this.currentMin = Math.min(val, this.currentMax - this.dataRange * 0.01);
+            this.setHandle(this.dragging, this.getPositionFromEvent(event));
+        },
+
+        // The handles keep 1% of the data range between them and stay inside it
+        setHandle(handle, val) {
+            const gap = this.dataRange * 0.01;
+            if (handle === 'min') {
+                this.currentMin = Math.max(this.dataMin, Math.min(val, this.currentMax - gap));
             } else {
-                this.currentMax = Math.max(val, this.currentMin + this.dataRange * 0.01);
+                this.currentMax = Math.min(this.dataMax, Math.max(val, this.currentMin + gap));
             }
         },
 
-        onOverlayMouseDown() {},
-        onOverlayTouchStart() {}
+        // Arrows move 1% of the range (10% with Shift), Home/End go to the ends;
+        // the range is applied when the key is released, not on every repeat
+        onHandleKey(handle, e) {
+            const step = this.dataRange * (e.shiftKey ? 0.1 : 0.01);
+            const current = handle === 'min' ? this.currentMin : this.currentMax;
+            const targets = {
+                ArrowLeft: current - step,
+                ArrowDown: current - step,
+                ArrowRight: current + step,
+                ArrowUp: current + step,
+                Home: this.dataMin,
+                End: this.dataMax
+            };
+            if (!HANDLE_KEYS.includes(e.key)) return;
+            e.preventDefault();
+            this.setHandle(handle, targets[e.key]);
+        },
+
+        onHandleKeyUp(e) {
+            if (HANDLE_KEYS.includes(e.key)) this.$emit('update:range', { min: this.currentMin, max: this.currentMax });
+        }
     }
 };
 </script>
@@ -246,6 +275,11 @@ export default {
     cursor: ew-resize;
     pointer-events: all;
     z-index: 2;
+}
+
+.handle:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: 1px;
 }
 
 .handle::after {

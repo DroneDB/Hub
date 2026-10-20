@@ -12,19 +12,19 @@
 
             <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Current Password</label>
-                    <Password ref="txtCurrentPassword" v-model="currentPassword" placeholder="Enter current password"
+                    <label for="change-password-dialog-current-password" class="d-block mb-1 fw-semibold">Current Password</label>
+                    <Password ref="txtCurrentPassword" v-model="currentPassword" input-id="change-password-dialog-current-password" placeholder="Enter current password"
                               :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                     <small>Leave empty if you don't know the current password (admin override)</small>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password v-model="newPassword" placeholder="Enter new password"
+                    <label for="change-password-dialog-new-password" class="d-block mb-1 fw-semibold">New Password</label>
+                    <Password v-model="newPassword" input-id="change-password-dialog-new-password" placeholder="Enter new password"
                               :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password v-model="confirmPassword" placeholder="Confirm new password"
+                    <label for="change-password-dialog-confirm-new-password" class="d-block mb-1 fw-semibold">Confirm New Password</label>
+                    <Password v-model="confirmPassword" input-id="change-password-dialog-confirm-new-password" placeholder="Confirm new password"
                               :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                 </div>
             </form>

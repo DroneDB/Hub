@@ -7,7 +7,7 @@
                     {{ file.label }}
                 </div>
             </h3>
-            <Button severity="secondary" outlined title="Close" icon="fa-solid fa-xmark" @click="handleClose" />
+            <Button severity="secondary" outlined title="Close" aria-label="Close" icon="fa-solid fa-xmark" @click="handleClose" />
         </div>
 
         <div class="detail-content">
@@ -15,7 +15,7 @@
             <div v-if="hasThumbnailSupport" class="thumbnail-section">
                 <div class="thumbnail-container">
                     <img v-if="thumbnail && !loading && !buildLoading"
-                         :src="thumbnail"
+                         :src="thumbnail" alt="Preview"
                          class="detail-thumbnail"
                          @error="handleImageError">
 

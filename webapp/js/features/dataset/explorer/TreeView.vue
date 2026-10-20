@@ -1,6 +1,7 @@
 <template>
     <div ref="treeView" class="tree-view"
-         tabindex="0"
+         tabindex="0" role="tree" aria-label="Folders" aria-multiselectable="true"
+         :aria-activedescendant="focusedNode ? focusedNode.domId : undefined"
          :class="{ dropping }"
          @keydown="onKeyDown"
          @drop="explorerDropHandler($event)"
@@ -220,6 +221,10 @@ export default {
             const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
             if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Enter') {
+                if (this.focusedNode) this.focusedNode.handleOpenDblClick(e);
+                return;
+            }
             if (['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'].indexOf(e.key) === -1) return;
 
             const visible = this.buildVisibleNodes();

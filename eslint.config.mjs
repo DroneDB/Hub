@@ -43,7 +43,7 @@ export default [
     },
     // HQ-01: mixins, $parent, raw storage and raw network calls may not spread
     ...guardConfigs(),
-    // HQ-01/HQ-10: accessibility rules; files with findings today are listed in a11y.mjs
+    // HQ-01/HQ-10: accessibility rules on every component (no exceptions list)
     ...a11yConfigs(),
     {
         files: ['webapp/**/*.spec.js', 'webapp/**/*.test.js', 'test-setup.js'],

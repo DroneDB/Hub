@@ -6,6 +6,7 @@
                     <iframe
                         ref="pdfFrame"
                         :src="pdfUrl"
+                        :title="windowTitle"
                         frameborder="0"
                         class="pdf-iframe"
                     />

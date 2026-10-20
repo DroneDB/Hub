@@ -11,31 +11,32 @@
 <template>
     <div class="odm-option-row">
         <div class="odm-option-label">
-            <span class="odm-option-name">{{ option.name }}</span>
+            <span :id="labelId" class="odm-option-name">{{ option.name }}</span>
             <span v-if="domainLabel" class="odm-option-domain">({{ domainLabel }})</span>
             <i v-if="interpolatedHelp" v-tooltip.bottom="interpolatedHelp"
-               class="fa-solid fa-circle-info odm-option-help" />
+               class="fa-solid fa-circle-info odm-option-help" aria-hidden="true" />
+            <span v-if="interpolatedHelp" :id="helpId" class="visually-hidden">{{ interpolatedHelp }}</span>
         </div>
 
         <div class="odm-option-control">
             <!-- Boolean: checkbox -->
-            <Checkbox v-if="option.type === 'bool'" v-model="localValue" :binary="true" />
+            <Checkbox v-if="option.type === 'bool'" v-model="localValue" :binary="true" :aria-labelledby="labelId" :aria-describedby="helpId" />
 
             <!-- Enum: select dropdown -->
-            <Select v-else-if="isEnum" v-model="localValue" :options="enumChoices"
+            <Select v-else-if="isEnum" v-model="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" :options="enumChoices"
                     option-label="label" option-value="value" class="w-100" />
 
             <!-- JSON: textarea with file import -->
-            <Textarea v-else-if="option.type === 'json'" v-model="localValue" rows="2"
+            <Textarea v-else-if="option.type === 'json'" v-model="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" rows="2"
                       placeholder="Paste JSON..." class="w-100" />
 
             <!-- String, int, float: text input -->
-            <InputText v-else v-model="localValue" :placeholder="option.defaultValue ?? ''" class="w-100" />
+            <InputText v-else v-model="localValue" :aria-labelledby="labelId" :aria-describedby="helpId" :placeholder="option.defaultValue ?? ''" class="w-100" />
         </div>
 
         <div class="odm-option-actions">
             <Button v-if="hasChanged" type="button" severity="secondary" text icon="fa-solid fa-rotate-left"
-                    class="odm-reset-btn" @click="resetToDefault" />
+                    class="odm-reset-btn" :aria-label="`Reset ${option.name} to default`" @click="resetToDefault" />
         </div>
 
         <div v-if="showWarning" class="odm-option-warning">
@@ -51,6 +52,7 @@ import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Button from 'primevue/button';
 import Tooltip from 'primevue/tooltip';
+import { useId } from 'vue';
 
 const warnings = {
     'ignore-gsd': 'You might run out of memory if you use this option.'
@@ -69,6 +71,10 @@ export default {
 
     emits: ['update:value'],
 
+    setup() {
+        return { labelId: useId() };
+    },
+
     data() {
         return {
             localValue: this.option.value !== undefined ? this.option.value : ''
@@ -76,6 +82,10 @@ export default {
     },
 
     computed: {
+        // The option name labels the control, its help describes it (the tooltip is mouse-only)
+        helpId() {
+            return this.interpolatedHelp ? this.labelId + '-help' : undefined;
+        },
         isEnum() {
             return this.option.type === 'enum' && Array.isArray(this.option.domain);
         },

@@ -9,21 +9,22 @@
                 <template v-for="group in groupedStructure.groups" :key="group.id">
                     <!-- Group header row -->
                     <div class="group-row" :style="{ borderLeftColor: group.color }">
-                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'"
+                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has(group.id) ? 'Expand' : 'Collapse'"
                                 @click="toggleGroupCollapse(group.id)">
                             <i :class="collapsedGroups.has(group.id) ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                         </button>
-                        <button class="btn-icon btn-visibility" :title="group.visible ? 'Hide group' : 'Show group'"
+                        <button class="btn-icon btn-visibility" :title="group.visible ? 'Hide group' : 'Show group'" :aria-label="group.visible ? 'Hide group' : 'Show group'"
                                 @click="$emit('toggleGroupVisibility', group.id)">
                             <i :class="group.visible ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash'" />
                         </button>
+                        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- double click is a shortcut for the Rename button -->
                         <span class="group-name" @dblclick="startRenameGroup(group)">{{ group.name }}</span>
                         <span class="group-count">({{ group.items.length }})</span>
                         <div class="group-actions">
-                            <button class="btn-icon btn-rename" title="Rename group" @click="startRenameGroup(group)">
+                            <button class="btn-icon btn-rename" title="Rename group" aria-label="Rename group" @click="startRenameGroup(group)">
                                 <i class="fa-solid fa-pencil" />
                             </button>
-                            <button class="btn-icon btn-delete-group" title="Delete group and its measurements" @click="confirmDeleteGroup(group)">
+                            <button class="btn-icon btn-delete-group" title="Delete group and its measurements" aria-label="Delete group and its measurements" @click="confirmDeleteGroup(group)">
                                 <i class="fa-solid fa-trash" />
                             </button>
                         </div>
@@ -37,15 +38,15 @@
                             <span class="measurement-value">{{ m.value || '' }}</span>
                             <div class="measurement-actions">
                                 <select class="group-select" :value="m.groupId || ''"
-                                        title="Move to group"
+                                        title="Move to group" aria-label="Move to group"
                                         @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <button class="btn-icon btn-edit" title="Edit" @click="$emit('editMeasurement', m)">
+                                <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
                                     <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" title="Delete" @click="confirmDelete(m)">
+                                <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
                                     <i class="fa-solid fa-trash" />
                                 </button>
                             </div>
@@ -56,7 +57,7 @@
                 <!-- Ungrouped measurements -->
                 <template v-if="groupedStructure.ungrouped.length > 0">
                     <div v-if="groups.length > 0" class="group-row group-row--ungrouped">
-                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'"
+                        <button class="btn-icon btn-collapse" :title="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'" :aria-label="collapsedGroups.has('__ungrouped__') ? 'Expand' : 'Collapse'"
                                 @click="toggleGroupCollapse('__ungrouped__')">
                             <i :class="collapsedGroups.has('__ungrouped__') ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'" />
                         </button>
@@ -71,15 +72,15 @@
                             <span class="measurement-value">{{ m.value || '' }}</span>
                             <div class="measurement-actions">
                                 <select v-if="groups.length > 0" class="group-select" :value="m.groupId || ''"
-                                        title="Move to group"
+                                        title="Move to group" aria-label="Move to group"
                                         @change="$emit('moveMeasurementToGroup', m, $event.target.value)">
                                     <option value="">Ungrouped</option>
                                     <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
                                 </select>
-                                <button class="btn-icon btn-edit" title="Edit" @click="$emit('editMeasurement', m)">
+                                <button class="btn-icon btn-edit" title="Edit" aria-label="Edit" @click="$emit('editMeasurement', m)">
                                     <i class="fa-solid fa-pencil" />
                                 </button>
-                                <button class="btn-icon btn-delete" title="Delete" @click="confirmDelete(m)">
+                                <button class="btn-icon btn-delete" title="Delete" aria-label="Delete" @click="confirmDelete(m)">
                                     <i class="fa-solid fa-trash" />
                                 </button>
                             </div>

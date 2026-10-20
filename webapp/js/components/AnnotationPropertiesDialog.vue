@@ -12,10 +12,10 @@
             </div>
 
             <div class="form-group">
-                <label>Position</label>
+                <span id="ap-position-label" class="field-label">Position</span>
                 <div class="coords-row">
-                    <code class="coords-text">{{ coordsText }}</code>
-                    <button type="button" class="btn-copy-coords" :title="copyTooltip" @click="copyCoordinates">
+                    <code class="coords-text" aria-labelledby="ap-position-label">{{ coordsText }}</code>
+                    <button type="button" class="btn-copy-coords" :title="copyTooltip" :aria-label="copyTooltip" @click="copyCoordinates">
                         <i :class="copyIconClass" />
                     </button>
                 </div>
@@ -133,7 +133,8 @@ export default {
     margin-bottom: 1rem;
 }
 
-.form-group label {
+.form-group label,
+.form-group .field-label {
     display: block;
     margin-bottom: 0.25rem;
     font-weight: 500;

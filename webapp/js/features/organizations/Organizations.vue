@@ -14,10 +14,10 @@
                                 <Tag rounded severity="info" icon="fa-solid fa-layer-group">
                                     {{ filteredOrganizations.length }}
                                 </Tag>
-                                <label class="d-flex align-items-center gap-2 ms-2">
-                                    <ToggleSwitch v-model="showAll" />
-                                    <span class="show-all-label">Show all</span>
-                                </label>
+                                <div class="d-flex align-items-center gap-2 ms-2">
+                                    <ToggleSwitch v-model="showAll" input-id="organizations-show-all" />
+                                    <label for="organizations-show-all" class="show-all-label">Show all</label>
+                                </div>
                             </div>
                             <p class="org-description mt-1 mb-0">Organize your datasets into groups and manage team access.</p>
                         </div>
@@ -26,9 +26,9 @@
                 <div class="org-actions">
                     <IconField>
                         <InputIcon class="fa-solid fa-magnifying-glass" />
-                        <InputText v-model="searchQuery" small placeholder="Search organizations" />
+                        <InputText v-model="searchQuery" small placeholder="Search organizations" aria-label="Search organizations" />
                     </IconField>
-                    <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" class="d-inline-flex d-sm-none" @click.stop="handleNew()" />
+                    <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" aria-label="Create organization" class="d-inline-flex d-sm-none" @click.stop="handleNew()" />
                     <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" class="d-none d-sm-inline-flex" @click.stop="handleNew()" />
                 </div>
             </div>
@@ -61,15 +61,17 @@
                 <p v-if="!showAll">You don't own any organizations yet. You may have access to organizations owned by others: enable <b>Show all</b> above to see them. You can also create a new organization.</p>
                 <p v-else>You can create a new organization by clicking the create organization button.</p>
             </EmptyState>
-            <div v-for="org in paginatedOrganizations" :key="org.slug"
-                 class="org-card" style="cursor: pointer;" @click="viewOrganization(org)">
+            <div v-for="org in paginatedOrganizations" :key="org.slug" class="org-card">
                 <Card>
                     <template #content>
                         <div class="d-flex justify-content-between align-items-center">
                             <div class="flex-grow-1">
                                 <div class="d-flex align-items-center gap-2">
-                                    <i class="fa-solid fa-sitemap" />
-                                    <strong class="org-name">{{ org.name ? org.name : org.slug }}</strong>
+                                    <i class="fa-solid fa-sitemap" aria-hidden="true" />
+                                    <!-- The whole card opens the organization (stretched link) -->
+                                    <router-link :to="{ name: 'Datasets', params: { org: org.slug } }" class="org-name stretched-link">
+                                        {{ org.name ? org.name : org.slug }}
+                                    </router-link>
                                 </div>
                                 <div v-if="org.description" class="org-card-description mt-1">{{ org.description }}</div>
                             </div>
@@ -83,15 +85,15 @@
                             <div class="org-card-actions d-flex gap-1 ms-3">
                                 <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
                                         severity="secondary" outlined size="small" icon="fa-solid fa-users"
-                                        title="Manage Members" @click.stop="openMembersDialog(org)" />
+                                        title="Manage Members" aria-label="Manage members" @click.stop="openMembersDialog(org)" />
                                 <Button v-if="!readyOnly && org.permissions?.canWrite && org.slug !== 'public'"
                                         severity="secondary" outlined size="small" :loading="org.editing"
                                         :disabled="org.editing || org.deleting" icon="fa-solid fa-pencil"
-                                        @click.stop="handleEdit(org)" />
+                                        title="Edit" aria-label="Edit organization" @click.stop="handleEdit(org)" />
                                 <Button v-if="!readyOnly && org.permissions?.canDelete && org.slug !== 'public'"
                                         severity="danger" size="small" :loading="org.deleting"
                                         :disabled="org.deleting || org.editing" icon="fa-solid fa-trash"
-                                        @click.stop="handleDelete(org)" />
+                                        title="Delete" aria-label="Delete organization" @click.stop="handleDelete(org)" />
                             </div>
                         </div>
                     </template>
@@ -506,10 +508,27 @@ export default {
     }
 
     .org-card {
+        position: relative;
         margin-bottom: var(--ddb-spacing-sm);
 
         .org-name {
             font-size: 1.25rem;
+            font-weight: bold;
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .org-name:focus-visible {
+            outline: none;
+        }
+
+        &:has(.org-name:focus-visible) {
+            outline: 2px solid var(--ddb-primary);
+            border-radius: var(--ddb-radius-sm);
+        }
+
+        &:hover .org-name {
+            text-decoration: underline;
         }
 
         .org-card-description {
@@ -519,6 +538,12 @@ export default {
 
         .org-card-tags {
             flex-shrink: 0;
+        }
+
+        /* Above the stretched link */
+        .org-card-actions {
+            position: relative;
+            z-index: 2;
         }
     }
 

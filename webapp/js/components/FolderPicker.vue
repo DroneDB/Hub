@@ -1,16 +1,7 @@
 <template>
     <Window id="folderPicker" :title="title" modal fixed-size max-width="80%" @close="handleClose">
         <div v-if="currentPath" class="folder-picker-breadcrumb mt-3 ms-3">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems">
-                <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon" />
-                        <template v-else>{{ item.label }}</template>
-                    </a>
-                    <span v-else class="bc-active">{{ item.label }}</span>
-                </template>
-                <template #separator> / </template>
-            </Breadcrumb>
+            <PathBreadcrumb :path="currentPath" @navigate="navigateTo" />
         </div>
 
         <div class="folder-picker-body">
@@ -30,11 +21,7 @@
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('name')">
-                            Name
-                            <i v-if="sortColumn === 'name'" class="fa-solid"
-                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-name" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ data.label }}</span>
@@ -42,11 +29,7 @@
                 </Column>
                 <Column style="width: 7.5rem;">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('type')">
-                            Type
-                            <i v-if="sortColumn === 'type'" class="fa-solid"
-                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-type" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getFileType(data) }}</span>
@@ -54,11 +37,7 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('size')">
-                            Size
-                            <i v-if="sortColumn === 'size'" class="fa-solid"
-                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Size" column="size" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-size" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getFileSize(data) }}</span>
@@ -66,11 +45,7 @@
                 </Column>
                 <Column style="width: 12rem">
                     <template #header>
-                        <span class="sortable-header" @click="sortBy('modified')">
-                            Modified
-                            <i v-if="sortColumn === 'modified'" class="fa-solid"
-                               :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'" />
-                        </span>
+                        <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-date" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getModifiedDate(data) }}</span>
@@ -86,12 +61,13 @@
         <div class="folder-picker-selected">
             <span class="folder-picker-selected-label">{{ mode === 'file' ? 'Selected file:' : 'Selected folder:' }}</span>
             <InputText v-model="selectedPath" class="folder-picker-selected-input"
+                       :aria-label="mode === 'file' ? 'Selected file' : 'Selected folder'"
                        :placeholder="selectedPathPlaceholder" @keyup.enter="onConfirm" />
         </div>
 
         <div class="folder-picker-new-folder">
             <span class="folder-picker-new-folder-label">New folder:</span>
-            <InputText ref="newFolderInput" v-model="newFolderName"
+            <InputText ref="newFolderInput" v-model="newFolderName" aria-label="New folder name"
                        class="folder-picker-new-folder-input" :disabled="creatingFolder"
                        placeholder="Folder name" @keyup.enter="createFolder" />
             <Button :disabled="!newFolderName || creatingFolder" :loading="creatingFolder"
@@ -117,7 +93,8 @@ import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Breadcrumb from 'primevue/breadcrumb';
+import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import PrimeMessage from 'primevue/message';
@@ -151,7 +128,7 @@ const { pathutils, entry } = ddb;
 export default {
     components: {
         LoadingSpinner,
-        Window, Button, InputText, Breadcrumb, DataTable, Column, PrimeMessage, ConfirmDialog
+        Window, Button, InputText, PathBreadcrumb, SortHeader, DataTable, Column, PrimeMessage, ConfirmDialog
     },
 
     props: {
@@ -209,47 +186,6 @@ export default {
         },
         createFolderMessage: function () {
             return `The folder <strong>${this.pendingCreatePath}</strong> does not exist. Do you want to create it?`;
-        },
-        breadcrumbs: function () {
-            if (!this.currentPath || this.currentPath.length === 0) return null;
-
-            var folders = this.currentPath.split('/');
-            var cur = '';
-            var bc = [];
-
-            for (var el of folders) {
-                cur += '/' + el;
-                bc.push({
-                    path: cur.substring(1),
-                    name: el
-                });
-            }
-
-            if (bc.length > 0) {
-                bc.unshift({
-                    path: '',
-                    name: '~'
-                });
-            }
-
-            return bc;
-        },
-        breadcrumbHome: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
-            const home = this.breadcrumbs[0];
-            return {
-                icon: 'fa-solid fa-home',
-                command: () => this.navigateTo(home.path)
-            };
-        },
-        breadcrumbItems: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
-            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
-                if (idx < arr.length - 1) {
-                    return { label: b.name, command: () => this.navigateTo(b.path) };
-                }
-                return { label: b.name };
-            });
         },
         sortedFiles: function () {
             const sorted = [...this.files];

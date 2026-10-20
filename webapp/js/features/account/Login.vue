@@ -12,12 +12,12 @@
                         <div class="login-form">
                             <IconField>
                                 <InputIcon class="fa-solid fa-user" />
-                                <InputText v-model="username" placeholder="Username" autocomplete="off"
+                                <InputText v-model="username" placeholder="Username" aria-label="Username" autocomplete="off"
                                            autocorrect="off" autocapitalize="none" fluid @keyup.enter="login" />
                             </IconField>
                             <IconField>
                                 <InputIcon class="fa-solid fa-key" />
-                                <Password v-model="password" placeholder="Password" :feedback="false"
+                                <Password v-model="password" placeholder="Password" aria-label="Password" :feedback="false"
                                           toggle-mask fluid input-class="w-100" @keyup.enter="login" />
                             </IconField>
                             <Button label="Login" :loading="loggingIn" severity="info" class="w-100" size="large" @click="login" />

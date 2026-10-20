@@ -26,7 +26,7 @@
             </div>
             <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
                 {{ truncatedError }}
-                <Button v-if="file.canRetry" size="small" severity="danger" outlined title="Retry upload" icon="fa-solid fa-rotate-right"
+                <Button v-if="file.canRetry" size="small" severity="danger" outlined title="Retry upload" aria-label="Retry upload" icon="fa-solid fa-rotate-right"
                         class="retry-btn" @click="$emit('retry', file)" />
             </div>
             <div v-else-if="file.status === 'done'" class="done-label">

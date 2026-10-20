@@ -3,11 +3,13 @@
         <div v-if="!hideSingle || dynTabs.length > 1" class="tab-buttons-strip">
             <Tabs :value="activeTab" @update:value="onTabChange">
                 <TabList>
-                    <Tab v-for="t in dynTabs" :key="t.key" :value="t.key">
+                    <Tab v-for="t in dynTabs" :key="t.key" :value="t.key"
+                         :aria-keyshortcuts="t.canClose ? 'Delete' : undefined"
+                         @keydown.delete="t.canClose && removeTab(t.key)">
                         <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
                            style="margin-right: 0.5rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
                                t.label }}</span>
-                        <span v-if="!!t.canClose" class="close-btn" @click.stop="removeTab(t.key)"><i
+                        <span v-if="!!t.canClose" class="close-btn" aria-hidden="true" title="Close (Delete)" @click.stop="removeTab(t.key)"><i
                             class="fa-solid fa-xmark" /></span>
                     </Tab>
                 </TabList>

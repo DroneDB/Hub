@@ -4,8 +4,8 @@
             <!-- Configure + verify -->
             <div v-if="!importing">
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Source</label>
-                    <Select v-model="sourceType" :options="sourceOptions" option-label="label" option-value="type"
+                    <label id="import-dataset-dialog-source-label" for="import-dataset-dialog-source" class="d-block mb-1 fw-semibold">Source</label>
+                    <Select v-model="sourceType" input-id="import-dataset-dialog-source" aria-labelledby="import-dataset-dialog-source-label" :options="sourceOptions" option-label="label" option-value="type"
                             class="w-100" :disabled="verifying" placeholder="Select a source" @change="onSourceChange" />
                     <small v-if="selectedSource" class="text-muted">{{ selectedSource.description }}</small>
                 </div>
@@ -13,50 +13,50 @@
                 <!-- Registry source: enhanced UI with org/dataset browsing -->
                 <template v-if="sourceType === 'registry' && selectedSource">
                     <div class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
-                        <InputText v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
+                        <label for="import-dataset-dialog-registry-url" class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
+                        <InputText id="import-dataset-dialog-registry-url" v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
                                    :disabled="verifying" @input="onRemoteUrlChange" @keyup.enter="canVerify && verify()" />
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col">
-                            <label class="d-block mb-1 fw-semibold">Username</label>
-                            <InputText v-model="params.username" placeholder="optional" class="w-100"
+                            <label for="import-dataset-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
+                            <InputText id="import-dataset-dialog-username" v-model="params.username" placeholder="optional" class="w-100"
                                        :disabled="verifying" @keyup.enter="canVerify && verify()" />
                         </div>
                         <div class="col">
-                            <label class="d-block mb-1 fw-semibold">Password</label>
-                            <InputText v-model="params.password" type="password" placeholder="optional" class="w-100"
+                            <label for="import-dataset-dialog-password" class="d-block mb-1 fw-semibold">Password</label>
+                            <InputText id="import-dataset-dialog-password" v-model="params.password" type="password" placeholder="optional" class="w-100"
                                        :disabled="verifying" @keyup.enter="canVerify && verify()" />
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">Organization <span class="text-danger">*</span></label>
+                        <label id="import-dataset-dialog-organization-label" for="import-dataset-dialog-organization" class="d-block mb-1 fw-semibold">Organization <span class="text-danger">*</span></label>
                         <div class="d-flex gap-2">
-                            <Select v-if="remoteOrgs !== null" v-model="params.organization"
+                            <Select v-if="remoteOrgs !== null" v-model="params.organization" input-id="import-dataset-dialog-organization" aria-labelledby="import-dataset-dialog-organization-label"
                                     :options="remoteOrgs" option-label="label" option-value="value"
                                     placeholder="Select an organization" class="flex-grow-1"
                                     :disabled="verifying || browsingOrgs" @change="onRemoteOrgChange" />
-                            <InputText v-else v-model="params.organization" placeholder="organization slug"
+                            <InputText v-else v-model="params.organization" placeholder="organization slug" aria-label="Organization slug"
                                        class="flex-grow-1" :disabled="verifying || browsingOrgs"
                                        @keyup.enter="canVerify && verify()" />
                             <Button icon="fa-solid fa-list" severity="secondary" :loading="browsingOrgs"
-                                    :disabled="!canBrowseOrgs || browsingOrgs" title="Browse organizations"
+                                    :disabled="!canBrowseOrgs || browsingOrgs" title="Browse organizations" aria-label="Browse organizations"
                                     @click="browseOrgs" />
                         </div>
                         <small v-if="browseOrgsError" class="text-danger">{{ browseOrgsError }}</small>
                     </div>
                     <div class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">Dataset <span class="text-danger">*</span></label>
+                        <label id="import-dataset-dialog-dataset-label" for="import-dataset-dialog-dataset" class="d-block mb-1 fw-semibold">Dataset <span class="text-danger">*</span></label>
                         <div class="d-flex gap-2">
-                            <Select v-if="remoteDatasets !== null" v-model="params.dataset"
+                            <Select v-if="remoteDatasets !== null" v-model="params.dataset" input-id="import-dataset-dialog-dataset" aria-labelledby="import-dataset-dialog-dataset-label"
                                     :options="remoteDatasets" option-label="label" option-value="value"
                                     placeholder="Select a dataset" class="flex-grow-1"
                                     :disabled="verifying || browsingDatasets" />
-                            <InputText v-else v-model="params.dataset" placeholder="dataset slug"
+                            <InputText v-else v-model="params.dataset" placeholder="dataset slug" aria-label="Dataset slug"
                                        class="flex-grow-1" :disabled="verifying || browsingDatasets"
                                        @keyup.enter="canVerify && verify()" />
                             <Button icon="fa-solid fa-list" severity="secondary" :loading="browsingDatasets"
-                                    :disabled="!canBrowseDatasets || browsingDatasets" title="Browse datasets"
+                                    :disabled="!canBrowseDatasets || browsingDatasets" title="Browse datasets" aria-label="Browse datasets"
                                     @click="browseDatasets" />
                         </div>
                         <small v-if="browseDatasetsError" class="text-danger">{{ browseDatasetsError }}</small>
@@ -66,10 +66,10 @@
                 <!-- Generic fields for all other source types -->
                 <template v-else>
                     <div v-for="f in selectedSource ? selectedSource.fields : []" :key="f.name" class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">
+                        <label :for="'import-dataset-field-' + f.name" class="d-block mb-1 fw-semibold">
                             {{ f.label }}<span v-if="f.required" class="text-danger"> *</span>
                         </label>
-                        <InputText v-model="params[f.name]" :type="f.type === 'password' ? 'password' : 'text'"
+                        <InputText :id="'import-dataset-field-' + f.name" v-model="params[f.name]" :type="f.type === 'password' ? 'password' : 'text'"
                                    :placeholder="f.placeholder" class="w-100" :disabled="verifying"
                                    @keyup.enter="canVerify && verify()" />
                     </div>
@@ -102,18 +102,18 @@
 
                     <div class="row g-3 mt-1">
                         <div class="col-md-6">
-                            <label class="d-block mb-1 fw-semibold">Dataset Name</label>
-                            <InputText v-model="name" placeholder="Dataset name" class="w-100" />
+                            <label for="import-dataset-dialog-dataset-name" class="d-block mb-1 fw-semibold">Dataset Name</label>
+                            <InputText id="import-dataset-dialog-dataset-name" v-model="name" placeholder="Dataset name" class="w-100" />
                         </div>
                         <div class="col-md-6">
-                            <label class="d-block mb-1 fw-semibold">Visibility</label>
-                            <Select v-model="visibility" :options="visibilityOptions" option-label="label"
+                            <label id="import-dataset-dialog-visibility-label" for="import-dataset-dialog-visibility" class="d-block mb-1 fw-semibold">Visibility</label>
+                            <Select v-model="visibility" input-id="import-dataset-dialog-visibility" aria-labelledby="import-dataset-dialog-visibility-label" :options="visibilityOptions" option-label="label"
                                     option-value="value" class="w-100" />
                         </div>
                     </div>
                     <div class="mb-2 mt-2">
-                        <label class="d-block mb-1 fw-semibold">Slug</label>
-                        <InputText v-model="slug" placeholder="dataset-slug" class="w-100" @input="slugEdited = true" />
+                        <label for="import-dataset-dialog-slug" class="d-block mb-1 fw-semibold">Slug</label>
+                        <InputText id="import-dataset-dialog-slug" v-model="slug" placeholder="dataset-slug" class="w-100" @input="slugEdited = true" />
                         <small v-if="slug && slugFormatInvalid" class="text-danger">
                             A slug may only contain lowercase letters, numbers, dashes and underscores.
                         </small>

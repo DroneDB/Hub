@@ -37,7 +37,7 @@
 
         <!-- Search -->
         <div v-if="showSearch" class="odm-search-bar">
-            <InputText v-model="searchQuery" placeholder="Search options by name..." class="w-100" />
+            <InputText v-model="searchQuery" placeholder="Search options by name..." aria-label="Search options" class="w-100" />
         </div>
 
         <!-- Options content -->
@@ -45,13 +45,13 @@
             <!-- Grouped view -->
             <template v-if="viewMode === 'grouped'">
                 <div v-for="group in groupsWithContent" :key="group.id" class="odm-option-group">
-                    <div class="odm-option-group-header" @click="toggleGroup(group.id)">
+                    <button type="button" class="btn-reset odm-option-group-header" :aria-expanded="!collapsedGroups[group.id]" @click="toggleGroup(group.id)">
                         <i :class="collapsedGroups[group.id] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"
-                           class="odm-toggle-icon" />
+                           class="odm-toggle-icon" aria-hidden="true" />
                         <i :class="group.icon" class="odm-group-icon" />
                         <span class="odm-group-name">{{ group.name }}</span>
                         <span class="odm-option-count">({{ groupOptionCount(group) }})</span>
-                    </div>
+                    </button>
                     <div v-show="!collapsedGroups[group.id]" class="odm-option-group-content">
                         <div v-for="subgroup in getSubgroups(group)" :key="subgroup.id" class="odm-option-subgroup">
                             <div v-if="group.subgroups.length > 1" class="odm-option-subgroup-header">
@@ -66,13 +66,13 @@
                 </div>
                 <!-- Ungrouped options -->
                 <div v-if="ungroupedOptions.length > 0" class="odm-option-group">
-                    <div class="odm-option-group-header" @click="toggleGroup('ungrouped')">
+                    <button type="button" class="btn-reset odm-option-group-header" :aria-expanded="!collapsedGroups['ungrouped']" @click="toggleGroup('ungrouped')">
                         <i :class="collapsedGroups['ungrouped'] ? 'fa-solid fa-chevron-right' : 'fa-solid fa-chevron-down'"
-                           class="odm-toggle-icon" />
+                           class="odm-toggle-icon" aria-hidden="true" />
                         <i class="fa-solid fa-circle-question odm-group-icon" />
                         <span class="odm-group-name">Other Options</span>
                         <span class="odm-option-count">({{ ungroupedOptions.length }})</span>
-                    </div>
+                    </button>
                     <div v-show="!collapsedGroups['ungrouped']" class="odm-option-group-content">
                         <div class="odm-option-subgroup-content">
                             <OdxOptionRow v-for="opt in ungroupedOptions" :key="opt.name" :option="opt"
@@ -538,6 +538,7 @@ export default {
 }
 
 .odm-option-group-header {
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 0.5rem;

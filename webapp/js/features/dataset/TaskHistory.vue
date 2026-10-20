@@ -3,9 +3,9 @@
         <div class="filters">
             <div class="filter-bar">
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <Select v-model="selectedState" :options="stateOptions" option-label="label" option-value="value"
+                    <Select v-model="selectedState" aria-label="Filter by state" :options="stateOptions" option-label="label" option-value="value"
                             placeholder="All States" @change="onFilterChange" />
-                    <Select v-model="selectedTool" :options="toolFilterOptions" option-label="label" option-value="value"
+                    <Select v-model="selectedTool" aria-label="Filter by tool" :options="toolFilterOptions" option-label="label" option-value="value"
                             placeholder="All Tools" @change="onFilterChange" />
                     <Button icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary" :loading="loading"
                             @click="refreshData" />
@@ -43,12 +43,12 @@
         <Dialog v-model:visible="photogrammetryDialogOpen" modal header="Run Photogrammetry (NodeODX)"
                 :style="{ width: '52rem' }">
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
+                <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
                 <div class="d-flex gap-2">
-                    <InputText v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
+                    <InputText id="task-history-image-folder" v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
                                placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
                     <Button icon="fa-regular fa-folder-open" severity="secondary"
-                            title="Browse dataset" @click="openImageFolderPicker" />
+                            title="Browse dataset" aria-label="Browse dataset" @click="openImageFolderPicker" />
                 </div>
                 <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
                 <small v-else class="muted">All images under this folder will be processed.</small>
@@ -56,8 +56,8 @@
 
             <!-- Processing node: dropdown when several are configured, details for a single one -->
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Processing node</strong></label>
-                <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId"
+                <label id="task-history-processing-node-label" for="task-history-processing-node" class="d-block mb-1"><strong>Processing node</strong></label>
+                <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId" input-id="task-history-processing-node" aria-labelledby="task-history-processing-node-label"
                         :options="photogrammetryNodes" option-label="label" option-value="value"
                         class="w-100" @change="onNodeChanged" />
                 <div v-else-if="photogrammetryNodes.length === 1" class="pg-node-details">
@@ -80,13 +80,13 @@
                 </PrimeMessage>
             </div>
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
-                <InputText v-model="photogrammetryForm.name" class="w-100" placeholder="Auto-generated" />
+                <label for="task-history-task-name" class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
+                <InputText id="task-history-task-name" v-model="photogrammetryForm.name" class="w-100" placeholder="Auto-generated" />
             </div>
             <!-- Processing profile -->
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Processing profile</strong></label>
-                <Select v-model="photogrammetryForm.preset"
+                <label id="task-history-processing-profile-label" for="task-history-processing-profile" class="d-block mb-1"><strong>Processing profile</strong></label>
+                <Select v-model="photogrammetryForm.preset" input-id="task-history-processing-profile" aria-labelledby="task-history-processing-profile-label"
                         :options="odmPresetOptions" option-label="label" option-value="id"
                         class="w-100" />
                 <small class="d-block muted mt-1">{{ selectedPreset.description }}</small>
@@ -100,22 +100,22 @@
                                   :available-options="availableOdmOptions"
                                   :preset-options="selectedPreset.options" class="mb-3" />
                 <div v-if="customOptions.length > 0" class="mb-3 pg-preset-tags">
-                    <label class="d-block mb-1"><strong>Customized options ({{ customOptions.length }})</strong></label>
+                    <strong class="d-block mb-1">Customized options ({{ customOptions.length }})</strong>
                     <div class="d-flex flex-wrap gap-1">
-                        <span v-for="opt in customOptions" :key="opt.name"
-                              class="pg-option-chip pg-option-chip-clickable"
-                              title="Click to scroll to option"
-                              @click="scrollToPresetOption(opt.name)">
+                        <button v-for="opt in customOptions" :key="opt.name" type="button"
+                                class="btn-reset pg-option-chip pg-option-chip-clickable"
+                                title="Go to this option"
+                                @click="scrollToPresetOption(opt.name)">
                             {{ opt.name }}: {{ opt.value }}
-                        </span>
+                        </button>
                     </div>
                 </div>
             </template>
 
             <!-- Custom JSON (only when Custom preset is selected) -->
             <div v-if="photogrammetryForm.preset === 'custom'" class="mb-2">
-                <label class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
-                <Textarea v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
+                <label for="task-history-options" class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
+                <Textarea id="task-history-options" v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
                           placeholder="[{&quot;name&quot;:&quot;fast-orthophoto&quot;,&quot;value&quot;:true},{&quot;name&quot;:&quot;dsm&quot;,&quot;value&quot;:true}]" />
             </div>
             <small v-if="optionsError" class="error-text">{{ optionsError }}</small>
@@ -129,12 +129,12 @@
             </div>
 
             <div v-if="!photogrammetryForm.createNewDataset" class="mb-3">
-                <label class="d-block mb-1"><strong>Output folder</strong></label>
+                <label for="task-history-output-folder" class="d-block mb-1"><strong>Output folder</strong></label>
                 <div class="d-flex gap-2">
-                    <InputText v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
+                    <InputText id="task-history-output-folder" v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
                                placeholder="photogrammetry_output" @input="destPathError = ''" />
                     <Button icon="fa-regular fa-folder-open" severity="secondary"
-                            title="Browse dataset" @click="openOutputFolderPicker" />
+                            title="Browse dataset" aria-label="Browse dataset" @click="openOutputFolderPicker" />
                 </div>
                 <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
                 <small v-else class="muted">Extracted files will be placed in this folder.</small>
@@ -142,14 +142,14 @@
 
             <template v-if="photogrammetryForm.createNewDataset">
                 <div class="mb-3">
-                    <label class="d-block mb-1"><strong>New dataset name</strong></label>
-                    <InputText v-model="photogrammetryForm.newDatasetName" class="w-100"
+                    <label for="task-history-new-dataset-name" class="d-block mb-1"><strong>New dataset name</strong></label>
+                    <InputText id="task-history-new-dataset-name" v-model="photogrammetryForm.newDatasetName" class="w-100"
                                placeholder="photogrammetry-results" />
                     <small class="muted">Kebab-case slug, max 128 chars.</small>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1"><strong>Visibility</strong></label>
-                    <Select v-model="photogrammetryForm.newDatasetVisibility"
+                    <label id="task-history-visibility-label" for="task-history-visibility" class="d-block mb-1"><strong>Visibility</strong></label>
+                    <Select v-model="photogrammetryForm.newDatasetVisibility" input-id="task-history-visibility" aria-labelledby="task-history-visibility-label"
                             :options="visibilityOptions" option-label="label" option-value="value"
                             class="w-100" />
                 </div>

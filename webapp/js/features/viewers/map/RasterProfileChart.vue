@@ -9,8 +9,13 @@
         </div>
 
         <!-- Inline SVG chart (no external dependencies) -->
+        <!-- A scrubber over the samples: the pointer or the arrow keys pick one -->
         <svg class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
-             @mousemove="onHover" @mouseleave="hoverIdx = null" @touchmove.prevent="onTouchHover">
+             role="slider" tabindex="0" aria-label="Profile position"
+             :aria-valuemin="0" :aria-valuemax="samples.length - 1" :aria-valuenow="hoverIdx ?? 0"
+             :aria-valuetext="hoverText"
+             @mousemove="onHover" @mouseleave="setHover(null)" @touchmove.prevent="onTouchHover"
+             @focus="hoverIdx === null && setHover(0)" @blur="setHover(null)" @keydown="onKey">
             <!-- Axis grid lines (5 horizontal bands) -->
             <g class="grid">
                 <line v-for="i in 4" :key="'h' + i"
@@ -53,13 +58,10 @@
 
         <!-- Tooltip + CSV export -->
         <div class="profile-actions">
-            <span v-if="hoveredSample" class="hover-info">
-                d: {{ formatLength(hoveredSample.distance) }} ·
-                v: {{ hoveredSample.value === null ? 'n/d' : formatValue(hoveredSample.value) }}
-            </span>
-            <span v-else class="hover-info placeholder">Hover the chart for details</span>
-            <button class="btn btn-secondary btn-sm" title="Export CSV" @click="exportCsv">
-                <i class="fas fa-file-csv" />
+            <span v-if="hoveredSample" class="hover-info">{{ hoverText }}</span>
+            <span v-else class="hover-info placeholder">Hover or focus the chart for details</span>
+            <button class="btn btn-secondary btn-sm" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
+                <i class="fas fa-file-csv" aria-hidden="true" />
             </button>
         </div>
     </div>
@@ -85,7 +87,7 @@ export default {
         unit: { type: String, default: '' },
         isThermal: { type: Boolean, default: false }
     },
-    emits: ['hover'],
+    emits: ['activeSample'],
     data() {
         return {
             width: 320,
@@ -155,6 +157,11 @@ export default {
             }
             return bands;
         },
+        hoverText() {
+            const h = this.hoveredSample;
+            if (!h) return '';
+            return `d: ${this.formatLength(h.distance)} · v: ${h.value === null ? 'n/d' : this.formatValue(h.value)}`;
+        },
         hoveredSample() {
             if (this.hoverIdx === null) return null;
             return this.samples[this.hoverIdx] || null;
@@ -212,10 +219,24 @@ export default {
             const n = this.samples.length;
             const idx = n <= 1 ? 0 : Math.round((pxFromLeft / this.chartWidth) * (n - 1));
             const clamped = Math.max(0, Math.min(n - 1, idx));
-            if (clamped !== this.hoverIdx) {
-                this.hoverIdx = clamped;
-                this.$emit('hover', this.samples[clamped] || null);
-            }
+            this.setHover(clamped);
+        },
+        // The map marker follows the chart: null removes it
+        setHover(idx) {
+            if (idx === this.hoverIdx) return;
+            this.hoverIdx = idx;
+            this.$emit('activeSample', idx === null ? null : this.samples[idx] || null);
+        },
+        // Arrows step one sample (ten with Shift), Home/End go to the ends
+        onKey(e) {
+            const n = this.samples.length;
+            if (!n) return;
+            const cur = this.hoverIdx ?? 0;
+            const step = e.shiftKey ? 10 : 1;
+            const targets = { ArrowLeft: cur - step, ArrowDown: cur - step, ArrowRight: cur + step, ArrowUp: cur + step, Home: 0, End: n - 1 };
+            if (!(e.key in targets)) return;
+            e.preventDefault();
+            this.setHover(Math.max(0, Math.min(n - 1, targets[e.key])));
         },
         exportCsv() {
             if (!this.hasSamples) return;
@@ -256,6 +277,11 @@ export default {
     border-radius: 3px;
     cursor: crosshair;
     display: block;
+}
+
+.profile-svg:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: 1px;
 }
 
 .profile-svg .grid {

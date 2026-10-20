@@ -12,24 +12,24 @@
             <Card class="account-card">
                 <template #content>
                     <h3><i class="fa-solid fa-user" /> User Information</h3>
-                    <div class="info-grid">
+                    <dl class="info-grid">
                         <div class="info-item">
-                            <label>Username</label>
-                            <p>{{ username }}</p>
+                            <dt>Username</dt>
+                            <dd>{{ username }}</dd>
                         </div>
                         <div class="info-item">
-                            <label>Email</label>
-                            <p>{{ email || 'Not set' }}</p>
+                            <dt>Email</dt>
+                            <dd>{{ email || 'Not set' }}</dd>
                         </div>
                         <div v-if="isAdmin" class="info-item">
-                            <label>Role</label>
-                            <p><Tag severity="danger"><i class="fa-solid fa-shield" /> Administrator</Tag></p>
+                            <dt>Role</dt>
+                            <dd><Tag severity="danger"><i class="fa-solid fa-shield" /> Administrator</Tag></dd>
                         </div>
                         <div class="info-item">
-                            <label>Organizations</label>
-                            <p>{{ organizationsCount }} organization{{ organizationsCount !== 1 ? 's' : '' }}</p>
+                            <dt>Organizations</dt>
+                            <dd>{{ organizationsCount }} organization{{ organizationsCount !== 1 ? 's' : '' }}</dd>
                         </div>
-                    </div>
+                    </dl>
                 </template>
             </Card>
 
@@ -244,6 +244,7 @@ export default {
 }
 
 .info-grid {
+    margin: 0;
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
@@ -254,7 +255,7 @@ export default {
     min-width: 12.5rem;
 }
 
-.info-item label {
+.info-item dt {
     display: block;
     font-weight: bold;
     color: var(--ddb-text-secondary);
@@ -262,7 +263,7 @@ export default {
     margin-bottom: 0.25rem;
 }
 
-.info-item p {
+.info-item dd {
     margin: 0;
     font-size: var(--ddb-font-size-base);
     color: var(--ddb-text);

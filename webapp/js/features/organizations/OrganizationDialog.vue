@@ -3,14 +3,14 @@
         <div class="org-dialog">
             <form @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Name</label>
-                    <InputText ref="name"
+                    <label for="organization-dialog-name" class="d-block mb-1 fw-semibold">Name</label>
+                    <InputText id="organization-dialog-name" ref="name"
                                v-model="org.name" placeholder="Name"
                                class="w-100" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Description</label>
-                    <Textarea v-model="org.description" placeholder="Description" rows="3" auto-resize class="w-100" />
+                    <label for="organization-dialog-description" class="d-block mb-1 fw-semibold">Description</label>
+                    <Textarea id="organization-dialog-description" v-model="org.description" placeholder="Description" rows="3" auto-resize class="w-100" />
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-2">
                     <Checkbox v-model="org.isPublic" :binary="true" input-id="orgPublic" />

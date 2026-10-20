@@ -6,12 +6,12 @@
             <!-- Toggles on the left -->
             <div class="d-flex align-items-center gap-3">
                 <div v-if="isActive" class="d-flex align-items-center gap-2">
-                    <ToggleSwitch v-model="autoRefresh" />
-                    <span class="muted" style="font-size: 0.8rem;">Auto-refresh</span>
+                    <ToggleSwitch v-model="autoRefresh" input-id="task-log-auto-refresh" />
+                    <label for="task-log-auto-refresh" class="muted" style="font-size: 0.8rem;">Auto-refresh</label>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <ToggleSwitch v-model="autoScroll" />
-                    <span class="muted" style="font-size: 0.8rem;">Auto-scroll</span>
+                    <ToggleSwitch v-model="autoScroll" input-id="task-log-auto-scroll" />
+                    <label for="task-log-auto-scroll" class="muted" style="font-size: 0.8rem;">Auto-scroll</label>
                 </div>
             </div>
             <!-- Spacer to push buttons to the right -->

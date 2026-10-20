@@ -92,7 +92,7 @@
             <Column header="Actions" style="width: 10rem;">
                 <template #body="slotProps">
                     <div class="d-flex gap-1 flex-wrap">
-                        <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log"
+                        <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log" aria-label="View log"
                                 @click="$emit('view-log', slotProps.data)" />
                         <Button v-if="canDownloadResult(slotProps.data, tools)" size="small" icon="fa-solid fa-download"
                                 label="Result" :title="resultAvailabilityHint(slotProps.data)"
@@ -100,11 +100,11 @@
                                 :disabled="slotProps.data.taskId === downloadingTaskId"
                                 @click="$emit('download-result', slotProps.data)" />
                         <Button v-if="isActive(slotProps.data.state)" size="small" severity="warn"
-                                icon="fa-solid fa-stop" title="Cancel" @click="$emit('cancel', slotProps.data)" />
+                                icon="fa-solid fa-stop" title="Cancel" aria-label="Cancel" @click="$emit('cancel', slotProps.data)" />
                         <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
-                                icon="fa-solid fa-rotate-right" title="Retry" @click="$emit('retry', slotProps.data)" />
+                                icon="fa-solid fa-rotate-right" title="Retry" aria-label="Retry" @click="$emit('retry', slotProps.data)" />
                         <Button v-if="!isActive(slotProps.data.state)" size="small" severity="danger"
-                                icon="fa-solid fa-trash" title="Delete from history" @click="$emit('delete', slotProps.data)" />
+                                icon="fa-solid fa-trash" title="Delete from history" aria-label="Delete from history" @click="$emit('delete', slotProps.data)" />
                     </div>
                 </template>
             </Column>

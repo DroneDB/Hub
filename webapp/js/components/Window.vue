@@ -8,7 +8,7 @@
             <div v-if="$slots.footer || confirmLabel || closeButton" class="window-footer d-flex justify-content-end gap-2 mt-3 w-100">
                 <slot name="footer">
                     <Button :label="cancelLabel" severity="secondary" :disabled="busy" @click="close()" />
-                    <Button v-if="confirmLabel" :label="confirmLabel" :severity="confirmSeverity" :icon="confirmIcon"
+                    <Button v-if="confirmLabel" :label="confirmLabel" :severity="confirmSeverity" :icon="confirmIcon" data-confirm
                             :disabled="busy || confirmDisabled" :loading="busy" @click="emit('confirm')" />
                 </slot>
             </div>
@@ -28,11 +28,12 @@
  * - `busy` disables closing and the footer buttons.
  * - A footer: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
  *   just the Cancel (`cancelLabel`) button with `closeButton`.
- * - Focuses the first field (or the [data-autofocus] element) when shown.
+ * - Focuses the [data-autofocus] element, the first field, or the confirm button when shown,
+ *   so the keyboard never stays on the page behind the dialog.
  *
  *   <Window id="rename" title="Rename" modal confirm-label="Rename" :busy="saving" @confirm="rename" @close="cancel">
  */
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onBeforeUnmount, useId } from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import { useEventListener } from '@/composables/useEventListener';
@@ -40,7 +41,8 @@ import { useEventListener } from '@/composables/useEventListener';
 defineOptions({ name: 'HubWindow' });
 
 const props = defineProps({
-    id: { type: String, required: true },
+    /** DOM id of the dialog (generated when omitted) */
+    id: { type: String, default: '' },
     title: { type: String, default: '' },
     visible: { type: Boolean, default: true },
     modal: { type: Boolean, default: false },
@@ -54,7 +56,8 @@ const props = defineProps({
     height: { type: String, default: '40%' },
     /** CSS size class (dialog-xs ... dialog-xl): no inline size */
     sizeClass: { type: String, default: null },
-    autofocus: { type: Boolean, default: true },
+    /** Focus the first field (or [data-autofocus]) when shown */
+    focusOnShow: { type: Boolean, default: true },
     busy: { type: Boolean, default: false },
     confirmLabel: { type: String, default: '' },
     cancelLabel: { type: String, default: 'Cancel' },
@@ -66,6 +69,7 @@ const props = defineProps({
 });
 const emit = defineEmits(['update:visible', 'close', 'confirm', 'show']);
 const contentRoot = ref(null);
+const generatedId = useId();
 
 function close(result) {
     if (props.busy) return;
@@ -107,18 +111,28 @@ const dialogStyle = computed(() => {
     return style;
 });
 const contentStyle = computed(() => (props.fixedSize ? {} : { overflow: 'auto', flex: '1' }));
-const dialogPt = computed(() => ({ root: { class: ['window-dialog', props.sizeClass].filter(Boolean).join(' ') } }));
+const dialogPt = computed(() => ({
+    root: { id: props.id || generatedId, class: ['window-dialog', props.sizeClass].filter(Boolean).join(' ') }
+}));
 
 const FIELD = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])';
 
-// PrimeVue focuses the [autofocus] element after its enter transition: tag the first field
-// ([data-autofocus] wins) and focus it now too, without scrolling mid-animation
+const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+
+// PrimeVue focuses the [autofocus] element after its enter transition: tag the target
+// ([data-autofocus], else the first field, the confirm button, anything focusable) and
+// focus it now too, without scrolling mid-animation
+function focusTarget(root) {
+    const explicit = root.querySelector('[data-autofocus]');
+    if (explicit) return explicit.matches(FIELD) ? explicit : explicit.querySelector(FIELD) || explicit;
+    return root.querySelector(FIELD) || root.querySelector('[data-confirm]:not([disabled])') || root.querySelector(FOCUSABLE);
+}
+
 function onShow() {
     emit('show');
     const root = contentRoot.value;
-    if (!props.autofocus || !root) return;
-    const explicit = root.querySelector('[data-autofocus]');
-    const target = explicit ? (explicit.matches(FIELD) ? explicit : explicit.querySelector(FIELD) || explicit) : root.querySelector(FIELD);
+    if (!props.focusOnShow || !root) return;
+    const target = focusTarget(root);
     if (!target) return;
     target.setAttribute('autofocus', '');
     target.focus({ preventScroll: true });

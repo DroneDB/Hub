@@ -4,14 +4,15 @@
         <div id="search-box">
             <IconField style="flex: 1; min-width: 0;">
                 <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" placeholder="Search files" style="width: 100%;" @keyup.enter="search()" />
+                <InputText v-model="filterRaw" placeholder="Search files" aria-label="Search files" style="width: 100%;" @keyup.enter="search()" />
             </IconField>
-            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" @click="clearSearch()">
-                <i class="fa-solid fa-xmark" />
-            </div>
+            <Button v-if="filterRaw != null && filterRaw.length > 0" icon="fa-solid fa-xmark"
+                    title="Clear search" aria-label="Clear search" severity="secondary" text size="small"
+                    @click="clearSearch()" />
             <Button
                 :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
                 :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
+                :aria-label="sortDescending ? 'Sorted Z to A, sort A to Z' : 'Sorted A to Z, sort Z to A'"
                 severity="secondary" text size="small"
                 style="flex-shrink: 0;"
                 @click="toggleSortDirection"
@@ -482,30 +483,6 @@ export default {
         text-align: left;
     }
 
-    #cancel {
-        cursor: pointer;
-        visibility: hidden;
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        padding-right: 0.5rem;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-
-        .icon {
-            margin: 0;
-        }
-    }
-
-    #src {
-        margin-left: 0.5rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-    }
 
     .no-results {
         text-align: center;

@@ -1,74 +1,129 @@
 <template>
-    <div ref="dropdownRef" class="colormap-dropdown">
-        <button class="colormap-trigger" type="button" @click="toggleOpen">
+    <div ref="root" class="colormap-dropdown">
+        <button :id="inputId" ref="trigger" class="colormap-trigger" type="button"
+                aria-haspopup="listbox" :aria-expanded="open" :aria-controls="menuId"
+                :aria-labelledby="ariaLabelledby" @click="toggleOpen" @keydown="onTriggerKey">
             <span v-if="selectedItem" class="colormap-preview" :style="gradientStyle(selectedItem.colors)" />
             <span class="colormap-label">{{ selectedItem ? selectedItem.name : 'Select...' }}</span>
-            <i class="fas fa-chevron-down colormap-arrow" />
+            <i class="fas fa-chevron-down colormap-arrow" aria-hidden="true" />
         </button>
-        <div v-if="open" class="colormap-menu">
-            <div v-for="cm in items" :key="cm.id"
-                 class="colormap-option"
-                 :class="{ selected: cm.id === modelValue }"
-                 @click="select(cm)">
+        <ul v-if="open" :id="menuId" ref="menu" class="colormap-menu" role="listbox" tabindex="-1"
+            :aria-labelledby="ariaLabelledby" :aria-activedescendant="optionId(active)"
+            @keydown="onMenuKey">
+            <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events -- the listbox owns the keyboard and points here with aria-activedescendant -->
+            <li v-for="(cm, idx) in items" :id="optionId(idx)" :key="cm.id"
+                class="colormap-option" role="option" tabindex="-1"
+                :class="{ selected: cm.id === modelValue, active: idx === active }"
+                :aria-selected="cm.id === modelValue"
+                @click="select(cm)" @mousemove="active = idx">
                 <span class="colormap-preview" :style="gradientStyle(cm.colors)" />
                 <span class="colormap-label">{{ cm.name }}</span>
-            </div>
-        </div>
+            </li>
+        </ul>
     </div>
 </template>
 
-<script>
+<script setup>
 /**
- * ColormapDropdown - Colormap picker with gradient preview swatches.
+ * ColormapDropdown - colormap picker with gradient preview swatches (a native select
+ * cannot draw them). Keyboard follows the select-only combobox pattern: arrows open the
+ * list and move, Enter/Space pick, Escape and Tab close.
  *
- * Props:
- *   modelValue - ID of the currently selected colormap.
- *   colormaps  - Array of { id, name, colors } colormap descriptors.
+ *   <label id="cm-label" for="cm">Colormap</label>
+ *   <ColormapDropdown v-model="colormap" :colormaps="list" input-id="cm" aria-labelledby="cm-label" />
  */
-export default {
-    props: {
-        modelValue: { type: String, default: '' },
-        colormaps: { type: Array, default: () => [] }
-    },
-    emits: ['update:modelValue'],
-    data() {
-        return { open: false };
-    },
-    computed: {
-        items() {
-            return this.colormaps.map(cm =>
-                typeof cm === 'string' ? { id: cm, name: cm, colors: [] } : cm
-            );
-        },
-        selectedItem() {
-            return this.items.find(cm => cm.id === this.modelValue) || null;
-        }
-    },
-    mounted() {
-        document.addEventListener('click', this.onClickOutside);
-    },
-    beforeUnmount() {
-        document.removeEventListener('click', this.onClickOutside);
-    },
-    methods: {
-        toggleOpen() {
-            this.open = !this.open;
-        },
-        select(cm) {
-            this.open = false;
-            this.$emit('update:modelValue', cm.id);
-        },
-        gradientStyle(colors) {
-            if (!colors || colors.length === 0) return {};
-            return { background: `linear-gradient(to right, ${colors.join(', ')})` };
-        },
-        onClickOutside(e) {
-            if (this.$refs.dropdownRef && !this.$refs.dropdownRef.contains(e.target)) {
-                this.open = false;
-            }
-        }
+import { computed, nextTick, ref, useId } from 'vue';
+import { useEventListener } from '@/composables/useEventListener';
+
+const props = defineProps({
+    /** ID of the selected colormap */
+    modelValue: { type: String, default: '' },
+    /** { id, name, colors } descriptors, or plain names */
+    colormaps: { type: Array, default: () => [] },
+    inputId: { type: String, default: undefined },
+    ariaLabelledby: { type: String, default: undefined }
+});
+
+const emit = defineEmits(['update:modelValue']);
+
+const root = ref(null);
+const trigger = ref(null);
+const menu = ref(null);
+const open = ref(false);
+const active = ref(-1);
+const menuId = useId();
+
+const items = computed(() => props.colormaps.map(cm =>
+    typeof cm === 'string' ? { id: cm, name: cm, colors: [] } : cm));
+const selectedIndex = computed(() => items.value.findIndex(cm => cm.id === props.modelValue));
+const selectedItem = computed(() => items.value[selectedIndex.value] || null);
+
+const optionId = idx => (idx >= 0 ? `${menuId}-${idx}` : undefined);
+
+function gradientStyle(colors) {
+    if (!colors || colors.length === 0) return {};
+    return { background: `linear-gradient(to right, ${colors.join(', ')})` };
+}
+
+async function show() {
+    open.value = true;
+    active.value = Math.max(0, selectedIndex.value);
+    await nextTick();
+    menu.value?.focus();
+    menu.value?.querySelector('.active')?.scrollIntoView?.({ block: 'nearest' });
+}
+
+function close(refocus = false) {
+    open.value = false;
+    if (refocus) trigger.value?.focus();
+}
+
+function toggleOpen() {
+    if (open.value) close();
+    else show();
+}
+
+function select(cm) {
+    close(true);
+    emit('update:modelValue', cm.id);
+}
+
+function onTriggerKey(e) {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        show();
     }
-};
+}
+
+function move(idx) {
+    active.value = Math.min(Math.max(idx, 0), items.value.length - 1);
+    nextTick(() => menu.value?.querySelector('.active')?.scrollIntoView?.({ block: 'nearest' }));
+}
+
+function onMenuKey(e) {
+    const keys = {
+        ArrowDown: () => move(active.value + 1),
+        ArrowUp: () => move(active.value - 1),
+        Home: () => move(0),
+        End: () => move(items.value.length - 1),
+        Enter: () => items.value[active.value] && select(items.value[active.value]),
+        ' ': () => items.value[active.value] && select(items.value[active.value]),
+        Escape: () => close(true)
+    };
+    const action = keys[e.key];
+    if (!action) {
+        if (e.key === 'Tab') close();
+        return;
+    }
+    // Escape here closes the list, not the dialog around it
+    e.preventDefault();
+    e.stopPropagation();
+    action();
+}
+
+useEventListener(document, 'click', e => {
+    if (open.value && root.value && !root.value.contains(e.target)) close();
+});
 </script>
 
 <style scoped>
@@ -92,7 +147,7 @@ export default {
     text-align: left;
 }
 
-.colormap-trigger:focus {
+.colormap-trigger:focus-visible {
     outline: none;
     border-color: rgba(76, 175, 80, 0.6);
 }
@@ -104,6 +159,8 @@ export default {
 }
 
 .colormap-menu {
+    list-style: none;
+    padding: 0;
     position: absolute;
     top: 100%;
     left: 0;
@@ -128,7 +185,8 @@ export default {
     color: #eee;
 }
 
-.colormap-option:hover {
+.colormap-option:hover,
+.colormap-option.active {
     background: rgba(255,255,255,0.1);
 }
 

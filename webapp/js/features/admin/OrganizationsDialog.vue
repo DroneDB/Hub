@@ -18,12 +18,12 @@
                 <h4>Add Organization</h4>
                 <div class="d-flex gap-3 flex-wrap align-items-end">
                     <div class="flex-grow-1" style="min-width: 12rem;">
-                        <label class="d-block mb-1 fw-semibold">Organization</label>
-                        <Select v-model="newOrg.slug" :options="availableOrganizations" option-label="displayName" option-value="slug" filter placeholder="Search organization..." class="w-100" />
+                        <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
+                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter placeholder="Search organization..." class="w-100" />
                     </div>
                     <div style="min-width: 10rem;">
-                        <label class="d-block mb-1 fw-semibold">Permissions</label>
-                        <Select v-model="newOrg.permissions" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
+                        <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
+                        <Select v-model="newOrg.permissions" input-id="organizations-dialog-permissions" aria-labelledby="organizations-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                     </div>
                     <div>
                         <Button severity="primary" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" @click="addOrganization" />
@@ -53,6 +53,7 @@
                         <td>
                             <Select v-if="!org.isOwner"
                                     v-model="org.permissions"
+                                    :aria-label="`Permissions in ${org.name || org.slug}`"
                                     :options="permissionsOptions"
                                     option-label="label"
                                     option-value="value"

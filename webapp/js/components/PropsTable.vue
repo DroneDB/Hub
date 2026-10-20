@@ -34,7 +34,7 @@
                                 size="small"
                                 text
                                 class="copy-btn"
-                                title="Copy hash to clipboard"
+                                title="Copy hash to clipboard" aria-label="Copy hash to clipboard"
                                 @click="copyValue(copyableValues[data.key])" />
                     </div>
                     <div v-else-if="typeof data.rawValue === 'number'">

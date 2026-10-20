@@ -41,7 +41,7 @@
                             <div>
                                 <div class="org-title-row">
                                     <h1 class="my-0">{{ orgName }}</h1>
-                                    <Button v-if="canManageOrg" severity="secondary" text rounded size="small" title="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
+                                    <Button v-if="canManageOrg" severity="secondary" text rounded size="small" title="Edit Organization" aria-label="Edit Organization" icon="fa-solid fa-pencil" @click.stop="openOrgDialog()" />
                                     <div class="org-tags d-flex align-items-center gap-2 flex-wrap">
                                         <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                             {{ orgInfo.owner }}
@@ -70,7 +70,7 @@
                         </div>
                         <IconField class="mt-2">
                             <InputIcon class="fa-solid fa-magnifying-glass" />
-                            <InputText v-model="searchQuery" small placeholder="Search datasets" fluid />
+                            <InputText v-model="searchQuery" small placeholder="Search datasets" aria-label="Search datasets" fluid />
                         </IconField>
                     </div>
                 </div>
@@ -85,7 +85,7 @@
                 <Column header="" style="width: 3.75rem;">
                     <template #body="slotProps">
                         <ProgressSpinner v-if="slotProps.data.loading" class="ds-row-spinner" stroke-width="4" />
-                        <img v-else :src="slotProps.data.thumbUrl" class="ds-thumb-img"
+                        <img v-else :src="slotProps.data.thumbUrl" alt="" class="ds-thumb-img"
                              :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }">
                     </template>
                 </Column>

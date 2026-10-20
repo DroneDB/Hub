@@ -9,26 +9,26 @@
                 <li v-for="(cam, i) in cameras" :key="cam.id"
                     class="camera-row" :class="{ active: i === activeIndex }">
                     <span class="idx" :title="`Press ${i} to jump here`">{{ i }}</span>
-                    <input v-model.trim="cam.name" class="name" type="text"
+                    <input v-model.trim="cam.name" class="name" type="text" :aria-label="`Name of view ${i}`"
                            :readonly="!canWrite"
                            @change="$emit('rename', { index: i, name: cam.name })">
                     <div class="actions">
-                        <button class="act" title="Go to this view" @click="$emit('goto', i)">
+                        <button class="act" title="Go to this view" aria-label="Go to this view" @click="$emit('goto', i)">
                             <i class="fa-solid fa-eye" />
                         </button>
-                        <button v-if="canWrite" class="act" title="Replace with the current view"
+                        <button v-if="canWrite" class="act" title="Replace with the current view" aria-label="Replace with the current view"
                                 @click="$emit('update-current', i)">
                             <i class="fa-solid fa-camera-rotate" />
                         </button>
                         <button v-if="canWrite" class="act" :disabled="i === 0"
-                                title="Move up" @click="$emit('move', { index: i, dir: -1 })">
+                                title="Move up" aria-label="Move up" @click="$emit('move', { index: i, dir: -1 })">
                             <i class="fa-solid fa-arrow-up" />
                         </button>
                         <button v-if="canWrite" class="act" :disabled="i === cameras.length - 1"
-                                title="Move down" @click="$emit('move', { index: i, dir: 1 })">
+                                title="Move down" aria-label="Move down" @click="$emit('move', { index: i, dir: 1 })">
                             <i class="fa-solid fa-arrow-down" />
                         </button>
-                        <button v-if="canWrite" class="act danger" title="Remove this view"
+                        <button v-if="canWrite" class="act danger" title="Remove this view" aria-label="Remove this view"
                                 @click="$emit('delete', i)">
                             <i class="fa-solid fa-trash" />
                         </button>

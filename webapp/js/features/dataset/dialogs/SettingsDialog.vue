@@ -8,7 +8,8 @@
             <div class="settings-section">
                 <div class="mb-2">
                     <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }" />
-                    Visibility: <Select v-model="visibility" :options="visibilityOptions" option-label="label" option-value="value" @change="setVisibility" />
+                    <label id="settings-visibility-label" for="settings-visibility">Visibility:</label>
+                    <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label" :options="visibilityOptions" option-label="label" option-value="value" @change="setVisibility" />
                 </div>
                 <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
                     <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
@@ -19,7 +20,8 @@
             <div class="settings-section">
                 <div>
                     <i class="fa-solid fa-scale-balanced" />
-                    License: <Select v-model="license" :options="licenseOptions" option-label="label" option-value="value" class="license-dropdown" :title="Licenses[license].name" @change="setLicense" />
+                    <label id="settings-license-label" for="settings-license">License:</label>
+                    <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label" :options="licenseOptions" option-label="label" option-value="value" class="license-dropdown" :title="Licenses[license].name" @change="setLicense" />
                 </div>
             </div>
 
@@ -29,7 +31,7 @@
                     Tagline
                 </div>
                 <div class="tagline-field">
-                    <InputText v-model="tagline" maxlength="256"
+                    <InputText v-model="tagline" maxlength="256" aria-label="Tagline"
                                placeholder="Brief description of your dataset (max 256 chars)"
                                fluid @change="setTagline" />
                     <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
@@ -44,15 +46,15 @@
                 <div class="thumbnail-upload">
                     <div class="thumbnail-preview-container">
                         <img v-if="thumbnailPreview && !thumbnailError"
-                             :src="thumbnailPreview"
+                             :src="thumbnailPreview" alt="Dataset thumbnail"
                              class="thumbnail-preview"
                              @error="thumbnailError = true">
                         <img v-else
-                             src="/images/dataset-placeholder.svg"
+                             src="/images/dataset-placeholder.svg" alt="No thumbnail"
                              class="thumbnail-preview thumbnail-placeholder">
                     </div>
                     <div class="thumbnail-actions">
-                        <input ref="thumbnailInput" type="file"
+                        <input ref="thumbnailInput" type="file" aria-label="Thumbnail image"
                                accept="image/webp,image/jpeg,image/png"
                                style="display: none"
                                @change="handleThumbnailSelect">
@@ -309,12 +311,6 @@ export default {
 </script>
 
 <style scoped>
-#settings {
-    min-height: 12.5rem;
-    padding: 1rem;
-    margin-top: 0.75rem;
-}
-
 .loading {
     text-align: center;
     padding: 1rem;

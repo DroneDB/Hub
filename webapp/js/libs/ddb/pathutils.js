@@ -45,6 +45,16 @@ const pathutils = {
         return path.substr(0, idx);
     },
 
+    // Folders along a relative path, outermost first: "a/b" -> [{name:"a",path:"a"},{name:"b",path:"a/b"}]
+    crumbs: function (path) {
+        if (!path) return [];
+        let cur = "";
+        return path.split("/").filter(Boolean).map(name => {
+            cur = cur ? cur + "/" + name : name;
+            return { name, path: cur };
+        });
+    },
+
     getTree: function (path) {
         path = path.replace("file://", "");
 

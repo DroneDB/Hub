@@ -23,15 +23,15 @@
                         <h3>Add Member</h3>
                         <div class="d-flex gap-3 flex-wrap align-items-end">
                             <div style="flex: 7;">
-                                <label class="d-block mb-1 fw-semibold">User</label>
-                                <Select v-model="newMember.userName" :options="availableUsers" option-label="displayName" option-value="userName" filter placeholder="Search user..." class="w-100" />
+                                <label id="organization-members-dialog-user-label" for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User</label>
+                                <Select v-model="newMember.userName" input-id="organization-members-dialog-user" aria-labelledby="organization-members-dialog-user-label" :options="availableUsers" option-label="displayName" option-value="userName" filter placeholder="Search user..." class="w-100" />
                             </div>
                             <div style="flex: 5;">
-                                <label class="d-block mb-1 fw-semibold">Permissions</label>
-                                <Select v-model="newMember.permissions" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
+                                <label id="organization-members-dialog-permissions-label" for="organization-members-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
+                                <Select v-model="newMember.permissions" input-id="organization-members-dialog-permissions" aria-labelledby="organization-members-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                             </div>
                             <div style="flex: 4;">
-                                <label class="d-block mb-1">&nbsp;</label>
+                                <span class="d-block mb-1" aria-hidden="true">&nbsp;</span>
                                 <Button severity="info" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" @click="addMember" />
                             </div>
                         </div>
@@ -56,6 +56,7 @@
                                 <td>
                                     <Select v-if="canManageMembers"
                                             v-model="member.permissions"
+                                            :aria-label="`Permissions of ${member.userName}`"
                                             :options="permissionsOptions"
                                             option-label="label"
                                             option-value="value"

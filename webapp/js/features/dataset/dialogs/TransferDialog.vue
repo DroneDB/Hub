@@ -15,22 +15,22 @@
 
                 <!-- Destination Organization -->
                 <div class="my-3">
-                    <label class="d-block mb-1 fw-semibold">Destination Organization</label>
-                    <Select v-model="destOrg" :options="organizationOptions" option-label="label" option-value="value"
+                    <label id="transfer-dialog-destination-organization-label" for="transfer-dialog-destination-organization" class="d-block mb-1 fw-semibold">Destination Organization</label>
+                    <Select v-model="destOrg" input-id="transfer-dialog-destination-organization" aria-labelledby="transfer-dialog-destination-organization-label" :options="organizationOptions" option-label="label" option-value="value"
                             placeholder="Select organization" class="w-100" data-autofocus @change="onOrgChange" />
                 </div>
 
                 <!-- Destination Dataset -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Destination Dataset</label>
-                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" option-label="label"
+                    <label id="transfer-dialog-destination-dataset-label" for="transfer-dialog-destination-dataset" class="d-block mb-1 fw-semibold">Destination Dataset</label>
+                    <Select v-model="destDs" input-id="transfer-dialog-destination-dataset" aria-labelledby="transfer-dialog-destination-dataset-label" :disabled="!destOrg" :options="datasetOptions" option-label="label"
                             option-value="value" option-disabled="disabled" placeholder="Select dataset" class="w-100" />
                 </div>
 
                 <!-- Destination Path -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Destination Path (optional)</label>
-                    <InputText v-model="destPath" placeholder="Leave empty for root folder" fluid />
+                    <label for="transfer-dialog-destination-path" class="d-block mb-1 fw-semibold">Destination Path (optional)</label>
+                    <InputText id="transfer-dialog-destination-path" v-model="destPath" placeholder="Leave empty for root folder" fluid />
                     <small class="help-text">Example: folder/subfolder</small>
                 </div>
 

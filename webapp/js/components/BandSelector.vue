@@ -1,8 +1,8 @@
 <template>
-    <div class="band-selector">
+    <div class="band-selector" role="group">
         <div v-for="ch in channels" :key="ch.id" class="band-channel">
-            <label class="channel-label" :style="{ color: ch.color }">{{ ch.label }}</label>
-            <select v-model="selected[ch.id]" class="channel-select" @change="emitChange">
+            <label :for="uid + ch.id" class="channel-label" :style="{ color: ch.color }">{{ ch.label }}</label>
+            <select :id="uid + ch.id" v-model="selected[ch.id]" class="channel-select" @change="emitChange">
                 <option v-for="b in bands" :key="b.index" :value="b.index">
                     {{ b.index }} - {{ b.name }}
                 </option>
@@ -22,12 +22,18 @@
  *   modelValue - Current band mapping string (e.g. "1:2:3").
  *   bands      - Array of { index, name } band descriptors.
  */
+import { useId } from 'vue';
+
 export default {
     props: {
         modelValue: { type: String, default: '' },
         bands: { type: Array, default: () => [] }
     },
     emits: ['update:modelValue'],
+    setup() {
+        // Unique per instance: the selector can be on screen more than once
+        return { uid: useId() + '-band-' };
+    },
     data() {
         return {
             channels: [

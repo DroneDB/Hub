@@ -27,7 +27,8 @@
             </div>
         </div>
 
-        <div ref="droparea" class="droparea" :class="{ hidden: url || uploading }"
+        <!-- Drop files here, or use the button -->
+        <div ref="droparea" class="droparea" :class="{ hidden: url || uploading }" role="presentation"
              @dragover.prevent @drop.prevent="handleDrop">
             <Button ref="btnUpload" severity="info" size="large" icon="fa-solid fa-cloud-arrow-up" label="Upload Files" @click="handleUpload" />
         </div>

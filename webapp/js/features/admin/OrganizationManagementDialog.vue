@@ -16,7 +16,7 @@
                             <div style="flex: 1; max-width: 18.75rem;">
                                 <IconField>
                                     <InputIcon class="fa-solid fa-magnifying-glass" />
-                                    <InputText v-model="searchQuery" placeholder="Search organizations" class="w-100" />
+                                    <InputText v-model="searchQuery" placeholder="Search organizations" aria-label="Search organizations" class="w-100" />
                                 </IconField>
                             </div>
                             <Button severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" @click="loadOrganizations" />
@@ -58,21 +58,21 @@
                     <TabPanel value="create">
                         <form :class="{ error: !!createError }" @submit.prevent>
                             <div class="mb-3">
-                                <label class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
-                                <InputText ref="txtOrgName" v-model="newOrgName" placeholder="Enter organization name"
+                                <label for="organization-management-dialog-organization-name" class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
+                                <InputText id="organization-management-dialog-organization-name" ref="txtOrgName" v-model="newOrgName" placeholder="Enter organization name"
                                            class="w-100" @keydown="clearCreateError()" @keyup.enter="createOrganization()" />
                                 <small>Organization names should be descriptive and will be converted to a valid slug</small>
                             </div>
 
                             <div class="mb-3">
-                                <label class="d-block mb-1 fw-semibold">Organization Slug</label>
-                                <InputText :model-value="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-100" />
+                                <label for="organization-management-dialog-organization-slug" class="d-block mb-1 fw-semibold">Organization Slug</label>
+                                <InputText id="organization-management-dialog-organization-slug" :model-value="suggestedSlug" :placeholder="suggestedSlug" readonly class="w-100" />
                                 <small>This is automatically generated from the name and cannot be changed later</small>
                             </div>
 
                             <div class="mb-3">
-                                <label class="d-block mb-1 fw-semibold">Description (Optional)</label>
-                                <Textarea v-model="newOrgDescription" placeholder="Brief description of the organization" rows="3" auto-resize class="w-100" />
+                                <label for="organization-management-dialog-description" class="d-block mb-1 fw-semibold">Description (Optional)</label>
+                                <Textarea id="organization-management-dialog-description" v-model="newOrgDescription" placeholder="Brief description of the organization" rows="3" auto-resize class="w-100" />
                             </div>
 
                             <div v-if="createError" class="mb-3">

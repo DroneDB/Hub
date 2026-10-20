@@ -16,7 +16,7 @@
                         <RadioButton v-model="mode" input-id="crsModeSystem" value="system" :disabled="saving" />
                         <label for="crsModeSystem">Coordinate system</label>
                     </div>
-                    <InputText v-model="crs" placeholder="EPSG:32632, or WKT" :disabled="saving || mode !== 'system'"
+                    <InputText v-model="crs" placeholder="EPSG:32632, or WKT" aria-label="Coordinate system (EPSG code or WKT)" :disabled="saving || mode !== 'system'"
                                :invalid="showCrsError" fluid @input="touched = true" />
                     <small v-if="showCrsError" class="crs-error">{{ crsError }}</small>
                     <small v-else class="help-text">The coordinate system of the drawing's coordinates: an EPSG

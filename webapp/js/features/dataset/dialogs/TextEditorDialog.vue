@@ -1,6 +1,6 @@
 <template>
     <div class="text-editor-wrapper">
-        <Window id="textEditorDialog" :title="windowTitle" :autofocus="false" modal width="80%" height="80%" @close="close">
+        <Window id="textEditorDialog" :title="windowTitle" :focus-on-show="false" modal width="80%" height="80%" @close="close">
             <div class="text-editor-dialog">
                 <Message v-model="error" />
 

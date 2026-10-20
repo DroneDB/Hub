@@ -7,7 +7,7 @@
                     Clipboard
                     <span class="clipboard-panel-mode">{{ isCut ? 'Cut' : 'Copy' }}</span>
                 </span>
-                <button class="clipboard-panel-close" title="Clear clipboard" @click="clear">
+                <button class="clipboard-panel-close" title="Clear clipboard" aria-label="Clear clipboard" @click="clear">
                     <i class="fa-solid fa-xmark" />
                 </button>
             </div>

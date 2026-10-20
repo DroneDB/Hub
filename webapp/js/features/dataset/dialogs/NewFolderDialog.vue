@@ -1,7 +1,7 @@
 <template>
     <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Create folder" :confirm-disabled="!newFolderPath" :busy="busy" @confirm="createFolder" @close="onWindowClose">
 
-        <InputText ref="newFolderInput" v-model="newFolderPath" class="newFolderInput" :invalid="!newFolderPath"
+        <InputText ref="newFolderInput" v-model="newFolderPath" class="newFolderInput" aria-label="Folder name" :invalid="!newFolderPath"
                    :disabled="busy" placeholder="Folder name" />
 
     </Window>

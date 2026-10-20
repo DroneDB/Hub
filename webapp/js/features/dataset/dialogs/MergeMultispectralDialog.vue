@@ -5,24 +5,33 @@
             <div class="columns-row">
                 <!-- Column 1: Band order -->
                 <div class="col-bands">
-                    <label class="section-label">Band Order (drag to reorder)</label>
-                    <div ref="bandList" class="band-list">
-                        <div v-for="(item, index) in orderedFiles" :key="item.entry.path"
-                             class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
-                             draggable="true"
-                             @dragstart="onDragStart(index, $event)"
-                             @dragover.prevent="onDragOver(index)"
-                             @dragleave="onDragLeave"
-                             @drop.prevent="onDrop(index)"
-                             @dragend="onDragEnd">
-                            <span class="drag-handle"><i class="fa-solid fa-grip-vertical" /></span>
+                    <span id="merge-band-order-label" class="section-label">Band Order (drag or use the arrows)</span>
+                    <ol ref="bandList" class="band-list" aria-labelledby="merge-band-order-label">
+                        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- dragging is the mouse way; the arrow buttons are the keyboard way -->
+                        <li v-for="(item, index) in orderedFiles" :key="item.entry.path"
+                            class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
+                            draggable="true"
+                            @dragstart="onDragStart(index, $event)"
+                            @dragover.prevent="onDragOver(index)"
+                            @dragleave="onDragLeave"
+                            @drop.prevent="onDrop(index)"
+                            @dragend="onDragEnd">
+                            <span class="drag-handle" aria-hidden="true"><i class="fa-solid fa-grip-vertical" /></span>
                             <span class="band-index">{{ index + 1 }}.</span>
                             <span class="band-name" :title="item.entry.path">{{ item.label }}</span>
                             <span v-if="bandInfo[item.entry.path]" class="band-meta">
                                 ({{ bandInfo[item.entry.path].dataType }})
                             </span>
-                        </div>
-                    </div>
+                            <span class="band-move">
+                                <Button icon="fa-solid fa-arrow-up" text rounded size="small" severity="secondary"
+                                        :aria-label="`Move ${item.label} up`" :disabled="index === 0"
+                                        @click="moveBand(index, index - 1)" />
+                                <Button icon="fa-solid fa-arrow-down" text rounded size="small" severity="secondary"
+                                        :aria-label="`Move ${item.label} down`" :disabled="index === orderedFiles.length - 1"
+                                        @click="moveBand(index, index + 1)" />
+                            </span>
+                        </li>
+                    </ol>
                 </div>
 
                 <!-- Column 2: Validation info -->
@@ -81,8 +90,8 @@
             <div class="bottom-row">
                 <div class="bottom-left">
                     <div class="section">
-                        <label class="section-label">Output path</label>
-                        <InputText v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
+                        <label for="merge-multispectral-dialog-output-path" class="section-label">Output path</label>
+                        <InputText id="merge-multispectral-dialog-output-path" v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
                                    placeholder="merged.tif" @input="validateOutputName" />
                         <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
                     </div>
@@ -310,11 +319,16 @@ export default {
             this.dragOverIndex = null;
         },
         onDrop(index) {
-            if (this.dragIndex === null || this.dragIndex === index) return;
-            const item = this.orderedFiles.splice(this.dragIndex, 1)[0];
-            this.orderedFiles.splice(index, 0, item);
+            const from = this.dragIndex;
             this.dragOverIndex = null;
             this.dragIndex = null;
+            if (from !== null) this.moveBand(from, index);
+        },
+        // Band order is the merge order: drag and the arrow buttons both end here
+        moveBand(from, to) {
+            if (from === to || to < 0 || to >= this.orderedFiles.length) return;
+            const item = this.orderedFiles.splice(from, 1)[0];
+            this.orderedFiles.splice(to, 0, item);
             this.validate();
         },
         onDragEnd() {
@@ -389,6 +403,9 @@ export default {
 }
 
 .band-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     border: 1px solid var(--p-surface-300);
     border-radius: 0.375rem;
     overflow: hidden;
@@ -418,6 +435,11 @@ export default {
 
 .band-item.drag-over {
     border-top: 2px solid var(--p-primary-color);
+}
+
+.band-move {
+    margin-left: auto;
+    display: inline-flex;
 }
 
 .drag-handle {

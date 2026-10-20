@@ -24,8 +24,8 @@
 
             <!-- Mode toggle -->
             <div class="form-row">
-                <label class="form-label">Spacing</label>
-                <div class="mode-toggle">
+                <span id="contour-spacing-label" class="form-label">Spacing</span>
+                <div class="mode-toggle" role="radiogroup" aria-labelledby="contour-spacing-label">
                     <label>
                         <input v-model="mode" type="radio" value="interval">
                         Fixed interval
@@ -39,8 +39,8 @@
 
             <!-- Interval -->
             <div v-if="mode === 'interval'" class="form-row">
-                <label class="form-label">Interval ({{ unit || 'units' }})</label>
-                <InputNumber v-model="interval"
+                <label for="contour-options-dialog-interval" class="form-label">Interval ({{ unit || 'units' }})</label>
+                <InputNumber v-model="interval" input-id="contour-options-dialog-interval"
                              :min="0.0001"
                              :max-fraction-digits="4"
                              :min-fraction-digits="0"
@@ -50,8 +50,8 @@
 
             <!-- Count -->
             <div v-else class="form-row">
-                <label class="form-label">Number of levels</label>
-                <InputNumber v-model="count"
+                <label for="contour-options-dialog-number-of-levels" class="form-label">Number of levels</label>
+                <InputNumber v-model="count" input-id="contour-options-dialog-number-of-levels"
                              :min="2" :max="500"
                              show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
@@ -62,8 +62,8 @@
 
             <!-- Base offset -->
             <div class="form-row">
-                <label class="form-label">Base elevation</label>
-                <InputNumber v-model="baseOffset"
+                <label for="contour-options-dialog-base-elevation" class="form-label">Base elevation</label>
+                <InputNumber v-model="baseOffset" input-id="contour-options-dialog-base-elevation"
                              :max-fraction-digits="3"
                              show-buttons button-layout="horizontal" :step="1"
                              class="form-input" />
@@ -72,15 +72,15 @@
             <!-- Min/max clipping -->
             <div class="form-row two-cols">
                 <div>
-                    <label class="form-label">Min elevation</label>
-                    <InputNumber v-model="minElev"
+                    <label for="contour-options-dialog-min-elevation" class="form-label">Min elevation</label>
+                    <InputNumber v-model="minElev" input-id="contour-options-dialog-min-elevation"
                                  :max-fraction-digits="3"
                                  :placeholder="rasterMin != null ? String(rasterMin) : ''"
                                  class="form-input" />
                 </div>
                 <div>
-                    <label class="form-label">Max elevation</label>
-                    <InputNumber v-model="maxElev"
+                    <label for="contour-options-dialog-max-elevation" class="form-label">Max elevation</label>
+                    <InputNumber v-model="maxElev" input-id="contour-options-dialog-max-elevation"
                                  :max-fraction-digits="3"
                                  :placeholder="rasterMax != null ? String(rasterMax) : ''"
                                  class="form-input" />
@@ -89,8 +89,8 @@
 
             <!-- Simplification -->
             <div class="form-row">
-                <label class="form-label">Simplification tolerance (raster CRS units)</label>
-                <InputNumber v-model="simplifyTolerance"
+                <label for="contour-options-dialog-simplification-tolerance" class="form-label">Simplification tolerance (raster CRS units)</label>
+                <InputNumber v-model="simplifyTolerance" input-id="contour-options-dialog-simplification-tolerance"
                              :min="0"
                              :max-fraction-digits="4"
                              show-buttons button-layout="horizontal" :step="0.5"

@@ -8,20 +8,20 @@
 
             <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Username</label>
-                    <InputText v-model="editUser.userName" disabled class="w-100" />
+                    <label for="edit-user-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
+                    <InputText id="edit-user-dialog-username" v-model="editUser.userName" disabled class="w-100" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Email</label>
-                    <InputText v-model="editUser.email" placeholder="user@example.com"
+                    <label for="edit-user-dialog-email" class="d-block mb-1 fw-semibold">Email</label>
+                    <InputText id="edit-user-dialog-email" v-model="editUser.email" placeholder="user@example.com"
                                class="w-100" @keydown="clearError()" />
                     <div v-if="editUser.email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Roles</label>
-                    <MultiSelect v-model="editUser.roles" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
+                    <label id="edit-user-dialog-roles-label" for="edit-user-dialog-roles" class="d-block mb-1 fw-semibold">Roles</label>
+                    <MultiSelect v-model="editUser.roles" input-id="edit-user-dialog-roles" aria-labelledby="edit-user-dialog-roles-label" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
         </div>

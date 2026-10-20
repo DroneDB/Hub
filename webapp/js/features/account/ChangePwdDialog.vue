@@ -5,13 +5,13 @@
                 <Message v-if="error" severity="error">{{ error }}</Message>
                 <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Old Password</label>
-                    <Password ref="oldPwd" v-model="oldPwd" :feedback="false"
+                    <label for="change-pwd-dialog-old-password" class="d-block mb-1 fw-semibold">Old Password</label>
+                    <Password ref="oldPwd" v-model="oldPwd" input-id="change-pwd-dialog-old-password" :feedback="false"
                               toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password v-model="newPwd" :feedback="false" toggle-mask
+                    <label for="change-pwd-dialog-new-password" class="d-block mb-1 fw-semibold">New Password</label>
+                    <Password v-model="newPwd" input-id="change-pwd-dialog-new-password" :feedback="false" toggle-mask
                               class="w-100" input-class="w-100" @keydown="clearError()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && newPwd" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
@@ -22,8 +22,8 @@
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password v-model="confirmPwd" :feedback="false"
+                    <label for="change-pwd-dialog-confirm-new-password" class="d-block mb-1 fw-semibold">Confirm New Password</label>
+                    <Password v-model="confirmPwd" input-id="change-pwd-dialog-confirm-new-password" :feedback="false"
                               toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" />
                 </div>
             </form>

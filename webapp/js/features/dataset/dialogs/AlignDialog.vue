@@ -15,14 +15,14 @@
 
             <!-- Source (read-only) -->
             <div class="section">
-                <label class="section-label">Source file</label>
-                <InputText :model-value="sourceEntry.entry.path" readonly fluid class="w-100" />
+                <label for="align-dialog-source-file" class="section-label">Source file</label>
+                <InputText id="align-dialog-source-file" :model-value="sourceEntry.entry.path" readonly fluid class="w-100" />
             </div>
 
             <!-- Reference picker -->
             <div class="section">
-                <label class="section-label">Reference GeoTIFF</label>
-                <Select v-model="selectedReference" :options="referenceOptions" option-label="label" option-value="value"
+                <label id="align-dialog-reference-geotiff-label" for="align-dialog-reference-geotiff" class="section-label">Reference GeoTIFF</label>
+                <Select v-model="selectedReference" input-id="align-dialog-reference-geotiff" aria-labelledby="align-dialog-reference-geotiff-label" :options="referenceOptions" option-label="label" option-value="value"
                         placeholder="Select reference..." class="w-100" fluid @change="onReferenceChange" />
                 <small v-if="referenceOptions.length === 0" class="hint-error">
                     No other GeoTIFF in this dataset to use as reference.
@@ -31,14 +31,14 @@
 
             <!-- Mode -->
             <div class="section">
-                <label class="section-label">Alignment mode</label>
-                <Select v-model="mode" :options="modeOptions" option-label="label" option-value="value" class="w-100" fluid />
+                <label id="align-dialog-alignment-mode-label" for="align-dialog-alignment-mode" class="section-label">Alignment mode</label>
+                <Select v-model="mode" input-id="align-dialog-alignment-mode" aria-labelledby="align-dialog-alignment-mode-label" :options="modeOptions" option-label="label" option-value="value" class="w-100" fluid />
             </div>
 
             <!-- Output name -->
             <div class="section">
-                <label class="section-label">Output file name</label>
-                <InputText v-model="outputName" fluid class="w-100" :invalid="!isOutputValid"
+                <label for="align-dialog-output-file-name" class="section-label">Output file name</label>
+                <InputText id="align-dialog-output-file-name" v-model="outputName" fluid class="w-100" :invalid="!isOutputValid"
                            placeholder="aligned.tif" @input="validateOutputName" />
                 <small v-if="outputNameError" class="hint-error">{{ outputNameError }}</small>
             </div>

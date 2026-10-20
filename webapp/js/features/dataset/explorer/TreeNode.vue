@@ -1,6 +1,8 @@
 <template>
     <div class="tree-node">
-        <div class="entry"
+        <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events -- the tree owns the keyboard (arrows, Enter) and points at this item with aria-activedescendant -->
+        <div :id="domId" class="entry" role="treeitem" tabindex="-1"
+             :aria-selected="selected" :aria-expanded="isExpandable ? expanded : undefined"
              :draggable="!node.root && canWrite"
              :class="{ selected: selected, 'drop-target': dropTargetPath === node.entry.path }"
              @dragstart="onDragStart($event, node)"
@@ -11,13 +13,13 @@
              @contextmenu="onRightClick">
             <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
             <i v-if="isExpandable && !loading && (!empty || !loadedChildren)" class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
-               @click="handleOpenCaret" />
+               aria-hidden="true" @click="handleOpenCaret" />
             <i v-if="!isExpandable || (empty && loadedChildren)" class="icon nonexistent" />
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
         </div>
-        <div v-show="expanded" class="children">
+        <div v-show="expanded" class="children" role="group">
             <TreeNode v-for="(child, index) in children" :key="'N,' + child.path + ',' + index" ref="nodes" :node="child"
                       :get-children="getChildren" :can-write="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
                       @opened="(n, sender) => $emit('opened', n, sender)" />
@@ -66,6 +68,10 @@ export default {
         }
     },
     computed: {
+        // Target of the tree's aria-activedescendant
+        domId: function () {
+            return 'tree-node-' + this.$.uid;
+        },
         isExpandable: function () {
             return ddb.entry.isDirectory(this.node.entry);
         },

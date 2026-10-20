@@ -19,7 +19,7 @@
                     <div class="search-col">
                         <IconField>
                             <InputIcon class="fa-solid fa-magnifying-glass" />
-                            <InputText v-model="searchQuery" placeholder="Search users" style="width: 100%;" />
+                            <InputText v-model="searchQuery" placeholder="Search users" aria-label="Search users" style="width: 100%;" />
                         </IconField>
                     </div>
                     <!-- align right -->
@@ -86,14 +86,14 @@
                     <template #body="slotProps">
                         <div class="d-flex gap-1 justify-content-center">
                             <Button severity="info" size="small" :loading="slotProps.data.editing"
-                                    :disabled="slotProps.data.editing || slotProps.data.deleting" title="Edit User"
+                                    :disabled="slotProps.data.editing || slotProps.data.deleting" title="Edit User" aria-label="Edit User"
                                     icon="fa-solid fa-pen-to-square" @click.stop="editUser(slotProps.data)" />
                             <Button severity="warn" size="small" :disabled="slotProps.data.editing || slotProps.data.deleting"
-                                    title="Change Password" icon="fa-solid fa-key"
+                                    title="Change Password" aria-label="Change Password" icon="fa-solid fa-key"
                                     @click.stop="changePassword(slotProps.data)" />
                             <Button severity="danger" size="small" :loading="slotProps.data.deleting"
                                     :disabled="slotProps.data.deleting || slotProps.data.editing || slotProps.data.userName === 'admin'"
-                                    title="Delete User"
+                                    title="Delete User" aria-label="Delete User"
                                     icon="fa-solid fa-trash" @click.stop="handleDelete(slotProps.data)" />
                         </div>
                     </template>
@@ -129,14 +129,14 @@
             <template #extra>
                 <div class="delete-options">
                     <div class="field">
-                        <label>Transfer data to successor (optional)</label>
-                        <Select v-model="deleteSuccessor" :options="successorOptions" option-label="label" option-value="value" placeholder="-- Delete all data --" show-clear class="w-full" />
+                        <label id="users-transfer-data-to-successor-label" for="users-transfer-data-to-successor">Transfer data to successor (optional)</label>
+                        <Select v-model="deleteSuccessor" input-id="users-transfer-data-to-successor" aria-labelledby="users-transfer-data-to-successor-label" :options="successorOptions" option-label="label" option-value="value" placeholder="-- Delete all data --" show-clear class="w-full" />
                         <small class="text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
                     </div>
 
                     <div v-if="deleteSuccessor" class="field">
-                        <label>Conflict Resolution Strategy</label>
-                        <div class="radio-group">
+                        <span id="users-conflict-label">Conflict Resolution Strategy</span>
+                        <div class="radio-group" role="radiogroup" aria-labelledby="users-conflict-label">
                             <div class="radio-item">
                                 <input id="conflict-rename" v-model="deleteConflictResolution" type="radio" value="Rename">
                                 <label for="conflict-rename">Rename conflicting datasets</label>

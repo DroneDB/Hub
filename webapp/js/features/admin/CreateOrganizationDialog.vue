@@ -7,21 +7,21 @@
 
             <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
-                    <InputText ref="txtOrgName" v-model="organizationName" placeholder="Enter organization name"
+                    <label for="create-organization-dialog-organization-name" class="d-block mb-1 fw-semibold">Organization Name <span class="text-danger">*</span></label>
+                    <InputText id="create-organization-dialog-organization-name" ref="txtOrgName" v-model="organizationName" placeholder="Enter organization name"
                                class="w-100" @keydown="clearError()" @keyup.enter="confirmCreate()" />
                     <small>Organization names should be descriptive and will be converted to a valid slug</small>
                 </div>
 
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Organization Slug</label>
-                    <InputText :model-value="organizationSlug" :placeholder="suggestedSlug" readonly class="w-100" />
+                    <label for="create-organization-dialog-organization-slug" class="d-block mb-1 fw-semibold">Organization Slug</label>
+                    <InputText id="create-organization-dialog-organization-slug" :model-value="organizationSlug" :placeholder="suggestedSlug" readonly class="w-100" />
                     <small>This is automatically generated from the name and cannot be changed later</small>
                 </div>
 
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Description (Optional)</label>
-                    <Textarea v-model="organizationDescription" placeholder="Brief description of the organization" rows="3" auto-resize class="w-100" />
+                    <label for="create-organization-dialog-description" class="d-block mb-1 fw-semibold">Description (Optional)</label>
+                    <Textarea id="create-organization-dialog-description" v-model="organizationDescription" placeholder="Brief description of the organization" rows="3" auto-resize class="w-100" />
                 </div>
             </form>
 

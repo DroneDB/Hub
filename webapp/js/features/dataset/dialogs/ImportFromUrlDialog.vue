@@ -10,9 +10,9 @@
 
                 <!-- URL input row -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">File URL <span class="text-danger">*</span></label>
+                    <label for="import-from-url-dialog-file-url" class="d-block mb-1 fw-semibold">File URL <span class="text-danger">*</span></label>
                     <div class="url-row">
-                        <InputText v-model="url" placeholder="https://example.com/file.tif" :disabled="importing"
+                        <InputText id="import-from-url-dialog-file-url" v-model="url" placeholder="https://example.com/file.tif" :disabled="importing"
                                    :invalid="urlTouched && !urlValid" fluid @input="onUrlInput" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-magnifying-glass"
                                 label="Verify" :loading="verifying" :disabled="importing || verifying || !urlValid"
@@ -42,19 +42,19 @@
 
                 <!-- File name -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">File name</label>
-                    <InputText v-model="fileName" :placeholder="derivedFileName || 'Derived from URL after verify'" fluid
+                    <label for="import-from-url-dialog-file-name" class="d-block mb-1 fw-semibold">File name</label>
+                    <InputText id="import-from-url-dialog-file-name" v-model="fileName" :placeholder="derivedFileName || 'Derived from URL after verify'" fluid
                                :disabled="importing" />
                     <small class="help-text">Leave empty to use the name from the URL.</small>
                 </div>
 
                 <!-- Destination folder -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Destination folder</label>
+                    <label for="import-from-url-dialog-destination-folder" class="d-block mb-1 fw-semibold">Destination folder</label>
                     <div class="url-row">
-                        <InputText v-model="folder" placeholder="root folder" fluid :disabled="importing" />
+                        <InputText id="import-from-url-dialog-destination-folder" v-model="folder" placeholder="root folder" fluid :disabled="importing" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-folder-open"
-                                :disabled="importing" title="Browse folders" @click="folderPickerOpen = true" />
+                                :disabled="importing" title="Browse folders" aria-label="Browse folders" @click="folderPickerOpen = true" />
                     </div>
                     <small class="help-text">Destination folder inside the dataset (empty = root).</small>
                 </div>
@@ -69,14 +69,14 @@
 
                 <!-- Advanced: basic-auth -->
                 <div class="mb-3">
-                    <span class="advanced-toggle" @click="showAuth = !showAuth">
-                        <i :class="showAuth ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" />
+                    <button type="button" class="btn-reset advanced-toggle" :aria-expanded="showAuth" @click="showAuth = !showAuth">
+                        <i :class="showAuth ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" aria-hidden="true" />
                         Authentication (optional)
-                    </span>
+                    </button>
                     <div v-if="showAuth" class="auth-fields mt-2">
                         <div class="d-flex gap-2">
-                            <InputText v-model="username" placeholder="Username" fluid :disabled="importing" />
-                            <InputText v-model="password" type="password" placeholder="Password" fluid :disabled="importing" />
+                            <InputText v-model="username" placeholder="Username" aria-label="Username" fluid :disabled="importing" />
+                            <InputText v-model="password" type="password" placeholder="Password" aria-label="Password" fluid :disabled="importing" />
                         </div>
                     </div>
                 </div>

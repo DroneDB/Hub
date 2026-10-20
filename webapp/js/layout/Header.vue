@@ -1,9 +1,9 @@
 <template>
     <div id="header">
         <a :href="homeUrl" class="logo">
-            <img v-if="appLogo" :src="appLogo">
+            <img v-if="appLogo" :src="appLogo" :alt="appName || 'Home'">
             <template v-else>
-                <img v-if="appIconUrl" class="app-icon-img" :src="appIconUrl">
+                <img v-if="appIconUrl" class="app-icon-img" :src="appIconUrl" alt="">
                 <i v-else class="app-icon" :class="appIcon" />
                 <div v-if="appName" class="app-name">{{ appName }}</div>
             </template>

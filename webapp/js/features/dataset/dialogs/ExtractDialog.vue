@@ -15,9 +15,9 @@
 
                 <!-- Destination Path -->
                 <div class="my-3">
-                    <label class="d-block mb-1 fw-semibold">Extract to</label>
+                    <label for="extract-dialog-extract-to" class="d-block mb-1 fw-semibold">Extract to</label>
                     <div class="dest-path-row">
-                        <InputText v-model="destPath" placeholder="root folder" :disabled="isExtracting"
+                        <InputText id="extract-dialog-extract-to" v-model="destPath" placeholder="root folder" :disabled="isExtracting"
                                    :invalid="!!destPathError" fluid @input="onDestPathInput" />
                         <Button type="button" severity="secondary" icon="fa-solid fa-folder-open"
                                 :disabled="isExtracting" title="Browse folders" aria-label="Browse folders"

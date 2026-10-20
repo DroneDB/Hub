@@ -1,10 +1,12 @@
 <template>
     <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
-         :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick">
+         role="option" tabindex="0" :aria-selected="!!file.selected"
+         :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick"
+         @keydown.enter.self.prevent="onDblClick" @keydown.space.self.prevent="onClick">
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
             <img v-if="thumbnail && !loading && !buildLoading"
-                 :src="thumbnail" style="max-width: 100%; max-height: 100%;" @load="handleImageLoad"
+                 :src="thumbnail" alt="" style="max-width: 100%; max-height: 100%;" @load="handleImageLoad"
                  @error="handleImageError">
 
             <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
@@ -416,9 +418,13 @@ export default {
     cursor: pointer;
 }
 
-.thumbnail:focus,
 .thumbnail:active {
     background: var(--ddb-border);
+}
+
+.thumbnail:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: -2px;
 }
 
 .thumbnail.selected {

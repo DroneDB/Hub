@@ -3,7 +3,7 @@
         <template #start>
             <template v-for="(tool, index) in startTools" :key="tool.id || 'start-' + index">
                 <Divider v-if="tool.id === 'separator'" layout="vertical" />
-                <Button v-else :icon="tool.icon" :title="tool.title" :disabled="tool.disabled"
+                <Button v-else :icon="tool.icon" :title="tool.title" :aria-label="tool.title" :disabled="tool.disabled"
                         :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
                         @click="toggleTool(tool.id)" />
             </template>
@@ -11,7 +11,7 @@
         <template #end>
             <template v-for="(tool, index) in endTools" :key="tool.id || 'end-' + index">
                 <Divider v-if="tool.id === 'separator'" layout="vertical" />
-                <Button v-else :icon="tool.icon" :title="tool.title" :disabled="tool.disabled"
+                <Button v-else :icon="tool.icon" :title="tool.title" :aria-label="tool.title" :disabled="tool.disabled"
                         :severity="tool.selected ? 'contrast' : 'secondary'" text size="small"
                         @click="toggleTool(tool.id)" />
             </template>

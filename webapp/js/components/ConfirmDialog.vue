@@ -15,7 +15,7 @@
         <template #footer>
             <Button :label="cancelText" severity="secondary" @click="$emit('close', 'cancel')" />
             <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="$emit('close', 'secondary')" />
-            <Button :label="confirmText" :severity="confirmButtonClass" @click="$emit('close', 'confirm')" />
+            <Button :label="confirmText" :severity="confirmButtonClass" data-confirm @click="$emit('close', 'confirm')" />
         </template>
     </Window>
 </template>
