@@ -86,8 +86,7 @@ export default {
             registeredChildren: {},
             dynamicComponents: {},
             dynamicChildRefs: {},
-            tabRefs: {},
-            tabMap: {}
+            tabRefs: {}
         };
     },
     mounted: function () {
@@ -121,8 +120,10 @@ export default {
             }
         },
 
+        // Any tab on show: from the props or added with addTab (tabMap only had the
+        // added ones, so activateTab('map') did nothing)
         getTabFor(tabKey) {
-            return this.tabMap[tabKey];
+            return this.dynTabs.find(t => t.key === tabKey);
         },
 
         getActiveTabIndex: function () {
@@ -216,8 +217,6 @@ export default {
                 if (activate) {
                     this.setActiveTab(tab);
                 }
-
-                this.tabMap[tab.key] = tab;
             });
         },
 
@@ -247,7 +246,6 @@ export default {
                 delete this.dynamicComponents[tabKey];
                 delete this.dynamicChildRefs[tabKey];
                 delete this.tabRefs[tabKey];
-                delete this.tabMap[tabKey];
             } else {
                 console.warn(`Cannot remove tab with key: ${tabKey}`);
             }
