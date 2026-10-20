@@ -1,5 +1,5 @@
 <template>
-    <Splitter :layout="layout" class="panel-splitter" :pt="{ gutter: { class: 'panel-gutter' } }"
+    <Splitter :layout="layout" class="panel-splitter" :pt="splitterPt"
               @resizeend="onResizeEnd">
         <SplitterPanel :size="size0" :min-size="2">
             <slot name="first" />
@@ -66,6 +66,20 @@ export default {
     computed: {
         layout: function () {
             return this.split === "horizontal" ? "vertical" : "horizontal";
+        },
+        // The focusable handle is the separator (PrimeVue puts the role on its
+        // unfocusable parent and the value on the handle)
+        splitterPt: function () {
+            return {
+                gutter: { class: 'panel-gutter', role: 'presentation' },
+                gutterHandle: {
+                    role: 'separator',
+                    'aria-label': 'Resize panels',
+                    'aria-orientation': this.layout === 'horizontal' ? 'vertical' : 'horizontal',
+                    'aria-valuemin': 0,
+                    'aria-valuemax': 100
+                }
+            };
         }
     },
     methods: {

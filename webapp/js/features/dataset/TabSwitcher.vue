@@ -1,9 +1,10 @@
 <template>
     <div class="tab-switcher" :class="{ 'position-top': position === 'top' }">
-        <div v-if="!hideSingle || dynTabs.length > 1" class="tab-buttons-strip">
+        <div v-if="showStrip" class="tab-buttons-strip">
             <Tabs :value="activeTab" @update:value="onTabChange">
                 <TabList>
                     <Tab v-for="t in dynTabs" :key="t.key" :value="t.key"
+                         :pt="{ root: { id: tabId(t.key), 'aria-controls': panelId(t.key) } }"
                          :aria-keyshortcuts="t.canClose ? 'Delete' : undefined"
                          @keydown.delete="t.canClose && removeTab(t.key)">
                         <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
@@ -16,8 +17,10 @@
             </Tabs>
         </div>
         <div class="tabs">
-            <div v-for="t in dynTabs" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }" class="tab"
-                 :class="{ hidden: t.key !== activeTab }">
+            <!-- Our own panels (Tabs renders only the strip): ids the tabs point to -->
+            <div v-for="t in dynTabs" :id="panelId(t.key)" :key="t.key" :ref="el => { if (el) tabRefs[t.key] = el; }" class="tab"
+                 :class="{ hidden: t.key !== activeTab }"
+                 :role="showStrip ? 'tabpanel' : undefined" :aria-labelledby="showStrip ? tabId(t.key) : undefined">
                 <slot :name="t.key" />
                 <component :is="dynamicComponents[t.key].component" v-if="dynamicComponents[t.key]"
                            v-bind="dynamicComponents[t.key].props"
@@ -29,7 +32,7 @@
 
 <script>
 import { clone } from '@/libs/utils';
-import { markRaw } from 'vue';
+import { markRaw, useId } from 'vue';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';
@@ -81,6 +84,9 @@ export default {
         }
     },
     emits: ['tabChange'],
+    setup: function () {
+        return { uid: useId() };
+    },
     data: function () {
         return {
             activeTab: this.selectedTab != null ? this.selectedTab : this.tabs[0].key,
@@ -90,6 +96,11 @@ export default {
             dynamicChildRefs: {},
             tabRefs: {}
         };
+    },
+    computed: {
+        showStrip: function () {
+            return !this.hideSingle || this.dynTabs.length > 1;
+        }
     },
     mounted: function () {
         // Trigger first onTabActivated on next tick so children have registered
@@ -101,6 +112,12 @@ export default {
         this.$emit('tabChange', this.activeTab);
     },
     methods: {
+        tabId(key) {
+            return `${this.uid}-tab-${key}`;
+        },
+        panelId(key) {
+            return `${this.uid}-panel-${key}`;
+        },
         registerTabChild(key, component) {
             this.registeredChildren[key] = component;
         },

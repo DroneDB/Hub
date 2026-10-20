@@ -38,43 +38,43 @@ class MeasureControls extends Control {
 
         const btnPoint = document.createElement('button');
         btnPoint.title = 'Point Annotation - Click on the map to place an annotation.';
-        btnPoint.innerHTML = '<img src="' + '/images/measure-point.svg' + '"/>';
+        btnPoint.innerHTML = '<img src="' + '/images/measure-point.svg' + '" alt=""/>';
         const btnLength = document.createElement('button');
         btnLength.title = 'Measure Length - Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.';
-        btnLength.innerHTML = '<img src="' + '/images/measure-length.svg' + '"/>';
+        btnLength.innerHTML = '<img src="' + '/images/measure-length.svg' + '" alt=""/>';
         const btnArea = document.createElement('button');
         btnArea.title = 'Measure Area - Click on the map to draw a polygon. Double-click to finish and calculate the area. Press ESC to cancel.';
-        btnArea.innerHTML = '<img src="' + '/images/measure-area.svg' + '"/>';
+        btnArea.innerHTML = '<img src="' + '/images/measure-area.svg' + '" alt=""/>';
         const btnErase = document.createElement('button');
         btnErase.title = 'Erase Measurement - Click on a measurement to delete it.';
-        btnErase.innerHTML = '<img src="' + '/images/measure-erase.svg' + '"/>';
+        btnErase.innerHTML = '<img src="' + '/images/measure-erase.svg' + '" alt=""/>';
         const btnEdit = document.createElement('button');
         btnEdit.title = 'Edit/Move Measurements - Click and drag measurement points to reposition them.';
-        btnEdit.innerHTML = '<img src="' + '/images/edit.svg' + '"/>';
+        btnEdit.innerHTML = '<img src="' + '/images/edit.svg' + '" alt=""/>';
         const btnStop = document.createElement('button');
         btnStop.title = 'Stop Measuring - Cancel the current measurement. Shortcut: ESC';
-        btnStop.innerHTML = '<img src="' + '/images/measure-stop.svg' + '"/>';
+        btnStop.innerHTML = '<img src="' + '/images/measure-stop.svg' + '" alt=""/>';
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
 
         // Save/Load/Clear buttons
         const btnSave = document.createElement('button');
         btnSave.title = 'Save Measurements - Save all current measurements to the dataset.';
-        btnSave.innerHTML = '<img src="' + '/images/save.svg' + '"/>';
+        btnSave.innerHTML = '<img src="' + '/images/save.svg' + '" alt=""/>';
         btnSave.style.display = 'none';
 
         const btnClear = document.createElement('button');
         btnClear.title = 'Clear All Measurements - Remove all measurements from the map.';
-        btnClear.innerHTML = '<img src="' + '/images/eraser.svg' + '"/>';
+        btnClear.innerHTML = '<img src="' + '/images/eraser.svg' + '" alt=""/>';
         btnClear.style.display = 'none';
 
         const btnExport = document.createElement('button');
         btnExport.title = 'Export Measurements - Download measurements as a GeoJSON file.';
-        btnExport.innerHTML = '<img src="' + '/images/download.svg' + '"/>';
+        btnExport.innerHTML = '<img src="' + '/images/download.svg' + '" alt=""/>';
         btnExport.style.display = 'none';
 
         const btnDelete = document.createElement('button');
         btnDelete.title = 'Delete Saved Measurements - Permanently delete saved measurements from the dataset.';
-        btnDelete.innerHTML = '<img src="' + '/images/trash.svg' + '"/>';
+        btnDelete.innerHTML = '<img src="' + '/images/trash.svg' + '" alt=""/>';
         btnDelete.style.display = 'none';
 
         const btnList = document.createElement('button');
