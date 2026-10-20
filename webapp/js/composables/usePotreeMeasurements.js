@@ -8,8 +8,8 @@
  *   await m.load();
  */
 import { ref, computed } from 'vue';
-import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
-import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.vue';
+import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
+import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { createUndoStack } from '@/libs/undoStack';

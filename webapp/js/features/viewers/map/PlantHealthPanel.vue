@@ -155,10 +155,10 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import HistogramChart from '@/components/HistogramChart.vue';
-import ColormapDropdown from '@/components/ColormapDropdown.vue';
+import HistogramChart from '@/features/viewers/map/HistogramChart.vue';
+import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import { colormap, INDEX_COLORMAPS } from '@/libs/map/colormaps';
-import BandSelector from '@/components/BandSelector.vue';
+import BandSelector from '@/features/viewers/map/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';

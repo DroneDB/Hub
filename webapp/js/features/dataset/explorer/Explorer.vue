@@ -56,7 +56,7 @@ const VIRTUAL_GRID_MIN_FILES = 200;
 // One grid cell: the 128 px tile plus its margins and label
 const GRID_CELL_WIDTH = 140;
 const GRID_ROW_HEIGHT = 180;
-import Toolbar from '@/components/Toolbar.vue';
+import Toolbar from '@/features/dataset/explorer/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
 import emitter from '@/libs/eventBus';
@@ -67,7 +67,7 @@ import ddb from 'ddb';
 const { pathutils } = ddb;
 
 import { entry } from 'ddb';
-import ContextMenu from '@/components/ContextMenu';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
 import { getCurrentInstance } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';

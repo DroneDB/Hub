@@ -198,7 +198,7 @@ import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
 import PrimeMessage from 'primevue/message';
-import OdxOptionsEditor from '@/components/OdxOptionsEditor.vue';
+import OdxOptionsEditor from '@/features/dataset/OdxOptionsEditor.vue';
 import FolderPicker from '@/components/FolderPicker.vue';
 import Paginator from 'primevue/paginator';
 import { useDatasetSessionStore } from '@/stores/datasetSession';

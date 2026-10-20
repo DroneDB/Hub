@@ -81,7 +81,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import Toolbar from '@/components/Toolbar.vue';
+import Toolbar from '@/features/dataset/explorer/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import { formatTimeAgo } from '@/libs/utils';
 import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
@@ -93,7 +93,7 @@ import { getTypeDisplayName } from '@/libs/entryTypes';
 import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
 
-import ContextMenu from '@/components/ContextMenu';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
 import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';

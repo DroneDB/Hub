@@ -174,7 +174,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import ColormapDropdown from '@/components/ColormapDropdown.vue';
+import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';

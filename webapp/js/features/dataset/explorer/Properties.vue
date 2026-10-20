@@ -16,7 +16,7 @@
 
 <script>
 import Window from '@/components/Window.vue';
-import PropsTable from '@/components/PropsTable.vue';
+import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { buildAllProperties, getFileTypeName } from '@/libs/propertiesUtils';

@@ -94,7 +94,7 @@
 </template>
 
 <script>
-import OdxOptionRow from '@/components/OdxOptionRow.vue';
+import OdxOptionRow from '@/features/dataset/OdxOptionRow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import { useTimerGroup } from '@/composables/useTimers';

@@ -3,8 +3,8 @@ import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import PathBreadcrumb from './PathBreadcrumb.vue';
 import SortHeader from './SortHeader.vue';
-import ColormapDropdown from './ColormapDropdown.vue';
-import HistogramChart from './HistogramChart.vue';
+import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
+import HistogramChart from '@/features/viewers/map/HistogramChart.vue';
 import RasterProfileChart from '@/features/viewers/map/RasterProfileChart.vue';
 import pathutils from '@/libs/ddb/pathutils';
 

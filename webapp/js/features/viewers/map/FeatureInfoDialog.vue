@@ -27,7 +27,7 @@
 
 <script>
 import Window from '@/components/Window.vue';
-import ObjTable from '@/components/ObjTable.vue';
+import ObjTable from '@/features/viewers/map/ObjTable.vue';
 import Button from 'primevue/button';
 import { formatDateTime } from '@/libs/format';
 

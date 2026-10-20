@@ -70,7 +70,7 @@ import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import { isFileBuilt, formatMissingDeps } from '@/libs/build/buildHelpers';
 import ddb from 'ddb';
-import PropsTable from '@/components/PropsTable.vue';
+import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
 import { buildAllProperties, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';

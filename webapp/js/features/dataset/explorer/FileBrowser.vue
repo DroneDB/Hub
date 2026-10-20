@@ -30,7 +30,7 @@
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
-import ContextMenu from '@/components/ContextMenu';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';

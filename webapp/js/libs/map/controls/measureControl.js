@@ -13,7 +13,7 @@ import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
-import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
+import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
 import { pointPopupHtml } from '@/libs/map/pointPopup';
 import { formatArea as formatAreaText, formatLength as formatLengthText } from '@/libs/format';
