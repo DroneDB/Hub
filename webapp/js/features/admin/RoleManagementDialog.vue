@@ -6,7 +6,7 @@
         </div>
 
         <div v-else class="dialog">
-            <Message bind-to="error" />
+            <Message v-model="error" />
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
@@ -155,13 +155,13 @@ export default {
                 await reg.createRole(this.newRoleName.trim());
 
                 this.currentRoles.push(this.newRoleName.trim());
-                this.$toast.add({ severity: 'success', summary: 'Role Created', detail: `Role "${this.newRoleName}" created successfully`, life: 3000 });
+                this.$notify.success(`Role "${this.newRoleName}" created successfully`, { summary: 'Role Created' });
                 this.newRoleName = "";
                 this.activeTab = 'view';
 
                 this.$emit('onRolesChanged');
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create role: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to create role: ' + e.message);
                 this.error = e.message;
             }
             this.addingRole = false;
@@ -191,14 +191,14 @@ export default {
                 // This is normal and indicates success
 
                 this.currentRoles = this.currentRoles.filter(role => role !== this.roleToDelete);
-                this.$toast.add({ severity: 'success', summary: 'Role Deleted', detail: `Role "${this.roleToDelete}" deleted successfully`, life: 3000 });
+                this.$notify.success(`Role "${this.roleToDelete}" deleted successfully`, { summary: 'Role Deleted' });
 
                 this.$emit('onRolesChanged');
 
                 this.showDeleteDialog = false;
                 this.roleToDelete = null;
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete role: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to delete role: ' + e.message);
                 this.error = e.message;
             }
             this.deletingRole = null;

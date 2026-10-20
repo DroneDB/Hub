@@ -1,7 +1,7 @@
 <template>
     <div id="upload">
         <div v-if="error" class="error-msg">
-            <Message bind-to="error" />
+            <Message v-model="error" />
         </div>
         <div v-if="uploading || url" class="container">
             <div v-if="uploading" class="uploading">

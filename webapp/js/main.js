@@ -28,6 +28,9 @@ import ConfirmationService from 'primevue/confirmationservice';
 import ToastService from 'primevue/toastservice';
 import DialogService from 'primevue/dialogservice';
 import VirtualScroller from '@/components/VirtualScroller.vue';
+import Toast from 'primevue/toast';
+import { notify, setToastService } from '@/libs/notify';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 import { createAppRouter } from './router';
 
@@ -100,7 +103,7 @@ window.addEventListener('load', function () {
         const updateNotice = consumePendingUpdateNotice();
 
         const app = createApp({
-            components: { HubUpdateNoticeDialog },
+            components: { HubUpdateNoticeDialog, Toast },
             data() {
                 return {
                     hubUpdateNotice: updateNotice,
@@ -125,6 +128,7 @@ window.addEventListener('load', function () {
             template:
                 '<router-view name="header" />' +
                 '<router-view name="content" :key="contentKey" />' +
+                '<Toast position="bottom-left" />' +
                 '<HubUpdateNoticeDialog v-if="hubUpdateNotice"' +
                 '   :notice="hubUpdateNotice"' +
                 '   :hub-version="hubVersion"' +
@@ -187,6 +191,10 @@ window.addEventListener('load', function () {
         app.use(ToastService);
         app.use(DialogService);
 
+        // The one toast host (root template) and the notifier every component uses (HQ-03)
+        setToastService(app.config.globalProperties.$toast);
+        app.config.globalProperties.$notify = notify;
+
         // Global properties (replaces Vue.prototype)
         app.config.globalProperties.$embed = params.embed ? true : false;
 
@@ -195,7 +203,7 @@ window.addEventListener('load', function () {
 
         app.config.errorHandler = function (err, vm, info) {
             // Catch unauthorized error globally
-            if (err.message === "Unauthorized") {
+            if (isUnauthorized(err)) {
                 router.push({ name: "Login" }).catch(() => { });
                 return;
             }

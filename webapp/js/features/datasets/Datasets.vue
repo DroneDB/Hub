@@ -1,7 +1,6 @@
 <template>
     <div id="datasets">
-        <Toast position="bottom-left" />
-        <Message bind-to="error" />
+        <Message v-model="error" />
 
         <div v-if="loading" class="ds-content">
             <div class="p-3">
@@ -201,7 +200,6 @@ import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
 import Skeleton from 'primevue/skeleton';
-import Toast from 'primevue/toast';
 import PrimeContextMenu from 'primevue/contextmenu';
 import reg from '@/libs/api/sharedRegistry';
 import { datasetListQuery } from '@/libs/datasetList';
@@ -234,8 +232,6 @@ export default {
         
         ProgressSpinner,
         Skeleton,
-        Toast,
-        
         PrimeContextMenu
     },
     data: function () {
@@ -518,15 +514,15 @@ export default {
                 if (ret) {
                     // The next dataset moves into the page
                     await this.reloadPage();
-                    this.$toast.add({ severity: 'success', summary: 'Dataset Deleted', detail: 'Dataset deleted successfully', life: 3000 });
+                    this.$notify.success('Dataset deleted successfully', { summary: 'Dataset Deleted' });
                 } else {
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete dataset "' + this.currentDsSlug + '"', life: 5000 });
+                    this.$notify.error('Failed to delete dataset "' + this.currentDsSlug + '"');
                     console.error(ret);
                     ds['deleting'] = false;
                 }
             } catch (e) {
                 console.error(e);
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete dataset: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to delete dataset: ' + e.message);
                 ds['deleting'] = false;
             }
         },
@@ -608,15 +604,15 @@ export default {
                 const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === slug);
                 if (payload.success) {
                     this.reloadPage();
-                    this.$toast.add({ severity: 'success', summary: 'Import complete', detail: `Dataset "${slug}" imported successfully`, life: 4000 });
+                    this.$notify.success(`Dataset "${slug}" imported successfully`, { summary: 'Import complete', life: 'normal' });
                 } else {
                     if (index !== -1) {
                         this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === slug));
                     }
-                    this.$toast.add({ severity: 'error', summary: 'Import failed', detail: (payload && payload.error) || `Import of "${slug}" failed`, life: 6000 });
+                    this.$notify.error((payload && payload.error) || `Import of "${slug}" failed`, { summary: 'Import failed', life: 'long' });
                 }
             } else if (action === 'background') {
-                this.$toast.add({ severity: 'info', summary: 'Import running', detail: `Import of "${slug}" continues in the background`, life: 4000 });
+                this.$notify.info(`Import of "${slug}" continues in the background`, { summary: 'Import running', life: 'normal' });
             }
         },
 
@@ -660,7 +656,7 @@ export default {
                         // The server places the new dataset in the sort order
                         await this.reloadPage();
 
-                        this.$toast.add({ severity: 'success', summary: 'Dataset Created', detail: 'Dataset created successfully', life: 3000 });
+                        this.$notify.success('Dataset created successfully', { summary: 'Dataset Created' });
 
                         // Navigate to the newly created dataset if the user has enabled the preference
                         if (newds.openAfterCreate) {
@@ -675,14 +671,14 @@ export default {
                     } else {
                         // Remove the temporary dataset on error
                         this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
-                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create dataset "' + newds.slug + '"', life: 5000 });
+                        this.$notify.error('Failed to create dataset "' + newds.slug + '"');
                         console.error(ret);
                     }
                 } catch (e) {
                     // Remove the temporary dataset on error
                     this.datasets = this.datasets.filter(ds => !(ds.isTemporary && ds.slug === newds.slug));
                     console.error(e);
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create dataset: ' + e.message, life: 5000 });
+                    this.$notify.error('Failed to create dataset: ' + e.message);
                 } finally {
                     this.creatingDataset = false;
                 }
@@ -716,14 +712,14 @@ export default {
                             dsitem['name'] = newds.name;
                             dsitem['visibility'] = newds.visibility;
                             dsitem['tagline'] = newds.tagline || '';
-                            this.$toast.add({ severity: 'success', summary: 'Dataset Updated', detail: 'Dataset updated successfully', life: 3000 });
+                            this.$notify.success('Dataset updated successfully', { summary: 'Dataset Updated' });
                         }
                     } else {
-                        this.$toast.add({ severity: 'error', summary: 'Error', detail: `Failed to update dataset "${ds.slug}"`, life: 5000 });
+                        this.$notify.error(`Failed to update dataset "${ds.slug}"`);
                     }
                 } catch (e) {
                     console.error(e);
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update dataset: ' + e.message, life: 5000 });
+                    this.$notify.error('Failed to update dataset: ' + e.message);
                 }
 
                 dsitem['editing'] = false;
@@ -870,7 +866,7 @@ export default {
                     this.orgName = neworg.name || this.$route.params.org;
                     this.orgInfo = { ...this.orgInfo, name: neworg.name, description: neworg.description, isPublic: neworg.isPublic };
                     setTitle(this.orgName);
-                    this.$toast.add({ severity: 'success', summary: 'Organization Updated', detail: 'Organization updated successfully', life: 3000 });
+                    this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
                 } else {
                     this.error = 'Failed to update organization';
                 }

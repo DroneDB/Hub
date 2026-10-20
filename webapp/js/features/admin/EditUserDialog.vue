@@ -6,7 +6,7 @@
         </div>
 
         <div v-else class="dialog">
-            <Message bind-to="error" />
+            <Message v-model="error" />
 
             <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
@@ -109,11 +109,11 @@ export default {
                 // Update user with both email and roles
                 await reg.updateUser(this.editUser.userName, this.editUser.email, this.editUser.roles);
 
-                this.$toast.add({ severity: 'success', summary: 'User Updated', detail: `User "${this.editUser.userName}" updated successfully`, life: 3000 });
+                this.$notify.success(`User "${this.editUser.userName}" updated successfully`, { summary: 'User Updated' });
                 this.updating = false;
                 this.$emit('onClose', 'updated');
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update user: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update user: ' + e.message);
                 this.error = e.message;
                 this.updating = false;
             }

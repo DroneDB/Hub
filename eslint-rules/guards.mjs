@@ -43,7 +43,6 @@ export const GUARDS = [
         entries: [{ property: '$parent', message: 'Pass data with props/emits, provide/inject or a store, not $parent (HQ-03/HQ-04).' }],
         allow: [
             'webapp/js/components/ContextMenu.vue',
-            'webapp/js/components/Message.vue',
             'webapp/js/features/viewers/TabViewLoader.vue'
         ]
     },

@@ -46,6 +46,7 @@ import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
 import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
 import { getPref, setPref, PREF } from '@/libs/preferences';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 const { pathutils } = ddb;
 
@@ -217,6 +218,10 @@ export default {
             }
         },
 
+        reportLoadError: function (e) {
+            this.$emit('error', isUnauthorized(e) ? "You are not allowed to perform this action" : e, "Load entries");
+        },
+
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
             setPref(PREF.SORT_DESCENDING, this.sortDescending);
@@ -276,11 +281,7 @@ export default {
             } catch (e) {
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
 
                 this.nodes = [];
 
@@ -326,11 +327,7 @@ export default {
                 if (isAbort(e)) return [];
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
                 return [];
             }
 
@@ -362,11 +359,7 @@ export default {
                         entry
                     });
                 } catch (e) {
-                    if (e.message == "Unauthorized") {
-                        this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                    } else {
-                        this.$emit('error', e, "Load entries");
-                    }
+                    this.reportLoadError(e);
                 }
             }
 

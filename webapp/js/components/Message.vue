@@ -1,78 +1,32 @@
 <template>
-    <PrimeMessage v-if="parentRef[bindTo]" :severity="primeSeverity" :closable="!noDismiss" @close="dismiss">
+    <PrimeMessage v-if="modelValue" :severity="severity" :closable="!noDismiss" @close="$emit('update:modelValue', '')">
         <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
         <span v-html="safeContent" />
     </PrimeMessage>
 </template>
 
-<script>
+<script setup>
+/**
+ * Message - a dismissible message box bound with v-model (HQ-03).
+ *
+ *   <Message v-model="error" />            shows `error` while it is not empty;
+ *                                          dismissing sets it to ''
+ *   <Message v-model="error" no-dismiss />
+ *
+ * The text may contain simple HTML; it is sanitised before rendering.
+ */
+import { computed } from 'vue';
 import PrimeMessage from 'primevue/message';
 import { sanitizeHtml } from '@/libs/sanitize';
 
-/**
- * Message - Conditional dismissible message bound to a parent data property.
- *
- * Watches `parentRef[bindTo]` and shows a PrimeVue Message when it is truthy.
- * Sanitizes content via DOMPurify before rendering.
- *
- * Props:
- *   bindTo    - Name of the parent data key to watch (default: 'message').
- *   className - Semantic severity class (default: 'warning').
- *   noDismiss - When true the close button is hidden (default: false).
- */
-export default {
-    name: 'HubMessage',
-    components: {
-        PrimeMessage
-    },
-    props: {
-        bindTo: {
-            type: String,
-            default: "message"
-        },
-        className: {
-            type: String,
-            default: "warning"
-        },
-        noDismiss: {
-            type: Boolean,
-            default: false
-        }
-    },
-    data: function () {
-        return {
-            parentRef: {}
-        }
-    },
-    computed: {
-        primeSeverity: function () {
-            const map = {
-                'warning': 'warn',
-                'error': 'error',
-                'negative': 'error',
-                'positive': 'success',
-                'success': 'success',
-                'info': 'info'
-            };
-            return map[this.className] || 'warn';
-        },
-        safeContent: function () {
-            return sanitizeHtml(this.parentRef?.[this.bindTo] || '');
-        }
-    },
-    beforeMount: function () {
-        let p = this.$parent;
-        while (p !== undefined && p[this.bindTo] === undefined) {
-            p = p.$parent;
-        }
-        this.parentRef = p;
-    },
-    methods: {
-        dismiss: function () {
-            this.parentRef[this.bindTo] = "";
-        }
-    }
-}
-</script>
+defineOptions({ name: 'HubMessage' });
 
-<style scoped></style>
+const props = defineProps({
+    modelValue: { type: String, default: '' },
+    severity: { type: String, default: 'warn', validator: v => ['success', 'info', 'warn', 'error', 'secondary', 'contrast'].includes(v) },
+    noDismiss: { type: Boolean, default: false }
+});
+defineEmits(['update:modelValue']);
+
+const safeContent = computed(() => sanitizeHtml(props.modelValue));
+</script>

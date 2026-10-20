@@ -288,12 +288,7 @@ export default {
         async copyValue(text) {
             try {
                 await copyText(text);
-                this.$toast.add({
-                    severity: 'success',
-                    summary: 'Copied',
-                    detail: 'Hash copied to clipboard',
-                    life: 2000
-                });
+                this.$notify.success('Hash copied to clipboard', { summary: 'Copied' });
             } catch (e) {
                 console.error('Failed to copy to clipboard:', e);
             }

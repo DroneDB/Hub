@@ -1,7 +1,7 @@
 <template>
     <Window id="settings" title="Settings" modal max-width="70%" fixed-size fixed-position close-modal-on-click
             @on-close="close('close')">
-        <Message bind-to="error" />
+        <Message v-model="error" />
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -197,18 +197,18 @@ export default {
         setVisibility: async function () {
             try {
                 this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);
-                this.$toast.add({ severity: 'success', summary: 'Visibility Updated', detail: 'Dataset visibility updated successfully', life: 3000 });
+                this.$notify.success('Dataset visibility updated successfully', { summary: 'Visibility Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update visibility: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update visibility: ' + e.message);
                 this.error = e.message;
             }
         },
         setLicense: async function () {
             try {
                 this.properties.meta.license = await this.dataset.metaSet("license", this.license);
-                this.$toast.add({ severity: 'success', summary: 'License Updated', detail: 'Dataset license updated successfully', life: 3000 });
+                this.$notify.success('Dataset license updated successfully', { summary: 'License Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update license: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update license: ' + e.message);
                 this.error = e.message;
             }
         },
@@ -216,14 +216,14 @@ export default {
             try {
                 if (this.tagline && this.tagline.trim()) {
                     await this.dataset.metaSet('tagline', this.tagline.trim());
-                    this.$toast.add({ severity: 'success', summary: 'Tagline Updated', detail: 'Tagline updated successfully', life: 3000 });
+                    this.$notify.success('Tagline updated successfully', { summary: 'Tagline Updated' });
                 } else {
                     await this.dataset.metaUnset('tagline');
                     this.tagline = '';
-                    this.$toast.add({ severity: 'success', summary: 'Tagline Removed', detail: 'Tagline removed successfully', life: 3000 });
+                    this.$notify.success('Tagline removed successfully', { summary: 'Tagline Removed' });
                 }
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update tagline: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update tagline: ' + e.message);
                 this.error = e.message;
             }
         },
@@ -246,9 +246,9 @@ export default {
                 // Refresh preview with cache-busting timestamp
                 this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
                 this.thumbnailError = false;
-                this.$toast.add({ severity: 'success', summary: 'Thumbnail Updated', detail: 'Thumbnail uploaded successfully', life: 3000 });
+                this.$notify.success('Thumbnail uploaded successfully', { summary: 'Thumbnail Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to upload thumbnail: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to upload thumbnail: ' + e.message);
                 this.error = 'Failed to upload thumbnail: ' + e.message;
             }
 
@@ -274,9 +274,9 @@ export default {
 
                 this.thumbnailPreview = null;
                 this.thumbnailError = true;
-                this.$toast.add({ severity: 'success', summary: 'Thumbnail Removed', detail: 'Thumbnail removed successfully', life: 3000 });
+                this.$notify.success('Thumbnail removed successfully', { summary: 'Thumbnail Removed' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove thumbnail: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to remove thumbnail: ' + e.message);
                 this.error = 'Failed to remove thumbnail: ' + e.message;
             }
 
@@ -298,10 +298,10 @@ export default {
                         throw new Error("Invalid document: " + document);
                 }
 
-                this.$toast.add({ severity: 'success', summary: 'Document Created', detail: `${document} created successfully`, life: 3000 });
+                this.$notify.success(`${document} created successfully`, { summary: 'Document Created' });
                 this.$emit('addMarkdown', document, entry);
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create document: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to create document: ' + e.message);
                 this.error = e.message;
             }
 

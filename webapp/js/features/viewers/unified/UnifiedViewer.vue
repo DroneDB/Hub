@@ -2,8 +2,7 @@
     <div id="unified-viewer">
         <TabViewLoader title-suffix="3D Viewer" @loaded="handleLoad" />
 
-        <Message bind-to="error" no-dismiss />
-        <Toast position="bottom-left" />
+        <Message v-model="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p>{{ loadingText }}</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -96,7 +95,6 @@ import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
-import Toast from 'primevue/toast';
 import keyboard from '@/libs/keyboard';
 import {
     createNavControls, applySceneMetrics,
@@ -148,7 +146,7 @@ function loadSettings() {
  */
 export default {
     components: {
-        Message, TabViewLoader, Window, Button, Toast
+        Message, TabViewLoader, Window, Button
     },
     props: {
         uri: { type: String, default: null }
@@ -927,12 +925,7 @@ export default {
                 // The basemap has no elevation layer, so the model's real ellipsoidal height
                 // would otherwise leave it floating above (or sunk below) the ground - let the
                 // user know its altitude was shifted to rest on the ground.
-                this.$toast.add({
-                    severity: 'info',
-                    summary: 'Altitude adjusted',
-                    detail: `The model was shifted by ${Math.round(Math.abs(groundElevation))} m to rest on the ground.`,
-                    life: 6000
-                });
+                this.$notify.info(`The model was shifted by ${Math.round(Math.abs(groundElevation))} m to rest on the ground.`, { summary: 'Altitude adjusted', life: 'long' });
             }
 
             // Clip away anything left below ground (the closed-bottom cap) - a rigid shift alone

@@ -200,7 +200,7 @@ export default {
                     this.newOrg.permissions
                 );
 
-                this.$toast.add({ severity: 'success', summary: 'Organization Added', detail: `User added to organization successfully`, life: 3000 });
+                this.$notify.success(`User added to organization successfully`, { summary: 'Organization Added' });
                 this.hasChanges = true;
 
                 // Refresh organizations list
@@ -211,7 +211,7 @@ export default {
                 this.newOrg.permissions = 1;
 
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to add organization', life: 5000 });
+                this.$notify.error(e.message || 'Failed to add organization');
                 this.error = e.message || 'Failed to add organization';
             } finally {
                 this.addingOrg = false;
@@ -225,9 +225,9 @@ export default {
                     org.slug,
                     org.permissions
                 );
-                this.$toast.add({ severity: 'success', summary: 'Permissions Updated', detail: `Permissions updated for organization "${org.name || org.slug}"`, life: 3000 });
+                this.$notify.success(`Permissions updated for organization "${org.name || org.slug}"`, { summary: 'Permissions Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to update permissions', life: 5000 });
+                this.$notify.error(e.message || 'Failed to update permissions');
                 this.error = e.message || 'Failed to update permissions';
                 // Reload to get correct state
                 await this.loadData();
@@ -250,11 +250,11 @@ export default {
             this.removingOrg = this.orgToRemove.slug;
             try {
                 await reg.removeUserFromOrganization(this.user.userName, this.orgToRemove.slug);
-                this.$toast.add({ severity: 'success', summary: 'Organization Removed', detail: `User removed from organization successfully`, life: 3000 });
+                this.$notify.success(`User removed from organization successfully`, { summary: 'Organization Removed' });
                 this.hasChanges = true;
                 await this.loadData();
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to remove from organization', life: 5000 });
+                this.$notify.error(e.message || 'Failed to remove from organization');
                 this.error = e.message || 'Failed to remove from organization';
             } finally {
                 this.removingOrg = null;

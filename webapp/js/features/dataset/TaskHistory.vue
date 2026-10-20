@@ -628,7 +628,7 @@ export default {
             const nodeId = this.photogrammetryForm.nodeId
                 || (this.photogrammetryNodes[0] && this.photogrammetryNodes[0].value);
             if (!nodeId) {
-                this._toast('warn', 'No processing node', 'No NodeODX node is configured.');
+                this.$notify.warn('No NodeODX node is configured.', { summary: 'No processing node' });
                 return null;
             }
             this.checkingNode = true;
@@ -638,15 +638,14 @@ export default {
                     `/sys/processingNodes/${encodeURIComponent(nodeId)}/status`);
                 this.nodeStatus = status;
                 if (status.reachable) {
-                    this._toast('success', 'Node reachable',
-                        `${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`);
+                    this.$notify.success(`${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`, { summary: 'Node reachable' });
                 } else {
-                    this._toast('error', 'Node unreachable', status.errorMessage || 'The node did not respond.');
+                    this.$notify.error(status.errorMessage || 'The node did not respond.', { summary: 'Node unreachable' });
                 }
                 return status;
             } catch (e) {
                 this.nodeStatus = { reachable: false, errorMessage: e.message };
-                this._toast('error', 'Check failed', e.message);
+                this.$notify.error(e.message, { summary: 'Check failed' });
                 return this.nodeStatus;
             } finally {
                 this.checkingNode = false;
@@ -783,21 +782,21 @@ export default {
                 this.trackHeavyTask(this.dataset, submit.taskId, { params })
                     .catch(e => {
                         if (e && e.status === 403) {
-                            this._toast('error', 'Not available', e.message || this.photogrammetryDisabledMsg);
+                            this.$notify.error(e.message || this.photogrammetryDisabledMsg, { summary: 'Not available' });
                         } else {
                             console.warn('Photogrammetry task ended with error:', e.message);
                         }
                     });
 
                 this.photogrammetryDialogOpen = false;
-                this._toast('info', 'Photogrammetry started', 'The task is now queued on the processing node.');
+                this.$notify.info('The task is now queued on the processing node.', { summary: 'Photogrammetry started' });
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
                 if (e && e.status === 403) {
-                    this._toast('error', 'Not available', e.message || this.photogrammetryDisabledMsg);
+                    this.$notify.error(e.message || this.photogrammetryDisabledMsg, { summary: 'Not available' });
                 } else {
-                    this._toast('error', 'Submit failed', e.message);
+                    this.$notify.error(e.message, { summary: 'Submit failed' });
                 }
             } finally {
                 this.submitting = false;
@@ -825,7 +824,7 @@ export default {
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
-                this._toast('error', 'Cancel failed', e.message);
+                this.$notify.error(e.message, { summary: 'Cancel failed' });
             }
         },
 
@@ -835,7 +834,7 @@ export default {
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
-                this._toast('error', 'Retry failed', e.message);
+                this.$notify.error(e.message, { summary: 'Retry failed' });
             }
         },
 
@@ -874,9 +873,9 @@ export default {
                 await this.dataset.clearTasks(this.selectedTool || undefined);
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
-                this._toast('success', 'Tasks cleared', 'The concluded tasks have been removed.');
+                this.$notify.success('The concluded tasks have been removed.', { summary: 'Tasks cleared' });
             } catch (e) {
-                this._toast('error', 'Clear failed', e.message);
+                this.$notify.error(e.message, { summary: 'Clear failed' });
             } finally {
                 this.loading = false;
             }
@@ -899,9 +898,9 @@ export default {
                 await this.dataset.deleteTask(task.taskId);
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
-                this._toast('success', 'Task deleted', 'The task has been removed from history.');
+                this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
             } catch (e) {
-                this._toast('error', 'Delete failed', e.message);
+                this.$notify.error(e.message, { summary: 'Delete failed' });
             }
         },
 

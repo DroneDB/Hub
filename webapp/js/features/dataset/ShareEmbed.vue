@@ -1,7 +1,7 @@
 <template>
     <Window id="share-embed" :title="windowTitle" modal fixed-size @on-close="$emit('onClose')">
         <div class="content">
-            <Message bind-to="error" no-dismiss />
+            <Message v-model="error" no-dismiss />
             <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
             <template v-else>
                 <div class="share-type">

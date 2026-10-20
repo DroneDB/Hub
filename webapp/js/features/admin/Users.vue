@@ -1,7 +1,6 @@
 <template>
     <div id="users">
-        <Toast position="bottom-left" />
-        <Message bind-to="error" />
+        <Message v-model="error" />
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -218,7 +217,6 @@ import RoleManagementDialog from './RoleManagementDialog.vue';
 import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import Toast from 'primevue/toast';
 import Chip from 'primevue/chip';
 import Select from 'primevue/select';
 import DataTable from 'primevue/datatable';
@@ -251,8 +249,6 @@ export default {
         OrganizationManagementDialog,
         Button,
         PrimeMessage,
-        Toast,
-        
         Chip,
         Select,
         DataTable,
@@ -411,10 +407,10 @@ export default {
                 this.showDeleteDialog = false;
                 this.showDeleteResultDialog = true;
 
-                this.$toast.add({ severity: 'success', summary: 'User Deleted', detail: `User "${result.userName}" deleted successfully`, life: 3000 });
+                this.$notify.success(`User "${result.userName}" deleted successfully`, { summary: 'User Deleted' });
 
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete user: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to delete user: ' + e.message);
                 this.error = e.message;
                 if (this.userToDelete) {
                     this.userToDelete.deleting = false;

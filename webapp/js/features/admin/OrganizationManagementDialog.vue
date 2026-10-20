@@ -5,7 +5,7 @@
         </div>
 
         <div v-else class="dialog">
-            <Message bind-to="error" />
+            <Message v-model="error" />
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
@@ -236,7 +236,7 @@ export default {
                 // Remove organization from list
                 this.organizations = this.organizations.filter(org => org.slug !== this.orgToDelete.slug);
 
-                this.$toast.add({ severity: 'success', summary: 'Organization Deleted', detail: `Organization "${this.orgToDelete.name || this.orgToDelete.slug}" deleted successfully`, life: 3000 });
+                this.$notify.success(`Organization "${this.orgToDelete.name || this.orgToDelete.slug}" deleted successfully`, { summary: 'Organization Deleted' });
 
                 // Close dialog and reset state
                 this.showDeleteDialog = false;
@@ -244,7 +244,7 @@ export default {
                 this.deleting = null;
 
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization: ' + (e.message || 'Unknown error'), life: 5000 });
+                this.$notify.error('Failed to delete organization: ' + (e.message || 'Unknown error'));
                 this.error = e.message || 'Failed to delete organization';
                 this.deleting = null;
             }
@@ -272,7 +272,7 @@ export default {
                 // Add to organizations list
                 this.organizations.push(newOrg);
 
-                this.$toast.add({ severity: 'success', summary: 'Organization Created', detail: `Organization "${this.newOrgName}" created successfully`, life: 3000 });
+                this.$notify.success(`Organization "${this.newOrgName}" created successfully`, { summary: 'Organization Created' });
 
                 // Reset form
                 this.resetCreateForm();
@@ -281,7 +281,7 @@ export default {
                 this.activeTab = "list";
 
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization: ' + (e.message || 'Unknown error'), life: 5000 });
+                this.$notify.error('Failed to create organization: ' + (e.message || 'Unknown error'));
                 this.createError = e.message || 'Failed to create organization';
             }
             this.creating = false;

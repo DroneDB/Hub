@@ -19,11 +19,10 @@ const { applyHubBranding } = require('../hubBranding');
 
 let refreshTimers = {};
 
+const { ApiError } = require('./apiError');
+
 const throwError = (msg, status, extraData = {}) => {
-    const e = new Error(msg);
-    e.status = status;
-    Object.assign(e, extraData);
-    throw e;
+    throw new ApiError(msg, status, extraData);
 };
 
 // Credit https://stackoverflow.com/a/38552302

@@ -1,6 +1,5 @@
 <template>
     <div id="admin-config" class="admin-config-page">
-        <Toast position="bottom-left" />
 
         <div class="top-banner d-flex justify-content-between align-items-center">
             <div>
@@ -166,7 +165,6 @@ import Select from 'primevue/select';
 import Password from 'primevue/password';
 import Chips from 'primevue/chips';
 import Textarea from 'primevue/textarea';
-import Toast from 'primevue/toast';
 import Tag from 'primevue/tag';
 import { copyText } from '@/composables/useCopyText';
 
@@ -179,7 +177,7 @@ export default {
 
     components: {
         Accordion, AccordionTab, Button, InputText, InputNumber,
-        ToggleSwitch, Select, Password, Chips, Textarea, Toast, Tag
+        ToggleSwitch, Select, Password, Chips, Textarea, Tag
     },
 
     data() {
@@ -287,11 +285,7 @@ export default {
         resetToDefaults() {
             this.modifiedFields = {};
             this.modifiedSections = {};
-            this.$toast.add({
-                severity: 'info', summary: 'Reset',
-                detail: 'All fields restored to defaults.',
-                life: 3000
-            });
+            this.$notify.info('All fields restored to defaults.', { summary: 'Reset' });
         },
 
         resetSection(sIdx) {
@@ -299,11 +293,7 @@ export default {
             const keysToRemove = Object.keys(this.modifiedFields).filter(k => k.startsWith(sIdx + '-'));
             keysToRemove.forEach(k => delete this.modifiedFields[k]);
             delete this.modifiedSections[sIdx];
-            this.$toast.add({
-                severity: 'info', summary: 'Reset Section',
-                detail: 'Section restored to defaults.',
-                life: 3000
-            });
+            this.$notify.info('Section restored to defaults.', { summary: 'Reset Section' });
         },
 
         // ---- JSON generation ----
@@ -393,17 +383,9 @@ export default {
             const json = this.generateAppSettingsJson();
             const fullJson = JSON.stringify({ AppSettings: JSON.parse(json) }, null, 2);
             copyText(fullJson).then(() => {
-                this.$toast.add({
-                    severity: 'success', summary: 'Copied',
-                    detail: 'AppSettings JSON copied to clipboard.',
-                    life: 3000
-                });
+                this.$notify.success('AppSettings JSON copied to clipboard.', { summary: 'Copied' });
             }).catch(() => {
-                this.$toast.add({
-                    severity: 'error', summary: 'Error',
-                    detail: 'Failed to copy to clipboard.',
-                    life: 3000
-                });
+                this.$notify.error('Failed to copy to clipboard.', { life: 'short' });
             });
         }
     }

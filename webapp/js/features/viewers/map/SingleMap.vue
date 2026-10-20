@@ -102,7 +102,6 @@
                                 :group="pendingGroupForRename"
                                 @on-close="measurementGroupDialogOpen = false"
                                 @on-save="handleGroupDialogSave" />
-        <Toast position="bottom-left" />
     </div>
 </template>
 
@@ -132,7 +131,6 @@ import MapSettingsDialog from './MapSettingsDialog.vue';
 import MeasurementListDialog from './MeasurementListDialog.vue';
 import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import olSettings from './olSettings';
-import Toast from 'primevue/toast';
 import Keyboard from '@/libs/keyboard';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { getVectorColor } from '@/libs/map/mapUtils';
@@ -155,7 +153,7 @@ import { getPref, PREF } from '@/libs/preferences';
 
 export default {
     components: {
-        TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog, Toast
+        TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     props: {

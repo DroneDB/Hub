@@ -1,6 +1,5 @@
 <template>
     <div>
-        <Toast position="bottom-left" />
         <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @on-close="close">
             <div class="members-dialog">
                 <!-- Loading state -->
@@ -108,13 +107,12 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Select from 'primevue/select';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import Toast from 'primevue/toast';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { formatDate } from '@/libs/format';
 
 export default {
-    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Toast },
+    components: { Window, ConfirmDialog, Select, Button, PrimeMessage },
 
     props: {
         orgSlug: { type: String, required: true },
@@ -207,7 +205,7 @@ export default {
                 this.newMember.userName = '';
                 this.newMember.permissions = 1;
 
-                this.$toast.add({ severity: 'success', summary: 'Member Added', detail: 'Member added successfully', life: 3000 });
+                this.$notify.success('Member added successfully', { summary: 'Member Added' });
 
             } catch (e) {
                 this.error = e.message || 'Failed to add member';
@@ -223,7 +221,7 @@ export default {
                     member.userName,
                     member.permissions
                 );
-                this.$toast.add({ severity: 'success', summary: 'Permissions Updated', detail: 'Permissions saved successfully', life: 3000 });
+                this.$notify.success('Permissions saved successfully', { summary: 'Permissions Updated' });
             } catch (e) {
                 this.error = e.message || 'Failed to update permissions';
                 // Reload to get correct state
@@ -248,7 +246,7 @@ export default {
             try {
                 await reg.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
                 await this.loadData();
-                this.$toast.add({ severity: 'success', summary: 'Member Removed', detail: 'Member removed successfully', life: 3000 });
+                this.$notify.success('Member removed successfully', { summary: 'Member Removed' });
             } catch (e) {
                 this.error = e.message || 'Failed to remove member';
             } finally {

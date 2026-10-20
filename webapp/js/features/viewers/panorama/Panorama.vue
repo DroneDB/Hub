@@ -2,7 +2,7 @@
     <div id="panorama">
         <TabViewLoader title-suffix="Panorama" loading-text="Loading viewer..." @loaded="handleLoad" />
 
-        <Message bind-to="error" no-dismiss />
+        <Message v-model="error" no-dismiss />
 
         <div ref="viewer" class="viewer" />
     </div>

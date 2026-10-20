@@ -2,7 +2,7 @@
     <div class="text-editor-wrapper">
         <Window id="textEditorDialog" :title="windowTitle" :autofocus="false" modal width="80%" height="80%" @on-close="close">
             <div class="text-editor-dialog">
-                <Message bind-to="error" />
+                <Message v-model="error" />
 
                 <div v-if="loading" class="loading-container">
                     <i class="fa-solid fa-circle-notch fa-spin" />

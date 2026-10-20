@@ -464,9 +464,7 @@ export default {
                 downloadBlob(blob, `${pathutils.stem(this.filePath) || 'export'}_export.tif`);
             } catch (e) {
                 console.error('Export error:', e);
-                if (this.$toast) {
-                    this.$toast.add({ severity: 'error', summary: 'Export Failed', detail: e.message, life: 5000 });
-                }
+                this.$notify.error(e, { summary: 'Export Failed' });
             } finally {
                 this.exporting = false;
             }

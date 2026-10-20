@@ -182,7 +182,7 @@ export default {
                 BuildManager.onFilesAdded(this.dataset, newEntries);
             }
 
-            if (uploadSuccess) this.$toast.add({ severity: 'success', summary: 'Upload Complete', detail: `Uploaded ${uploaded.length} file${uploaded.length > 1 ? 's' : ''}`, life: 3000 });
+            if (uploadSuccess) this.$notify.success(`Uploaded ${uploaded.length} file${uploaded.length > 1 ? 's' : ''}`, { summary: 'Upload Complete' });
         },
 
         // Delete Dialog
@@ -252,7 +252,7 @@ export default {
                         }
 
                         const count = sidecarsInfo.sidecars.length;
-                        this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File and ${count} sidecar${count > 1 ? 's' : ''} renamed successfully`, life: 3000 });
+                        this.$notify.success(`File and ${count} sidecar${count > 1 ? 's' : ''} renamed successfully`, { summary: 'Renamed' });
                     } catch (e) {
                         this.showError(e, "Rename");
                     } finally {
@@ -313,7 +313,7 @@ export default {
 
                 emitter.emit('deleteEntries', transferredPaths);
 
-                this.$toast.add({ severity: 'success', summary: 'Transfer Complete', detail: `${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`, life: 3000 });
+                this.$notify.success(`${transferredFiles.length} item${transferredFiles.length > 1 ? 's' : ''} transferred successfully`, { summary: 'Transfer Complete' });
             }
         },
 
@@ -364,12 +364,7 @@ export default {
                 await this.dataset.submitTask('rescan-index', {
                     params: { stopOnError: false }, force: true
                 });
-                this.$toast.add({
-                    severity: 'info',
-                    summary: 'Rescan Started',
-                    detail: 'The dataset index rescan is running. Check the Tasks tab for progress.',
-                    life: 6000
-                });
+                this.$notify.info('The dataset index rescan is running. Check the Tasks tab for progress.', { summary: 'Rescan Started', life: 'long' });
             } catch (e) {
                 this.showError(e.message, 'Rescan Error');
             } finally {
@@ -448,7 +443,7 @@ export default {
                 // Upload to the dataset root with the target filename
                 await this.dataset.uploadObj(targetFilename, new File([blob], targetFilename, { type: blob.type }));
 
-                this.$toast.add({ severity: 'success', summary: 'Cover Set', detail: 'Dataset cover set successfully', life: 3000 });
+                this.$notify.success('Dataset cover set successfully', { summary: 'Cover Set' });
 
                 // Notify components that new items have been added
                 emitter.emit('addItems', []);
@@ -489,12 +484,7 @@ export default {
                 const fileList = sources.length > 3
                     ? sources.slice(0, 3).join(', ') + ` and ${sources.length - 3} more`
                     : sources.join(', ');
-                this.$toast.add({
-                    severity: 'success',
-                    summary: 'Merge Completed',
-                    detail: `${fileList} merged into ${dest}`,
-                    life: 8000
-                });
+                this.$notify.success(`${fileList} merged into ${dest}`, { summary: 'Merge Completed', life: 'long' });
 
                 try {
                     // Add merged file to file browser
@@ -546,12 +536,7 @@ export default {
 
             if (action !== 'aligned' || !result || !result.outputPath) return;
 
-            this.$toast.add({
-                severity: 'success',
-                summary: 'Alignment complete',
-                detail: `Output saved as ${result.outputPath}`,
-                life: 6000
-            });
+            this.$notify.success(`Output saved as ${result.outputPath}`, { summary: 'Alignment complete', life: 'long' });
 
             try {
                 // Add the aligned output to the file browser (if it belongs to the current folder).
@@ -609,12 +594,7 @@ export default {
             this.setCrsFile = null;
             if (action !== 'set' || !result) return;
 
-            this.$toast.add({
-                severity: 'success',
-                summary: 'Coordinate System Set',
-                detail: `${result.prjPath} written: the drawing is rebuilt with it`,
-                life: 5000
-            });
+            this.$notify.success(`${result.prjPath} written: the drawing is rebuilt with it`, { summary: 'Coordinate System Set', life: 'normal' });
             // The .prj appears next to the drawing, whose properties change once indexed
             this.handleRefresh();
         },
@@ -632,12 +612,7 @@ export default {
 
             if (action !== 'extracted' || !result) return;
 
-            this.$toast.add({
-                severity: 'success',
-                summary: 'Extract Completed',
-                detail: `Archive extracted to ${result.destPath && result.destPath.length > 0 ? result.destPath : 'root folder'}`,
-                life: 5000
-            });
+            this.$notify.success(`Archive extracted to ${result.destPath && result.destPath.length > 0 ? result.destPath : 'root folder'}`, { summary: 'Extract Completed', life: 'normal' });
 
             // Reveal the newly extracted entries in the current folder view.
             await this.revealExtractedFiles(result.destPath);
@@ -744,7 +719,7 @@ export default {
 
                 await this.startMaskBorders(entry);
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
+                this.$notify.error(e.message);
             }
         },
 
@@ -760,15 +735,10 @@ export default {
         async startMaskBorders(entry) {
             try {
                 await this.dataset.maskBorders(entry.entry.path);
-                this.$toast.add({
-                    severity: 'info',
-                    summary: 'Mask Borders',
-                    detail: `Masking started for ${entry.label}...`,
-                    life: 5000
-                });
+                this.$notify.info(`Masking started for ${entry.label}...`, { summary: 'Mask Borders', life: 'normal' });
                 BuildManager.startPolling(this.dataset);
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
+                this.$notify.error(e.message);
             }
         }
     }

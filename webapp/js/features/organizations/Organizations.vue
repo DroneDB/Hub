@@ -1,6 +1,5 @@
 <template>
     <div id="organizations">
-        <Toast position="bottom-left" />
 
         <div class="org-page-header">
             <div class="org-header-layout">
@@ -133,13 +132,13 @@ import { Features } from '@/libs/features';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
 import Tag from 'primevue/tag';
-import Toast from 'primevue/toast';
 import Skeleton from 'primevue/skeleton';
 import ToggleSwitch from 'primevue/toggleswitch';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Paginator from 'primevue/paginator';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 /**
  * Organizations - Admin panel for managing platform organizations.
@@ -158,7 +157,6 @@ export default {
         Button,
         Card,
         Tag,
-        Toast,
         Skeleton,
         ToggleSwitch,
         InputText,
@@ -270,15 +268,11 @@ export default {
                     };
                 });
             } catch (e) {
-                if (e.status === 401) {
-                    if (e.noRetry) {
-                        reg.logout();
-                        this.$router.push({ name: "Login" }).catch(() => { });
-                    } else {
-                        this.error = "Temporary authentication issue. Please try again.";
-                    }
+                if (isUnauthorized(e)) {
+                    reg.logout();
+                    this.$router.push({ name: "Login" }).catch(() => { });
                 } else {
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message, life: 5000 });
+                    this.$notify.error(e.message);
                 }
             }
             this.loading = false;
@@ -316,15 +310,15 @@ export default {
 
                 if (ret) {
                     this.organizations = this.organizations.filter(o => o.slug !== this.currentOrgSlug);
-                    this.$toast.add({ severity: 'success', summary: 'Organization Deleted', detail: 'Organization deleted successfully', life: 3000 });
+                    this.$notify.success('Organization deleted successfully', { summary: 'Organization Deleted' });
                 } else {
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization "' + this.currentOrgSlug + '"', life: 5000 });
+                    this.$notify.error('Failed to delete organization "' + this.currentOrgSlug + '"');
                     console.error(ret);
                     org.deleting = false;
                 }
             } catch (e) {
                 console.error(e);
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete organization: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to delete organization: ' + e.message);
                 org.deleting = false;
             }
 
@@ -381,14 +375,14 @@ export default {
                             owner: this.userName,
                             permissions: { canRead: true, canWrite: true, canDelete: true, canManageMembers: true }
                         });
-                        this.$toast.add({ severity: 'success', summary: 'Organization Created', detail: 'Organization created successfully', life: 3000 });
+                        this.$notify.success('Organization created successfully', { summary: 'Organization Created' });
                     } else {
-                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization "' + neworg.slug + '"', life: 5000 });
+                        this.$notify.error('Failed to create organization "' + neworg.slug + '"');
                         console.error(ret);
                     }
                 } catch (e) {
                     console.error(e);
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization: ' + e.message, life: 5000 });
+                    this.$notify.error('Failed to create organization: ' + e.message);
                 }
                 this.loading = false;
 
@@ -407,14 +401,14 @@ export default {
                         orgitem.name = neworg.name;
                         orgitem.description = neworg.description;
                         orgitem.isPublic = neworg.isPublic;
-                        this.$toast.add({ severity: 'success', summary: 'Organization Updated', detail: 'Organization updated successfully', life: 3000 });
+                        this.$notify.success('Organization updated successfully', { summary: 'Organization Updated' });
                     } else {
-                        this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update organization "' + org.slug + '"', life: 5000 });
+                        this.$notify.error('Failed to update organization "' + org.slug + '"');
                         console.error(ret);
                     }
                 } catch (e) {
                     console.error(e);
-                    this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update organization: ' + e.message, life: 5000 });
+                    this.$notify.error('Failed to update organization: ' + e.message);
                 }
                 this.loading = false;
             }

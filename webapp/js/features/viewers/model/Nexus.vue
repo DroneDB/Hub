@@ -2,7 +2,7 @@
     <div id="nexus">
         <TabViewLoader title-suffix="Model" @loaded="handleLoad" />
 
-        <Message bind-to="error" no-dismiss />
+        <Message v-model="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p>Loading model...</p>
             <i class="fa-solid fa-circle-notch fa-spin" />

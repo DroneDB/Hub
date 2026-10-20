@@ -1,6 +1,6 @@
 <template>
     <div id="account">
-        <Message bind-to="error" />
+        <Message v-model="error" />
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />

@@ -471,7 +471,7 @@ export default {
                 if (err.status === 429) {
                     emitter.emit('downloadLimitReached', err.message);
                 } else {
-                    alert(err.message || err);
+                    this.$notify.error(err);
                 }
             } finally {
                 this.isDownloading = false;
@@ -504,18 +504,14 @@ export default {
                 if (paths && paths.length) params.paths = paths;
 
                 // Inform the user upfront: ZIP creation runs as a background task.
-                this.$toast.add({
-                    severity: 'info', summary: 'Preparing archive',
-                    detail: 'Archive creation started. Open the Tasks tab to download it when ready.',
-                    life: 6000
-                });
+                this.$notify.info('Archive creation started. Open the Tasks tab to download it when ready.', { summary: 'Preparing archive', life: 'long' });
 
                 const result = await this.runHeavyTask(dataset, 'bulk-download', { params, notify: false });
 
                 // Trigger the browser download via the authenticated result URL.
                 window.location.href = dataset.taskResultUrl(result.taskId);
             } catch (err) {
-                alert((err && err.message) || err);
+                this.$notify.error(err);
             } finally {
                 this.isDownloading = false;
             }

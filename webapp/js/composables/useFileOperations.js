@@ -82,7 +82,7 @@ export default {
                     const what = parts.length > 0
                         ? parts.join(' and ')
                         : `${response.deleted.length} item${response.deleted.length > 1 ? 's' : ''}`;
-                    this.$toast.add({ severity: 'success', summary: 'Deleted', detail: `${what} deleted successfully`, life: 3000 });
+                    this.$notify.success(`${what} deleted successfully`, { summary: 'Deleted' });
                 }
 
                 // Show result dialog only if there are failures
@@ -158,9 +158,9 @@ export default {
                 if (options.silent) {
                     // Caller shows its own (aggregate) toast
                 } else if (action === 'move') {
-                    this.$toast.add({ severity: 'success', summary: 'Moved', detail: `File moved successfully`, life: 3000 });
+                    this.$notify.success(`File moved successfully`, { summary: 'Moved' });
                 } else {
-                    this.$toast.add({ severity: 'success', summary: 'Renamed', detail: `File renamed successfully`, life: 3000 });
+                    this.$notify.success(`File renamed successfully`, { summary: 'Renamed' });
                 }
 
             } catch (e) {
@@ -240,7 +240,7 @@ export default {
             if (!sourceItem || !sourceItem.entry || !destItem || !destItem.entry) return;
 
             if (sourceItem.entry.type === ddb.entry.type.DRONEDB) {
-                this.$toast.add({ severity: 'warn', summary: 'Move', detail: 'Cannot move dataset root', life: 3000 });
+                this.$notify.warn('Cannot move dataset root', { summary: 'Move', life: 'short' });
                 return;
             }
 
@@ -259,24 +259,14 @@ export default {
             }
 
             if (destPath === sourceItem.entry.path) {
-                this.$toast.add({
-                    severity: 'info',
-                    summary: 'Move',
-                    detail: 'Item is already in this folder',
-                    life: 2500
-                });
+                this.$notify.info('Item is already in this folder', { summary: 'Move' });
                 return;
             }
 
             // Block move into self or descendant for directories
             if (ddb.entry.isDirectory(sourceItem.entry)
                 && (destPath + '/').startsWith(sourceItem.entry.path + '/')) {
-                this.$toast.add({
-                    severity: 'warn',
-                    summary: 'Move',
-                    detail: 'Cannot move a folder onto itself or one of its descendants',
-                    life: 3500
-                });
+                this.$notify.warn('Cannot move a folder onto itself or one of its descendants', { summary: 'Move' });
                 return;
             }
 
@@ -329,7 +319,7 @@ export default {
         clipboardCopySelected(selection) {
             const { items, basePath } = this._clipboardSelection(selection);
             if (items.length === 0) {
-                this.$toast.add({ severity: 'info', summary: 'Copy', detail: 'No items selected', life: 2000 });
+                this.$notify.info('No items selected', { summary: 'Copy' });
                 return;
             }
             clipboard.copy({
@@ -337,17 +327,17 @@ export default {
                 dsSlug: this.dataset.ds,
                 basePath
             }, items);
-            this.$toast.add({ severity: 'success', summary: 'Copied', detail: `${items.length} item${items.length > 1 ? 's' : ''} copied to clipboard`, life: 2000 });
+            this.$notify.success(`${items.length} item${items.length > 1 ? 's' : ''} copied to clipboard`, { summary: 'Copied' });
         },
 
         clipboardCutSelected(selection) {
             if (!this.canWrite) {
-                this.$toast.add({ severity: 'warn', summary: 'Cut', detail: 'You do not have write access to this dataset', life: 3000 });
+                this.$notify.warn('You do not have write access to this dataset', { summary: 'Cut', life: 'short' });
                 return;
             }
             const { items, basePath } = this._clipboardSelection(selection);
             if (items.length === 0) {
-                this.$toast.add({ severity: 'info', summary: 'Cut', detail: 'No items selected', life: 2000 });
+                this.$notify.info('No items selected', { summary: 'Cut' });
                 return;
             }
             clipboard.cut({
@@ -355,7 +345,7 @@ export default {
                 dsSlug: this.dataset.ds,
                 basePath
             }, items);
-            this.$toast.add({ severity: 'success', summary: 'Cut', detail: `${items.length} item${items.length > 1 ? 's' : ''} ready to move`, life: 2000 });
+            this.$notify.success(`${items.length} item${items.length > 1 ? 's' : ''} ready to move`, { summary: 'Cut' });
         },
 
         clipboardClear() {
@@ -376,7 +366,7 @@ export default {
         async clipboardPaste() {
             if (clipboard.isEmpty.value) return;
             if (!this.canWrite) {
-                this.$toast.add({ severity: 'warn', summary: 'Paste', detail: 'You do not have write access to this dataset', life: 3000 });
+                this.$notify.warn('You do not have write access to this dataset', { summary: 'Paste', life: 'short' });
                 return;
             }
 
@@ -394,14 +384,9 @@ export default {
             if (source && source.orgSlug === target.orgSlug
                 && source.dsSlug === target.dsSlug
                 && (source.basePath || '') === (target.basePath || '')) {
-                this.$toast.add({
-                    severity: 'info',
-                    summary: 'Paste',
-                    detail: mode === 'cut'
+                this.$notify.info(mode === 'cut'
                         ? 'Cannot move into the same folder'
-                        : 'Cannot copy into the same folder',
-                    life: 3000
-                });
+                        : 'Cannot copy into the same folder', { summary: 'Paste' });
                 return;
             }
 
@@ -529,12 +514,7 @@ export default {
             const ok = result.succeeded.length;
 
             if (failedCount === 0 && skippedCount === 0) {
-                this.$toast.add({
-                    severity: 'success',
-                    summary: 'Paste',
-                    detail: `${ok} item${ok !== 1 ? 's' : ''} ${mode === 'cut' ? 'moved' : 'copied'} successfully`,
-                    life: 3000
-                });
+                this.$notify.success(`${ok} item${ok !== 1 ? 's' : ''} ${mode === 'cut' ? 'moved' : 'copied'} successfully`, { summary: 'Paste' });
             } else {
                 this.pasteResultData = {
                     mode,

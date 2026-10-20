@@ -2,7 +2,7 @@
     <div id="potree">
         <TabViewLoader title-suffix="Point Cloud" @loaded="handleLoad" />
 
-        <Message bind-to="error" no-dismiss />
+        <Message v-model="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p>Loading point cloud...</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -80,7 +80,6 @@
                        warning-title="Warning"
                        warning-message="This action cannot be undone."
                        @on-close="handleDeleteMeasurementsDialogClose" />
-        <Toast position="bottom-left" />
     </div>
 </template>
 
@@ -93,7 +92,6 @@ import Lara from '@primevue/themes/lara';
 import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import Toast from 'primevue/toast';
 import MeasurementPropertiesDialog from '@/features/viewers/map/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/components/AnnotationPropertiesDialog.vue';
 import { loadResources } from '@/libs/lazy';
@@ -111,7 +109,7 @@ import { getPref, setPref, PREF } from '@/libs/preferences';
 export default {
     name: 'PotreeViewer',
     components: {
-        Message, TabViewLoader, ConfirmDialog, Toast
+        Message, TabViewLoader, ConfirmDialog
     },
     props: {
         uri: { type: String, default: null }
@@ -1198,7 +1196,7 @@ export default {
          */
         showFlash: function(message, color = 'positive') {
             const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
-            this.$toast.add({ severity: severityMap[color] || 'success', summary: message, life: 3000 });
+            this.$notify[severityMap[color] || 'success']({ summary: message });
         },
 
         /**

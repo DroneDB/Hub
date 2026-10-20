@@ -197,12 +197,10 @@ export default {
                             if (this._heavyTaskUnmounted) return;
 
                             if (summary.state === 'Succeeded') {
-                                if (notify) this._toast('success', 'Task completed',
-                                    `${entry.toolId} finished`);
+                                if (notify) this.$notify.success(`${entry.toolId} finished`, { summary: 'Task completed' });
                                 resolve(entry);
                             } else {
-                                if (notify) this._toast('error', 'Task failed',
-                                    entry.error || `${entry.toolId} ${summary.state.toLowerCase()}`);
+                                if (notify) this.$notify.error(entry.error || `${entry.toolId} ${summary.state.toLowerCase()}`, { summary: 'Task failed', life: 'long' });
                                 const err = new Error(entry.error || `Task ${summary.state}`);
                                 err.task = entry;
                                 reject(err);
@@ -249,10 +247,5 @@ export default {
             delete this._heavyTaskPromises[taskId];
         },
 
-        _toast(severity, summary, detail) {
-            if (this.$toast && typeof this.$toast.add === 'function') {
-                this.$toast.add({ severity, summary, detail, life: severity === 'error' ? 6000 : 3000 });
-            }
-        },
     },
 };

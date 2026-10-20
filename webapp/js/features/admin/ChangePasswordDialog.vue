@@ -6,7 +6,7 @@
         </div>
 
         <div v-else class="dialog">
-            <Message bind-to="error" />
+            <Message v-model="error" />
 
             <PrimeMessage severity="info" :closable="false" class="mb-3">
                 Changing password for user: <strong>{{ user.userName }}</strong>
@@ -98,11 +98,11 @@ export default {
                     this.newPassword
                 );
 
-                this.$toast.add({ severity: 'success', summary: 'Password Changed', detail: `Password changed successfully for "${this.user.userName}"`, life: 3000 });
+                this.$notify.success(`Password changed successfully for "${this.user.userName}"`, { summary: 'Password Changed' });
                 this.changing = false;
                 this.$emit('onClose', 'updated');
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to change password: ' + (e.message || 'Unknown error'), life: 5000 });
+                this.$notify.error('Failed to change password: ' + (e.message || 'Unknown error'));
                 this.error = e.message || 'Failed to change password';
                 this.changing = false;
             }

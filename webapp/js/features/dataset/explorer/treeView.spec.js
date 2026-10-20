@@ -176,7 +176,7 @@ describe('clipboard copy/cut from the tree', () => {
             selectedFiles,
             contextMenuFiles: selectedFiles,
             dataset: { org: 'org', ds: 'ds' },
-            $toast: { add: vi.fn() }
+            $notify: { success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
         };
         vm._clipboardSelection = (s) => _clipboardSelection.call(vm, s);
         vm._selectedItemsForClipboard = () => _selectedItemsForClipboard.call(vm);
@@ -220,7 +220,7 @@ describe('clipboard copy/cut from the tree', () => {
         const vm = fakeView();
         clipboardCopySelected.call(vm, []);
         expect(clipboard.state.mode).toBe(null);
-        expect(vm.$toast.add).toHaveBeenCalledWith(expect.objectContaining({ detail: 'No items selected' }));
+        expect(vm.$notify.info).toHaveBeenCalledWith('No items selected', { summary: 'Copy' });
     });
 });
 
@@ -233,7 +233,7 @@ describe('paste conflict detection', () => {
             currentPath: 'dest',
             fileBrowserFiles,
             dataset: { org: 'org', ds: 'ds', list },
-            $toast: { add: vi.fn() },
+            $notify: { success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
             showError: vi.fn(),
             _askPasteConflict: vi.fn(async () => 'cancel'),
             _resolveSourceDataset: vi.fn()

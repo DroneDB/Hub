@@ -21,7 +21,7 @@ export default {
         },
         showFlash(message, color = 'positive') {
             const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
-            this.$toast.add({ severity: severityMap[color] || 'success', summary: message, life: 3000 });
+            this.$notify[severityMap[color] || 'success']({ summary: message });
         },
         closeFlash() {
             // No-op: Toast auto-closes

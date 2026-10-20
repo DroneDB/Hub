@@ -1,6 +1,5 @@
 <template>
     <div id="admin-tasks" class="admin-tasks-page">
-        <Toast position="bottom-left" />
 
         <div class="top-banner d-flex justify-content-between align-items-center">
             <div>
@@ -57,7 +56,6 @@ import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import Toast from 'primevue/toast';
 import reg from '@/libs/api/sharedRegistry';
 
 /**
@@ -68,7 +66,7 @@ import reg from '@/libs/api/sharedRegistry';
 export default {
     name: 'TasksPage',
 
-    components: { Button, Select, Toast, TasksTable, TaskLogDialog, ConfirmDialog },
+    components: { Button, Select, TasksTable, TaskLogDialog, ConfirmDialog },
     mixins: [useTaskFormatting],
 
     data() {
@@ -217,7 +215,7 @@ export default {
                 await this.datasetFor(task).cancelTask(task.taskId);
                 await this.loadTasks();
             } catch (e) {
-                this._toast('error', 'Cancel failed', e.message);
+                this.$notify.error(e.message, { summary: 'Cancel failed' });
             }
         },
 
@@ -227,7 +225,7 @@ export default {
                 await this.loadTasks();
                 this.scheduleAutoRefresh();
             } catch (e) {
-                this._toast('error', 'Retry failed', e.message);
+                this.$notify.error(e.message, { summary: 'Retry failed' });
             }
         },
 
@@ -247,9 +245,9 @@ export default {
             try {
                 await reg.adminDeleteTask(task.taskId);
                 await this.loadTasks();
-                this._toast('success', 'Task deleted', 'The task has been removed from history.');
+                this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
             } catch (e) {
-                this._toast('error', 'Delete failed', e.message);
+                this.$notify.error(e.message, { summary: 'Delete failed' });
             }
         },
 
@@ -276,11 +274,6 @@ export default {
             }
         },
 
-        _toast(severity, summary, detail) {
-            if (this.$toast && typeof this.$toast.add === 'function') {
-                this.$toast.add({ severity, summary, detail, life: severity === 'error' ? 6000 : 3000 });
-            }
-        }
     }
 };
 </script>

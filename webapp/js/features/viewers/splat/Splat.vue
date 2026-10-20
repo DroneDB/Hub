@@ -2,8 +2,7 @@
     <div id="splat">
         <TabViewLoader title-suffix="Gaussian Splat" @loaded="handleLoad" />
 
-        <Message bind-to="error" no-dismiss />
-        <Toast position="bottom-left" />
+        <Message v-model="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p>Loading Gaussian Splat...</p>
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -167,7 +166,6 @@ import Message from '@/components/Message';
 import TabViewLoader from '@/features/viewers/TabViewLoader';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
-import Toast from 'primevue/toast';
 import CameraManager from './CameraManager.vue';
 import { getPref, setPref, PREF } from '@/libs/preferences';
 
@@ -193,7 +191,7 @@ const NAV_KEYS = [
 export default {
     name: 'SplatViewer',
     components: {
-        Message, TabViewLoader, Window, Button, CameraManager, Toast
+        Message, TabViewLoader, Window, Button, CameraManager
     },
     props: {
         uri: { type: String, default: null }
@@ -1454,7 +1452,7 @@ export default {
                 };
                 await this.dataset.writeObj(this.camerasPath, JSON.stringify(payload, null, 2));
                 this.camerasDirty = false;
-                this.$toast.add({ severity: 'success', summary: 'Camera views saved', life: 3000 });
+                this.$notify.success({ summary: 'Camera views saved' });
             } catch (e) {
                 this.error = `Failed to save camera views: ${e.message}`;
             }

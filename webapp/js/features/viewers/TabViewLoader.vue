@@ -1,6 +1,6 @@
 <template>
     <div class="tab-view-loader">
-        <Message bind-to="error" no-dismiss />
+        <Message v-model="error" no-dismiss />
         <div v-if="loading" class="loading">
             <p v-if="loadingText">{{ loadingText }}</p> <i class="fa-solid fa-circle-notch fa-spin" />
         </div>

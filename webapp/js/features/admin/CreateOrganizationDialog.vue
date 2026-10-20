@@ -5,7 +5,7 @@
         </div>
 
         <div v-else class="dialog">
-            <Message bind-to="error" />
+            <Message v-model="error" />
 
             <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
@@ -119,11 +119,11 @@ export default {
                     description: this.organizationDescription.trim() || undefined
                 });
 
-                this.$toast.add({ severity: 'success', summary: 'Organization Created', detail: `Organization "${this.organizationName}" created successfully`, life: 3000 });
+                this.$notify.success(`Organization "${this.organizationName}" created successfully`, { summary: 'Organization Created' });
                 this.creating = false;
                 this.$emit('onClose', 'created');
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create organization: ' + (e.message || 'Unknown error'), life: 5000 });
+                this.$notify.error('Failed to create organization: ' + (e.message || 'Unknown error'));
                 this.error = e.message || 'Failed to create organization';
                 this.creating = false;
             }

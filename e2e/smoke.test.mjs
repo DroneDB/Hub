@@ -112,6 +112,15 @@ test('admin pages render for an admin', async () => {
     await page.waitForSelector(`text=${USER}`, { timeout: 15000 });
 });
 
+test('a session the server rejects goes to Login', async () => {
+    await page.goto(`${URL_}/r/${USER}`);
+    await page.waitForSelector(`text=${DS}`, { timeout: 15000 });
+    // The token is still "valid" locally (not expired) but the server no longer accepts it
+    await page.evaluate(origin => localStorage.setItem(`${origin}_jwt_token`, 'revoked'), URL_);
+    await page.evaluate(() => document.querySelector('#app').__vue_app__.config.globalProperties.$router.push('/r'));
+    await page.waitForSelector('input[type=password]', { timeout: 15000 });
+});
+
 test('no uncaught page errors', () => {
     assert.deepEqual(pageErrors, []);
 });

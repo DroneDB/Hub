@@ -1,6 +1,6 @@
 <template>
     <div id="browser" class="cui app">
-        <Message bind-to="error" />
+        <Message v-model="error" />
         <Panel split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%"
                mobile-collapsed>
             <template #first>
@@ -159,7 +159,6 @@
             {{ errorMessage }}
         </Alert>
         <Loader v-if="isBusy" />
-        <Toast position="bottom-left" />
         <ShareEmbed v-if="shareFile" :file="shareFile" @on-close="handleCloseShareEmbed" />
         <FileAvailabilityDialog
             v-if="showAvailabilityDialog"
@@ -250,7 +249,6 @@ import TabSwitcher from '@/components/TabSwitcher.vue';
 import Panel from '@/components/Panel.vue';
 import Alert from '@/components/Alert.vue';
 import Loader from '@/components/Loader.vue';
-import Toast from 'primevue/toast';
 import ShareEmbed from './ShareEmbed.vue';
 const TaskHistory = lazyComponent(() => import(/* webpackChunkName: "dataset-tasks" */ './TaskHistory.vue'), { showLoader: false });
 import FileAvailabilityDialog from './dialogs/FileAvailabilityDialog.vue';
@@ -331,7 +329,6 @@ export default {
         ClipboardPanel,
         Alert,
         Loader,
-        Toast,
         ShareEmbed,
         TaskHistory,
         FileAvailabilityDialog,
@@ -565,7 +562,7 @@ export default {
         };
 
         this._onDownloadLimitReached = (msg) => {
-            this.$toast.add({ severity: 'error', summary: 'Download Limit', detail: msg || 'Download limit reached. Please wait for a download to finish before starting a new one.', life: 5000 });
+            this.$notify.error(msg || 'Download limit reached. Please wait for a download to finish before starting a new one.', { summary: 'Download Limit' });
         };
 
         this._onUploadItems = (msg) => {
@@ -1052,7 +1049,7 @@ export default {
         },
 
         handleTextEditorSaved: function(path) {
-            this.$toast.add({ severity: 'success', summary: 'File Saved', detail: `File saved: ${path}`, life: 3000 });
+            this.$notify.success(`File saved: ${path}`, { summary: 'File Saved' });
         },
 
         showFileNotAvailableDialog: function(availability, node) {
@@ -1073,7 +1070,7 @@ export default {
 
         handleBuildCompleted: function(entry) {
             this.showAvailabilityDialog = false;
-            this.$toast.add({ severity: 'success', summary: 'Build Completed', detail: `Build completed for ${entry.path}. Opening viewer...`, life: 3000 });
+            this.$notify.success(`Build completed for ${entry.path}. Opening viewer...`, { summary: 'Build Completed' });
 
             // Automatically open the viewer
             setTimeout(() => {
@@ -1156,11 +1153,7 @@ export default {
 
             // Block any download trigger while a bulk-download task is active.
             if (this.activeBulkDownload) {
-                this.$toast.add({
-                    severity: 'warn', summary: 'Download in progress',
-                    detail: 'A download archive is already being prepared. Please wait for it to complete.',
-                    life: 5000
-                });
+                this.$notify.warn('A download archive is already being prepared. Please wait for it to complete.', { summary: 'Download in progress' });
                 return;
             }
 
@@ -1184,7 +1177,7 @@ export default {
                 await this.dataset.downloadWithCheck(paths);
             } catch (e) {
                 if (e.status === 429) {
-                    this.$toast.add({ severity: 'error', summary: 'Download Limit', detail: 'Download limit reached. Please wait for a download to finish before starting a new one.', life: 5000 });
+                    this.$notify.error('Download limit reached. Please wait for a download to finish before starting a new one.', { summary: 'Download Limit' });
                 } else {
                     this.showError(e.message || e, "Download Error");
                 }
@@ -1201,12 +1194,7 @@ export default {
             // Async double-check: isFileBuilt does a HEAD request if cache is stale
             const built = await isFileBuilt(this.dataset, file);
             if (!built) {
-                this.$toast.add({
-                    severity: 'warn',
-                    summary: 'Not available',
-                    detail: 'This file has not been built yet. Run Build first.',
-                    life: 4000
-                });
+                this.$notify.warn('This file has not been built yet. Run Build first.', { summary: 'Not available' });
                 return;
             }
 
@@ -1219,12 +1207,7 @@ export default {
 
             const checkResp = await fetch(url, { headers });
             if (checkResp.status === 429) {
-                this.$toast.add({
-                    severity: 'error',
-                    summary: 'Download Limit',
-                    detail: 'Download limit reached. Please wait for a download to finish before starting a new one.',
-                    life: 5000
-                });
+                this.$notify.error('Download limit reached. Please wait for a download to finish before starting a new one.', { summary: 'Download Limit' });
                 return;
             }
 
@@ -1259,11 +1242,7 @@ export default {
                 if (paths && paths.length) params.paths = paths;
 
                 // Inform the user upfront: ZIP creation runs as a background task.
-                this.$toast.add({
-                    severity: 'info', summary: 'Preparing archive',
-                    detail: 'Archive creation started. Open the Tasks tab to download it when ready.',
-                    life: 6000
-                });
+                this.$notify.info('Archive creation started. Open the Tasks tab to download it when ready.', { summary: 'Preparing archive', life: 'long' });
 
                 const result = await this.runHeavyTask(this.dataset, 'bulk-download', { params, notify: false });
 
