@@ -1,5 +1,5 @@
 <template>
-    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @on-close="close">
+    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @close="close">
         <div class="map-settings-content">
             <div class="setting-row">
                 <label class="setting-label align-items-baseline">
@@ -63,7 +63,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
@@ -95,7 +94,7 @@ export default {
             default: () => null
         }
     },
-    emits: ['onClose', 'basemapChanged', 'unitsChanged', 'customBasemapConfigChanged'],
+    emits: ['close', 'basemapChanged', 'unitsChanged', 'customBasemapConfigChanged'],
 
     data: function () {
         const config = this.customBasemapConfig;
@@ -154,17 +153,11 @@ export default {
         }
     },
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
 
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
 
     methods: {
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         onBasemapChange: function (value) {
@@ -325,10 +318,6 @@ export default {
                 this.customLoading = false;
                 this.customError = 'Failed to load tiles. Please check the URL and try again.';
             }
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Escape') this.close();
         }
     }
 }

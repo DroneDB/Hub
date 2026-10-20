@@ -1,5 +1,5 @@
 <template>
-    <Window id="remove" title="Confirm delete" modal max-width="70%" fixed-size @on-close="close('close')">
+    <Window id="remove" title="Confirm delete" modal max-width="70%" fixed-size @close="close('close')">
 
         <div class="mb-3">Are you sure you want to delete the organization '{{ orgSlug }}'?</div>
 
@@ -28,7 +28,7 @@ export default {
     props: {
         orgSlug: { type: String, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -37,7 +37,7 @@ export default {
     },
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         }
     }
 }

@@ -1,5 +1,5 @@
 <template>
-    <Window id="createOrganizationDialog" title="Create Organization" modal max-width="40%" fixed-size @on-close="close">
+    <Window id="createOrganizationDialog" title="Create Organization" modal max-width="40%" fixed-size @close="close">
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
@@ -48,7 +48,7 @@ export default {
     components: {
         Window, Message, Button, InputText, Textarea
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -93,7 +93,7 @@ export default {
         },
 
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         clearError: function () {
@@ -121,7 +121,7 @@ export default {
 
                 this.$notify.success(`Organization "${this.organizationName}" created successfully`, { summary: 'Organization Created' });
                 this.creating = false;
-                this.$emit('onClose', 'created');
+                this.$emit('close', 'created');
             } catch (e) {
                 this.$notify.error('Failed to create organization: ' + (e.message || 'Unknown error'));
                 this.error = e.message || 'Failed to create organization';

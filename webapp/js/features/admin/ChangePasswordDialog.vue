@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size @on-close="close">
+    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size @close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -59,7 +59,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -73,7 +73,7 @@ export default {
     },
     methods: {
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
         clearError: function () {
             this.error = "";
@@ -100,7 +100,7 @@ export default {
 
                 this.$notify.success(`Password changed successfully for "${this.user.userName}"`, { summary: 'Password Changed' });
                 this.changing = false;
-                this.$emit('onClose', 'updated');
+                this.$emit('close', 'updated');
             } catch (e) {
                 this.$notify.error('Failed to change password: ' + (e.message || 'Unknown error'));
                 this.error = e.message || 'Failed to change password';

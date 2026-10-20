@@ -1,5 +1,5 @@
 <template>
-    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size @on-close="close('close')">
+    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size @close="close('close')">
         <div class="transfer-dialog">
             <form :class="{ error: hasError }" @submit.prevent>
 
@@ -93,7 +93,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         return { later: useTimerGroup() };
@@ -231,7 +231,7 @@ export default {
                 this.statusMessage = "Transfer completed successfully!";
 
                 // Close dialog after a short delay
-                this.later(() => this.$emit('onClose', 'transferred', this.files), 1500);
+                this.later(() => this.$emit('close', 'transferred', this.files), 1500);
 
             } catch (e) {
                 console.error("Transfer error:", e);
@@ -243,7 +243,7 @@ export default {
 
         close: function (buttonId) {
             if (this.isTransferring) return; // Prevent closing during transfer
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         }
     }
 }

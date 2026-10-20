@@ -1,5 +1,5 @@
 <template>
-    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size @on-close="close">
+    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size @close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -69,7 +69,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -97,7 +97,7 @@ export default {
     },
     methods: {
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
         clearError: function () {
             this.error = "";
@@ -147,7 +147,7 @@ export default {
                 const user = await reg.admin.addUser(this.username, this.password, this.roles, this.email);
                 this.$notify.success(`User "${this.username}" created successfully`, { summary: 'User Added' });
                 this.adding = false;
-                this.$emit('onClose', user);
+                this.$emit('close', user);
             } catch (e) {
                 this.$notify.error('Failed to add user: ' + e.message);
                 this.error = e.message;

@@ -1,5 +1,5 @@
 <template>
-    <Window id="measurement-list" title="Measurements" modal fixed-size size-class="dialog-md" @on-close="$emit('onClose')">
+    <Window id="measurement-list" title="Measurements" modal fixed-size size-class="dialog-md" @close="$emit('close')">
         <div class="measurement-list-content">
             <div v-if="measurements.length === 0" class="no-measurements">
                 No measurements on the map.
@@ -95,7 +95,7 @@
                 <i class="fa-solid fa-folder-plus" />
                 New Group
             </button>
-            <Button label="Close" severity="secondary" @click="$emit('onClose')" />
+            <Button label="Close" severity="secondary" @click="$emit('close')" />
         </div>
 
         <!-- Confirm delete measurement -->
@@ -105,7 +105,7 @@
                        confirm-text="Delete"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="handleDeleteConfirm" />
+                       @close="handleDeleteConfirm" />
 
         <!-- Confirm delete group -->
         <ConfirmDialog v-if="deleteGroupConfirmOpen"
@@ -114,7 +114,7 @@
                        confirm-text="Delete"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="handleDeleteGroupConfirm" />
+                       @close="handleDeleteGroupConfirm" />
     </Window>
 </template>
 
@@ -136,7 +136,7 @@ export default {
         }
     },
     emits: [
-        'onClose',
+        'close',
         'deleteMeasurement',
         'editMeasurement',
         'createGroup',

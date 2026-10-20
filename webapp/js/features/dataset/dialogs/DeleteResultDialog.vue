@@ -1,5 +1,5 @@
 <template>
-    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size @on-close="close">
+    <Window id="delete-results" title="Delete Results" modal size-class="dialog-lg" fixed-size @close="close" @confirm="close">
         <div class="delete-results-content">
             <!-- Success section -->
             <div v-if="deleted.length > 0" class="result-section success-section">
@@ -32,7 +32,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
@@ -51,23 +50,11 @@ export default {
             default: () => ({})
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
     methods: {
         close: function () {
-            this.$emit('onClose');
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Enter' || e.key === 'Escape') {
-                this.close();
-            }
+            this.$emit('close');
         }
     }
 }

@@ -1,5 +1,5 @@
 <template>
-    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('close')">
+    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size @close="close('close')">
         <div class="ds-dialog">
             <form class="me-2" :class="{ error: !isValid() }" @submit.prevent>
                 <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
@@ -82,7 +82,7 @@ export default {
             required: false
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -122,7 +122,7 @@ export default {
             if (buttonId === 'create') {
                 saveOpenAfterCreatePreference(this.openAfterCreate);
             }
-            this.$emit('onClose', buttonId, {
+            this.$emit('close', buttonId, {
                 name: this.ds.name,
                 visibility: this.ds.visibility,
                 slug: this.mode === 'edit' ? this.model.slug : slugFromName(this.ds.name),

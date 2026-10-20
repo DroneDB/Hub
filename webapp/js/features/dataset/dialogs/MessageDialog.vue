@@ -1,5 +1,5 @@
 <template>
-    <Window id="info" title="Information" modal max-width="70%" fixed-size @on-close="close('close')">
+    <Window id="info" title="Information" modal max-width="70%" fixed-size @close="close('close')">
 
         {{ message }}
 
@@ -23,7 +23,7 @@ export default {
     props: {
         message: { type: String, default: '' }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -32,7 +32,7 @@ export default {
     },
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         }
     }
 }

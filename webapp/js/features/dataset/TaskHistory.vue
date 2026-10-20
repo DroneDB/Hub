@@ -172,14 +172,14 @@
                        :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`"
                        confirm-text="Clear" cancel-text="Cancel" confirm-button-class="danger"
                        warning-title="Warning" warning-message="This action cannot be undone. Any task results still available for download will be deleted."
-                       @on-close="handleClearDialogClose" />
+                       @close="handleClearDialogClose" />
 
         <!-- Invalid path error (#5) -->
         <ConfirmDialog v-if="errorDialogOpen"
                        title="Invalid path"
                        :message="errorDialogMessage"
                        confirm-text="OK" cancel-text="Close" confirm-button-class="primary"
-                       @on-close="errorDialogOpen = false" />
+                       @close="errorDialogOpen = false" />
 
         <!-- Unreachable node confirmation before starting (#6) -->
         <ConfirmDialog v-if="unreachableConfirmOpen"
@@ -187,14 +187,14 @@
                        :message="`The selected processing node did not respond${nodeStatus && nodeStatus.errorMessage ? ` (${nodeStatus.errorMessage})` : ''}.<br/>Do you want to start the task anyway?`"
                        confirm-text="Start anyway" cancel-text="Cancel" confirm-button-class="primary"
                        warning-title="Warning" warning-message="The task may fail immediately if the node is offline."
-                       @on-close="handleUnreachableConfirmClose" />
+                       @close="handleUnreachableConfirmClose" />
 
         <!-- Cancel task confirmation -->
         <ConfirmDialog v-if="cancelDialogOpen"
                        title="Cancel Task"
                        :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, tools)}</strong>${cancellingTask.path ? ' (path: ' + cancellingTask.path + ')' : ''} will be stopped.`"
                        confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
-                       @on-close="handleCancelDialogClose" />
+                       @close="handleCancelDialogClose" />
 
         <!-- Delete task confirmation -->
         <ConfirmDialog v-if="deleteDialogOpen"
@@ -203,17 +203,17 @@
                        confirm-text="Delete" cancel-text="Cancel" confirm-button-class="danger"
                        warning-title="Warning"
                        warning-message="This action cannot be undone. Any task results still available for download will be deleted."
-                       @on-close="handleDeleteDialogClose" />
+                       @close="handleDeleteDialogClose" />
 
         <!-- Folder picker for output folder -->
         <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
                       :initial-path="photogrammetryForm.destPath || ''" title="Select output folder"
-                      @on-close="handleOutputFolderPickerClose" />
+                      @close="handleOutputFolderPickerClose" />
 
         <!-- Folder picker for image folder -->
         <FolderPicker v-if="imageFolderPickerOpen" :dataset="dataset" mode="folder"
                       :initial-path="photogrammetryForm.folder || ''" title="Select image folder"
-                      @on-close="handleImageFolderPickerClose" />
+                      @close="handleImageFolderPickerClose" />
     </div>
 </template>
 

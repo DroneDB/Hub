@@ -34,9 +34,9 @@
                            confirm-text="Download"
                            cancel-text="Cancel"
                            confirm-button-class="primary"
-                           @on-close="handleDownloadConfirmClose" />
+                           @close="handleDownloadConfirmClose" />
 
-            <Alert v-if="storageInfoDialogOpen" title="Storage Info" @on-close="handleStorageInfoDialogClose">
+            <Alert v-if="storageInfoDialogOpen" title="Storage Info" @close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
                     <template v-if="storageInfo.used > 0">
                         <ProgressBar :value="storagePercent" :show-value="false"
@@ -84,7 +84,7 @@
             <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" />
         </div>
 
-        <ShareEmbed v-if="shareFile" :file="shareFile" @on-close="handleCloseShareEmbed" />
+        <ShareEmbed v-if="shareFile" :file="shareFile" @close="handleCloseShareEmbed" />
     </div>
 </template>
 

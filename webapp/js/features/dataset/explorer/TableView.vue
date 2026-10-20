@@ -119,6 +119,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { getCurrentInstance } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
+import { useFileSelection } from '@/composables/useFileSelection';
 
 /**
  * TableView - Flat-list table view for dataset files.
@@ -144,7 +145,11 @@ export default {
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
     setup(props) {
         const instance = getCurrentInstance();
-        return useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles });
+        return {
+            ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
+            // Ranges follow the rows as sorted on screen
+            selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path)
+        };
     },
     data: function () {
         const self = this;
@@ -171,7 +176,6 @@ export default {
             contextMenu,
             sortColumn: 'name',
             sortDirection: 'asc',
-            rangeStartIdx: null,
             thumbnailCache: new Map(), // path -> thumbnail URL, or null if unsupported/unavailable
             // Paths whose thumbnail failed to load (e.g. build artifact missing).
             // Component-scoped (cleared on mount / dataset switch) so failures
@@ -363,16 +367,28 @@ export default {
         },
 
         selectAll: function () {
-            this.files.forEach(f => f.selected = true);
+            this.selection.selectAll();
+            this.applySelection();
         },
 
         deselectAll: function () {
-            this.files.forEach(f => f.selected = false);
+            this.selection.clear();
+            this.applySelection();
         },
 
         clearSelection: function () {
-            this.files.forEach(f => f.selected = false);
-            this.rangeStartIdx = null;
+            this.deselectAll();
+        },
+
+        // The explorer items carry the selection (the map and the file grid share them)
+        applySelection: function () {
+            this.files.forEach(f => { f.selected = this.selection.has(f); });
+        },
+
+        select: function (file, mods) {
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(this.sortedFiles.indexOf(file), mods);
+            this.applySelection();
         },
 
         handleOpen: async function (file) {
@@ -386,44 +402,13 @@ export default {
 
         handleSelection: function (evt, file) {
             Keyboard.updateState(evt);
-
-            const idx = this.sortedFiles.indexOf(file);
-
-            if (Keyboard.isShiftPressed() && this.selectedFiles.length > 0 && this.rangeStartIdx !== null) {
-                // Range selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                this.selectRange(this.rangeStartIdx, idx);
-            } else if (Keyboard.isCtrlPressed()) {
-                // Toggle selection
-                file.selected = !file.selected;
-                if (file.selected) this.rangeStartIdx = idx;
-            } else {
-                // Single selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-                this.rangeStartIdx = idx;
-            }
-
-            // Emit selection changed event
+            this.select(file, { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isCtrlPressed() });
             this.$emit('selectionChanged', file);
         },
 
         handleRightClick: function (evt, file) {
             Keyboard.updateState(evt);
-
-            // If right-clicking on an unselected item, select only that item
-            if (!file.selected) {
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-            }
-        },
-
-        selectRange: function (startIdx, endIdx) {
-            const [low, high] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
-
-            for (let i = low; i <= high; i++) {
-                this.sortedFiles[i].selected = true;
-            }
+            this.select(file, { right: true });
         },
 
         sortBy: function(column) {

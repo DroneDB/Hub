@@ -1,5 +1,5 @@
 <template>
-    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size @on-close="close('cancel')">
+    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size @close="close('cancel')" @confirm="close('confirm')">
         <div class="change-units-content">
             <p>
                 Convert <strong>{{ measurementsCount }}</strong> measurement{{ measurementsCount !== 1 ? 's' : '' }}
@@ -18,7 +18,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
@@ -38,7 +37,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -50,22 +49,11 @@ export default {
         }
     },
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
 
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
 
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Enter') this.close('confirm');
-            if (e.key === 'Escape') this.close('cancel');
+            this.$emit('close', buttonId);
         }
     }
 }

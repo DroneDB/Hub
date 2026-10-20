@@ -104,21 +104,21 @@
                 </TabSwitcher>
             </template>
         </Panel>
-        <Properties v-if="showProperties" :files="contextMenuFiles" @on-close="handleCloseProperties" />
-        <SettingsDialog v-if="showSettings" :dataset="dataset" :can-write="canWrite" @on-close="handleSettingsClose"
+        <Properties v-if="showProperties" :files="contextMenuFiles" @close="handleCloseProperties" />
+        <SettingsDialog v-if="showSettings" :dataset="dataset" :can-write="canWrite" @close="handleSettingsClose"
                         @add-markdown="handleAddMarkdown" @rescan-requested="handleRescanRequested" />
         <AddToDatasetDialog v-if="uploadDialogOpen" :path="currentPath" :organization="dataset.org" :dataset="dataset.ds"
-                            :files-to-upload="filesToUpload" :open="true" @on-close="handleAddClose" @import-from-url="handleUploadImportFromUrl" />
-        <DeleteDialog v-if="deleteDialogOpen" :files="contextMenuFiles" @on-close="handleDeleteClose" />
+                            :files-to-upload="filesToUpload" :open="true" @close="handleAddClose" @import-from-url="handleUploadImportFromUrl" />
+        <DeleteDialog v-if="deleteDialogOpen" :files="contextMenuFiles" @close="handleDeleteClose" />
         <DeleteResultDialog v-if="deleteResultDialogOpen"
                             :deleted="deleteResultData.deleted"
                             :failed="deleteResultData.failed"
-                            @on-close="handleDeleteResultClose" />
+                            @close="handleDeleteResultClose" />
         <RescanResultDialog v-if="rescanResultDialogOpen"
                             :result="rescanResultData"
-                            @on-close="handleRescanResultClose" />
+                            @close="handleRescanResultClose" />
         <RescanConfirmDialog v-if="rescanConfirmDialogOpen"
-                             @on-close="handleRescanConfirmClose" />
+                             @close="handleRescanConfirmClose" />
         <BuildConfirmDialog v-if="buildConfirmDialogOpen"
                             @confirm="handleBuildConfirmOk"
                             @cancel="buildConfirmDialogOpen = false" />
@@ -127,24 +127,24 @@
                        message="A dataset cover already exists. Do you want to replace it? This action is irreversible."
                        confirm-text="Replace"
                        confirm-button-class="danger"
-                       @on-close="handleSetCoverClose" />
-        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" :file="fileToRename" :all-entries="fileBrowserFiles" @on-close="handleRenameClose" />
-        <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" :files="mergeMultispectralFiles" :dataset="dataset" @on-close="handleMergeMultispectralClose" />
-        <AlignDialog v-if="alignDialogOpen" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" @on-close="handleAlignClose" />
-        <MaskBordersDialog v-if="maskBordersDialogOpen" :entry="maskBordersDialogEntry" @on-close="handleMaskBordersDialogClose" />
-        <ExtractDialog v-if="extractDialogOpen" :file="extractFile" :dataset="dataset" @on-close="handleExtractClose" />
-        <SetCrsDialog v-if="setCrsDialogOpen" :file="setCrsFile" :dataset="dataset" @on-close="handleSetCrsClose" />
+                       @close="handleSetCoverClose" />
+        <RenameDialog v-if="renameDialogOpen" :busy="isBusy" :file="fileToRename" :all-entries="fileBrowserFiles" @close="handleRenameClose" />
+        <MergeMultispectralDialog v-if="mergeMultispectralDialogOpen" :files="mergeMultispectralFiles" :dataset="dataset" @close="handleMergeMultispectralClose" />
+        <AlignDialog v-if="alignDialogOpen" :source-entry="alignSourceEntry" :dataset="dataset" :all-entries="fileBrowserFiles" @close="handleAlignClose" />
+        <MaskBordersDialog v-if="maskBordersDialogOpen" :entry="maskBordersDialogEntry" @close="handleMaskBordersDialogClose" />
+        <ExtractDialog v-if="extractDialogOpen" :file="extractFile" :dataset="dataset" @close="handleExtractClose" />
+        <SetCrsDialog v-if="setCrsDialogOpen" :file="setCrsFile" :dataset="dataset" @close="handleSetCrsClose" />
         <ImportFromUrlDialog v-if="importUrlDialogOpen" :dataset="dataset"
-                             :initial-url="importUrlInitial" :initial-folder="currentPath || ''" @on-close="handleImportUrlClose" />
+                             :initial-url="importUrlInitial" :initial-folder="currentPath || ''" @close="handleImportUrlClose" />
         <ConfirmDialog v-if="maskBordersConfirmOpen"
                        title="Mask Borders"
                        :message="`The file <strong>${maskBordersOutputPath}</strong> already exists. Do you want to overwrite it?`"
                        confirm-text="Overwrite"
                        confirm-button-class="danger"
-                       @on-close="handleMaskBordersConfirm" />
-        <NewFolderDialog v-if="createFolderDialogOpen" :busy="isBusy" @on-close="handleNewFolderClose" />
+                       @close="handleMaskBordersConfirm" />
+        <NewFolderDialog v-if="createFolderDialogOpen" :busy="isBusy" @close="handleNewFolderClose" />
         <TransferDialog v-if="transferDialogOpen" :files="contextMenuFiles" :source-org="dataset.org"
-                        :source-ds="dataset.ds" @on-close="handleTransferClose" />
+                        :source-ds="dataset.ds" @close="handleTransferClose" />
         <PasteConflictDialog v-if="pasteConflictDialogOpen"
                              :items="pasteConflictData ? pasteConflictData.items : []"
                              @resolve="handlePasteConflictResolve" />
@@ -153,13 +153,13 @@
                            :succeeded="pasteResultData ? pasteResultData.succeeded : []"
                            :failed="pasteResultData ? pasteResultData.failed : {}"
                            :skipped="pasteResultData ? pasteResultData.skipped : []"
-                           @on-close="handlePasteResultClose" />
+                           @close="handlePasteResultClose" />
         <ClipboardPanel v-if="dataset" />
-        <Alert v-if="errorDialogOpen" :title="errorMessageTitle" @on-close="handleErrorDialogClose">
+        <Alert v-if="errorDialogOpen" :title="errorMessageTitle" @close="handleErrorDialogClose">
             {{ errorMessage }}
         </Alert>
         <Loader v-if="isBusy" />
-        <ShareEmbed v-if="shareFile" :file="shareFile" @on-close="handleCloseShareEmbed" />
+        <ShareEmbed v-if="shareFile" :file="shareFile" @close="handleCloseShareEmbed" />
         <FileAvailabilityDialog
             v-if="showAvailabilityDialog"
             :show="showAvailabilityDialog"
@@ -182,7 +182,7 @@
             :dataset="dataset"
             :entry="textEditorEntry"
             :readonly="textEditorReadonly"
-            @on-close="handleTextEditorClose"
+            @close="handleTextEditorClose"
             @saved="handleTextEditorSaved"
         />
         <PdfViewerDialog

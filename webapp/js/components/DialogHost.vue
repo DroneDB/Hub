@@ -1,6 +1,6 @@
 <template>
     <component :is="d.component || components[d.name]" v-for="d in dialogs.stack.value" :key="d.id"
-               v-bind="d.props" @on-close="(...args) => d.finish(args[0])" @close="(...args) => d.finish(args[0])" />
+               v-bind="d.props" @close="(...args) => d.finish(args[0])" />
 </template>
 
 <script setup>

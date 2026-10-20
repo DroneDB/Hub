@@ -1,6 +1,6 @@
 <template>
     <Window id="settings" title="Settings" modal max-width="70%" fixed-size fixed-position close-modal-on-click
-            @on-close="close('close')">
+            @close="close('close')">
         <Message v-model="error" />
 
         <div v-if="loading" class="loading">
@@ -113,7 +113,7 @@ export default {
             default: false
         }
     },
-    emits: ['onClose', 'rescanRequested', 'addMarkdown'],
+    emits: ['close', 'rescanRequested', 'addMarkdown'],
     data: function () {
         return {
             error: "",
@@ -192,7 +192,7 @@ export default {
     },
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         },
         setVisibility: async function () {
             try {

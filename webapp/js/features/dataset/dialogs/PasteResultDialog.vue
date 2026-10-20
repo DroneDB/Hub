@@ -1,5 +1,5 @@
 <template>
-    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size @on-close="close">
+    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size @close="close" @confirm="close">
         <div class="paste-results-content">
             <div v-if="succeeded.length > 0" class="result-section success-section">
                 <h4>
@@ -49,7 +49,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
@@ -61,7 +60,7 @@ export default {
         failed: { type: Object, default: () => ({}) },
         skipped: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     computed: {
         failedCount() { return Object.keys(this.failed).length; },
@@ -70,14 +69,9 @@ export default {
         }
     },
 
-    mounted() { Keyboard.onKeyDown(this.handleKeyDown); },
-    beforeUnmount() { Keyboard.offKeyDown(this.handleKeyDown); },
 
     methods: {
-        close() { this.$emit('onClose'); },
-        handleKeyDown(e) {
-            if (e.key === 'Enter' || e.key === 'Escape') this.close();
-        }
+        close() { this.$emit('close'); }
     }
 };
 </script>

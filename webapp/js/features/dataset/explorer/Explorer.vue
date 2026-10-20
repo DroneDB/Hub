@@ -78,6 +78,7 @@ import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
 import { getCurrentInstance } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
+import { useFileSelection } from '@/composables/useFileSelection';
 
 export default {
     name: 'DatasetExplorer',
@@ -106,7 +107,10 @@ export default {
     emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
     setup(props) {
         const instance = getCurrentInstance();
-        return useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles });
+        return {
+            ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
+            selection: useFileSelection(() => props.files, f => f.path)
+        };
     },
     data: function () {
         const self = this;
@@ -202,8 +206,6 @@ export default {
         }
     },
     mounted: function () {
-        this.rangeStartThumb = null;
-
         // Columns of the virtual grid follow the explorer's width
         if (typeof ResizeObserver !== 'undefined') {
             this._resizeObserver = new ResizeObserver(entries => {
@@ -236,14 +238,21 @@ export default {
             }
         },
         selectAll: function () {
-            this.files.forEach(f => f.selected = true);
+            this.selection.selectAll();
+            this.applySelection();
         },
         deselectAll: function () {
-            this.files.forEach(f => f.selected = false);
+            this.selection.clear();
+            this.applySelection();
         },
         clearSelection: function () {
-            this.files.forEach(f => f.selected = false);
+            this.deselectAll();
             this.$emit('selectionChanged');
+        },
+
+        // The explorer items carry the selection (the map and the file list share them)
+        applySelection: function () {
+            this.files.forEach(f => { f.selected = this.selection.has(f); });
         },
         handleOpen: async function (thumb) {
             const file = thumb.file;
@@ -258,42 +267,11 @@ export default {
         handleSelection: function (thumb, mouseBtn) {
             if (!thumb) return;
             const file = thumb.file;
-
-            if (Keyboard.isShiftPressed() && this.selectedFiles.length > 0 && this.rangeStartThumb) {
-                // Range selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                this.selectRange(this.rangeStartThumb, thumb);
-            } else if (Keyboard.isCtrlPressed()) {
-                // Ctrl+click: toggle selection
-                file.selected = !file.selected;
-                if (file.selected) this.rangeStartThumb = thumb;
-            } else if (mouseBtn === Mouse.RIGHT) {
-                // Right-click: select only if not already selected
-                if (!file.selected) {
-                    this.selectedFiles.forEach(f => f.selected = false);
-                    file.selected = true;
-                    this.rangeStartThumb = thumb;
-                }
-            } else {
-                // Normal click: deselect all, select only this file
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-                this.rangeStartThumb = thumb;
-            }
-
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(this.files.indexOf(file),
+                { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isCtrlPressed(), right: mouseBtn === Mouse.RIGHT });
+            this.applySelection();
             this.$emit('selectionChanged', file);
-        },
-
-        selectRange: function (startThumb, endThumb) {
-            let idxLow = parseInt(startThumb.$el.getAttribute('data-idx'));
-            let idxHigh = parseInt(endThumb.$el.getAttribute('data-idx'));
-
-            if (idxLow > idxHigh) {
-                [idxLow, idxHigh] = [idxHigh, idxLow];
-            }
-
-            // The files are the parent's objects: selection is a flag on each of them
-            this.files.slice(idxLow, idxHigh + 1).forEach(f => { f.selected = true; });
         },
 
         scrollTo: function (file) {

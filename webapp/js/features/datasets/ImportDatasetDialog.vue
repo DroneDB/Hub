@@ -1,5 +1,5 @@
 <template>
-    <Window id="importDatasetDialog" :title="title" modal max-width="70%" fixed-size @on-close="onWindowClose">
+    <Window id="importDatasetDialog" :title="title" modal max-width="70%" fixed-size @close="onWindowClose">
         <div class="import-dialog">
             <!-- Configure + verify -->
             <div v-if="!importing">
@@ -183,7 +183,7 @@ export default {
         orgSlug: { type: String, required: true },
         forbiddenSlugs: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         const { trackHeavyTask } = useHeavyTask();
@@ -441,7 +441,7 @@ export default {
             this.taskId = result.taskId;
 
             // Tell the parent the dataset now exists so it can show it in the list.
-            this.$emit('onClose', 'started', {
+            this.$emit('close', 'started', {
                 slug: result.dsSlug || this.slug,
                 name: this.name,
                 visibility: this.visibility
@@ -453,9 +453,9 @@ export default {
                     notify: false,
                     onProgress: this.onImportProgress
                 });
-                this.$emit('onClose', 'done', { slug: result.dsSlug || this.slug, success: true });
+                this.$emit('close', 'done', { slug: result.dsSlug || this.slug, success: true });
             } catch (e) {
-                this.$emit('onClose', 'done', {
+                this.$emit('close', 'done', {
                     slug: result.dsSlug || this.slug,
                     success: false,
                     error: (e && e.message) || 'Import failed.'
@@ -483,7 +483,7 @@ export default {
         },
 
         emitClose(action) {
-            this.$emit('onClose', action, { slug: this.slug });
+            this.$emit('close', action, { slug: this.slug });
         }
     }
 };

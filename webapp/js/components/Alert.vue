@@ -1,5 +1,5 @@
 <template>
-    <Window id="alert" :title="title" modal max-width="70%" fixed-size @on-close="dismiss('cancel')">
+    <Window id="alert" :title="title" modal max-width="70%" fixed-size @close="dismiss('cancel')">
 
         <slot />
 
@@ -44,7 +44,7 @@ export default {
             required: false
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -53,7 +53,7 @@ export default {
     },
     methods: {
         dismiss: function (buttonId) {
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         }
     }
 }

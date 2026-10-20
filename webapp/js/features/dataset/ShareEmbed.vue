@@ -1,5 +1,5 @@
 <template>
-    <Window id="share-embed" :title="windowTitle" modal fixed-size @on-close="$emit('onClose')">
+    <Window id="share-embed" :title="windowTitle" modal fixed-size @close="$emit('close')">
         <div class="content">
             <Message v-model="error" no-dismiss />
             <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
@@ -88,12 +88,12 @@
             </template>
 
             <div class="d-flex justify-content-end mt-3">
-                <Button severity="secondary" label="Close" @click="$emit('onClose')" />
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
             </div>
         </div>
 
         <OgcUsageHints v-if="hintsOpen && hintsService" :service="hintsService"
-                       :url="primaryHintUrl" @on-close="hintsOpen = false" />
+                       :url="primaryHintUrl" @close="hintsOpen = false" />
     </Window>
 </template>
 
@@ -130,7 +130,7 @@ export default {
         // For folder-level sharing, pass the directory entry as usual - scope is auto-detected.
         file: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
     setup() {
         const { copy, copied } = useCopyText();
         return { copy, copied };

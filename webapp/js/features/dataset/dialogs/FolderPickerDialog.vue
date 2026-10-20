@@ -1,5 +1,5 @@
 <template>
-    <Window id="folderPicker" title="Select Destination Folder" modal max-width="520px" fixed-size @on-close="cancel">
+    <Window id="folderPicker" title="Select Destination Folder" modal max-width="520px" fixed-size @close="cancel">
         <div class="folder-picker">
             <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
                 {{ errorMessage }}
@@ -47,7 +47,7 @@ export default {
         dataset: { type: Object, required: true },
         initialPath: { type: String, default: '' }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data() {
         return {
@@ -139,11 +139,11 @@ export default {
         },
 
         confirm() {
-            this.$emit('onClose', 'select', this.selectedPath || '');
+            this.$emit('close', 'select', this.selectedPath || '');
         },
 
         cancel() {
-            this.$emit('onClose', 'cancel');
+            this.$emit('close', 'cancel');
         }
     }
 };

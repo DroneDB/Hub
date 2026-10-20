@@ -1,5 +1,5 @@
 <template>
-    <Window id="importFromUrlDialog" title="Import from URL" modal max-width="640px" fixed-size @on-close="close('close')">
+    <Window id="importFromUrlDialog" title="Import from URL" modal max-width="640px" fixed-size @close="close('close')">
         <div class="import-url-dialog">
             <form @submit.prevent="importing ? undefined : runImport()">
 
@@ -103,7 +103,7 @@
         </div>
 
         <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initial-path="folder"
-                            @on-close="handleFolderPickerClose" />
+                            @close="handleFolderPickerClose" />
     </Window>
 </template>
 
@@ -120,7 +120,7 @@
  *   4. The dialog polls the task inline (useHeavyTask.trackHeavyTask) so the user
  *      sees progress. The dialog can be closed and the task continues running in
  *      the Tasks tab.
- *   5. On successful completion the parent is notified via onClose('imported') so
+ *   5. On successful completion the parent is notified via close('imported') so
  *      it can refresh the file browser.
  */
 import Window from '@/components/Window.vue';
@@ -146,7 +146,7 @@ export default {
         /** Default destination folder (matches current browser path). */
         initialFolder: { type: String, default: '' }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         const { trackHeavyTask } = useHeavyTask();
@@ -273,7 +273,7 @@ export default {
                 this.importProgress = 100;
                 this.importStatus = 'Done';
                 this.importDone = true;
-                this.$emit('onClose', 'imported', { folder: this.folder.trim() || '' });
+                this.$emit('close', 'imported', { folder: this.folder.trim() || '' });
 
             } catch (e) {
                 this.errorMessage = (e && e.message) ? e.message : String(e);
@@ -305,7 +305,7 @@ export default {
 
         close(id) {
             // Allow closing even while importing (task continues in background).
-            this.$emit('onClose', id || 'close');
+            this.$emit('close', id || 'close');
         }
     }
 };

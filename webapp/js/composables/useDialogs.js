@@ -9,7 +9,7 @@
  *   this.dialogs.open('rename', { path }) ... this.dialogs.close('rename', 'b.jpg');   // named, with a component map on DialogHost
  *
  * A dialog closes (and its promise resolves with the event's first argument) when it
- * emits `onClose` or `close`; the returned promise also has `close(result)`.
+ * emits `close` (Window's contract, HQ-09); the returned promise also has `close(result)`.
  */
 import { shallowRef, markRaw } from 'vue';
 

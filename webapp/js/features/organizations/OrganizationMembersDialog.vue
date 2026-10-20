@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @on-close="close">
+        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @close="close">
             <div class="members-dialog">
                 <!-- Loading state -->
                 <div v-if="loading" class="ui active centered inline loader" />
@@ -96,7 +96,7 @@
                            confirm-text="Remove"
                            cancel-text="Cancel"
                            confirm-button-class="danger"
-                           @on-close="handleRemoveMemberDialogClose" />
+                           @close="handleRemoveMemberDialogClose" />
         </Window>
     </div>
 </template>
@@ -118,7 +118,7 @@ export default {
         orgSlug: { type: String, required: true },
         canManageMembers: { type: Boolean, default: false }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data() {
         return {
@@ -258,7 +258,7 @@ export default {
         formatDate,
 
         close() {
-            this.$emit('onClose');
+            this.$emit('close');
         }
     }
 };

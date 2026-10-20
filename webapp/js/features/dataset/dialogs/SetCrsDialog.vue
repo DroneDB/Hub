@@ -1,5 +1,5 @@
 <template>
-    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size @on-close="close('close')">
+    <Window id="setCrsDialog" title="Set Coordinate System" modal max-width="560px" fixed-size @close="close('close')">
         <div class="set-crs-dialog">
             <form @submit.prevent="apply">
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -60,7 +60,7 @@ export default {
         file: { type: Object, required: true },
         dataset: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data() {
         const crs = this.file.entry?.properties?.vector?.crs;
@@ -111,7 +111,7 @@ export default {
         },
 
         close(action, result) {
-            this.$emit('onClose', action, result);
+            this.$emit('close', action, result);
         }
     }
 };

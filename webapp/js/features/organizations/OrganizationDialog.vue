@@ -1,5 +1,5 @@
 <template>
-    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('close')">
+    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size @close="close('close')">
         <div class="org-dialog">
             <form @submit.prevent>
                 <div class="mb-3">
@@ -45,7 +45,7 @@ export default {
         mode: { type: String, required: true },
         model: { type: Object, default: null }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -90,10 +90,10 @@ export default {
         },
         close: function (buttonId) {
             if (buttonId === 'close') {
-                this.$emit('onClose', 'close');
+                this.$emit('close', 'close');
                 return;
             }
-            this.$emit('onClose', buttonId, {
+            this.$emit('close', buttonId, {
                 name: this.org.name,
                 description: typeof this.org.description === "string" ? this.org.description : "",
                 isPublic: this.org.isPublic,

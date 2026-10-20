@@ -1,5 +1,5 @@
 <template>
-    <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size @on-close="onWindowClose">
+    <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size @close="onWindowClose">
 
         <InputText ref="newFolderInput" v-model="newFolderPath" class="newFolderInput" :invalid="!newFolderPath"
                    :disabled="busy" placeholder="Folder name" @keyup.enter="createFolder" @keyup.esc="close('close')" />
@@ -24,7 +24,7 @@ export default {
     props: {
         busy: { type: Boolean, default: false }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -39,12 +39,12 @@ export default {
         },
         close: function (buttonId) {
             if (this.busy && buttonId !== 'createFolder') return;
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         },
         createFolder: function () {
             if (this.busy) return;
             if (this.newFolderPath) {
-                this.$emit('onClose', "createFolder", this.newFolderPath);
+                this.$emit('close', "createFolder", this.newFolderPath);
             }
         }
     }

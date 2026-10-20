@@ -1,5 +1,5 @@
 <template>
-    <Window id="rescan-confirm" title="Rescan Dataset" modal size-class="dialog-md" fixed-size @on-close="close('cancel')">
+    <Window id="rescan-confirm" title="Rescan Dataset" modal size-class="dialog-md" fixed-size @close="close('cancel')">
         <div class="rescan-confirm-body">
             <PrimeMessage severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                 <strong>Are you sure you want to rescan this dataset?</strong>
@@ -26,7 +26,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
@@ -35,21 +34,11 @@ export default {
     components: {
         Window, Button, PrimeMessage
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Escape') this.close('cancel');
+            this.$emit('close', buttonId);
         }
     }
 }

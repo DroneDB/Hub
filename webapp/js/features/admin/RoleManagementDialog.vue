@@ -1,5 +1,5 @@
 <template>
-    <Window id="roleManagementDialog" title="Role Management" modal max-width="60%" fixed-size @on-close="close">
+    <Window id="roleManagementDialog" title="Role Management" modal max-width="60%" fixed-size @close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -72,7 +72,7 @@
                        confirm-text="Delete Role"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="handleDeleteDialogClose" />
+                       @close="handleDeleteDialogClose" />
     </Window>
 </template>
 
@@ -102,7 +102,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose', 'onRolesChanged'],
+    emits: ['close', 'onRolesChanged'],
 
     data: function () {
         return {
@@ -140,7 +140,7 @@ export default {
         },
 
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         clearError: function () {

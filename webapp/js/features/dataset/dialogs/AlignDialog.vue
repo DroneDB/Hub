@@ -1,5 +1,5 @@
 <template>
-    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @on-close="close">
+    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @close="close">
         <div class="align-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="align-info">
@@ -119,7 +119,7 @@ export default {
         dataset:     { type: Object, required: true },
         allEntries:  { type: Array,  required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
@@ -304,12 +304,12 @@ export default {
 
             // Notify parent to refresh file browser
             if (this.alignTaskState === 'Succeeded') {
-                this.$emit('onClose', 'aligned', { outputPath });
+                this.$emit('close', 'aligned', { outputPath });
             }
         },
 
         close() {
-            this.$emit('onClose', 'close');
+            this.$emit('close', 'close');
         }
     }
 };

@@ -1,5 +1,5 @@
 <template>
-    <Window id="extractDialog" title="Extract Archive" modal max-width="600px" fixed-size @on-close="close('close')">
+    <Window id="extractDialog" title="Extract Archive" modal max-width="600px" fixed-size @close="close('close')">
         <div class="extract-dialog">
             <form @submit.prevent>
 
@@ -64,7 +64,7 @@
 
         <!-- Guided folder browser -->
         <FolderPickerDialog v-if="folderPickerOpen" :dataset="dataset" :initial-path="destPath"
-                            @on-close="handleFolderPickerClose" />
+                            @close="handleFolderPickerClose" />
     </Window>
 </template>
 
@@ -88,7 +88,7 @@ export default {
         file: { type: Object, required: true },
         dataset: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
@@ -251,7 +251,7 @@ export default {
                     }
                 });
 
-                this.$emit('onClose', 'extracted', {
+                this.$emit('close', 'extracted', {
                     destPath: this.destPath || '',
                     deletedArchive: this.deleteArchive,
                     archivePath: sourcePath
@@ -274,7 +274,7 @@ export default {
 
         close(id) {
             if (this.isExtracting) return;
-            this.$emit('onClose', id || 'close');
+            this.$emit('close', id || 'close');
         }
     }
 };

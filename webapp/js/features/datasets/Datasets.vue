@@ -155,20 +155,20 @@
             </div>
         </div>
 
-        <DeleteDatasetDialog v-if="deleteDialogOpen" :ds-slug="currentDsSlug" @on-close="handleDeleteClose" />
-        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @on-close="handleMessageClose" />
+        <DeleteDatasetDialog v-if="deleteDialogOpen" :ds-slug="currentDsSlug" @close="handleDeleteClose" />
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <DatasetDialog v-if="dsDialogOpen" :mode="dsDialogMode" :model="dsDialogModel" :forbidden-slugs="forbiddenSlugs"
-                       @on-close="handleDatasetClose" />
+                       @close="handleDatasetClose" />
 
         <ImportDatasetDialog v-if="importDialogOpen" :org-slug="$route.params.org" :forbidden-slugs="forbiddenSlugs"
-                             @on-close="handleImportClose" />
+                             @close="handleImportClose" />
 
         <OrganizationDialog v-if="orgEditDialogOpen" mode="edit" :model="orgDialogModel"
-                            @on-close="handleOrgDialogClose" />
+                            @close="handleOrgDialogClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="$route.params.org"
                                    :can-manage-members="orgInfo?.permissions?.canManageMembers || false"
-                                   @on-close="closeMembersDialog" />
+                                   @close="closeMembersDialog" />
 
         <!-- Full-screen feedback while a new dataset is being created -->
         <div v-if="creatingDataset" class="ds-overlay-wrapper">

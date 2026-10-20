@@ -1,5 +1,5 @@
 <template>
-    <Window id="organizationsDialog" title="Manage User Organizations" modal size-class="dialog-xl" fixed-size @on-close="close">
+    <Window id="organizationsDialog" title="Manage User Organizations" modal size-class="dialog-xl" fixed-size @close="close">
         <div class="organizations-dialog">
             <!-- Loading state -->
             <div v-if="loading" class="ui active centered inline loader" />
@@ -98,7 +98,7 @@
                        confirm-text="Remove"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="handleRemoveOrgDialogClose" />
+                       @close="handleRemoveOrgDialogClose" />
     </Window>
 </template>
 
@@ -122,7 +122,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data() {
         return {
@@ -265,7 +265,7 @@ export default {
         formatDate,
 
         close() {
-            this.$emit('onClose', this.hasChanges ? 'updated' : null);
+            this.$emit('close', this.hasChanges ? 'updated' : null);
         }
     }
 };

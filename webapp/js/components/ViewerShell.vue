@@ -17,7 +17,7 @@
         </div>
 
         <Window v-if="settingsOpen" :id="settingsId" :title="settingsTitle" fixed-size size-class="dialog-xs"
-                @on-close="settingsOpen = false">
+                @close="settingsOpen = false">
             <div class="viewer-settings">
                 <slot name="settings" />
             </div>

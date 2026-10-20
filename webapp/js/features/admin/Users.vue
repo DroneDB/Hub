@@ -110,16 +110,16 @@
         </div>
 
         <!-- Dialogs -->
-        <AddUserDialog v-if="showAddUserDialog" :available-roles="availableRoles" @on-close="handleCloseAddUser" />
+        <AddUserDialog v-if="showAddUserDialog" :available-roles="availableRoles" @close="handleCloseAddUser" />
         <EditUserDialog v-if="showEditUserDialog" :user="currentUser"
-                        :available-roles="availableRoles" @on-close="handleCloseEditUser" />
+                        :available-roles="availableRoles" @close="handleCloseEditUser" />
         <ChangePasswordDialog v-if="showChangePasswordDialog" :user="currentUser"
-                              @on-close="handleCloseChangePassword" />
+                              @close="handleCloseChangePassword" />
         <OrganizationsDialog v-if="showOrganizationsDialog" :user="currentUser"
-                             @on-close="handleCloseOrganizations" />
+                             @close="handleCloseOrganizations" />
         <RoleManagementDialog v-if="showRoleManagement" :roles="availableRoles"
-                              @on-close="handleCloseRoleManagement" @on-roles-changed="refreshRoles" />
-        <OrganizationManagementDialog v-if="showOrganizationManagement" @on-close="handleCloseOrganizationManagement" />
+                              @close="handleCloseRoleManagement" @on-roles-changed="refreshRoles" />
+        <OrganizationManagementDialog v-if="showOrganizationManagement" @close="handleCloseOrganizationManagement" />
 
         <!-- Delete User Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
@@ -128,7 +128,7 @@
                        confirm-text="Delete"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="handleDeleteDialogClose">
+                       @close="handleDeleteDialogClose">
             <template #extra>
                 <div class="delete-options">
                     <div class="field">
@@ -168,7 +168,7 @@
         </ConfirmDialog>
 
         <!-- Delete Result Dialog -->
-        <Window v-if="showDeleteResultDialog" id="deleteResultDialog" title="User Deleted Successfully" modal max-width="50%" fixed-size @on-close="closeDeleteResultDialog">
+        <Window v-if="showDeleteResultDialog" id="deleteResultDialog" title="User Deleted Successfully" modal max-width="50%" fixed-size @close="closeDeleteResultDialog">
             <p>User <strong>{{ deleteResult && deleteResult.userName }}</strong> has been deleted.</p>
 
             <div v-if="deleteResult" class="delete-result-details">

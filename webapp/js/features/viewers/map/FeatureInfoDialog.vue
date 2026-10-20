@@ -1,5 +1,5 @@
 <template>
-    <Window id="feature-info" :title="title" modal close-modal-on-click max-width="70%" fixed-size @on-close="close('close')">
+    <Window id="feature-info" :title="title" modal close-modal-on-click max-width="70%" fixed-size @close="close('close')">
         <div class="feature-info-content">
             <template v-for="(categoryProps, category) in categorizedProperties" :key="category">
                 <div v-if="categoryProps && Object.keys(categoryProps).length > 0" class="category-section">
@@ -48,7 +48,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -101,7 +101,7 @@ export default {
 
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         },
 
         formatValue: function(value) {

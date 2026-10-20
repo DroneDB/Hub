@@ -36,7 +36,7 @@
                        title="Cancel Task"
                        :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
                        confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
-                       @on-close="handleCancelDialogClose" />
+                       @close="handleCancelDialogClose" />
 
         <!-- Delete task confirmation -->
         <ConfirmDialog v-if="deleteDialogOpen"
@@ -45,7 +45,7 @@
                        confirm-text="Delete" cancel-text="Cancel" confirm-button-class="danger"
                        warning-title="Warning"
                        warning-message="This action cannot be undone. Any task results still available for download will be deleted."
-                       @on-close="handleDeleteDialogClose" />
+                       @close="handleDeleteDialogClose" />
     </div>
 </template>
 

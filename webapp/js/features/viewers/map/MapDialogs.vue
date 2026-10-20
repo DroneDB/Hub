@@ -1,6 +1,6 @@
 <template>
     <div>
-        <Alert v-if="alertDialogOpen" :title="alertTitle" @on-close="$emit('alertClose')">
+        <Alert v-if="alertDialogOpen" :title="alertTitle" @close="$emit('alertClose')">
             {{ alertMessage }}
         </Alert>
         <ConfirmDialog v-if="clearMeasurementsDialogOpen"
@@ -9,14 +9,14 @@
                        confirm-text="Clear"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="$emit('clearMeasurementsClose', $event)" />
+                       @close="$emit('clearMeasurementsClose', $event)" />
         <ConfirmDialog v-if="deleteSavedMeasurementsDialogOpen"
                        title="Delete Saved Measurements"
                        message="Are you sure you want to delete saved measurements?"
                        confirm-text="Delete"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="$emit('deleteSavedMeasurementsClose', $event)" />
+                       @close="$emit('deleteSavedMeasurementsClose', $event)" />
     </div>
 </template>
 

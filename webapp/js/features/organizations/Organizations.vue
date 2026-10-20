@@ -108,14 +108,14 @@
                        :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
         </div>
 
-        <DeleteOrganizationDialog v-if="deleteDialogOpen" :org-slug="currentOrgSlug" @on-close="handleDeleteClose" />
-        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @on-close="handleMessageClose" />
+        <DeleteOrganizationDialog v-if="deleteDialogOpen" :org-slug="currentOrgSlug" @close="handleDeleteClose" />
+        <MessageDialog v-if="messageDialogOpen" :message="currentMessage" @close="handleMessageClose" />
         <OrganizationDialog v-if="orgDialogOpen" :mode="orgDialogMode" :model="orgDialogModel"
-                            @on-close="handleOrganizationClose" />
+                            @close="handleOrganizationClose" />
         <OrganizationMembersDialog v-if="membersDialogOpen"
                                    :org-slug="selectedOrgForMembers.slug"
                                    :can-manage-members="selectedOrgForMembers.permissions?.canManageMembers || false"
-                                   @on-close="closeMembersDialog" />
+                                   @close="closeMembersDialog" />
 
     </div>
 </template>

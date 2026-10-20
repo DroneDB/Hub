@@ -1,6 +1,6 @@
 <template>
     <div class="text-editor-wrapper">
-        <Window id="textEditorDialog" :title="windowTitle" :autofocus="false" modal width="80%" height="80%" @on-close="close">
+        <Window id="textEditorDialog" :title="windowTitle" :autofocus="false" modal width="80%" height="80%" @close="close">
             <div class="text-editor-dialog">
                 <Message v-model="error" />
 
@@ -50,7 +50,7 @@
             confirm-button-class="danger"
             secondary-text="Save and Close"
             secondary-button-class="success"
-            @on-close="handleConfirmClose"
+            @close="handleConfirmClose"
         />
     </div>
 </template>
@@ -61,7 +61,7 @@ import Message from '@/components/Message.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import Keyboard from '@/libs/keyboard';
+import { useListenerBag } from '@/composables/useEventListener';
 import { getLanguageMode, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '@/libs/textFileUtils';
 import { bytesToSize } from '@/libs/utils';
 
@@ -97,8 +97,11 @@ export default {
             default: false
         }
     },
-    emits: ['onClose', 'saved'],
+    emits: ['close', 'saved'],
 
+    setup() {
+        return { listeners: useListenerBag() };
+    },
     data() {
         return {
             loading: true,
@@ -142,12 +145,12 @@ export default {
     },
 
     async mounted() {
-        Keyboard.onKeyDown(this.handleKeyDown);
+        // Ctrl/Cmd+S saves, Shift+Alt+F formats (Escape is the Window's)
+        this.listeners.add(document, 'keydown', this.handleKeyDown);
         await this.loadFile();
     },
 
     beforeUnmount() {
-        Keyboard.offKeyDown(this.handleKeyDown);
         if (this.editor) {
             this.editor.destroy();
             this.editor = null;
@@ -280,7 +283,7 @@ export default {
                 this.showConfirmClose = true;
                 return;
             }
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         async handleConfirmClose(buttonId) {
@@ -289,10 +292,10 @@ export default {
                 // Save and close
                 await this.save();
                 if (!this.error) {
-                    this.$emit('onClose');
+                    this.$emit('close');
                 }
             } else if (buttonId === 'confirm') {
-                this.$emit('onClose');
+                this.$emit('close');
             }
         },
 
@@ -307,11 +310,6 @@ export default {
             if (e.shiftKey && e.altKey && e.key === 'F') {
                 e.preventDefault();
                 this.formatDocument();
-            }
-
-            // Escape to close
-            if (e.key === 'Escape') {
-                this.close();
             }
         },
 

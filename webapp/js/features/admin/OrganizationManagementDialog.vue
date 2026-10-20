@@ -1,5 +1,5 @@
 <template>
-    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size @on-close="close">
+    <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size @close="close">
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
         </div>
@@ -104,7 +104,7 @@
                        confirm-text="Delete Organization"
                        cancel-text="Cancel"
                        confirm-button-class="danger"
-                       @on-close="handleDeleteDialogClose" />
+                       @close="handleDeleteDialogClose" />
     </Window>
 </template>
 
@@ -130,7 +130,7 @@ export default {
         Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
         InputIcon, IconField, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -204,7 +204,7 @@ export default {
         },
 
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         confirmDeleteOrganization: function(org) {

@@ -158,7 +158,7 @@ export default {
         path: { type: String, default: null },
         filesToUpload: { type: Array, default: null }
     },
-    emits: ['onClose', 'onUpload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
+    emits: ['close', 'onUpload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
     data: function () {
         return {
             error: null,
@@ -290,11 +290,11 @@ export default {
         handleCancel() {
             this.queue.cancel();
             this.$emit('update:closable', true);
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         finishUpload() {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         // File picker methods
@@ -322,7 +322,7 @@ export default {
         },
 
         cancelSelection() {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         handleFileInputChange(event) {

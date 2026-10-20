@@ -1,5 +1,5 @@
 <template>
-    <Window id="rescan-results" title="Rescan Results" modal size-class="dialog-lg" fixed-size @on-close="close">
+    <Window id="rescan-results" title="Rescan Results" modal size-class="dialog-lg" fixed-size @close="close" @confirm="close">
         <div class="rescan-results-content">
             <!-- Summary -->
             <div class="summary">
@@ -45,7 +45,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 
@@ -60,7 +59,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     computed: {
         successEntries() {
@@ -71,21 +70,9 @@ export default {
         }
     },
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
     methods: {
         close: function () {
-            this.$emit('onClose');
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Enter' || e.key === 'Escape') {
-                this.close();
-            }
+            this.$emit('close');
         }
     }
 }

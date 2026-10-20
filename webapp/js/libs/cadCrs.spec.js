@@ -80,7 +80,7 @@ describe('SetCrsDialog', () => {
         d.crs = '2193';
         await d.apply();
         expect(d.dataset.setCadCrs).toHaveBeenCalledWith('site/plan.dwg', 'EPSG:2193');
-        expect(d.$emit).toHaveBeenCalledWith('onClose', 'set', { prjPath: 'site/plan.prj' });
+        expect(d.$emit).toHaveBeenCalledWith('close', 'set', { prjPath: 'site/plan.prj' });
     });
 
     it('shows the server\'s error and stays open', async () => {

@@ -86,7 +86,7 @@
             </Card>
         </div>
 
-        <ChangePwdDialog v-if="showChangePwd" @on-close="showChangePwd = false" />
+        <ChangePwdDialog v-if="showChangePwd" @close="showChangePwd = false" />
     </div>
 </template>
 

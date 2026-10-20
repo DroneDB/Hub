@@ -51,7 +51,7 @@
                        confirm-button-class="danger"
                        warning-title="Warning"
                        warning-message="This action cannot be undone."
-                       @on-close="onDeleteDialogClose" />
+                       @close="onDeleteDialogClose" />
     </ViewerShell>
 </template>
 

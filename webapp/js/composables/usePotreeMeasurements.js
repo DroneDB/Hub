@@ -63,7 +63,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
 
     function openDialog(component, props) {
         if (dialog) dialog.close();
-        dialog = dialogs.open(component, { ...props, onOnClose: () => { dialog = null; } });
+        dialog = dialogs.open(component, { ...props, onClose: () => { dialog = null; } });
     }
 
     function editMeasure(measure) {

@@ -1,5 +1,5 @@
 <template>
-    <Window id="rename" title="Rename" modal max-width="70%" fixed-size @on-close="onWindowClose" @show="focusInput">
+    <Window id="rename" title="Rename" modal max-width="70%" fixed-size @close="onWindowClose" @show="focusInput">
 
         <InputText ref="renameInput" v-model="renameText" class="renameInput" :invalid="renameText == null || renameText.length == 0"
                    :disabled="busy" fluid @keyup.enter="rename" @keyup.esc="close('close')" />
@@ -46,7 +46,7 @@ export default {
         busy: { type: Boolean, default: false },
         allEntries: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -81,7 +81,7 @@ export default {
         },
         close: function (buttonId) {
             if (this.busy && buttonId !== 'rename' && buttonId !== 'renameddb') return;
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         },
         onWindowClose: function () {
             if (this.busy) return;
@@ -93,7 +93,7 @@ export default {
 
             // Check file type
             if (this.file.entry.type === ddb.entry.type.DRONEDB) {
-                this.$emit('onClose', "renameddb", this.renameText, this.entry);
+                this.$emit('close', "renameddb", this.renameText, this.entry);
                 return;
             }
 
@@ -123,12 +123,12 @@ export default {
                     newPath: newBase + sc.path.substring(oldBase.length)
                 }));
 
-                this.$emit('onClose', "rename", newPath, this.file.entry, { sidecars: sidecarsInfo });
+                this.$emit('close', "rename", newPath, this.file.entry, { sidecars: sidecarsInfo });
                 return;
             }
 
             // Normal emit for files without sidecars or with unchecked checkbox
-            this.$emit('onClose', "rename", newPath, this.file.entry);
+            this.$emit('close', "rename", newPath, this.file.entry);
         }
     }
 }

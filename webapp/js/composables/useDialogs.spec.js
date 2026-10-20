@@ -10,7 +10,7 @@ const Echo = defineComponent({
     setup(props, { emit }) {
         return () => h('div', { class: 'echo' }, [
             h('button', { class: 'save', onClick: () => emit('onSave', props.text) }),
-            h('button', { class: 'close', onClick: () => emit('onClose', 'done') })
+            h('button', { class: 'close', onClick: () => emit('close', 'done') })
         ]);
     }
 });

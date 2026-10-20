@@ -1,5 +1,5 @@
 <template>
-    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size @on-close="close">
+    <Window id="editUserDialog" title="Edit User" modal max-width="70%" fixed-size @close="close">
 
         <div v-if="loading" class="loading">
             <i class="fa-solid fa-circle-notch fa-spin" />
@@ -57,7 +57,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -81,7 +81,7 @@ export default {
     },
     methods: {
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
         clearError: function () {
             this.error = "";
@@ -111,7 +111,7 @@ export default {
 
                 this.$notify.success(`User "${this.editUser.userName}" updated successfully`, { summary: 'User Updated' });
                 this.updating = false;
-                this.$emit('onClose', 'updated');
+                this.$emit('close', 'updated');
             } catch (e) {
                 this.$notify.error('Failed to update user: ' + e.message);
                 this.error = e.message;

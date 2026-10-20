@@ -1,5 +1,5 @@
 <template>
-    <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" @on-close="discard">
+    <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" @close="discard">
         <div class="point-annotation-form">
             <div class="mb-3">
                 <label class="d-block mb-1 fw-semibold" for="pa-color">Color</label>
@@ -43,7 +43,7 @@ export default {
             default: ''
         }
     },
-    emits: ['onClose', 'onSave', 'onDiscard'],
+    emits: ['close', 'onSave', 'onDiscard'],
     data() {
         return {
             formData: {
@@ -55,11 +55,11 @@ export default {
     methods: {
         save() {
             this.$emit('onSave', { ...this.formData });
-            this.$emit('onClose');
+            this.$emit('close');
         },
         discard() {
             this.$emit('onDiscard');
-            this.$emit('onClose');
+            this.$emit('close');
         }
     }
 };

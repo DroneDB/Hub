@@ -1,5 +1,5 @@
 <template>
-    <Window id="measurement-group" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @on-close="cancel">
+    <Window id="measurement-group" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel">
         <div class="measurement-group-form">
             <div class="form-group">
                 <label for="mg-name">Group Name</label>
@@ -32,7 +32,7 @@ export default {
             default: null
         }
     },
-    emits: ['onClose', 'onSave'],
+    emits: ['close', 'onSave'],
     data() {
         return {
             formName: this.group ? this.group.name : '',
@@ -60,10 +60,10 @@ export default {
             const name = this.formName.trim();
             if (!name) return;
             this.$emit('onSave', { name, color: this.formColor });
-            this.$emit('onClose');
+            this.$emit('close');
         },
         cancel() {
-            this.$emit('onClose');
+            this.$emit('close');
         }
     }
 };

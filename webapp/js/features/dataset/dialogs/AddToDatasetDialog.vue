@@ -1,8 +1,8 @@
 <template>
-    <Window id="addToDataset" :title="dialogTitle" modal :closable="closable" :fixed-size="true" @on-close="close">
+    <Window id="addToDataset" :title="dialogTitle" modal :closable="closable" :fixed-size="true" @close="close">
         <DatasetUpload :organization="organization" :dataset="dataset" :path="path"
                        :files-to-upload="filesToUpload" @on-upload="onUploaded" @done="done"
-                       @update:closable="updateClosable" @on-close="close"
+                       @update:closable="updateClosable" @close="close"
                        @update:waiting-for-files="updateWaitingForFiles"
                        @import-from-url="$emit('importFromUrl')" />
     </Window>
@@ -24,7 +24,7 @@ export default {
         path: { type: String, default: null },
         filesToUpload: { type: Array, default: null }
     },
-    emits: ['onClose', 'importFromUrl'],
+    emits: ['close', 'importFromUrl'],
 
     data: function () {
         return {
@@ -42,7 +42,7 @@ export default {
     },
     methods: {
         close: function (uploadSuccess) {
-            this.$emit('onClose', this.uploaded, uploadSuccess);
+            this.$emit('close', this.uploaded, uploadSuccess);
         },
         onUploaded: function (file) {
             this.uploaded.push(file);

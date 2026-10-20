@@ -1,5 +1,5 @@
 <template>
-    <Window id="merge-multispectral" title="Merge Multispectral Bands" modal width="900px" height="auto" fixed-position @on-close="close">
+    <Window id="merge-multispectral" title="Merge Multispectral Bands" modal width="900px" height="auto" fixed-position @close="close">
         <div class="merge-ms-dialog">
             <!-- 3-column layout -->
             <div class="columns-row">
@@ -124,7 +124,7 @@ export default {
         files: { type: Array, required: true },
         dataset: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
@@ -335,7 +335,7 @@ export default {
                 });
 
                 const sourceNames = paths.map(p => pathutils.basename(p));
-                this.$emit('onClose', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
+                this.$emit('close', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
             } catch (e) {
                 this.validationResult = { ok: false, errors: [e.message || 'Merge failed'], warnings: [] };
             }
@@ -345,7 +345,7 @@ export default {
             if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(this.previewUrl);
             }
-            this.$emit('onClose', 'close');
+            this.$emit('close', 'close');
         }
     }
 };

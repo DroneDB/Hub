@@ -1,5 +1,5 @@
 <template>
-    <Window id="build-confirm" title="Rebuild File" modal size-class="dialog-md" fixed-size @on-close="close('cancel')">
+    <Window id="build-confirm" title="Rebuild File" modal size-class="dialog-md" fixed-size @close="close('cancel')">
         <div class="build-confirm-body">
             <PrimeMessage severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                 <strong>This file is already ready for visualization.</strong>
@@ -24,7 +24,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
@@ -35,12 +34,6 @@ export default {
     },
     emits: ['confirm', 'cancel'],
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
     methods: {
         close: function (buttonId) {
             if (buttonId === 'confirm') {
@@ -48,10 +41,6 @@ export default {
             } else {
                 this.$emit('cancel');
             }
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Escape') this.close('cancel');
         }
     }
 }

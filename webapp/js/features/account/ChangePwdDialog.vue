@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size @on-close="close">
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size @close="close">
         <div class="dialog">
             <form @submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
@@ -53,7 +53,7 @@ export default {
     props: {
 
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     setup() {
         return { later: useTimerGroup() };
@@ -77,7 +77,7 @@ export default {
     },
     methods: {
         close: function () {
-            this.$emit('onClose');
+            this.$emit('close');
         },
         clearError: function () {
             this.error = "";

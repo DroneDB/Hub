@@ -1,5 +1,5 @@
 <template>
-    <Window id="mask-borders-dialog" title="Mask Borders" modal width="600px" height="auto" fixed-position @on-close="close('cancel')">
+    <Window id="mask-borders-dialog" title="Mask Borders" modal width="600px" height="auto" fixed-position @close="close('cancel')">
         <div class="mask-borders-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-3">
@@ -38,7 +38,7 @@ import PrimeMessage from 'primevue/message';
  * operation on a single GeoTIFF.
  *
  * Explains what the operation does, links to the Border Masking documentation,
- * and emits 'onClose' with 'confirm' or 'cancel'. The actual check/existence
+ * and emits 'close' with 'confirm' or 'cancel'. The actual check/existence
  * and job start are handled by the parent after confirmation.
  *
  * Props:
@@ -51,11 +51,11 @@ export default {
     props: {
         entry: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     methods: {
         close(action) {
-            this.$emit('onClose', action);
+            this.$emit('close', action);
         }
     }
 };

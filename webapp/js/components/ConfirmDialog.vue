@@ -1,5 +1,5 @@
 <template>
-    <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @on-close="close('cancel')">
+    <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @close="close('cancel')" @confirm="close('confirm')">
         <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
         <div v-html="safeMessage" />
 
@@ -21,7 +21,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
@@ -89,7 +88,7 @@ export default {
             default: null
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -99,20 +98,9 @@ export default {
             return sanitizeHtml(this.message);
         }
     },
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
     methods: {
         close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Enter') this.close('confirm');
-            if (e.key === 'Escape') this.close('cancel');
+            this.$emit('close', buttonId);
         }
     }
 }

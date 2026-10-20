@@ -1,6 +1,6 @@
 <template>
     <Window id="properties" height="80%" width="40%" title="Properties"
-            @on-close="$emit('onClose', $event, arguments[1])">
+            @close="$emit('close', $event, arguments[1])">
         <div v-if="files.length === 1" class="text-selectable">
             <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserve-order="true" />
         </div>
@@ -30,7 +30,7 @@ export default {
     props: {
         files: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
     computed: {
         singleFileProperties() {
             if (!this.files || this.files.length !== 1) return null;

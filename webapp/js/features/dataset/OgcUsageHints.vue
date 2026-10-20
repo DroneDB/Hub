@@ -1,5 +1,5 @@
 <template>
-    <Window id="ogc-usage-hints" title="How to use this OGC service" modal fixed-size @on-close="$emit('onClose')">
+    <Window id="ogc-usage-hints" title="How to use this OGC service" modal fixed-size @close="$emit('close')">
         <div class="content">
             <h4 class="mt-0">{{ hints.title }}</h4>
 
@@ -34,7 +34,7 @@
             </div>
 
             <div class="d-flex justify-content-end mt-3">
-                <Button severity="secondary" label="Close" @click="$emit('onClose')" />
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
             </div>
         </div>
     </Window>
@@ -51,7 +51,7 @@ export default {
         service: { type: String, required: true },
         url: { type: String, default: '' }
     },
-    emits: ['onClose'],
+    emits: ['close'],
     computed: {
         hints() {
             return OGC_USAGE_HINTS[this.service] || {

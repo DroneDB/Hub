@@ -47,10 +47,10 @@
                     @clear-measurements-close="handleClearMeasurementsDialogClose"
                     @delete-saved-measurements-close="handleDeleteSavedMeasurementsDialogClose" />
         <ChangeUnitsDialog v-if="changeUnitsDialogOpen" :target-unit="changeUnitsTargetUnit"
-                           :measurements-count="changeUnitsMeasurementsCount" @on-close="handleChangeUnitsDialogClose" />
+                           :measurements-count="changeUnitsMeasurementsCount" @close="handleChangeUnitsDialogClose" />
         <MeasurementListDialog v-if="measurementListDialogOpen" :measurements="measurementListItems"
                                :groups="measurementGroups"
-                               @on-close="measurementListDialogOpen = false"
+                               @close="measurementListDialogOpen = false"
                                @delete-measurement="handleDeleteMeasurementFromList"
                                @edit-measurement="handleEditMeasurementFromList"
                                @create-group="openCreateGroupDialog"
@@ -60,11 +60,11 @@
                                @move-measurement-to-group="moveMeasurementToGroup" />
         <MeasurementGroupDialog v-if="measurementGroupDialogOpen"
                                 :group="pendingGroupForRename"
-                                @on-close="measurementGroupDialogOpen = false"
+                                @close="measurementGroupDialogOpen = false"
                                 @on-save="handleGroupDialogSave" />
         <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selected-basemap="selectedBasemap"
                            :unit-pref="currentUnitPref" :custom-basemap-config="customBasemapConfig"
-                           @on-close="mapSettingsDialogOpen = false" @basemap-changed="handleBasemapChanged"
+                           @close="mapSettingsDialogOpen = false" @basemap-changed="handleBasemapChanged"
                            @units-changed="handleUnitsChanged" @custom-basemap-config-changed="handleCustomBasemapConfigChanged" />
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
         <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :display-options="!standalone"

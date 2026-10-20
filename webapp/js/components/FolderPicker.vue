@@ -1,5 +1,5 @@
 <template>
-    <Window id="folderPicker" :title="title" modal fixed-size max-width="80%" @on-close="handleClose">
+    <Window id="folderPicker" :title="title" modal fixed-size max-width="80%" @close="handleClose">
         <div v-if="currentPath" class="folder-picker-breadcrumb mt-3 ms-3">
             <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems">
                 <template #item="{ item }">
@@ -110,7 +110,7 @@
                        title="Folder does not exist"
                        :message="createFolderMessage"
                        confirm-text="Create" cancel-text="Cancel" confirm-button-class="primary"
-                       @on-close="handleCreateConfirmClose" />
+                       @close="handleCreateConfirmClose" />
     </Window>
 </template>
 
@@ -143,11 +143,11 @@ const { pathutils, entry } = ddb;
  *   title       - Dialog title (default: 'Select folder').
  *
  * Emits:
- *   onClose - Emitted on confirm with { path, entry } or on cancel with null.
+ *   close - Emitted on confirm with { path, entry } or on cancel with null.
  *
  * Usage example:
  *   <FolderPicker v-if="pickerOpen" :dataset="dataset" mode="folder"
- *     :initialPath="currentPath" @onClose="handlePickerClose" />
+ *     :initialPath="currentPath" @close="handlePickerClose" />
  */
 export default {
     components: {
@@ -174,7 +174,7 @@ export default {
         }
     },
 
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -422,7 +422,7 @@ export default {
         },
 
         emitConfirm: function (path) {
-            this.$emit('onClose', { path: this.normalizePath(path), entry: null });
+            this.$emit('close', { path: this.normalizePath(path), entry: null });
         },
 
         canSelect: function (file) {
@@ -484,12 +484,12 @@ export default {
 
         close: function (action) {
             if (action === 'confirm' && this.selectedFile && this.canSelect(this.selectedFile)) {
-                this.$emit('onClose', {
+                this.$emit('close', {
                     path: this.selectedFile.entry.path,
                     entry: this.selectedFile.entry
                 });
             } else {
-                this.$emit('onClose', null);
+                this.$emit('close', null);
             }
         },
 

@@ -1,5 +1,5 @@
 <template>
-    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @on-close="cancel">
+    <Window id="measurement-properties" :title="dialogTitle" modal fixed-size size-class="dialog-sm" @close="cancel">
         <div class="measurement-properties-form">
             <div class="form-group">
                 <label for="mp-name">Name</label>
@@ -109,7 +109,7 @@ export default {
             default: () => []
         }
     },
-    emits: ['onClose', 'onSave', 'onDelete'],
+    emits: ['close', 'onSave', 'onDelete'],
     setup() {
         const { copy: copyText, copied: coordsCopied } = useCopyText({ resetMs: 1500 });
         return { copyText, coordsCopied };
@@ -184,14 +184,14 @@ export default {
     methods: {
         save() {
             this.$emit('onSave', { ...this.formData });
-            this.$emit('onClose');
+            this.$emit('close');
         },
         deleteMeasurement() {
             this.$emit('onDelete');
-            this.$emit('onClose');
+            this.$emit('close');
         },
         cancel() {
-            this.$emit('onClose');
+            this.$emit('close');
         },
         copyCoordinates() {
             const text = this.coordsText;

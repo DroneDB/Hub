@@ -1008,7 +1008,7 @@ class MeasureControls extends Control {
                     this.updateButtonsVisibility(this.hasMeasurements(), false);
                 }
             },
-            onOnClose: () => {
+            onClose: () => {
                 this._dialog = null;
             }
         });
@@ -1097,7 +1097,7 @@ class MeasureControls extends Control {
             onOnDelete: () => {
                 this.deleteMeasurement(feature);
             },
-            onOnClose: () => {
+            onClose: () => {
                 this._dialog = null;
             }
         });

@@ -1,5 +1,5 @@
 <template>
-    <Window v-if="show" id="fileAvailabilityDialog" :title="title" modal size-class="dialog-lg" fixed-size @on-close="handleClose">
+    <Window v-if="show" id="fileAvailabilityDialog" :title="title" modal size-class="dialog-lg" fixed-size @close="handleClose">
         <div class="file-availability-dialog">
             <div class="content">
                 <div class="description">

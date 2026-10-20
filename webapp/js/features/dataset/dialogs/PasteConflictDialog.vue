@@ -1,5 +1,5 @@
 <template>
-    <Window id="paste-conflict" title="Paste Conflict" modal size-class="dialog-md" fixed-size @on-close="cancel">
+    <Window id="paste-conflict" title="Paste Conflict" modal size-class="dialog-md" fixed-size @close="cancel">
         <div class="paste-conflict-content">
             <p>
                 <strong>{{ items.length }}</strong> file<span v-if="items.length !== 1">s</span>
@@ -23,7 +23,6 @@
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import ddb from 'ddb';
@@ -39,20 +38,11 @@ export default {
     },
     emits: ['resolve'],
 
-    mounted() {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount() {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
 
     methods: {
         basename(p) { return pathutils.basename(p); },
         cancel() { this.$emit('resolve', 'cancel'); },
-        choose(mode) { this.$emit('resolve', mode); },
-        handleKeyDown(e) {
-            if (e.key === 'Escape') this.cancel();
-        }
+        choose(mode) { this.$emit('resolve', mode); }
     }
 };
 </script>
