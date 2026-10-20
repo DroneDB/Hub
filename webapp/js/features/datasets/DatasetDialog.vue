@@ -77,7 +77,7 @@ export default {
             required: false
         },
         forbiddenSlugs: {
-            default: [],
+            default: () => [],
             type: Array,
             required: false
         }

@@ -66,15 +66,13 @@ const GRID_ROW_HEIGHT = 180;
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
-import Window from '@/components/Window.vue';
 import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
-import { isBuildableFile, hasActiveBuild, buildFile } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild } from '@/libs/build/buildHelpers';
 
 import ddb from 'ddb';
-const { pathutils, utils } = ddb;
+const { pathutils } = ddb;
 
 import { entry } from 'ddb';
 import shell from '@/dynamic/shell';
@@ -83,9 +81,10 @@ import ContextMenu from '@/components/ContextMenu';
 import Breadcrumb from 'primevue/breadcrumb';
 
 export default {
+    name: 'DatasetExplorer',
     mixins: [dragDropMixin],
     components: {
-        Thumbnail, Toolbar, ContextMenu, Window, Breadcrumb, VirtualScroller
+        Thumbnail, Toolbar, ContextMenu, Breadcrumb, VirtualScroller
     },
     // Thumbnails load as they come into view, a few at a time (HUB-03)
     provide: function () {
@@ -310,9 +309,8 @@ export default {
                 [idxLow, idxHigh] = [idxHigh, idxLow];
             }
 
-            for (let i = idxLow; i <= idxHigh; i++) {
-                this.files[i].selected = true;
-            }
+            // The files are the parent's objects: selection is a flag on each of them
+            this.files.slice(idxLow, idxHigh + 1).forEach(f => { f.selected = true; });
         },
 
         scrollTo: function (file) {

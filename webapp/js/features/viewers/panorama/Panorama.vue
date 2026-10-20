@@ -16,6 +16,7 @@ import TabViewLoader from '@/features/viewers/TabViewLoader';
 import { loadResources } from '@/libs/lazy';
 
 export default {
+    name: 'PanoramaViewer',
     components: {
         Message, TabViewLoader
     },

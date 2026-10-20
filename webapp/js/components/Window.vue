@@ -28,6 +28,7 @@ import Dialog from 'primevue/dialog';
  *   closable          - Show the X close button (default: true).
  */
 export default {
+    name: 'HubWindow',
     components: {
         Dialog
     },

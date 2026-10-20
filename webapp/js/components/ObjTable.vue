@@ -143,7 +143,7 @@ export default {
                 // Check if string is a valid URL
                 const url = new URL(str);
                 return url.protocol === 'http:' || url.protocol === 'https:';
-            } catch (e) {
+            } catch {
                 return false;
             }
         }

@@ -45,6 +45,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { xAuthAvailable, getXAuthToken } from '@/libs/api/xauth';
 
 export default {
+    name: 'LoginPage',
     components: {
         Message, Button, InputText, Password, Card, IconField, InputIcon, ProgressSpinner
     },
@@ -73,7 +74,7 @@ export default {
     mounted: async function () {
         if (this.xAuthInProgress) {
             try {
-                let res = await reg.login(null, null, getXAuthToken());
+                await reg.login(null, null, getXAuthToken());
                 await reg.loadFeatures();
                 this.redirectToPrevRoute();
             } catch (e) {

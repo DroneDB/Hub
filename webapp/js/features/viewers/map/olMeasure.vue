@@ -1,6 +1,3 @@
-<template>
-</template>
-
 <script>
 import { rootPath } from '@/dynamic/pathutils';
 import { Control } from 'ol/control';
@@ -8,7 +5,6 @@ import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
 import Modify from 'ol/interaction/Modify';
 import Translate from 'ol/interaction/Translate';
-import { defaults as defaultInteractions } from 'ol/interaction';
 import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
@@ -150,7 +146,7 @@ class MeasureControls extends Control {
         this.source = new VectorSource();
         // lifetime: owner (the control's own measurement source)
         this.source.on('removefeature', (evt) => {
-            try { this.onMeasurementDeleted(evt.feature); } catch (e) { /* noop */ }
+            try { this.onMeasurementDeleted(evt.feature); } catch { /* noop */ }
         });
         this.vector = new VectorLayer({
             source: this.source,
@@ -261,11 +257,11 @@ class MeasureControls extends Control {
             });
         } else {
             if (this._detailDblClickKey) {
-                try { unByKey(this._detailDblClickKey); } catch (e) { /* noop */ }
+                try { unByKey(this._detailDblClickKey); } catch { /* noop */ }
                 this._detailDblClickKey = null;
             }
             if (this._hoverPointerKey) {
-                try { unByKey(this._hoverPointerKey); } catch (e) { /* noop */ }
+                try { unByKey(this._hoverPointerKey); } catch { /* noop */ }
                 this._hoverPointerKey = null;
             }
             this._setHoveredFeature(null);
@@ -283,7 +279,7 @@ class MeasureControls extends Control {
         this._hoveredFeature = feature || null;
         if (previous) {
             previous._hovered = false;
-            try { previous.changed(); } catch (e) { /* noop */ }
+            try { previous.changed(); } catch { /* noop */ }
             // Re-hide the persistent tooltip label that was revealed on hover.
             const prevTip = previous.get && previous.get('measureTooltipElement');
             if (prevTip && prevTip.classList) {
@@ -292,7 +288,7 @@ class MeasureControls extends Control {
         }
         if (feature) {
             feature._hovered = true;
-            try { feature.changed(); } catch (e) { /* noop */ }
+            try { feature.changed(); } catch { /* noop */ }
             // Reveal the persistent tooltip label only for the hovered feature.
             const tip = feature.get && feature.get('measureTooltipElement');
             if (tip && tip.classList) {
@@ -316,8 +312,8 @@ class MeasureControls extends Control {
         if (disabled) {
             this._disableLockCount++;
             if (this._disableLockCount > 1) return; // already suspended
-            try { this.deselectCurrent && this.deselectCurrent(); } catch (e) { /* noop */ }
-            try { if (this.isEditMode && this.disableEditMode) this.disableEditMode(); } catch (e) { /* noop */ }
+            try { this.deselectCurrent && this.deselectCurrent(); } catch { /* noop */ }
+            try { if (this.isEditMode && this.disableEditMode) this.disableEditMode(); } catch { /* noop */ }
         } else {
             if (this._disableLockCount === 0) return;
             this._disableLockCount--;
@@ -456,7 +452,7 @@ class MeasureControls extends Control {
             .map(f => {
                 const type = f.get('measurementType');
                 const name = f.get('name') || f.get('title') || '';
-                let value = '';
+                let value;
                 if (type === 'point') {
                     const coords = f.getGeometry().getCoordinates();
                     const lonLat = toLonLat(coords);
@@ -548,7 +544,6 @@ class MeasureControls extends Control {
     createFeatureStyle(feature) {
         // Default colors
         const defaultStroke = '#ffcc33';
-        const defaultFill = 'rgba(255, 255, 255, 0.2)';
         const defaultStrokeWidth = 2;
 
         // Read GeoJSON style properties from feature
@@ -1499,7 +1494,7 @@ class MeasureControls extends Control {
                         toDelete.forEach((f) => self.deleteMeasurement(f));
 
                         // Remove the transient erase-click point itself.
-                        try { self.source.removeFeature(feat); } catch (e) { /* noop */ }
+                        try { self.source.removeFeature(feat); } catch { /* noop */ }
 
                         // Update button visibility after erase
                         self.updateButtonsVisibility(self.hasMeasurements(), false);

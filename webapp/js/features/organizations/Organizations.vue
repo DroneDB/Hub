@@ -124,7 +124,6 @@
 </template>
 
 <script>
-import Message from '@/components/Message.vue';
 import DeleteOrganizationDialog from './DeleteOrganizationDialog.vue';
 import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
@@ -151,8 +150,9 @@ import Paginator from 'primevue/paginator';
  * for creating, editing, and deleting organizations.
  */
 export default {
+    name: 'OrganizationsPage',
     components: {
-        Message,
+        
         DeleteOrganizationDialog,
         MessageDialog,
         OrganizationDialog,

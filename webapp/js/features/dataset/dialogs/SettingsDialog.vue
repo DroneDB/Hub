@@ -89,8 +89,6 @@
 
 <script>
 import Message from '@/components/Message.vue';
-import mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
 import { Licenses } from '@/libs/licenses';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
@@ -268,7 +266,7 @@ export default {
                 for (const candidate of candidates) {
                     try {
                         await this.dataset.deleteObj(candidate);
-                    } catch (e) {
+                    } catch {
                         // Ignore 404 errors - file doesn't exist
                     }
                 }
@@ -287,7 +285,7 @@ export default {
 
             this.loading = true;
 
-            var entry = null;
+            var entry;
 
             try {
                 switch (document) {

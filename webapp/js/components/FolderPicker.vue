@@ -271,14 +271,10 @@ export default {
                         result = this.getFileType(a).localeCompare(this.getFileType(b));
                         break;
                     case 'size':
-                        const sizeA = a.entry.size || 0;
-                        const sizeB = b.entry.size || 0;
-                        result = sizeA - sizeB;
+                        result = (a.entry.size || 0) - (b.entry.size || 0);
                         break;
                     case 'modified':
-                        const modA = a.entry.mtime || 0;
-                        const modB = b.entry.mtime || 0;
-                        result = modA - modB;
+                        result = (a.entry.mtime || 0) - (b.entry.mtime || 0);
                         break;
                 }
 

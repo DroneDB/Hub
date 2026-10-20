@@ -114,7 +114,7 @@ export function isInternalDrag(evt) {
     try {
         const data = evt.dataTransfer.getData('item');
         return data && data.length > 0;
-    } catch (e) {
+    } catch {
         return false;
     }
 }
@@ -122,7 +122,7 @@ export function isInternalDrag(evt) {
 import emitter from '@/libs/eventBus';
 import { clone } from '@/libs/utils';
 import ddb from 'ddb';
-const { entry: ddbEntry, pathutils } = ddb;
+const { entry: ddbEntry } = ddb;
 
 /**
  * Build a synthetic directory entry representing a destination folder
@@ -345,7 +345,7 @@ export const itemDnDMixin = {
             let sourceItem;
             try {
                 sourceItem = JSON.parse(evt.dataTransfer.getData('item'));
-            } catch (e) {
+            } catch {
                 return;
             }
             if (!sourceItem || !sourceItem.entry) return;
@@ -376,13 +376,13 @@ export const dragDropMixin = {
         };
     },
     methods: {
-        explorerDragEnter(evt) {
+        explorerDragEnter() {
             if (!this.canWrite) return;
             this.dragEnterCount++;
             this.dropping = true;
         },
 
-        explorerDragLeave(evt) {
+        explorerDragLeave() {
             this.dragEnterCount--;
             if (this.dragEnterCount <= 0) {
                 this.dragEnterCount = 0;
@@ -417,7 +417,7 @@ export const dragDropMixin = {
                 let sourceItem;
                 try {
                     sourceItem = JSON.parse(ev.dataTransfer.getData('item'));
-                } catch (e) {
+                } catch {
                     return;
                 }
                 if (!sourceItem || !sourceItem.entry) return;

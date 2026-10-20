@@ -186,7 +186,7 @@ module.exports = {
             __HUB_VERSION__: JSON.stringify(pkg.version),
         }),
         new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
-            resource.request = resource.request.replace(/polyfills\/node\//, `polyfills\/web\/`);
+            resource.request = resource.request.replace(/polyfills\/node\//, `polyfills/web/`);
         }),
         new HtmlWebpackPlugin({
             template: path.join(__dirname, 'webapp/public/index.html'),

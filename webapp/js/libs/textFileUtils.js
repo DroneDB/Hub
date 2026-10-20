@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import ddb from 'ddb';
-import { bytesToSize } from './utils';
 const { pathutils } = ddb;
 
 // Extensions that should open as text by default
@@ -130,12 +129,13 @@ function canFormat(path) {
 function formatContent(content, mode) {
     try {
         switch (mode) {
-            case 'json':
+            case 'json': {
                 const parsed = JSON.parse(content);
                 return {
                     success: true,
                     content: JSON.stringify(parsed, null, 2)
                 };
+            }
             default:
                 return {
                     success: false,

@@ -9,7 +9,7 @@
 
 <script>
 import Message from '@/components/Message';
-import { b64encode, b64decode } from '@/libs/base64';
+import { b64decode } from '@/libs/base64';
 import { setTitle } from '@/libs/utils';
 import reg from '@/libs/api/sharedRegistry';
 import ddb from 'ddb';

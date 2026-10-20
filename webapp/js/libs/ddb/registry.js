@@ -39,7 +39,7 @@ function parseJwt(token) {
             return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
         }).join(''));
         return JSON.parse(jsonPayload);
-    } catch (e) {
+    } catch {
         return null;
     }
 }
@@ -51,7 +51,7 @@ const hasLocalStorage = (() => {
         localStorage.setItem(test, test);
         localStorage.removeItem(test);
         return true;
-    } catch (e) {
+    } catch {
         return false;
     }
 })();
@@ -130,7 +130,7 @@ module.exports = class Registry {
                 // Re-throw API errors
                 throw e;
             } else {
-                throw new Error(`Cannot login: ${e.message}`);
+                throw new Error(`Cannot login: ${e.message}`, { cause: e });
             }
         }
     }
@@ -245,7 +245,7 @@ module.exports = class Registry {
             if (error.status === 401) {
                 // Token is no longer valid, clear credentials
                 this.clearCredentials();
-                throw new Error("logged out");
+                throw new Error("logged out", { cause: error });
             }
             throw error;
         }
@@ -592,7 +592,7 @@ module.exports = class Registry {
             throw new Error("Invalid endpoint: must start with '/'");
         }
         // Validate endpoint for dangerous patterns
-        if (/\.\.[\/\\]/.test(endpoint) || /[\x00-\x1f]/.test(endpoint)) {
+        if (/\.\.[/\\]/.test(endpoint) || [...endpoint].some(c => c.charCodeAt(0) < 0x20)) {
             throw new Error('Invalid endpoint: contains dangerous characters or patterns');
         }
 
@@ -831,7 +831,7 @@ module.exports = class Registry {
                             throwError(errorMessage, status, json);
                         }
                         return json;
-                    } catch (e) {
+                    } catch {
                         // If JSON parsing fails, return as text
                         return text;
                     }

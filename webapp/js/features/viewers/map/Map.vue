@@ -137,23 +137,20 @@
 <script>
 import 'ol/ol.css';
 import { Map, View } from 'ol';
-import { Tile as TileLayer, Vector as VectorLayer, VectorTile as VectorTileLayer, Group as LayerGroup } from 'ol/layer';
-import { Vector as VectorSource, VectorTile as VectorTileSource, Cluster } from 'ol/source';
-import MVT from 'ol/format/MVT';
-import { defaults as defaultControls, Control } from 'ol/control';
+import { Tile as TileLayer, Vector as VectorLayer, Group as LayerGroup } from 'ol/layer';
+import { Vector as VectorSource, Cluster } from 'ol/source';
+import { Control } from 'ol/control';
 import Collection from 'ol/Collection';
-import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent, getCenter as getExtentCenter, buffer as extentBuffer } from 'ol/extent';
+import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
 import { transformExtent, toLonLat } from 'ol/proj';
-import { bbox as bboxStrategy } from 'ol/loadingstrategy';
 
 import Feature from 'ol/Feature';
-import { coordEach, coordAll } from '@turf/meta';
+import { coordAll } from '@turf/meta';
 import bbox from '@turf/bbox';
 import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
 import Polygon from 'ol/geom/Polygon';
 import { fromExtent } from 'ol/geom/Polygon';
-import GeoJSON from 'ol/format/GeoJSON';
 import Overlay from 'ol/Overlay';
 import { unByKey } from 'ol/Observable';
 import { lifecycleListenersMixin } from '@/composables/useEventListener';
@@ -166,8 +163,6 @@ import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles, SOURCE_M
 import olMeasure from './olMeasure';
 import olSelection from './olSelection';
 import olSettings from './olSettings';
-import XYZ from 'ol/source/XYZ';
-import TileWMS from 'ol/source/TileWMS';
 import OpacityControl from './OpacityControl.vue';
 import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
 import PlantHealthPanel from './PlantHealthPanel.vue';
@@ -176,11 +171,10 @@ import ContourOptionsDialog from './ContourOptionsDialog.vue';
 import StockpileVolumePanel from './StockpileVolumePanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import Keyboard from '@/libs/keyboard';
-import Mouse from '@/libs/mouse';
 import { rootPath } from '@/dynamic/pathutils';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently, supportsFullScreen } from '@/libs/utils';
 import { isMobile } from '@/libs/responsive';
-import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
+import { saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { MeasurementStorage } from '@/libs/map/measurementStorage';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
@@ -206,12 +200,12 @@ import mapRasterAnalysis from '@/composables/useRasterAnalysis';
 import mapStockpileVolume from '@/composables/useStockpileVolume';
 import mapContourLines from '@/composables/useContourLines';
 import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
-import emitter from '@/libs/eventBus';
 
 
 export default {
+    name: 'MapViewer',
     components: {
-        Map, olMeasure, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
+        olMeasure, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog
     },
     emits: ['scrollTo', 'openItem'],
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
@@ -1511,8 +1505,7 @@ export default {
         clearLayerGroup: function (layerGroup) {
             let count = layerGroup.getLayers().getLength();
             for (var j = 0; j < count; j++) {
-                let layer = layerGroup.getLayers().pop();
-                layer = {};
+                layerGroup.getLayers().pop();
             }
         },
         setMouseInside: function (flag) {
@@ -2103,7 +2096,7 @@ export default {
                         this.measurementStorage = null;
                         this.hasSavedMeasurements = false;
                     }
-                } catch (e) {
+                } catch {
                     this.currentOrthophotoEntry = null;
                     this.measurementStorage = null;
                     this.hasSavedMeasurements = false;

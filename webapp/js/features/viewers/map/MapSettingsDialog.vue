@@ -184,7 +184,7 @@ export default {
             try {
                 const hostname = new URL(url).hostname;
                 return '&copy; ' + hostname;
-            } catch (e) {
+            } catch {
                 return '';
             }
         },
@@ -290,7 +290,7 @@ export default {
                         } else {
                             reject(new Error('No layers found in WMS capabilities.'));
                         }
-                    } catch (e) {
+                    } catch {
                         reject(new Error('Failed to parse WMS capabilities.'));
                     }
                 };
@@ -388,7 +388,7 @@ export default {
                 this.customLoading = false;
                 this.customError = null;
                 this.$emit('customBasemapConfigChanged', config);
-            } catch (e) {
+            } catch {
                 this.customLoading = false;
                 this.customError = 'Failed to load tiles. Please check the URL and try again.';
             }

@@ -77,7 +77,7 @@ function loadSettings() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (raw) return JSON.parse(raw);
-    } catch (e) {
+    } catch {
         // Ignore parse errors
     }
     return null;
@@ -90,12 +90,13 @@ function saveSettings(ambient, directional, shininess) {
             directionalIntensity: directional,
             shininess: shininess
         }));
-    } catch (e) {
+    } catch {
         // Ignore storage errors
     }
 }
 
 export default {
+    name: 'NexusViewer',
     components: {
         Message, TabViewLoader, Window, Button
     },
@@ -310,7 +311,7 @@ export default {
             this.updateAmbient();
             this.updateDirectional();
             this.updateShininess();
-            try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* ignore */ }
+            try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
         },
     }
 }

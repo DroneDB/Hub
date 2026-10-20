@@ -231,7 +231,7 @@ class BuildManager {
 
     /* ---- readiness helpers ---- */
 
-    async isFileReadyForViewing(dataset, entry, _viewType) {
+    async isFileReadyForViewing(dataset, entry) {
         if (!this.isBuildableType(entry.type)) return true;
         const bs = this.getBuildState(dataset, entry.path);
         if (bs) return bs.currentState === BUILD_STATES.SUCCEEDED;

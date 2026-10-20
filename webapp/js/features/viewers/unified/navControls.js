@@ -189,7 +189,7 @@ export function createTurntableRotate(libs, camera, controls, domElement, getUpA
 
     function disarm() {
         if (state.pointerId !== null && domElement.releasePointerCapture) {
-            try { domElement.releasePointerCapture(state.pointerId); } catch (e) { /* already gone */ }
+            try { domElement.releasePointerCapture(state.pointerId); } catch { /* already gone */ }
         }
         state.pointerId = null;
         state.active = false;
@@ -213,7 +213,7 @@ export function createTurntableRotate(libs, camera, controls, domElement, getUpA
         state.active = true;
         state.started = false;
         if (domElement.setPointerCapture) {
-            try { domElement.setPointerCapture(e.pointerId); } catch (e2) { /* passive */ }
+            try { domElement.setPointerCapture(e.pointerId); } catch { /* passive */ }
         }
     };
 

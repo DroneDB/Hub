@@ -245,7 +245,7 @@ export default {
             }
 
             const sourceItemName = pathutils.basename(sourceItem.entry.path);
-            let destPath = "";
+            let destPath;
 
             if (ddb.entry.isDirectory(destItem.entry)) {
                 destPath = destItem.entry.type === ddb.entry.type.DRONEDB

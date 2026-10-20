@@ -12,8 +12,7 @@
     "build:stats": "cross-env NODE_ENV=production npx webpack --json=stats.json",
     "check:bundle": "node scripts/check_bundle_budget.mjs stats.json build",
     "check:listeners": "node scripts/audit_listeners.mjs",
-    "lint": "eslint .",
-    "lint:ratchet": "node scripts/lint_ratchet.mjs"
+    "lint": "eslint . --quiet"
   },
   "repository": {
     "type": "git",

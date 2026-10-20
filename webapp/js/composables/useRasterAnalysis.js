@@ -284,7 +284,7 @@ export default {
                 // source already, so we have to remove it explicitly here.
                 if (!Array.isArray(coords) || coords.length < 2) {
                     try { this.measureControls.source.removeFeature(feature); }
-                    catch (e) { /* noop */ }
+                    catch { /* noop */ }
                     this.cancelRasterProfileDrawing();
                     return;
                 }
@@ -293,7 +293,7 @@ export default {
                 // export, edit, and erase tools all treat the profile like a
                 // first-class measurement.
                 let lengthM = 0;
-                try { lengthM = olGetLength(geom); } catch (e) { /* noop */ }
+                try { lengthM = olGetLength(geom); } catch { /* noop */ }
                 const lengthLabel = lengthM >= 1000
                     ? `${(lengthM / 1000).toFixed(2)} km`
                     : `${lengthM.toFixed(1)} m`;
@@ -324,7 +324,7 @@ export default {
                 // flag right away so the panel button immediately shows
                 // "Redraw" instead of staying in "Stop drawing" mode.
                 if (this._rasterProfileDraw) {
-                    try { this._rasterProfileDraw.setActive(false); } catch (e) { /* noop */ }
+                    try { this._rasterProfileDraw.setActive(false); } catch { /* noop */ }
                 }
                 this.rasterProfileDrawing = false;
 
@@ -357,9 +357,9 @@ export default {
 
         _stopRasterProfileDrawing() {
             if (this._rasterProfileDraw && this.map) {
-                try { this._rasterProfileDraw.setActive(false); } catch (e) { /* noop */ }
-                try { this._rasterProfileDraw.abortDrawing(); } catch (e) { /* noop */ }
-                try { this.map.removeInteraction(this._rasterProfileDraw); } catch (e) { /* noop */ }
+                try { this._rasterProfileDraw.setActive(false); } catch { /* noop */ }
+                try { this._rasterProfileDraw.abortDrawing(); } catch { /* noop */ }
+                try { this.map.removeInteraction(this._rasterProfileDraw); } catch { /* noop */ }
             }
             this._rasterProfileDraw = null;
             this.rasterProfileDrawing = false;
@@ -369,7 +369,7 @@ export default {
             }
             if (this._rasterProfileToolLockHeld
                 && this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
+                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
                 this._rasterProfileToolLockHeld = false;
             }
         },
@@ -430,7 +430,7 @@ export default {
 
         _tearDownRasterProfileMeasurementWatcher() {
             if (this._rasterProfileSourceRemoveKey) {
-                try { unByKey(this._rasterProfileSourceRemoveKey); } catch (e) { /* noop */ }
+                try { unByKey(this._rasterProfileSourceRemoveKey); } catch { /* noop */ }
                 this._rasterProfileSourceRemoveKey = null;
             }
         },
@@ -441,7 +441,7 @@ export default {
                 if (this.measureControls && typeof this.measureControls.deleteMeasurement === 'function') {
                     this.measureControls.deleteMeasurement(this._currentProfileFeature);
                 }
-            } catch (e) { /* noop */ }
+            } catch { /* noop */ }
             // The removefeature watcher (if installed) will null out
             // _currentProfileFeature; null defensively in case it isn't.
             this._currentProfileFeature = null;
@@ -484,7 +484,7 @@ export default {
         _removeRasterProfileHoverMarker() {
             if (this._rasterProfileHoverFeature && this._rasterProfileHoverSource) {
                 try { this._rasterProfileHoverSource.removeFeature(this._rasterProfileHoverFeature); }
-                catch (e) { /* noop */ }
+                catch { /* noop */ }
             }
             this._rasterProfileHoverFeature = null;
         },
@@ -702,11 +702,11 @@ export default {
             this.rasterInspectValue = null;
             this._rasterInspectErrorLogged = false;
             if (this._rasterInspectMoveKey) {
-                try { unByKey(this._rasterInspectMoveKey); } catch (e) { /* noop */ }
+                try { unByKey(this._rasterInspectMoveKey); } catch { /* noop */ }
             }
             this._rasterInspectMoveKey = null;
             if (this._rasterInspectClickKey) {
-                try { unByKey(this._rasterInspectClickKey); } catch (e) { /* noop */ }
+                try { unByKey(this._rasterInspectClickKey); } catch { /* noop */ }
             }
             this._rasterInspectClickKey = null;
             if (this._rasterInspectKeyHandler) {
@@ -714,12 +714,12 @@ export default {
                 this._rasterInspectKeyHandler = null;
             }
             if (this._rasterInspectTooltipOverlay && this.map) {
-                try { this.map.removeOverlay(this._rasterInspectTooltipOverlay); } catch (e) { /* noop */ }
+                try { this.map.removeOverlay(this._rasterInspectTooltipOverlay); } catch { /* noop */ }
             }
             this._rasterInspectTooltipOverlay = null;
             this._rasterInspectTooltipEl = null;
             if (this._rasterInspectLayer && this.map) {
-                try { this.map.removeLayer(this._rasterInspectLayer); } catch (e) { /* noop */ }
+                try { this.map.removeLayer(this._rasterInspectLayer); } catch { /* noop */ }
             }
             this._rasterInspectLayer = null;
             this._rasterInspectSource = null;

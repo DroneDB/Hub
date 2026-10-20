@@ -23,6 +23,7 @@ import { buildAllProperties, getFileTypeName } from '@/libs/propertiesUtils';
 import { bytesToSize } from '@/libs/utils';
 
 export default {
+    name: 'EntryProperties',
     components: {
         Window, PropsTable, DataTable, Column
     },

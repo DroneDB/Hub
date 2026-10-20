@@ -1,6 +1,3 @@
-<template>
-</template>
-
 <script>
 import { rootPath } from '@/dynamic/pathutils';
 import { Control } from 'ol/control';

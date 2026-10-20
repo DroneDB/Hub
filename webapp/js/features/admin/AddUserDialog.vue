@@ -55,14 +55,13 @@ import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
 import Button from 'primevue/button';
-import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
 
 export default {
     components: {
-        Window, Message, MultiSelect, InputText, Password, Button, PrimeMessage
+        Window, Message, MultiSelect, InputText, Password, Button
     },
     props: {
         availableRoles: {

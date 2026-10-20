@@ -72,7 +72,7 @@ export default {
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
-        close: function (buttonId) {
+        close: function () {
             this.$emit('onClose');
         },
         clearError: function () {

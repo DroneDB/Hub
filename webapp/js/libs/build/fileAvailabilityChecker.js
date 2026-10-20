@@ -118,7 +118,7 @@ class FileAvailabilityChecker {
     /**
      * Checks non-buildable files (panorama, markdown)
      */
-    async checkNonBuildableFile(dataset, entry, viewType) {
+    async checkNonBuildableFile(dataset, entry) {
         // For panoramas and markdown, file is always available if it exists in the entry
         if (entry.hash && entry.path) {
             return {
@@ -303,7 +303,7 @@ class FileAvailabilityChecker {
                 if (await entryObj.dataset.registry.headRequest(url)) return true;
             }
             return false;
-        } catch (error) {
+        } catch {
             return false;
         }
     }

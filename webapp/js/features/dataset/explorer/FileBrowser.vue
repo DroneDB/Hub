@@ -30,7 +30,6 @@
 
 <script>
 import TreeView from './TreeView.vue';
-import TreeNode from './TreeNode.vue';
 import ContextMenu from '@/components/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';

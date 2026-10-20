@@ -107,6 +107,7 @@ import PrimeMessage from 'primevue/message';
 import useHeavyTask from '@/composables/useHeavyTask';
 
 export default {
+    name: 'HubHeader',
     components: {
         Alert,
         ConfirmDialog,
@@ -181,6 +182,7 @@ export default {
                     return dataset.downloadUrl();
                 }
             }
+            return null;
         },
 
         downloadLabel: function () {
@@ -348,7 +350,7 @@ export default {
         this.updateBackToOrgVisibility();
     },
     watch: {
-        $route: function (to, from) {
+        $route: function (to) {
             const { params } = to;
 
             this.showDownload = !!params.ds;
@@ -398,7 +400,7 @@ export default {
                     this.orgInfoCache[org] = orgInfo;
                 }
                 this.showBackToOrg = orgInfo.isPublic || (orgInfo.permissions && orgInfo.permissions.canRead);
-            } catch (e) {
+            } catch {
                 this.showBackToOrg = false;
             }
         },

@@ -187,7 +187,7 @@ export default {
 
             this.deletingRole = this.roleToDelete;
             try {
-                const result = await reg.deleteRole(this.roleToDelete);
+                await reg.deleteRole(this.roleToDelete);
                 // NOTE: DELETE role endpoint returns 204 No Content (empty response)
                 // This is normal and indicates success
 

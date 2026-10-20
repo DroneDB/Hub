@@ -141,7 +141,7 @@ export default {
                         // If not in the shared store yet, fall back to direct API.
                         if (!summary) {
                             try { summary = (await dataset.getTasks({ skip: 0, take: 200 }) || []).find(t => t.taskId === taskId); }
-                            catch(e) { /* ignore */ }
+                            catch { /* ignore */ }
                             if (this._heavyTaskUnmounted) return;
                         }
 
@@ -162,7 +162,7 @@ export default {
                                 logTail = logTail.concat(log.lines).slice(-500);
                             }
                             if (log && typeof log.cursor === 'number') logCursor = log.cursor;
-                        } catch (e) { /* log fetch is best-effort */ }
+                        } catch { /* log fetch is best-effort */ }
                         if (this._heavyTaskUnmounted) return;
 
                         const entry = {
@@ -183,7 +183,7 @@ export default {
                         this._setHeavyTask(taskId, entry);
 
                         if (typeof options.onProgress === 'function') {
-                            try { options.onProgress(entry); } catch (e) { /* ignore */ }
+                            try { options.onProgress(entry); } catch { /* ignore */ }
                         }
 
                         if (TERMINAL_STATES.includes(summary.state)) {
@@ -193,7 +193,7 @@ export default {
                                 const full = await dataset.getTask(taskId);
                                 entry.error = full.error || null;
                                 entry.artifact = full.artifact || null;
-                            } catch(e) { /* best-effort */ }
+                            } catch { /* best-effort */ }
                             if (this._heavyTaskUnmounted) return;
 
                             if (summary.state === 'Succeeded') {

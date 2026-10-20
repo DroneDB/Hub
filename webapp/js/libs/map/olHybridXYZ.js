@@ -7,7 +7,7 @@ import ddb from 'ddb';
 // DDB tiling
 
 function genTileFSLoadFunction(filePath, minZoom, retina) {
-    return (tile, src) => {
+    return (tile) => {
         tile.setState(TileState.LOADING);
         const { tileCoord } = tile;
         let [tz, tx, ty] = tileCoord;
@@ -30,7 +30,7 @@ function genTileFSLoadFunction(filePath, minZoom, retina) {
 function genTileDDBLoadFunction(ddbUri, minZoom, vizParams, retina, hash) {
     const [dataset, path] = ddb.utils.datasetPathFromUri(ddbUri);
 
-    return (tile, src) => {
+    return (tile) => {
         tile.setState(TileState.LOADING);
         const { tileCoord } = tile;
         let [tz, tx, ty] = tileCoord;

@@ -234,7 +234,7 @@ export default {
 
                 // Build bandInfo from validation summary
                 if (this.validationResult.summary) {
-                    this.orderedFiles.forEach((f, i) => {
+                    this.orderedFiles.forEach((f) => {
                         this.bandInfo[f.entry.path] = {
                             dataType: this.validationResult.summary.dataType || 'Unknown'
                         };

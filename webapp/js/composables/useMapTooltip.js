@@ -108,7 +108,7 @@ export default {
             const cleanup = () => {
                 try {
                     dialogApp.unmount();
-                } catch (e) { /* already unmounted */ }
+                } catch { /* already unmounted */ }
                 if (container.parentNode) {
                     document.body.removeChild(container);
                 }

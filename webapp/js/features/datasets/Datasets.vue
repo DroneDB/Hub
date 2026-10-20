@@ -201,11 +201,9 @@ import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
-import Divider from 'primevue/divider';
 import ProgressSpinner from 'primevue/progressspinner';
 import Skeleton from 'primevue/skeleton';
 import Toast from 'primevue/toast';
-import Badge from 'primevue/badge';
 import PrimeContextMenu from 'primevue/contextmenu';
 import reg from '@/libs/api/sharedRegistry';
 import { datasetListQuery } from '@/libs/datasetList';
@@ -216,6 +214,7 @@ import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 
 export default {
+    name: 'DatasetsPage',
     components: {
         Message,
         DeleteDatasetDialog,
@@ -233,11 +232,11 @@ export default {
         InputIcon,
         Paginator,
         Tag,
-        Divider,
+        
         ProgressSpinner,
         Skeleton,
         Toast,
-        Badge,
+        
         PrimeContextMenu
     },
     data: function () {
@@ -443,7 +442,7 @@ export default {
                 this.searchTerm = value;
             }, SEARCH_DELAY_MS);
         },
-        itemsPerPage: function (newValue) {
+        itemsPerPage: function () {
             this.currentPage = 1; // Reset to first page when items per page changes
             this.savePreferences();
         },

@@ -190,6 +190,7 @@ const NAV_KEYS = [
  * optional GPS geolocation for map integration.
  */
 export default {
+    name: 'SplatViewer',
     components: {
         Message, TabViewLoader, Window, Button, CameraManager, Toast
     },
@@ -367,7 +368,7 @@ export default {
                         this.crs = georef && georef.srs ? georef.srs : null;
                     }
                 }
-            } catch (e) {
+            } catch {
                 // Georeferencing is optional; ignore failures.
             }
 
@@ -950,7 +951,7 @@ export default {
         // Press-and-hold handlers for the on-screen overlay buttons (mouse + touch).
         pressDir: function (code, ev) {
             if (ev && ev.pointerId !== undefined && ev.currentTarget && ev.currentTarget.setPointerCapture) {
-                try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+                try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch { /* ignore */ }
             }
             this.activeKeys.add(code);
             if (Object.prototype.hasOwnProperty.call(this.pressed, code)) this.pressed[code] = true;
@@ -992,13 +993,13 @@ export default {
                     this.syncYawPitch();
                 }
             }
-            try { window.localStorage.setItem('ddb.splat.navMode', mode); } catch (e) { /* ignore */ }
+            try { window.localStorage.setItem('ddb.splat.navMode', mode); } catch { /* ignore */ }
         },
 
         // Read the persisted navigation mode (default 'fly') and apply it.
         restoreNavMode: function () {
             let saved = 'fly';
-            try { saved = window.localStorage.getItem('ddb.splat.navMode') || 'fly'; } catch (e) { /* ignore */ }
+            try { saved = window.localStorage.getItem('ddb.splat.navMode') || 'fly'; } catch { /* ignore */ }
             this.setNavMode(saved);
         },
 
@@ -1041,7 +1042,7 @@ export default {
             if (this.showSettings || this.showCameraManager) return;
             const canvas = this.renderer && this.renderer.domElement;
             if (canvas && canvas.setPointerCapture) {
-                try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+                try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
             }
             this.earthPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
             this.onUserInteract();
@@ -1088,7 +1089,7 @@ export default {
             if (!this.earthPointers.has(e.pointerId)) return;
             const canvas = this.renderer && this.renderer.domElement;
             if (canvas && canvas.releasePointerCapture) {
-                try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+                try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
             }
             this.earthPointers.delete(e.pointerId);
             if (this.earthPointers.size === 1) {
@@ -1252,7 +1253,7 @@ export default {
                     if (typeof o.tiltRoll === 'number') this.tiltRoll = o.tiltRoll;
                     if (typeof o.tiltPitch === 'number') this.tiltPitch = o.tiltPitch;
                 }
-            } catch (e) {
+            } catch {
                 // A missing sidecar (404) is the common case: start with no presets.
                 this.cameras = [];
             }

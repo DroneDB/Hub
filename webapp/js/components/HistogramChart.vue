@@ -180,7 +180,7 @@ export default {
             return this.dataMin + (pct / 100) * this.dataRange;
         },
 
-        startDrag(handle, event) {
+        startDrag(handle) {
             this.dragging = handle;
             const onMove = (e) => this.onDragMove(e);
             const onUp = () => {
@@ -193,7 +193,7 @@ export default {
             document.addEventListener('mouseup', onUp);
         },
 
-        startDragTouch(handle, event) {
+        startDragTouch(handle) {
             this.dragging = handle;
             const onMove = (e) => this.onDragMove(e);
             const onEnd = () => {

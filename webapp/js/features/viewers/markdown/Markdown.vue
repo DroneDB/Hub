@@ -28,6 +28,7 @@ import MarkdownIt from 'markdown-it';
 import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
+    name: 'MarkdownViewer',
     components: {
         TabViewLoader, Message, Button
     },

@@ -168,7 +168,6 @@ import Chips from 'primevue/chips';
 import Textarea from 'primevue/textarea';
 import Toast from 'primevue/toast';
 import Tag from 'primevue/tag';
-import { useToast } from 'primevue/usetoast';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by

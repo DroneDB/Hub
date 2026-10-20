@@ -35,6 +35,7 @@ import Divider from 'primevue/divider';
  *   position - Informational alignment hint; no layout effect.
  */
 export default {
+    name: 'HubToolbar',
     components: {
         PvToolbar: Toolbar,
         Button,

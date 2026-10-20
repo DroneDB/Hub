@@ -25,6 +25,7 @@ import { isMobile, isTablet } from '@/libs/responsive';
  *   amount - Initial size of the first pane as a percentage (default: '50%').
  */
 export default {
+    name: 'HubPanel',
     components: {
         Splitter,
         SplitterPanel

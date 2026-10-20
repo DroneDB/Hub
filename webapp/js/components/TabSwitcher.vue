@@ -27,7 +27,7 @@
 
 <script>
 import { clone } from '@/libs/utils';
-import { h, markRaw } from 'vue';
+import { markRaw } from 'vue';
 import Tabs from 'primevue/tabs';
 import TabList from 'primevue/tablist';
 import Tab from 'primevue/tab';

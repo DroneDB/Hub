@@ -135,7 +135,7 @@ const LEGACY_MODES = [
 
 export default {
     components: {
-        Window, Message, Button, Select, InputText, PrimeMessage, Textarea, OgcUsageHints, UrlRow
+        Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow
     },
     props: {
         // Legacy: a file-like object { path, entry }. For dataset-level sharing pass

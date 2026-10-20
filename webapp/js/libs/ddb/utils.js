@@ -35,13 +35,13 @@ module.exports = {
     },
 
     datasetFromUri: function (uri) {
-        const [dataset, _] = this.datasetPathFromUri(uri);
+        const [dataset] = this.datasetPathFromUri(uri);
         return dataset;
     },
 
     pathFromUri: function (uri) {
         if (this.isDDBUri(uri)) {
-            const [_, path] = this.datasetPathFromUri(uri);
+            const [, path] = this.datasetPathFromUri(uri);
             return path;
         } else if (uri.startsWith("file://")) {
             return uri.replace(/^file:\/\//, "");
@@ -49,7 +49,7 @@ module.exports = {
     },
 
     entryFromFile: function (file) {
-        const [dataset, _] = this.datasetPathFromUri(file.path);
+        const [dataset] = this.datasetPathFromUri(file.path);
         return dataset.Entry(file.entry);
     },
 

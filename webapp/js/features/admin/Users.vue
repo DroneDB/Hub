@@ -219,7 +219,6 @@ import OrganizationManagementDialog from './OrganizationManagementDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Toast from 'primevue/toast';
-import Tag from 'primevue/tag';
 import Chip from 'primevue/chip';
 import Select from 'primevue/select';
 import DataTable from 'primevue/datatable';
@@ -238,6 +237,7 @@ import { bytesToSize } from '@/libs/utils';
  * adding, editing, and deleting users, and a per-user role management dialog.
  */
 export default {
+    name: 'UsersPage',
     components: {
         Message,
         Window,
@@ -251,7 +251,7 @@ export default {
         Button,
         PrimeMessage,
         Toast,
-        Tag,
+        
         Chip,
         Select,
         DataTable,
@@ -450,7 +450,7 @@ export default {
             this.currentUser = null;
         },
 
-        handleCloseChangePassword: function (result) {
+        handleCloseChangePassword: function () {
             this.showChangePasswordDialog = false;
             this.currentUser = null;
         },

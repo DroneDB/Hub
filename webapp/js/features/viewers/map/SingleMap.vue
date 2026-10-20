@@ -112,12 +112,8 @@
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import bbox from '@turf/bbox';
-import { Tile as TileLayer, Vector as VectorLayer, VectorTile as VectorTileLayer, Group as LayerGroup } from 'ol/layer';
-import { Vector as VectorSource, VectorTile as VectorTileSource } from 'ol/source';
-import MVT from 'ol/format/MVT';
+import { Tile as TileLayer, Group as LayerGroup } from 'ol/layer';
 import { createEmpty as createEmptyExtent, isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
-import { Circle as CircleStyle, Fill, Stroke, Style, Text } from 'ol/style';
-import { bbox as bboxStrategy } from 'ol/loadingstrategy';
 
 import ddb from 'ddb';
 import HybridXYZ from '@/libs/map/olHybridXYZ';
@@ -158,7 +154,7 @@ import mapAnalysisButtons from '@/composables/useMapAnalysisButtons';
 
 export default {
     components: {
-        Map, TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog, Toast
+        TabViewLoader, OpacityControl, PlantHealthPanel, RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, MapSettingsDialog, MeasurementListDialog, MeasurementGroupDialog, Toast
     },
     mixins: [lifecycleListenersMixin, mapAlertFlash, mapBasemap, mapTooltip, mapMeasurements, mapPlantHealth, mapRasterAnalysis, mapStockpileVolume, mapContourLines, mapAnalysisButtons],
     props: ["uri"],

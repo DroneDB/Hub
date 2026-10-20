@@ -208,5 +208,5 @@ export async function loadStockpile(dataset, rasterPath, excludeIds) {
 export async function deleteStockpile(dataset, rasterPath) {
     const path = getStockpilePath(rasterPath);
     if (!path) return;
-    try { await dataset.deleteObj(path); } catch (e) { /* best-effort */ }
+    try { await dataset.deleteObj(path); } catch { /* best-effort */ }
 }

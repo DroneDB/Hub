@@ -316,7 +316,6 @@ export default {
             selectedTool: '',
             pageSize: 20,
             currentPageFirst: 0,
-            _refreshTimer: null,
             downloadingTaskId: null,
 
             photogrammetryDialogOpen: false,
@@ -341,7 +340,6 @@ export default {
             checkingNode: false,
             nodeStatus: null,
             unreachableConfirmOpen: false,
-            _pendingParams: null,
             availableOdmOptions: [],
             customOptions: [],
             visibilityOptions: [

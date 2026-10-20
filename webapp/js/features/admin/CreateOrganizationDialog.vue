@@ -42,12 +42,11 @@ import Message from '@/components/Message.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
-import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 
 export default {
     components: {
-        Window, Message, Button, InputText, Textarea, PrimeMessage
+        Window, Message, Button, InputText, Textarea
     },
     emits: ['onClose'],
 

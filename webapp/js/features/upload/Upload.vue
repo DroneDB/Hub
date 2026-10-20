@@ -62,6 +62,7 @@ const ONE_FILE_PER_REQUEST = { bundleMaxFiles: 1, chunkedFileBytes: Number.POSIT
  * upload dialog (useUploadQueue).
  */
 export default {
+    name: 'UploadPage',
     components: {
         Message, Button, Card, ProgressBar
     },

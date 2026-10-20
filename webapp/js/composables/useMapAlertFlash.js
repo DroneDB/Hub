@@ -19,7 +19,7 @@ export default {
         handleAlertDialogClose() {
             this.alertDialogOpen = false;
         },
-        showFlash(message, color = 'positive', icon = 'fa-regular fa-circle-check') {
+        showFlash(message, color = 'positive') {
             const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
             this.$toast.add({ severity: severityMap[color] || 'success', summary: message, life: 3000 });
         },

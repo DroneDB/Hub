@@ -11,7 +11,6 @@
 <script>
 import Window from '@/components/Window.vue';
 import DatasetUpload from '@/features/dataset/upload/DatasetUpload.vue';
-import { clone } from '@/libs/utils';
 
 export default {
     components: {

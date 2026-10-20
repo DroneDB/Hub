@@ -111,7 +111,7 @@ async function isFileBuilt(dataset, file) {
         const viewType = file.entry.type === ddb.entry.type.MODEL ? 'model' : 'map';
         const result = await FileAvailabilityChecker.check(dataset, file.entry, viewType);
         return !!(result && result.available && result.status === 'ready');
-    } catch (e) {
+    } catch {
         return false;
     }
 }

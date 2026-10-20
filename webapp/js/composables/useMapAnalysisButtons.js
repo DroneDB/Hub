@@ -16,7 +16,6 @@
  *  - state flags: plantHealthVisible, rasterPanelVisible,
  *    stockpilePanelVisible
  */
-import { Control } from 'ol/control';
 import { isPlantHealthCapable, isRasterAnalysisCapable } from '@/libs/entryTypes';
 
 function makeButton(title, iconClass, onClick, testId = null) {

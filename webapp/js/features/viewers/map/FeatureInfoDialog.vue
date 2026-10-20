@@ -126,7 +126,7 @@ export default {
                     try {
                         const parsed = JSON.parse(value);
                         return typeof parsed === 'object' && parsed !== null;
-                    } catch (e) {
+                    } catch {
                         // Not valid JSON
                         return false;
                     }
@@ -144,7 +144,7 @@ export default {
             if (typeof value === 'string') {
                 try {
                     return JSON.parse(value);
-                } catch (e) {
+                } catch {
                     console.warn('Failed to parse complex value:', value);
                     return value;
                 }

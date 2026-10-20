@@ -424,7 +424,6 @@ export default {
             this._setStockpileCursor('crosshair');
             this._acquireStockpileToolLock();
 
-            const mapProj = this.map.getView().getProjection();
             const draw = new Draw({
                 source: this._stockpileSource,
                 type: 'Polygon',
@@ -461,8 +460,8 @@ export default {
                 this._stockpileDrawTeardownTimer = setTimeout(() => {
                     this._stockpileDrawTeardownTimer = null;
                     if (this.map) {
-                        try { finishedDraw.abortDrawing(); } catch (e) { /* noop */ }
-                        try { this.map.removeInteraction(finishedDraw); } catch (e) { /* noop */ }
+                        try { finishedDraw.abortDrawing(); } catch { /* noop */ }
+                        try { this.map.removeInteraction(finishedDraw); } catch { /* noop */ }
                     }
                     if (this._stockpileEscKey) {
                         window.removeEventListener('keydown', this._stockpileEscKey);
@@ -527,7 +526,7 @@ export default {
             }
             this._teardownStockpileDraw();
             if (this._stockpileClickKey) {
-                try { unByKey(this._stockpileClickKey); } catch (e) { /* noop */ }
+                try { unByKey(this._stockpileClickKey); } catch { /* noop */ }
                 this._stockpileClickKey = null;
             }
             this.stockpileMode = null;
@@ -544,22 +543,22 @@ export default {
         _acquireStockpileToolLock() {
             if (this._stockpileToolLockHeld) return;
             if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(true); } catch (e) { /* noop */ }
+                try { this.measureControls.setToolsDisabled(true); } catch { /* noop */ }
                 this._stockpileToolLockHeld = true;
             }
         },
         _releaseStockpileToolLock() {
             if (!this._stockpileToolLockHeld) return;
             if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
+                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
             }
             this._stockpileToolLockHeld = false;
         },
 
         _teardownStockpileDraw() {
             if (this._stockpileDraw && this.map) {
-                try { this._stockpileDraw.abortDrawing(); } catch (e) { /* noop */ }
-                try { this.map.removeInteraction(this._stockpileDraw); } catch (e) { /* noop */ }
+                try { this._stockpileDraw.abortDrawing(); } catch { /* noop */ }
+                try { this.map.removeInteraction(this._stockpileDraw); } catch { /* noop */ }
             }
             this._stockpileDraw = null;
             if (this._stockpileEscKey) {
@@ -685,8 +684,8 @@ export default {
             if (!feature) return;
             try {
                 this.measureControls.deleteMeasurement(feature);
-            } catch (e) {
-                try { this.measureControls.source.removeFeature(feature); } catch (e) { /* noop */ }
+            } catch {
+                try { this.measureControls.source.removeFeature(feature); } catch { /* noop */ }
             }
             this._draftStockpileFeatureId = null;
         },

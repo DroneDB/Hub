@@ -2,7 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 const { Entry } = require('./entry');
-const Visibility = require('./visibility');
 
 module.exports = class Dataset {
     constructor(registry, org, ds) {
@@ -279,7 +278,7 @@ module.exports = class Dataset {
                     const json = await response.json();
                     errorMessage = json.error || json.message || errorMessage;
                 }
-            } catch (e) {
+            } catch {
                 // Ignore parse errors, use default message
             }
             const err = new Error(errorMessage);

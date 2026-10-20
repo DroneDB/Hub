@@ -59,10 +59,14 @@ export default {
     data() {
         return {
             autoRefresh: true,
-            autoScroll: true,
-            _refreshInterval: null,
-            _wasNearBottom: true  // Track whether user was near bottom before last change
+            autoScroll: true
         };
+    },
+
+    // Instance state, not reactive (Vue does not proxy data keys that start with "_")
+    created() {
+        this._refreshInterval = null;
+        this._wasNearBottom = true; // whether the user was near the bottom before the last change
     },
 
     watch: {

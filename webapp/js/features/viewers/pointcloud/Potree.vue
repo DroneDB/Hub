@@ -107,6 +107,7 @@ import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 
 
 export default {
+    name: 'PotreeViewer',
     components: {
         Message, TabViewLoader, ConfirmDialog, Toast
     },
@@ -990,29 +991,30 @@ export default {
         },
 
         addPointCloud: async function (entry) {
-            return new Promise(async (resolve, reject) => {
-                try {
-                    const copcUrl = await entry.getCopc();
-                    const basename = ddb.pathutils.basename(entry.path);
+            let copcUrl;
+            try {
+                copcUrl = await entry.getCopc();
 
-                    // Load coordinate system
-                    this.coordinateSystem = await this.getCoordinateSystem(copcUrl);
-                    console.log('Coordinate system:', this.coordinateSystem);
+                // Load coordinate system
+                this.coordinateSystem = await this.getCoordinateSystem(copcUrl);
+                console.log('Coordinate system:', this.coordinateSystem);
+            } catch (e) {
+                throw new Error(`${entry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`, { cause: e });
+            }
 
-                    Potree.loadPointCloud(copcUrl, basename, e => {
-                        if (e.type == "loading_failed") {
-                            reject(new Error(`Unable to load ${entry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
-                            return;
-                        }
+            const basename = ddb.pathutils.basename(entry.path);
+            await new Promise((resolve, reject) => {
+                Potree.loadPointCloud(copcUrl, basename, e => {
+                    if (e.type == "loading_failed") {
+                        reject(new Error(`Unable to load ${entry.path}.\n\nThe file may still be processing. Return to the file list to check the build status, or try again in a few minutes.`));
+                        return;
+                    }
 
-                        this.viewer.scene.addPointCloud(e.pointcloud);
-                        e.pointcloud.material.size = 1;
+                    this.viewer.scene.addPointCloud(e.pointcloud);
+                    e.pointcloud.material.size = 1;
 
-                        resolve();
-                    });
-                } catch (e) {
-                    reject(new Error(`${entry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`));
-                }
+                    resolve();
+                });
             });
         },
 
@@ -1190,7 +1192,7 @@ export default {
         /**
          * Show flash message
          */
-        showFlash: function(message, color = 'positive', icon = 'fa-regular fa-circle-check') {
+        showFlash: function(message, color = 'positive') {
             const severityMap = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
             this.$toast.add({ severity: severityMap[color] || 'success', summary: message, life: 3000 });
         },

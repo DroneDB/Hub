@@ -232,7 +232,7 @@ export default {
         let enabled;
         try {
             enabled = await this.org.importSources();
-        } catch (e) {
+        } catch {
             // Fall back to the full catalog if the server does not expose the endpoint.
             enabled = IMPORT_SOURCES.map(s => s.type);
         }

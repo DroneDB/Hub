@@ -102,7 +102,7 @@ export class MeasurementStorage {
             return { path: this.measurementPath, fileName: this._fileName() };
         } catch (error) {
             console.error('Failed to save measurements:', error);
-            throw new Error(`Failed to save measurements: ${error.message}`);
+            throw new Error(`Failed to save measurements: ${error.message}`, { cause: error });
         }
     }
 
@@ -149,7 +149,7 @@ export class MeasurementStorage {
         try {
             await this.dataset.list(this.measurementPath);
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }
@@ -164,7 +164,7 @@ export class MeasurementStorage {
             console.log(`Measurements deleted: ${this.measurementPath}`);
         } catch (error) {
             console.error('Failed to delete measurements:', error);
-            throw new Error(`Failed to delete measurements: ${error.message}`);
+            throw new Error(`Failed to delete measurements: ${error.message}`, { cause: error });
         }
     }
 

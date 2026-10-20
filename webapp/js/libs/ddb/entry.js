@@ -82,7 +82,7 @@ class Entry {
             if (!resp.ok) return null;
             const b = await resp.json();
             if (b && Array.isArray(b.min) && Array.isArray(b.max)) return b;
-        } catch (e) {
+        } catch {
             // bounds are an optimization; ignore failures and fall back to client-side framing.
         }
         return null;

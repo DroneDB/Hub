@@ -124,7 +124,6 @@
 </template>
 
 <script>
-import Message from '@/components/Message.vue';
 import FileUploadRow from './FileUploadRow.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import Button from 'primevue/button';
@@ -147,7 +146,7 @@ const EMPTY_COUNTS = { total: 0, pending: 0, uploading: 0, processing: 0, done: 
  */
 export default {
     components: {
-        Message,
+        
         FileUploadRow,
         VirtualScroller,
         Button

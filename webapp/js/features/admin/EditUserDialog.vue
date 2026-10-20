@@ -41,12 +41,11 @@ import Message from '@/components/Message.vue';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
-import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 
 export default {
     components: {
-        Window, Message, MultiSelect, InputText, Button, PrimeMessage
+        Window, Message, MultiSelect, InputText, Button
     },
     props: {
         user: {

@@ -126,7 +126,7 @@ function loadSettings() {
     try {
         const raw = localStorage.getItem(SETTINGS_KEY);
         if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
-    } catch (e) {
+    } catch {
         // Ignore parse errors and fall back to the defaults.
     }
     return { ...DEFAULTS };
@@ -347,7 +347,7 @@ export default {
             // Offline-first: serve the laz-perf WebAssembly decoder from our own origin (webpack
             // copies it to /wasm/laz-perf.wasm) instead of the public jsDelivr CDN, so COPC point
             // clouds decode in air-gapped / CSP-restricted deployments too.
-            try { lasConfig.setLazPerfPath('/wasm'); } catch (e) { /* falls back to the CDN default */ }
+            try { lasConfig.setLazPerfPath('/wasm'); } catch { /* falls back to the CDN default */ }
 
             return {
                 THREE,
@@ -417,7 +417,7 @@ export default {
                 this._dblClickDispose = null;
             }
             if (this.controls) {
-                try { this.controls.dispose(); } catch (e) { /* ignore */ }
+                try { this.controls.dispose(); } catch { /* ignore */ }
                 this.controls = null;
             }
 
@@ -506,7 +506,7 @@ export default {
                 map.addLayer(basemap);
 
                 this.registerLayer('Basemap (OSM)', 'fa-solid fa-map', () => basemap.visible, v => { basemap.visible = v; });
-            } catch (e) {
+            } catch {
                 // Basemap is optional.
             }
         },
@@ -550,7 +550,7 @@ export default {
                     entity.setActiveAttribute(z.name);
                     entity.setColoringMode('attribute');
                 }
-            } catch (e) {
+            } catch {
                 // Coloring is best-effort; keep the default appearance on failure.
             }
         },
@@ -619,7 +619,7 @@ export default {
         // cloud without CRS.
         loadLocalVector: async function (entry) {
             this.loadingText = "Loading drawing...";
-            const { FeatureCollection, OlVectorSource, OlGeoJSON, Extent, CoordinateSystem, THREE } = this.libs;
+            const { FeatureCollection, OlVectorSource, Extent, CoordinateSystem, THREE } = this.libs;
 
             const features = await this.fetchLocalFeatures(entry);
             if (features.length === 0)
@@ -678,10 +678,10 @@ export default {
 
         loadModel: async function (entry) {
             this.loadingText = "Loading 3D model...";
-            let tilesetUrl = null;
+            let tilesetUrl;
             try {
                 tilesetUrl = await this.dataset.Entry(entry).get3DTiles();
-            } catch (e) {
+            } catch {
                 // A missing artifact (404) can throw here; treat it as "not produced".
                 tilesetUrl = null;
             }
@@ -731,10 +731,10 @@ export default {
         loadTiles3D: async function (entry) {
             this.loadingText = "Loading 3D Tiles...";
 
-            let tilesetUrl = null;
+            let tilesetUrl;
             try {
                 tilesetUrl = await this.dataset.Entry(entry).get3DTiles();
-            } catch (e) {
+            } catch {
                 tilesetUrl = null;
             }
             if (!tilesetUrl)
@@ -859,7 +859,7 @@ export default {
                     source: new TiledImageSource({ source: new OSM() })
                 }));
                 this.registerLayer('Basemap (OSM)', 'fa-solid fa-earth-europe', () => globe.visible, v => { globe.visible = v; });
-            } catch (e) {
+            } catch {
                 // Basemap is optional.
             }
 
@@ -1081,7 +1081,7 @@ export default {
                 if (!id || !def) return false;
                 CS.register(id, def, { throwIfFailedToRegisterWithProj: true });
                 return true;
-            } catch (e) {
+            } catch {
                 return false;
             }
         },
@@ -1226,7 +1226,7 @@ export default {
             this.directionalIntensity = DEFAULTS.directionalIntensity;
             this.hemisphereIntensity = DEFAULTS.hemisphereIntensity;
             this.updateLighting();
-            try { localStorage.removeItem(SETTINGS_KEY); } catch (e) { /* ignore */ }
+            try { localStorage.removeItem(SETTINGS_KEY); } catch { /* ignore */ }
         },
 
         persistSettings: function () {
@@ -1236,7 +1236,7 @@ export default {
                     directionalIntensity: this.directionalIntensity,
                     hemisphereIntensity: this.hemisphereIntensity
                 }));
-            } catch (e) {
+            } catch {
                 // Ignore storage errors (private mode, quota).
             }
         },
@@ -1271,11 +1271,11 @@ export default {
                 const finish = () => {
                     if (done) return;
                     done = true;
-                    try { this.instance.removeEventListener('update-end', onUpdate); } catch (e) { /* ignore */ }
+                    try { this.instance.removeEventListener('update-end', onUpdate); } catch { /* ignore */ }
                     clearTimeout(timer);
                     resolve();
                 };
-                const onUpdate = () => { try { if (isReady()) finish(); } catch (e) { finish(); } };
+                const onUpdate = () => { try { if (isReady()) finish(); } catch { finish(); } };
                 const timer = setTimeout(finish, timeoutMs || 30000);
                 this.instance.addEventListener('update-end', onUpdate);
                 this.instance.notifyChange();
@@ -1305,7 +1305,7 @@ export default {
 
             // Cancel any measurement already in progress.
             if (this.abortController) {
-                try { this.abortController.abort(); } catch (e) { /* ignore */ }
+                try { this.abortController.abort(); } catch { /* ignore */ }
             }
             this.abortController = new AbortController();
             const signal = this.abortController.signal;
@@ -1330,7 +1330,7 @@ export default {
                         surfaceLabelFormatter: this.areaFormatter
                     });
                 }
-            } catch (e) {
+            } catch {
                 // Creation was cancelled (right-click ends it; DrawTool has no Escape handler) -
                 // nothing to do.
             }
@@ -1347,7 +1347,7 @@ export default {
         clearMeasurements: function () {
             if (!this.instance) return;
             this.shapes.forEach(s => {
-                try { this.instance.remove(s); } catch (e) { /* ignore */ }
+                try { this.instance.remove(s); } catch { /* ignore */ }
             });
             this.shapes = [];
             this.measureCount = 0;
@@ -1360,11 +1360,11 @@ export default {
             this.ready = false;
             if (this._cameraTweener) this._cameraTweener.stop();
             if (this.abortController) {
-                try { this.abortController.abort(); } catch (e) { /* ignore */ }
+                try { this.abortController.abort(); } catch { /* ignore */ }
                 this.abortController = null;
             }
             if (this.drawTool) {
-                try { this.drawTool.dispose(); } catch (e) { /* ignore */ }
+                try { this.drawTool.dispose(); } catch { /* ignore */ }
                 this.drawTool = null;
             }
             if (this._dblClickDispose) {
@@ -1372,14 +1372,14 @@ export default {
                 this._dblClickDispose = null;
             }
             if (this.controls && typeof this.controls.dispose === 'function') {
-                try { this.controls.dispose(); } catch (e) { /* ignore */ }
+                try { this.controls.dispose(); } catch { /* ignore */ }
             }
             this.controls = null;
             this._homePose = null;
             this._lights = { ambient: null, hemisphere: null, sun: null, fill: null };
             // Giro3D disposes its renderer, scene, entities, layers and canvas.
             if (this.instance) {
-                try { this.instance.dispose(); } catch (e) { /* ignore */ }
+                try { this.instance.dispose(); } catch { /* ignore */ }
                 this.instance = null;
             }
             this.map = null;

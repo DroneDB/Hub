@@ -103,8 +103,7 @@
 <script>
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
-import Mouse from '@/libs/mouse';
-import { clone, formatTimeAgo, bytesToSize } from '@/libs/utils';
+import { formatTimeAgo, bytesToSize } from '@/libs/utils';
 import { dragDropMixin } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
@@ -260,14 +259,10 @@ export default {
                         result = this.getFileType(a).localeCompare(this.getFileType(b));
                         break;
                     case 'size':
-                        const sizeA = a.entry.size || 0;
-                        const sizeB = b.entry.size || 0;
-                        result = sizeA - sizeB;
+                        result = (a.entry.size || 0) - (b.entry.size || 0);
                         break;
                     case 'modified':
-                        const modA = a.entry.mtime || 0;
-                        const modB = b.entry.mtime || 0;
-                        result = modA - modB;
+                        result = (a.entry.mtime || 0) - (b.entry.mtime || 0);
                         break;
                 }
 
@@ -476,7 +471,7 @@ export default {
                 if (this.failedThumbs.has(file.entry.path)) continue;
                 try {
                     this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48, file.entry.hash));
-                } catch (e) {
+                } catch {
                     // Unsupported URI scheme or fetch error - fall back to icon
                 }
             }

@@ -17,13 +17,12 @@
 
 <script>
 import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
 export default {
     components: {
-        Window, Button
+        Window
     },
     props: {
         dataset: {

@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { thumbs, pathutils } from 'ddb';
+import { thumbs } from 'ddb';
 import Mouse from '@/libs/mouse';
 import Keyboard from '@/libs/keyboard';
 import BuildManager from '@/libs/build/buildManager';
@@ -37,9 +37,9 @@ import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildHelpers';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
-import ddb from 'ddb';
 
 export default {
+    name: 'EntryThumbnail',
     components: {
     },
     emits: ['clicked', 'open'],
@@ -190,7 +190,7 @@ export default {
             this.imageTicket?.release();
             this.imageTicket = null;
         },
-        handleImageError: function (e) {
+        handleImageError: function () {
             this.releaseImageSlot();
             // Bounded retry: MAX_RETRIES retries with backoff (thumbRetryPolicy),
             // so a server-side failure costs <= 4 requests per tile instead of an
@@ -310,7 +310,7 @@ export default {
                             this.icon = this.file.icon;
                         }
                     }
-                } catch (e) {
+                } catch {
                     // If build check fails, continue with thumbnail load
                 }
             }

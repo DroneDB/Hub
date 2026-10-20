@@ -68,6 +68,7 @@ import reg from '@/libs/api/sharedRegistry';
  * presentational TasksTable and the per-dataset task endpoints for row actions.
  */
 export default {
+    name: 'TasksPage',
     mixins: [useTaskFormatting],
 
     components: { Button, Select, Toast, TasksTable, TaskLogDialog, ConfirmDialog },
@@ -95,9 +96,7 @@ export default {
             cancellingTask: null,
 
             deleteDialogOpen: false,
-            deletingTask: null,
-
-            _refreshTimer: null
+            deletingTask: null
         };
     },
 

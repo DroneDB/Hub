@@ -28,7 +28,6 @@
 import { defineAsyncComponent } from 'vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
 import { startInternalDrag, isInternalDrag, emitMove, itemDnDMixin } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
@@ -204,7 +203,7 @@ export default {
                 try {
                     const src = JSON.parse(evt.dataTransfer.getData('item'));
                     primaryPath = src && src.entry ? src.entry.path : null;
-                } catch (e) { /* ignore */ }
+                } catch { /* ignore */ }
             }
 
             this.onDrop(evt, item);

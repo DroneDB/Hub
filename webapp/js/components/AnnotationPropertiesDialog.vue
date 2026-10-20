@@ -128,7 +128,7 @@ export default {
                     document.execCommand('copy');
                     document.body.removeChild(ta);
                     done();
-                } catch (e) { /* noop */ }
+                } catch { /* noop */ }
             }
         }
     }

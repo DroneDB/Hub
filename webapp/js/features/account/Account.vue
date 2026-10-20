@@ -103,9 +103,8 @@ import { Features } from '@/libs/features';
 import { bytesToSize } from '@/libs/utils';
 import { xAuthLogout } from '@/libs/api/xauth';
 
-/* global HubOptions */
-
 export default {
+    name: 'AccountPage',
     components: {
         Message, ChangePwdDialog, UploadDiagnostics, Button, Card, ProgressBar, Tag
     },

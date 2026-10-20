@@ -22,6 +22,7 @@ import Button from 'primevue/button';
  *   buttons - Button set to show; supported value: 'ok' (default: ['ok']).
  */
 export default {
+    name: 'HubAlert',
     components: {
         Window,
         Button

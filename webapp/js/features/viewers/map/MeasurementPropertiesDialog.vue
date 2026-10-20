@@ -182,7 +182,7 @@ export default {
                 const c = geom.getCoordinates();
                 const [lon, lat] = toLonLat(c);
                 return { lon, lat };
-            } catch (e) {
+            } catch {
                 return null;
             }
         },
@@ -245,7 +245,7 @@ export default {
                     document.execCommand('copy');
                     document.body.removeChild(ta);
                     done();
-                } catch (e) { /* noop */ }
+                } catch { /* noop */ }
             }
         }
     }

@@ -15,6 +15,7 @@
  * No props; mount/unmount to show/hide.
  */
 export default {
+    name: 'HubLoader',
   components: {
 
   },

@@ -228,7 +228,6 @@
 </template>
 
 <script>
-import Header from '@/layout/Header.vue';
 import SettingsDialog from './dialogs/SettingsDialog.vue';
 const AddToDatasetDialog = lazyComponent(() => import(/* webpackChunkName: "dataset-upload" */ './dialogs/AddToDatasetDialog.vue'));
 import DeleteDialog from './dialogs/DeleteDialog.vue';
@@ -276,15 +275,14 @@ import { requestScopeMixin, isAbort } from '@/composables/useRequestScope';
 import icons from '@/libs/icons';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
-import { clone } from '@/libs/utils';
 import shell from '@/dynamic/shell';
 import { isMobile } from '@/libs/responsive';
-import { renameDataset, entryLabel } from '@/libs/api/registryUtils';
+import { renameDataset } from '@/libs/api/registryUtils';
 import { b64encode } from '@/libs/base64';
 import BuildManager from '@/libs/build/buildManager';
 import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
-import { shouldOpenAsText, canOpenAsText, isPdfFile } from '@/libs/textFileUtils';
+import { shouldOpenAsText, isPdfFile } from '@/libs/textFileUtils';
 
 import ddb from 'ddb';
 import { coordAll } from '@turf/meta';
@@ -316,7 +314,7 @@ export default {
         };
     },
     components: {
-        Header,
+        
         Message,
         FileBrowser,
         Map,
@@ -442,7 +440,6 @@ export default {
 
             // Build confirm dialog
             buildConfirmDialogOpen: false,
-            _buildConfirmCallback: null,
 
             // PDF viewer dialog
             pdfViewerOpen: false,
@@ -597,7 +594,7 @@ export default {
                             altitude = c[2].toFixed(1);
                         }
                     }
-                } catch (e) { /* no geo data */ }
+                } catch { /* no geo data */ }
             }
             return { name, coords, altitude };
         }
@@ -841,7 +838,6 @@ export default {
                 return;
             }
 
-            const t = node.entry.type;
             if (!view) view = defaultViewFor(node.entry);
 
             // .3tz files (OGC 3D Tiles archives) indexed by older ddb may appear as Generic.
@@ -888,7 +884,7 @@ export default {
                     }
 
                     // File available - proceed with opening
-                    const [_, path] = ddb.utils.datasetPathFromUri(node.path);
+                    const [, path] = ddb.utils.datasetPathFromUri(node.path);
                     const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
                     window.open(url, `${path}-${view}`);
 
@@ -925,20 +921,20 @@ export default {
             const imageFiles = this.getImageFiles();
             if (imageFiles.length === 0) return;
 
-            const [_, nodePath] = ddb.utils.datasetPathFromUri(node.path);
+            const [, nodePath] = ddb.utils.datasetPathFromUri(node.path);
 
             this.lightboxSources = imageFiles.map(f => {
-                const [__, p] = ddb.utils.datasetPathFromUri(f.path);
+                const [, p] = ddb.utils.datasetPathFromUri(f.path);
                 return this.dataset.thumbUrl(p, 1024);
             });
 
             this.lightboxEntries = imageFiles.map(f => {
-                const [__, p] = ddb.utils.datasetPathFromUri(f.path);
+                const [, p] = ddb.utils.datasetPathFromUri(f.path);
                 return { path: p, entry: f.entry };
             });
 
             const idx = imageFiles.findIndex(f => {
-                const [__, p] = ddb.utils.datasetPathFromUri(f.path);
+                const [, p] = ddb.utils.datasetPathFromUri(f.path);
                 return p === nodePath;
             });
 
@@ -981,7 +977,7 @@ export default {
         },
 
         openVideoLightbox: function (node) {
-            const [_, p] = ddb.utils.datasetPathFromUri(node.path);
+            const [, p] = ddb.utils.datasetPathFromUri(node.path);
             this.videoLightboxSrc = this.dataset.downloadUrl(p, { inline: true });
             this.videoLightboxEntry = { ...node.entry, path: p };
             this.videoLightboxVisible = true;
@@ -1065,7 +1061,7 @@ export default {
             setTimeout(() => {
                 const view = defaultViewFor(entry);
                 if (view) {
-                    const [_, path] = ddb.utils.datasetPathFromUri(entry.path);
+                    const [, path] = ddb.utils.datasetPathFromUri(entry.path);
                     const url = `/r/${this.$route.params.org}/${this.$route.params.ds}/view/${b64encode(path)}/${view}`;
                     window.open(url, `${path}-${view}`);
                 }
@@ -1484,7 +1480,7 @@ export default {
         }
     },
     watch: {
-        viewMode: function(newMode) {
+        viewMode: function() {
             // When viewMode changes, rebuild explorerTools to show the correct icon
             this.updateExplorerTools();
 
@@ -1493,7 +1489,7 @@ export default {
 
         fileBrowserFiles: {
             deep: true,
-            handler: function (newVal, oldVal) {
+            handler: function () {
                 if (!this.$embed)
                     emitter.emit('setSelectedFiles', this.selectedFiles);
             }

@@ -208,7 +208,7 @@ export default {
                     this.destPathExists = null;
                     this.destPathError = 'A file with this name already exists.';
                 }
-            } catch (e) {
+            } catch {
                 // Parent folder doesn't exist yet (or listing failed): it will be created.
                 if (norm(raw) === norm(this.destPath)) this.destPathExists = false;
             } finally {

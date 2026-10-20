@@ -95,11 +95,10 @@ export default {
                 const entryParentPath = this.pathutils.getParentFolder(entry.path);
 
                 // Determine what to show in the current view
-                let itemToAdd = null;
                 let itemPath = null;
-                let itemLabel = null;
+                let itemLabel;
                 let itemEntry = entry;
-                let isDirectory = false;
+                let isDirectory;
 
                 if (normalizedCurrentPath === null) {
                     // We're at root level
@@ -709,7 +708,7 @@ export default {
                         if (destItems.length > 0) {
                             emitter.emit('addItems', destItems);
                         }
-                    } catch (e) {
+                    } catch {
                         // best-effort - tree node will reload lazily on expansion
                     }
                 }

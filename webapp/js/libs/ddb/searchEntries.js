@@ -7,7 +7,7 @@ const Registry = require('./registry');
 // Server side search
 async function searchEntries(uri, query) {
     if (isDDBUri(uri)) {
-        const { registryUrl, org, ds, path } = parseUri(uri);
+        const { registryUrl, org, ds } = parseUri(uri);
         const dataset = Registry.forUrl(registryUrl).Organization(org).Dataset(ds);
         return dataset.search(query);
     }

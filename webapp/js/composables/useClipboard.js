@@ -33,7 +33,7 @@ try {
             state.capturedAt = parsed.capturedAt || null;
         }
     }
-} catch (e) {
+} catch {
     // ignore - corrupt clipboard, start fresh
 }
 
@@ -47,7 +47,7 @@ watch(
             } else {
                 window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(val));
             }
-        } catch (e) {
+        } catch {
             // sessionStorage unavailable / quota - non-fatal
         }
     },
@@ -63,10 +63,10 @@ function normalizeItems(items) {
             // destination entries after a paste. The hash in DroneDB is
             // content-based (SHA256), so it remains valid for the copied/moved
             // file at the new path.
-            let entryCopy = null;
+            let entryCopy;
             try {
                 entryCopy = JSON.parse(JSON.stringify(f.entry));
-            } catch (e) {
+            } catch {
                 entryCopy = null;
             }
             return {

@@ -17,6 +17,7 @@ import PrimeMessage from 'primevue/message';
  *   color - Semantic color key mapped to PrimeVue severity (default: 'positive').
  */
 export default {
+    name: 'HubFlash',
     components: {
         PrimeMessage
     },

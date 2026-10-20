@@ -38,7 +38,7 @@ export function applyHubBranding(hubOptions) {
             writable: false,
             configurable: true
         });
-    } catch (e) {
+    } catch {
         // Fallback if the property is non-configurable for some reason.
         window.HubOptions = Object.freeze({ ...opts });
     }

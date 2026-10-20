@@ -235,7 +235,7 @@ function emit(event, data) {
     if (!fn) return;
     for (const handler of fn) {
         try { handler(data); }
-        catch (e) { /* ignore */ }
+        catch { /* ignore */ }
     }
 }
 

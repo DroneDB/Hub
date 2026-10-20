@@ -20,6 +20,7 @@ import { sanitizeHtml } from '@/libs/sanitize';
  *   noDismiss - When true the close button is hidden (default: false).
  */
 export default {
+    name: 'HubMessage',
     components: {
         PrimeMessage
     },
