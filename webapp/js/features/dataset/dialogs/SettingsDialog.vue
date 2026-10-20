@@ -3,9 +3,7 @@
             @close="close('close')">
         <Message v-model="error" />
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
         <div v-else class="settings-body">
             <div class="settings-section">
                 <div class="mb-2">
@@ -89,6 +87,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/Message.vue';
 import { Licenses } from '@/libs/licenses';
 import Window from '@/components/Window.vue';
@@ -101,6 +100,7 @@ import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
     components: {
+        LoadingSpinner,
         Message, Window, Button, Select, InputText, PrimeMessage
     },
     props: {

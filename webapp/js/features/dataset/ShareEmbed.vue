@@ -2,7 +2,7 @@
     <Window id="share-embed" :title="windowTitle" modal fixed-size @close="$emit('close')">
         <div class="content">
             <Message v-model="error" no-dismiss />
-            <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
+            <LoadingSpinner v-if="loading" />
             <template v-else>
                 <div class="share-type">
                     <label for="share-mode" class="me-2 fw-semibold">Share: </label>
@@ -98,6 +98,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window';
 import Message from '@/components/Message';
 import Button from 'primevue/button';
@@ -121,7 +122,7 @@ const LEGACY_MODES = [
 ];
 
 export default {
-    components: {
+    components: { LoadingSpinner,
         Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow
     },
     props: {

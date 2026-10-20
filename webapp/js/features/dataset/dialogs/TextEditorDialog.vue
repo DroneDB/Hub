@@ -4,10 +4,7 @@
             <div class="text-editor-dialog">
                 <Message v-model="error" />
 
-                <div v-if="loading" class="loading-container">
-                    <i class="fa-solid fa-circle-notch fa-spin" />
-                    <span>Loading file...</span>
-                </div>
+                <LoadingSpinner v-if="loading" label="Loading file..." />
 
                 <PrimeMessage v-else-if="fileTooLarge" severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                     <p>File is too large to edit ({{ formattedSize }})</p>
@@ -56,6 +53,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -76,6 +74,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 export default {
     components: {
+        LoadingSpinner,
         Window,
         Message,
         ConfirmDialog,

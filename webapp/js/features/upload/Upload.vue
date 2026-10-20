@@ -5,15 +5,11 @@
         </div>
         <div v-if="uploading || url" class="container">
             <div v-if="uploading" class="uploading">
-                <div v-if="totalBytes === 0">
-                    <i class="fa-solid fa-circle-notch fa-spin" />
-                </div>
+                <LoadingSpinner v-if="totalBytes === 0" />
 
                 <Card v-if="totalBytes > 0">
                     <template #content>
-                        <div v-if="Object.keys(fileUploadStatus).length === 0">
-                            <i class="fa-solid fa-circle-notch fa-spin" />
-                        </div>
+                        <LoadingSpinner v-if="Object.keys(fileUploadStatus).length === 0" />
                         <template v-if="!inIframe">
                             <div v-for="f in Object.keys(fileUploadStatus)" :key="f" class="progress-indicator">
                                 <ProgressBar :value="parseFloat(fileUploadStatus[f].toFixed(2))" :show-value="false" style="height: 0.75rem; margin-bottom: 0.25rem;" />
@@ -40,6 +36,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/Message.vue';
 import Button from 'primevue/button';
 import Card from 'primevue/card';
@@ -63,7 +60,7 @@ const ONE_FILE_PER_REQUEST = { bundleMaxFiles: 1, chunkedFileBytes: Number.POSIT
  */
 export default {
     name: 'UploadPage',
-    components: {
+    components: { LoadingSpinner,
         Message, Button, Card, ProgressBar
     },
     data: function () {

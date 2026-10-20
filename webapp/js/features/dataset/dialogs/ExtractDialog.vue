@@ -24,7 +24,7 @@
                                 @click="openFolderPicker" />
                     </div>
                     <small v-if="destPathError" class="dest-error">{{ destPathError }}</small>
-                    <small v-else-if="destPathChecking" class="help-text"><i class="fa-solid fa-circle-notch fa-spin" /> Checking destination…</small>
+                    <small v-else-if="destPathChecking" class="help-text"><LoadingSpinner inline label="Checking destination…" /></small>
                     <small v-else-if="destPathExists === true" class="dest-exists"><i class="fa-solid fa-folder-open" /> This folder already exists; extracted files will be added to it.</small>
                     <small v-else-if="destPathExists === false" class="dest-create"><i class="fa-solid fa-folder-plus" /> This folder will be created.</small>
                     <small v-else class="help-text">Destination folder (leave empty for the dataset root).</small>
@@ -69,6 +69,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
@@ -82,7 +83,7 @@ import ddb from 'ddb';
 const { pathutils } = ddb;
 
 export default {
-    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPicker },
+    components: { Window, Button, PrimeMessage, InputText, Checkbox, ProgressBar, FolderPicker, LoadingSpinner },
 
     props: {
         file: { type: Object, required: true },

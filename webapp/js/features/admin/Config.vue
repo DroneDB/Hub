@@ -13,10 +13,7 @@
             </div>
         </div>
 
-        <div v-if="loading" class="loading text-center py-5">
-            <i class="fa-solid fa-circle-notch fa-spin fa-2x" />
-            <p class="mt-2">Loading configuration...</p>
-        </div>
+        <LoadingSpinner v-if="loading" size="lg" label="Loading configuration..." />
 
         <div v-else class="config-scroll-container">
             <Accordion :active-index="activeIndex" class="config-accordion">
@@ -154,6 +151,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import reg from '@/libs/api/sharedRegistry';
 import Accordion from 'primevue/accordion';
 import AccordionTab from 'primevue/accordiontab';
@@ -177,6 +175,7 @@ export default {
     name: 'AdminConfig',
 
     components: {
+        LoadingSpinner,
         Accordion, AccordionTab, Button, InputText, InputNumber,
         ToggleSwitch, Select, Password, Chips, Textarea, Tag
     },

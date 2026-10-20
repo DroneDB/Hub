@@ -1,8 +1,6 @@
 <template>
     <Window id="createOrganizationDialog" title="Create Organization" modal max-width="40%" fixed-size @close="close">
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
             <Message v-model="error" />
@@ -37,6 +35,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import Button from 'primevue/button';
@@ -46,6 +45,7 @@ import reg from '@/libs/api/sharedRegistry';
 
 export default {
     components: {
+        LoadingSpinner,
         Window, Message, Button, InputText, Textarea
     },
     emits: ['close'],

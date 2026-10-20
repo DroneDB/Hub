@@ -2,8 +2,7 @@
     <ViewerShell id="unified-viewer" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
                  :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings">
         <template #loading>
-            <p>{{ loadingText }}</p>
-            <i class="fa-solid fa-circle-notch fa-spin" />
+            <LoadingSpinner :label="loadingText" />
             <div v-if="progress !== null" class="progress-track">
                 <div class="progress-fill" :style="{ width: Math.round(progress * 100) + '%' }" />
             </div>
@@ -70,6 +69,7 @@
  * type are unchanged. HQ-08: the scene, the loaders and the measure tool are modules next
  * to this view.
  */
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import { ref, reactive, toRefs, watch, onMounted, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';
 import ViewerShell from '@/components/ViewerShell.vue';

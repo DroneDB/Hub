@@ -11,10 +11,7 @@
         <!-- Full-dialog loading overlay - teleported above the PrimeVue dialog z-index -->
         <Teleport to="body">
             <div v-if="loading && visible" class="contour-gen-overlay">
-                <div class="contour-gen-spinner">
-                    <i class="fas fa-spinner fa-spin fa-2x" />
-                    <span>Generating contour lines…</span>
-                </div>
+                <LoadingSpinner class="contour-gen-spinner" size="lg" label="Generating contour lines…" />
             </div>
         </Teleport>
 
@@ -112,7 +109,7 @@
                     :disabled="loading"
                     @click="onCancel" />
             <Button :label="loading ? 'Generating...' : 'Generate'"
-                    :icon="loading ? 'fas fa-spinner fa-spin' : 'fas fa-check'"
+                    icon="fas fa-check" :loading="loading"
                     :disabled="loading || !!validationError"
                     @click="onGenerate" />
         </template>
@@ -120,13 +117,14 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import InputNumber from 'primevue/inputnumber';
 
 export default {
     name: 'ContourOptionsDialog',
-    components: { Dialog, Button, InputNumber },
+    components: { Dialog, Button, InputNumber, LoadingSpinner },
     props: {
         visible: { type: Boolean, default: false },
         loading: { type: Boolean, default: false },

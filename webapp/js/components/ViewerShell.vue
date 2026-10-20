@@ -3,8 +3,7 @@
         <Message v-model="error" no-dismiss />
         <div v-if="loading" class="viewer-loading">
             <slot name="loading">
-                <p v-if="loadingText">{{ loadingText }}</p>
-                <i class="fa-solid fa-circle-notch fa-spin" />
+                <LoadingSpinner :label="loadingText" />
             </slot>
         </div>
 
@@ -36,6 +35,7 @@
  *       <template #settings>…</template>
  *   </ViewerShell>
  */
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/Message.vue';
 import Window from '@/components/Window.vue';
 

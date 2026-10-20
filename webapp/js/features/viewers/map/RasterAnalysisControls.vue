@@ -166,12 +166,13 @@
         </div>
 
         <div v-else class="panel-body loading">
-            <i class="fas fa-spinner fa-spin" /> Loading raster info...
+            <LoadingSpinner inline label="Loading raster info..." />
         </div>
     </div>
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -202,7 +203,7 @@ const GENERIC_COLORMAPS = [
 ];
 
 export default {
-    components: { ColormapDropdown, RasterProfileChart },
+    components: { ColormapDropdown, RasterProfileChart, LoadingSpinner },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },

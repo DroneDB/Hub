@@ -45,7 +45,7 @@
 
             <!-- Validation result -->
             <div v-if="validating" class="status-info">
-                <i class="fa-solid fa-spinner fa-spin" /> Validating...
+                <LoadingSpinner inline label="Validating..." />
             </div>
             <div v-else-if="validationResult">
                 <div v-if="!validationResult.ok" class="result-msg error">
@@ -102,6 +102,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ddb from 'ddb';
 import Window    from '@/components/Window.vue';
 import Button    from 'primevue/button';
@@ -112,7 +113,7 @@ import { useHeavyTask } from '@/composables/useHeavyTask';
 
 export default {
     name: 'AlignDialog',
-    components: { Window, Button, InputText, Select, PrimeMessage },
+    components: { Window, Button, InputText, Select, PrimeMessage, LoadingSpinner },
 
     props: {
         sourceEntry: { type: Object, required: true },

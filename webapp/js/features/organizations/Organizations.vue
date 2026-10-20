@@ -57,12 +57,10 @@
 
         <!-- Data loaded -->
         <div v-else ref="cardsArea" class="org-cards-area">
-            <div v-if="paginatedOrganizations.length === 0" class="text-center p-4">
-                <h3>No organizations found</h3>
-                <p v-if="searchQuery">Try adjusting your search criteria.</p>
-                <p v-else-if="!showAll">You don't own any organizations yet. You may have access to organizations owned by others: enable <b>Show all</b> above to see them. You can also create a new organization.</p>
+            <EmptyState v-if="paginatedOrganizations.length === 0" title="No organizations found" :filtered="!!searchQuery">
+                <p v-if="!showAll">You don't own any organizations yet. You may have access to organizations owned by others: enable <b>Show all</b> above to see them. You can also create a new organization.</p>
                 <p v-else>You can create a new organization by clicking the create organization button.</p>
-            </div>
+            </EmptyState>
             <div v-for="org in paginatedOrganizations" :key="org.slug"
                  class="org-card" style="cursor: pointer;" @click="viewOrganization(org)">
                 <Card>
@@ -121,6 +119,7 @@
 </template>
 
 <script>
+import EmptyState from '@/components/EmptyState.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useEntityDelete } from '@/composables/useEntityDelete';
@@ -151,6 +150,7 @@ import { isUnauthorized } from '@/libs/ddb/apiError';
 export default {
     name: 'OrganizationsPage',
     components: {
+        EmptyState,
         
         DialogHost,
         MessageDialog,

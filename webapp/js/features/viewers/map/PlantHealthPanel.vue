@@ -143,7 +143,7 @@
         </div>
 
         <div v-else class="panel-body loading">
-            <i class="fas fa-spinner fa-spin" /> Loading raster info...
+            <LoadingSpinner inline label="Loading raster info..." />
         </div>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
@@ -152,6 +152,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import HistogramChart from '@/components/HistogramChart.vue';
 import ColormapDropdown from '@/components/ColormapDropdown.vue';
 import BandSelector from '@/components/BandSelector.vue';
@@ -174,7 +175,7 @@ import { useTimerGroup } from '@/composables/useTimers';
  * rescaling, and copy-link functionality.
  */
 export default {
-    components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },
+    components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },

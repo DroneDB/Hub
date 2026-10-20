@@ -2,9 +2,7 @@
     <div id="users">
         <Message v-model="error" />
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
         <div v-else>
             <div class="top-banner d-flex justify-content-between align-items-center">
                 <div>
@@ -101,10 +99,9 @@
                     </template>
                 </Column>
                 <template #empty>
-                    <div class="text-center p-4">
-                        <h3>No users found</h3>
-                        <p>{{ searchQuery ? 'Try adjusting your search criteria.' : 'No users available.' }}</p>
-                    </div>
+                    <EmptyState title="No users found" :filtered="!!searchQuery">
+                        <p>No users available.</p>
+                    </EmptyState>
                 </template>
             </DataTable>
         </div>
@@ -206,6 +203,8 @@
 </template>
 
 <script>
+import EmptyState from '@/components/EmptyState.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/Message.vue';
 import Window from '@/components/Window.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -239,6 +238,8 @@ import { isUnauthorized } from '@/libs/ddb/apiError';
 export default {
     name: 'UsersPage',
     components: {
+        EmptyState,
+        LoadingSpinner,
         Message,
         Window,
         ConfirmDialog,

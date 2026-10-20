@@ -87,9 +87,7 @@
                     </template>
                 </Column>
                 <template #empty>
-                    <div v-if="isLoadingFiles" class="text-center p-4">
-                        <i class="fa-solid fa-circle-notch fa-spin" />
-                    </div>
+                    <LoadingSpinner v-if="isLoadingFiles" />
                     <div v-else class="text-center p-4">
                         <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
                         <p class="mt-2">This folder is empty</p>
@@ -101,6 +99,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Toolbar from '@/components/Toolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import { formatTimeAgo } from '@/libs/utils';
@@ -129,6 +128,7 @@ import { useFileSelection } from '@/composables/useFileSelection';
  */
 export default {
     components: {
+        LoadingSpinner,
         Toolbar, ContextMenu, Breadcrumb, DataTable, Column
     },
     inject: { showBuildConfirm: { default: null } },

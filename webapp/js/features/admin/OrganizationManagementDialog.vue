@@ -1,8 +1,6 @@
 <template>
     <Window id="organizationManagementDialog" title="Organization Management" modal max-width="80%" fixed-size @close="close">
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
             <Message v-model="error" />
@@ -109,6 +107,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
@@ -127,6 +126,7 @@ import reg from '@/libs/api/sharedRegistry';
 
 export default {
     components: {
+        LoadingSpinner,
         Window, Message, ConfirmDialog, Button, PrimeMessage, InputText,
         InputIcon, IconField, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
     },

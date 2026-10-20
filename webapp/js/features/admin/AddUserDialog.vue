@@ -1,9 +1,7 @@
 <template>
     <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size @close="close">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
             <Message v-model="error" />
@@ -49,6 +47,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import MultiSelect from 'primevue/multiselect';
@@ -61,6 +60,7 @@ import { validatePassword, getPasswordRequirements } from '@/libs/passwordValida
 
 export default {
     components: {
+        LoadingSpinner,
         Window, Message, MultiSelect, InputText, Password, Button
     },
     props: {

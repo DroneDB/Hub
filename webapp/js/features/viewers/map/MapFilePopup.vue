@@ -19,7 +19,7 @@
             </div>
         </div>
         <div v-if="popup.kind === 'image'" class="image-popup-body">
-            <div v-if="popup.loading" class="image-popup-loading"><i class="fa-solid fa-circle-notch fa-spin" /></div>
+            <LoadingSpinner v-if="popup.loading" class="image-popup-loading" />
             <img v-show="!popup.loading && popup.thumbnail" :src="popup.thumbnail" :alt="popup.name"
                  class="image-popup-img" @load="popup.loading = false" @error="onThumbnailError">
         </div>
@@ -48,6 +48,7 @@
  *
  *   <MapFilePopup ref="popup" :map="map" @open-item="..." />   then popup.show(file, coordinate)
  */
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import { reactive, ref, nextTick, onBeforeUnmount } from 'vue';
 import Overlay from 'ol/Overlay';
 import { coordAll } from '@turf/meta';

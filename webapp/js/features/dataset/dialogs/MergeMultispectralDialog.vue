@@ -28,7 +28,7 @@
                 <!-- Column 2: Validation info -->
                 <div class="col-info">
                     <div v-if="validating" class="status-info">
-                        <i class="fa-solid fa-spinner fa-spin" /> Validating...
+                        <LoadingSpinner inline label="Validating..." />
                     </div>
 
                     <template v-if="validationResult">
@@ -104,6 +104,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -119,7 +120,7 @@ import { pathutils } from 'ddb';
  * progress via the useHeavyTask composable.
  */
 export default {
-    components: { Window, Button, InputText, Checkbox },
+    components: { Window, Button, InputText, Checkbox, LoadingSpinner },
     props: {
         files: { type: Array, required: true },
         dataset: { type: Object, required: true }

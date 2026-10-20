@@ -19,9 +19,7 @@
         </div>
         <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
                   :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
         <div v-if="!loading && noResults" class="no-results">
             No files found
         </div>
@@ -29,6 +27,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
 import ContextMenu from '@/components/ContextMenu';
 import InputText from 'primevue/inputtext';
@@ -50,6 +49,7 @@ const { pathutils } = ddb;
 
 export default {
     components: {
+        LoadingSpinner,
         TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
     // Listings in flight are aborted when the browser goes away (HUB-06)

@@ -29,7 +29,7 @@
                     </label>
                     <div class="layer-select-wrapper">
                         <Select v-model="customLayerName" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" option-label="label" option-value="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
-                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" title="Fetch layers" :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'"
+                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" title="Fetch layers" icon="fa-solid fa-arrows-rotate" :loading="wmsLayersLoading" aria-label="Fetch layers"
                                 text @click="fetchLayers" />
                     </div>
                 </div>
@@ -43,7 +43,7 @@
                     {{ customError }}
                 </PrimeMessage>
                 <div class="setting-row" style="justify-content: flex-end;">
-                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" :icon="customLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'"
+                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" icon="fa-solid fa-check" :loading="customLoading"
                             :label="customLoading ? 'Checking...' : 'Apply'" @click="applyCustomConfig" />
                 </div>
             </div>

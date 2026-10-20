@@ -1,9 +1,7 @@
 <template>
     <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size @close="close">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
             <Message v-model="error" />
@@ -40,6 +38,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Message from '@/components/Message.vue';
 import Button from 'primevue/button';
@@ -51,6 +50,7 @@ export default {
     // NOTE: This dialog is used by admins to change other users' passwords.
     // Password policy validation is intentionally NOT applied here (admin override).
     components: {
+        LoadingSpinner,
         Window, Message, Button, Password, PrimeMessage
     },
     props: {

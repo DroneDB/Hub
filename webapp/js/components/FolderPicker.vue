@@ -14,9 +14,7 @@
         </div>
 
         <div class="folder-picker-body">
-            <div v-if="loading" class="text-center p-4">
-                <i class="fa-solid fa-circle-notch fa-spin" />
-            </div>
+            <LoadingSpinner v-if="loading" />
             <div v-else-if="sortedFiles.length === 0" class="text-center p-4">
                 <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
                 <p class="mt-2">This folder is empty</p>
@@ -115,6 +113,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Window from '@/components/Window.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
@@ -151,6 +150,7 @@ const { pathutils, entry } = ddb;
  */
 export default {
     components: {
+        LoadingSpinner,
         Window, Button, InputText, Breadcrumb, DataTable, Column, PrimeMessage, ConfirmDialog
     },
 

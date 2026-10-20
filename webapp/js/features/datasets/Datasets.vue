@@ -133,10 +133,9 @@
                     </template>
                 </Column>
                 <template #empty>
-                    <div class="text-center p-4">
-                        <h3>No datasets found</h3>
+                    <EmptyState title="No datasets found">
                         <p v-if="canCreateDataset">You can create a new dataset by clicking the create dataset button.</p>
-                    </div>
+                    </EmptyState>
                 </template>
             </DataTable>
 
@@ -179,6 +178,7 @@
 </template>
 
 <script>
+import EmptyState from '@/components/EmptyState.vue';
 import Message from '@/components/Message.vue';
 import { setTitle, bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
@@ -216,6 +216,7 @@ import { isUnauthorized } from '@/libs/ddb/apiError';
 export default {
     name: 'DatasetsPage',
     components: {
+        EmptyState,
         Message,
         DialogHost,
         MessageDialog,

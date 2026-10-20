@@ -2,9 +2,7 @@
     <div id="account">
         <Message v-model="error" />
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
         <div v-else>
             <div class="top-header">
                 <h1>Account</h1>
@@ -91,6 +89,7 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Message from '@/components/Message.vue';
 import ChangePwdDialog from './ChangePwdDialog.vue';
 import UploadDiagnostics from './UploadDiagnostics.vue';
@@ -107,6 +106,7 @@ import { loginLocation } from '@/libs/authRoutes';
 export default {
     name: 'AccountPage',
     components: {
+        LoadingSpinner,
         Message, ChangePwdDialog, UploadDiagnostics, Button, Card, ProgressBar, Tag
     },
     data: function () {
