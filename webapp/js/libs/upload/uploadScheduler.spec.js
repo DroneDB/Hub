@@ -268,6 +268,26 @@ describe('uploadRequests', () => {
         expect(sent).toEqual(['1', '3']);
         expect(result).toEqual({ id: 'big', ok: true, entry: { path: 'big' } });
     });
+
+    it('commits straight away when every chunk is already stored (the commit answer was lost)', async () => {
+        const urls = [];
+        const transport = vi.fn(async ({ url }) => {
+            urls.push(url);
+            return { status: 201, body: { path: 'big' }, uploaded: true };
+        });
+        const getJson = vi.fn(async () => ({ status: 200, body: { missing: [] } }));
+        const r = createUploadRequests({
+            baseUrl: 'http://hub/orgs/o/ds/d', authToken: () => null, destination: i => i.path,
+            transport, getJson, chunkBytes: 10
+        });
+
+        const [result] = await r.send({ kind: 'chunked', items: [item('big', 35)] }, hooks());
+
+        // No chunk is sent again: the only request is the commit
+        expect(urls).toHaveLength(1);
+        expect(urls[0]).toMatch(/\/obj\/chunk\/[^/]+\/commit$/);
+        expect(result).toEqual({ id: 'big', ok: true, entry: { path: 'big' } });
+    });
 });
 
 describe('protocol limits and probe hint', () => {
