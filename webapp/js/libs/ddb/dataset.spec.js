@@ -10,7 +10,7 @@
  * path raw into the query string, so the server saw the path truncated at the
  * ampersand), ',' (multi-path download transport), '#', '%' and spaces.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Dataset from './dataset';
 
 const NASTY = 'ortho & #25%, 100%slope (field) “café” #hash?.tif';
@@ -109,5 +109,23 @@ describe('Dataset URL builders — special characters in paths', () => {
                 expect(new URLSearchParams(query).get('inline')).toBe('1');
             }
         }
+    });
+});
+
+describe('Dataset.checkDownloadSlot — error message of a refused download', () => {
+    function datasetAnswering(status, contentType, body) {
+        const response = new Response(JSON.stringify(body), { status, headers: { 'Content-Type': contentType } });
+        const registry = { remote: 'hub.example.com', secure: true, fetchRaw: vi.fn(async () => response) };
+        return new Dataset(registry, 'my_org', 'my_ds');
+    }
+
+    it('reads a ProblemDetails body (application/problem+json)', async () => {
+        const ds = datasetAnswering(429, 'application/problem+json', { title: 'Too Many Requests', status: 429, detail: 'Too many downloads in progress' });
+        await expect(ds.checkDownloadSlot('/x')).rejects.toMatchObject({ message: 'Too many downloads in progress', status: 429 });
+    });
+
+    it('still reads the legacy { error } body', async () => {
+        const ds = datasetAnswering(429, 'application/json; charset=utf-8', { error: 'Busy' });
+        await expect(ds.checkDownloadSlot('/x')).rejects.toMatchObject({ message: 'Busy', status: 429 });
     });
 });

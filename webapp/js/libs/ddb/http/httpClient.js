@@ -57,7 +57,7 @@ function inlineErrorOf(json) {
  * Registry before and after its ProblemDetails switch (plan D1, RQ-05).
  * @param {unknown} json @returns {string|null}
  */
-function failureMessageOf(json) {
+export function failureMessageOf(json) {
     if (!json || typeof json !== 'object') return null;
     const j = /** @type {any} */ (json);
     return j.detail || j.error || j.message || j.title || null;
@@ -67,7 +67,7 @@ function failureMessageOf(json) {
 const contentTypeOf = response => (response.headers.get('Content-Type') || '').toLowerCase();
 
 /** `application/json` and structured `+json` types such as `application/problem+json`. */
-const isJsonType = (/** @type {string} */ contentType) =>
+export const isJsonType = (/** @type {string} */ contentType) =>
     contentType.includes('application/json') || contentType.includes('+json');
 
 /**

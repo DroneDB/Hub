@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 import { Entry } from './entry';
 import { ApiError } from './apiError';
+import { failureMessageOf, isJsonType } from './http/httpClient';
 
 export default class Dataset {
     constructor(registry, org, ds) {
@@ -636,9 +637,8 @@ export default class Dataset {
         if (response.ok) return;
         let message = `Download failed (${response.status})`;
         try {
-            if ((response.headers.get('Content-Type') || '').includes('application/json')) {
-                const json = await response.json();
-                message = json.error || json.message || message;
+            if (isJsonType((response.headers.get('Content-Type') || '').toLowerCase())) {
+                message = failureMessageOf(await response.json()) || message;
             }
         } catch {
             // No JSON body: keep the default message

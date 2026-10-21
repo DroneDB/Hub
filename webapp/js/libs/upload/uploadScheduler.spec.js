@@ -240,6 +240,15 @@ describe('uploadRequests', () => {
         expect(getJson).not.toHaveBeenCalled();
     });
 
+    it('shows the message of a ProblemDetails failure (and of the legacy { error } body)', async () => {
+        const problem = { status: 409, uploaded: true, body: { title: 'Conflict', status: 409, detail: 'Destination exists', noRetry: true } };
+        const legacy = { status: 400, uploaded: true, body: { error: 'Invalid path', noRetry: true } };
+        const [p] = await requests(vi.fn(async () => problem), vi.fn()).send({ kind: 'single', items: [item('a')] }, hooks());
+        const [l] = await requests(vi.fn(async () => legacy), vi.fn()).send({ kind: 'single', items: [item('b')] }, hooks());
+        expect(p).toMatchObject({ ok: false, status: 409, error: 'Destination exists', noRetry: true });
+        expect(l).toMatchObject({ ok: false, status: 400, error: 'Invalid path', noRetry: true });
+    });
+
     it('maps the per-file results of a bundle', async () => {
         const transport = vi.fn(async () => ({
             status: 200, uploaded: true,

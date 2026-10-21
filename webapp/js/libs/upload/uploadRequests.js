@@ -15,7 +15,7 @@
  */
 import { sendXhr } from './xhrTransport';
 import { newId } from '@/libs/ids';
-import { bearer } from '@/libs/ddb/http/httpClient';
+import { bearer, failureMessageOf } from '@/libs/ddb/http/httpClient';
 
 export const CHUNK_BYTES = 64 * 1024 * 1024;
 export const RECEIPT_POLL_MS = 2000;
@@ -206,7 +206,7 @@ function failure(item, res) {
         id: item.id,
         ok: false,
         status: res.status,
-        error: body?.error || body?.message || (typeof res.body === 'string' && res.body) || statusText(res.status),
+        error: failureMessageOf(body) || (typeof res.body === 'string' && res.body) || statusText(res.status),
         noRetry: body?.noRetry === true,
         retryAfter: res.retryAfter
     };
