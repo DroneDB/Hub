@@ -6,14 +6,14 @@ import { parseUri, isDDBUri } from './utils';
 import Registry from './registry';
 
 const thumbs = {
+    // The types libddb gives a thumbnail (DDBGetEntryTypes: "file" or "build"); the Registry answers 404 for the
+    // others (models, videos, panoramas, vectors, ...), so they are not asked for.
     supportedForType: function (entryType) {
         entryType = parseInt(entryType);
         return entryType === entry.type.GEOIMAGE ||
             entryType === entry.type.GEORASTER ||
             entryType === entry.type.IMAGE ||
             entryType === entry.type.POINTCLOUD ||
-            entryType === entry.type.PANORAMA ||
-            entryType === entry.type.GEOPANORAMA ||
             entryType === entry.type.GAUSSIAN_SPLAT;
     },
 
