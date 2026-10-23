@@ -15,6 +15,8 @@ describe('thumbs.supportedForType', () => {
         ['image', T.IMAGE],
         ['geoimage', T.GEOIMAGE],
         ['georaster', T.GEORASTER],
+        ['panorama', T.PANORAMA],
+        ['geopanorama', T.GEOPANORAMA],
         ['point cloud', T.POINTCLOUD],
         ['gaussian splat', T.GAUSSIAN_SPLAT]
     ])('asks for the thumbnail of a %s', (_name, type) => {
@@ -22,9 +24,8 @@ describe('thumbs.supportedForType', () => {
     });
 
     it.each([
-        ['panorama', T.PANORAMA],
-        ['geopanorama', T.GEOPANORAMA],
         ['video', T.VIDEO],
+        ['geovideo', T.GEOVIDEO],
         ['model', T.MODEL],
         ['vector', T.VECTOR],
         ['markdown', T.MARKDOWN],
