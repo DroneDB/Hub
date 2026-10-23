@@ -5,6 +5,11 @@ import { Entry } from './entry';
 import { ApiError } from './apiError';
 import { failureMessageOf, isJsonType } from './http/httpClient';
 
+// The image format of map tiles is the extension of their URL, and the server sends exactly that format. WebP is the
+// default: smaller than PNG for the same tile (what a map pulls by the hundred). PNG is the universal one, for URLs
+// handed to other software (see ShareEmbed).
+export const TILE_FORMAT = "webp";
+
 export default class Dataset {
     constructor(registry, org, ds) {
         this.registry = registry;
@@ -66,11 +71,13 @@ export default class Dataset {
         return url;
     }
 
+    // options: retina, hash (the entry hash, versions the URL), format ("png" | "webp" | "jpg", TILE_FORMAT by default)
     tileUrl(path, tz, tx, ty, options = {}) {
         let retina = "";
         if (options.retina) retina = "@2x";
+        const format = options.format || TILE_FORMAT;
 
-        let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.png?path=${encodeURIComponent(path)}`;
+        let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.${format}?path=${encodeURIComponent(path)}`;
         if (options.hash) url += `&v=${encodeURIComponent(options.hash)}`;
         return url;
     }
@@ -79,7 +86,9 @@ export default class Dataset {
         let retina = "";
         if (options.retina) retina = "@2x";
 
-        let url = `${this.baseApi}/tiles-ex/${tz}/${tx}/${ty}${retina}.webp?path=${encodeURIComponent(path)}`;
+        const format = options.format || TILE_FORMAT;
+
+        let url = `${this.baseApi}/tiles-ex/${tz}/${tx}/${ty}${retina}.${format}?path=${encodeURIComponent(path)}`;
         if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;
         if (vizParams.bands) url += `&bands=${encodeURIComponent(vizParams.bands)}`;
         if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;

@@ -248,7 +248,8 @@ export default {
             if (this.shareMode === 'tms') {
                 if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD, ddb.entry.type.GEOIMAGE]
                     .indexOf(this.entry.type) !== -1) {
-                    return baseUrl + this.dataset.tileUrl(this.entry.path, "{z}", "{x}", "{y}");
+                    // Handed to other software (QGIS, Leaflet, ...): PNG, which every client reads
+                    return baseUrl + this.dataset.tileUrl(this.entry.path, "{z}", "{x}", "{y}", { format: "png" });
                 }
             }
             return '';
