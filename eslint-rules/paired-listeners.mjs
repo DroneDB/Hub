@@ -1,5 +1,5 @@
 /**
- * HUB-08 local rule: a file must remove every listener, bus subscription and interval
+ * Local rule: a file must remove every listener, bus subscription and interval
  * it adds, or mark why it need not with a `// lifetime: app|element|owner|paired` comment.
  * Same counting as scripts/audit_listeners.mjs (scripts/lib/listenerAudit.mjs).
  */
@@ -11,7 +11,7 @@ const JS_ROOT = path.join('webapp', 'js') + path.sep;
 export default {
     meta: {
         type: 'problem',
-        docs: { description: 'Listeners added in a file must be removed by that file (HUB-08)' },
+        docs: { description: 'Listeners added in a file must be removed by that file' },
         schema: [],
         messages: {
             unpaired: 'Listeners or timers not removed: addEventListener {{add}}/{{rem}}, setInterval {{si}}/{{ci}}, setTimeout {{st}}/{{ct}}, on {{on}}/{{off}}. '

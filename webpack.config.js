@@ -11,7 +11,7 @@ const zlib = require('zlib');
 const pkg = require('./package.json');
 const { minify } = require('terser');
 
-// HUB-04: Potree 1.8 ships these unminified. They are minified when copied (production builds):
+// Potree 1.8 ships these unminified. They are minified when copied (production builds):
 // names are kept, as Potree looks up some of its classes by name.
 const POTREE_MINIFIED = [
     'potree/build/potree/potree.js',
@@ -30,7 +30,7 @@ async function minifyPotreeScript(content) {
 }
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Text assets worth a precompressed twin (HUB-09)
+// Text assets worth a precompressed twin
 const COMPRESSIBLE = /\.(js|css|html|svg|wasm|json|txt|xml)$/i;
 
 module.exports = {
@@ -113,7 +113,7 @@ module.exports = {
             },
             {
                 // Fonts are always files: hashed, cached once, and only the faces and subsets
-                // a page uses are downloaded (HUB-01: 850 KB of base64 fonts were in the CSS)
+                // a page uses are downloaded
                 test: /\.(woff|woff2|eot|ttf)$/,
                 type: 'asset/resource'
             },
@@ -136,7 +136,7 @@ module.exports = {
                 exclude: /potree/,
             }),
         ],
-        // HUB-01: one chunk per concern. The heavy viewer libraries are async: they load with
+        // One chunk per concern. The heavy viewer libraries are async: they load with
         // the viewer that needs them, never with the login page. The default group has no
         // fixed name, so webpack splits the remaining packages by the chunks that use them
         // instead of merging every package into one initial file.
@@ -208,7 +208,7 @@ module.exports = {
                     from: 'webapp/public', to: '', globOptions: {
                         ignore: [
                             '**/index.html',
-                            // HUB-04: Potree workers the Hub never starts. It loads COPC only
+                            // Potree workers the Hub never starts. It loads COPC only
                             // (EptLaszipDecoderWorker); the EPT binary/zstandard workers import
                             // /libs/ept and /libs/zstd-codec, which are not shipped, and the plasio
                             // workers are superseded by workers/LASLAZWorker.js.
@@ -244,7 +244,7 @@ module.exports = {
         ...(isProduction ? [new MiniCssExtractPlugin({
             filename: '[name].[contenthash:8].css',
         })] : []),
-        // HUB-09: compress once at build time at the highest levels; the Registry serves the
+        // Compress once at build time at the highest levels; the Registry serves the
         // .br / .gz twin instead of compressing every response again at a fast level
         ...(isProduction ? [
             new CompressionPlugin({

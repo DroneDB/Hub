@@ -1,9 +1,9 @@
 /**
- * HQ-01 guard rules: patterns the HQ refactor removes may not come back.
+ * Guard rules: patterns the Hub has moved away from may not come back.
  *
  * Each guard lists the files that still use the pattern today. A file on an allow-list
  * gets the rule without that guard's entries; every other file gets all of them.
- * When a proposal removes a use, delete the file from the list (HQ-02..HQ-09);
+ * When a file stops using a pattern, delete it from the list;
  * the lists only shrink.
  */
 const SCOPE = ['webapp/js/**/*.vue', 'webapp/js/composables/**/*.js'];
@@ -14,22 +14,22 @@ export const GUARDS = [
         rule: 'no-restricted-syntax',
         entries: [{
             selector: "ExportDefaultDeclaration > ObjectExpression > Property[key.name='mixins']",
-            message: 'Use a composable from setup(), not a mixin (HQ-06).'
+            message: 'Use a composable from setup(), not a mixin.'
         }],
         allow: []
     },
     {
         id: '$parent',
         rule: 'no-restricted-properties',
-        entries: [{ property: '$parent', message: 'Pass data with props/emits, provide/inject or a store, not $parent (HQ-03/HQ-04).' }],
+        entries: [{ property: '$parent', message: 'Pass data with props/emits, provide/inject or a store, not $parent.' }],
         allow: []
     },
     {
         id: 'storage',
         rule: 'no-restricted-globals',
         entries: [
-            { name: 'localStorage', message: 'Use libs/preferences.js or usePreference() (HQ-02).' },
-            { name: 'sessionStorage', message: 'Use libs/preferences.js (HQ-02).' }
+            { name: 'localStorage', message: 'Use libs/preferences.js or usePreference().' },
+            { name: 'sessionStorage', message: 'Use libs/preferences.js.' }
         ],
         allow: []
     },
@@ -37,9 +37,9 @@ export const GUARDS = [
         id: 'window-storage',
         rule: 'no-restricted-properties',
         entries: [
-            { object: 'window', property: 'localStorage', message: 'Use libs/preferences.js or usePreference() (HQ-02).' },
-            { object: 'window', property: 'sessionStorage', message: 'Use libs/preferences.js (HQ-02).' },
-            { object: 'window', property: 'fetch', message: 'Use the Registry client (HQ-05).' }
+            { object: 'window', property: 'localStorage', message: 'Use libs/preferences.js or usePreference().' },
+            { object: 'window', property: 'sessionStorage', message: 'Use libs/preferences.js.' },
+            { object: 'window', property: 'fetch', message: 'Use the Registry client.' }
         ],
         allow: []
     },
@@ -47,8 +47,8 @@ export const GUARDS = [
         id: 'network',
         rule: 'no-restricted-globals',
         entries: [
-            { name: 'fetch', message: 'Use the Registry client (Dataset/SysApi methods, httpClient.fetchRaw) (HQ-05).' },
-            { name: 'XMLHttpRequest', message: 'Use the Registry client (HQ-05).' }
+            { name: 'fetch', message: 'Use the Registry client (Dataset/SysApi methods, httpClient.fetchRaw).' },
+            { name: 'XMLHttpRequest', message: 'Use the Registry client.' }
         ],
         allow: []
     }

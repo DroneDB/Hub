@@ -1,5 +1,5 @@
 /**
- * HQ-01 smoke suite: drives the real Hub in Chromium against a running Registry.
+ * Smoke suite: drives the real Hub in Chromium against a running Registry.
  * Not part of `npm test` (needs a server). Run before committing component changes:
  *
  *   HUB_URL=http://localhost:5100 npm run e2e

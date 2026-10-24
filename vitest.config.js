@@ -23,7 +23,7 @@ export default defineConfig({
             reportsDirectory: 'coverage',
             include: ['webapp/js/libs/**/*.js', 'webapp/js/composables/**/*.js', 'webapp/js/stores/**/*.js'],
             exclude: ['webapp/js/**/*.spec.js', 'webapp/js/libs/map/potree/**'],
-            // Ratchet: the 2026-10-20 baseline (HQ-01); raise as coverage grows
+            // Ratchet: the coverage reached so far; raise it as coverage grows
             thresholds: { lines: 32, statements: 32, functions: 32, branches: 77 }
         }
     }

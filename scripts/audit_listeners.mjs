@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 /**
- * HUB-08: every listener the Hub adds must be removed by the code that adds it.
+ * Every listener the Hub adds must be removed by the code that adds it.
  * The counting rules are in scripts/lib/listenerAudit.mjs (shared with the
- * `paired-listeners` ESLint rule). Exits 1 when a file adds more than it removes
- * (the HUB-08 acceptance criterion).
+ * `paired-listeners` ESLint rule). Exits 1 when a file adds more than it removes.
  *
  * Usage: node scripts/audit_listeners.mjs [webapp/js]
  */

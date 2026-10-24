@@ -1,5 +1,5 @@
 /**
- * HUB-08: counts the listener and timer registrations of one source file and the
+ * Counts the listener and timer registrations of one source file and the
  * removals that pair with them. Shared by scripts/audit_listeners.mjs (CI) and the
  * local `paired-listeners` ESLint rule, so both apply the same rules.
  *
@@ -7,8 +7,7 @@
  *   addEventListener / removeEventListener;
  *   .on('event', ...) (event bus, OpenLayers) / .off('event') and OpenLayers unByKey() / .un();
  *   setInterval / clearInterval;
- *   setTimeout / clearTimeout, in components and composables only (HQ-06: a timeout that
- *   outlives its component runs on an unmounted instance).
+ *   setTimeout / clearTimeout, in components and composables only (a timeout that outlives its component runs on an unmounted instance).
  * Not counted, because they remove themselves:
  *   registrations through the helpers (ListenerBag add/ol/bus, useListenerBag,
  *   useEventListener, useEmitter, PotreeSession track, and the component timers of

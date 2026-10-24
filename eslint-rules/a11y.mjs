@@ -1,7 +1,6 @@
 /**
  * eslint-plugin-vuejs-accessibility's recommended rules, as errors, on every component.
- * HQ-01 started with 284 findings in 65 files switched off; HQ-10 fixed them all, so a
- * new finding fails the lint. A justified exception is an eslint-disable-next-line with
+ * No rule is switched off for any file, so a new finding fails the lint. A justified exception is an eslint-disable-next-line with
  * the reason (for example a mouse shortcut whose keyboard path is elsewhere).
  */
 import vueA11y from 'eslint-plugin-vuejs-accessibility';

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * HUB-01 / HUB-02 bundle budget check.
+ * Bundle budget check.
  *
  * Reads a webpack stats file (produced with `NODE_ENV=production npx webpack --profile --json > stats.json`)
  * and reports:
@@ -8,9 +8,9 @@
  *   - packages that only lazy routes import but that landed in an initial chunk;
  *   - which vendor chunks each route group pulls (to catch eager imports inside route components);
  *   - data: URIs embedded in CSS (fonts inlined by the asset module rule).
- * Exits 1 when the budgets below are exceeded (they are the HUB-01/HUB-02 acceptance criteria).
+ * Exits 1 when the budgets below are exceeded.
  *
- *   - the size of the vendored Potree folder, with no source maps or never-loaded libraries (HUB-04/09).
+ *   - the size of the vendored Potree folder, with no source maps or never-loaded libraries.
  *
  * Usage: node check_bundle_budget.mjs <stats.json> <outputDir> [--budget-initial-kb 2600] [--budget-initial-gzip-kb 1000]
  * In this repository: npm run build:stats && npm run check:bundle
@@ -25,9 +25,9 @@ const arg = (name, def) => { const i = process.argv.indexOf(name); return i > 0 
 const BUDGET_INITIAL_KB = arg('--budget-initial-kb', 2600);
 const BUDGET_INITIAL_GZIP_KB = arg('--budget-initial-gzip-kb', 1000);
 const LAZY_ONLY_PACKAGES = ['three', '@sparkjsdev/spark', '@giro3d/giro3d', 'ol', 'proj4', '@codemirror/view', 'chart.js', 'markdown-it', 'laz-perf', 'copc'];
-// HUB-02: the dataset page loads the map, the text editor and the upload panel on first use
+// The dataset page loads the map, the text editor and the upload panel on first use
 const EAGER_VENDORS_FORBIDDEN_IN = { dataset: ['vendor-openlayers', 'vendor-codemirror', 'dataset-map', 'dataset-upload', 'dataset-editor'] };
-// HUB-04 / HUB-09: what the Potree viewer ships (7.9 MB with its scripts minified at copy time)
+// What the Potree viewer ships (7.9 MB with its scripts minified at copy time)
 const POTREE_BUDGET_MB = 9;
 
 const st = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
@@ -85,7 +85,7 @@ for (const n of st.assets.map(a => a.name).filter(n => n.endsWith('.css'))) {
     if (bytes > 50 * 1024) { console.log(`  ${n}: ${uris.length} data URIs, ${(bytes / 1024).toFixed(0)} KB`); fail(`${n} embeds ${(bytes / 1024).toFixed(0)} KB of data: URIs (fonts should be separate cacheable files)`); }
 }
 
-// 5. vendored Potree: no source maps, no libraries the viewer never loads (HUB-04, HUB-09)
+// 5. vendored Potree: no source maps, no libraries the viewer never loads
 const potree = path.join(outDir, 'potree');
 if (fs.existsSync(potree)) {
     let bytes = 0;
