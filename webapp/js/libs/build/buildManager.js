@@ -206,11 +206,6 @@ class BuildManager {
         }
     }
 
-    monitorDatasetForBuilds(dataset) {
-        this.registerDataset(dataset);
-        this.loadBuilds(dataset).catch(e => console.error('Error monitoring dataset for builds:', e));
-    }
-
     /* ---- cleanup ---- */
 
     cleanup() {

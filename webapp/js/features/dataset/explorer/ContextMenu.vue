@@ -100,8 +100,6 @@ export default {
             if (this.$refs.ctxMenu) {
                 this.$refs.ctxMenu.show(e);
             }
-
-            window.dispatchEvent(new Event("contextmenuopen"));
         },
 
         handleKeyDown: function (e) {

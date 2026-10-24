@@ -2,7 +2,7 @@
  * Named user preferences of the dataset and organisation pages, stored through
  * libs/preferences.js (HQ-02).
  */
-import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
+import { getPref, setPref, PREF } from '@/libs/preferences';
 
 /**
  * @returns {{sortColumn: string, sortDirection: 'asc'|'desc', itemsPerPage: number}|null}
@@ -13,10 +13,6 @@ export function getDatasetTablePreferences() {
 
 export function saveDatasetTablePreferences(sortColumn, sortDirection, itemsPerPage) {
     setPref(PREF.DATASET_TABLE, { sortColumn, sortDirection, itemsPerPage });
-}
-
-export function clearDatasetTablePreferences() {
-    removePref(PREF.DATASET_TABLE);
 }
 
 /** @returns {boolean} open a dataset right after creating it */

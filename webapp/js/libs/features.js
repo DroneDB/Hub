@@ -5,7 +5,6 @@
 export const Features = {
     ORGANIZATION_MEMBER_MANAGEMENT: 'organizationMemberManagement',
     USER_MANAGEMENT: 'userManagement',
-    STORAGE_LIMITER: 'storageLimiter',
     PASSWORD_POLICY: 'passwordPolicy',
     DATASET_THUMBNAIL_CANDIDATES: 'datasetThumbnailCandidates',
     MAX_EXPORT_SIZE_BYTES: 'maxExportSizeBytes',

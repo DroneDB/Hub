@@ -156,7 +156,6 @@ class FileAvailabilityChecker {
                     message: `Processing of '${this.getFileName(entry.path)}' is on hold.\n\nMissing: ${formatMissingDeps(listed.buildMissingDependencies)}.`,
                     title: 'Processing On Hold',
                     buildState: null,
-                    missingDependencies: listed.buildMissingDependencies || [],
                     actions: ['cancel', 'retry-build']
                 };
             }

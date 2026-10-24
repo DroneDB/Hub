@@ -376,14 +376,6 @@ class MeasureControls extends Control {
     }
 
     /**
-     * Get the current unit preference
-     * @returns {string} 'metric' or 'imperial'
-     */
-    getUnitPref() {
-        return this.unitPref;
-    }
-
-    /**
      * Get the count of measurements
      * @returns {number} Number of measurements
      */
@@ -528,14 +520,6 @@ class MeasureControls extends Control {
         }
         this.source.removeFeature(feature);
         this.updateButtonsVisibility(this.hasMeasurements(), false);
-    }
-
-    /**
-     * Set the saved state (shows/hides the saved badge and delete button)
-     */
-    setSavedState(isSaved) {
-        const hasMeasurements = this.hasMeasurements();
-        this.updateButtonsVisibility(hasMeasurements, isSaved);
     }
 
     /**

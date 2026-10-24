@@ -82,5 +82,3 @@ export function consumePendingUpdateNotice() {
     safeStorage.removeItem(PREF.HUB_UPDATE_ATTEMPTED, SESSION);
     return notice;
 }
-
-export const __TEST__ = { STORAGE_KEY: PREF.HUB_UPDATE_NOTICE, SESSION_GUARD_KEY: PREF.HUB_UPDATE_ATTEMPTED, BUNDLE_VERSION };

@@ -98,7 +98,7 @@ describe('buildable file: the artifacts decide, the job explains', () => {
         buildManager.getBuildState.mockReturnValue(job('Succeeded'));
         const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'] }));
         const result = await checker.check(dataset, raster(), 'map');
-        expect(result).toMatchObject({ available: false, status: 'blocked', missingDependencies: ['ortho.tfw'] });
+        expect(result).toMatchObject({ available: false, status: 'blocked' });
         expect(result.message).toContain('ortho.tfw');
     });
 

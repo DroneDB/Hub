@@ -275,14 +275,6 @@ class SelectionControl extends Control {
     }
 
     /**
-     * Get the currently active mode.
-     * @returns {string|null} 'rectangle', 'polygon', or null
-     */
-    getActiveMode() {
-        return this.activeMode;
-    }
-
-    /**
      * Show or hide the clear selection button.
      * @param {boolean} visible
      */
