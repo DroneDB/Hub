@@ -26,39 +26,6 @@ export function useTimeout(fn, ms) {
 }
 
 /**
- * Runs `fn` every `ms`.
- * @param {() => void} fn
- * @param {number} ms
- * @returns {{ clear: () => void }}
- */
-export function useInterval(fn, ms) {
-    let handle = setInterval(fn, ms);
-    const clear = () => { if (handle) { clearInterval(handle); handle = null; } };
-    stopWithScope(clear);
-    return { clear };
-}
-
-/**
- * A debounced `fn`: runs `ms` after the last call; `cancel()` drops a pending run.
- * @template {(...args: any[]) => void} F
- * @param {F} fn
- * @param {number} ms
- * @returns {F & { cancel: () => void }}
- */
-export function useDebounceFn(fn, ms) {
-    /** @type {ReturnType<typeof setTimeout>|null} */
-    let handle = null;
-    const cancel = () => { if (handle) { clearTimeout(handle); handle = null; } };
-    const debounced = /** @type {F & { cancel: () => void }} */ (/** @type {unknown} */ ((...args) => {
-        cancel();
-        handle = setTimeout(() => { handle = null; fn(...args); }, ms);
-    }));
-    debounced.cancel = cancel;
-    stopWithScope(cancel);
-    return debounced;
-}
-
-/**
  * The current time, updated every second by the shared clock (paused while the page is
  * hidden).
  * @returns {import('vue').Ref<number>}

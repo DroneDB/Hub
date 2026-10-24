@@ -7,7 +7,6 @@
  *
  * Composition API (setup or another composable):
  *   useEventListener(window, 'resize', onResize);
- *   useEmitter('folderOpened', onFolderOpened);
  * Options API: `setup() { return { listeners: useListenerBag() }; }`, then
  *   this.listeners.add(target, 'click', handler)          // DOM / EventDispatcher
  *   this.listeners.bus(emitter, 'addItems', handler)      // event bus
@@ -16,7 +15,6 @@
  * lifecycleListenersMixin twin is gone).
  */
 import { getCurrentScope, onScopeDispose } from 'vue';
-import emitter from '@/libs/eventBus';
 import { ListenerBag } from '@/libs/listenerBag';
 
 function scopedBag() {
@@ -28,11 +26,6 @@ function scopedBag() {
 /** addEventListener removed with the current component / effect scope. */
 export function useEventListener(target, type, handler, options) {
     return scopedBag().add(target, type, handler, options);
-}
-
-/** Event bus subscription removed with the current component / effect scope. */
-export function useEmitter(event, handler, bus = emitter) {
-    return scopedBag().bus(bus, event, handler);
 }
 
 /**

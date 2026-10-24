@@ -14,10 +14,6 @@ export function getCookie(key) {
     return cobj[key];
 }
 
-export function clearCookie(key) {
-    document.cookie = `${key}=;-1;path=/`;
-}
-
 export function queryParams(location) {
     let params = {};
     let paramsRaw = (location.search.replace("?", "").match(/([^&=]+)=?([^&]*)/g) || []);
@@ -86,16 +82,6 @@ export function formatTimeAgo(ms) {
     if (days < 30) return `${days} day${days > 1 ? 's' : ''} ${suffix}`;
     if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
     return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
-}
-/**
- * ProgressBar mode for task progress values.
- * A task that reports no progress (null/undefined), 0 or a negative percent
- * renders as an animated indeterminate bar until a real percent arrives.
- * @param {number|null|undefined} percent Task progress percent (0-100, nullable)
- * @returns {'indeterminate'|'determinate'} ProgressBar mode
- */
-export function taskProgressMode(percent) {
-    return (percent == null || percent <= 0) ? 'indeterminate' : 'determinate';
 }
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {

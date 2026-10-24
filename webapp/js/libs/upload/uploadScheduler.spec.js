@@ -41,13 +41,13 @@ describe('uploadScheduler', () => {
         const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 6, policy: policy() });
         scheduler.add(Array.from({ length: 20 }, (_, i) => file(i)));
         await flush();
-        expect(scheduler.inFlightCount).toBe(6);
+        expect(server.pending.length).toBe(6);
 
         for (let done = 0; done < 14; done++) {
             server.releaseNext();
             await flush();
             // The freed slot was taken at once
-            expect(scheduler.inFlightCount).toBe(6);
+            expect(server.pending.length).toBe(6);
         }
         while (server.pending.length) { server.releaseNext(); await flush(); }
         expect(scheduler.snapshot().counts.done).toBe(20);
@@ -59,7 +59,7 @@ describe('uploadScheduler', () => {
         const scheduler = createUploadScheduler({ send: server.send, maxConcurrency: () => 2, policy: policy() });
         scheduler.add([file(0), file(1), file(2), file(3)]);
         await flush();
-        expect(scheduler.inFlightCount).toBe(2);
+        expect(server.pending.length).toBe(2);
         server.releaseNext(); await flush();
         server.releaseNext(); await flush();
         server.releaseNext(); await flush();

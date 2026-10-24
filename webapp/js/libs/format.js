@@ -6,9 +6,9 @@
  *
  * Empty input (null, undefined, '', invalid date) returns `placeholder` ('' by default).
  */
-import { bytesToSize, formatTimeAgo } from './utils';
+import { formatTimeAgo } from './utils';
 
-export { bytesToSize as formatBytes, formatTimeAgo };
+export { formatTimeAgo };
 
 /**
  * @typedef {Date|number|string|null|undefined} DateInput  a Date, epoch milliseconds or an ISO string
@@ -80,16 +80,6 @@ export function formatDuration(ms, options) {
 export function formatNumber(value, digits = 3, { placeholder = '-' } = {}) {
     if (value === null || value === undefined || value === '') return placeholder;
     return typeof value === 'number' ? value.toFixed(digits) : String(value);
-}
-
-/**
- * "45.123457, 9.765432" (latitude first).
- * @param {number} lat
- * @param {number} lon
- * @param {number} [digits]
- */
-export function formatLatLon(lat, lon, digits = 6) {
-    return `${lat.toFixed(digits)}, ${lon.toFixed(digits)}`;
 }
 
 /**

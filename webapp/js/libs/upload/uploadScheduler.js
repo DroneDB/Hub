@@ -316,9 +316,6 @@ export function createUploadScheduler(opts) {
         retry,
         retryFailed,
         cancelAll,
-        snapshot,
-        get inFlightCount() {
-            return inFlight.size;
-        }
+        snapshot
     };
 }

@@ -72,9 +72,3 @@ export function isExportTooLarge(info, maxBytes) {
     const estimated = estimateExportSize(info);
     return estimated > 0 && estimated > maxBytes;
 }
-
-/**
- * Human-readable byte size formatter.
- * Re-exports bytesToSize from utils.js as the single source of truth.
- */
-export { bytesToSize as formatBytes } from './utils';

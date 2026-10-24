@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { effectScope } from 'vue';
 import { ListenerBag } from '@/libs/listenerBag';
-import { useEventListener, useEmitter, useListenerBag } from '@/composables/useEventListener';
+import { useEventListener, useListenerBag } from '@/composables/useEventListener';
 import mitt from 'mitt';
 
 describe('ListenerBag', () => {
@@ -40,23 +40,16 @@ describe('ListenerBag', () => {
     });
 });
 
-describe('useEventListener / useEmitter', () => {
-    it('remove their listeners when the scope is disposed', () => {
+describe('useEventListener', () => {
+    it('removes its listener when the scope is disposed', () => {
         const scope = effectScope();
         const el = new EventTarget();
-        const bus = mitt();
-        const onClick = vi.fn(), onBus = vi.fn();
-        scope.run(() => {
-            useEventListener(el, 'click', onClick);
-            useEmitter('x', onBus, bus);
-        });
+        const onClick = vi.fn();
+        scope.run(() => useEventListener(el, 'click', onClick));
         el.dispatchEvent(new Event('click'));
-        bus.emit('x');
         scope.stop();
         el.dispatchEvent(new Event('click'));
-        bus.emit('x');
         expect(onClick).toHaveBeenCalledTimes(1);
-        expect(onBus).toHaveBeenCalledTimes(1);
     });
 });
 

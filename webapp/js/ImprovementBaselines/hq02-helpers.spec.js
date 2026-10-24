@@ -16,13 +16,11 @@ describe('libs/format', () => {
         expect(f.formatDateTime(d)).toContain(d.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' }));
     });
 
-    it('formats bytes, durations, numbers and coordinates', async () => {
+    it('formats durations and coordinates', async () => {
         const f = await import('@/libs/format');
-        expect(f.formatBytes(1536)).toBe('1.5 KB');
         expect(f.formatDuration(3723000)).toBe('1h 2m 3s');
         expect(f.formatDuration(5000)).toBe('5s');
         expect(f.formatDurationSeconds(125)).toBe('2m 5s');
-        expect(f.formatLatLon(45.1234567, 9.7654321)).toBe('45.123457, 9.765432');
         expect(f.toDms(45.5, 'lat')).toBe(`45\u00B030'00.00" N`);
         expect(f.toDms(-9.25, 'lon')).toBe(`9\u00B015'00.00" W`);
     });
