@@ -25,7 +25,5 @@ const hasStatus = (e, status) => !!e && typeof e === 'object' && /** @type {any}
 export const isUnauthorized = e => hasStatus(e, 401);
 /** @param {unknown} e */
 export const isForbidden = e => hasStatus(e, 403);
-/** @param {unknown} e */
-export const isNotFound = e => hasStatus(e, 404);
 
 export { ApiError };

@@ -33,11 +33,6 @@ export function datasetPathFromUri(uri) {
     return [dataset, path];
 }
 
-export function datasetFromUri(uri) {
-    const [dataset] = datasetPathFromUri(uri);
-    return dataset;
-}
-
 export function pathFromUri(uri) {
     if (isDDBUri(uri)) {
         const [, path] = datasetPathFromUri(uri);
@@ -45,11 +40,6 @@ export function pathFromUri(uri) {
     } else if (uri.startsWith("file://")) {
         return uri.replace(/^file:\/\//, "");
     } else throw Error("Cannot extract path from URI: " + uri);
-}
-
-export function entryFromFile(file) {
-    const [dataset] = datasetPathFromUri(file.path);
-    return dataset.Entry(file.entry);
 }
 
 export function entryLabel(entry) {
@@ -60,4 +50,4 @@ export function entryLabel(entry) {
     }
 }
 
-export default { parseUri, isDDBUri, datasetPathFromUri, datasetFromUri, pathFromUri, entryFromFile, entryLabel };
+export default { parseUri, isDDBUri, datasetPathFromUri, pathFromUri, entryLabel };

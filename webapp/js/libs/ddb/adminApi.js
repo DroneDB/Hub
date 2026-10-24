@@ -107,15 +107,6 @@ export default class AdminApi {
         return await this.registry.deleteRequest(`/users/roles/${encodeURIComponent(roleName)}`);
     }
 
-    async updateUserRoles(userName, roles) {
-        const result = await this.registry.putRequest(`/users/${encodeURIComponent(userName)}`, {
-            email: null, // Will be handled by the updateUser method instead
-            roles: roles
-        });
-        // PUT /users/{userName} returns 200 OK with empty body on success
-        return result || {}; // Return empty object if result is null/undefined
-    }
-
     // User organization management
     async getUserOrganizations(userName) {
         return await this.registry.getRequest(`/users/${encodeURIComponent(userName)}/orgs`);

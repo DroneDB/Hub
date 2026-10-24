@@ -55,10 +55,6 @@ class Entry {
         return this.requireArtifact(ArtifactRole.POINTCLOUD_COPC, 'The COPC file');
     }
 
-    getCog() {
-        return this.requireArtifact(ArtifactRole.RASTER_COG, 'The COG file');
-    }
-
     getNxz() {
         return this.requireArtifact(ArtifactRole.MODEL_NEXUS, 'The 3D model');
     }
@@ -96,14 +92,6 @@ class Entry {
         // Bounds are an optimization: on any failure the viewer frames client-side.
         const b = await this.readArtifactJson(ArtifactRole.GSPLAT_BOUNDS);
         return b && Array.isArray(b.min) && Array.isArray(b.max) ? b : null;
-    }
-
-    /**
-     * URL of the georeferencing sidecar when present, or null. A splat without
-     * georeferencing renders in local space, so callers must tolerate null.
-     */
-    getGeoref() {
-        return this.findArtifact(ArtifactRole.GSPLAT_GEOREF);
     }
 
     /** The parsed georeferencing sidecar, or null when absent or unreadable. */

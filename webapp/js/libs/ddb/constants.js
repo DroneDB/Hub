@@ -3,5 +3,3 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 export const DEFAULT_REGISTRY = "hub.dronedb.app";
-
-export default { DEFAULT_REGISTRY };

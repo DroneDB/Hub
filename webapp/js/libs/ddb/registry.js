@@ -77,11 +77,6 @@ export default class Registry {
         return this.url.replace(/^https?:\/\//, "");
     }
 
-    get tagUrl() {
-        // Drop the https prefix if it's secure (it's the default)
-        return this.secure ? this.remote : this.url;
-    }
-
     get secure() {
         return this.url.startsWith("https://");
     }
@@ -242,10 +237,6 @@ export default class Registry {
         return this.makeRequest(endpoint, "DELETE", body);
     }
 
-    async patchRequest(endpoint, body = {}) {
-        return this.makeRequest(endpoint, "PATCH", body);
-    }
-
     // Methods for explicit FormData usage (for file uploads or when needed)
     async postFormData(endpoint, formData, options = {}) {
         if (!(formData instanceof FormData))
@@ -257,12 +248,6 @@ export default class Registry {
         if (!(formData instanceof FormData))
             throw new Error('Expected FormData instance');
         return this.makeRequest(endpoint, "PUT", formData);
-    }
-
-    async patchFormData(endpoint, formData) {
-        if (!(formData instanceof FormData))
-            throw new Error('Expected FormData instance');
-        return this.makeRequest(endpoint, "PATCH", formData);
     }
 
     async deleteFormData(endpoint, formData) {

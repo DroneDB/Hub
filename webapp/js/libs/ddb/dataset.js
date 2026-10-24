@@ -99,19 +99,6 @@ export default class Dataset {
         return url;
     }
 
-    thumbExUrl(path, size, vizParams = {}) {
-        let url = `${this.baseApi}/thumb-ex?path=${encodeURIComponent(path)}`;
-        if (size) url += `&size=${size}`;
-        if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;
-        if (vizParams.bands) url += `&bands=${encodeURIComponent(vizParams.bands)}`;
-        if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;
-        if (vizParams.bandFilter) url += `&bandFilter=${encodeURIComponent(vizParams.bandFilter)}`;
-        if (vizParams.colormap) url += `&colormap=${encodeURIComponent(vizParams.colormap)}`;
-        if (vizParams.rescale) url += `&rescale=${encodeURIComponent(vizParams.rescale)}`;
-        if (vizParams.stretch) url += `&stretch=${encodeURIComponent(vizParams.stretch)}`;
-        return url;
-    }
-
     async getRasterInfo(path) {
         return this.registry.getRequest(`${this.baseApi}/raster-info?path=${encodeURIComponent(path)}`);
     }
@@ -465,11 +452,6 @@ export default class Dataset {
         formData.append('path', path);
         formData.append('crs', crs);
         return this.registry.postFormData(`${this.baseApi}/cad/crs`, formData);
-    }
-
-    async clearCompletedBuilds() {
-        const response = await this.registry.postRequest(`${this.baseApi}/builds/clear`, {});
-        return response;
     }
 
     async rescan(stopOnError = false) {
