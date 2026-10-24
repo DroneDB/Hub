@@ -75,10 +75,6 @@ body {
     display: none !important;
 }
 
-.spin {
-    animation: rotation 2s infinite linear;
-}
-
 // A <button> that looks like the element it replaces: clickable text, icons
 // and headers get keyboard focus and Enter/Space for free.
 .btn-reset {
@@ -204,16 +200,6 @@ div.loading {
         overflow: auto;
 
         height: 100%;
-    }
-}
-
-@keyframes rotation {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
     }
 }
 

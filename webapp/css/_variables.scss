@@ -49,8 +49,6 @@
 //    Map.vue, SingleMap.vue, olMeasure.vue, olSelection.vue
 //    construct OpenLayers Style objects with rgba() color
 //    strings. These are rendering-engine colors, not CSS.
-//    Color tokens exist (--ddb-map-*, --ddb-measure-*) as
-//    reference but are not consumed by OL JS code.
 //
 // 8. Color picker palette arrays:
 //    PointAnnotationDialog.vue, MeasurementPropertiesDialog.vue
@@ -63,7 +61,7 @@
 //    maps the legacy pixel API to rem.
 //
 // RADIUS SCALE:
-//   sm = 0.25rem (rounded-1), md = 0.5rem (rounded-3), lg = 1rem (rounded-4)
+//   sm = 0.25rem (rounded-1), md = 0.5rem (rounded-3)
 //
 // EXCEPTIONS (px still allowed):
 //   - Mouse-tracking positions (event.clientX/Y in JS)
@@ -81,8 +79,6 @@
     --ddb-primary-rgb: 0, 112, 224;
     --ddb-primary-hover: #0060bf;
     --ddb-secondary: #00C4CC;
-    --ddb-secondary-rgb: 0, 196, 204;
-    --ddb-accent: #6C5CE7;
 
     // ── Text ───────────────────────────────────────────────
     --ddb-text: #1A1A2E;
@@ -96,7 +92,6 @@
     --ddb-bg-light: #FAFBFC;
     --ddb-bg-subtle: #f5f5f5;
     --ddb-bg-hover: #f0f0f0;
-    --ddb-bg-dark: #212121;
     --ddb-bg-surface: #fff;
 
     // ── Borders ────────────────────────────────────────────
@@ -123,12 +118,10 @@
     // ── Border Radius ──────────────────────────────────────
     --ddb-radius-sm: 0.25rem;    // Bootstrap rounded-1
     --ddb-radius-md: 0.5rem;     // Bootstrap rounded-3
-    --ddb-radius-lg: 1rem;       // Bootstrap rounded-4
 
     // ── Shadows ────────────────────────────────────────────
     --ddb-shadow-sm: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
     --ddb-shadow-md: 0 0.25rem 1rem rgba(0, 0, 0, 0.15);
-    --ddb-shadow-lg: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
 
     // ── Layout ─────────────────────────────────────────────
     --ddb-sidebar-width: 18.75rem;     // 300px
@@ -162,17 +155,6 @@
 
     // ── Measure / Annotation colors ────────────────────────
     --ddb-measure-color: #ffcc33;
-    --ddb-measure-fill: rgba(255, 204, 51, 0.7);
-    --ddb-measure-vertex-fill: rgba(0, 0, 0, 0.9);
-    --ddb-measure-vertex-stroke: rgba(255, 255, 255, 0.4);
-    --ddb-measure-sketch-fill: rgba(255, 255, 255, 0.4);
-
-    // ── Map colors ─────────────────────────────────────────
-    --ddb-map-shot-color: rgba(75, 150, 243, 1);
-    --ddb-map-shot-selected: rgba(255, 158, 103, 1);
-    --ddb-map-shot-hover: rgba(253, 226, 147, 1);    --ddb-map-shot-text: rgba(252, 252, 255, 1);    --ddb-map-label-color: #000;
-    --ddb-map-label-halo: #fff;
-    --ddb-map-vector-selected: rgba(255, 158, 103, 0.8);
 
     // ── Tooltip ────────────────────────────────────────────
     --ddb-tooltip-bg: rgba(0, 0, 0, 0.85);
@@ -202,12 +184,7 @@
     --ddb-viewer-btn-primary-hover: #357abd;
     --ddb-viewer-btn-danger: #e74c3c;
     --ddb-viewer-btn-danger-hover: #c0392b;
-    --ddb-viewer-btn-danger-glow: rgba(231, 76, 60, 0.8);
     --ddb-viewer-select-bg: #555;
     --ddb-viewer-select-border: #777;
     --ddb-viewer-label-color: #555;
-
-    // ── Gradients
-    --ddb-gradient-start: #0025e0;
-    --ddb-gradient-end: #00bbe0;
 }
