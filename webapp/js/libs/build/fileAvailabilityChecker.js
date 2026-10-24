@@ -11,7 +11,8 @@ import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
-import { currentEntry } from '@/libs/build/entryBuild';
+import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
+import { isActiveState } from '@/libs/tasks/taskStates';
 
 // Build artifact each viewer needs, by role (the entry DTO lists the artifacts that exist).
 // An array is an any-of match.
@@ -138,80 +139,55 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * Checks buildable files (pointcloud, georaster, model, vector)
+     * Checks buildable files (pointcloud, georaster, model, vector).
+     *
+     * What can be opened is what the entry lists: libddb's artifacts (through Registry) say whether
+     * the output a viewer needs exists, and the build status the server could not leave out says why
+     * it does not (on hold, running, failed). The Hangfire job is the progress of a running build
+     * and the reason of a failed one: a job that succeeded does not make a build that is not there.
      */
     async checkBuildableFile(dataset, entry, viewType, options = {}) {
         try {
-            const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
+            // 1. A running job is authoritative about progress (nothing fresher can exist)
+            const job = this.currentJob(dataset, entry.path);
+            if (job && isActiveState(job.currentState))
+                return this.handleExistingBuildState(job, entry);
 
-            // 1. Check build state in BuildManager cache. An in-progress build is always
-            // authoritative (nothing fresher can exist), so surface it immediately.
-            const buildState = BuildManager.getBuildState(dataset, entry.path);
+            // 2. The entry as the server reports it now: the artifacts it lists, else why not
+            const roles = this.getRequiredArtifact(entry.type, viewType, entry);
+            const isReady = e => roles ? !!findArtifactIn(e, roles) : isBuilt(e);
+            const listed = options.current ? entry : await currentEntry(dataset, entry, isReady);
 
-            if (buildState && activeStates.includes(buildState.currentState))
-                return this.handleExistingBuildState(buildState, entry);
+            if (isReady(listed)) {
+                return { available: true, status: 'ready', message: '', title: '', buildState: job, actions: [] };
+            }
 
-            // 2. If no active build state in cache, query taskMonitor store for one
-            const allTasks = taskMonitor.getTasks(dataset);
-            const buildTasks = allTasks.filter(t => t.toolId === 'build');
-            const currentBuild = buildTasks.find(b => b.path === entry.path);
-
-            if (currentBuild && activeStates.includes(currentBuild.state))
-                return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
-
-            // 2b. No active job found: the list API may already know the build is
-            // deferred because a dependency (companion file or external tool) is missing.
-            // This must be checked BEFORE trusting any terminal (Succeeded/Failed) cached
-            // job below: a build can have succeeded in the past and then become pending
-            // again (e.g. its companion file was later removed), leaving a stale
-            // "Succeeded" job record for the same path. entry.buildStatus reflects the
-            // CURRENT on-disk state, freshly recomputed by the server on every list()
-            // call from ddb.GetPendingBuildInfo(), so it takes priority over job history.
-            if (entry.buildStatus === 'pending') {
+            // Deferred because a dependency (companion file or external tool) is missing. Checked
+            // before any terminal job: a build that succeeded once can become pending again (its
+            // companion file was removed) and the job history still says "Succeeded".
+            if (listed.buildStatus === 'pending') {
                 return {
                     available: false,
                     status: 'blocked',
-                    message: `Processing of '${this.getFileName(entry.path)}' is on hold.\n\nMissing: ${formatMissingDeps(entry.buildMissingDependencies)}.`,
+                    message: `Processing of '${this.getFileName(entry.path)}' is on hold.\n\nMissing: ${formatMissingDeps(listed.buildMissingDependencies)}.`,
                     title: 'Processing On Hold',
                     buildState: null,
-                    missingDependencies: entry.buildMissingDependencies || [],
+                    missingDependencies: listed.buildMissingDependencies || [],
                     actions: ['cancel', 'retry-build']
                 };
             }
 
-            // 2c. Not pending: now it's safe to trust a terminal cached build state
-            // (Succeeded/Failed/etc.) found above.
-            if (buildState)
-                return this.handleExistingBuildState(buildState, entry);
+            // A build the server sees running that this page has no job for yet (started elsewhere)
+            if (listed.buildStatus === 'building')
+                return this.handleExistingBuildState({ path: entry.path, currentState: 'Processing' }, entry);
 
-            if (currentBuild)
-                return this.handleExistingBuildState({ path: currentBuild.path, currentState: currentBuild.state }, entry);
+            // The job says why a build ended without its output: it failed, or left a state we do not know
+            if (job && job.currentState !== 'Succeeded')
+                return this.handleExistingBuildState(job, entry);
+            if (listed.buildStatus === 'failed')
+                return this.handleExistingBuildState({ path: entry.path, currentState: 'Failed' }, entry);
 
-            // 3. No build found - check if output file exists anyway
-            const roles = this.getRequiredArtifact(entry.type, viewType, entry);
-            if (roles) {
-                const isAvailable = await this.hasArtifact(dataset, entry, roles, options.current);
-
-                if (isAvailable) {
-                    const syntheticBuildState = {
-                        path: entry.path,
-                        currentState: 'Succeeded',
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString()
-                    };
-
-                    return {
-                        available: true,
-                        status: 'ready',
-                        message: '',
-                        title: '',
-                        buildState: syntheticBuildState,
-                        actions: []
-                    };
-                }
-            }
-
-            // 4. Buildable file without build - needs processing
+            // 3. Buildable file without its build - needs processing
             return {
                 available: false,
                 status: 'queued',
@@ -235,24 +211,24 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * Handles an existing build state
+     * The build job of an entry as { path, currentState }: the BuildManager cache and the task
+     * monitor store, a running one first (they are the same tasks; the cache also holds the
+     * "Enqueued" a build start writes before the monitor has refreshed).
+     */
+    currentJob(dataset, path) {
+        const cached = BuildManager.getBuildState(dataset, path);
+        const task = taskMonitor.getTasks(dataset).find(t => t.toolId === 'build' && t.path === path);
+        const jobs = [cached, task && { path: task.path, currentState: task.state }].filter(Boolean);
+        return jobs.find(j => isActiveState(j.currentState)) || jobs[0] || null;
+    }
+
+    /**
+     * Handles the job of a build that is running or ended without its output
      */
     handleExistingBuildState(buildState, entry) {
         const fileName = this.getFileName(entry.path);
-        const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
 
-        if (buildState.currentState === 'Succeeded') {
-            return {
-                available: true,
-                status: 'ready',
-                message: '',
-                title: '',
-                buildState: buildState,
-                actions: []
-            };
-        }
-
-        if (activeStates.includes(buildState.currentState)) {
+        if (isActiveState(buildState.currentState)) {
             const timeInfo = this.getTimeInfo(buildState);
             return {
                 available: false,

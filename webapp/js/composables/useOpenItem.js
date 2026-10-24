@@ -42,11 +42,23 @@ export function useOpenItem({ dataset, route, canWrite, dialogs, actions, showIn
             title: availability.title, message: availability.message, status: availability.status,
             actions: availability.actions, buildState: availability.buildState,
             onBuildStarted: entry => notify.info(`Build started for ${pathutils.basename(entry.path)}`, { summary: 'Build Started' }),
-            onBuildCompleted: entry => {
+            // The job has ended: the viewer opens when the entry lists what it needs (a job that
+            // succeeded can leave the build on hold), else the dialog says what is missing
+            onBuildCompleted: async entry => {
                 dialog.close();
-                notify.success(`Build completed for ${entry.path}. Opening viewer...`, { summary: 'Build Completed' });
-                const view = defaultViewFor(entry);
-                if (view) openViewer(entry.path, view);
+                try {
+                    const view = defaultViewFor(entry);
+                    if (!view) return;
+                    const availability = await FileAvailabilityChecker.check(dataset, entry, view);
+                    if (!availability.available) {
+                        explainUnavailable(availability, node);
+                        return;
+                    }
+                    notify.success(`Build completed for ${entry.path}. Opening viewer...`, { summary: 'Build Completed' });
+                    openViewer(node.path, view);
+                } catch (e) {
+                    actions.showError(e.message, 'Error');
+                }
             },
             onBuildFailed: buildState => actions.showError(`Build failed for ${buildState.path}`, 'Build Error'),
             onTimeout: () => {

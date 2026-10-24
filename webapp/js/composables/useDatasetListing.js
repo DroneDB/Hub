@@ -1,14 +1,17 @@
 /**
  * useDatasetListing - the items of the folder on show on the dataset page (HQ-09, out of
  * ViewDataset and its mixins): kept sorted, and every change announced on the event bus
- * so the tree and the map follow (addItems / deleteEntries).
+ * so the tree and the map follow (addItems / deleteEntries). The build fields of an item (the
+ * artifacts the entry lists, its build status) are read again when its build job ends.
  *
  *   const listing = useDatasetListing(dataset);
  *   listing.added([itemFor(dataset, entry)]);   listing.removed(['a.jpg']);
  */
-import { ref, computed } from 'vue';
+import { ref, computed, getCurrentScope, onScopeDispose } from 'vue';
 import emitter from '@/libs/eventBus';
 import BuildManager from '@/libs/build/buildManager';
+import { applyBuildFields } from '@/libs/build/entryBuild';
+import { isTerminalState } from '@/libs/tasks/taskStates';
 import { itemFor, sortItems, isInFolder, entriesInView } from '@/libs/dataset/explorerItems';
 
 /** @param {any} dataset */
@@ -51,6 +54,32 @@ export function useDatasetListing(dataset) {
         if (inView(entry.path) && !files.value.some(f => f.entry.path === entry.path)) added([itemFor(dataset, entry)]);
     }
 
+    /**
+     * An entry is a snapshot of the listing that gave it: a build that ends afterwards is not in it.
+     * Reads the entry again and copies its build fields (artifacts, build status) onto the item on
+     * show, so the badges, the download menu and the viewers' gate follow what the build produced.
+     * A path whose refresh is running is not asked twice (a state change reaches us more than once).
+     */
+    const refreshing = new Set();
+    async function refreshBuild(path) {
+        const item = files.value.find(f => f.entry.path === path);
+        if (!item || refreshing.has(path)) return;
+        refreshing.add(path);
+        try {
+            applyBuildFields(item.entry, await dataset.listOne(path));
+        } catch (e) {
+            console.warn(`Could not refresh the build of ${path}:`, e);
+        } finally {
+            refreshing.delete(path);
+        }
+    }
+
+    const onBuildStateChanged = data => {
+        if (data.dataset === dataset && isTerminalState(data.newState)) refreshBuild(data.filePath);
+    };
+    BuildManager.on('buildStateChanged', onBuildStateChanged);
+    if (getCurrentScope()) onScopeDispose(() => BuildManager.off('buildStateChanged', onBuildStateChanged));
+
     /** Uploaded entries as the folder on show sees them (subfolders as their top folder). */
     function uploaded(entries) {
         const items = entriesInView(entries, currentPath.value)
@@ -85,5 +114,5 @@ export function useDatasetListing(dataset) {
         }
     }
 
-    return { files, currentPath, isLoading, selected, inView, put, drop, added, removed, addEntry, uploaded, reload };
+    return { files, currentPath, isLoading, selected, inView, put, drop, added, removed, addEntry, uploaded, reload, refreshBuild };
 }

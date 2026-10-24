@@ -5,7 +5,7 @@ import { isLocalVector } from '@/libs/openItemDefaults';
 import { isCadDrawing } from '@/libs/cadCrs';
 import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceeded } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -530,7 +530,7 @@ function makeDownloadItem(label, icon, entryType, ctx) {
             const sel = ctx.getSelectedEntries();
             return sel.length === 1
                 && sel[0].entry.type === entryType
-                && isBuildSucceeded(ctx.dataset, sel[0]);
+                && isBuildComplete(ctx.dataset, sel[0]);
         },
         click: () => {
             const sel = ctx.getSelectedEntries();

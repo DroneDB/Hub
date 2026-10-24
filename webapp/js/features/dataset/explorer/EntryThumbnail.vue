@@ -37,6 +37,7 @@ import Keyboard from '@/libs/keyboard';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildHelpers';
+import { shownBuildStatus } from '@/libs/build/entryBuild';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 
@@ -90,19 +91,16 @@ export default {
         }
     },
     computed: {
-        // Effective badge status: the live Hangfire state (once a job exists)
-        // takes priority over the static list-API status. "ready" (built) is
-        // the default and never produces a badge - only queued/pending/failed do.
+        // Effective badge status: the job gives failure (a running build shows the spinner), the
+        // entry says whether the build exists. "ready" (built) is the default and never produces
+        // a badge - only queued/pending/failed do.
         effectiveBuildStatus() {
-            if (this.buildState) {
-                return this.buildState.currentState === 'Failed' ? 'failed' : null;
-            }
-            const status = this.file.entry && this.file.entry.buildStatus;
-            return status === 'pending' || status === 'queued' || status === 'failed' ? status : null;
+            return shownBuildStatus(this.buildState, this.file.entry);
         },
         getTitleText() {
             if (this.error) return this.error;
-            if (this.buildState) {
+            // The job's state, unless the entry says more (a job that succeeded can leave a build on hold)
+            if (this.buildState && this.effectiveBuildStatus !== 'pending' && this.effectiveBuildStatus !== 'queued') {
                 return `${this.file.path}\nBuild Status: ${this.buildState.currentState}`;
             }
             if (this.effectiveBuildStatus === 'pending') {

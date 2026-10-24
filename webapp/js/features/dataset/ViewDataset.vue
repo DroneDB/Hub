@@ -216,7 +216,7 @@ async function downloadItems(files) {
     }
 }
 
-// Build output: re-checks the build (a HEAD when the cache is stale), then downloads it
+// Build output: re-checks that the build exists (the entry's artifacts), then downloads it
 async function downloadArtifact(file) {
     if (!file || !file.entry) return;
     if (!await isFileBuilt(dataset, file)) {

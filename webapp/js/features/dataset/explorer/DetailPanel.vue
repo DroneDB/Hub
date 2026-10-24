@@ -69,6 +69,7 @@
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import { isFileBuilt, formatMissingDeps } from '@/libs/build/buildHelpers';
+import { shownBuildStatus } from '@/libs/build/entryBuild';
 import ddb from 'ddb';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import Button from 'primevue/button';
@@ -116,18 +117,12 @@ export default {
             if (!this.file || !this.dataset) return false;
             return BuildManager.hasActiveBuild(this.dataset, this.file.entry.path);
         },
-        // Effective badge status: the live Hangfire state (once a job exists) takes
-        // priority over the static list-API status. "ready" (built) is the default
-        // and never produces a badge - only queued/processing/pending/failed do.
+        // Effective badge status: the job gives progress and failure, the entry says whether the
+        // build exists. "ready" (built) is the default and never produces a badge - only
+        // queued/processing/pending/failed do.
         effectiveBuildStatus() {
-            if (this.buildState) {
-                const state = this.buildState.currentState;
-                if (state === 'Failed') return 'failed';
-                if (state === 'Processing') return 'processing';
-                return null;
-            }
-            const status = this.file && this.file.entry && this.file.entry.buildStatus;
-            return status === 'pending' || status === 'queued' || status === 'failed' ? status : null;
+            if (this.buildState && this.buildState.currentState === 'Processing') return 'processing';
+            return shownBuildStatus(this.buildState, this.file && this.file.entry);
         },
         shouldShowBuildBadge() {
             return !!this.effectiveBuildStatus;

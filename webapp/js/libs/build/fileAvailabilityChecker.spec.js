@@ -73,3 +73,92 @@ describe('unified viewer gate', () => {
         await expect(checker.check(dataset, model(), 'unified')).rejects.toThrow('network down');
     });
 });
+
+describe('buildable file: the artifacts decide, the job explains', () => {
+    const job = currentState => ({ path: 'ortho.tif', currentState });
+
+    it('is ready when the entry lists the artifact, whatever the job history says', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Failed'));
+        const dataset = datasetListing(null);
+        const result = await checker.check(dataset, raster({ artifacts: [COG] }), 'map');
+        expect(result).toMatchObject({ available: true, status: 'ready' });
+        expect(dataset.listOne).not.toHaveBeenCalled();
+    });
+
+    it('is not ready because a job succeeded: no output listed means not built (a job that succeeded says nothing about the output)', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Succeeded'));
+        const dataset = datasetListing(raster());
+        const result = await checker.check(dataset, raster(), 'map');
+        expect(result).toMatchObject({ available: false, status: 'queued' });
+        expect(result.actions).toContain('start-build');
+    });
+
+    it('says the build is on hold when the job succeeded but the server reports missing dependencies', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Succeeded'));
+        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'] }));
+        const result = await checker.check(dataset, raster(), 'map');
+        expect(result).toMatchObject({ available: false, status: 'blocked', missingDependencies: ['ortho.tfw'] });
+        expect(result.message).toContain('ortho.tfw');
+    });
+
+    it('finds a build that finished after the explorer listed the entry, with one listing and no job', async () => {
+        const dataset = datasetListing(raster({ artifacts: [COG] }));
+        const result = await checker.check(dataset, raster({ buildStatus: 'queued' }), 'map');
+        expect(result).toMatchObject({ available: true, status: 'ready' });
+        expect(dataset.listOne).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows progress from a running job without asking the server about the entry', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Processing'));
+        const dataset = datasetListing(null);
+        const result = await checker.check(dataset, raster(), 'map');
+        expect(result).toMatchObject({ available: false, status: 'building', actions: ['cancel', 'wait-and-open'] });
+        expect(result.buildState).toEqual(job('Processing'));
+        expect(dataset.listOne).not.toHaveBeenCalled();
+    });
+
+    it('a running job of the task monitor counts even when the build cache holds an ended one', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Succeeded'));
+        taskMonitor.getTasks.mockReturnValue([{ toolId: 'build', path: 'ortho.tif', state: 'Enqueued' }]);
+        const result = await checker.check(datasetListing(null), raster(), 'map');
+        expect(result.status).toBe('building');
+    });
+
+    it('shows the failure of the job', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Failed'));
+        const result = await checker.check(datasetListing(raster({ buildStatus: 'failed' })), raster({ buildStatus: 'failed' }), 'map');
+        expect(result).toMatchObject({ available: false, status: 'failed', buildState: job('Failed') });
+        expect(result.actions).toContain('details');
+    });
+
+    it('shows a failed build the server reports when this page has no job for it', async () => {
+        const dataset = datasetListing(raster({ buildStatus: 'failed' }));
+        const result = await checker.check(dataset, raster({ buildStatus: 'failed' }), 'map');
+        expect(result).toMatchObject({ available: false, status: 'failed' });
+    });
+
+    it('shows a build the server sees running that this page has no job for (started elsewhere)', async () => {
+        const dataset = datasetListing(raster({ buildStatus: 'building' }));
+        const result = await checker.check(dataset, raster({ buildStatus: 'building' }), 'map');
+        expect(result).toMatchObject({ available: false, status: 'building' });
+    });
+
+    it('reports a job state it does not know as an invalid state', async () => {
+        buildManager.getBuildState.mockReturnValue(job('Deleted'));
+        const result = await checker.check(datasetListing(raster()), raster(), 'map');
+        expect(result.status).toBe('unknown');
+    });
+
+    it('a view without a required artifact is ready when the build is complete', async () => {
+        const ready = await checker.check(datasetListing(null), model({ artifacts: [TILES] }), 'map');
+        expect(ready.available).toBe(true);
+        const notReady = await checker.check(datasetListing(model({ buildStatus: 'queued' })), model(), 'map');
+        expect(notReady.status).toBe('queued');
+    });
+
+    it('never probes: the registry client is not asked for a file', async () => {
+        const dataset = datasetListing(raster());
+        await checker.check(dataset, raster(), 'map');
+        expect(dataset.registry.headRequest).not.toHaveBeenCalled();
+    });
+});
