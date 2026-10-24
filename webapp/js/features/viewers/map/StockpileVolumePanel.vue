@@ -204,7 +204,6 @@ export default {
             default: 'metric',
             validator: (v) => ['metric', 'imperial'].includes(v)
         },
-        canSave: { type: Boolean, default: true },
         title: { type: String, default: '' },
         description: { type: String, default: '' }
     },

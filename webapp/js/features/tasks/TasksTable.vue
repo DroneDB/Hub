@@ -165,11 +165,6 @@ export default {
     },
 
     computed: {
-        /** Show paginator only when there are 10 or more items. */
-        paginatorVisible() {
-            return this.totalItems >= 10;
-        },
-
         /** Slice tasks array for client-side pagination. Lazy mode returns full array. */
         slicedTasks() {
             if (this.lazy) return this.tasks;

@@ -70,18 +70,6 @@ export default {
 
     },
     methods: {
-        filterKeys(e) {
-
-            // Allow backspace, canc, left arrow, right arrow and tab
-            if (e.keyCode == 8 || e.keyCode == 46 || e.keyCode == 37 || e.keyCode == 39 || e.keyCode == 9) {
-                return;
-            }
-
-            // Allow only lowercase letters and numbers
-            if (!re.test(e.key)) {
-                e.preventDefault();
-            }
-        },
         close: function (buttonId) {
             if (buttonId === 'close') {
                 this.$emit('close', 'close');

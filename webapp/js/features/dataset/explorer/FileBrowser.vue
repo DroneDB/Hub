@@ -473,11 +473,6 @@ export default {
     gap: 0.25rem;
     width: 100%;
 
-    .box {
-        width: 100%;
-        position: relative;
-    }
-
     input {
         width: 100%;
         text-align: left;

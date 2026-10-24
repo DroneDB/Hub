@@ -5,9 +5,7 @@
  * Props:
  *   items       - Array of items to render
  *   itemSize    - Estimated height per item in pixels (default: 35)
- *   keyField    - Property name to use as :key (default: 'id')
  *   minHeight   - Minimum height of the scroll container (default: 200)
- *   maxHeight   - Maximum height of the scroll container (default: none)
  *
  * Slot:
  *   Receives { item } for each visible item, same as RecycleScroller's v-slot.
@@ -18,10 +16,7 @@
     <div
         ref="parentRef"
         class="virtual-scroller"
-        :style="{
-            minHeight: minHeight + 'px',
-            maxHeight: maxHeight ? maxHeight + 'px' : 'none'
-        }"
+        :style="{ minHeight: minHeight + 'px' }"
     >
         <div :style="{ height: totalSize + 'px', position: 'relative' }">
             <div
@@ -56,17 +51,9 @@ const props = defineProps({
     type: Number,
     default: 35
   },
-  keyField: {
-    type: String,
-    default: 'id'
-  },
   minHeight: {
     type: Number,
     default: 200
-  },
-  maxHeight: {
-    type: [Number, String],
-    default: null
   }
 });
 

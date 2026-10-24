@@ -42,8 +42,7 @@ export default {
         Divider
     },
     props: {
-        tools: { type: Array, required: true },
-        className: { type: String, default: null }
+        tools: { type: Array, required: true }
     },
     data: function () {
         return {
@@ -136,20 +135,9 @@ export default {
             }
         },
 
-        disableToolIf: function (toolId, disabled) {
-            const tool = this.getTool(toolId);
-            tool.disabled = disabled;
-        },
-
         deselectAll: function () {
             this.dataTools.forEach(t => {
                 if (t.selected) this.deselectTool(t.id);
-            });
-        },
-
-        deselectNonToggle: function () {
-            this.dataTools.forEach(t => {
-                if (t.selected && !t.id.startsWith('toggle-')) this.deselectTool(t.id);
             });
         },
 

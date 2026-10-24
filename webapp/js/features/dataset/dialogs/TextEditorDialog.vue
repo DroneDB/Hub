@@ -344,20 +344,6 @@ export default {
     min-height: 25rem;
 }
 
-.loading-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 12.5rem;
-    color: var(--ddb-text-secondary);
-}
-
-.loading-container i {
-    font-size: 2rem;
-    margin-bottom: var(--ddb-spacing-sm);
-}
-
 .footer-actions {
     display: flex;
     justify-content: space-between;

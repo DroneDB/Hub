@@ -124,14 +124,6 @@
                     <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'" />
                     <span class="action-label">Inspect</span>
                 </button>
-                <button v-if="supports3D" class="panel-btn action-btn"
-                        :class="{ 'panel-btn--primary': view3D }"
-                        :title="view3D ? 'Switch back to 2D map view' : 'Show this raster as a 3D heightmap'"
-                        data-testid="raster-3d-toggle"
-                        @click="toggle3DView">
-                    <i class="fas fa-cube" />
-                    <span class="action-label">{{ view3D ? '2D View' : '3D View' }}</span>
-                </button>
                 <button v-if="!isThermal && !loadError" class="panel-btn action-btn"
                         title="Generate contour lines from this elevation raster"
                         data-testid="raster-contours-btn"
@@ -178,7 +170,8 @@ import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
 import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
+import { isExportTooLarge as computeIsExportTooLarge } from '@/libs/exportSize';
+import { bytesToSize } from '@/libs/utils';
 import RasterProfileChart from './RasterProfileChart.vue';
 import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
@@ -198,15 +191,11 @@ export default {
         // True while the host has an active OL Draw interaction for the profile.
         drawingProfile: { type: Boolean, default: false },
         // True while the inspect-value tool is active on the host.
-        inspectActive: { type: Boolean, default: false },
-        // True if the host can render a 3D heightmap for this raster.
-        supports3D: { type: Boolean, default: false },
-        // True while the host is showing the 3D view instead of the 2D map.
-        view3D: { type: Boolean, default: false }
+        inspectActive: { type: Boolean, default: false }
     },
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
-            'profileHover', 'cancelDrawProfile', 'toggleInspectValue', 'toggle3DView',
+            'profileHover', 'cancelDrawProfile', 'toggleInspectValue',
             'openContourDialog'],
 
     setup() {
@@ -254,7 +243,7 @@ export default {
         exportLimitTooltip() {
             const limit = this.maxExportSizeBytes;
             return limit
-                ? `Export disabled: estimated output exceeds the configured limit (${formatBytes(limit)})`
+                ? `Export disabled: estimated output exceeds the configured limit (${bytesToSize(limit)})`
                 : 'Export disabled';
         }
     },
@@ -357,10 +346,6 @@ export default {
             }
         },
 
-        requestPickProfile() {
-            this.$emit('pickProfile');
-        },
-
         /**
          * Single button that toggles between starting a draw, redrawing, and
          * stopping an in-progress draw. Exact behaviour is decided by the host.
@@ -372,10 +357,6 @@ export default {
 
         toggleInspect() {
             this.$emit('toggleInspectValue');
-        },
-
-        toggle3DView() {
-            this.$emit('toggle3DView');
         },
 
         onGenerateContoursClick() {
@@ -479,12 +460,6 @@ export default {
 .spot-coords {
     font-size: 0.7rem;
     color: var(--panel-text-faint);
-}
-
-.profile-controls {
-    display: flex;
-    gap: 0.35rem;
-    margin-bottom: 0.35rem;
 }
 
 .profile-error {

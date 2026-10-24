@@ -349,19 +349,6 @@ export default {
     color: var(--ddb-text-secondary);
 }
 
-.setting-toggle {
-    cursor: pointer;
-    width: 100%;
-    justify-content: space-between;
-    user-select: none;
-}
-
-.setting-toggle input[type="checkbox"] {
-    cursor: pointer;
-    width: 1rem;
-    height: 1rem;
-}
-
 .setting-select {
     font-size: 0.75rem;
 }
@@ -395,13 +382,4 @@ export default {
     margin-left: 0.5rem;
 }
 
-.fetch-layers-btn {
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-xs) !important;
-    margin: 0 !important;
-    min-height: 0 !important;
-}
-
-.fetch-layers-btn .icon {
-    margin: 0 !important;
-}
 </style>

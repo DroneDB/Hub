@@ -162,9 +162,6 @@ export default {
         if (this.loadTimeout) clearTimeout(this.loadTimeout);
     },
     methods: {
-        getBoundingRect: function () {
-            return this.$el.getBoundingClientRect();
-        },
         // Shows `url` once the loader grants a slot (at once without a loader)
         showImage: function (url) {
             this.cancelImageRequest();

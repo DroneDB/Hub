@@ -330,26 +330,6 @@ export default {
     padding-bottom: 0;
 }
 
-.settings-section .ui.header {
-    margin-top: 0;
-    margin-bottom: var(--ddb-spacing-xs);
-}
-
-.settings-desc {
-    font-size: 90%;
-    margin-top: 0.25rem;
-    max-width: 26.25rem;
-    color: var(--ddb-text-secondary);
-}
-
-.settings-desc a {
-    text-decoration: underline;
-}
-
-.settings-section .ui.button {
-    color: var(--ddb-text) !important;
-}
-
 .license-dropdown {
     max-width: 16rem;
 }

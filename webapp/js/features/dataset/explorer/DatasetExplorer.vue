@@ -93,7 +93,6 @@ export default {
         currentPath: { type: String, default: null },
         tools: { type: Array, default: null },
         dataset: { type: Object, required: true },
-        viewMode: { type: String, default: null },
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },

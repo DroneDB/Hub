@@ -188,19 +188,6 @@ export default {
                     return null;
             }
         },
-        extendedProperties() {
-            if (!this.file || !this.file.entry || !this.file.entry.properties) return null;
-            const props = this.file.entry.properties;
-            // Exclude meta and permissions (already shown or internal)
-            const excluded = ['meta', 'permissions'];
-            const filtered = {};
-            for (const key in props) {
-                if (!excluded.includes(key)) {
-                    filtered[key] = props[key];
-                }
-            }
-            return Object.keys(filtered).length > 0 ? filtered : null;
-        },
         allProperties() {
             if (!this.file) return null;
             return buildAllProperties(this.file);
@@ -297,18 +284,6 @@ export default {
             return formatModifiedDate(file.entry.mtime);
         },
 
-        formatMetaKey(key) {
-            return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-        },
-
-        formatMetaValue(value) {
-            if (typeof value === 'object' && value !== null) {
-                if (value.data !== undefined) return value.data;
-                return JSON.stringify(value);
-            }
-            return value;
-        },
-
         handleClose() {
             this.$emit('close');
         },
@@ -399,10 +374,6 @@ export default {
     word-break: break-all;
 }
 
-.detail-header .ui.button {
-    margin-left: 0.5rem;
-}
-
 .detail-content {
     flex: 1;
     overflow-y: auto;
@@ -469,14 +440,6 @@ export default {
     margin-bottom: 1.5rem;
 }
 
-.properties-section :deep(.ui.table) {
-    font-size: var(--ddb-font-size-sm);
-}
-
-.properties-section :deep(.ui.table td) {
-    padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
-}
-
 .actions-section {
     margin-bottom: 1rem;
 }
@@ -497,7 +460,4 @@ export default {
     padding: 2rem;
 }
 
-.detail-panel-empty .ui.message {
-    text-align: center;
-}
 </style>

@@ -165,10 +165,6 @@ export default {
             return filtered;
         },
 
-        newOrgSlug: function() {
-            return this.suggestedSlug;
-        },
-
         suggestedSlug: function() {
             if (!this.newOrgName.trim()) return "";
 

@@ -62,9 +62,6 @@ export default {
                 this.$emit('close');
             }
         },
-        openInNewTab() {
-            window.open(this.pdfUrl, '_blank');
-        },
         downloadFile() {
             window.open(this.downloadLink, '_blank');
         }

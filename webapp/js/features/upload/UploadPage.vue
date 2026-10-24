@@ -106,9 +106,6 @@ export default {
         totalProgress: function () {
             if (this.totalBytes === 0) return 0;
             return (this.totalBytesSent / this.totalBytes * 100.0).toFixed(2);
-        },
-        fullUrl: function () {
-            return reg.url + this.url;
         }
     },
     beforeUnmount: function () {

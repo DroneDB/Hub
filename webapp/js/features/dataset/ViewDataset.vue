@@ -8,7 +8,7 @@
                 </div>
             </template>
             <template #second>
-                <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="mainTabs[0].key" position="top" button-width="auto"
+                <TabSwitcher ref="tabs" :tabs="mainTabs" :selected-tab="mainTabs[0].key" position="top"
                              :hide-single="false" @tab-change="onTabChange">
                     <template v-if="isMobile" #filebrowser>
                         <FileBrowser ref="mobileFileBrowser" v-bind="treeProps" v-on="treeEvents" />
@@ -340,7 +340,7 @@ const tools = computed(() => explorerTools({
 }));
 const explorerProps = computed(() => ({
     files: listing.files.value, tools: tools.value, currentPath: listing.currentPath.value, dataset,
-    viewMode: viewMode.value, canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value
+    canWrite: canWrite.value, isLoadingFiles: listing.isLoading.value
 }));
 
 // ---- Session and lifecycle -------------------------------------------------------------

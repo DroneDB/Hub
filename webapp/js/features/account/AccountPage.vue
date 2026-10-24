@@ -135,11 +135,6 @@ export default {
         storagePercentage() {
             if (!this.storageTotal || this.storageTotal === 0) return 0;
             return Math.min(100, Math.round((this.storageUsed / this.storageTotal) * 100));
-        },
-        storageProgressClass() {
-            if (this.storagePercentage >= 90) return 'red';
-            if (this.storagePercentage >= 70) return 'yellow';
-            return 'green';
         }
     },
     mounted: async function () {

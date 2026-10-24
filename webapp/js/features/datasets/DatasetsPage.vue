@@ -367,42 +367,6 @@ export default {
         },
         totalPages: function () {
             return Math.ceil(this.totalDatasets / this.itemsPerPage);
-        }, displayedPages: function () {
-            if (this.totalPages <= 5) {
-                // If we have 5 or fewer pages, show all pages
-                return Array.from({ length: this.totalPages }, (_, i) => i + 1);
-            }
-
-            const pages = [];
-            const range = 1; // Number of pages to show before and after current page
-
-            // Always include first page
-            pages.push(1);
-
-            // Add ellipsis after first page if needed
-            if (this.currentPage > 2 + range) {
-                pages.push('ellipsis-1');
-            }
-
-            // Add pages around current page
-            const startPage = Math.max(2, this.currentPage - range);
-            const endPage = Math.min(this.totalPages - 1, this.currentPage + range);
-
-            for (let i = startPage; i <= endPage; i++) {
-                pages.push(i);
-            }
-
-            // Add ellipsis before last page if needed
-            if (this.currentPage < this.totalPages - 1 - range) {
-                pages.push('ellipsis-2');
-            }
-
-            // Always include last page if we have more than one page
-            if (this.totalPages > 1) {
-                pages.push(this.totalPages);
-            }
-
-            return pages;
         },
         sortOrderPrimevue: function () {
             return this.sortDirection === 'asc' ? 1 : -1;
@@ -491,12 +455,6 @@ export default {
                 // Set new sort column with default ascending direction
                 this.sortColumn = column;
                 this.sortDirection = 'asc';
-            }
-        },
-
-        changePage(page) {
-            if (page >= 1 && page <= this.totalPages) {
-                this.currentPage = page;
             }
         },
 

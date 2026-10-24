@@ -87,7 +87,7 @@ import { formatTimeAgo } from '@/libs/utils';
 import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
-import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 
@@ -120,7 +120,6 @@ export default {
         currentPath: { type: String, default: null },
         tools: { type: Array, default: null },
         dataset: { type: Object, required: true },
-        viewMode: { type: String, default: null },
         expandedGrid: { type: Boolean, default: false },
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
@@ -435,16 +434,6 @@ export default {
             return getBuildBadgeTooltip(this.dataset, file);
         },
 
-        buildSelectedFile: async function() {
-            if (this.selectedFiles.length !== 1) return;
-            const file = this.selectedFiles[0];
-            try {
-                await buildFile(this.dataset, file);
-            } catch (error) {
-                this.$emit('buildError', { file, error: error.message });
-            }
-        },
-
         onTabActivated: function () {
             // Called when the tab becomes active
             // Currently no specific action needed for table view
@@ -512,15 +501,6 @@ export default {
         outline: 2px dashed var(--ddb-primary);
         outline-offset: -2px;
         background-color: var(--ddb-bg-hover) !important;
-    }
-
-    .icon-column i.icon {
-        margin: 0;
-    }
-
-    .icon-column i.icon.badge {
-        margin-left: var(--ddb-spacing-xs);
-        font-size: var(--ddb-font-size-base);
     }
 
     .loading-icon {

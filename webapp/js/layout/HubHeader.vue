@@ -96,7 +96,6 @@ import Alert from '@/components/HubAlert';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { xAuthLogout } from '@/libs/api/xauth';
-import { isMobile } from '@/libs/responsive';
 import { bytesToSize } from '@/libs/utils';
 import emitter from '@/libs/eventBus';
 import Button from 'primevue/button';
@@ -193,19 +192,6 @@ export default {
                 }
             }
             return null;
-        },
-
-        downloadLabel: function () {
-            if (this.selectedFiles.length > 0) {
-                return `${this.selectedFiles.length}`;
-            } else {
-                return "Download";
-            }
-        },
-
-        showDownloadIcon: function () {
-            if (!isMobile()) return true;
-            else return this.selectedFiles.length == 0;
         },
 
         fileUploads: function () {

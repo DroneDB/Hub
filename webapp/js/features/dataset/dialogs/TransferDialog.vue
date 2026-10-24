@@ -138,15 +138,6 @@ export default {
 
         hasError: function () {
             return !!this.errorMessage;
-        },
-
-        progressClass: function () {
-            if (this.progress === 100) return 'success';
-            return 'blue';
-        },
-
-        progressText: function () {
-            return `${this.transferredCount}/${this.files.length}`;
         }
     },
 

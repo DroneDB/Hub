@@ -264,10 +264,6 @@ export default {
 
 <style scoped>
 
-.add-member-section {
-    margin-bottom: 1rem;
-}
-
 table.ui.celled.table {
     margin-top: 0.5rem;
 }

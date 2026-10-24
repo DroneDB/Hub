@@ -403,14 +403,6 @@ export default {
             this.editOrganization(org);
         },
 
-        viewOrganization(org) {
-            this.$router.push({
-                name: "Datasets", params: {
-                    org: org.slug
-                }
-            });
-        },
-
         openMembersDialog(org) {
             this.selectedOrgForMembers = org;
             this.membersDialogOpen = true;

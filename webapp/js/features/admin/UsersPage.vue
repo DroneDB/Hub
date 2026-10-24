@@ -514,12 +514,4 @@ export default {
     gap: var(--ddb-spacing-xs);
 }
 
-.delete-result-details .detail-section {
-    margin-bottom: 0.75rem;
-}
-
-.delete-result-details .detail-section ul {
-    margin: 0.25rem 0;
-    padding-left: 1.25rem;
-}
 </style>

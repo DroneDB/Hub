@@ -74,10 +74,6 @@ export default {
             type: String,
             default: "bottom" // one of "bottom", "top"
         },
-        buttonWidth: {
-            type: String,
-            default: "expand" // one of "expand", "auto"
-        },
         selectedTab: {
             type: String,
             default: null

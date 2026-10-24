@@ -162,7 +162,8 @@ import BandSelector from '@/features/viewers/map/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
+import { isExportTooLarge as computeIsExportTooLarge } from '@/libs/exportSize';
+import { bytesToSize } from '@/libs/utils';
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { downloadBlob } from '@/libs/download';
 import { pathutils } from 'ddb';
@@ -228,12 +229,8 @@ export default {
         exportLimitTooltip() {
             const limit = this.maxExportSizeBytes;
             return limit
-                ? `Export disabled: estimated output exceeds the configured limit (${formatBytes(limit)})`
+                ? `Export disabled: estimated output exceeds the configured limit (${bytesToSize(limit)})`
                 : 'Export disabled';
-        },
-        enabledFormulas() {
-            if (!this.rasterInfo || !this.availableFormulas) return [];
-            return this.availableFormulas.filter(f => !f.disabled);
         },
         firstBandStats() {
             if (!this.metadata || !this.metadata.statistics) return {};

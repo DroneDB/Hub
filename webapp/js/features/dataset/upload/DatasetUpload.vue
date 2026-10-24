@@ -54,7 +54,6 @@
                     class="file-list-scroller"
                     :items="filteredFiles"
                     :item-size="48"
-                    key-field="id"
                 >
                     <FileUploadRow :file="item" @retry="retryFile" />
                 </VirtualScroller>
@@ -321,10 +320,6 @@ export default {
             input.click();
         },
 
-        cancelSelection() {
-            this.$emit('close');
-        },
-
         handleFileInputChange(event) {
             const files = event.target.files;
             if (!files || files.length === 0) return;
@@ -542,15 +537,6 @@ export default {
 }
 
 /* Spinning animation */
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-.icon.spin {
-    animation: spin 1s linear infinite;
-}
-
 /* File selection screen */
 .file-selection-screen {
     display: flex;
@@ -587,10 +573,6 @@ export default {
     gap: 0.75rem;
     justify-content: center;
     margin-bottom: 1.5rem;
-}
-
-.selection-cancel {
-    margin-top: 0.5rem;
 }
 
 /* Upload summary */
