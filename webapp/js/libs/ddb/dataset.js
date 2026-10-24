@@ -1,10 +1,16 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-const { Entry } = require('./entry');
-const Visibility = require('./visibility');
+import { Entry } from './entry';
+import { ApiError } from './apiError';
+import { failureMessageOf, isJsonType } from './http/httpClient';
 
-module.exports = class Dataset {
+// The image format of map tiles is the extension of their URL, and the server sends exactly that format. WebP is the
+// default: smaller than PNG for the same tile (what a map pulls by the hundred). PNG is the universal one, for URLs
+// handed to other software (see ShareEmbed).
+export const TILE_FORMAT = "webp";
+
+export default class Dataset {
     constructor(registry, org, ds) {
         this.registry = registry;
         this.org = org;
@@ -22,7 +28,7 @@ module.exports = class Dataset {
 
 
     get baseApi() {
-        return `/orgs/${this.org}/ds/${this.ds}`;
+        return `/orgs/${encodeURIComponent(this.org)}/ds/${encodeURIComponent(this.ds)}`;
     }
 
     downloadUrl(paths, options = {}) {
@@ -50,9 +56,12 @@ module.exports = class Dataset {
         return url;
     }
 
-    thumbUrl(path, size) {
+    // hash: the entry hash, when known. It makes the URL change when the entry changes, so the
+    // server can let the browser reuse the response without revalidating (REG-03).
+    thumbUrl(path, size, hash) {
         let url = `${this.baseApi}/thumb?path=${encodeURIComponent(path)}`;
         if (size) url += `&size=${size}`;
+        if (hash) url += `&v=${encodeURIComponent(hash)}`;
         return url;
     }
 
@@ -62,11 +71,14 @@ module.exports = class Dataset {
         return url;
     }
 
+    // options: retina, hash (the entry hash, versions the URL), format ("png" | "webp" | "jpg", TILE_FORMAT by default)
     tileUrl(path, tz, tx, ty, options = {}) {
         let retina = "";
         if (options.retina) retina = "@2x";
+        const format = options.format || TILE_FORMAT;
 
-        let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.png?path=${encodeURIComponent(path)}`;
+        let url = `${this.baseApi}/tiles/${tz}/${tx}/${ty}${retina}.${format}?path=${encodeURIComponent(path)}`;
+        if (options.hash) url += `&v=${encodeURIComponent(options.hash)}`;
         return url;
     }
 
@@ -74,7 +86,9 @@ module.exports = class Dataset {
         let retina = "";
         if (options.retina) retina = "@2x";
 
-        let url = `${this.baseApi}/tiles-ex/${tz}/${tx}/${ty}${retina}.webp?path=${encodeURIComponent(path)}`;
+        const format = options.format || TILE_FORMAT;
+
+        let url = `${this.baseApi}/tiles-ex/${tz}/${tx}/${ty}${retina}.${format}?path=${encodeURIComponent(path)}`;
         if (vizParams.preset) url += `&preset=${encodeURIComponent(vizParams.preset)}`;
         if (vizParams.bands) url += `&bands=${encodeURIComponent(vizParams.bands)}`;
         if (vizParams.formula) url += `&formula=${encodeURIComponent(vizParams.formula)}`;
@@ -100,6 +114,16 @@ module.exports = class Dataset {
 
     async getRasterInfo(path) {
         return this.registry.getRequest(`${this.baseApi}/raster-info?path=${encodeURIComponent(path)}`);
+    }
+
+    /**
+     * One page of features (GeoJSON FeatureCollection) of a built vector layer, through
+     * OGC API Features. collectionId is "<entry path>:<GPKG layer name>". Features of a
+     * layer without a coordinate system (a local CAD drawing) come in drawing coordinates.
+     */
+    async getFeatures(collectionId, { limit = 1000, offset = 0 } = {}) {
+        const id = encodeURIComponent(collectionId);
+        return this.registry.getRequest(`${this.baseApi}/ogcapi/collections/${id}/items?limit=${limit}&offset=${offset}&f=json`);
     }
 
     async getRasterMetadata(path, formula, bandFilter) {
@@ -251,27 +275,7 @@ module.exports = class Dataset {
      */
     async downloadWithCheck(paths, options = {}) {
         const url = this.downloadUrl(paths, options);
-        const headers = { 'X-Download-Check': '1' };
-        const authToken = this.registry.getAuthToken();
-        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-            let errorMessage = `Download failed (${response.status})`;
-            try {
-                const contentType = response.headers.get('Content-Type');
-                if (contentType && contentType.includes('application/json')) {
-                    const json = await response.json();
-                    errorMessage = json.error || json.message || errorMessage;
-                }
-            } catch (e) {
-                // Ignore parse errors, use default message
-            }
-            const err = new Error(errorMessage);
-            err.status = response.status;
-            throw err;
-        }
+        await this.checkDownloadSlot(url);
 
         // Preflight passed - initiate native browser download
         if (url.length < 2000) {
@@ -295,8 +299,9 @@ module.exports = class Dataset {
         return this.registry.getRequestAsText(url);
     }
 
-    async info() {
-        return this.registry.getRequest(`${this.baseApi}`);
+    /** @param {{signal?: AbortSignal}} [options] */
+    async info(options = {}) {
+        return this.registry.getRequest(`${this.baseApi}`, options);
     }
 
     async update(name, visibility) {
@@ -306,10 +311,14 @@ module.exports = class Dataset {
         return this.registry.putFormData(`${this.baseApi}`, formData);
     }
 
-    async list(path) {
+    /**
+     * @param {string} [path]
+     * @param {{signal?: AbortSignal}} [options] aborting the signal aborts the listing
+     */
+    async list(path, options = {}) {
         const formData = new FormData();
         if (path !== undefined && path !== null) formData.append('path', path);
-        return this.registry.postFormData(`${this.baseApi}/list`, formData);
+        return this.registry.postFormData(`${this.baseApi}/list`, formData, { signal: options.signal, readOnly: true });
     }
 
     async listOne(path){
@@ -326,7 +335,7 @@ module.exports = class Dataset {
     async search(query){
         const formData = new FormData();
         if (query !== undefined && query !== null) formData.append('query', query);
-        return this.registry.postFormData(`${this.baseApi}/search`, formData);
+        return this.registry.postFormData(`${this.baseApi}/search`, formData, { readOnly: true });
     }
 
     async delete() {
@@ -445,6 +454,17 @@ module.exports = class Dataset {
         const response = await this.registry.postFormData(`${this.baseApi}/build`, formData);
 
         return response === true ? { success: true } : response;
+    }
+
+    // Sets the coordinate system of a CAD drawing (.dxf, .dwg) by writing its .prj:
+    // an EPSG code, WKT or PROJ string, or "local" to keep it in drawing coordinates
+    async setCadCrs(path, crs) {
+        if (!path) throw new Error(`Invalid path ${path}`);
+
+        const formData = new FormData();
+        formData.append('path', path);
+        formData.append('crs', crs);
+        return this.registry.postFormData(`${this.baseApi}/cad/crs`, formData);
     }
 
     async clearCompletedBuilds() {
@@ -599,6 +619,40 @@ module.exports = class Dataset {
      */
     taskResultUrl(id) {
         return `${this.baseApi}/tasks/${encodeURIComponent(id)}/result`;
+    }
+
+    /**
+     * A completed task's artifact as a Blob (authenticated).
+     * @param {string} id Task id
+     * @returns {Promise<Blob>}
+     */
+    taskResult(id) {
+        return this.registry.makeRequest(this.taskResultUrl(id), { responseType: 'blob' });
+    }
+
+    /** URL of a built file's main artifact (e.g. a COG, a point-cloud EPT). */
+    buildArtifactUrl(path) {
+        return `${this.baseApi}/build-artifact?path=${encodeURIComponent(path)}`;
+    }
+
+    /**
+     * Preflight of a download: asks the server whether a download slot is free
+     * (X-Download-Check) before the browser navigates to `url`.
+     * @param {string} url
+     * @throws {ApiError} status 429 when the user's download limit is reached
+     */
+    async checkDownloadSlot(url) {
+        const response = await this.registry.fetchRaw(url, { headers: { 'X-Download-Check': '1' } });
+        if (response.ok) return;
+        let message = `Download failed (${response.status})`;
+        try {
+            if (isJsonType((response.headers.get('Content-Type') || '').toLowerCase())) {
+                message = failureMessageOf(await response.json()) || message;
+            }
+        } catch {
+            // No JSON body: keep the default message
+        }
+        throw new ApiError(message, response.status);
     }
 };
 

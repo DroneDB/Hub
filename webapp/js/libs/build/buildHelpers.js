@@ -1,11 +1,11 @@
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
-import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
-import ddb from 'ddb';
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
+import { isBuilt, currentEntry, shownBuildStatus } from '@/libs/build/entryBuild';
 
 function isBuildableFile(dataset, file) {
     if (!dataset) return false;
-    return BuildManager.isBuildableType(file.entry.type);
+    return isBuildableType(file.entry.type);
 }
 
 function hasActiveBuild(dataset, file) {
@@ -25,33 +25,15 @@ function isBuildLoading(dataset, file) {
 function getBuildBadge(dataset, file) {
     if (!dataset) return null;
 
-    // Live Hangfire state (from BuildManager polling) takes priority: it is
-    // the most up-to-date signal once a job actually exists.
-    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
-    if (buildState) {
-        switch (buildState.currentState) {
-            case BUILD_STATES.FAILED:
-                return 'fa-solid fa-circle-xmark red';
-            case BUILD_STATES.PROCESSING:
-            case BUILD_STATES.ENQUEUED:
-            case BUILD_STATES.SCHEDULED:
-            case BUILD_STATES.AWAITING:
-            case BUILD_STATES.CREATED:
-                return null; // spinner overlay already covers the "building" case
-            default:
-                return null;
-        }
-    }
-
-    // No live job yet: fall back to the static build status returned by the
-    // list API. "ready" (built) is the default state and never gets a badge.
-    switch (file.entry.buildStatus) {
+    // The build job gives failures (and the spinner overlay covers a running build); whether the
+    // build exists is on the entry: "ready" (built) is the default and never gets a badge.
+    switch (shownBuildStatus(BuildManager.getBuildState(dataset, file.entry.path), file.entry)) {
+        case 'failed':
+            return 'fa-solid fa-circle-xmark red';
         case 'pending':
             return 'fa-solid fa-triangle-exclamation orange';
         case 'queued':
             return 'fa-solid fa-clock amber';
-        case 'failed':
-            return 'fa-solid fa-circle-xmark red';
         default:
             return null;
     }
@@ -65,19 +47,13 @@ function getBuildBadge(dataset, file) {
 function getBuildBadgeTooltip(dataset, file) {
     if (!dataset) return '';
 
-    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
-    if (buildState) {
-        if (buildState.currentState === BUILD_STATES.FAILED) return 'Build failed';
-        return '';
-    }
-
-    switch (file.entry.buildStatus) {
+    switch (shownBuildStatus(BuildManager.getBuildState(dataset, file.entry.path), file.entry)) {
+        case 'failed':
+            return 'Build failed';
         case 'pending':
             return `Waiting for: ${formatMissingDeps(file.entry.buildMissingDependencies)}`;
         case 'queued':
             return 'Queued for processing';
-        case 'failed':
-            return 'Build failed';
         default:
             return '';
     }
@@ -87,31 +63,29 @@ async function buildFile(dataset, file) {
     await BuildManager.startBuild(dataset, file.entry.path, true);
 }
 
-function isBuildSucceeded(dataset, file) {
+/**
+ * Whether a file has a complete build (artifacts listed, no build status) and none is running:
+ * what the "Download COG/COPC/..." menu items need. A job that succeeded does not say it.
+ */
+function isBuildComplete(dataset, file) {
     if (!dataset) return false;
-    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
-    if (!buildState) return false;
-    return buildState.currentState === BUILD_STATES.SUCCEEDED;
+    return !BuildManager.hasActiveBuild(dataset, file.entry.path) && isBuilt(file.entry);
 }
 
 /**
- * Robustly determines whether a buildable file is already built and ready for
- * visualization. Uses the BuildManager cache first (fast path), then falls
- * back to the availability checker which queries the API and performs a HEAD
- * request on the expected build product (COG/COPC/nxs/fgb). This catches files
- * that were built in previous sessions and are not present in the cache.
+ * Whether a buildable file is already built (a rebuild asks for confirmation, a build download
+ * needs it). The entry the page holds answers when it lists a complete build; otherwise the
+ * entry is listed again, once, so a build that finished after the listing is found (no probe of
+ * the build folder).
  */
 async function isFileBuilt(dataset, file) {
     if (!dataset) return false;
-
-    const buildState = BuildManager.getBuildState(dataset, file.entry.path);
-    if (buildState) return buildState.currentState === BUILD_STATES.SUCCEEDED;
+    if (BuildManager.hasActiveBuild(dataset, file.entry.path)) return false;
 
     try {
-        const viewType = file.entry.type === ddb.entry.type.MODEL ? 'model' : 'map';
-        const result = await FileAvailabilityChecker.check(dataset, file.entry, viewType);
-        return !!(result && result.available && result.status === 'ready');
+        return isBuilt(await currentEntry(dataset, file.entry, isBuilt));
     } catch (e) {
+        console.warn(`Cannot tell whether ${file.entry.path} is built:`, e);
         return false;
     }
 }
@@ -124,6 +98,6 @@ export {
     getBuildBadgeTooltip,
     formatMissingDeps,
     buildFile,
-    isBuildSucceeded,
+    isBuildComplete,
     isFileBuilt
 };

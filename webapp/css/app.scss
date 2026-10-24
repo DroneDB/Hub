@@ -21,7 +21,8 @@
 // Bootstrap grid + utilities are imported in main.js
 // Font Awesome 6 is imported in main.js
 
-@import 'variables';
+@use 'variables';
+@use 'analysis-panel';
 
 html {
     font-size: 16px;
@@ -76,6 +77,25 @@ body {
 
 .spin {
     animation: rotation 2s infinite linear;
+}
+
+// A <button> that looks like the element it replaces: clickable text, icons
+// and headers get keyboard focus and Enter/Space for free.
+.btn-reset {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid var(--ddb-primary, currentColor);
+        outline-offset: 2px;
+    }
 }
 
 // ============================================================
@@ -327,3 +347,4 @@ body:fullscreen {
 .p-button-icon {
     cursor: pointer;
 }
+

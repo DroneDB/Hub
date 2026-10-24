@@ -1,10 +1,7 @@
 <template>
-    <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
-            modal
-            header="Base plane methods"
-            :style="{ width: '560px' }"
-            :draggable="false">
+    <Window id="stockpile-base-methods" :visible="visible" title="Base plane methods" modal fixed-position
+            width="560px" max-width="95vw" height="auto" close-button cancel-label="Close"
+            @update:visible="$emit('update:visible', $event)">
         <div class="info-dialog-body">
             <p class="info-intro">
                 The <b>base plane</b> is the reference surface used to compute
@@ -12,8 +9,8 @@
                 best matches the terrain around your pile.
             </p>
 
-            <div class="method-card" v-for="m in methods" :key="m.id">
-                <h4><i :class="m.icon"></i> {{ m.name }}</h4>
+            <div v-for="m in methods" :key="m.id" class="method-card">
+                <h4><i :class="m.icon" /> {{ m.name }}</h4>
                 <p class="method-line"><b>What it does:</b> {{ m.what }}</p>
                 <p class="method-line"><b>When to use it:</b> {{ m.when }}</p>
                 <p class="method-line"><b>Output:</b> {{ m.output }}</p>
@@ -22,30 +19,25 @@
             <h4 class="params-title">Detection parameters</h4>
             <div class="param-card">
                 <p><b>Search radius (m):</b> the distance, in meters, that the
-                detector explores around your click looking for the pile edges.
-                Increase it for large piles or when nothing is detected; decrease
-                it to constrain the search to a small area.</p>
+                    detector explores around your click looking for the pile edges.
+                    Increase it for large piles or when nothing is detected; decrease
+                    it to constrain the search to a small area.</p>
                 <p><b>Sensitivity (0 - 1):</b> how aggressively the edge detector
-                separates the pile from the surrounding ground. Higher values
-                find subtler piles but may include unrelated terrain; lower values
-                stay closer to clearly elevated areas.</p>
+                    separates the pile from the surrounding ground. Higher values
+                    find subtler piles but may include unrelated terrain; lower values
+                    stay closer to clearly elevated areas.</p>
             </div>
         </div>
 
-        <template #footer>
-            <Button label="Close" icon="fas fa-times" severity="secondary"
-                    @click="onClose" />
-        </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 
 export default {
     name: 'StockpileBaseMethodsDialog',
-    components: { Dialog, Button },
+    components: { Window },
     props: {
         visible: { type: Boolean, default: false }
     },
@@ -87,10 +79,6 @@ export default {
                 }
             ]
         };
-    },
-    methods: {
-        onVisibleChange(v) { this.$emit('update:visible', v); },
-        onClose() { this.$emit('update:visible', false); }
     }
 };
 </script>
@@ -108,7 +96,7 @@ export default {
 }
 
 .method-card {
-    border: 1px solid var(--p-content-border-color, rgba(255, 255, 255, 0.15));
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
@@ -135,7 +123,7 @@ export default {
 }
 
 .param-card {
-    border: 1px solid var(--p-content-border-color, rgba(255, 255, 255, 0.15));
+    border: 1px solid var(--p-content-border-color);
     border-radius: 0.4rem;
     padding: 0.6rem 0.8rem;
     background: rgba(255, 255, 255, 0.03);

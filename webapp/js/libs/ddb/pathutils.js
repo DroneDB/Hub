@@ -1,11 +1,31 @@
 const protoRegex = /^(file:\/\/|ddb:\/\/|ddb+unsafe:\/\/)/i;
 
-module.exports = {
+const pathutils = {
     basename: function (path) {
         const pathWithoutProto = path.replace(protoRegex, "");
         const name = pathWithoutProto.split(/[\\/]/).pop();
         if (name) return name;
         else return pathWithoutProto;
+    },
+
+    // Extension of the last path component, lower-case with the dot ("" when none)
+    extname: function (path) {
+        const name = pathutils.basename(path);
+        const i = name.lastIndexOf(".");
+        return i > 0 ? name.substring(i).toLowerCase() : "";
+    },
+
+    // Last path component without its extension
+    stem: function (path) {
+        const name = pathutils.basename(path);
+        const i = name.lastIndexOf(".");
+        return i > 0 ? name.substring(0, i) : name;
+    },
+
+    // Path without the extension of its last component
+    dropExtension: function (path) {
+        const ext = pathutils.extname(path);
+        return ext ? path.substring(0, path.length - ext.length) : path;
     },
 
     join: function (...paths) {
@@ -23,6 +43,16 @@ module.exports = {
         if (idx == -1) return null;
 
         return path.substr(0, idx);
+    },
+
+    // Folders along a relative path, outermost first: "a/b" -> [{name:"a",path:"a"},{name:"b",path:"a/b"}]
+    crumbs: function (path) {
+        if (!path) return [];
+        let cur = "";
+        return path.split("/").filter(Boolean).map(name => {
+            cur = cur ? cur + "/" + name : name;
+            return { name, path: cur };
+        });
     },
 
     getTree: function (path) {
@@ -50,4 +80,6 @@ module.exports = {
         if (path.length > 1 && path[path.length - 1] === '/') path = path.substring(0, path.length - 1);
         return path;
     }
-}
+};
+
+export default pathutils;

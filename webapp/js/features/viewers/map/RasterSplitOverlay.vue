@@ -1,5 +1,5 @@
 <template>
-    <div class="split-overlay" ref="overlay">
+    <div ref="overlay" class="split-overlay">
         <!-- Per-band top label -->
         <div
             v-for="(band, i) in bands"
@@ -115,7 +115,7 @@ export default {
 .split-label-pill {
     display: inline-block;
     background: rgba(0, 0, 0, 0.65);
-    color: #fff;
+    color: var(--ddb-text-on-color);
     font-size: 0.7rem;
     font-weight: 500;
     padding: 0.2rem 0.55rem;
@@ -156,7 +156,7 @@ export default {
 .split-handle-grip {
     position: relative;
     background: rgba(0, 0, 0, 0.6);
-    color: #fff;
+    color: var(--ddb-text-on-color);
     border-radius: 0.4rem;
     padding: 0.3rem 0.35rem;
     font-size: 0.75rem;

@@ -1,39 +1,39 @@
 <template>
-    <div class="detail-panel" v-if="file">
+    <div v-if="file" class="detail-panel">
         <div class="detail-header">
             <h3 class="ui header">
-                <i class="icon" :class="file.icon"></i>
+                <i class="icon" :class="file.icon" />
                 <div class="content">
                     {{ file.label }}
                 </div>
             </h3>
-            <Button severity="secondary" outlined @click="handleClose" title="Close" icon="fa-solid fa-xmark" />
+            <Button severity="secondary" outlined title="Close" aria-label="Close" icon="fa-solid fa-xmark" @click="handleClose" />
         </div>
 
         <div class="detail-content">
             <!-- Thumbnail section -->
-            <div class="thumbnail-section" v-if="hasThumbnailSupport">
+            <div v-if="hasThumbnailSupport" class="thumbnail-section">
                 <div class="thumbnail-container">
                     <img v-if="thumbnail && !loading && !buildLoading"
-                        @error="handleImageError"
-                        :src="thumbnail"
-                        class="detail-thumbnail" />
+                         :src="thumbnail" alt="Preview"
+                         class="detail-thumbnail"
+                         @error="handleImageError">
 
                     <i v-else-if="file.icon && !loading && !buildLoading"
-                        class="icon massive"
-                        :class="file.icon" />
+                       class="icon massive"
+                       :class="file.icon" />
 
-                    <i class="fa-solid fa-circle-notch fa-spin loading massive" v-if="buildLoading || loading" />
+                    <i v-if="buildLoading || loading" class="fa-solid fa-circle-notch fa-spin loading massive" />
 
                     <div v-if="shouldShowBuildBadge" class="build-status" :class="buildBadgeClass">
-                        <i class="icon" :class="buildBadgeIcon"></i>
+                        <i class="icon" :class="buildBadgeIcon" />
                         <span>{{ buildBadgeLabel }}</span>
                     </div>
                 </div>
             </div>
 
             <!-- Build status explanation (queued/pending/failed) -->
-            <div class="build-explanation-section" v-if="buildExplanation">
+            <div v-if="buildExplanation" class="build-explanation-section">
                 <Message :severity="buildExplanation.severity" :closable="false">
                     {{ buildExplanation.text }}
                 </Message>
@@ -42,27 +42,24 @@
             <!-- Properties section -->
             <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
-                <PropsTable v-if="allProperties" :obj="allProperties" :preserveOrder="true" :copyableValues="copyableValues" />
+                <PropsTable v-if="allProperties" :obj="allProperties" :preserve-order="true" :copyable-values="copyableValues" />
             </div>
 
             <!-- Actions section -->
             <div class="actions-section">
                 <h4 class="ui dividing header">Actions</h4>
                 <div class="action-buttons">
-                    <Button severity="secondary" @click="handleOpen" icon="fa-regular fa-folder-open" label="Open" />
-                    <Button severity="secondary" @click="handleShare" v-if="!isDirectory" icon="fa-solid fa-share-nodes" label="Share/Embed" />
-                    <Button severity="secondary" @click="handleBuild"
-                        v-if="isBuildableFile && !hasActiveBuild" icon="fa-solid fa-gear" label="Build" />
+                    <Button severity="secondary" icon="fa-regular fa-folder-open" label="Open" @click="handleOpen" />
+                    <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
+                    <Button v-if="isBuildableFile && !hasActiveBuild" severity="secondary"
+                            icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
                 </div>
             </div>
         </div>
-        <BuildConfirmDialog v-if="buildConfirmDialogOpen"
-            @confirm="handleBuildConfirmOk"
-            @cancel="buildConfirmDialogOpen = false" />
     </div>
-    <div class="detail-panel-empty" v-else>
+    <div v-else class="detail-panel-empty">
         <Message severity="info" :closable="false" icon="fa-solid fa-circle-info">
-            <strong>No Selection</strong><br />
+            <strong>No Selection</strong><br>
             Select an item to view its details
         </Message>
     </div>
@@ -71,17 +68,19 @@
 <script>
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
+import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { isFileBuilt, formatMissingDeps } from '@/libs/build/buildHelpers';
+import { shownBuildStatus } from '@/libs/build/entryBuild';
 import ddb from 'ddb';
-import PropsTable from '@/components/PropsTable.vue';
+import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
-import { buildAllProperties, isDirectory } from '@/libs/propertiesUtils';
-import BuildConfirmDialog from '@/features/dataset/dialogs/BuildConfirmDialog.vue';
+import { buildAllProperties, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 
 export default {
-    components: { PropsTable, Button, Message, BuildConfirmDialog },
-    emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
+    components: { PropsTable, Button, Message },
+    // The page asks before rebuilding (useDatasetActions.confirmBuild)
+    inject: { showBuildConfirm: { default: null } },
     props: {
         file: {
             type: Object,
@@ -90,17 +89,17 @@ export default {
         },
         dataset: {
             type: Object,
-            required: false
+            default: null
         }
     },
+    emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
     data: function () {
         return {
             thumbnail: null,
             loading: false,
             buildState: null,
             buildLoading: false,
-            error: null,
-            buildConfirmDialogOpen: false
+            error: null
         }
     },
     computed: {
@@ -109,28 +108,22 @@ export default {
         },
         hasThumbnailSupport() {
             if (!this.file || this.isDirectory) return false;
-            return thumbs.supportedForType(this.file.entry.type);
+            return hasThumbnail(this.file.entry.type);
         },
         isBuildableFile() {
             if (!this.file || !this.dataset) return false;
-            return BuildManager.isBuildableType(this.file.entry.type);
+            return isBuildableType(this.file.entry.type);
         },
         hasActiveBuild() {
             if (!this.file || !this.dataset) return false;
             return BuildManager.hasActiveBuild(this.dataset, this.file.entry.path);
         },
-        // Effective badge status: the live Hangfire state (once a job exists) takes
-        // priority over the static list-API status. "ready" (built) is the default
-        // and never produces a badge - only queued/processing/pending/failed do.
+        // Effective badge status: the job gives progress and failure, the entry says whether the
+        // build exists. "ready" (built) is the default and never produces a badge - only
+        // queued/processing/pending/failed do.
         effectiveBuildStatus() {
-            if (this.buildState) {
-                const state = this.buildState.currentState;
-                if (state === 'Failed') return 'failed';
-                if (state === 'Processing') return 'processing';
-                return null;
-            }
-            const status = this.file && this.file.entry && this.file.entry.buildStatus;
-            return status === 'pending' || status === 'queued' || status === 'failed' ? status : null;
+            if (this.buildState && this.buildState.currentState === 'Processing') return 'processing';
+            return shownBuildStatus(this.buildState, this.file && this.file.entry);
         },
         shouldShowBuildBadge() {
             return !!this.effectiveBuildStatus;
@@ -244,7 +237,7 @@ export default {
             if (!this.file) return;
 
             // Check for builds if applicable
-            if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
+            if (this.dataset && isBuildableType(this.file.entry.type)) {
                 const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
                 if (buildState) {
                     this.buildState = buildState;
@@ -275,8 +268,8 @@ export default {
             this.loading = true;
 
             try {
-                if (thumbs.supportedForType(this.file.entry.type)) {
-                    this.thumbnail = await thumbs.fetch(this.file.path, 512);
+                if (hasThumbnail(this.file.entry.type)) {
+                    this.thumbnail = await thumbs.fetch(this.file.path, 512, this.file.entry.hash);
                     this.buildLoading = false;
                 }
             } catch (e) {
@@ -293,42 +286,15 @@ export default {
         },
 
         getFileType(file) {
-            const typeMap = {
-                [ddb.entry.type.DIRECTORY]: 'Folder',
-                [ddb.entry.type.GENERIC]: 'File',
-                [ddb.entry.type.GEOIMAGE]: 'GeoImage',
-                [ddb.entry.type.GEORASTER]: 'GeoRaster',
-                [ddb.entry.type.POINTCLOUD]: 'Point Cloud',
-                [ddb.entry.type.IMAGE]: 'Image',
-                [ddb.entry.type.DRONEDB]: 'DroneDB',
-                [ddb.entry.type.MARKDOWN]: 'Markdown',
-                [ddb.entry.type.VIDEO]: 'Video',
-                [ddb.entry.type.MODEL]: '3D Model',
-                [ddb.entry.type.PANORAMA]: 'Panorama',
-                [ddb.entry.type.GEOPANORAMA]: 'GeoPanorama'
-            };
-            return typeMap[file.entry.type] || 'Unknown';
+            return getFileTypeName(file.entry.type);
         },
 
         getFileSize(file) {
-            if (ddb.entry.isDirectory(file.entry)) return '--';
-            if (!file.entry.size) return '--';
-
-            const bytes = file.entry.size;
-            if (bytes === 0) return '0 B';
-
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate(file) {
-            if (!file.entry.mtime) return '--';
-
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         formatMetaKey(key) {
@@ -359,19 +325,14 @@ export default {
             if (!this.dataset || !this.file) return;
 
             try {
-                if (await isFileBuilt(this.dataset, this.file)) {
-                    this.buildConfirmDialogOpen = true;
-                } else {
-                    await BuildManager.startBuild(this.dataset, this.file.entry.path, true);
-                    this.buildLoading = true;
-                }
+                if (await isFileBuilt(this.dataset, this.file) && this.showBuildConfirm) this.showBuildConfirm(this.file, () => this.startBuild());
+                else await this.startBuild();
             } catch (error) {
                 this.$emit('buildError', { file: this.file, error: error.message });
             }
         },
 
-        async handleBuildConfirmOk() {
-            this.buildConfirmDialogOpen = false;
+        async startBuild() {
             if (!this.dataset || !this.file) return;
             try {
                 await BuildManager.startBuild(this.dataset, this.file.entry.path, true);
@@ -497,7 +458,7 @@ export default {
 }
 
 .build-status.pending {
-    background-color: #e67e22;
+    background-color: var(--ddb-build-pending);
 }
 
 .build-explanation-section {

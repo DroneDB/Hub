@@ -2,7 +2,7 @@
  * Unit tests for libs/utils.js
  * Run with: npx vitest run --reporter=verbose
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
     setTitle,
     getCookie,

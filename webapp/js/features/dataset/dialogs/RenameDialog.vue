@@ -1,8 +1,8 @@
 <template>
-    <Window title="Rename" id="rename" @onClose="onWindowClose" @show="focusInput" modal maxWidth="70%" fixedSize>
+    <Window id="rename" title="Rename" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Rename" :confirm-disabled="!renameText || renameText === file.label" :busy="busy" @confirm="rename" @close="onWindowClose" @show="focusInput">
 
-        <InputText class="renameInput" ref="renameInput" @keyup.enter="rename" @keyup.esc="close('close')"
-            v-model="renameText" :invalid="renameText == null || renameText.length == 0" :disabled="busy" fluid />
+        <InputText ref="renameInput" v-model="renameText" class="renameInput" aria-label="New name" :invalid="renameText == null || renameText.length == 0"
+                   :disabled="busy" fluid />
 
         <!-- Checkbox to also rename sidecar files (e.g. _measurements.geojson, _cameras.json) -->
         <div v-if="sidecars.length > 0" class="sidecar-rename-option">
@@ -11,7 +11,7 @@
                     v-model="renameSidecars"
                     :binary="true"
                     :disabled="busy"
-                    inputId="renameSidecarsCheckbox" />
+                    input-id="renameSidecarsCheckbox" />
                 <label for="renameSidecarsCheckbox">
                     Also rename sidecar files
                 </label>
@@ -21,16 +21,11 @@
             </ul>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" :disabled="busy" severity="secondary" label="Close" />
-            <Button @click="rename" :disabled="!renameText || renameText === file.label || busy" :loading="busy" severity="primary" label="Rename" />
-        </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ddb from 'ddb';
@@ -38,7 +33,7 @@ import { discoverSidecars } from '@/libs/sidecarUtils';
 
 export default {
     components: {
-        Window, Button, InputText, Checkbox
+        Window, InputText, Checkbox
     },
 
     props: {
@@ -46,7 +41,7 @@ export default {
         busy: { type: Boolean, default: false },
         allEntries: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -81,7 +76,7 @@ export default {
         },
         close: function (buttonId) {
             if (this.busy && buttonId !== 'rename' && buttonId !== 'renameddb') return;
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         },
         onWindowClose: function () {
             if (this.busy) return;
@@ -93,11 +88,11 @@ export default {
 
             // Check file type
             if (this.file.entry.type === ddb.entry.type.DRONEDB) {
-                this.$emit('onClose', "renameddb", this.renameText, this.entry);
+                this.$emit('close', "renameddb", this.renameText, this.entry);
                 return;
             }
 
-            let basePath = this.file.entry.path.substring(0, this.file.entry.path.lastIndexOf('/'));
+            let basePath = ddb.pathutils.getParentFolder(this.file.entry.path) || '';
 
             // Check that renameText doesn't contain invalid characters
             if (this.renameText.indexOf('/') != -1 ||
@@ -123,12 +118,12 @@ export default {
                     newPath: newBase + sc.path.substring(oldBase.length)
                 }));
 
-                this.$emit('onClose', "rename", newPath, this.file.entry, { sidecars: sidecarsInfo });
+                this.$emit('close', "rename", newPath, this.file.entry, { sidecars: sidecarsInfo });
                 return;
             }
 
             // Normal emit for files without sidecars or with unchecked checkbox
-            this.$emit('onClose', "rename", newPath, this.file.entry);
+            this.$emit('close', "rename", newPath, this.file.entry);
         }
     }
 }

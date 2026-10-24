@@ -1,50 +1,40 @@
 <template>
     <div id="table-view-container">
         <ContextMenu :items="contextMenu" />
-        <Toolbar :tools="tools" v-if="tools" />
+        <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems" class="m-3">
-                <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon"></i>
-                        <template v-else>{{ item.label }}</template>
-                    </a>
-                    <span v-else class="bc-active">{{ item.label }}</span>
-                </template>
-                <template #separator> / </template>
-            </Breadcrumb>
+            <PathBreadcrumb :path="currentPath" root-path="/" class="m-3" @navigate="goToPath" />
             <!--<div class="ui divider"></div>-->
         </div>
-        <div ref="tableview" id="table-view" :class="{ dropping }"
-            @drop="explorerDropHandler($event)"
-            @dragleave="explorerDragLeave($event)"
-            @dragenter="explorerDragEnter($event)"
-            @dragover.prevent
-            @click="onClick">
-            <DataTable :value="sortedFiles" :paginator="false" scrollable scrollHeight="flex" size="small"
-                dataKey="path" stripedRows
-                :rowClass="rowClass"
-                :pt="{ bodyRow: rowPt }"
-                @row-click="onRowClick"
-                @row-dblclick="onRowDblClick"
-                @row-contextmenu="onRowContextMenu">
+        <!-- A click on the empty area clears the selection, Escape does it from the keyboard -->
+        <div id="table-view" ref="tableview" :class="{ dropping }" role="presentation"
+             @keydown.esc="clearSelection"
+             @drop="explorerDropHandler($event)"
+             @dragleave="explorerDragLeave($event)"
+             @dragenter="explorerDragEnter($event)"
+             @dragover.prevent
+             @click="onClick">
+            <DataTable :value="sortedFiles" :paginator="false" scrollable scroll-height="flex" size="small"
+                       data-key="path" striped-rows
+                       :row-class="rowClass"
+                       :pt="{ bodyRow: rowPt }"
+                       @row-click="onRowClick"
+                       @row-dblclick="onRowDblClick"
+                       @row-contextmenu="onRowContextMenu">
                 <Column header="" style="width: 3rem; text-align: center;">
                     <template #body="{ data }">
-                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon"></i>
+                        <i v-if="isBuildLoading(data)" class="fa-solid fa-circle-notch fa-spin loading-icon" />
                         <template v-else-if="expandedGrid">
-                            <img v-if="getThumbnail(data)" class="thumb-preview" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)" />
-                            <i v-else class="icon" :class="data.icon"></i>
+                            <img v-if="getThumbnail(data)" class="thumb-preview" loading="lazy" decoding="async" :src="getThumbnail(data)" :alt="data.label + ' preview'" @error="onThumbError(data)">
+                            <i v-else class="icon" :class="data.icon" />
                         </template>
-                        <i v-else class="icon" :class="data.icon"></i>
-                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)"></i>
+                        <i v-else class="icon" :class="data.icon" />
+                        <i v-if="getBuildBadge(data)" class="icon badge" :class="getBuildBadge(data)" :title="getBuildBadgeTooltip(data)" />
                     </template>
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span @click="sortBy('name')" class="sortable-header">
-                            Name
-                            <i v-if="sortColumn === 'name'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-name">{{ data.label }}</span>
@@ -52,10 +42,7 @@
                 </Column>
                 <Column style="width: 7.5rem;">
                     <template #header>
-                        <span @click="sortBy('type')" class="sortable-header">
-                            Type
-                            <i v-if="sortColumn === 'type'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-type">{{ getFileType(data) }}</span>
@@ -63,10 +50,7 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span @click="sortBy('size')" class="sortable-header">
-                            Size
-                            <i v-if="sortColumn === 'size'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Size" column="size" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-size">{{ getFileSize(data) }}</span>
@@ -74,10 +58,7 @@
                 </Column>
                 <Column style="width: 12rem">
                     <template #header>
-                        <span @click="sortBy('modified')" class="sortable-header">
-                            Modified
-                            <i v-if="sortColumn === 'modified'" class="fa-solid" :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <div class="file-date">
@@ -87,11 +68,9 @@
                     </template>
                 </Column>
                 <template #empty>
-                    <div v-if="isLoadingFiles" class="text-center p-4">
-                        <i class="fa-solid fa-circle-notch fa-spin"></i>
-                    </div>
+                    <LoadingSpinner v-if="isLoadingFiles" />
                     <div v-else class="text-center p-4">
-                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;"></i>
+                        <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
                         <p class="mt-2">This folder is empty</p>
                     </div>
                 </template>
@@ -101,23 +80,28 @@
 </template>
 
 <script>
-import Toolbar from '@/components/Toolbar.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
-import Mouse from '@/libs/mouse';
-import { clone, formatTimeAgo, bytesToSize } from '@/libs/utils';
-import { dragDropMixin } from '@/libs/dragDropUtils';
+import { formatTimeAgo } from '@/libs/utils';
+import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
+import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 
 import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
 
-import ContextMenu from '@/components/ContextMenu';
-import Breadcrumb from 'primevue/breadcrumb';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
+import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
+import { getCurrentInstance } from 'vue';
+import { useDragDrop } from '@/composables/useDragDrop';
+import { useFileSelection } from '@/composables/useFileSelection';
 
 /**
  * TableView - Flat-list table view for dataset files.
@@ -126,13 +110,30 @@ import Column from 'primevue/column';
  * drag-and-drop support, and a context menu for file operations.
  */
 export default {
-    mixins: [dragDropMixin],
     components: {
-        Toolbar, ContextMenu, Breadcrumb, DataTable, Column
+        LoadingSpinner,
+        Toolbar, ContextMenu, PathBreadcrumb, SortHeader, DataTable, Column
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
-    props: ['files', 'currentPath', 'tools', 'dataset', 'viewMode', 'expandedGrid', 'canWrite', 'isLoadingFiles'],
     inject: { showBuildConfirm: { default: null } },
+    props: {
+        files: { type: Array, required: true },
+        currentPath: { type: String, default: null },
+        tools: { type: Array, default: null },
+        dataset: { type: Object, required: true },
+        viewMode: { type: String, default: null },
+        expandedGrid: { type: Boolean, default: false },
+        canWrite: { type: Boolean, default: false },
+        isLoadingFiles: { type: Boolean, default: false }
+    },
+    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact'],
+    setup(props) {
+        const instance = getCurrentInstance();
+        return {
+            ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
+            // Ranges follow the rows as sorted on screen
+            selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path)
+        };
+    },
     data: function () {
         const self = this;
         const ctx = {
@@ -155,17 +156,99 @@ export default {
 
         return {
             loading: false,
-            dropping: false,
             contextMenu,
             sortColumn: 'name',
             sortDirection: 'asc',
-            rangeStartIdx: null,
             thumbnailCache: new Map(), // path -> thumbnail URL, or null if unsupported/unavailable
             // Paths whose thumbnail failed to load (e.g. build artifact missing).
             // Component-scoped (cleared on mount / dataset switch) so failures
             // stick for this list without cross-dataset poisoning (Fix 1 Q7).
             failedThumbs: new Set()
         };
+    },
+    computed: {
+        selectedFiles: function () {
+            return this.files.filter(f => f.selected);
+        },
+        sortedFiles: function() {
+            const sorted = [...this.files];
+
+            sorted.sort((a, b) => {
+                // Folders first
+                let aDir = ddb.entry.isDirectory(a.entry);
+                let bDir = ddb.entry.isDirectory(b.entry);
+
+                if (aDir && !bDir) return -1;
+                else if (!aDir && bDir) return 1;
+
+                // Then sort by column
+                let result = 0;
+                switch(this.sortColumn) {
+                    case 'name':
+                        result = a.label.toLowerCase().localeCompare(b.label.toLowerCase());
+                        break;
+                    case 'type':
+                        result = this.getFileType(a).localeCompare(this.getFileType(b));
+                        break;
+                    case 'size':
+                        result = (a.entry.size || 0) - (b.entry.size || 0);
+                        break;
+                    case 'modified':
+                        result = (a.entry.mtime || 0) - (b.entry.mtime || 0);
+                        break;
+                }
+
+                return this.sortDirection === 'asc' ? result : -result;
+            });
+
+            return sorted;
+        },
+        // Row events find their file by the row's position (the header is row 0)
+        rowPt: function () {
+            const fileOf = e => {
+                const row = e.target.closest('tr');
+                return row ? this.sortedFiles[row.rowIndex - 1] : undefined;
+            };
+            return {
+                tabindex: 0,
+                // Enter opens, Space selects (with Shift/Ctrl like a click)
+                onKeydown: e => {
+                    if (e.target.tagName !== 'TR') return;
+                    const file = fileOf(e);
+                    if (!file) return;
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.handleOpen(file);
+                    } else if (e.key === ' ') {
+                        e.preventDefault();
+                        this.handleSelection(e, file);
+                    }
+                },
+                onDragstart: e => {
+                    const file = fileOf(e);
+                    if (file) this.startDrag(e, file);
+                },
+                onDrop: e => {
+                    const file = fileOf(e);
+                    if (file) this.onDrop(e, file);
+                },
+                onDragenter: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragEnter(e, file);
+                    else e.preventDefault();
+                },
+                onDragover: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragOver(e, file);
+                    else e.preventDefault();
+                },
+                onDragleave: e => {
+                    const file = fileOf(e);
+                    if (file) this.itemDragLeave(e, file);
+                },
+                draggable: this.canWrite
+            };
+        }
     },
     watch: {
         files: {
@@ -193,133 +276,6 @@ export default {
         // Failed-thumbnail tracking is component-scoped: fresh set per mount.
         this.failedThumbs.clear();
     },
-    computed: {
-        selectedFiles: function () {
-            return this.files.filter(f => f.selected);
-        },
-        breadcrumbs: function () {
-            if (this.currentPath == null || this.currentPath.length == 0) return null;
-
-            var folders = this.currentPath.split('/');
-            var cur = "";
-            var bc = [];
-
-            for (var el of folders) {
-                cur += '/' + el;
-
-                bc.push({
-                    path: cur.substring(1),
-                    name: el
-                });
-            }
-
-            if (bc.length > 0) {
-                bc.unshift({
-                    path: "/",
-                    name: "~"
-                })
-            }
-
-            return bc;
-        },
-        breadcrumbHome: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
-            const home = this.breadcrumbs[0];
-            return {
-                icon: 'fa-solid fa-home',
-                command: () => this.goTo(home)
-            };
-        },
-        breadcrumbItems: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
-            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
-                if (idx < arr.length - 1) {
-                    return { label: b.name, command: () => this.goTo(b) };
-                }
-                return { label: b.name };
-            });
-        },
-        sortedFiles: function() {
-            const sorted = [...this.files];
-
-            sorted.sort((a, b) => {
-                // Folders first
-                let aDir = ddb.entry.isDirectory(a.entry);
-                let bDir = ddb.entry.isDirectory(b.entry);
-
-                if (aDir && !bDir) return -1;
-                else if (!aDir && bDir) return 1;
-
-                // Then sort by column
-                let result = 0;
-                switch(this.sortColumn) {
-                    case 'name':
-                        result = a.label.toLowerCase().localeCompare(b.label.toLowerCase());
-                        break;
-                    case 'type':
-                        result = this.getFileType(a).localeCompare(this.getFileType(b));
-                        break;
-                    case 'size':
-                        const sizeA = a.entry.size || 0;
-                        const sizeB = b.entry.size || 0;
-                        result = sizeA - sizeB;
-                        break;
-                    case 'modified':
-                        const modA = a.entry.mtime || 0;
-                        const modB = b.entry.mtime || 0;
-                        result = modA - modB;
-                        break;
-                }
-
-                return this.sortDirection === 'asc' ? result : -result;
-            });
-
-            return sorted;
-        },
-        rowPt: function () {
-            const self = this;
-            return {
-                onDragstart(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1; // account for header row
-                    const file = self.sortedFiles[idx];
-                    if (file) self.startDrag(e, file);
-                },
-                onDrop(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.onDrop(e, file);
-                },
-                onDragenter(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragEnter(e, file);
-                    else e.preventDefault();
-                },
-                onDragover(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) { e.preventDefault(); return; }
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragOver(e, file);
-                    else e.preventDefault();
-                },
-                onDragleave(e) {
-                    const row = e.target.closest('tr');
-                    if (!row) return;
-                    const idx = row.rowIndex - 1;
-                    const file = self.sortedFiles[idx];
-                    if (file) self.itemDragLeave(e, file);
-                },
-                draggable: this.canWrite
-            };
-        }
-    },
     methods: {
         rowClass(data) {
             const classes = [];
@@ -340,11 +296,11 @@ export default {
             this.handleRightClick(event.originalEvent, event.data);
         },
 
-        goTo: function (itm) {
-            emitter.emit("folderOpened", pathutils.getTree(itm.path));
+        goToPath: function (path) {
+            emitter.emit("folderOpened", pathutils.getTree(path));
         },
 
-        // startDrag, onDrop and explorerDropHandler are inherited from dragDropMixin.
+        // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
 
         onClick: function (e) {
             // Clicked an empty area (DataTable wrapper or empty body)
@@ -355,16 +311,28 @@ export default {
         },
 
         selectAll: function () {
-            this.files.forEach(f => f.selected = true);
+            this.selection.selectAll();
+            this.applySelection();
         },
 
         deselectAll: function () {
-            this.files.forEach(f => f.selected = false);
+            this.selection.clear();
+            this.applySelection();
         },
 
         clearSelection: function () {
-            this.files.forEach(f => f.selected = false);
-            this.rangeStartIdx = null;
+            this.deselectAll();
+        },
+
+        // The explorer items carry the selection (the map and the file grid share them)
+        applySelection: function () {
+            this.files.forEach(f => { f.selected = this.selection.has(f); });
+        },
+
+        select: function (file, mods) {
+            this.selection.load(this.selectedFiles);
+            this.selection.toggle(this.sortedFiles.indexOf(file), mods);
+            this.applySelection();
         },
 
         handleOpen: async function (file) {
@@ -378,44 +346,13 @@ export default {
 
         handleSelection: function (evt, file) {
             Keyboard.updateState(evt);
-
-            const idx = this.sortedFiles.indexOf(file);
-
-            if (Keyboard.isShiftPressed() && this.selectedFiles.length > 0 && this.rangeStartIdx !== null) {
-                // Range selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                this.selectRange(this.rangeStartIdx, idx);
-            } else if (Keyboard.isCtrlPressed()) {
-                // Toggle selection
-                file.selected = !file.selected;
-                if (file.selected) this.rangeStartIdx = idx;
-            } else {
-                // Single selection
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-                this.rangeStartIdx = idx;
-            }
-
-            // Emit selection changed event
+            this.select(file, { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isCtrlPressed() });
             this.$emit('selectionChanged', file);
         },
 
         handleRightClick: function (evt, file) {
             Keyboard.updateState(evt);
-
-            // If right-clicking on an unselected item, select only that item
-            if (!file.selected) {
-                this.selectedFiles.forEach(f => f.selected = false);
-                file.selected = true;
-            }
-        },
-
-        selectRange: function (startIdx, endIdx) {
-            const [low, high] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
-
-            for (let i = low; i <= high; i++) {
-                this.sortedFiles[i].selected = true;
-            }
+            this.select(file, { right: true });
         },
 
         sortBy: function(column) {
@@ -432,16 +369,11 @@ export default {
         },
 
         getFileSize: function(file) {
-            if (entry.isDirectory(file.entry)) return '';
-            if (!file.entry.size) return '';
-            return bytesToSize(file.entry.size);
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate: function(file) {
-            if (!file.entry.mtime) return '--';
-
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         getFileModifiedDateRel: function(file) {
@@ -470,13 +402,13 @@ export default {
             if (!this.files) return;
 
             for (const file of this.files) {
-                if (!thumbs.supportedForType(file.entry.type)) continue;
+                if (!hasThumbnail(file.entry.type)) continue;
                 // Skip paths whose thumbnail already failed in this component
                 // instance; they heal on remount / dataset switch.
                 if (this.failedThumbs.has(file.entry.path)) continue;
                 try {
-                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48));
-                } catch (e) {
+                    this.thumbnailCache.set(file.entry.path, thumbs.fetch(file.path, 48, file.entry.hash));
+                } catch {
                     // Unsupported URI scheme or fetch error - fall back to icon
                 }
             }
@@ -532,33 +464,6 @@ export default {
     height: 100%;
     display: flex;
     flex-direction: column;
-
-    :deep(.p-breadcrumb) {
-        background: transparent;
-        border: none;
-        padding: 0;
-        font-size: 1rem;
-
-        .p-breadcrumb-separator {
-            color: var(--ddb-text-muted);
-            margin: 0 0.25rem;
-        }
-    }
-
-    .bc-link {
-        color: var(--ddb-link);
-        cursor: pointer;
-        text-decoration: none;
-
-        &:hover {
-            text-decoration: underline;
-        }
-    }
-
-    .bc-active {
-        color: inherit;
-        font-weight: 600;
-    }
 }
 
 #table-view {
@@ -585,20 +490,14 @@ export default {
         cursor: pointer;
     }
 
-    .sortable-header {
-        cursor: pointer;
-        user-select: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.25rem;
-
-        &:hover {
-            color: var(--ddb-primary);
-        }
-    }
 
     tr {
         cursor: pointer;
+    }
+
+    tr:focus-visible {
+        outline: 2px solid var(--ddb-primary);
+        outline-offset: -2px;
     }
 
     tr.row-selected {
@@ -610,7 +509,7 @@ export default {
     }
 
     tr.drop-target > td {
-        outline: 2px dashed var(--ddb-color-primary, #1976d2);
+        outline: 2px dashed var(--ddb-primary);
         outline-offset: -2px;
         background-color: var(--ddb-bg-hover) !important;
     }

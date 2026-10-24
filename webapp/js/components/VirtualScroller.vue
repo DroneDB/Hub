@@ -11,34 +11,36 @@
  *
  * Slot:
  *   Receives { item } for each visible item, same as RecycleScroller's v-slot.
+ *
+ * Exposes scrollToIndex(index) and scrollElement.
  */
 <template>
-  <div
-    ref="parentRef"
-    class="virtual-scroller"
-    :style="{
-      minHeight: minHeight + 'px',
-      maxHeight: maxHeight ? maxHeight + 'px' : 'none'
-    }"
-  >
-    <div :style="{ height: totalSize + 'px', position: 'relative' }">
-      <div
-        v-for="virtualItem in virtualItems"
-        :key="virtualItem.key"
-        class="virtual-scroller-item"
+    <div
+        ref="parentRef"
+        class="virtual-scroller"
         :style="{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: virtualItem.size + 'px',
-          transform: `translateY(${virtualItem.start}px)`
+            minHeight: minHeight + 'px',
+            maxHeight: maxHeight ? maxHeight + 'px' : 'none'
         }"
-      >
-        <slot :item="items[virtualItem.index]" :index="virtualItem.index" />
-      </div>
+    >
+        <div :style="{ height: totalSize + 'px', position: 'relative' }">
+            <div
+                v-for="virtualItem in virtualItems"
+                :key="virtualItem.key"
+                class="virtual-scroller-item"
+                :style="{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: virtualItem.size + 'px',
+                    transform: `translateY(${virtualItem.start}px)`
+                }"
+            >
+                <slot :item="items[virtualItem.index]" :index="virtualItem.index" />
+            </div>
+        </div>
     </div>
-  </div>
 </template>
 
 <script setup>
@@ -48,8 +50,7 @@ import { useVirtualizer } from '@tanstack/vue-virtual';
 const props = defineProps({
   items: {
     type: Array,
-    required: true,
-    default: () => []
+    required: true
   },
   itemSize: {
     type: Number,
@@ -92,6 +93,14 @@ const totalSize = computed(() => virtualizer.value.getTotalSize());
 watch(() => props.items.length, async () => {
   await nextTick();
   virtualizer.value.measure();
+});
+
+// For parents: scroll to a row, and the element that scrolls (e.g. an IntersectionObserver root)
+defineExpose({
+  scrollToIndex: (index) => virtualizer.value.scrollToIndex(index, { align: 'start' }),
+  get scrollElement() {
+    return parentRef.value;
+  }
 });
 </script>
 

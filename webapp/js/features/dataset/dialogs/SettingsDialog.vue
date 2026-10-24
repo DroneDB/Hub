@@ -1,79 +1,80 @@
 <template>
-    <Window title="Settings" id="settings" @onClose="close('close')" modal maxWidth="70%" fixedSize fixedPosition
-        closeModalOnClick>
-        <Message bindTo="error" />
+    <Window id="settings" title="Settings" modal max-width="70%" fixed-size fixed-position close-modal-on-click
+            @close="$emit('close', 'close')">
+        <Message v-model="error" />
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
-        <div class="settings-body" v-else>
+        <LoadingSpinner v-if="loading" />
+        <div v-else class="settings-body">
             <div class="settings-section">
                 <div class="mb-2">
-                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }"></i>
-                    Visibility: <Select v-model="visibility" @change="setVisibility" :options="visibilityOptions" optionLabel="label" optionValue="value" />
+                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }" />
+                    <label id="settings-visibility-label" for="settings-visibility">Visibility:</label>
+                    <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label" :options="visibilityOptions" option-label="label" option-value="value" @change="setVisibility" />
                 </div>
                 <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
+                    <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
                     <span v-html="safeDescription" />
                 </PrimeMessage>
             </div>
 
             <div class="settings-section">
                 <div>
-                    <i class="fa-solid fa-scale-balanced"></i>
-                    License: <Select v-model="license" @change="setLicense" :options="licenseOptions" optionLabel="label" optionValue="value" class="license-dropdown" :title="Licenses[license].name" />
+                    <i class="fa-solid fa-scale-balanced" />
+                    <label id="settings-license-label" for="settings-license">License:</label>
+                    <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label" :options="licenseOptions" option-label="label" option-value="value" class="license-dropdown" :title="Licenses[license].name" @change="setLicense" />
                 </div>
             </div>
 
-            <div class="settings-section" v-if="canWrite">
+            <div v-if="canWrite" class="settings-section">
                 <div class="mb-2">
-                    <i class="fa-solid fa-tag"></i>
+                    <i class="fa-solid fa-tag" />
                     Tagline
                 </div>
                 <div class="tagline-field">
-                    <InputText v-model="tagline" maxlength="256"
-                        placeholder="Brief description of your dataset (max 256 chars)"
-                        @change="setTagline" fluid />
+                    <InputText v-model="tagline" maxlength="256" aria-label="Tagline"
+                               placeholder="Brief description of your dataset (max 256 chars)"
+                               fluid @change="setTagline" />
                     <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
                 </div>
             </div>
 
-            <div class="settings-section" v-if="canWrite">
+            <div v-if="canWrite" class="settings-section">
                 <div class="mb-2">
-                    <i class="fa-solid fa-image"></i>
+                    <i class="fa-solid fa-image" />
                     Thumbnail
                 </div>
                 <div class="thumbnail-upload">
                     <div class="thumbnail-preview-container">
                         <img v-if="thumbnailPreview && !thumbnailError"
-                            :src="thumbnailPreview"
-                            class="thumbnail-preview"
-                            @error="thumbnailError = true" />
+                             :src="thumbnailPreview" alt="Dataset thumbnail"
+                             class="thumbnail-preview"
+                             @error="thumbnailError = true">
                         <img v-else
-                            src="/images/dataset-placeholder.svg"
-                            class="thumbnail-preview thumbnail-placeholder" />
+                             src="/images/dataset-placeholder.svg" alt="No thumbnail"
+                             class="thumbnail-preview thumbnail-placeholder">
                     </div>
                     <div class="thumbnail-actions">
-                        <input type="file" ref="thumbnailInput"
-                            @change="handleThumbnailSelect"
-                            accept="image/webp,image/jpeg,image/png"
-                            style="display: none" />
-                        <Button @click="$refs.thumbnailInput.click()"
-                            :loading="thumbnailUploading" icon="fa-solid fa-upload" label="Upload" />
+                        <input ref="thumbnailInput" type="file" aria-label="Thumbnail image"
+                               accept="image/webp,image/jpeg,image/png"
+                               style="display: none"
+                               @change="handleThumbnailSelect">
+                        <Button :loading="thumbnailUploading"
+                                icon="fa-solid fa-upload" label="Upload" @click="$refs.thumbnailInput.click()" />
                         <Button v-if="thumbnailPreview && !thumbnailError"
-                            severity="danger"
-                            @click="removeThumbnail"
-                            :loading="thumbnailRemoving" icon="fa-solid fa-trash" label="Remove" />
+                                severity="danger"
+                                :loading="thumbnailRemoving"
+                                icon="fa-solid fa-trash" label="Remove" @click="removeThumbnail" />
                     </div>
                 </div>
             </div>
 
-            <div class="settings-section" v-if="readme == null">
-                <Button @click="addDocument('README.md')" icon="fa-solid fa-book" label="Add Readme" />
+            <div v-if="readme == null" class="settings-section">
+                <Button icon="fa-solid fa-book" label="Add Readme" @click="addDocument('README.md')" />
             </div>
 
-            <div class="settings-section settings-maintenance" v-if="canWrite">
+            <div v-if="canWrite" class="settings-section settings-maintenance">
                 <div class="mb-2">
-                    <i class="fa-solid fa-gear"></i>
+                    <i class="fa-solid fa-gear" />
                     Maintenance
                 </div>
                 <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-2">
@@ -81,18 +82,17 @@
                     (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
                     or if file metadata appears outdated or incorrect.
                 </PrimeMessage>
-                <Button @click="$emit('rescanRequested')" icon="fa-solid fa-rotate" label="Rescan Dataset" />
+                <Button icon="fa-solid fa-rotate" label="Rescan Dataset" @click="$emit('rescanRequested')" />
             </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Message from '@/components/Message.vue';
-import mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Message from '@/components/HubMessage.vue';
 import { Licenses } from '@/libs/licenses';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
@@ -101,6 +101,10 @@ import ddb from 'ddb';
 import { sanitizeHtml } from '@/libs/sanitize';
 
 export default {
+    components: {
+        LoadingSpinner,
+        Message, Window, Button, Select, InputText, PrimeMessage
+    },
     props: {
         dataset: {
             required: true,
@@ -111,10 +115,7 @@ export default {
             default: false
         }
     },
-    emits: ['onClose'],
-    components: {
-        Message, Window, Button, Select, InputText, PrimeMessage
-    },
+    emits: ['close', 'rescanRequested', 'addMarkdown'],
     data: function () {
         return {
             error: "",
@@ -135,29 +136,6 @@ export default {
             },
             visibility: ddb.Visibility.PRIVATE
         }
-    },
-    mounted: async function () {
-        try {
-            const info = await this.dataset.info();
-            this.properties = info[0].properties;
-
-            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
-            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
-            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
-            this.tagline = this.properties?.meta?.tagline?.data ?? '';
-
-            // Load existing dataset thumbnail preview
-            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
-            this.thumbnailError = false;
-
-            console.log(this.Visibilities);
-        } catch (e) {
-            this.error = e.message;
-        }
-
-        this.loading = false;
-    },
-    beforeUnmount: function () {
     },
     computed: {
         currentUrl: function () {
@@ -191,25 +169,45 @@ export default {
             }));
         }
     },
+    mounted: async function () {
+        try {
+            const info = await this.dataset.info();
+            this.properties = info[0].properties;
+
+            this.readme = (typeof this.properties.readme !== 'undefined') ? this.properties.readme : null;
+            this.license = this.properties?.meta?.license?.data ?? 'proprietary';
+            this.visibility = this.properties?.meta?.visibility?.data ?? ddb.Visibility.PRIVATE;
+            this.tagline = this.properties?.meta?.tagline?.data ?? '';
+
+            // Load existing dataset thumbnail preview
+            this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
+            this.thumbnailError = false;
+
+            console.log(this.Visibilities);
+        } catch (e) {
+            this.error = e.message;
+        }
+
+        this.loading = false;
+    },
+    beforeUnmount: function () {
+    },
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
         setVisibility: async function () {
             try {
                 this.properties.meta.visibility = await this.dataset.setVisibility(this.visibility);
-                this.$toast.add({ severity: 'success', summary: 'Visibility Updated', detail: 'Dataset visibility updated successfully', life: 3000 });
+                this.$notify.success('Dataset visibility updated successfully', { summary: 'Visibility Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update visibility: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update visibility: ' + e.message);
                 this.error = e.message;
             }
         },
         setLicense: async function () {
             try {
                 this.properties.meta.license = await this.dataset.metaSet("license", this.license);
-                this.$toast.add({ severity: 'success', summary: 'License Updated', detail: 'Dataset license updated successfully', life: 3000 });
+                this.$notify.success('Dataset license updated successfully', { summary: 'License Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update license: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update license: ' + e.message);
                 this.error = e.message;
             }
         },
@@ -217,14 +215,14 @@ export default {
             try {
                 if (this.tagline && this.tagline.trim()) {
                     await this.dataset.metaSet('tagline', this.tagline.trim());
-                    this.$toast.add({ severity: 'success', summary: 'Tagline Updated', detail: 'Tagline updated successfully', life: 3000 });
+                    this.$notify.success('Tagline updated successfully', { summary: 'Tagline Updated' });
                 } else {
                     await this.dataset.metaUnset('tagline');
                     this.tagline = '';
-                    this.$toast.add({ severity: 'success', summary: 'Tagline Removed', detail: 'Tagline removed successfully', life: 3000 });
+                    this.$notify.success('Tagline removed successfully', { summary: 'Tagline Removed' });
                 }
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to update tagline: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to update tagline: ' + e.message);
                 this.error = e.message;
             }
         },
@@ -247,9 +245,9 @@ export default {
                 // Refresh preview with cache-busting timestamp
                 this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
                 this.thumbnailError = false;
-                this.$toast.add({ severity: 'success', summary: 'Thumbnail Updated', detail: 'Thumbnail uploaded successfully', life: 3000 });
+                this.$notify.success('Thumbnail uploaded successfully', { summary: 'Thumbnail Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to upload thumbnail: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to upload thumbnail: ' + e.message);
                 this.error = 'Failed to upload thumbnail: ' + e.message;
             }
 
@@ -268,16 +266,16 @@ export default {
                 for (const candidate of candidates) {
                     try {
                         await this.dataset.deleteObj(candidate);
-                    } catch (e) {
+                    } catch {
                         // Ignore 404 errors - file doesn't exist
                     }
                 }
 
                 this.thumbnailPreview = null;
                 this.thumbnailError = true;
-                this.$toast.add({ severity: 'success', summary: 'Thumbnail Removed', detail: 'Thumbnail removed successfully', life: 3000 });
+                this.$notify.success('Thumbnail removed successfully', { summary: 'Thumbnail Removed' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to remove thumbnail: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to remove thumbnail: ' + e.message);
                 this.error = 'Failed to remove thumbnail: ' + e.message;
             }
 
@@ -287,7 +285,7 @@ export default {
 
             this.loading = true;
 
-            var entry = null;
+            var entry;
 
             try {
                 switch (document) {
@@ -299,10 +297,10 @@ export default {
                         throw new Error("Invalid document: " + document);
                 }
 
-                this.$toast.add({ severity: 'success', summary: 'Document Created', detail: `${document} created successfully`, life: 3000 });
+                this.$notify.success(`${document} created successfully`, { summary: 'Document Created' });
                 this.$emit('addMarkdown', document, entry);
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create document: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to create document: ' + e.message);
                 this.error = e.message;
             }
 
@@ -313,12 +311,6 @@ export default {
 </script>
 
 <style scoped>
-#settings {
-    min-height: 12.5rem;
-    padding: 1rem;
-    margin-top: 0.75rem;
-}
-
 .loading {
     text-align: center;
     padding: 1rem;

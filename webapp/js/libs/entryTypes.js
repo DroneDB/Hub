@@ -1,5 +1,6 @@
 import ddb from 'ddb';
 import { OpenItemDefaults } from '@/libs/openItemDefaults';
+import { isArchivePath } from '@/libs/entryTypeCapabilities';
 
 // Types that have a dedicated viewer (derived from OpenItemDefaults)
 const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
@@ -7,7 +8,6 @@ const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
 // Type groupings used across the application
 const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR, ddb.entry.type.GEOVIDEO];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
-const THUMBNAIL_CANDIDATE_TYPES = [ddb.entry.type.IMAGE, ddb.entry.type.GEOIMAGE, ddb.entry.type.GEORASTER, ddb.entry.type.GAUSSIAN_SPLAT];
 const VIDEO_TYPES = [ddb.entry.type.VIDEO, ddb.entry.type.GEOVIDEO];
 
 // Helper functions
@@ -27,23 +27,12 @@ function isVideoType(type) {
     return VIDEO_TYPES.includes(type);
 }
 
-function isThumbnailCandidate(type) {
-    return THUMBNAIL_CANDIDATE_TYPES.includes(type);
-}
-
 function isDroneDB(type) {
     return type === ddb.entry.type.DRONEDB;
 }
 
-// Returns true when the entry is a (supported) compressed archive file.
-// Mirrors the formats handled by the backend SharpCompress extractor.
-const ARCHIVE_EXTENSION_RE = /\.(zip|rar|7z|tar|tar\.gz|tgz|tar\.bz2|tbz2|tar\.xz|txz|gz|bz2|xz)$/i;
-
-// True when a path looks like a supported archive (extension-based, no entry needed).
-function isArchivePath(path) {
-    return !!path && ARCHIVE_EXTENSION_RE.test(path);
-}
-
+// Returns true when the entry is a (supported) compressed archive file: the extensions are the
+// server's (libs/entryTypeCapabilities.js).
 function isArchiveFile(entry) {
     if (!entry || !entry.path) return false;
     if (ddb.entry.isDirectory(entry)) return false;
@@ -119,19 +108,16 @@ export {
     TYPES_WITH_DEDICATED_VIEWER,
     MAP_VIEWABLE_TYPES,
     PANORAMA_TYPES,
-    THUMBNAIL_CANDIDATE_TYPES,
     VIDEO_TYPES,
     TYPE_DISPLAY_NAMES,
     hasDedicatedViewer,
     isMapViewable,
     isPanoramaType,
     isVideoType,
-    isThumbnailCandidate,
     isDroneDB,
     isPlantHealthCapable,
     isRasterAnalysisCapable,
     getTypeDisplayName,
     sortEntriesDirectoriesFirst,
-    isArchiveFile,
-    isArchivePath
+    isArchiveFile
 };

@@ -10,8 +10,9 @@
  */
 import HybridXYZ from '@/libs/map/olHybridXYZ';
 import { sourceMaxZoom, FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
+import { createFeatureScope } from '@/composables/featureScope';
 
-export default {
+const definition = {
     data() {
         return {
             plantHealthVisible: false,
@@ -35,9 +36,6 @@ export default {
         openPlantHealth(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path) return;
-            // Mutually-exclusive analysis panels.
-            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
-            if (typeof this.closeStockpileVolume === 'function') this.closeStockpileVolume();
             this.plantHealthFilePath = path;
             this.plantHealthVisible = true;
             // Restore previously-applied viz params for this file so the
@@ -206,3 +204,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function usePlantHealth(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

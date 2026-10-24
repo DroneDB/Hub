@@ -18,14 +18,13 @@ export default defineConfig({
         include: ['webapp/js/**/*.spec.js', 'webapp/js/**/*.test.js'],
         setupFiles: ['./test-setup.js'],
         coverage: {
-            provider: 'istanbul',
-            reporter: ['text', 'json', 'html'],
-            include: ['webapp/js/libs/**/*.js', 'webapp/js/composables/**/*.js'],
-            exclude: [
-                'webapp/js/vendor/**',
-                'webapp/js/libs/ddb/**',
-                'webapp/js/libs/map/potree/**'
-            ]
+            provider: 'v8',
+            reporter: ['text-summary', 'json-summary', 'html'],
+            reportsDirectory: 'coverage',
+            include: ['webapp/js/libs/**/*.js', 'webapp/js/composables/**/*.js', 'webapp/js/stores/**/*.js'],
+            exclude: ['webapp/js/**/*.spec.js', 'webapp/js/libs/map/potree/**'],
+            // Ratchet: the 2026-10-20 baseline (HQ-01); raise as coverage grows
+            thresholds: { lines: 32, statements: 32, functions: 32, branches: 77 }
         }
     }
 });

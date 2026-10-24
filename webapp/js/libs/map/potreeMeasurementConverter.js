@@ -2,6 +2,7 @@
  * Utility to convert Potree measurements to GeoJSON and vice versa
  */
 
+import { EPSG } from '@/libs/constants';
 /**
  * Convert a Potree measurement to a GeoJSON Feature
  * @param {Potree.Measure} measure - Potree measurement
@@ -225,7 +226,7 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem, gro
         crs: {
             type: 'name',
             properties: {
-                name: 'EPSG:4326' // Output is always in WGS84
+                name: EPSG.WGS84 // Output is always in WGS84
             }
         },
         metadata: {
@@ -378,7 +379,7 @@ function localToGeographic(localCoords, coordinateSystem) {
     // Use proj4 to transform to WGS84 (proj4 handles both EPSG codes and WKT)
     if (typeof proj4 !== 'undefined') {
         try {
-            const transformed = proj4(srsDefinition, 'EPSG:4326', [x, y]);
+            const transformed = proj4(srsDefinition, EPSG.WGS84, [x, y]);
             return [transformed[0], transformed[1], z];
         } catch (e) {
             console.warn('Projection failed, using raw coordinates:', e);
@@ -416,7 +417,7 @@ function geographicToLocal(geoCoords, coordinateSystem) {
     // Transform from WGS84 to local system if necessary
     if (srsDefinition && typeof proj4 !== 'undefined') {
         try {
-            [x, y] = proj4('EPSG:4326', srsDefinition, [x, y]);
+            [x, y] = proj4(EPSG.WGS84, srsDefinition, [x, y]);
         } catch (e) {
             console.warn('Reverse projection failed:', e);
         }

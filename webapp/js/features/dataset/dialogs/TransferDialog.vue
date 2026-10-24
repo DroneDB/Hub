@@ -1,7 +1,7 @@
 <template>
-    <Window title="Transfer to Dataset" id="transferDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Transfer" confirm-icon="fa-solid fa-right-left" :confirm-disabled="!canTransfer" :busy="isTransferring" @confirm="transfer" @close="close('close')">
         <div class="transfer-dialog">
-            <form v-on:submit.prevent :class="{ error: hasError }">
+            <form :class="{ error: hasError }" @submit.prevent>
 
                 <!-- Error Message -->
                 <PrimeMessage v-if="errorMessage" severity="error" :closable="false">
@@ -15,67 +15,62 @@
 
                 <!-- Destination Organization -->
                 <div class="my-3">
-                    <label class="d-block mb-1 fw-semibold">Destination Organization</label>
-                    <Select v-model="destOrg" @change="onOrgChange" :options="organizationOptions" optionLabel="label"
-                        optionValue="value" placeholder="Select organization" class="w-100" data-autofocus />
+                    <label id="transfer-dialog-destination-organization-label" for="transfer-dialog-destination-organization" class="d-block mb-1 fw-semibold">Destination Organization</label>
+                    <Select v-model="destOrg" input-id="transfer-dialog-destination-organization" aria-labelledby="transfer-dialog-destination-organization-label" :options="organizationOptions" option-label="label" option-value="value"
+                            placeholder="Select organization" class="w-100" data-autofocus @change="onOrgChange" />
                 </div>
 
                 <!-- Destination Dataset -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Destination Dataset</label>
-                    <Select v-model="destDs" :disabled="!destOrg" :options="datasetOptions" optionLabel="label"
-                        optionValue="value" optionDisabled="disabled" placeholder="Select dataset" class="w-100" />
+                    <label id="transfer-dialog-destination-dataset-label" for="transfer-dialog-destination-dataset" class="d-block mb-1 fw-semibold">Destination Dataset</label>
+                    <Select v-model="destDs" input-id="transfer-dialog-destination-dataset" aria-labelledby="transfer-dialog-destination-dataset-label" :disabled="!destOrg" :options="datasetOptions" option-label="label"
+                            option-value="value" option-disabled="disabled" placeholder="Select dataset" class="w-100" />
                 </div>
 
                 <!-- Destination Path -->
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Destination Path (optional)</label>
-                    <InputText v-model="destPath" placeholder="Leave empty for root folder" fluid />
+                    <label for="transfer-dialog-destination-path" class="d-block mb-1 fw-semibold">Destination Path (optional)</label>
+                    <InputText id="transfer-dialog-destination-path" v-model="destPath" placeholder="Leave empty for root folder" fluid />
                     <small class="help-text">Example: folder/subfolder</small>
                 </div>
 
                 <!-- Overwrite Checkbox -->
                 <div class="mb-3">
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="overwrite" :binary="true" inputId="overwriteCheckbox" />
+                        <Checkbox v-model="overwrite" :binary="true" input-id="overwriteCheckbox" />
                         <label for="overwriteCheckbox">Overwrite existing files</label>
                     </div>
                 </div>
 
                 <!-- Progress Bar -->
                 <div v-if="isTransferring" class="progress-section">
-                    <ProgressBar :value="progress" :showValue="true" />
+                    <ProgressBar :value="progress" :show-value="true" />
                     <div class="progress-label">{{ statusMessage }}</div>
                 </div>
 
             </form>
 
             <!-- Buttons -->
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" :disabled="isTransferring" label="Close" />
-                <Button @click="transfer" :disabled="!canTransfer" severity="primary" icon="fa-solid fa-right-left"
-                    label="Transfer" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
 import ddb from 'ddb';
+import { useTimerGroup } from '@/composables/useTimers';
 
 const { Registry } = ddb;
-const reg = new Registry(window.location.origin);
+const reg = Registry.forUrl(window.location.origin);
 
 export default {
     components: {
-        Window, Button, PrimeMessage, Select, InputText, Checkbox, ProgressBar
+        Window, PrimeMessage, Select, InputText, Checkbox, ProgressBar
     },
 
     props: {
@@ -92,8 +87,11 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        return { later: useTimerGroup() };
+    },
     data: function () {
         return {
             organizations: [],
@@ -155,7 +153,7 @@ export default {
     mounted: async function () {
         try {
             // Load organizations - getOrganizations returns Organization instances
-            const orgInstances = await reg.getOrganizations();
+            const orgInstances = await reg.orgs.getOrganizations();
             // Extract the org data from each Organization instance
             this.organizations = orgInstances.map(orgInstance => orgInstance.org);
 
@@ -227,9 +225,7 @@ export default {
                 this.statusMessage = "Transfer completed successfully!";
 
                 // Close dialog after a short delay
-                setTimeout(() => {
-                    this.$emit('onClose', 'transferred', this.files);
-                }, 1500);
+                this.later(() => this.$emit('close', 'transferred', this.files), 1500);
 
             } catch (e) {
                 console.error("Transfer error:", e);
@@ -241,7 +237,7 @@ export default {
 
         close: function (buttonId) {
             if (this.isTransferring) return; // Prevent closing during transfer
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         }
     }
 }

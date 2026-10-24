@@ -1,101 +1,38 @@
 /**
- * Local Storage utility functions for managing user preferences
+ * Named user preferences of the dataset and organisation pages, stored through
+ * libs/preferences.js (HQ-02).
  */
-
-const DATASET_TABLE_PREFS_KEY = 'dataset_table_prefs';
+import { getPref, setPref, removePref, PREF } from '@/libs/preferences';
 
 /**
- * Get dataset table preferences from Local Storage
- * @returns {Object|null} The preferences object with sortColumn, sortDirection, and itemsPerPage, or null if not found
+ * @returns {{sortColumn: string, sortDirection: 'asc'|'desc', itemsPerPage: number}|null}
  */
 export function getDatasetTablePreferences() {
-    try {
-        const prefs = localStorage.getItem(DATASET_TABLE_PREFS_KEY);
-        if (prefs) {
-            return JSON.parse(prefs);
-        }
-    } catch (e) {
-        console.error('Error reading dataset table preferences from Local Storage:', e);
-    }
-    return null;
+    return getPref(PREF.DATASET_TABLE, null);
 }
 
-/**
- * Save dataset table preferences to Local Storage
- * @param {string} sortColumn - The column to sort by
- * @param {string} sortDirection - The sort direction ('asc' or 'desc')
- * @param {number} itemsPerPage - The number of items per page
- */
 export function saveDatasetTablePreferences(sortColumn, sortDirection, itemsPerPage) {
-    const prefs = {
-        sortColumn,
-        sortDirection,
-        itemsPerPage
-    };
-    try {
-        localStorage.setItem(DATASET_TABLE_PREFS_KEY, JSON.stringify(prefs));
-    } catch (e) {
-        console.error('Error saving dataset table preferences to Local Storage:', e);
-    }
+    setPref(PREF.DATASET_TABLE, { sortColumn, sortDirection, itemsPerPage });
 }
 
-/**
- * Clear dataset table preferences from Local Storage
- */
 export function clearDatasetTablePreferences() {
-    try {
-        localStorage.removeItem(DATASET_TABLE_PREFS_KEY);
-    } catch (e) {
-        console.error('Error clearing dataset table preferences from Local Storage:', e);
-    }
+    removePref(PREF.DATASET_TABLE);
 }
 
-const OPEN_AFTER_CREATE_KEY = 'open_dataset_after_create';
-
-/**
- * Get the preference for opening a dataset after creation
- * @returns {boolean} True if the user wants to open the dataset after creation, false otherwise
- */
+/** @returns {boolean} open a dataset right after creating it */
 export function getOpenAfterCreatePreference() {
-    try {
-        return localStorage.getItem(OPEN_AFTER_CREATE_KEY) === 'true';
-    } catch (e) {
-        console.error('Error reading open after create preference from Local Storage:', e);
-    }
-    return false;
+    return getPref(PREF.OPEN_AFTER_CREATE, false) === true;
 }
 
-/**
- * Save the preference for opening a dataset after creation
- * @param {boolean} value - True to open the dataset after creation, false otherwise
- */
+/** @param {boolean} value */
 export function saveOpenAfterCreatePreference(value) {
-    try {
-        localStorage.setItem(OPEN_AFTER_CREATE_KEY, value.toString());
-    } catch (e) {
-        console.error('Error saving open after create preference to Local Storage:', e);
-    }
+    setPref(PREF.OPEN_AFTER_CREATE, !!value);
 }
-
-const ORG_PAGE_PREFS_KEY = 'org_page_prefs';
 
 export function getOrgPagePreferences() {
-    try {
-        const prefs = localStorage.getItem(ORG_PAGE_PREFS_KEY);
-        if (prefs) {
-            return JSON.parse(prefs);
-        }
-    } catch (e) {
-        console.error('Error reading org page preferences from Local Storage:', e);
-    }
-    return null;
+    return getPref(PREF.ORG_PAGE, null);
 }
 
 export function saveOrgPagePreferences(itemsPerPage, ownedOnly, currentPage = 1, scrollTop = 0) {
-    const prefs = { itemsPerPage, ownedOnly, currentPage, scrollTop };
-    try {
-        localStorage.setItem(ORG_PAGE_PREFS_KEY, JSON.stringify(prefs));
-    } catch (e) {
-        console.error('Error saving org page preferences to Local Storage:', e);
-    }
+    setPref(PREF.ORG_PAGE, { itemsPerPage, ownedOnly, currentPage, scrollTop });
 }

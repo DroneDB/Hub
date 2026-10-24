@@ -1,48 +1,41 @@
 <template>
-    <Window title="Change Password" id="changePasswordDialog" @onClose="close" modal maxWidth="50%" fixedSize>
+    <Window id="changePasswordDialog" title="Change Password" modal max-width="50%" fixed-size confirm-label="Change Password" :confirm-disabled="!isValid()" :busy="changing" @confirm="confirmChange()" @close="$emit('close')">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message v-model="error" />
 
             <PrimeMessage severity="info" :closable="false" class="mb-3">
                 Changing password for user: <strong>{{ user.userName }}</strong>
             </PrimeMessage>
 
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+            <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Current Password</label>
-                    <Password ref="txtCurrentPassword" @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="currentPassword" placeholder="Enter current password" :feedback="false" toggleMask class="w-100" />
+                    <label for="change-password-dialog-current-password" class="d-block mb-1 fw-semibold">Current Password</label>
+                    <Password ref="txtCurrentPassword" v-model="currentPassword" input-id="change-password-dialog-current-password" placeholder="Enter current password"
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                     <small>Leave empty if you don't know the current password (admin override)</small>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="newPassword" placeholder="Enter new password" :feedback="false" toggleMask class="w-100" />
+                    <label for="change-password-dialog-new-password" class="d-block mb-1 fw-semibold">New Password</label>
+                    <Password v-model="newPassword" input-id="change-password-dialog-new-password" placeholder="Enter new password"
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="confirmChange()"
-                           v-model="confirmPassword" placeholder="Confirm new password" :feedback="false" toggleMask class="w-100" />
+                    <label for="change-password-dialog-confirm-new-password" class="d-block mb-1 fw-semibold">Confirm New Password</label>
+                    <Password v-model="confirmPassword" input-id="change-password-dialog-confirm-new-password" placeholder="Confirm new password"
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="changing" label="Cancel" />
-                <Button @click="confirmChange()" :disabled="changing || !isValid()" :loading="changing"
-                    severity="primary" label="Change Password" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
-import Button from 'primevue/button';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
+import Message from '@/components/HubMessage.vue';
 import Password from 'primevue/password';
 import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
@@ -51,7 +44,8 @@ export default {
     // NOTE: This dialog is used by admins to change other users' passwords.
     // Password policy validation is intentionally NOT applied here (admin override).
     components: {
-        Window, Message, Button, Password, PrimeMessage
+        LoadingSpinner,
+        Window, Message, Password, PrimeMessage
     },
     props: {
         user: {
@@ -59,7 +53,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -72,9 +66,6 @@ export default {
         };
     },
     methods: {
-        close: function () {
-            this.$emit('onClose');
-        },
         clearError: function () {
             this.error = "";
         },
@@ -92,17 +83,17 @@ export default {
 
             this.changing = true;
             try {
-                await reg.changeUserPassword(
+                await reg.admin.changeUserPassword(
                     this.user.userName,
                     this.currentPassword || null, // Pass null instead of empty string for admin override
                     this.newPassword
                 );
 
-                this.$toast.add({ severity: 'success', summary: 'Password Changed', detail: `Password changed successfully for "${this.user.userName}"`, life: 3000 });
+                this.$notify.success(`Password changed successfully for "${this.user.userName}"`, { summary: 'Password Changed' });
                 this.changing = false;
-                this.$emit('onClose', 'updated');
+                this.$emit('close', 'updated');
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to change password: ' + (e.message || 'Unknown error'), life: 5000 });
+                this.$notify.error('Failed to change password: ' + (e.message || 'Unknown error'));
                 this.error = e.message || 'Failed to change password';
                 this.changing = false;
             }

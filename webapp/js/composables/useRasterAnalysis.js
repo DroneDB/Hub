@@ -8,6 +8,9 @@ import { Point } from 'ol/geom';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import { getLength as olGetLength } from 'ol/sphere';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { EPSG } from '@/libs/constants';
+import { createFeatureScope } from '@/composables/featureScope';
 
 /**
  * Mixin for Raster Analysis panel (thermal + DEM + generic value rasters).
@@ -20,7 +23,7 @@ import { getLength as olGetLength } from 'ol/sphere';
  * - Component must import and register RasterAnalysisControls component
  * - Component must call `this.refreshRasterLayers()` when vizParams change
  */
-export default {
+const definition = {
     data() {
         return {
             rasterPanelVisible: false,
@@ -74,9 +77,6 @@ export default {
         openRasterAnalysis(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path) return;
-            // Mutually-exclusive analysis panels.
-            if (typeof this.closeStockpileVolume === 'function') this.closeStockpileVolume();
-            if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
             this.rasterFilePath = path;
             this.rasterPanelVisible = true;
             // Restore previously-applied viz params for this file so the
@@ -231,13 +231,13 @@ export default {
             // set below and inherits hover highlight automatically).
             const sketchStyle = new Style({
                 stroke: new Stroke({
-                    color: '#ff9800',
+                    color: ANALYSIS_COLOR,
                     width: 3,
                     lineDash: [8, 6]
                 }),
                 image: new CircleStyle({
                     radius: 4,
-                    fill: new Fill({ color: '#ff9800' }),
+                    fill: new Fill({ color: ANALYSIS_COLOR }),
                     stroke: new Stroke({ color: '#ffffff', width: 1.5 })
                 })
             });
@@ -276,7 +276,7 @@ export default {
                 const feature = evt.feature;
                 const geom = feature.getGeometry();
                 const mapProj = this.map.getView().getProjection();
-                const lineGeo = geom.clone().transform(mapProj, 'EPSG:4326');
+                const lineGeo = geom.clone().transform(mapProj, EPSG.WGS84);
                 const coords = lineGeo.getCoordinates();
 
                 // Drop degenerate profiles (the user double-clicked without
@@ -284,7 +284,7 @@ export default {
                 // source already, so we have to remove it explicitly here.
                 if (!Array.isArray(coords) || coords.length < 2) {
                     try { this.measureControls.source.removeFeature(feature); }
-                    catch (e) { /* noop */ }
+                    catch { /* noop */ }
                     this.cancelRasterProfileDrawing();
                     return;
                 }
@@ -293,13 +293,13 @@ export default {
                 // export, edit, and erase tools all treat the profile like a
                 // first-class measurement.
                 let lengthM = 0;
-                try { lengthM = olGetLength(geom); } catch (e) { /* noop */ }
+                try { lengthM = olGetLength(geom); } catch { /* noop */ }
                 const lengthLabel = lengthM >= 1000
                     ? `${(lengthM / 1000).toFixed(2)} km`
                     : `${lengthM.toFixed(1)} m`;
                 feature.set('measurementType', 'profile');
                 feature.set('createdAt', new Date().toISOString());
-                feature.set('stroke', '#ff9800');
+                feature.set('stroke', ANALYSIS_COLOR);
                 feature.set('stroke-width', 3);
                 feature.set('tooltipText', `Profile: ${lengthLabel}`);
                 if (this.rasterFilePath) feature.set('rasterFilePath', this.rasterFilePath);
@@ -308,7 +308,7 @@ export default {
                 this._setupRasterProfileMeasurementWatcher();
 
                 // Floating tooltip on the line (matches length/area). Hidden
-                // by default; revealed on hover by olMeasure's hover handler.
+                // by default; revealed on hover by the measure control's hover handler.
                 this._createProfileStaticTooltip(feature);
 
                 if (typeof this.measureControls.updateButtonsVisibility === 'function') {
@@ -324,7 +324,7 @@ export default {
                 // flag right away so the panel button immediately shows
                 // "Redraw" instead of staying in "Stop drawing" mode.
                 if (this._rasterProfileDraw) {
-                    try { this._rasterProfileDraw.setActive(false); } catch (e) { /* noop */ }
+                    try { this._rasterProfileDraw.setActive(false); } catch { /* noop */ }
                 }
                 this.rasterProfileDrawing = false;
 
@@ -357,9 +357,9 @@ export default {
 
         _stopRasterProfileDrawing() {
             if (this._rasterProfileDraw && this.map) {
-                try { this._rasterProfileDraw.setActive(false); } catch (e) { /* noop */ }
-                try { this._rasterProfileDraw.abortDrawing(); } catch (e) { /* noop */ }
-                try { this.map.removeInteraction(this._rasterProfileDraw); } catch (e) { /* noop */ }
+                try { this._rasterProfileDraw.setActive(false); } catch { /* noop */ }
+                try { this._rasterProfileDraw.abortDrawing(); } catch { /* noop */ }
+                try { this.map.removeInteraction(this._rasterProfileDraw); } catch { /* noop */ }
             }
             this._rasterProfileDraw = null;
             this.rasterProfileDrawing = false;
@@ -369,7 +369,7 @@ export default {
             }
             if (this._rasterProfileToolLockHeld
                 && this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
+                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
                 this._rasterProfileToolLockHeld = false;
             }
         },
@@ -377,7 +377,7 @@ export default {
         /**
          * Build a static, hover-revealed tooltip overlay for a finalized
          * profile feature. Mirrors the format used by length/area
-         * measurements in olMeasure.vue and `createStaticTooltip` in
+         * measurements in the measure control (libs/map/controls/measureControl.js) and `createStaticTooltip` in
          * olMeasurementConverter.js so the visual style stays consistent.
          */
         _createProfileStaticTooltip(feature) {
@@ -430,7 +430,7 @@ export default {
 
         _tearDownRasterProfileMeasurementWatcher() {
             if (this._rasterProfileSourceRemoveKey) {
-                try { unByKey(this._rasterProfileSourceRemoveKey); } catch (e) { /* noop */ }
+                try { unByKey(this._rasterProfileSourceRemoveKey); } catch { /* noop */ }
                 this._rasterProfileSourceRemoveKey = null;
             }
         },
@@ -441,7 +441,7 @@ export default {
                 if (this.measureControls && typeof this.measureControls.deleteMeasurement === 'function') {
                     this.measureControls.deleteMeasurement(this._currentProfileFeature);
                 }
-            } catch (e) { /* noop */ }
+            } catch { /* noop */ }
             // The removefeature watcher (if installed) will null out
             // _currentProfileFeature; null defensively in case it isn't.
             this._currentProfileFeature = null;
@@ -484,7 +484,7 @@ export default {
         _removeRasterProfileHoverMarker() {
             if (this._rasterProfileHoverFeature && this._rasterProfileHoverSource) {
                 try { this._rasterProfileHoverSource.removeFeature(this._rasterProfileHoverFeature); }
-                catch (e) { /* noop */ }
+                catch { /* noop */ }
             }
             this._rasterProfileHoverFeature = null;
         },
@@ -498,7 +498,7 @@ export default {
             }
             this._ensureRasterProfileHoverLayer();
             const mapProj = this.map.getView().getProjection();
-            const coord = transform([sample.lon, sample.lat], 'EPSG:4326', mapProj);
+            const coord = transform([sample.lon, sample.lat], EPSG.WGS84, mapProj);
             if (!this._rasterProfileHoverFeature) {
                 this._rasterProfileHoverFeature = new Feature({ geometry: new Point(coord) });
                 this._rasterProfileHoverSource.addFeature(this._rasterProfileHoverFeature);
@@ -702,11 +702,11 @@ export default {
             this.rasterInspectValue = null;
             this._rasterInspectErrorLogged = false;
             if (this._rasterInspectMoveKey) {
-                try { unByKey(this._rasterInspectMoveKey); } catch (e) { /* noop */ }
+                try { unByKey(this._rasterInspectMoveKey); } catch { /* noop */ }
             }
             this._rasterInspectMoveKey = null;
             if (this._rasterInspectClickKey) {
-                try { unByKey(this._rasterInspectClickKey); } catch (e) { /* noop */ }
+                try { unByKey(this._rasterInspectClickKey); } catch { /* noop */ }
             }
             this._rasterInspectClickKey = null;
             if (this._rasterInspectKeyHandler) {
@@ -714,12 +714,12 @@ export default {
                 this._rasterInspectKeyHandler = null;
             }
             if (this._rasterInspectTooltipOverlay && this.map) {
-                try { this.map.removeOverlay(this._rasterInspectTooltipOverlay); } catch (e) { /* noop */ }
+                try { this.map.removeOverlay(this._rasterInspectTooltipOverlay); } catch { /* noop */ }
             }
             this._rasterInspectTooltipOverlay = null;
             this._rasterInspectTooltipEl = null;
             if (this._rasterInspectLayer && this.map) {
-                try { this.map.removeLayer(this._rasterInspectLayer); } catch (e) { /* noop */ }
+                try { this.map.removeLayer(this._rasterInspectLayer); } catch { /* noop */ }
             }
             this._rasterInspectLayer = null;
             this._rasterInspectSource = null;
@@ -732,3 +732,12 @@ export default {
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useRasterAnalysis(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

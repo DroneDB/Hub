@@ -1,5 +1,5 @@
 <template>
-    <div class="raster-profile-chart" v-if="profile && hasSamples">
+    <div v-if="profile && hasSamples" class="raster-profile-chart">
         <!-- Summary stats -->
         <div class="profile-summary" :class="{ 'thermal': isThermal }">
             <span v-if="profile.min !== null && profile.min !== undefined">Min: {{ formatValue(profile.min) }}</span>
@@ -9,24 +9,29 @@
         </div>
 
         <!-- Inline SVG chart (no external dependencies) -->
+        <!-- A scrubber over the samples: the pointer or the arrow keys pick one -->
         <svg class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
-            @mousemove="onHover" @mouseleave="hoverIdx = null" @touchmove.prevent="onTouchHover">
+             role="slider" tabindex="0" aria-label="Profile position"
+             :aria-valuemin="0" :aria-valuemax="samples.length - 1" :aria-valuenow="hoverIdx ?? 0"
+             :aria-valuetext="hoverText"
+             @mousemove="onHover" @mouseleave="setHover(null)" @touchmove.prevent="onTouchHover"
+             @focus="hoverIdx === null && setHover(0)" @blur="setHover(null)" @keydown="onKey">
             <!-- Axis grid lines (5 horizontal bands) -->
             <g class="grid">
                 <line v-for="i in 4" :key="'h' + i"
-                    :x1="padLeft" :x2="width - padRight"
-                    :y1="padTop + (i * chartHeight) / 5"
-                    :y2="padTop + (i * chartHeight) / 5" />
+                      :x1="padLeft" :x2="width - padRight"
+                      :y1="padTop + (i * chartHeight) / 5"
+                      :y2="padTop + (i * chartHeight) / 5" />
             </g>
 
             <!-- Profile polyline -->
             <polyline class="profile-line" :class="{ 'thermal': isThermal }"
-                :points="polyPoints" fill="none" stroke-width="1.5" />
+                      :points="polyPoints" fill="none" stroke-width="1.5" />
 
             <!-- Invalid-sample markers (null values, e.g. nodata) -->
             <g v-if="nullBands.length" class="null-bands">
                 <rect v-for="(band, i) in nullBands" :key="'n' + i"
-                    :x="band.x" :y="padTop" :width="band.w" :height="chartHeight" />
+                      :x="band.x" :y="padTop" :width="band.w" :height="chartHeight" />
             </g>
 
             <!-- Axes -->
@@ -46,26 +51,25 @@
             <g v-if="hoverIdx !== null && hoveredSample">
                 <line class="hover-line" :x1="hoverX" :x2="hoverX" :y1="padTop" :y2="height - padBottom" />
                 <circle v-if="hoveredSample.value !== null"
-                    class="hover-dot" :class="{ 'thermal': isThermal }"
-                    :cx="hoverX" :cy="hoverY" r="3" />
+                        class="hover-dot" :class="{ 'thermal': isThermal }"
+                        :cx="hoverX" :cy="hoverY" r="3" />
             </g>
         </svg>
 
         <!-- Tooltip + CSV export -->
         <div class="profile-actions">
-            <span class="hover-info" v-if="hoveredSample">
-                d: {{ formatLength(hoveredSample.distance) }} ·
-                v: {{ hoveredSample.value === null ? 'n/d' : formatValue(hoveredSample.value) }}
-            </span>
-            <span class="hover-info placeholder" v-else>Hover the chart for details</span>
-            <button class="btn btn-secondary btn-sm" @click="exportCsv" title="Export CSV">
-                <i class="fas fa-file-csv"></i>
+            <span v-if="hoveredSample" class="hover-info">{{ hoverText }}</span>
+            <span v-else class="hover-info placeholder">Hover or focus the chart for details</span>
+            <button class="panel-btn" title="Export CSV" aria-label="Export CSV" @click="exportCsv">
+                <i class="fas fa-file-csv" aria-hidden="true" />
             </button>
         </div>
     </div>
 </template>
 
 <script>
+import { downloadText } from '@/libs/download';
+
 /**
  * Elevation / value profile chart.
  *
@@ -83,7 +87,7 @@ export default {
         unit: { type: String, default: '' },
         isThermal: { type: Boolean, default: false }
     },
-    emits: ['hover'],
+    emits: ['activeSample'],
     data() {
         return {
             width: 320,
@@ -153,6 +157,11 @@ export default {
             }
             return bands;
         },
+        hoverText() {
+            const h = this.hoveredSample;
+            if (!h) return '';
+            return `d: ${this.formatLength(h.distance)} · v: ${h.value === null ? 'n/d' : this.formatValue(h.value)}`;
+        },
         hoveredSample() {
             if (this.hoverIdx === null) return null;
             return this.samples[this.hoverIdx] || null;
@@ -164,6 +173,9 @@ export default {
             if (!this.hoveredSample || this.hoveredSample.value === null) return this.padTop;
             return this.yFor(this.hoveredSample.value);
         }
+    },
+    watch: {
+        profile() { this.hoverIdx = null; }
     },
     methods: {
         xFor(i) {
@@ -207,10 +219,24 @@ export default {
             const n = this.samples.length;
             const idx = n <= 1 ? 0 : Math.round((pxFromLeft / this.chartWidth) * (n - 1));
             const clamped = Math.max(0, Math.min(n - 1, idx));
-            if (clamped !== this.hoverIdx) {
-                this.hoverIdx = clamped;
-                this.$emit('hover', this.samples[clamped] || null);
-            }
+            this.setHover(clamped);
+        },
+        // The map marker follows the chart: null removes it
+        setHover(idx) {
+            if (idx === this.hoverIdx) return;
+            this.hoverIdx = idx;
+            this.$emit('activeSample', idx === null ? null : this.samples[idx] || null);
+        },
+        // Arrows step one sample (ten with Shift), Home/End go to the ends
+        onKey(e) {
+            const n = this.samples.length;
+            if (!n) return;
+            const cur = this.hoverIdx ?? 0;
+            const step = e.shiftKey ? 10 : 1;
+            const targets = { ArrowLeft: cur - step, ArrowDown: cur - step, ArrowRight: cur + step, ArrowUp: cur + step, Home: 0, End: n - 1 };
+            if (!(e.key in targets)) return;
+            e.preventDefault();
+            this.setHover(Math.max(0, Math.min(n - 1, targets[e.key])));
         },
         exportCsv() {
             if (!this.hasSamples) return;
@@ -219,20 +245,8 @@ export default {
             const escape = (v) => (v === null || v === undefined) ? '' : String(v);
             const rows = this.samples.map((s, i) =>
                 `${i},${escape(s.distance)},${escape(s.value)},${unit},${escape(s.lon)},${escape(s.lat)}`);
-            const blob = new Blob([header + rows.join('\n') + '\n'], { type: 'text/csv;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'raster-profile.csv';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            // Revoke on next tick to avoid cancelling the download on slow browsers.
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            downloadText(header + rows.join('\n') + '\n', 'raster-profile.csv', 'text/csv;charset=utf-8');
         }
-    },
-    watch: {
-        profile() { this.hoverIdx = null; }
     }
 };
 </script>
@@ -249,11 +263,11 @@ export default {
     flex-wrap: wrap;
     gap: 8px;
     font-size: 11px;
-    color: #ccc;
+    color: var(--panel-text-soft);
 }
 
 .profile-summary.thermal {
-    color: #ffab91;
+    color: var(--panel-thermal-soft);
 }
 
 .profile-svg {
@@ -263,6 +277,11 @@ export default {
     border-radius: 3px;
     cursor: crosshair;
     display: block;
+}
+
+.profile-svg:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: 1px;
 }
 
 .profile-svg .grid {
@@ -277,16 +296,16 @@ export default {
 
 .profile-svg .label {
     font-size: 9px;
-    fill: #bbb;
+    fill: var(--panel-text-soft);
     font-family: inherit;
 }
 
 .profile-line {
-    stroke: #4fc3f7;
+    stroke: var(--panel-accent);
 }
 
 .profile-line.thermal {
-    stroke: #ff7043;
+    stroke: var(--panel-thermal-strong);
 }
 
 .null-bands rect {
@@ -300,13 +319,13 @@ export default {
 }
 
 .hover-dot {
-    fill: #fff;
-    stroke: #4fc3f7;
+    fill: var(--ddb-text-on-color);
+    stroke: var(--panel-accent);
     stroke-width: 1.5;
 }
 
 .hover-dot.thermal {
-    stroke: #ff7043;
+    stroke: var(--panel-thermal-strong);
 }
 
 .profile-actions {
@@ -314,11 +333,11 @@ export default {
     justify-content: space-between;
     align-items: center;
     font-size: 11px;
-    color: #ccc;
+    color: var(--panel-text-soft);
 }
 
 .hover-info.placeholder {
-    color: #888;
+    color: var(--panel-text-faint);
     font-style: italic;
 }
 </style>

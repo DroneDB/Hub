@@ -1,0 +1,160 @@
+// The 3D viewer's overlays: toolbars, layer panel, badges, load progress (HQ-08: out of
+// UnifiedViewer.vue).
+#unified-viewer .giro3d-view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Fixed regardless of which control (orbit/earth/flight/globe) is currently attached, so a
+       mode switch can never leave the page scrolling under a touch drag (see OrbitControls'
+       connect()/disconnect() toggling this on its own element). */
+    touch-action: none;
+}
+
+#unified-viewer .progress-track {
+    width: 12rem;
+    height: 0.4rem;
+    margin: 0.5rem auto 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 0.2rem;
+    overflow: hidden;
+}
+
+#unified-viewer .progress-fill {
+    height: 100%;
+    background: var(--ddb-primary, #2978b4);
+    transition: width 0.2s ease;
+}
+
+#unified-viewer .progress-text {
+    margin: 0.25rem 0 0;
+    font-size: 0.85em;
+}
+
+#unified-viewer .toolbar {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    display: flex;
+    gap: 0.25rem;
+    z-index: 100;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--ddb-border-radius, 4px);
+    padding: 0.25rem;
+}
+
+#unified-viewer .toolbar button {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--ddb-text-on-dark);
+    font-size: var(--ddb-font-size-base);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+#unified-viewer .toolbar button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#unified-viewer .toolbar button.active {
+    background: var(--ddb-primary, #2978b4);
+}
+
+#unified-viewer .toolbar button:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+#unified-viewer .layer-panel {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-md);
+    z-index: 100;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--ddb-border-radius, 4px);
+    padding: 0.5rem 0.75rem;
+    color: var(--ddb-text-on-dark);
+    min-width: 10rem;
+    max-width: 16rem;
+}
+
+#unified-viewer .layer-panel-title {
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-bottom: 0.4rem;
+    opacity: 0.85;
+}
+
+#unified-viewer .layer-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    padding: 0.15rem 0;
+    cursor: pointer;
+}
+
+#unified-viewer .layer-row span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#unified-viewer .nav-toolbar {
+    position: absolute;
+    bottom: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    display: flex;
+    gap: 0.25rem;
+    z-index: 100;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--ddb-border-radius, 4px);
+    padding: 0.25rem;
+}
+
+#unified-viewer .nav-toolbar button {
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 4px;
+    background: transparent;
+    border: none;
+    color: var(--ddb-text-on-dark);
+    font-size: var(--ddb-font-size-base);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+#unified-viewer .nav-toolbar button:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#unified-viewer .local-coords-badge {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(255, 255, 255, 0.25);
+    border-radius: var(--ddb-border-radius, 4px);
+    color: var(--ddb-text-on-dark);
+    font-size: 0.85rem;
+    pointer-events: none;
+}

@@ -1,23 +1,21 @@
 /**
  * Build Manager - delegates to taskMonitor for unified polling.
  *
+ * It holds the Hangfire jobs of the builds of a dataset: how far a build is and why it failed.
+ * Whether a build's output exists is not a job state: that is the artifacts the entry lists
+ * (libs/build/entryBuild.js).
+ *
  * Public API preserved for backward compatibility with existing consumers:
  * DetailPanel, Thumbnail, buildHelpers, fileAvailabilityChecker,
- * contextMenuItems, FileAvailabilityDialog, useFileOperations, useDialogManager.
+ * contextMenuItems, FileAvailabilityDialog, useDatasetActions, useDatasetListing.
  */
 
 import taskMonitor from '@/libs/tasks/taskMonitor';
-import ddb from 'ddb';
+import { datasetKey, isActiveState } from '@/libs/tasks/taskStates';
+import { isBuilt } from '@/libs/build/entryBuild';
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
-const BUILDABLE_TYPES = [
-    ddb.entry.type.POINTCLOUD,
-    ddb.entry.type.GEORASTER,
-    ddb.entry.type.MODEL,
-    ddb.entry.type.VECTOR,
-    ddb.entry.type.GAUSSIAN_SPLAT
-];
-
-// Build states according to Hangfire / JobIndex states
+// Build job states according to Hangfire / JobIndex states (progress and failures, not availability)
 const BUILD_STATES = {
     AWAITING: 'Awaiting',
     CREATED: 'Created',
@@ -29,13 +27,6 @@ const BUILD_STATES = {
     SUCCEEDED: 'Succeeded'
 };
 
-const ACTIVE_STATES = [
-    BUILD_STATES.AWAITING,
-    BUILD_STATES.CREATED,
-    BUILD_STATES.ENQUEUED,
-    BUILD_STATES.PROCESSING,
-    BUILD_STATES.SCHEDULED
-];
 
 class BuildManager {
     constructor() {
@@ -63,16 +54,10 @@ class BuildManager {
         });
     }
 
-    /* ---- dataset key (mirrors old getDatasetKey) ---- */
+    /* ---- dataset key (libs/tasks/taskStates) ---- */
 
     getDatasetKey(dataset) {
-        return dataset.baseApi || `${dataset.org}/${dataset.ds}`;
-    }
-
-    /* ---- buildable type helpers ---- */
-
-    isBuildableType(entryType) {
-        return BUILDABLE_TYPES.includes(entryType);
+        return datasetKey(dataset);
     }
 
     /* ---- dataset registration & initialisation ---- */
@@ -140,7 +125,7 @@ class BuildManager {
         const key = this.getDatasetKey(dataset);
         const cache = this._buildByPath.get(key);
         if (!cache || !cache.has(filePath)) return false;
-        return ACTIVE_STATES.includes(cache.get(filePath).state);
+        return isActiveState(cache.get(filePath).state);
     }
 
     /** Get build info for a file. Returns { path, currentState } to match old BuildJobDto. */
@@ -157,7 +142,7 @@ class BuildManager {
     async startBuild(dataset, filePath, force = false) {
         try {
             const entry = await dataset.listOne(filePath);
-            if (!this.isBuildableType(entry.type)) {
+            if (!isBuildableType(entry.type)) {
                 throw new Error(`File type ${entry.type} is not buildable`);
             }
             if (this.hasActiveBuild(dataset, filePath) && !force) {
@@ -199,7 +184,7 @@ class BuildManager {
     /* ---- file-added callbacks ---- */
 
     async startPollingForNewFiles(dataset, fileEntries = []) {
-        const buildableFiles = fileEntries.filter(e => e && this.isBuildableType(e.type));
+        const buildableFiles = fileEntries.filter(e => e && isBuildableType(e.type));
         if (buildableFiles.length > 0) {
             taskMonitor.onFilesAdded(dataset);
             this.emit('newBuildableFilesDetected', {
@@ -209,12 +194,9 @@ class BuildManager {
         }
     }
 
+    /** Whether any of the entries (as just listed) is buildable and has no complete build. */
     hasNewBuildableFiles(dataset, fileEntries = []) {
-        return fileEntries.some(entry => {
-            if (!entry || !this.isBuildableType(entry.type)) return false;
-            const bs = this.getBuildState(dataset, entry.path);
-            return !bs || bs.currentState !== BUILD_STATES.SUCCEEDED;
-        });
+        return fileEntries.some(entry => entry && isBuildableType(entry.type) && !isBuilt(entry));
     }
 
     async onFilesAdded(dataset, fileEntries) {
@@ -227,43 +209,6 @@ class BuildManager {
     monitorDatasetForBuilds(dataset) {
         this.registerDataset(dataset);
         this.loadBuilds(dataset).catch(e => console.error('Error monitoring dataset for builds:', e));
-    }
-
-    /* ---- readiness helpers ---- */
-
-    async isFileReadyForViewing(dataset, entry, _viewType) {
-        if (!this.isBuildableType(entry.type)) return true;
-        const bs = this.getBuildState(dataset, entry.path);
-        if (bs) return bs.currentState === BUILD_STATES.SUCCEEDED;
-        // Fallback: check taskMonitor store directly
-        const builds = taskMonitor.getTasks(dataset).filter(t => t.toolId === 'build');
-        const cur = builds.find(b => b.path === entry.path);
-        if (cur) return cur.state === BUILD_STATES.SUCCEEDED;
-        return false;
-    }
-
-    async waitForBuildCompletion(dataset, filePath, maxWaitMs = 300000) {
-        const startTime = Date.now();
-        return new Promise((resolve, reject) => {
-            const tick = async () => {
-                try {
-                    if (Date.now() - startTime > maxWaitMs) {
-                        reject(new Error('Timeout waiting for build completion'));
-                        return;
-                    }
-                    this._sync(dataset);
-                    const bs = this.getBuildState(dataset, filePath);
-                    if (!bs) { setTimeout(tick, 3000); return; }
-                    if (bs.currentState === BUILD_STATES.SUCCEEDED) { resolve(bs); return; }
-                    if (bs.currentState === BUILD_STATES.FAILED) {
-                        reject(new Error(`Build failed for ${filePath}`));
-                        return;
-                    }
-                    setTimeout(tick, 3000);
-                } catch (e) { reject(e); }
-            };
-            tick();
-        });
     }
 
     /* ---- cleanup ---- */

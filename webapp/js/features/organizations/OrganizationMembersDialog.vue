@@ -1,10 +1,9 @@
 <template>
     <div>
-        <Toast position="bottom-left" />
-        <Window title="Manage Members" id="organizationMembersDialog" @onClose="close" modal width="43.75rem" fixedSize>
+        <Window id="organizationMembersDialog" title="Manage Members" modal width="43.75rem" fixed-size @close="$emit('close')">
             <div class="members-dialog">
                 <!-- Loading state -->
-                <div v-if="loading" class="ui active centered inline loader"></div>
+                <div v-if="loading" class="ui active centered inline loader" />
 
                 <!-- Error message -->
                 <PrimeMessage v-if="error" severity="error" @close="error = null">
@@ -20,27 +19,27 @@
                 <!-- Members list -->
                 <div v-if="featureEnabled">
                     <!-- Add member section -->
-                    <div class="mb-3" v-if="canManageMembers">
+                    <div v-if="canManageMembers" class="mb-3">
                         <h3>Add Member</h3>
                         <div class="d-flex gap-3 flex-wrap align-items-end">
                             <div style="flex: 7;">
-                                <label class="d-block mb-1 fw-semibold">User</label>
-                                <Select v-model="newMember.userName" :options="availableUsers" optionLabel="displayName" optionValue="userName" filter placeholder="Search user..." class="w-100" />
+                                <label id="organization-members-dialog-user-label" for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User</label>
+                                <Select v-model="newMember.userName" input-id="organization-members-dialog-user" aria-labelledby="organization-members-dialog-user-label" :options="availableUsers" option-label="displayName" option-value="userName" filter placeholder="Search user..." class="w-100" />
                             </div>
                             <div style="flex: 5;">
-                                <label class="d-block mb-1 fw-semibold">Permissions</label>
-                                <Select v-model="newMember.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                                <label id="organization-members-dialog-permissions-label" for="organization-members-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
+                                <Select v-model="newMember.permissions" input-id="organization-members-dialog-permissions" aria-labelledby="organization-members-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                             </div>
                             <div style="flex: 4;">
-                                <label class="d-block mb-1">&nbsp;</label>
-                                <Button severity="info" @click="addMember" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" />
+                                <span class="d-block mb-1" aria-hidden="true">&nbsp;</span>
+                                <Button severity="info" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" @click="addMember" />
                             </div>
                         </div>
                     </div>
 
                     <!-- Current members table -->
                     <h3>Current Members</h3>
-                    <table class="ui celled table" v-if="members.length > 0">
+                    <table v-if="members.length > 0" class="ui celled table">
                         <thead>
                             <tr>
                                 <th>Username</th>
@@ -57,11 +56,12 @@
                                 <td>
                                     <Select v-if="canManageMembers"
                                             v-model="member.permissions"
+                                            :aria-label="`Permissions of ${member.userName}`"
                                             :options="permissionsOptions"
-                                            optionLabel="label"
-                                            optionValue="value"
-                                            @change="updatePermission(member)"
-                                            class="w-full" />
+                                            option-label="label"
+                                            option-value="value"
+                                            class="w-full"
+                                            @change="updatePermission(member)" />
                                     <span v-else>{{ member.permissionName }}</span>
                                 </td>
                                 <td>
@@ -72,7 +72,7 @@
                                     <span v-else>-</span>
                                 </td>
                                 <td v-if="canManageMembers">
-                                    <Button severity="danger" size="small" @click="removeMember(member)" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" />
+                                    <Button severity="danger" size="small" :disabled="removingMember === member.userName" icon="fa-solid fa-trash" label="Remove" @click="removeMember(member)" />
                                 </td>
                             </tr>
                         </tbody>
@@ -87,40 +87,39 @@
 
                 <!-- Footer -->
                 <div class="d-flex justify-content-end gap-2 mt-4">
-                    <Button @click="close" severity="secondary" label="Close" />
+                    <Button severity="secondary" label="Close" @click="$emit('close')" />
                 </div>
             </div>
 
             <ConfirmDialog v-if="removeMemberDialogOpen"
-                title="Remove Member"
-                :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
-                confirmText="Remove"
-                cancelText="Cancel"
-                confirmButtonClass="danger"
-                @onClose="handleRemoveMemberDialogClose">
-            </ConfirmDialog>
+                           title="Remove Member"
+                           :message="`Are you sure you want to remove <strong>${memberToRemove ? memberToRemove.userName : ''}</strong> from this organization?`"
+                           confirm-text="Remove"
+                           cancel-text="Cancel"
+                           confirm-button-class="danger"
+                           @close="handleRemoveMemberDialogClose" />
         </Window>
     </div>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Select from 'primevue/select';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import Toast from 'primevue/toast';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import { formatDate } from '@/libs/format';
 
 export default {
-    components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Toast },
+    components: { Window, ConfirmDialog, Select, Button, PrimeMessage },
 
     props: {
         orgSlug: { type: String, required: true },
         canManageMembers: { type: Boolean, default: false }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data() {
         return {
@@ -166,7 +165,7 @@ export default {
 
             try {
                 // Check if feature is enabled
-                this.featureEnabled = reg.getFeature(Features.ORGANIZATION_MEMBER_MANAGEMENT);
+                this.featureEnabled = reg.features.get(Features.ORGANIZATION_MEMBER_MANAGEMENT);
 
                 if (!this.featureEnabled) {
                     this.loading = false;
@@ -174,11 +173,11 @@ export default {
                 }
 
                 // Load members
-                this.members = await reg.getOrganizationMembers(this.orgSlug);
+                this.members = await reg.orgs.getOrganizationMembers(this.orgSlug);
 
                 // Load all users if can manage (for adding new members)
                 if (this.canManageMembers) {
-                    this.allUsers = await reg.users();
+                    this.allUsers = await reg.admin.users();
                 }
 
             } catch (e) {
@@ -194,7 +193,7 @@ export default {
 
             this.addingMember = true;
             try {
-                await reg.addOrganizationMember(
+                await reg.orgs.addOrganizationMember(
                     this.orgSlug,
                     this.newMember.userName,
                     this.newMember.permissions
@@ -207,7 +206,7 @@ export default {
                 this.newMember.userName = '';
                 this.newMember.permissions = 1;
 
-                this.$toast.add({ severity: 'success', summary: 'Member Added', detail: 'Member added successfully', life: 3000 });
+                this.$notify.success('Member added successfully', { summary: 'Member Added' });
 
             } catch (e) {
                 this.error = e.message || 'Failed to add member';
@@ -218,12 +217,12 @@ export default {
 
         async updatePermission(member) {
             try {
-                await reg.updateMemberPermissions(
+                await reg.orgs.updateMemberPermissions(
                     this.orgSlug,
                     member.userName,
                     member.permissions
                 );
-                this.$toast.add({ severity: 'success', summary: 'Permissions Updated', detail: 'Permissions saved successfully', life: 3000 });
+                this.$notify.success('Permissions saved successfully', { summary: 'Permissions Updated' });
             } catch (e) {
                 this.error = e.message || 'Failed to update permissions';
                 // Reload to get correct state
@@ -246,9 +245,9 @@ export default {
 
             this.removingMember = this.memberToRemove.userName;
             try {
-                await reg.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
+                await reg.orgs.removeOrganizationMember(this.orgSlug, this.memberToRemove.userName);
                 await this.loadData();
-                this.$toast.add({ severity: 'success', summary: 'Member Removed', detail: 'Member removed successfully', life: 3000 });
+                this.$notify.success('Member removed successfully', { summary: 'Member Removed' });
             } catch (e) {
                 this.error = e.message || 'Failed to remove member';
             } finally {
@@ -257,15 +256,8 @@ export default {
             }
         },
 
-        formatDate(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString();
-        },
+        formatDate,
 
-        close() {
-            this.$emit('onClose');
-        }
     }
 };
 </script>

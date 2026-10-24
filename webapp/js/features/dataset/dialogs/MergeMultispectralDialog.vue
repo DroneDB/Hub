@@ -1,13 +1,14 @@
 <template>
-    <Window title="Merge Multispectral Bands" id="merge-multispectral" @onClose="close" modal width="900px" height="auto" fixedPosition>
+    <Window id="merge-multispectral" title="Merge Multispectral Bands" modal width="900px" height="auto" fixed-position @close="close">
         <div class="merge-ms-dialog">
             <!-- 3-column layout -->
             <div class="columns-row">
                 <!-- Column 1: Band order -->
                 <div class="col-bands">
-                    <label class="section-label">Band Order (drag to reorder)</label>
-                    <div class="band-list" ref="bandList">
-                        <div v-for="(item, index) in orderedFiles" :key="item.entry.path"
+                    <span id="merge-band-order-label" class="section-label">Band Order (drag or use the arrows)</span>
+                    <ol ref="bandList" class="band-list" aria-labelledby="merge-band-order-label">
+                        <!-- eslint-disable-next-line vuejs-accessibility/no-static-element-interactions -- dragging is the mouse way; the arrow buttons are the keyboard way -->
+                        <li v-for="(item, index) in orderedFiles" :key="item.entry.path"
                             class="band-item" :class="{ 'drag-over': dragOverIndex === index }"
                             draggable="true"
                             @dragstart="onDragStart(index, $event)"
@@ -15,38 +16,46 @@
                             @dragleave="onDragLeave"
                             @drop.prevent="onDrop(index)"
                             @dragend="onDragEnd">
-                            <span class="drag-handle"><i class="fa-solid fa-grip-vertical"></i></span>
+                            <span class="drag-handle" aria-hidden="true"><i class="fa-solid fa-grip-vertical" /></span>
                             <span class="band-index">{{ index + 1 }}.</span>
                             <span class="band-name" :title="item.entry.path">{{ item.label }}</span>
                             <span v-if="bandInfo[item.entry.path]" class="band-meta">
                                 ({{ bandInfo[item.entry.path].dataType }})
                             </span>
-                        </div>
-                    </div>
+                            <span class="band-move">
+                                <Button icon="fa-solid fa-arrow-up" text rounded size="small" severity="secondary"
+                                        :aria-label="`Move ${item.label} up`" :disabled="index === 0"
+                                        @click="moveBand(index, index - 1)" />
+                                <Button icon="fa-solid fa-arrow-down" text rounded size="small" severity="secondary"
+                                        :aria-label="`Move ${item.label} down`" :disabled="index === orderedFiles.length - 1"
+                                        @click="moveBand(index, index + 1)" />
+                            </span>
+                        </li>
+                    </ol>
                 </div>
 
                 <!-- Column 2: Validation info -->
                 <div class="col-info">
                     <div v-if="validating" class="status-info">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Validating...
+                        <LoadingSpinner inline label="Validating..." />
                     </div>
 
                     <template v-if="validationResult">
                         <!-- Errors -->
                         <div v-if="validationResult.errors && validationResult.errors.length > 0" class="validation-errors">
                             <div v-for="(err, i) in validationResult.errors" :key="'e'+i" class="validation-msg error">
-                                <i class="fa-solid fa-circle-xmark"></i> {{ err }}
+                                <i class="fa-solid fa-circle-xmark" /> {{ err }}
                             </div>
                         </div>
                         <!-- Warnings (filtered to remove misalignment duplicates) -->
                         <div v-if="filteredWarnings.length > 0" class="validation-warnings">
                             <div v-for="(warn, i) in filteredWarnings" :key="'w'+i" class="validation-msg warning">
-                                <i class="fa-solid fa-triangle-exclamation"></i> {{ warn }}
+                                <i class="fa-solid fa-triangle-exclamation" /> {{ warn }}
                             </div>
                         </div>
                         <!-- Alignment banner -->
                         <div v-if="alignmentWarning" class="alignment-warning">
-                            <i class="fa-solid fa-circle-info"></i>
+                            <i class="fa-solid fa-circle-info" />
                             <div>
                                 <strong>Band misalignment detected</strong>
                                 <p>
@@ -59,7 +68,7 @@
                         </div>
                         <!-- Summary -->
                         <div v-if="validationResult.ok || (validationResult.errors && validationResult.errors.length === 0)" class="merge-summary">
-                            <div class="summary-row" v-if="validationResult.summary">
+                            <div v-if="validationResult.summary" class="summary-row">
                                 <div class="d-flex gap-3 flex-wrap">
                                     <div v-if="validationResult.summary.crs"><strong>CRS:</strong> {{ validationResult.summary.crs }}</div>
                                     <div><strong>Size:</strong> {{ validationResult.summary.width }}×{{ validationResult.summary.height }}</div>
@@ -72,8 +81,8 @@
                 </div>
 
                 <!-- Column 3: Preview -->
-                <div class="col-preview" v-if="previewUrl">
-                    <img :src="previewUrl" class="preview-thumb" alt="Merge preview" />
+                <div v-if="previewUrl" class="col-preview">
+                    <img :src="previewUrl" class="preview-thumb" alt="Merge preview">
                 </div>
             </div>
 
@@ -81,22 +90,22 @@
             <div class="bottom-row">
                 <div class="bottom-left">
                     <div class="section">
-                        <label class="section-label">Output path</label>
-                        <InputText v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
-                            @input="validateOutputName" placeholder="merged.tif" />
+                        <label for="merge-multispectral-dialog-output-path" class="section-label">Output path</label>
+                        <InputText id="merge-multispectral-dialog-output-path" v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
+                                   placeholder="merged.tif" @input="validateOutputName" />
                         <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="deleteSource" :binary="true" inputId="deleteSrcCheckbox" />
+                        <Checkbox v-model="deleteSource" :binary="true" input-id="deleteSrcCheckbox" />
                         <label for="deleteSrcCheckbox">Delete source files after merge</label>
                     </div>
                     <div v-if="deleteSource" class="delete-warning">
-                        <i class="fa-solid fa-triangle-exclamation"></i> Source files will be permanently deleted after merge.
+                        <i class="fa-solid fa-triangle-exclamation" /> Source files will be permanently deleted after merge.
                     </div>
                 </div>
                 <div class="bottom-actions">
-                    <Button @click="close" severity="secondary" label="Cancel" />
-                    <Button @click="merge" :disabled="!canMerge" severity="primary" label="Merge" />
+                    <Button severity="secondary" label="Cancel" @click="close" />
+                    <Button :disabled="!canMerge" severity="primary" label="Merge" @click="merge" />
                 </div>
             </div>
         </div>
@@ -104,11 +113,13 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { pathutils } from 'ddb';
 
 /**
  * MergeMultispectralDialog - Dialog for merging multispectral bands into a
@@ -118,14 +129,17 @@ import useHeavyTask from '@/composables/useHeavyTask';
  * progress via the useHeavyTask composable.
  */
 export default {
-    components: { Window, Button, InputText, Checkbox },
-    mixins: [useHeavyTask],
+    components: { Window, Button, InputText, Checkbox, LoadingSpinner },
     props: {
         files: { type: Array, required: true },
         dataset: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask };
+    },
     data() {
         return {
             orderedFiles: [...this.files],
@@ -179,6 +193,12 @@ export default {
         this.validate();
     },
 
+    beforeUnmount() {
+        if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(this.previewUrl);
+        }
+    },
+
     methods: {
         generateOutputName() {
             if (this.files.length === 0) return;
@@ -195,7 +215,7 @@ export default {
             }
 
             // Find common base name among file names (without folder)
-            const names = this.files.map(f => f.label || f.entry.path.split('/').pop());
+            const names = this.files.map(f => f.label || pathutils.basename(f.entry.path));
             // Try to find common prefix
             let prefix = names[0];
             for (let i = 1; i < names.length; i++) {
@@ -234,7 +254,7 @@ export default {
 
                 // Build bandInfo from validation summary
                 if (this.validationResult.summary) {
-                    this.orderedFiles.forEach((f, i) => {
+                    this.orderedFiles.forEach((f) => {
                         this.bandInfo[f.entry.path] = {
                             dataType: this.validationResult.summary.dataType || 'Unknown'
                         };
@@ -299,11 +319,16 @@ export default {
             this.dragOverIndex = null;
         },
         onDrop(index) {
-            if (this.dragIndex === null || this.dragIndex === index) return;
-            const item = this.orderedFiles.splice(this.dragIndex, 1)[0];
-            this.orderedFiles.splice(index, 0, item);
+            const from = this.dragIndex;
             this.dragOverIndex = null;
             this.dragIndex = null;
+            if (from !== null) this.moveBand(from, index);
+        },
+        // Band order is the merge order: drag and the arrow buttons both end here
+        moveBand(from, to) {
+            if (from === to || to < 0 || to >= this.orderedFiles.length) return;
+            const item = this.orderedFiles.splice(from, 1)[0];
+            this.orderedFiles.splice(to, 0, item);
             this.validate();
         },
         onDragEnd() {
@@ -324,8 +349,8 @@ export default {
                     params: { paths, outputPath }, force: true, notify: false
                 });
 
-                const sourceNames = paths.map(p => p.split('/').pop());
-                this.$emit('onClose', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
+                const sourceNames = paths.map(p => pathutils.basename(p));
+                this.$emit('close', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
             } catch (e) {
                 this.validationResult = { ok: false, errors: [e.message || 'Merge failed'], warnings: [] };
             }
@@ -335,13 +360,7 @@ export default {
             if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
                 URL.revokeObjectURL(this.previewUrl);
             }
-            this.$emit('onClose', 'close');
-        }
-    },
-
-    beforeUnmount() {
-        if (this.previewUrl && this.previewUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(this.previewUrl);
+            this.$emit('close', 'close');
         }
     }
 };
@@ -384,6 +403,9 @@ export default {
 }
 
 .band-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
     border: 1px solid var(--p-surface-300);
     border-radius: 0.375rem;
     overflow: hidden;
@@ -413,6 +435,11 @@ export default {
 
 .band-item.drag-over {
     border-top: 2px solid var(--p-primary-color);
+}
+
+.band-move {
+    margin-left: auto;
+    display: inline-flex;
 }
 
 .drag-handle {

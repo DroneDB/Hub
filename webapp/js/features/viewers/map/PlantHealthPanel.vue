@@ -1,21 +1,21 @@
 <template>
-    <div class="plant-health-panel" v-if="visible">
+    <div v-if="visible" class="analysis-panel analysis-panel--plant-health plant-health-panel">
         <div class="panel-header">
-            <span class="panel-title"><i class="fas fa-leaf"></i> Plant Health</span>
-            <button class="close-btn" @click="close" title="Close"><i class="fas fa-times"></i></button>
+            <span class="panel-title"><i class="fas fa-leaf" /> Plant Health</span>
+            <button class="close-btn" title="Close" aria-label="Close" @click="close"><i class="fas fa-times" /></button>
         </div>
 
-        <div class="panel-body" v-if="rasterInfo">
+        <div v-if="rasterInfo" class="panel-body">
             <!-- Sensor Info -->
-            <div class="section" v-if="rasterInfo.detectedSensor">
-                <label class="section-label">Sensor</label>
+            <div v-if="rasterInfo.detectedSensor" class="section">
+                <span class="section-label">Sensor</span>
                 <span class="sensor-badge">{{ rasterInfo.detectedSensor }}</span>
             </div>
 
             <!-- Preset Selection -->
-            <div class="section" v-if="rasterInfo.presets && rasterInfo.presets.length > 0">
-                <label class="section-label">Preset</label>
-                <select v-model="selectedPreset" @change="onPresetChange" class="panel-select">
+            <div v-if="rasterInfo.presets && rasterInfo.presets.length > 0" class="section">
+                <label for="plant-health-panel-preset" class="section-label">Preset</label>
+                <select id="plant-health-panel-preset" v-model="selectedPreset" class="panel-select" @change="onPresetChange">
                     <option value="">Custom...</option>
                     <option v-for="p in rasterInfo.presets" :key="p.id" :value="p.id">{{ p.name }}</option>
                 </select>
@@ -23,55 +23,57 @@
 
             <!-- Formula Selection -->
             <div class="section">
-                <label class="section-label">
+                <label for="plant-health-panel-formula" class="section-label">
                     Formula
                     <button type="button" class="info-icon-btn"
-                            @click="showFormulasInfo = true"
-                            title="Learn more about each vegetation index"
-                            data-testid="plant-health-formulas-info">
-                        <i class="fas fa-info-circle"></i>
+                            title="Learn more about each vegetation index" aria-label="Learn more about each vegetation index"
+                            data-testid="plant-health-formulas-info"
+                            @click="showFormulasInfo = true">
+                        <i class="fas fa-info-circle" />
                     </button>
                 </label>
-                <select v-model="selectedFormula" @change="onFormulaChange" class="panel-select">
+                <select id="plant-health-panel-formula" v-model="selectedFormula" class="panel-select" @change="onFormulaChange">
                     <option value="">None (bands only)</option>
                     <option v-for="f in availableFormulas" :key="f.id" :value="f.id"
-                        :disabled="f.disabled"
-                        :title="f.disabled ? f.disabledReason : f.help">
+                            :disabled="f.disabled"
+                            :title="f.disabled ? f.disabledReason : f.help">
                         {{ f.name }}{{ f.disabled ? ' ✗' : '' }}
                     </option>
                 </select>
             </div>
 
             <!-- Band Mapping (when no formula) -->
-            <div class="section" v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3">
-                <label class="section-label">Bands (R,G,B)</label>
+            <div v-if="!selectedFormula && rasterInfo.bands && rasterInfo.bands.length > 3" class="section">
+                <span id="plant-health-panel-bands-label" class="section-label">Bands (R,G,B)</span>
                 <BandSelector
                     v-model="customBands"
+                    aria-labelledby="plant-health-panel-bands-label"
                     :bands="rasterInfo.bands"
-                    @update:modelValue="debouncedApply" />
+                    @update:model-value="debouncedApply" />
             </div>
 
             <!-- Single band info message -->
-            <div class="section" v-if="rasterInfo.bands && rasterInfo.bands.length === 1">
+            <div v-if="rasterInfo.bands && rasterInfo.bands.length === 1" class="section">
                 <div class="single-band-info">
-                    <i class="fas fa-info-circle"></i>
+                    <i class="fas fa-info-circle" />
                     <span>Single band image. Use <strong>Merge Multispectral</strong> to combine bands for vegetation indices.</span>
                 </div>
             </div>
 
             <!-- Colormap (when formula is active) -->
-            <div class="section" v-if="selectedFormula">
-                <label class="section-label">Colormap</label>
+            <div v-if="selectedFormula" class="section">
+                <label id="plant-health-panel-colormap-label" for="plant-health-panel-colormap" class="section-label">Colormap</label>
                 <ColormapDropdown
                     v-model="selectedColormap"
-                    :colormaps="availableColormaps"
-                    @update:modelValue="debouncedApply" />
+                    input-id="plant-health-panel-colormap" aria-labelledby="plant-health-panel-colormap-label"
+                    :colormaps="colormapOptions"
+                    @update:model-value="debouncedApply" />
             </div>
 
             <!-- Stretch Type -->
-            <div class="section" v-if="selectedFormula">
-                <label class="section-label">Stretch</label>
-                <select v-model="selectedStretch" @change="onStretchChange" class="panel-select">
+            <div v-if="selectedFormula" class="section">
+                <label for="plant-health-panel-stretch" class="section-label">Stretch</label>
+                <select id="plant-health-panel-stretch" v-model="selectedStretch" class="panel-select" @change="onStretchChange">
                     <option value="percentile">Percentile (2%-98%)</option>
                     <option value="minmax">Min / Max</option>
                     <option value="stddev">Std Dev (±2σ)</option>
@@ -80,14 +82,14 @@
             </div>
 
             <!-- Rescale (when formula is active) -->
-            <div class="section" v-if="selectedFormula">
-                <label class="section-label">Rescale</label>
-                <input v-model="rescale" @change="onRescaleManualChange" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" />
+            <div v-if="selectedFormula" class="section">
+                <label for="plant-health-panel-rescale" class="section-label">Rescale</label>
+                <input id="plant-health-panel-rescale" v-model="rescale" class="panel-input" placeholder="e.g. -1,1 (auto if empty)" @change="onRescaleManualChange">
             </div>
 
             <!-- Histogram -->
-            <div class="section" style="margin-bottom: 1rem" v-if="histogramData">
-                <label class="section-label">Histogram</label>
+            <div v-if="histogramData" class="section" style="margin-bottom: 1rem">
+                <span class="section-label">Histogram</span>
                 <HistogramChart
                     :data="histogramData"
                     :min="histogramMin"
@@ -98,8 +100,8 @@
             </div>
 
             <!-- Statistics -->
-            <div class="section" v-if="metadata && metadata.statistics">
-                <label class="section-label">Statistics</label>
+            <div v-if="metadata && metadata.statistics" class="section">
+                <span class="section-label">Statistics</span>
                 <div class="stats-grid">
                     <span>Min: {{ formatNum(firstBandStats.min) }}</span>
                     <span>Max: {{ formatNum(firstBandStats.max) }}</span>
@@ -109,41 +111,41 @@
             </div>
 
             <!-- Reset / Toggle / Copy Link / Export -->
-            <div class="section actions actions-grid">
-                <button class="btn btn-secondary btn-sm action-btn" @click="reset"
-                        title="Reset visualization parameters to defaults">
-                    <i class="fas fa-rotate-left"></i>
+            <div class="section actions-grid">
+                <button class="panel-btn action-btn" title="Reset visualization parameters to defaults"
+                        @click="reset">
+                    <i class="fas fa-rotate-left" />
                     <span class="action-label">Reset</span>
                 </button>
-                <button class="btn btn-sm action-btn"
-                        :class="originalView ? 'btn-primary' : 'btn-secondary'"
-                        @click="toggleOriginalView"
-                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'">
-                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                <button class="panel-btn action-btn"
+                        :class="{ 'panel-btn--primary': originalView }"
+                        :title="originalView ? 'Show the analyzed raster' : 'Show the original raster (no styling applied)'"
+                        @click="toggleOriginalView">
+                    <i :class="originalView ? 'fas fa-eye-slash' : 'fas fa-eye'" />
                     <span class="action-label">{{ originalView ? 'Hide Orig.' : 'Original' }}</span>
                 </button>
-                <button class="btn btn-secondary btn-sm action-btn" @click="copyLink"
-                        title="Copy a shareable link with the current settings">
-                    <i class="fas fa-link"></i>
+                <button class="panel-btn action-btn" title="Copy a shareable link with the current settings"
+                        @click="copyLink">
+                    <i class="fas fa-link" />
                     <span class="action-label">Copy Link</span>
                 </button>
                 <button v-if="!isExportTooLarge"
-                        class="btn btn-secondary btn-sm action-btn"
-                        @click="exportGeoTiff"
+                        class="panel-btn action-btn"
                         :disabled="exporting"
-                        title="Export the current view as a GeoTIFF file">
-                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'"></i>
+                        title="Export the current view as a GeoTIFF file"
+                        @click="exportGeoTiff">
+                    <i :class="exporting ? 'fas fa-spinner fa-spin' : 'fas fa-download'" />
                     <span class="action-label">Export</span>
                 </button>
                 <span v-else class="action-btn export-limit-hint" :title="exportLimitTooltip">
-                    <i class="fas fa-download"></i>
+                    <i class="fas fa-download" />
                     <span class="action-label">Export</span>
                 </span>
             </div>
         </div>
 
-        <div class="panel-body loading" v-else>
-            <i class="fas fa-spinner fa-spin"></i> Loading raster info...
+        <div v-else class="panel-body loading">
+            <LoadingSpinner inline label="Loading raster info..." />
         </div>
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
@@ -152,15 +154,21 @@
 </template>
 
 <script>
-import HistogramChart from '@/components/HistogramChart.vue';
-import ColormapDropdown from '@/components/ColormapDropdown.vue';
-import BandSelector from '@/components/BandSelector.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import HistogramChart from '@/features/viewers/map/HistogramChart.vue';
+import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
+import { colormap, INDEX_COLORMAPS } from '@/libs/map/colormaps';
+import BandSelector from '@/features/viewers/map/BandSelector.vue';
 import PlantHealthFormulasDialog from './PlantHealthFormulasDialog.vue';
-import clipboardCopy from 'clipboard-copy';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { isExportTooLarge as computeIsExportTooLarge, formatBytes } from '@/libs/exportSize';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { downloadBlob } from '@/libs/download';
+import { pathutils } from 'ddb';
+import { copyText } from '@/composables/useCopyText';
+import { formatNumber } from '@/libs/format';
+import { useTimerGroup } from '@/composables/useTimers';
 
 /**
  * PlantHealthPanel - Plant health (NDVI / custom index) analysis panel.
@@ -170,8 +178,7 @@ import useHeavyTask from '@/composables/useHeavyTask';
  * rescaling, and copy-link functionality.
  */
 export default {
-    mixins: [useHeavyTask],
-    components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog },
+    components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -181,6 +188,10 @@ export default {
 
     emits: ['close', 'vizParamsChanged'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask, applyLater: useTimerGroup() };
+    },
     data() {
         return {
             rasterInfo: null,
@@ -192,7 +203,8 @@ export default {
             selectedStretch: 'percentile',
             rescale: '',
             availableFormulas: [],
-            availableColormaps: ['rdylgn', 'discrete_ndvi', 'spectral', 'viridis', 'plasma', 'inferno', 'magma', 'grayscale', 'ironbow', 'rainbow', 'bugn', 'whitehot', 'blackhot', 'arctic', 'lava'],
+            // Ids, or { id, name } from the raster metadata
+            availableColormaps: INDEX_COLORMAPS,
             exporting: false,
             originalView: false,
             showFormulasInfo: false
@@ -200,13 +212,15 @@ export default {
     },
 
     computed: {
-        normalizedColormaps() {
-            return this.availableColormaps.map(cm =>
-                typeof cm === 'string' ? { id: cm, name: cm } : cm
-            );
+        // With the swatch colours of the shared table (the server sends ids and names)
+        colormapOptions() {
+            return this.availableColormaps.map(cm => {
+                const id = typeof cm === 'string' ? cm : cm.id;
+                return { ...colormap(id), ...(cm.name ? { name: cm.name } : {}) };
+            });
         },
         maxExportSizeBytes() {
-            return reg.getFeatureValue(Features.MAX_EXPORT_SIZE_BYTES);
+            return reg.features.value(Features.MAX_EXPORT_SIZE_BYTES);
         },
         isExportTooLarge() {
             return computeIsExportTooLarge(this.rasterInfo, this.maxExportSizeBytes);
@@ -359,8 +373,8 @@ export default {
         },
 
         debouncedApply() {
-            if (this._debounceTimer) clearTimeout(this._debounceTimer);
-            this._debounceTimer = setTimeout(() => this.apply(), 300);
+            this.applyLater.clear();
+            this.applyLater(() => this.apply(), 300);
         },
 
         async reset() {
@@ -455,23 +469,12 @@ export default {
                     notify: false
                 });
 
-                // Download the produced GeoTIFF (auth via Authorization header).
-                const url = this.dataset.taskResultUrl(result.taskId);
-                const blob = await this.dataset.registry.makeRequest(url, 'GET', null, null, 'blob');
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                const baseName = this.filePath.split('/').pop().replace(/\.[^.]+$/, '');
-                a.download = `${baseName || 'export'}_export.tif`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(blobUrl);
+                // Download the produced GeoTIFF
+                const blob = await this.dataset.taskResult(result.taskId);
+                downloadBlob(blob, `${pathutils.stem(this.filePath) || 'export'}_export.tif`);
             } catch (e) {
                 console.error('Export error:', e);
-                if (this.$toast) {
-                    this.$toast.add({ severity: 'error', summary: 'Export Failed', detail: e.message, life: 5000 });
-                }
+                this.$notify.error(e, { summary: 'Export Failed' });
             } finally {
                 this.exporting = false;
             }
@@ -493,149 +496,26 @@ export default {
             // Update browser URL
             window.history.replaceState(null, '', url.toString());
 
-            clipboardCopy(url.toString());
+            copyText(url.toString());
         },
 
         formatNum(val) {
-            if (val === undefined || val === null) return '-';
-            return typeof val === 'number' ? val.toFixed(3) : val;
+            return formatNumber(val, 3);
         }
     }
 };
 </script>
 
 <style scoped>
-.plant-health-panel {
-    position: absolute;
-    top: 0.5rem;
-    right: 4rem;
-    z-index: 2;
-    width: 16rem;
-    background: rgba(0, 0, 0, 0.85);
-    color: #eee;
-    border-radius: 0.5rem;
-    font-size: 0.8rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-    max-height: calc(100% - 1rem);
-    overflow-y: auto;
-}
+/* Shared look and palette: css/_analysis-panel.scss */
 
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(255,255,255,0.15);
-}
-
-.panel-title {
-    font-weight: 600;
-}
-
-.panel-title i {
-    color: #4caf50;
-    margin-right: 0.3rem;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: #aaa;
-    cursor: pointer;
-    font-size: 0.9rem;
-    padding: 0;
-}
-
-.close-btn:hover {
-    color: #fff;
-}
-
-.panel-body {
-    padding: 0.5rem 0.75rem;
-}
-
-.panel-body.loading {
-    text-align: center;
-    padding: 1rem;
-    color: #aaa;
-}
-
-.section {
-    margin-bottom: 0.5rem;
-}
-
-.section-label {
-    display: block;
-    font-size: 0.7rem;
-    color: #aaa;
-    margin-bottom: 0.15rem;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-
-.info-icon-btn {
-    background: none;
-    border: none;
-    padding: 0;
-    margin-left: 0.35rem;
-    color: #4caf50;
-    cursor: pointer;
-    opacity: 0.85;
-    font-size: 0.8rem;
-    line-height: 1;
-}
-
-.info-icon-btn:hover {
-    opacity: 1;
-}
-
-.sensor-badge {
-    display: inline-block;
-    background: rgba(76, 175, 80, 0.25);
-    border: 1px solid rgba(76, 175, 80, 0.5);
-    border-radius: 0.25rem;
-    padding: 0.1rem 0.4rem;
-    font-size: 0.75rem;
-}
-
-.panel-select, .panel-input {
-    width: 100%;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    color: #eee;
-    border-radius: 0.25rem;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.8rem;
-}
-
-.panel-select:focus, .panel-input:focus {
-    outline: none;
-    border-color: rgba(76, 175, 80, 0.6);
-}
-
-.panel-select option {
-    background: #2a2a2a;
-    color: #eee;
-}
-
-.panel-select option:disabled {
-    color: #777;
-}
-
-.stats-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.15rem;
-    font-size: 0.75rem;
-    color: #ccc;
-}
 
 .single-band-info {
     display: flex;
     align-items: flex-start;
     gap: 0.4rem;
     font-size: 0.75rem;
-    color: #bbb;
+    color: var(--panel-text-soft);
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 4px;
@@ -644,119 +524,9 @@ export default {
 }
 
 .single-band-info i {
-    color: #66b3ff;
+    color: var(--panel-info);
     margin-top: 0.1rem;
     flex-shrink: 0;
 }
 
-.actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-/* Two-row grid so each action button has room to display its short label
-   without overflowing the panel width. Mirrors RasterAnalysisControls. */
-.actions-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.4rem;
-    margin-top: 0.5rem;
-}
-
-.action-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    padding: 0.4rem 0.3rem;
-    min-height: 2.6rem;
-    text-align: center;
-    line-height: 1.1;
-}
-
-.action-btn .action-label {
-    font-size: 0.7rem;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-.action-btn i {
-    font-size: 0.95rem;
-}
-
-.export-limit-hint {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.btn {
-    border: none;
-    border-radius: 0.25rem;
-    padding: 0.3rem 0.6rem;
-    cursor: pointer;
-    font-size: 0.8rem;
-}
-
-.btn-primary {
-    background: #4caf50;
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #388e3c;
-}
-
-.btn-secondary {
-    background: rgba(255,255,255,0.15);
-    color: #ccc;
-}
-
-.btn-secondary:hover {
-    background: rgba(255,255,255,0.25);
-}
-
-.btn-sm {
-    flex: 1;
-}
-
-.export-limit-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    font-size: 0.85rem;
-    color: #aaa;
-    cursor: default;
-    flex: 1;
-    justify-content: center;
-}
-
-/* Responsive: bottom-sheet on mobile */
-@media (max-width: 768px) {
-    .plant-health-panel {
-        position: fixed;
-        top: auto;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        max-height: 50vh;
-        border-radius: 0.75rem 0.75rem 0 0;
-        transition: transform 0.3s ease;
-    }
-
-    .panel-body {
-        padding: 0.5rem;
-    }
-
-    .stats-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    .actions {
-        flex-wrap: wrap;
-    }
-}
 </style>

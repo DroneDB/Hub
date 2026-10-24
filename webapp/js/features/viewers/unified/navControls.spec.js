@@ -265,7 +265,7 @@ describe('turntable rotation (real OrbitControls)', () => {
     });
 
     it('never flips at the poles: a huge vertical drag stops short and drags stay responsive', () => {
-        const { camera, controls, center, azimuth, elevation, drag } = fixture();
+        const { camera, azimuth, elevation, drag } = fixture();
         const startUp = camera.up.clone();
 
         // 2 viewport heights in one drag: the equivalent accumulated rotation carried the real
@@ -323,7 +323,7 @@ describe('turntable rotation (real OrbitControls)', () => {
     });
 
     it('stop responding once the control is disposed', () => {
-        const { el, camera, controls, azimuth, drag } = fixture();
+        const { el, controls, azimuth } = fixture();
         controls.dispose();
         const az = azimuth();
         // Replaying the whole gesture on the disposed control must be inert: the listeners are

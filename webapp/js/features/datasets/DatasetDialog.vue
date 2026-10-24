@@ -1,7 +1,7 @@
 <template>
-    <Window v-bind:title="title" id="datasetDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="datasetDialog" :title="title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
         <div class="ds-dialog">
-            <form v-on:submit.prevent class="me-2" v-bind:class="{ error: !isValid() }">
+            <form class="me-2" :class="{ error: !isValid() }" @submit.prevent>
                 <PrimeMessage v-if="isDuplicateSlug()" severity="error" :closable="false">
                     This dataset name is already in use. It will generate a duplicate slug.
                 </PrimeMessage>
@@ -9,52 +9,46 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="d-block mb-1 fw-semibold">Dataset Name</label>
-                            <InputText ref="name" @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')"
-                                v-model="ds.name" placeholder="Dataset Name" class="w-100" />
+                            <label for="dataset-dialog-dataset-name" class="d-block mb-1 fw-semibold">Dataset Name</label>
+                            <InputText id="dataset-dialog-dataset-name" ref="name" v-model="ds.name"
+                                       placeholder="Dataset Name" class="w-100" />
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label class="d-block mb-1 fw-semibold">Visibility</label>
-                            <Select v-model="ds.visibility" :options="visibilityOptions" optionLabel="label" optionValue="value" placeholder="Select visibility" class="w-100" />
+                            <label id="dataset-dialog-visibility-label" for="dataset-dialog-visibility" class="d-block mb-1 fw-semibold">Visibility</label>
+                            <Select v-model="ds.visibility" input-id="dataset-dialog-visibility" aria-labelledby="dataset-dialog-visibility-label" :options="visibilityOptions" option-label="label" option-value="value" placeholder="Select visibility" class="w-100" />
                         </div>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Dataset Slug</label>
+                    <span class="d-block mb-1 fw-semibold">Dataset Slug</span>
                     <PrimeMessage severity="info" :closable="false">
                         <small>{{ ds.name ? slugFromName(ds.name) : "" }}</small>
                     </PrimeMessage>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Tagline</label>
-                    <InputText v-model="ds.tagline" maxlength="256"
-                        placeholder="Brief description of your dataset (max 256 chars)" class="w-100" />
+                    <label for="dataset-dialog-tagline" class="d-block mb-1 fw-semibold">Tagline</label>
+                    <InputText id="dataset-dialog-tagline" v-model="ds.tagline" maxlength="256"
+                               placeholder="Brief description of your dataset (max 256 chars)" class="w-100" />
                     <small class="char-count">{{ ds.tagline ? ds.tagline.length : 0 }}/256</small>
                 </div>
 
             </form>
             <div v-if="mode == 'new'" class="mb-3">
                 <div class="d-flex align-items-center gap-2">
-                    <Checkbox v-model="openAfterCreate" :binary="true" inputId="openAfterCreate" />
+                    <Checkbox v-model="openAfterCreate" :binary="true" input-id="openAfterCreate" />
                     <label for="openAfterCreate">Open dataset after creation</label>
                 </div>
-            </div>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" label="Close" />
-                <Button v-if="mode == 'new'" @click="close('create')" severity="primary" :disabled="!isValid()" label="Create" />
-                <Button v-else @click="close('save')" severity="primary" :disabled="!isValid()" label="Save" />
             </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
-import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '@/libs/api/registryUtils';
@@ -65,7 +59,7 @@ var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window, Select, InputText, Button, PrimeMessage, Checkbox
+        Window, Select, InputText, PrimeMessage, Checkbox
     },
     props: {
         mode: {
@@ -74,15 +68,15 @@ export default {
         },
         model: {
             type: Object,
-            required: false
+            default: null
         },
         forbiddenSlugs: {
-            default: [],
+            default: () => [],
             type: Array,
             required: false
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -122,7 +116,7 @@ export default {
             if (buttonId === 'create') {
                 saveOpenAfterCreatePreference(this.openAfterCreate);
             }
-            this.$emit('onClose', buttonId, {
+            this.$emit('close', buttonId, {
                 name: this.ds.name,
                 visibility: this.ds.visibility,
                 slug: this.mode === 'edit' ? this.model.slug : slugFromName(this.ds.name),

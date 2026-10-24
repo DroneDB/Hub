@@ -5,13 +5,13 @@
         <template v-if="waitingForFiles">
             <div class="file-selection-screen">
                 <div class="selection-content">
-                    <i class="fa-solid fa-cloud-arrow-up huge"></i>
+                    <i class="fa-solid fa-cloud-arrow-up huge" />
                     <h3>Select files to upload</h3>
                     <p>Choose files or folders to upload to this dataset</p>
                     <div class="selection-buttons">
-                        <Button severity="info" @click="openFilePicker" icon="fa-solid fa-file" label="Select Files" />
-                        <Button severity="secondary" @click="openFolderPicker" icon="fa-solid fa-folder" label="Select Folder" />
-                        <Button severity="secondary" @click="$emit('importFromUrl')" icon="fa-solid fa-link" label="Import from URL" />
+                        <Button severity="info" icon="fa-solid fa-file" label="Select Files" @click="openFilePicker" />
+                        <Button severity="secondary" icon="fa-solid fa-folder" label="Select Folder" @click="openFolderPicker" />
+                        <Button severity="secondary" icon="fa-solid fa-link" label="Import from URL" @click="$emit('importFromUrl')" />
                     </div>
                 </div>
             </div>
@@ -19,455 +19,227 @@
 
         <!-- Upload progress view -->
         <template v-else>
-        <div class="upload-header">
-            <div class="upload-filters">
-                <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" @click="activeFilter = 'all'"
-                    text :severity="activeFilter === 'all' ? 'secondary' : 'secondary'">
-                    <i class="fa-solid fa-file"></i>
-                    <span class="filter-label">All</span>
-                    <span class="filter-count">{{ counts.total }}</span>
-                </Button>
-                <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" @click="activeFilter = 'uploading'"
-                    text :severity="activeFilter === 'uploading' ? 'info' : 'secondary'">
-                    <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading > 0 }"></i>
-                    <span class="filter-label">In Progress</span>
-                    <span class="filter-count">{{ counts.uploading + counts.pending }}</span>
-                </Button>
-                <Button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" @click="activeFilter = 'done'"
-                    text :severity="activeFilter === 'done' ? 'success' : 'secondary'">
-                    <i class="fa-solid fa-check"></i>
-                    <span class="filter-label">Done</span>
-                    <span class="filter-count">{{ counts.done }}</span>
-                </Button>
-                <Button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" @click="activeFilter = 'error'"
-                    text :severity="activeFilter === 'error' ? 'danger' : 'secondary'">
-                    <i class="fa-solid fa-xmark"></i>
-                    <span class="filter-label">Errors</span>
-                    <span class="filter-count">{{ counts.error }}</span>
-                </Button>
-            </div>
-        </div>
-
-        <div class="upload-body">
-            <VirtualScroller
-                class="file-list-scroller"
-                :items="filteredFiles"
-                :item-size="48"
-                key-field="id"
-                v-slot="{ item }"
-            >
-                <FileUploadRow :file="item" @retry="retryFile" />
-            </VirtualScroller>
-        </div>
-
-        <div class="upload-footer">
-            <div class="total-progress-container" v-if="uploading">
-                <div class="progress-info">
-                    <span>{{ humanBytesSent }} / {{ humanTotalBytes }}</span>
-                    <span>{{ totalProgress.toFixed(1) }}%</span>
-                </div>
-                <div class="progress-speed-info">
-                    <span><i class="fa-solid fa-gauge"></i> {{ currentSpeedFormatted }}</span>
-                    <span><i class="fa-regular fa-clock"></i> {{ etaFormatted }}</span>
-                </div>
-                <div class="total-progress-bar">
-                    <div class="progress-fill" :style="{ width: totalProgress + '%' }"></div>
+            <div class="upload-header">
+                <div class="upload-filters">
+                    <Button class="filter-btn filter-all" :class="{ active: activeFilter === 'all' }" text
+                            :severity="activeFilter === 'all' ? 'secondary' : 'secondary'" @click="activeFilter = 'all'">
+                        <i class="fa-solid fa-file" />
+                        <span class="filter-label">All</span>
+                        <span class="filter-count">{{ counts.total }}</span>
+                    </Button>
+                    <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" text
+                            :severity="activeFilter === 'uploading' ? 'info' : 'secondary'" @click="activeFilter = 'uploading'">
+                        <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading + counts.processing > 0 }" />
+                        <span class="filter-label">In Progress</span>
+                        <span class="filter-count">{{ counts.uploading + counts.processing + counts.pending }}</span>
+                    </Button>
+                    <Button class="filter-btn filter-done" :class="{ active: activeFilter === 'done' }" text
+                            :severity="activeFilter === 'done' ? 'success' : 'secondary'" @click="activeFilter = 'done'">
+                        <i class="fa-solid fa-check" />
+                        <span class="filter-label">Done</span>
+                        <span class="filter-count">{{ counts.done }}</span>
+                    </Button>
+                    <Button v-if="counts.error > 0" class="filter-btn filter-error" :class="{ active: activeFilter === 'error', 'has-errors': counts.error > 0 }" text
+                            :severity="activeFilter === 'error' ? 'danger' : 'secondary'" @click="activeFilter = 'error'">
+                        <i class="fa-solid fa-xmark" />
+                        <span class="filter-label">Errors</span>
+                        <span class="filter-count">{{ counts.error }}</span>
+                    </Button>
                 </div>
             </div>
 
-            <!-- Upload summary stats (shown when done) -->
-            <div class="upload-summary" v-if="done">
-                <div class="summary-stats">
-                    <div class="summary-stat">
-                        <i class="fa-regular fa-clock"></i>
-                        <span class="stat-label">Duration:</span>
-                        <span class="stat-value">{{ uploadDuration }}</span>
+            <div class="upload-body">
+                <VirtualScroller
+                    v-slot="{ item }"
+                    class="file-list-scroller"
+                    :items="filteredFiles"
+                    :item-size="48"
+                    key-field="id"
+                >
+                    <FileUploadRow :file="item" @retry="retryFile" />
+                </VirtualScroller>
+            </div>
+
+            <div class="upload-footer">
+                <div v-if="uploading" class="total-progress-container">
+                    <div class="progress-info">
+                        <span>{{ humanBytesSent }} / {{ humanTotalBytes }}</span>
+                        <span>{{ totalProgress.toFixed(1) }}%</span>
                     </div>
-                    <div class="summary-stat">
-                        <i class="fa-solid fa-database"></i>
-                        <span class="stat-label">Transferred:</span>
-                        <span class="stat-value">{{ humanTotalBytes }}</span>
+                    <div class="progress-speed-info">
+                        <span><i class="fa-solid fa-gauge" /> {{ currentSpeedFormatted }}</span>
+                        <span v-if="allSent && counts.processing > 0"><i class="fa-solid fa-gears" /> Processing on server...</span>
+                        <span v-else><i class="fa-regular fa-clock" /> {{ etaFormatted }}</span>
                     </div>
-                    <div class="summary-stat">
-                        <i class="fa-solid fa-gauge"></i>
-                        <span class="stat-label">Average speed:</span>
-                        <span class="stat-value">{{ averageSpeed }}</span>
+                    <div class="total-progress-bar">
+                        <div class="progress-fill" :style="{ width: totalProgress + '%' }" />
                     </div>
                 </div>
-                <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
-                    <template v-if="counts.error === 0">
-                        <i class="fa-solid fa-circle-check"></i> All {{ counts.done }} files uploaded successfully!
+
+                <!-- Upload summary stats (shown when done) -->
+                <div v-if="done" class="upload-summary">
+                    <div class="summary-stats">
+                        <div class="summary-stat">
+                            <i class="fa-regular fa-clock" />
+                            <span class="stat-label">Duration:</span>
+                            <span class="stat-value">{{ uploadDuration }}</span>
+                        </div>
+                        <div class="summary-stat">
+                            <i class="fa-solid fa-database" />
+                            <span class="stat-label">Transferred:</span>
+                            <span class="stat-value">{{ humanTotalBytes }}</span>
+                        </div>
+                        <div class="summary-stat">
+                            <i class="fa-solid fa-gauge" />
+                            <span class="stat-label">Average speed:</span>
+                            <span class="stat-value">{{ averageSpeed }}</span>
+                        </div>
+                    </div>
+                    <div class="upload-result" :class="{ success: counts.error === 0, 'has-errors': counts.error > 0 }">
+                        <template v-if="counts.error === 0">
+                            <i class="fa-solid fa-circle-check" /> All {{ counts.done }} files uploaded successfully!
+                        </template>
+                        <template v-else>
+                            <i class="fa-solid fa-triangle-exclamation" /> {{ counts.done }} succeeded, {{ counts.error }} failed
+                        </template>
+                    </div>
+                    <router-link class="diagnostics-link" :to="{ name: 'Account', hash: '#upload-diagnostics' }">
+                        <i class="fa-solid fa-stethoscope" /> Uploads slower than expected? Test the connection
+                    </router-link>
+                </div>
+
+                <div class="upload-actions">
+                    <Button v-if="uploading" severity="danger" icon="fa-regular fa-circle-stop" label="Cancel Upload" :title="counts.processing > 0 ? 'Files already sent are still added to the dataset by the server' : ''"
+                            @click="handleCancel" />
+
+                    <template v-if="done">
+                        <Button v-if="counts.error > 0" severity="warn" icon="fa-solid fa-rotate-right"
+                                :label="'Retry Failed (' + counts.error + ')'" @click="retryAllFailed" />
+                        <Button severity="secondary" icon="fa-solid fa-check" label="Close" @click="finishUpload" />
                     </template>
-                    <template v-else>
-                        <i class="fa-solid fa-triangle-exclamation"></i> {{ counts.done }} succeeded, {{ counts.error }} failed
-                    </template>
                 </div>
             </div>
-
-            <div class="upload-actions">
-                <Button v-if="uploading" severity="danger" @click="handleCancel" icon="fa-regular fa-circle-stop" label="Cancel Upload" />
-
-                <template v-if="done">
-                    <Button v-if="counts.error > 0" severity="warn" @click="retryAllFailed"
-                        icon="fa-solid fa-rotate-right" :label="'Retry Failed (' + counts.error + ')'" />
-                    <Button severity="secondary" @click="finishUpload" icon="fa-solid fa-check" label="Close" />
-                </template>
-            </div>
-        </div>
         </template><!-- end upload progress view -->
     </div>
 </template>
 
 <script>
-import Message from '@/components/Message.vue';
 import FileUploadRow from './FileUploadRow.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import Button from 'primevue/button';
-import ddb from 'ddb';
 import { bytesToSize } from '@/libs/utils';
-import Dropzone from '@/vendor/dropzone';
-import { useResilientUpload } from '@/composables/useResilientUpload';
 import { orderCompanionsFirst } from '@/libs/uploadOrder';
+import { useUploadQueue } from '@/composables/useUploadQueue';
+import { createUploadRequests } from '@/libs/upload/uploadRequests';
+import { authorizedGetJson } from '@/libs/upload/uploadFormat';
+import { formatDurationSeconds } from '@/libs/format';
+import reg from '@/libs/api/sharedRegistry';
+import { markRaw } from 'vue';
 
-const { Registry } = ddb;
-const reg = new Registry(window.location.origin);
-
-// Small files still get a fast bounded retry loop of their own for legacy parity; the
-// composable's status/backoff/Retry-After policy governs everything else.
-const SMALL_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const SMALL_FILE_MAX_RETRIES = 3;
+const EMPTY_COUNTS = { total: 0, pending: 0, uploading: 0, processing: 0, done: 0, error: 0 };
 
 /**
- * DatasetUpload - Chunked file upload panel for adding files to a dataset.
+ * DatasetUpload - upload panel for adding files to a dataset.
  *
- * Manages an upload queue with real-time progress, pause/resume/cancel per
- * file, and automatic retry on transient errors. Integrates with the
- * Registry chunked-upload API.
+ * Presentation over the upload queue (useUploadQueue, UPL-01): requests start as soon as a
+ * slot frees, small files go in bundles, large ones as resumable chunks, and a file whose
+ * bytes are all sent shows "Processing on server" until the server has added it.
  */
 export default {
     components: {
-        Message,
+        
         FileUploadRow,
         VirtualScroller,
         Button
     },
-    props: ['organization', 'dataset', 'path', 'filesToUpload'],
-    emits: ['onClose', 'onUpload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
+    props: {
+        organization: { type: String, required: true },
+        dataset: { type: String, required: true },
+        path: { type: String, default: null },
+        filesToUpload: { type: Array, default: null }
+    },
+    emits: ['close', 'upload', 'update:closable', 'update:waitingForFiles', 'importFromUrl'],
     data: function () {
         return {
             error: null,
-            uploading: false,
-            done: false,
             activeFilter: 'uploading',
             waitingForFiles: false,  // True when waiting for user to select files
-
-            // File tracking
-            fileList: {},  // { [id]: { id, name, size, status, progress, errorMessage, retryCount, canRetry, dzFile } }
-
-            // Progress tracking
-            totalBytes: 0,
-            totalBytesSent: 0,
-            lastUpdated: 0,
-
-            // Time tracking
-            uploadStartTime: null,
-            uploadEndTime: null,
-
-            // Speed & ETA tracking
-            speedHistory: [],
-            currentSpeed: 0,
-            estimatedTimeRemaining: null,
-
-            // Retry/backpressure policy shared with Upload.vue (see useResilientUpload)
-            resilience: useResilientUpload({ parallelUploads: 8 })
+            // Created with the data, before the watchers read it; raw: its state ref is the
+            // reactive part
+            queue: markRaw(this.createQueue())
         }
     },
     computed: {
+        snapshot() {
+            return this.queue.state.value;
+        },
         counts() {
-            const files = Object.values(this.fileList);
-            return {
-                total: files.length,
-                pending: files.filter(f => f.status === 'pending').length,
-                uploading: files.filter(f => f.status === 'uploading').length,
-                done: files.filter(f => f.status === 'done').length,
-                error: files.filter(f => f.status === 'error').length
-            };
+            return this.snapshot?.counts ?? EMPTY_COUNTS;
         },
-
+        uploading() {
+            return this.counts.total > 0 && !this.done;
+        },
+        done() {
+            return this.counts.total > 0 && this.snapshot?.done === true;
+        },
+        // Every byte is sent: what is left is the server adding the files
+        allSent() {
+            return this.snapshot != null && this.snapshot.bytesSent >= this.snapshot.totalBytes;
+        },
         filteredFiles() {
-            const files = Object.values(this.fileList);
-            if (this.activeFilter === 'all') return files;
-            if (this.activeFilter === 'uploading') return files.filter(f => f.status === 'uploading' || f.status === 'pending');
-            return files.filter(f => f.status === this.activeFilter);
+            const filter = this.activeFilter;
+            return this.queue.rows(f => filter === 'all' ||
+                (filter === 'uploading' ? ['uploading', 'processing', 'pending'].includes(f.status) : f.status === filter));
         },
-
         humanTotalBytes() {
-            return bytesToSize(this.totalBytes);
+            return bytesToSize(this.snapshot?.totalBytes ?? 0);
         },
-
         humanBytesSent() {
-            return bytesToSize(this.totalBytesSent);
+            return bytesToSize(this.snapshot?.bytesSent ?? 0);
         },
-
         totalProgress() {
-            if (this.totalBytes === 0) return 0;
-            return (this.totalBytesSent / this.totalBytes * 100.0);
+            const total = this.snapshot?.totalBytes ?? 0;
+            return total === 0 ? 0 : (this.snapshot.bytesSent / total) * 100.0;
         },
-
         uploadDuration() {
-            if (!this.uploadStartTime) return '0s';
-            const endTime = this.uploadEndTime || new Date();
-            const durationMs = endTime - this.uploadStartTime;
-            const seconds = Math.floor(durationMs / 1000);
-            if (seconds < 60) return `${seconds}s`;
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = minutes % 60;
-            return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
+            const start = this.snapshot?.startedAt;
+            if (!start) return '0s';
+            return formatDurationSeconds(((this.snapshot.endedAt ?? Date.now()) - start) / 1000);
         },
-
         averageSpeed() {
-            if (!this.uploadStartTime || !this.uploadEndTime) return '0 B/s';
-            const durationMs = this.uploadEndTime - this.uploadStartTime;
-            if (durationMs <= 0) return '0 B/s';
-            const bytesPerSecond = (this.totalBytesSent / durationMs) * 1000;
-            return bytesToSize(bytesPerSecond) + '/s';
+            const s = this.snapshot;
+            if (!s?.startedAt || !s.endedAt || s.endedAt <= s.startedAt) return '0 B/s';
+            return bytesToSize((s.bytesSent / (s.endedAt - s.startedAt)) * 1000) + '/s';
         },
-
         currentSpeedFormatted() {
-            if (this.currentSpeed <= 0) return '0 B/s';
-            return bytesToSize(this.currentSpeed) + '/s';
+            const speed = this.snapshot?.speed ?? 0;
+            return speed <= 0 ? '0 B/s' : bytesToSize(speed) + '/s';
         },
-
         etaFormatted() {
-            if (this.estimatedTimeRemaining === null) return 'Calculating...';
-            const seconds = Math.floor(this.estimatedTimeRemaining);
-            if (seconds < 1) return '< 1s';
-            if (seconds < 60) return `${seconds}s`;
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
-            if (minutes < 60) return `${minutes}m ${remainingSeconds}s`;
-            const hours = Math.floor(minutes / 60);
-            const remainingMinutes = minutes % 60;
-            return `${hours}h ${remainingMinutes}m ${remainingSeconds}s`;
+            const eta = this.snapshot?.eta;
+            if (eta == null) return 'Calculating...';
+            return eta < 1 ? '< 1s' : formatDurationSeconds(eta);
         }
     },
     watch: {
         waitingForFiles(val) {
             this.$emit('update:waitingForFiles', val);
+        },
+        uploading(val) {
+            this.$emit('update:closable', !val);
+        },
+        done(val) {
+            // Switch to the tab that matters once everything settled
+            if (val) this.activeFilter = this.counts.error > 0 ? 'error' : 'done';
         }
     },
-    mounted: async function () {
-        Dropzone.autoDiscover = false;
-        // processQueue timers (completions and retries, the latter able to run up to the
-        // 5-minute Retry-After cap) are tracked so unmount can cancel them - otherwise
-        // pending retries keep uploading after the dialog closes (ghost uploads)
-        this._queueTimers = [];
-        this._isUnmounted = false;
-
+    mounted() {
         // Dialog starts not closable during upload
         this.$emit('update:closable', false);
 
-        // Create a hidden dropzone element for file handling
-        this.hiddenDropzone = document.createElement('div');
-        this.hiddenDropzone.style.display = 'none';
-        document.body.appendChild(this.hiddenDropzone);
-
-        this.dz = new Dropzone(this.hiddenDropzone, {
-            paramName: function () { return "file"; },
-            url: "/share/upload/<uuid>",
-            parallelUploads: this.resilience.aimd.current,
-            uploadMultiple: false,
-            autoProcessQueue: false,
-            createImageThumbnails: false,
-            maxFilesize: Number.MAX_SAFE_INTEGER,
-            previewTemplate: '<div style="display:none"></div>',
-            // Explicit handler fully replaces dropzone's default "canceled" (options are
-            // merged in the constructor via Dropzone.extend), which re-emits "Upload
-            // canceled." as an "error" event with no xhr. The "error" handler would then
-            // classify a user cancellation as a transient status-0 failure: AIMD budget
-            // halved and the file re-queued for retry. Note: dropzone internally still
-            // wires canceled -> complete (init), so a cancelled file never reaches a
-            // retry branch - its fileList entry is just dropped here.
-            canceled: (file) => {
-                const id = file.upload && file.upload.uuid;
-                if (id) delete this.fileList[id];
-            },
-            chunkSize: Number.MAX_SAFE_INTEGER,
-            timeout: 2147483647
-        });
-
-        this.dz.on("processing", (file) => {
-            this.dz.options.url = `/orgs/${this.organization}/ds/${this.dataset}/obj`;
-            this.updateFileStatus(file.upload.uuid, 'uploading', 0);
-        })
-        .on("error", (file, message, xhr) => {
-            const fileId = file.upload.uuid;
-            const fileInfo = this.fileList[fileId];
-            const errorMsg = this.parseErrorMessage(message);
-
-            // Respect noRetry flag from server (e.g. extension blocked, quota exceeded)
-            // When noRetry is true, skip auto-retry and disable manual retry as well
-            const responseObj = typeof message === 'object' ? message : null;
-            const noRetry = responseObj && responseObj.noRetry;
-
-            if (noRetry) {
-                this.updateFileStatus(fileId, 'error', 0, errorMsg);
-                this.fileList[fileId].canRetry = false;
-                this.fileList[fileId].dzFile = file;
-                file.status = Dropzone.ERROR;
-                this.scheduleProcessQueue(500);
-                return;
-            }
-
-            const status = xhr ? xhr.status : 0;
-            const retryAfterSeconds = xhr
-                ? this.resilience.parseRetryAfterSeconds(xhr.getResponseHeader && xhr.getResponseHeader('Retry-After'))
-                : null;
-
-            // Small files additionally get a fast, tight retry loop for legacy parity;
-            // everything else (including small files once that budget is exhausted) is
-            // governed by the shared status-code + Retry-After + jittered-backoff policy.
-            const canAutoRetry = file.size < SMALL_FILE_SIZE && fileInfo.retryCount < SMALL_FILE_MAX_RETRIES;
-            const canPolicyRetry = this.resilience.shouldRetryStatus(status) && fileInfo.retryCount < this.resilience.maxRetries;
-
-            if (canAutoRetry) {
-                // Increment retry count and schedule retry with exponential backoff
-                fileInfo.retryCount++;
-                const delay = Math.pow(2, fileInfo.retryCount) * 1000; // 2s, 4s, 8s
-
-                console.log(`Auto-retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${SMALL_FILE_MAX_RETRIES}) in ${delay/1000}s`);
-                this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${SMALL_FILE_MAX_RETRIES})`);
-
-                this.scheduleRetry(file, delay);
-            } else if (canPolicyRetry) {
-                // computeRetryDelayMs takes a 0-based attempt, so use the counter
-                // BEFORE incrementing (first retry -> attempt 0 -> base backoff)
-                const delay = this.resilience.computeRetryDelayMs(fileInfo.retryCount, retryAfterSeconds);
-                fileInfo.retryCount++;
-
-                this.applyAimd('failure');
-
-                console.log(`Retry ${fileInfo.name} (attempt ${fileInfo.retryCount}/${this.resilience.maxRetries}, status ${status}) in ${delay}ms`);
-                this.updateFileStatus(fileId, 'pending', 0, `Retrying... (${fileInfo.retryCount}/${this.resilience.maxRetries})`);
-
-                this.scheduleRetry(file, delay);
-            } else {
-                // Mark as error, allow manual retry for large files
-                const canManualRetry = file.size >= SMALL_FILE_SIZE || fileInfo.retryCount >= SMALL_FILE_MAX_RETRIES;
-                this.updateFileStatus(fileId, 'error', 0, errorMsg);
-                this.fileList[fileId].canRetry = canManualRetry;
-                this.fileList[fileId].dzFile = file;
-
-                // Keep file in dropzone for potential retry
-                file.status = Dropzone.ERROR;
-
-                // Continue processing queue
-                this.scheduleProcessQueue(500);
-            }
-        })
-        .on("uploadprogress", (file, progress, bytesSent) => {
-            const now = new Date().getTime();
-
-            if (bytesSent > file.size) bytesSent = file.size;
-
-            if (progress === 100 || now - this.lastUpdated > 300) {
-                const deltaBytesSent = bytesSent - (file.deltaBytesSent || 0);
-                file.trackedBytesSent = (file.trackedBytesSent || 0) + deltaBytesSent;
-
-                this.totalBytesSent = this.totalBytesSent + deltaBytesSent;
-                this.lastUpdated = now;
-                this.updateFileStatus(file.upload.uuid, 'uploading', progress);
-                file.deltaBytesSent = bytesSent;
-                this.updateSpeedAndEta(now);
-            }
-        })
-        .on("addedfile", (file) => {
-            // Handle each file as it's added
-            file.deltaBytesSent = 0;
-            file.trackedBytesSent = 0;
-
-            // Add to fileList
-            const id = file.upload.uuid;
-            this.fileList[id] = {
-                id: id,
-                name: file.fullPath || file.name,
-                size: file.size,
-                status: 'pending',
-                progress: 0,
-                errorMessage: '',
-                retryCount: 0,
-                canRetry: false,
-                dzFile: file
-            };
-
-            this.totalBytes += file.size;
-            this.uploading = true;
-            this.$emit('update:closable', false);
-
-            // Start time tracking on first file
-            if (!this.uploadStartTime) {
-                this.uploadStartTime = new Date();
-            }
-        })
-        .on("complete", (file) => {
-            if (file.status === "success") {
-                this.updateFileStatus(file.upload.uuid, 'done', 100);
-                this.applyAimd('success');
-
-                // Correct total bytes sent
-                this.totalBytesSent = this.totalBytesSent + file.size;
-                if (file.trackedBytesSent) this.totalBytesSent -= file.trackedBytesSent;
-
-                this.$emit('onUpload', JSON.parse(file.xhr.response));
-            }
-
-            // Non-success paths (error/canceled) have nothing to do here: retriable
-            // failures were already rescheduled by the "error" handler, cancellations
-            // dropped their fileList entry in the "canceled" handler
-            this.scheduleProcessQueue(100);
-        })
-        .on("sending", (file, xhr, formData) => {
-            // Use fullPath to preserve folder structure, fallback to name
-            const filePath = file.fullPath || file.name;
-            formData.append("path", !this.path ? filePath : (this.path + "/" + filePath));
-        })
-        .on("queuecomplete", async () => {
-            // Fires deferred via setTimeout(0) inside dropzone, including from
-            // dz.destroy() during unmount - don't update state after that point
-            if (this._isUnmounted) return;
-            // Check if all files are done or error (no pending/uploading)
-            const pending = this.counts.pending + this.counts.uploading;
-            if (pending === 0) {
-                this.uploading = false;
-                this.done = true;
-                this.uploadEndTime = new Date();
-                this.$emit('update:closable', true);
-                // Switch to appropriate tab based on results
-                this.activeFilter = this.counts.error > 0 ? 'error' : 'done';
-            }
-        })
-        .on("reset", () => {
-            this.resetUpload();
-        });
-
-        // Start processing files passed via prop
         if (this.filesToUpload != null && this.filesToUpload.length > 0) {
             this.waitingForFiles = false;
-            // Convert to array if needed (FileList is not a real array)
-            // and assign fullPath from webkitRelativePath for folder uploads
-            const fileArray = Array.from(this.filesToUpload).map(file => {
-                if (file.webkitRelativePath) {
-                    file.fullPath = file.webkitRelativePath;
-                }
-                return file;
-            });
-            // Queue companions (.mtl, textures, ...) before 3D models (best effort)
-            // handleFiles assigns upload.uuid and triggers addedfile event
-            this.dz.handleFiles(orderCompanionsFirst(fileArray));
-            this.dz.processQueue();
+            this.enqueue(this.filesToUpload);
         } else {
             // No files passed, show file selection screen
             this.waitingForFiles = true;
@@ -475,208 +247,91 @@ export default {
         }
     },
     beforeUnmount() {
-        // Prevent ghost uploads: pending retry timers (Retry-After can be up to the
-        // 5-minute cap) and the live dropzone must not keep working after the dialog
-        // closes. The unmount flag is set first so the canceled/complete events
-        // triggered by dz.destroy() short-circuit instead of scheduling new timers
-        this._isUnmounted = true;
-        if (this._queueTimers) {
-            this._queueTimers.forEach((timerId) => clearTimeout(timerId));
-            this._queueTimers = [];
-        }
-        if (this.dz) {
-            this.dz.destroy();
-            this.dz = null;
-        }
-        // Clean up hidden dropzone element
-        if (this.hiddenDropzone && this.hiddenDropzone.parentNode) {
-            this.hiddenDropzone.parentNode.removeChild(this.hiddenDropzone);
-        }
+        // No ghost uploads: requests in flight and pending retries stop with the dialog
+        this.queue.cancel();
     },
     methods: {
-        // Schedules Dropzone to pick up queued files; the timer is tracked so
-        // beforeUnmount can cancel it. A destroyed dropzone is a safe no-op
-        scheduleProcessQueue(delay) {
-            if (this._isUnmounted) return;
-            const timerId = setTimeout(() => {
-                this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
-                if (this.dz) this.dz.processQueue();
-            }, delay);
-            this._queueTimers.push(timerId);
+        createQueue() {
+            const requests = createUploadRequests({
+                baseUrl: `${reg.url}${reg.Organization(this.organization).Dataset(this.dataset).baseApi}`,
+                authToken: () => reg.getAuthToken(),
+                getJson: authorizedGetJson(reg),
+                destination: item => item.path
+            });
+            return useUploadQueue({
+                send: requests.send,
+                onItemDone: (_item, entry) => this.$emit('upload', entry),
+                // Dataset size, entry count, storage: the cached reads are stale now
+                onIdle: () => reg.invalidateCache()
+            });
         },
 
-        // Re-queues `file` only when its own delay expires. Parked as ADDED (not
-        // QUEUED) meanwhile: processQueue() - which the 100 ms timer of any other
-        // file's own "complete" event schedules - never sees it, so the backoff is
-        // not bypassed; ADDED consumes no slot and keeps queuecomplete from firing
-        scheduleRetry(file, delay) {
-            if (this._isUnmounted) return;
-            file.status = Dropzone.ADDED;
-            const timerId = setTimeout(() => {
-                this._queueTimers.splice(this._queueTimers.indexOf(timerId), 1);
-                if (this._isUnmounted || !this.dz) return;
-                file.status = Dropzone.QUEUED;
-                this.dz.processQueue();
-            }, delay);
-            this._queueTimers.push(timerId);
-        },
-
-        updateSpeedAndEta(now) {
-            this.speedHistory.push({ time: now, bytes: this.totalBytesSent });
-
-            // Keep only samples from the last 5 seconds
-            const windowMs = 5000;
-            const cutoff = now - windowMs;
-            while (this.speedHistory.length > 0 && this.speedHistory[0].time < cutoff) {
-                this.speedHistory.shift();
-            }
-
-            if (this.speedHistory.length < 2) return;
-
-            const oldest = this.speedHistory[0];
-            const newest = this.speedHistory[this.speedHistory.length - 1];
-            const elapsed = newest.time - oldest.time;
-            if (elapsed <= 0) return;
-
-            this.currentSpeed = ((newest.bytes - oldest.bytes) / elapsed) * 1000;
-
-            const remaining = this.totalBytes - this.totalBytesSent;
-            this.estimatedTimeRemaining = this.currentSpeed > 0 ? remaining / this.currentSpeed : null;
-        },
-
-        updateFileStatus(id, status, progress, errorMessage = '') {
-            if (this.fileList[id]) {
-                this.fileList[id].status = status;
-                this.fileList[id].progress = progress;
-                if (errorMessage) {
-                    this.fileList[id].errorMessage = errorMessage;
-                }
-            }
-        },
-
-        // Applies the AIMD decision to Dropzone's live-read parallelUploads option
-        // (it is read from options on every processQueue(), not cached).
-        applyAimd(outcome) {
-            const next = outcome === 'success' ? this.resilience.aimd.onSuccess() : this.resilience.aimd.onFailure();
-            if (this.dz) this.dz.options.parallelUploads = next;
-        },
-
-        parseErrorMessage(message) {
-            if (typeof message === 'string') return message;
-            if (message && message.error) return message.error;
-            if (message && message.message) return message.message;
-            return 'Upload failed';
-        },
-
-        resetUpload() {
-            this.fileList = {};
-            this.totalBytes = 0;
-            this.lastUpdated = 0;
-            this.totalBytesSent = 0;
-            this.error = null;
-            this.uploading = false;
-            this.done = false;
-            this.activeFilter = 'all';
-            this.uploadStartTime = null;
-            this.uploadEndTime = null;
-            this.speedHistory = [];
-            this.currentSpeed = 0;
-            this.estimatedTimeRemaining = null;
-            if (this.dz) this.dz.removeAllFiles(true);
+        // Companions (.mtl, textures, ...) are queued before 3D models (best effort)
+        enqueue(fileList) {
+            const files = orderCompanionsFirst(Array.from(fileList).map(file => {
+                // webkitRelativePath holds the folder structure of a folder pick
+                if (file.webkitRelativePath && !file.fullPath) file.fullPath = file.webkitRelativePath;
+                return file;
+            }));
+            this.queue.add(files.map(file => {
+                const filePath = file.fullPath || file.name;
+                return { file, path: !this.path ? filePath : (this.path + "/" + filePath) };
+            }));
         },
 
         retryFile(file) {
-            if (!file.dzFile) return;
-
-            // Reset file status
-            file.retryCount = 0;
-            file.status = 'pending';
-            file.progress = 0;
-            file.errorMessage = '';
-            file.canRetry = false;
-
-            // Re-queue in Dropzone
-            file.dzFile.status = Dropzone.QUEUED;
-            this.uploading = true;
-            this.done = false;
-            this.$emit('update:closable', false);
-            this.dz.processQueue();
+            this.queue.retry(file.id);
         },
 
         retryAllFailed() {
-            const failedFiles = Object.values(this.fileList).filter(f => f.status === 'error');
-            for (const file of failedFiles) {
-                this.retryFile(file);
-            }
+            this.queue.retryFailed();
         },
 
         handleCancel() {
-            this.dz.removeAllFiles(true);
-            this.resetUpload();
+            this.queue.cancel();
             this.$emit('update:closable', true);
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         finishUpload() {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         // File picker methods
         openFilePicker() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.multiple = true;
-            input.style.display = 'none';
-            input.addEventListener('change', (e) => {
-                this.handleFileInputChange(e);
-                document.body.removeChild(input);
-            });
-            document.body.appendChild(input);
-            input.click();
+            this.pickFiles(false);
         },
 
         openFolderPicker() {
+            this.pickFiles(true);
+        },
+
+        pickFiles(folder) {
             const input = document.createElement('input');
             input.type = 'file';
             input.multiple = true;
-            input.webkitdirectory = true;
+            input.webkitdirectory = folder;
             input.style.display = 'none';
+            // lifetime: element (a one-shot file input created here)
             input.addEventListener('change', (e) => {
                 this.handleFileInputChange(e);
                 document.body.removeChild(input);
-            });
+            }, { once: true });
             document.body.appendChild(input);
             input.click();
         },
 
         cancelSelection() {
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         handleFileInputChange(event) {
             const files = event.target.files;
-            if (!files || files.length === 0) {
-                return;
-            }
-
-            // Convert FileList to array and assign fullPath from webkitRelativePath
-            const fileArray = Array.from(files).map(file => {
-                // webkitRelativePath contains the relative path including folder structure
-                // e.g. "folder/subfolder/file.jpg"
-                if (file.webkitRelativePath) {
-                    file.fullPath = file.webkitRelativePath;
-                }
-                return file;
-            });
+            if (!files || files.length === 0) return;
 
             this.waitingForFiles = false;
             this.$emit('update:closable', false);
-
-            // Add files to dropzone - handleFiles must be called first to assign upload.uuid
-            // Companions (.mtl, textures, ...) are queued before 3D models (best effort)
-            this.dz.handleFiles(orderCompanionsFirst(fileArray));
-            // The addedfiles event will be triggered automatically by handleFiles
-            this.dz.processQueue();
+            this.enqueue(files);
 
             // Clear the input for future use
             event.target.value = '';
@@ -976,5 +631,10 @@ export default {
     padding-top: var(--ddb-spacing-md);
     margin-top: var(--ddb-spacing-xs);
 }
+.diagnostics-link {
+    display: inline-block;
+    margin-top: var(--ddb-spacing-sm);
+    font-size: 0.8rem;
+    color: var(--ddb-text-muted);
+}
 </style>
-

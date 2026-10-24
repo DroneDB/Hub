@@ -1,5 +1,5 @@
 <template>
-    <Window title="Camera views" id="splat-cameras" @onClose="$emit('close')" fixedSize sizeClass="dialog-md">
+    <Window id="splat-cameras" title="Camera views" fixed-size size-class="dialog-md" @close="$emit('close')">
         <div class="cameras-manager">
             <p v-if="!cameras.length" class="empty">
                 No camera views yet. Move to a viewpoint and add it below.
@@ -9,27 +9,27 @@
                 <li v-for="(cam, i) in cameras" :key="cam.id"
                     class="camera-row" :class="{ active: i === activeIndex }">
                     <span class="idx" :title="`Press ${i} to jump here`">{{ i }}</span>
-                    <input class="name" type="text" v-model.trim="cam.name"
-                        :readonly="!canWrite"
-                        @change="$emit('rename', { index: i, name: cam.name })" />
+                    <input v-model.trim="cam.name" class="name" type="text" :aria-label="`Name of view ${i}`"
+                           :readonly="!canWrite"
+                           @change="$emit('rename', { index: i, name: cam.name })">
                     <div class="actions">
-                        <button class="act" @click="$emit('goto', i)" title="Go to this view">
+                        <button class="act" title="Go to this view" aria-label="Go to this view" @click="$emit('goto', i)">
                             <i class="fa-solid fa-eye" />
                         </button>
-                        <button v-if="canWrite" class="act" @click="$emit('update-current', i)"
-                            title="Replace with the current view">
+                        <button v-if="canWrite" class="act" title="Replace with the current view" aria-label="Replace with the current view"
+                                @click="$emit('update-current', i)">
                             <i class="fa-solid fa-camera-rotate" />
                         </button>
-                        <button v-if="canWrite" class="act" @click="$emit('move', { index: i, dir: -1 })"
-                            :disabled="i === 0" title="Move up">
+                        <button v-if="canWrite" class="act" :disabled="i === 0"
+                                title="Move up" aria-label="Move up" @click="$emit('move', { index: i, dir: -1 })">
                             <i class="fa-solid fa-arrow-up" />
                         </button>
-                        <button v-if="canWrite" class="act" @click="$emit('move', { index: i, dir: 1 })"
-                            :disabled="i === cameras.length - 1" title="Move down">
+                        <button v-if="canWrite" class="act" :disabled="i === cameras.length - 1"
+                                title="Move down" aria-label="Move down" @click="$emit('move', { index: i, dir: 1 })">
                             <i class="fa-solid fa-arrow-down" />
                         </button>
-                        <button v-if="canWrite" class="act danger" @click="$emit('delete', i)"
-                            title="Remove this view">
+                        <button v-if="canWrite" class="act danger" title="Remove this view" aria-label="Remove this view"
+                                @click="$emit('delete', i)">
                             <i class="fa-solid fa-trash" />
                         </button>
                     </div>
@@ -42,11 +42,11 @@
 
             <div class="manager-footer">
                 <Button v-if="canWrite" label="Add current view" icon="fa-solid fa-plus"
-                    @click="$emit('add-current')" text />
-                <span class="spacer"></span>
+                        text @click="$emit('add-current')" />
+                <span class="spacer" />
                 <Button v-if="canWrite" :label="dirty ? 'Save *' : 'Save'"
-                    :disabled="!dirty" @click="$emit('save')" />
-                <Button label="Close" severity="secondary" @click="$emit('close')" text />
+                        :disabled="!dirty" @click="$emit('save')" />
+                <Button label="Close" severity="secondary" text @click="$emit('close')" />
             </div>
 
             <small v-if="!canWrite" class="readonly-note">
@@ -57,7 +57,7 @@
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 
 export default {
@@ -77,12 +77,12 @@ export default {
 .cameras-manager {
     display: flex;
     flex-direction: column;
-    gap: var(--ddb-spacing-sm, 0.5rem);
+    gap: var(--ddb-spacing-sm);
     min-width: 22rem;
 }
 
 .cameras-manager .empty {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
     text-align: center;
     margin: var(--ddb-spacing-md) 0;
 }
@@ -100,29 +100,29 @@ export default {
     align-items: center;
     gap: 0.4rem;
     padding: 0.25rem 0.15rem;
-    border-bottom: 1px solid var(--ddb-border-color, rgba(0, 0, 0, 0.08));
+    border-bottom: 1px solid var(--ddb-border);
 }
 
 .cameras-manager .camera-row.active {
-    background: var(--ddb-surface-hover, rgba(40, 110, 190, 0.12));
-    border-radius: var(--ddb-border-radius, 4px);
+    background: var(--ddb-bg-hover);
+    border-radius: var(--ddb-radius-sm);
 }
 
 .cameras-manager .idx {
     flex: 0 0 1.4rem;
     text-align: center;
     font-weight: 600;
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .cameras-manager .name {
     flex: 1 1 auto;
     min-width: 0;
     padding: 0.25rem 0.4rem;
-    border: 1px solid var(--ddb-border-color, rgba(0, 0, 0, 0.15));
-    border-radius: var(--ddb-border-radius, 4px);
-    background: var(--ddb-surface, #fff);
-    color: var(--ddb-text, #222);
+    border: 1px solid var(--ddb-border);
+    border-radius: var(--ddb-radius-sm);
+    background: var(--ddb-bg-surface);
+    color: var(--ddb-text);
 }
 
 .cameras-manager .name[readonly] {
@@ -139,14 +139,14 @@ export default {
     width: 1.9rem;
     height: 1.9rem;
     border: none;
-    border-radius: var(--ddb-border-radius, 4px);
+    border-radius: var(--ddb-radius-sm);
     background: transparent;
-    color: var(--ddb-text, #444);
+    color: var(--ddb-text);
     cursor: pointer;
 }
 
 .cameras-manager .act:hover:not(:disabled) {
-    background: var(--ddb-surface-hover, rgba(0, 0, 0, 0.07));
+    background: var(--ddb-bg-hover);
 }
 
 .cameras-manager .act:disabled {
@@ -155,18 +155,18 @@ export default {
 }
 
 .cameras-manager .act.danger:hover {
-    color: var(--ddb-danger, #c0392b);
+    color: var(--ddb-danger);
 }
 
 .cameras-manager .hint {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .cameras-manager .manager-footer {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    margin-top: var(--ddb-spacing-sm, 0.5rem);
+    margin-top: var(--ddb-spacing-sm);
 }
 
 .cameras-manager .manager-footer .spacer {
@@ -174,7 +174,7 @@ export default {
 }
 
 .cameras-manager .readonly-note {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .cameras-manager .readonly-note i {

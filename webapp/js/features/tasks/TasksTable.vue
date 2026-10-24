@@ -1,8 +1,8 @@
 <template>
     <div class="tasks-table">
         <!-- Skeleton while first load is in flight -->
-        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" stripedRows
-            :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
+        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows
+                   :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
             <Column header="State" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
             <Column header="Tool"><template #body><Skeleton width="80%" /></template></Column>
             <Column v-if="showDataset" header="Dataset"><template #body><Skeleton width="70%" /></template></Column>
@@ -20,20 +20,20 @@
         </PrimeMessage>
 
         <!-- Task table -->
-        <DataTable v-else :value="slicedTasks" stripedRows rowHover
-            :lazy="lazy" :totalRecords="lazy ? totalRecords : undefined"
-            :sortField="lazy ? undefined : 'createdAt'" :sortOrder="-1"
-            scrollable scrollHeight="flex"
-            :paginator="lazy"
-            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
-            :rows="lazy ? rows : undefined"
-            :rowsPerPageOptions="lazy ? rowsPerPageOptions : undefined"
-            @page="onPage" :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
+        <DataTable v-else :value="slicedTasks" striped-rows row-hover
+                   :lazy="lazy" :total-records="lazy ? totalRecords : undefined"
+                   :sort-field="lazy ? undefined : 'createdAt'" :sort-order="-1"
+                   scrollable scroll-height="flex"
+                   :paginator="lazy"
+                   paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                   :rows="lazy ? rows : undefined"
+                   :rows-per-page-options="lazy ? rowsPerPageOptions : undefined"
+                   :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }" @page="onPage">
             <Column field="state" header="State" :sortable="!lazy" style="width: 5rem;">
                 <template #body="slotProps">
                     <Tag :severity="getTagSeverity(slotProps.data.state)"
-                        :pt="{ root: { title: slotProps.data.state } }">
-                        <i :class="getStateIcon(slotProps.data.state)" style="font-size: 1rem;"></i>
+                         :pt="{ root: { title: slotProps.data.state } }">
+                        <i :class="getStateIcon(slotProps.data.state)" style="font-size: 1rem;" />
                     </Tag>
                 </template>
             </Column>
@@ -61,10 +61,10 @@
                 <template #body="slotProps">
                     <template v-if="progressKind(slotProps.data) === 'bar'">
                         <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
-                            :showValue="true" style="height: 1rem;" />
+                                     :show-value="true" style="height: 1rem;" />
                         <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
                         <small v-if="slotProps.data.state === 'Failed'" class="error-text" :title="slotProps.data.errorType">
-                            <i class="fa-solid fa-triangle-exclamation"></i> {{ slotProps.data.errorType || 'Failed' }}
+                            <i class="fa-solid fa-triangle-exclamation" /> {{ slotProps.data.errorType || 'Failed' }}
                         </small>
                     </template>
                     <div v-else class="muted">-</div>
@@ -81,7 +81,7 @@
             <Column header="Duration" style="width: 9rem;">
                 <template #body="slotProps">
                     <div v-if="isActive(slotProps.data.state)" class="duration running" title="Running time">
-                        <i class="fa-solid fa-stopwatch"></i> {{ runningTime(slotProps.data) }}
+                        <i class="fa-solid fa-stopwatch" /> {{ runningTime(slotProps.data) }}
                     </div>
                     <div v-else-if="taskDuration(slotProps.data)" class="duration" title="Total duration">
                         {{ taskDuration(slotProps.data) }}
@@ -92,19 +92,19 @@
             <Column header="Actions" style="width: 10rem;">
                 <template #body="slotProps">
                     <div class="d-flex gap-1 flex-wrap">
-                        <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log"
-                            @click="$emit('view-log', slotProps.data)" />
+                        <Button size="small" severity="secondary" icon="fa-solid fa-terminal" title="View log" aria-label="View log"
+                                @click="$emit('view-log', slotProps.data)" />
                         <Button v-if="canDownloadResult(slotProps.data, tools)" size="small" icon="fa-solid fa-download"
-                            label="Result" :title="resultAvailabilityHint(slotProps.data)"
-                            :loading="slotProps.data.taskId === downloadingTaskId"
-                            :disabled="slotProps.data.taskId === downloadingTaskId"
-                            @click="$emit('download-result', slotProps.data)" />
+                                label="Result" :title="resultAvailabilityHint(slotProps.data)"
+                                :loading="slotProps.data.taskId === downloadingTaskId"
+                                :disabled="slotProps.data.taskId === downloadingTaskId"
+                                @click="$emit('download-result', slotProps.data)" />
                         <Button v-if="isActive(slotProps.data.state)" size="small" severity="warn"
-                            icon="fa-solid fa-stop" title="Cancel" @click="$emit('cancel', slotProps.data)" />
+                                icon="fa-solid fa-stop" title="Cancel" aria-label="Cancel" @click="$emit('cancel', slotProps.data)" />
                         <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
-                            icon="fa-solid fa-rotate-right" title="Retry" @click="$emit('retry', slotProps.data)" />
+                                icon="fa-solid fa-rotate-right" title="Retry" aria-label="Retry" @click="$emit('retry', slotProps.data)" />
                         <Button v-if="!isActive(slotProps.data.state)" size="small" severity="danger"
-                            icon="fa-solid fa-trash" title="Delete from history" @click="$emit('delete', slotProps.data)" />
+                                icon="fa-solid fa-trash" title="Delete from history" aria-label="Delete from history" @click="$emit('delete', slotProps.data)" />
                     </div>
                 </template>
             </Column>
@@ -113,7 +113,7 @@
 </template>
 
 <script>
-import useTaskFormatting from '@/composables/useTaskFormatting';
+import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Tag from 'primevue/tag';
@@ -130,9 +130,8 @@ import ProgressBar from 'primevue/progressbar';
 export default {
     name: 'TasksTable',
 
-    mixins: [useTaskFormatting],
-
     components: { Button, PrimeMessage, Tag, DataTable, Column, Skeleton, ProgressBar },
+
 
     props: {
         tasks: { type: Array, default: () => [] },
@@ -156,6 +155,9 @@ export default {
 
     emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset'],
 
+    setup() {
+        return { ...useTaskFormatting() };
+    },
     data() {
         return {
             skeletonRows: Array.from({ length: 8 }, (_, i) => ({ id: i }))
@@ -254,15 +256,15 @@ export default {
 }
 
 .muted {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .error-text {
-    color: var(--ddb-danger, #d9534f);
+    color: var(--ddb-danger);
 }
 
 .path-details {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .dataset-cell,
@@ -286,6 +288,6 @@ export default {
 }
 
 .duration.running {
-    color: var(--ddb-warning, #f0ad4e);
+    color: var(--ddb-warning);
 }
 </style>

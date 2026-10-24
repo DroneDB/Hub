@@ -1,10 +1,11 @@
 <template>
     <div class="file-upload-row" :class="statusClass">
         <div class="file-icon">
-            <i v-if="file.status === 'pending'" class="fa-regular fa-clock grey"></i>
-            <i v-else-if="file.status === 'uploading'" class="fa-solid fa-circle-notch fa-spin blue"></i>
-            <i v-else-if="file.status === 'done'" class="fa-solid fa-circle-check green"></i>
-            <i v-else-if="file.status === 'error'" class="fa-solid fa-circle-xmark red"></i>
+            <i v-if="file.status === 'pending'" class="fa-regular fa-clock grey" />
+            <i v-else-if="file.status === 'uploading'" class="fa-solid fa-circle-notch fa-spin blue" />
+            <i v-else-if="file.status === 'processing'" class="fa-solid fa-gears blue" title="Processing on server" />
+            <i v-else-if="file.status === 'done'" class="fa-solid fa-circle-check green" />
+            <i v-else-if="file.status === 'error'" class="fa-solid fa-circle-xmark red" />
         </div>
         <div class="file-info">
             <div class="file-name" :title="file.name">{{ file.name }}</div>
@@ -12,16 +13,24 @@
         </div>
         <div class="file-progress">
             <div v-if="file.status === 'uploading'" class="progress-bar-container">
-                <div class="progress-bar" :style="{ width: file.progress + '%' }"></div>
+                <div class="progress-bar" :style="{ width: file.progress + '%' }" />
                 <span class="progress-text">{{ file.progress.toFixed(0) }}%</span>
+            </div>
+            <div v-else-if="file.status === 'processing'" class="progress-bar-container processing"
+                 title="Every byte is sent: the server is adding the file to the dataset">
+                <div class="progress-bar indeterminate" />
+                <span class="progress-text">Processing on server...</span>
+            </div>
+            <div v-else-if="file.status === 'pending' && file.errorMessage" class="pending-message" :title="file.errorMessage">
+                {{ file.errorMessage }}
             </div>
             <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
                 {{ truncatedError }}
-                <Button v-if="file.canRetry" size="small" severity="danger" outlined @click="$emit('retry', file)" title="Retry upload"
-                    icon="fa-solid fa-rotate-right" class="retry-btn" />
+                <Button v-if="file.canRetry" size="small" severity="danger" outlined title="Retry upload" aria-label="Retry upload" icon="fa-solid fa-rotate-right"
+                        class="retry-btn" @click="$emit('retry', file)" />
             </div>
             <div v-else-if="file.status === 'done'" class="done-label">
-                <i class="fa-solid fa-check"></i> Done
+                <i class="fa-solid fa-check" /> Done
             </div>
         </div>
     </div>
@@ -41,8 +50,10 @@ export default {
             type: Object,
             required: true
             // Expected shape: { id, name, size, status, progress, errorMessage, retryCount, canRetry }
+            // status: pending | uploading | processing (all bytes sent, server adding it) | done | error
         }
     },
+    emits: ['retry'],
     computed: {
         humanSize() {
             return bytesToSize(this.file.size);
@@ -163,4 +174,21 @@ export default {
     font-weight: 500;
 }
 
+.progress-bar.indeterminate {
+    width: 35%;
+    animation: upload-processing 1.4s ease-in-out infinite;
+}
+
+@keyframes upload-processing {
+    0% { margin-left: -35%; }
+    100% { margin-left: 100%; }
+}
+
+.pending-message {
+    font-size: 0.75rem;
+    color: var(--ddb-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 </style>

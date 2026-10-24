@@ -1,42 +1,27 @@
 <template>
-    <Window :title="title" id="folderPicker" modal fixedSize maxWidth="80%" @onClose="handleClose">
+    <Window id="folderPicker" :title="title" modal fixed-size max-width="80%" @close="handleClose">
         <div v-if="currentPath" class="folder-picker-breadcrumb mt-3 ms-3">
-            <Breadcrumb :home="breadcrumbHome" :model="breadcrumbItems">
-                <template #item="{ item }">
-                    <a v-if="item.command" class="bc-link" @click="item.command()">
-                        <i v-if="item.icon" :class="item.icon"></i>
-                        <template v-else>{{ item.label }}</template>
-                    </a>
-                    <span v-else class="bc-active">{{ item.label }}</span>
-                </template>
-                <template #separator> / </template>
-            </Breadcrumb>
+            <PathBreadcrumb :path="currentPath" @navigate="navigateTo" />
         </div>
 
         <div class="folder-picker-body">
-            <div v-if="loading" class="text-center p-4">
-                <i class="fa-solid fa-circle-notch fa-spin"></i>
-            </div>
+            <LoadingSpinner v-if="loading" />
             <div v-else-if="sortedFiles.length === 0" class="text-center p-4">
-                <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;"></i>
+                <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
                 <p class="mt-2">This folder is empty</p>
             </div>
-            <DataTable v-else :value="sortedFiles" :paginator="false" scrollable scrollHeight="flex"
-                size="small" dataKey="path" stripedRows :rowClass="rowClass"
-                @row-click="onRowClick" @row-dblclick="onRowDblClick">
+            <DataTable v-else :value="sortedFiles" :paginator="false" scrollable scroll-height="flex"
+                       size="small" data-key="path" striped-rows :row-class="rowClass"
+                       @row-click="onRowClick" @row-dblclick="onRowDblClick">
                 <Column header="" style="width: 3rem; text-align: center;">
                     <template #body="{ data }">
                         <i class="icon" :class="data.icon"
-                            :style="!canSelect(data) ? 'opacity: 0.4;' : ''"></i>
+                           :style="!canSelect(data) ? 'opacity: 0.4;' : ''" />
                     </template>
                 </Column>
                 <Column field="label" style="min-width: 12.5rem;">
                     <template #header>
-                        <span @click="sortBy('name')" class="sortable-header">
-                            Name
-                            <i v-if="sortColumn === 'name'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-name" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ data.label }}</span>
@@ -44,11 +29,7 @@
                 </Column>
                 <Column style="width: 7.5rem;">
                     <template #header>
-                        <span @click="sortBy('type')" class="sortable-header">
-                            Type
-                            <i v-if="sortColumn === 'type'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-type" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getFileType(data) }}</span>
@@ -56,11 +37,7 @@
                 </Column>
                 <Column style="width: 6.25rem;">
                     <template #header>
-                        <span @click="sortBy('size')" class="sortable-header">
-                            Size
-                            <i v-if="sortColumn === 'size'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Size" column="size" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-size" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getFileSize(data) }}</span>
@@ -68,11 +45,7 @@
                 </Column>
                 <Column style="width: 12rem">
                     <template #header>
-                        <span @click="sortBy('modified')" class="sortable-header">
-                            Modified
-                            <i v-if="sortColumn === 'modified'" class="fa-solid"
-                                :class="sortDirection === 'asc' ? 'fa-angle-up' : 'fa-angle-down'"></i>
-                        </span>
+                        <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
                     <template #body="{ data }">
                         <span class="file-date" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getModifiedDate(data) }}</span>
@@ -87,39 +60,41 @@
 
         <div class="folder-picker-selected">
             <span class="folder-picker-selected-label">{{ mode === 'file' ? 'Selected file:' : 'Selected folder:' }}</span>
-            <InputText class="folder-picker-selected-input" v-model="selectedPath"
-                v-on:keyup.enter="onConfirm" :placeholder="selectedPathPlaceholder" />
+            <InputText v-model="selectedPath" class="folder-picker-selected-input"
+                       :aria-label="mode === 'file' ? 'Selected file' : 'Selected folder'"
+                       :placeholder="selectedPathPlaceholder" @keyup.enter="onConfirm" />
         </div>
 
         <div class="folder-picker-new-folder">
             <span class="folder-picker-new-folder-label">New folder:</span>
-            <InputText class="folder-picker-new-folder-input" ref="newFolderInput"
-                v-on:keyup.enter="createFolder" v-model="newFolderName"
-                :disabled="creatingFolder" placeholder="Folder name" />
-            <Button @click="createFolder" :disabled="!newFolderName || creatingFolder"
-                :loading="creatingFolder" severity="secondary" label="Create" size="small" />
+            <InputText ref="newFolderInput" v-model="newFolderName" aria-label="New folder name"
+                       class="folder-picker-new-folder-input" :disabled="creatingFolder"
+                       placeholder="Folder name" @keyup.enter="createFolder" />
+            <Button :disabled="!newFolderName || creatingFolder" :loading="creatingFolder"
+                    severity="secondary" label="Create" size="small" @click="createFolder" />
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="onConfirm" :disabled="!canConfirm || checkingPath"
-                :loading="checkingPath" severity="primary" label="Confirm" />
-        </div>
+        <template #footer>
+            <Button severity="secondary" label="Cancel" @click="close('cancel')" />
+            <Button :disabled="!canConfirm || checkingPath" :loading="checkingPath"
+                    severity="primary" label="Confirm" @click="onConfirm" />
+        </template>
 
         <ConfirmDialog v-if="confirmCreateOpen"
-            title="Folder does not exist"
-            :message="createFolderMessage"
-            confirmText="Create" cancelText="Cancel" confirmButtonClass="primary"
-            @onClose="handleCreateConfirmClose">
-        </ConfirmDialog>
+                       title="Folder does not exist"
+                       :message="createFolderMessage"
+                       confirm-text="Create" cancel-text="Cancel" confirm-button-class="primary"
+                       @close="handleCreateConfirmClose" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Breadcrumb from 'primevue/breadcrumb';
+import PathBreadcrumb from '@/components/PathBreadcrumb.vue';
+import SortHeader from '@/components/SortHeader.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import PrimeMessage from 'primevue/message';
@@ -127,7 +102,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { bytesToSize } from '@/libs/utils';
+import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 
 const { pathutils, entry } = ddb;
 
@@ -144,15 +119,16 @@ const { pathutils, entry } = ddb;
  *   title       - Dialog title (default: 'Select folder').
  *
  * Emits:
- *   onClose - Emitted on confirm with { path, entry } or on cancel with null.
+ *   close - Emitted on confirm with { path, entry } or on cancel with null.
  *
  * Usage example:
  *   <FolderPicker v-if="pickerOpen" :dataset="dataset" mode="folder"
- *     :initialPath="currentPath" @onClose="handlePickerClose" />
+ *     :initialPath="currentPath" @close="handlePickerClose" />
  */
 export default {
     components: {
-        Window, Button, InputText, Breadcrumb, DataTable, Column, PrimeMessage, ConfirmDialog
+        LoadingSpinner,
+        Window, Button, InputText, PathBreadcrumb, SortHeader, DataTable, Column, PrimeMessage, ConfirmDialog
     },
 
     props: {
@@ -175,7 +151,7 @@ export default {
         }
     },
 
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -211,47 +187,6 @@ export default {
         createFolderMessage: function () {
             return `The folder <strong>${this.pendingCreatePath}</strong> does not exist. Do you want to create it?`;
         },
-        breadcrumbs: function () {
-            if (!this.currentPath || this.currentPath.length === 0) return null;
-
-            var folders = this.currentPath.split('/');
-            var cur = '';
-            var bc = [];
-
-            for (var el of folders) {
-                cur += '/' + el;
-                bc.push({
-                    path: cur.substring(1),
-                    name: el
-                });
-            }
-
-            if (bc.length > 0) {
-                bc.unshift({
-                    path: '',
-                    name: '~'
-                });
-            }
-
-            return bc;
-        },
-        breadcrumbHome: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length === 0) return null;
-            const home = this.breadcrumbs[0];
-            return {
-                icon: 'fa-solid fa-home',
-                command: () => this.navigateTo(home.path)
-            };
-        },
-        breadcrumbItems: function () {
-            if (!this.breadcrumbs || this.breadcrumbs.length <= 1) return [];
-            return this.breadcrumbs.slice(1).map((b, idx, arr) => {
-                if (idx < arr.length - 1) {
-                    return { label: b.name, command: () => this.navigateTo(b.path) };
-                }
-                return { label: b.name };
-            });
-        },
         sortedFiles: function () {
             const sorted = [...this.files];
 
@@ -271,14 +206,10 @@ export default {
                         result = this.getFileType(a).localeCompare(this.getFileType(b));
                         break;
                     case 'size':
-                        const sizeA = a.entry.size || 0;
-                        const sizeB = b.entry.size || 0;
-                        result = sizeA - sizeB;
+                        result = (a.entry.size || 0) - (b.entry.size || 0);
                         break;
                     case 'modified':
-                        const modA = a.entry.mtime || 0;
-                        const modB = b.entry.mtime || 0;
-                        result = modA - modB;
+                        result = (a.entry.mtime || 0) - (b.entry.mtime || 0);
                         break;
                 }
 
@@ -363,9 +294,8 @@ export default {
             const normalized = this.normalizePath(rawPath);
             if (!normalized) return true;
 
-            const slash = normalized.lastIndexOf('/');
-            const parent = slash >= 0 ? normalized.substring(0, slash) : '';
-            const base = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+            const parent = pathutils.getParentFolder(normalized) || '';
+            const base = pathutils.basename(normalized);
 
             const entries = await this.dataset.list(parent || null);
             return entries.some((e) => {
@@ -428,7 +358,7 @@ export default {
         },
 
         emitConfirm: function (path) {
-            this.$emit('onClose', { path: this.normalizePath(path), entry: null });
+            this.$emit('close', { path: this.normalizePath(path), entry: null });
         },
 
         canSelect: function (file) {
@@ -460,15 +390,11 @@ export default {
         },
 
         getFileSize: function (file) {
-            if (entry.isDirectory(file.entry)) return '';
-            if (!file.entry.size) return '';
-            return bytesToSize(file.entry.size);
+            return getFileSizeDisplay(file.entry);
         },
 
         getModifiedDate: function (file) {
-            if (!file.entry.mtime) return '--';
-            const date = new Date(file.entry.mtime * 1000);
-            return date.toLocaleString();
+            return formatModifiedDate(file.entry.mtime);
         },
 
         createFolder: async function () {
@@ -494,12 +420,12 @@ export default {
 
         close: function (action) {
             if (action === 'confirm' && this.selectedFile && this.canSelect(this.selectedFile)) {
-                this.$emit('onClose', {
+                this.$emit('close', {
                     path: this.selectedFile.entry.path,
                     entry: this.selectedFile.entry
                 });
             } else {
-                this.$emit('onClose', null);
+                this.$emit('close', null);
             }
         },
 
@@ -562,11 +488,11 @@ export default {
 /* Highlight the currently selected folder/file row. */
 .folder-picker-body :deep(tr.row-selected),
 .folder-picker-body :deep(tr.row-selected > td) {
-    background-color: var(--ddb-selected-bg, #e8f4ff) !important;
+    background-color: var(--ddb-selected-bg) !important;
 }
 
 .folder-picker-body :deep(tr.row-selected:hover),
 .folder-picker-body :deep(tr.row-selected:hover > td) {
-    background-color: var(--ddb-selected-active-bg, #d8e8f8) !important;
+    background-color: var(--ddb-selected-active-bg) !important;
 }
 </style>

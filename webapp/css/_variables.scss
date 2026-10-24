@@ -79,6 +79,7 @@
     // ── Brand ──────────────────────────────────────────────
     --ddb-primary: #0070e0;
     --ddb-primary-rgb: 0, 112, 224;
+    --ddb-primary-hover: #0060bf;
     --ddb-secondary: #00C4CC;
     --ddb-secondary-rgb: 0, 196, 204;
     --ddb-accent: #6C5CE7;
@@ -86,7 +87,7 @@
     // ── Text ───────────────────────────────────────────────
     --ddb-text: #1A1A2E;
     --ddb-text-secondary: #555;
-    --ddb-text-muted: #999;
+    --ddb-text-muted: #767676; // 4.5:1 on white
     --ddb-text-on-dark: #fefefe;
     --ddb-text-on-color: #fff;
 
@@ -154,6 +155,10 @@
 
     // ── Link ───────────────────────────────────────────────
     --ddb-link: var(--ddb-primary);
+    --ddb-console-bg: #1e1e1e;
+    --ddb-console-text: #d4d4d4;
+    --ddb-build-pending: #e67e22;
+    --ddb-map-control-active: #7bc67e;
 
     // ── Measure / Annotation colors ────────────────────────
     --ddb-measure-color: #ffcc33;

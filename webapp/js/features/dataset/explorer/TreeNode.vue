@@ -1,25 +1,28 @@
 <template>
     <div class="tree-node">
-        <div class="entry"
-            :draggable="!node.root && canWrite"
-            @dragstart="onDragStart($event, node)"
-            @drop="onItemDrop($event, node)"
-            @dragover="itemDragOver($event, node)"
-            @dragenter="itemDragEnter($event, node)"
-            @dragleave="itemDragLeave($event, node)"
-            @click="onClick" @dblclick="handleOpenDblClick" @contextmenu="onRightClick"
-            :class="{ selected: selected, 'drop-target': dropTargetPath === node.entry.path }">
-            <i class="fa-solid fa-circle-notch fa-spin" v-if="loading" />
-            <i class="icon" @click="handleOpenCaret" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
-                v-if="isExpandable && !loading && (!empty || !loadedChildren)" />
-            <i class="icon nonexistent" v-if="!isExpandable || (empty && loadedChildren)" />
+        <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events -- the tree owns the keyboard (arrows, Enter) and points at this item with aria-activedescendant -->
+        <div :id="domId" class="entry" role="treeitem" tabindex="-1"
+             :aria-selected="selected" :aria-expanded="isExpandable ? expanded : undefined"
+             :draggable="!node.root && canWrite"
+             :class="{ selected: selected, 'drop-target': dropTargetPath === node.entry.path }"
+             @dragstart="onDragStart($event, node)"
+             @drop="onItemDrop($event, node)"
+             @dragover="itemDragOver($event, node)"
+             @dragenter="itemDragEnter($event, node)"
+             @dragleave="itemDragLeave($event, node)" @click="onClick" @dblclick="handleOpenDblClick"
+             @contextmenu="onRightClick">
+            <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
+            <i v-if="isExpandable && !loading && (!empty || !loadedChildren)" class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'"
+               aria-hidden="true" @click="handleOpenCaret" />
+            <i v-if="!isExpandable || (empty && loadedChildren)" class="icon nonexistent" />
 
             <i class="icon" :class="node.icon" />
             <div class="text">{{ node.label }}</div>
-        </div>        <div class="children" v-show="expanded">
-            <TreeNode v-for="(node, index) in children" :key="'N,' + node.path + ',' + index" :node="node" ref="nodes"
-                :getChildren="getChildren" :canWrite="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
-                @opened="(n, sender) => $emit('opened', n, sender)" />
+        </div>
+        <div v-show="expanded" class="children" role="group">
+            <TreeNode v-for="(child, index) in children" :key="'N,' + child.path + ',' + index" ref="nodes" :node="child"
+                      :get-children="getChildren" :can-write="canWrite" @selected="(n, btn) => $emit('selected', n, btn)"
+                      @opened="(n, sender) => $emit('opened', n, sender)" />
         </div>
     </div>
 </template>
@@ -28,30 +31,33 @@
 import { defineAsyncComponent } from 'vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { clone } from '@/libs/utils';
-import { startInternalDrag, isInternalDrag, emitMove, itemDnDMixin } from '@/libs/dragDropUtils';
+import { startInternalDrag, isInternalDrag } from '@/libs/dragDropUtils';
 import ddb from 'ddb';
-import emitter from '@/libs/eventBus';
+import { useItemDragDrop } from '@/composables/useDragDrop';
 const { pathutils } = ddb;
 
 export default {
-    emits: ['opened', 'selected'],
-    mixins: [itemDnDMixin],
+    components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
+    inject: { treeRegistry: { default: null } },
     props: {
         node: {
-            type: Object
+            type: Object,
+            required: true
         },
         getChildren: {
             type: Function,
             required: true
         },
-        // Used by itemDnDMixin to gate internal drop dispatching.
+        // Gates internal drops (useItemDragDrop)
         canWrite: {
             type: Boolean,
             default: true
         }
     },
-    components: { TreeNode: defineAsyncComponent(() => import('./TreeNode.vue')) },
+    emits: ['opened', 'selected'],
+    setup(props) {
+        return useItemDragDrop(props);
+    },
     data: function () {
         return {
             children: [],
@@ -62,6 +68,10 @@ export default {
         }
     },
     computed: {
+        // Target of the tree's aria-activedescendant
+        domId: function () {
+            return 'tree-node-' + this.$.uid;
+        },
         isExpandable: function () {
             return ddb.entry.isDirectory(this.node.entry);
         },
@@ -74,63 +84,38 @@ export default {
             await this.handleOpenDblClick(new CustomEvent('click'));
         }
 
-        this._onDeleteEntries = async (deleted) => {
+        this.treeRegistry?.add(this);
+    },
+    beforeUnmount: function () {
+        this.treeRegistry?.remove(this);
+    },
+    methods: {
+        // ---- called by TreeView, which listens to the file-system events once for all nodes ----
 
-            var els = this.children.filter(item => deleted.includes(item.entry.path));
-
-            // It's not our business
-            if (els.length == 0)
-                return;
-
+        removeChildren: function (deleted) {
+            if (!this.children.some(item => deleted.includes(item.entry.path))) return;
             this.children = this.children.filter(item => !deleted.includes(item.entry.path));
+        },
 
-        };
-        emitter.on('deleteEntries', this._onDeleteEntries);
-
-        this._onFolderOpened = async (tree) => {
-
-            var ourPath = this.node.entry.path;
-
-            if (tree.length === 0)
-                return;
-
-            if (tree.includes(ourPath))
-                await this.expand();
-
-            if (tree[tree.length - 1] === ourPath ||
-                (tree[tree.length - 1] === "/" && this.node.root))
+        // `tree` lists the folders from the root to the one just opened (pathutils.getTree)
+        openFromTree: async function (tree) {
+            const ourPath = this.node.entry.path;
+            if (tree.length === 0) return;
+            if (tree.includes(ourPath)) await this.expand();
+            if (tree[tree.length - 1] === ourPath || (tree[tree.length - 1] === "/" && this.node.root)) {
                 this.$emit('opened', this, "explorer");
-
-        };
-        emitter.on('folderOpened', this._onFolderOpened);
-
-        this._onAddItems = async (items) => {
-
-            if (items.length == 0)
-                return;
-
-            if (!this.isExpandable)
-                return;
-
-            var parentPath = pathutils.getParentFolder(items[0].entry.path);
-
-            if (parentPath == null) {
-                if (!this.node.root) {
-                    return;
-                }
-            } else {
-                if (parentPath != this.node.entry.path) {
-                    return;
-                }
             }
+        },
 
-            // Let's remove first the duplicates
+        addItems: async function (items) {
+            if (items.length == 0 || !this.isExpandable) return;
+
+            const parentPath = pathutils.getParentFolder(items[0].entry.path);
+            if (parentPath == null ? !this.node.root : parentPath != this.node.entry.path) return;
+
+            // Replace duplicates, then add
             this.children = this.children.filter(ch => !items.find(i => i.entry.path === ch.entry.path));
-
-            // Add new items
-            for (var item of items) {
-                this.children.push(item);
-            }
+            this.children.push(...items);
 
             if (!this.expanded) {
                 await this.expand();
@@ -138,31 +123,8 @@ export default {
             }
 
             this.sortChildren();
+        },
 
-        };
-        emitter.on('addItems', this._onAddItems);
-
-        this._onMoveItemInit = (payload) => {
-            // Backwards-compatible: accept both the legacy raw destItem (no
-            // `destItem` key) and the new { destItem, primaryPath } shape.
-            const destItem = payload && payload.destItem ? payload.destItem : payload;
-            const primaryPath = payload && payload.primaryPath ? payload.primaryPath : null;
-            if (!this.selected) return;
-            this.selected = false;
-            // Skip if this node is the primary dataTransfer source (already moved by emitMove).
-            if (primaryPath != null && this.node.entry.path === primaryPath) return;
-            emitMove(this.node, destItem);
-        };
-        emitter.on('moveItemInit', this._onMoveItemInit);
-
-    },
-    beforeUnmount: function () {
-        emitter.off('deleteEntries', this._onDeleteEntries);
-        emitter.off('folderOpened', this._onFolderOpened);
-        emitter.off('addItems', this._onAddItems);
-        emitter.off('moveItemInit', this._onMoveItemInit);
-    },
-    methods: {
         onClick: function (e) {
             Keyboard.updateState(e);
             this.$emit('selected', this, Mouse.LEFT);
@@ -193,9 +155,8 @@ export default {
 
         /**
          * Drop on a TreeNode entry. Reuses the mixin's `onDrop` (validates
-         * internal drag, gates on canWrite, emits `moveItem`) and additionally
-         * notifies other selected TreeNodes via the `moveItemInit` bus event
-         * so the multi-selection drag in the tree continues to work.
+         * internal drag, gates on canWrite, asks the page to move) and then has
+         * the tree move the other selected nodes too (multi-selection drag).
          */
         onItemDrop(evt, item) {
             // Capture source path before mixin clears state.
@@ -204,14 +165,13 @@ export default {
                 try {
                     const src = JSON.parse(evt.dataTransfer.getData('item'));
                     primaryPath = src && src.entry ? src.entry.path : null;
-                } catch (e) { /* ignore */ }
+                } catch { /* ignore */ }
             }
 
             this.onDrop(evt, item);
 
-            if (primaryPath != null) {
-                emitter.emit('moveItemInit', { destItem: item, primaryPath });
-            }
+            // The other selected nodes of the tree move with it
+            if (primaryPath != null) this.treeRegistry?.moveSelected(item, primaryPath);
         },
 
         sortChildren: function () {
@@ -292,7 +252,7 @@ export default {
         user-select: none;
 
         &:hover {
-            background: var(--ddb-bg-secondary);
+            background: var(--ddb-bg-hover);
             cursor: pointer;
         }
 
@@ -306,7 +266,7 @@ export default {
         }
 
         &.drop-target {
-            outline: 2px dashed var(--ddb-color-primary, #1976d2);
+            outline: 2px dashed var(--ddb-primary);
             outline-offset: -2px;
             background: var(--ddb-bg-hover);
         }

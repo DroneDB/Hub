@@ -1,13 +1,16 @@
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { isLocalVector } from '@/libs/openItemDefaults';
+import { isCadDrawing } from '@/libs/cadCrs';
+import { hasDedicatedViewer, isMapViewable, isPanoramaType, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { hasThumbnail, isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceeded } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import clipboard from '@/composables/useClipboard';
+import { useClipboardStore } from '@/stores/clipboard';
 
 /**
  * Context object interface:
@@ -39,7 +42,8 @@ function openMapItem(ctx) {
         icon: 'fa-solid fa-map',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && isMapViewable(sel[0].entry.type);
+            // A drawing without geolocation has nothing to place on a map.
+            return sel.length === 1 && isMapViewable(sel[0].entry.type) && !isLocalVector(sel[0].entry);
         },
         click: () => {
             ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'map'));
@@ -222,7 +226,7 @@ function downloadItem(ctx) {
     };
     const isBulkBlocked = () =>
         !reg.isLoggedIn() &&
-        reg.getFeature(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
+        reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
         isBulkSelection();
 
     return {
@@ -315,7 +319,7 @@ function pasteClipboardItem(ctx) {
         label: 'Paste',
         icon: 'fa-solid fa-paste',
         accelerator: 'CmdOrCtrl+V',
-        isVisible: () => ctx.canWrite && !clipboard.isEmpty.value,
+        isVisible: () => ctx.canWrite && !useClipboardStore().isEmpty,
         click: () => ctx.emit('pasteFromClipboard')
     };
 }
@@ -326,7 +330,7 @@ function clipboardSeparator(ctx) {
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             const hasSel = sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-            return hasSel || (ctx.canWrite && !clipboard.isEmpty.value);
+            return hasSel || (ctx.canWrite && !useClipboardStore().isEmpty);
         }
     };
 }
@@ -340,10 +344,11 @@ function setThumbnailItem(ctx) {
             if (!ctx.canWrite || sel.length !== 1) return false;
             const file = sel[0];
             const type = file.entry.type;
-            if (!isThumbnailCandidate(type)) return false;
-            const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+            if (!hasThumbnail(type)) return false;
+            const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
             if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
-            if (type === ddb.entry.type.GEORASTER || type === ddb.entry.type.GAUSSIAN_SPLAT) {
+            // A thumbnail of a built type comes from its build: not while it failed or runs
+            if (isBuildableType(type)) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);
                 if (!buildState) return true;
                 return buildState.currentState !== BUILD_STATES.FAILED && !hasActiveBuild(ctx.dataset, file);
@@ -500,6 +505,18 @@ function extractItem(ctx) {
     };
 }
 
+function setCoordinateSystemItem(ctx) {
+    return {
+        label: 'Set Coordinate System...',
+        icon: 'fa-solid fa-earth-europe',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite && sel.length === 1 && isCadDrawing(sel[0].entry);
+        },
+        click: () => ctx.emit('setCrs', ctx.getSelectedEntries()[0])
+    };
+}
+
 /**
  * Factory: create a context menu item for downloading a build artifact.
  * @param {string} label - Menu item label (e.g. "Download COG")
@@ -515,7 +532,7 @@ function makeDownloadItem(label, icon, entryType, ctx) {
             const sel = ctx.getSelectedEntries();
             return sel.length === 1
                 && sel[0].entry.type === entryType
-                && isBuildSucceeded(ctx.dataset, sel[0]);
+                && isBuildComplete(ctx.dataset, sel[0]);
         },
         click: () => {
             const sel = ctx.getSelectedEntries();
@@ -533,6 +550,7 @@ function toolsItem(ctx) {
     const maskBorders = maskBordersItem(ctx);
     const alignGeoRaster = alignGeoRasterItem(ctx);
     const extract = extractItem(ctx);
+    const setCrs = setCoordinateSystemItem(ctx);
     const build = buildItem(ctx);
     const transfer = transferItem(ctx);
 
@@ -544,9 +562,11 @@ function toolsItem(ctx) {
             maskBorders,
             alignGeoRaster,
             extract,
+            setCrs,
             {
                 type: 'separator',
-                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() || extract.isVisible()
+                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() ||
+                    extract.isVisible() || setCrs.isVisible()
             },
             build,
             transfer,
@@ -637,6 +657,7 @@ export {
     mergeMultispectralItem,
     alignGeoRasterItem,
     extractItem,
+    setCoordinateSystemItem,
     deleteItem,
     deleteSeparator,
     selectAllNoneItem,

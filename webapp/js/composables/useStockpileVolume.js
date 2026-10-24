@@ -23,9 +23,14 @@ import {
     findStockpileMaterialBySlug,
     computeMaterialEstimate
 } from '@/libs/stockpileMaterials';
+import { downloadText } from '@/libs/download';
+import { pathutils } from 'ddb';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { EPSG } from '@/libs/constants';
+import { createFeatureScope } from '@/composables/featureScope';
 
 const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
-const STOCKPILE_STROKE = '#ff9800';
+const STOCKPILE_STROKE = ANALYSIS_COLOR;
 
 function stockpileStyle() {
     return new Style({
@@ -82,7 +87,7 @@ function resolveSelectedMaterial(slug, customDensity, customCostPerTon) {
     return findStockpileMaterialBySlug(slug);
 }
 
-export default {
+const definition = {
     data() {
         return {
             stockpilePanelVisible: false,
@@ -130,9 +135,6 @@ export default {
         async openStockpileVolume(file) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path || !this.dataset) return;
-            // Mutually-exclusive panels: ensure other analysis panels are closed.
-            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
-            if (typeof this.closePlantHealth === 'function') this.closePlantHealth();
 
             this.rasterFilePath = path;
             this.stockpilePanelVisible = true;
@@ -205,7 +207,7 @@ export default {
         },
 
         /**
-         * Hook invoked by olMeasure (via Map.vue / SingleMap.vue) whenever a
+         * Hook invoked by the measure control (via Map.vue / SingleMap.vue) whenever a
          * feature is removed from the shared measurement source. When the
          * removed feature is the current stockpile draft (eraser tool, edit
          * dialog Delete button, list-dialog delete, ...), reset the panel so
@@ -388,7 +390,7 @@ export default {
             this._acquireStockpileToolLock();
             const mapProj = this.map.getView().getProjection();
             this._stockpileClickKey = this.map.once('singleclick', (evt) => {
-                const [lon, lat] = transform(evt.coordinate, mapProj, 'EPSG:4326');
+                const [lon, lat] = transform(evt.coordinate, mapProj, EPSG.WGS84);
                 // Tear everything down (cursor, ESC handler, mode flag) BEFORE running
                 // detection so no interactions/listeners linger after the click.
                 this._stockpileClickKey = null;
@@ -424,7 +426,6 @@ export default {
             this._setStockpileCursor('crosshair');
             this._acquireStockpileToolLock();
 
-            const mapProj = this.map.getView().getProjection();
             const draw = new Draw({
                 source: this._stockpileSource,
                 type: 'Polygon',
@@ -444,7 +445,7 @@ export default {
                 // half-alive Draw that starts a new polygon.
                 this.stockpileMode = null;
                 const mapProjForEnd = this.map.getView().getProjection();
-                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, 'EPSG:4326');
+                const geom = evt.feature.getGeometry().clone().transform(mapProjForEnd, EPSG.WGS84);
                 const coords = geom.getCoordinates();
                 // Detach the live reference synchronously so a quick
                 // user re-click on Draw / Click does not get clobbered by
@@ -461,8 +462,8 @@ export default {
                 this._stockpileDrawTeardownTimer = setTimeout(() => {
                     this._stockpileDrawTeardownTimer = null;
                     if (this.map) {
-                        try { finishedDraw.abortDrawing(); } catch (e) { /* noop */ }
-                        try { this.map.removeInteraction(finishedDraw); } catch (e) { /* noop */ }
+                        try { finishedDraw.abortDrawing(); } catch { /* noop */ }
+                        try { this.map.removeInteraction(finishedDraw); } catch { /* noop */ }
                     }
                     if (this._stockpileEscKey) {
                         window.removeEventListener('keydown', this._stockpileEscKey);
@@ -507,7 +508,7 @@ export default {
             this._stockpileSource.clear();
             const mapProj = this.map.getView().getProjection();
             const coords = polygonGeoJson.coordinates.map(ring =>
-                ring.map(c => transform(c, 'EPSG:4326', mapProj))
+                ring.map(c => transform(c, EPSG.WGS84, mapProj))
             );
             const feature = new Feature({ geometry: new Polygon(coords) });
             feature.setStyle(stockpileStyle());
@@ -527,7 +528,7 @@ export default {
             }
             this._teardownStockpileDraw();
             if (this._stockpileClickKey) {
-                try { unByKey(this._stockpileClickKey); } catch (e) { /* noop */ }
+                try { unByKey(this._stockpileClickKey); } catch { /* noop */ }
                 this._stockpileClickKey = null;
             }
             this.stockpileMode = null;
@@ -544,22 +545,22 @@ export default {
         _acquireStockpileToolLock() {
             if (this._stockpileToolLockHeld) return;
             if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(true); } catch (e) { /* noop */ }
+                try { this.measureControls.setToolsDisabled(true); } catch { /* noop */ }
                 this._stockpileToolLockHeld = true;
             }
         },
         _releaseStockpileToolLock() {
             if (!this._stockpileToolLockHeld) return;
             if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch (e) { /* noop */ }
+                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
             }
             this._stockpileToolLockHeld = false;
         },
 
         _teardownStockpileDraw() {
             if (this._stockpileDraw && this.map) {
-                try { this._stockpileDraw.abortDrawing(); } catch (e) { /* noop */ }
-                try { this.map.removeInteraction(this._stockpileDraw); } catch (e) { /* noop */ }
+                try { this._stockpileDraw.abortDrawing(); } catch { /* noop */ }
+                try { this.map.removeInteraction(this._stockpileDraw); } catch { /* noop */ }
             }
             this._stockpileDraw = null;
             if (this._stockpileEscKey) {
@@ -685,8 +686,8 @@ export default {
             if (!feature) return;
             try {
                 this.measureControls.deleteMeasurement(feature);
-            } catch (e) {
-                try { this.measureControls.source.removeFeature(feature); } catch (e) { /* noop */ }
+            } catch {
+                try { this.measureControls.source.removeFeature(feature); } catch { /* noop */ }
             }
             this._draftStockpileFeatureId = null;
         },
@@ -719,6 +720,10 @@ export default {
          * Export the currently displayed pile contour as a GeoJSON Feature
          * (downloaded as a file). Only available when a polygon has been computed.
          */
+        // Public names for the map view (template and measure control)
+        stopStockpileInteractions() { this._stopStockpileInteractions(); },
+        onStockpileFeatureRemoved(feature) { this._onStockpileFeatureRemoved(feature); },
+
         exportStockpileGeoJson() {
             if (!this.stockpileDetectedPolygon) {
                 this.stockpileError = 'No polygon to export. Detect or draw a stockpile first.';
@@ -734,19 +739,17 @@ export default {
                     properties: props
                 }]
             };
-            const json = JSON.stringify(feature, null, 2);
-            const blob = new Blob([json], { type: 'application/geo+json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            const baseName = (this.rasterFilePath || 'stockpile').split('/').pop().replace(/\.[^.]+$/, '');
-            a.href = url;
-            a.download = `${baseName}-stockpile.geojson`;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 0);
+            const baseName = pathutils.stem(this.rasterFilePath || 'stockpile');
+            downloadText(JSON.stringify(feature, null, 2), `${baseName}-stockpile.geojson`, 'application/geo+json');
         }
     }
 };
+
+/**
+ * HQ-07: a composable. The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useStockpileVolume(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

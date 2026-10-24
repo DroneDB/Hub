@@ -1,74 +1,74 @@
 <template>
-    <Window title="Map Settings" id="map-settings" @onClose="close" modal sizeClass="dialog-sm" fixedSize>
+    <Window id="map-settings" title="Map Settings" modal size-class="dialog-sm" fixed-size @close="$emit('close')">
         <div class="map-settings-content">
             <div class="setting-row">
-                <label class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-map"></i> Basemap
+                <label id="map-settings-dialog-basemap-label" for="map-settings-dialog-basemap" class="setting-label align-items-baseline">
+                    <i class="fa-solid fa-map" /> Basemap
                 </label>
-                <Select :modelValue="selectedBasemap" @update:modelValue="onBasemapChange" :options="basemapOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                <Select input-id="map-settings-dialog-basemap" aria-labelledby="map-settings-dialog-basemap-label" :model-value="selectedBasemap" :options="basemapOptions" option-label="label" option-value="value" class="setting-select" @update:model-value="onBasemapChange" />
             </div>
 
             <div v-if="selectedBasemap === 'custom'" class="custom-basemap-fields">
                 <div class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label id="map-settings-dialog-source-type-label" for="map-settings-dialog-source-type" class="setting-label align-items-baseline">
                         Source Type
                     </label>
-                    <Select v-model="customSourceType" @change="onSourceTypeChanged" :options="sourceTypeOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                    <Select v-model="customSourceType" input-id="map-settings-dialog-source-type" aria-labelledby="map-settings-dialog-source-type-label" :options="sourceTypeOptions" option-label="label" option-value="value" class="setting-select" @change="onSourceTypeChanged" />
                 </div>
                 <div class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label for="map-settings-dialog-url" class="setting-label align-items-baseline">
                         URL
                     </label>
-                    <InputText v-model="customUrl" class="setting-input"
-                        :placeholder="customSourceType === 'wms' ? 'https://example.com/wms' : 'https://example.com/{z}/{x}/{y}.png'"
-                        @input="onUrlChanged" />
+                    <InputText id="map-settings-dialog-url" v-model="customUrl" class="setting-input"
+                               :placeholder="customSourceType === 'wms' ? 'https://example.com/wms' : 'https://example.com/{z}/{x}/{y}.png'"
+                               @input="onUrlChanged" />
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label id="map-settings-dialog-layer-label" for="map-settings-dialog-layer" class="setting-label align-items-baseline">
                         Layer
                     </label>
                     <div class="layer-select-wrapper">
-                        <Select v-model="customLayerName" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" optionLabel="label" optionValue="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
-                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" @click="fetchLayers" title="Fetch layers"
-                            :icon="wmsLayersLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-arrows-rotate'" text />
+                        <Select v-model="customLayerName" input-id="map-settings-dialog-layer" aria-labelledby="map-settings-dialog-layer-label" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" option-label="label" option-value="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
+                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" title="Fetch layers" icon="fa-solid fa-arrows-rotate" :loading="wmsLayersLoading" aria-label="Fetch layers"
+                                text @click="fetchLayers" />
                     </div>
                 </div>
                 <div v-if="customSourceType === 'wms'" class="setting-row">
-                    <label class="setting-label align-items-baseline">
+                    <label id="map-settings-dialog-tile-size-label" for="map-settings-dialog-tile-size" class="setting-label align-items-baseline">
                         Tile Size
                     </label>
-                    <Select v-model="customTileSize" :options="tileSizeOptions" optionLabel="label" optionValue="value" class="setting-select" />
+                    <Select v-model="customTileSize" input-id="map-settings-dialog-tile-size" aria-labelledby="map-settings-dialog-tile-size-label" :options="tileSizeOptions" option-label="label" option-value="value" class="setting-select" />
                 </div>
                 <PrimeMessage v-if="customError" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
                     {{ customError }}
                 </PrimeMessage>
                 <div class="setting-row" style="justify-content: flex-end;">
-                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" @click="applyCustomConfig"
-                        :icon="customLoading ? 'fa-solid fa-circle-notch fa-spin' : 'fa-solid fa-check'" :label="customLoading ? 'Checking...' : 'Apply'" />
+                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" icon="fa-solid fa-check" :loading="customLoading"
+                            :label="customLoading ? 'Checking...' : 'Apply'" @click="applyCustomConfig" />
                 </div>
             </div>
 
             <div class="setting-row">
-                <label class="setting-label align-items-baseline">
-                    <i class="fa-solid fa-pencil"></i> Measurement Units
+                <label id="map-settings-dialog-measurement-units-label" for="map-settings-dialog-measurement-units" class="setting-label align-items-baseline">
+                    <i class="fa-solid fa-pencil" /> Measurement Units
                 </label>
-                <Select :modelValue="unitPref" @update:modelValue="onUnitsChange" :options="unitOptions" optionLabel="label" optionValue="value" class="setting-select ms-3" />
+                <Select input-id="map-settings-dialog-measurement-units" aria-labelledby="map-settings-dialog-measurement-units-label" :model-value="unitPref" :options="unitOptions" option-label="label" option-value="value" class="setting-select ms-3" @update:model-value="onUnitsChange" />
             </div>
 
         </div>
         <div class="d-flex justify-content-end mt-3" style="padding: 0 0.75rem;">
-            <Button @click="close" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="$emit('close')" />
         </div>
     </Window>
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
+import { fetchWmsLayers } from '@/libs/map/wmsCapabilities';
 
 export default {
     components: {
@@ -94,7 +94,7 @@ export default {
             default: () => null
         }
     },
-    emits: ['onClose'],
+    emits: ['close', 'basemapChanged', 'unitsChanged', 'customBasemapConfigChanged'],
 
     data: function () {
         const config = this.customBasemapConfig;
@@ -153,18 +153,9 @@ export default {
         }
     },
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
 
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
 
     methods: {
-        close: function () {
-            this.$emit('onClose');
-        },
 
         onBasemapChange: function (value) {
             this.$emit('basemapChanged', value);
@@ -184,7 +175,7 @@ export default {
             try {
                 const hostname = new URL(url).hostname;
                 return '&copy; ' + hostname;
-            } catch (e) {
+            } catch {
                 return '';
             }
         },
@@ -217,7 +208,7 @@ export default {
             this.customError = null;
 
             try {
-                const layers = await this.fetchWmsCapabilities(this.customUrl.trim());
+                const layers = await fetchWmsLayers(this.customUrl.trim());
                 this.wmsLayers = layers;
                 if (layers.length > 0) {
                     this.customLayerName = layers[0].name;
@@ -231,74 +222,6 @@ export default {
             }
         },
 
-        /**
-         * Fetch WMS GetCapabilities and return all layer names and titles
-         */
-        fetchWmsCapabilities: function (url) {
-            return new Promise((resolve, reject) => {
-                const separator = url.includes('?') ? '&' : '?';
-                const capUrl = url + separator + 'SERVICE=WMS&REQUEST=GetCapabilities';
-                const xhr = new XMLHttpRequest();
-                xhr.open('GET', capUrl, true);
-                xhr.timeout = 15000;
-                xhr.onload = () => {
-                    try {
-                        const parser = new DOMParser();
-                        const xml = parser.parseFromString(xhr.responseText, 'text/xml');
-
-                        // Check for parse errors
-                        if (xml.querySelector('parsererror')) {
-                            reject(new Error('Invalid XML response from WMS server.'));
-                            return;
-                        }
-
-                        const layers = [];
-                        // Find all Layer elements that have a Name child (queryable layers)
-                        const layerElements = xml.querySelectorAll('Layer');
-                        layerElements.forEach(el => {
-                            const nameEl = el.querySelector(':scope > Name');
-                            if (nameEl) {
-                                const titleEl = el.querySelector(':scope > Title');
-                                // Extract TIME dimension default value if present
-                                let defaultTime = '';
-                                const dims = el.querySelectorAll(':scope > Dimension');
-                                dims.forEach(dim => {
-                                    if ((dim.getAttribute('name') || '').toLowerCase() === 'time') {
-                                        defaultTime = dim.getAttribute('default') || '';
-                                        if (!defaultTime) {
-                                            // Fallback: use last value from extent text
-                                            const extent = (dim.textContent || '').trim();
-                                            if (extent) {
-                                                const parts = extent.split(',');
-                                                const last = parts[parts.length - 1].trim();
-                                                // Extract first ISO date from range (e.g. "2026-03-12T12:28:18Z/...")
-                                                defaultTime = last.split('/')[0];
-                                            }
-                                        }
-                                    }
-                                });
-                                layers.push({
-                                    name: nameEl.textContent,
-                                    title: titleEl ? titleEl.textContent : '',
-                                    defaultTime: defaultTime
-                                });
-                            }
-                        });
-
-                        if (layers.length > 0) {
-                            resolve(layers);
-                        } else {
-                            reject(new Error('No layers found in WMS capabilities.'));
-                        }
-                    } catch (e) {
-                        reject(new Error('Failed to parse WMS capabilities.'));
-                    }
-                };
-                xhr.onerror = () => reject(new Error('Could not connect to WMS server.'));
-                xhr.ontimeout = () => reject(new Error('WMS capabilities request timed out.'));
-                xhr.send();
-            });
-        },
 
         /**
          * Build a test URL for verifying the custom source is reachable
@@ -388,14 +311,10 @@ export default {
                 this.customLoading = false;
                 this.customError = null;
                 this.$emit('customBasemapConfigChanged', config);
-            } catch (e) {
+            } catch {
                 this.customLoading = false;
                 this.customError = 'Failed to load tiles. Please check the URL and try again.';
             }
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Escape') this.close();
         }
     }
 }

@@ -1,0 +1,81 @@
+// Splat viewer overlays: badges and the bottom-left buttons (HQ-08: out of Splat.vue; the
+// rail, the pad and the settings carry their own styles).
+#splat canvas {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    /* Let our pointer handlers own touch gestures (earth pan/orbit/pinch) on touch devices. */
+    touch-action: none;
+}
+
+#splat .top-right-stack {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    pointer-events: none;
+}
+
+#splat .crs-badge,
+#splat .camera-hud {
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--ddb-text-on-dark);
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--ddb-border-radius, 4px);
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+    white-space: nowrap;
+}
+
+#splat .camera-hud {
+    background: rgba(20, 60, 110, 0.7);
+}
+
+#splat .crs-badge i,
+#splat .camera-hud i {
+    margin-right: 0.35rem;
+}
+
+#splat .streaming-badge {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--ddb-text-on-dark);
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--ddb-border-radius, 4px);
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+}
+
+#splat .streaming-badge i {
+    margin-right: 0.35rem;
+}
+
+#splat .btn-stack {
+    position: absolute;
+    bottom: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    display: flex;
+    gap: 0.4rem;
+}
+
+#splat .btn-overlay {
+    width: 2.25rem;
+    height: 2.25rem;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--ddb-text-on-dark);
+    cursor: pointer;
+}
+
+#splat .btn-overlay:hover {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+#splat .btn-overlay.active {
+    background: rgba(40, 110, 190, 0.85);
+    color: var(--ddb-text-on-dark);
+}

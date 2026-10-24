@@ -4,24 +4,23 @@
         <div id="search-box">
             <IconField style="flex: 1; min-width: 0;">
                 <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" @keyup.enter="search()" placeholder="Search files" style="width: 100%;" />
+                <InputText v-model="filterRaw" placeholder="Search files" aria-label="Search files" style="width: 100%;" @keyup.enter="search()" />
             </IconField>
-            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" v-on:click="clearSearch()">
-                <i class="fa-solid fa-xmark"></i>
-            </div>
+            <Button v-if="filterRaw != null && filterRaw.length > 0" icon="fa-solid fa-xmark"
+                    title="Clear search" aria-label="Clear search" severity="secondary" text size="small"
+                    @click="clearSearch()" />
             <Button
                 :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
                 :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
+                :aria-label="sortDescending ? 'Sorted Z to A, sort A to Z' : 'Sorted A to Z, sort Z to A'"
                 severity="secondary" text size="small"
-                @click="toggleSortDirection"
                 style="flex-shrink: 0;"
+                @click="toggleSortDirection"
             />
         </div>
-        <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
-            :getChildren="getChildren" :canWrite="canWrite" ref="treeView" />
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
+                  :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
+        <LoadingSpinner v-if="loading" />
         <div v-if="!loading && noResults" class="no-results">
             No files found
         </div>
@@ -29,14 +28,13 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
-import TreeNode from './TreeNode.vue';
-import ContextMenu from '@/components/ContextMenu';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Button from 'primevue/button';
-import env from '@/dynamic/env';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
@@ -44,14 +42,18 @@ import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
+import { useRequestScope, isAbort } from '@/composables/useRequestScope';
+import { getPref, setPref, PREF } from '@/libs/preferences';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 const { pathutils } = ddb;
 
 export default {
     components: {
+        LoadingSpinner,
         TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    // Listings in flight are aborted when the browser goes away (HUB-06)
     inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {
@@ -67,6 +69,10 @@ export default {
             default: null
         }
     },
+    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    setup() {
+        return { requestSignal: useRequestScope().signal };
+    },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
         const self = this;
@@ -80,22 +86,6 @@ export default {
         };
 
         let contextMenu = [];
-
-        if (env.isElectron()) {
-            contextMenu = contextMenu.concat([{
-                label: "Open Item Location",
-                icon: 'fa-regular fa-folder-open',
-                isVisible: () => {
-                    return this.lastSelectedNode !== null;
-                },
-                click: () => {
-                    if (this.lastSelectedNode !== null) shell.showItemInFolder(this.lastSelectedNode.node.path);
-                }
-            }, {
-                type: 'separator'
-            }
-            ]);
-        }
 
         contextMenu = contextMenu.concat([
         {
@@ -129,7 +119,7 @@ export default {
             filter: null,
             searchStaticPaths: null,
             noResults: false,
-            sortDescending: localStorage.getItem('sortDescending') === 'true',
+            sortDescending: getPref(PREF.SORT_DESCENDING, false),
         };
     },
     watch: {
@@ -213,9 +203,13 @@ export default {
             }
         },
 
+        reportLoadError: function (e) {
+            this.$emit('error', isUnauthorized(e) ? "You are not allowed to perform this action" : e, "Load entries");
+        },
+
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
-            localStorage.setItem('sortDescending', this.sortDescending);
+            setPref(PREF.SORT_DESCENDING, this.sortDescending);
             // Watcher handles the refresh
         },
 
@@ -272,11 +266,7 @@ export default {
             } catch (e) {
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
 
                 this.nodes = [];
 
@@ -295,7 +285,8 @@ export default {
                     withHash: false,
                     recursive: true,
                     maxRecursionDepth: 1,
-                    stopOnError: false
+                    stopOnError: false,
+                    signal: this.requestSignal
                 });
 
                 var res = sortEntriesDirectoriesFirst(
@@ -317,13 +308,11 @@ export default {
                     });
                 return res;
             } catch (e) {
+                // The browser is gone: nobody waits for this listing
+                if (isAbort(e)) return [];
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
                 return [];
             }
 
@@ -341,7 +330,8 @@ export default {
 
                 try {
                     const entry = n.entry || (await ddb.fetchEntries(n.path, {
-                        withHash: false
+                        withHash: false,
+                        signal: this.requestSignal
                     }))[0];
 
                     this.nodes.push({
@@ -354,11 +344,7 @@ export default {
                         entry
                     });
                 } catch (e) {
-                    if (e.message == "Unauthorized") {
-                        this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                    } else {
-                        this.$emit('error', e, "Load entries");
-                    }
+                    this.reportLoadError(e);
                 }
             }
 
@@ -497,30 +483,6 @@ export default {
         text-align: left;
     }
 
-    #cancel {
-        cursor: pointer;
-        visibility: hidden;
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        padding-right: 0.5rem;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-
-        .icon {
-            margin: 0;
-        }
-    }
-
-    #src {
-        margin-left: 0.5rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-    }
 
     .no-results {
         text-align: center;

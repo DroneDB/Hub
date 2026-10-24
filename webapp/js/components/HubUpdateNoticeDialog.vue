@@ -1,15 +1,10 @@
 <template>
-    <Dialog :visible="visible"
-            @update:visible="onVisibleChange"
-            modal
-            header="DroneDB Hub updated"
-            :style="{ width: '480px' }"
-            :draggable="false"
-            :closable="true">
+    <Window id="hubUpdateNotice" title="DroneDB Hub updated" modal fixed-position fixed-size size-class="dialog-md"
+            @close="$emit('close')" @confirm="$emit('close')">
 
         <div class="hub-update-body">
             <p>
-                <i class="fas fa-circle-check text-success me-2"></i>
+                <i class="fas fa-circle-check text-success me-2" />
                 <span v-if="notice && notice.from && notice.to">
                     DroneDB Hub has been updated from
                     <b>{{ notice.from }}</b> to <b>{{ notice.to }}</b>.
@@ -22,19 +17,19 @@
             <p class="mb-2">Component versions on this server:</p>
             <ul class="component-list">
                 <li v-if="hubVersion">
-                    <i class="fab fa-vuejs me-2"></i>
+                    <i class="fab fa-vuejs me-2" />
                     <a :href="hubReleaseUrl" target="_blank" rel="noopener">
                         Hub <b>{{ hubVersion }}</b>
                     </a>
                 </li>
                 <li v-if="registryVersion">
-                    <i class="fas fa-server me-2"></i>
+                    <i class="fas fa-server me-2" />
                     <a :href="registryReleaseUrl" target="_blank" rel="noopener">
                         Registry <b>{{ registryVersion }}</b>
                     </a>
                 </li>
                 <li v-if="ddbVersion">
-                    <i class="fas fa-database me-2"></i>
+                    <i class="fas fa-database me-2" />
                     <a :href="ddbReleaseUrl" target="_blank" rel="noopener">
                         DroneDB <b>{{ ddbVersion }}</b>
                     </a>
@@ -43,13 +38,13 @@
         </div>
 
         <template #footer>
-            <Button label="OK" icon="fas fa-check" @click="dismiss" autofocus />
+            <Button label="OK" icon="fas fa-check" data-autofocus @click="$emit('close')" />
         </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 
 const RELEASE_BASE = {
@@ -64,13 +59,14 @@ const RELEASE_BASE = {
  * Displays the previous and new versions with links to the GitHub release
  * notes for Hub, Registry, and DroneDB.
  *
+ * Mounted while there is a notice; `close` when dismissed.
+ *
  * Props:
- *   visible - Controls dialog visibility.
  *   notice  - Update object with { from, to, at } strings.
  */
 export default {
     name: 'HubUpdateNoticeDialog',
-    components: { Dialog, Button },
+    components: { Window, Button },
     props: {
         notice: {
             type: Object,
@@ -81,16 +77,6 @@ export default {
         ddbVersion: { type: String, default: null }
     },
     emits: ['close'],
-    data() {
-        return {
-            visible: !!this.notice
-        };
-    },
-    watch: {
-        notice(val) {
-            this.visible = !!val;
-        }
-    },
     computed: {
         hubReleaseUrl() {
             return this.hubVersion ? RELEASE_BASE.hub + this.hubVersion : '#';
@@ -102,16 +88,6 @@ export default {
             return this.ddbVersion ? RELEASE_BASE.ddb + this.ddbVersion : '#';
         }
     },
-    methods: {
-        onVisibleChange(v) {
-            this.visible = v;
-            if (!v) this.$emit('close');
-        },
-        dismiss() {
-            this.visible = false;
-            this.$emit('close');
-        }
-    }
 };
 </script>
 
@@ -139,6 +115,6 @@ export default {
 }
 
 .text-success {
-    color: var(--p-green-500, #22c55e);
+    color: var(--p-green-500);
 }
 </style>

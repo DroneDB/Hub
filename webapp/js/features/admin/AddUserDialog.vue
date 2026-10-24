@@ -1,68 +1,61 @@
 <template>
-    <Window title="Add User" id="addUserDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="addUserDialog" title="Add User" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Add User" :confirm-disabled="!isFilled()" :busy="adding" @confirm="confirmAddUser()" @close="$emit('close')">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message v-model="error" />
 
-            <form v-on:submit.prevent v-bind:class="{ error: !!error }">
+            <form :class="{ error: !!error }" @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Username</label>
-                    <InputText ref="txtUsername" @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="username" placeholder="" class="w-100" />
+                    <label for="add-user-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
+                    <InputText id="add-user-dialog-username" ref="txtUsername" v-model="username" placeholder=""
+                               class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Email</label>
-                    <InputText @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="email" placeholder="user@example.com" class="w-100" />
+                    <label for="add-user-dialog-email" class="d-block mb-1 fw-semibold">Email</label>
+                    <InputText id="add-user-dialog-email" v-model="email" placeholder="user@example.com"
+                               class="w-100" @keydown="clearError()" />
                     <div v-if="email && !isEmailValid()" class="text-danger small">
                         Please enter a valid email address
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Password</label>
-                    <Password ref="txtPassword" @keydown="clearError()" @keyup.enter="confirmAddUser()"
-                        v-model="password" placeholder="" :feedback="false" toggleMask class="w-100" @input="onPasswordInput" />
+                    <label for="add-user-dialog-password" class="d-block mb-1 fw-semibold">Password</label>
+                    <Password ref="txtPassword" v-model="password" input-id="add-user-dialog-password" placeholder=""
+                              :feedback="false" toggle-mask class="w-100" @keydown="clearError()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && password" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
-                            :class="{ met: isRequirementMet(req) }">
+                               :class="{ met: isRequirementMet(req) }">
                             <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
                             {{ req }}
                         </small>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Roles</label>
-                    <MultiSelect v-model="roles" :options="roleOptions" optionLabel="label" optionValue="value" placeholder="Select roles" class="w-100" display="chip" />
+                    <label id="add-user-dialog-roles-label" for="add-user-dialog-roles" class="d-block mb-1 fw-semibold">Roles</label>
+                    <MultiSelect v-model="roles" input-id="add-user-dialog-roles" aria-labelledby="add-user-dialog-roles-label" :options="roleOptions" option-label="label" option-value="value" placeholder="Select roles" class="w-100" display="chip" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="adding" label="Close" />
-                <Button @click="confirmAddUser()" :disabled="adding || !isFilled()" :loading="adding"
-                    severity="primary" label="Add User" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
+import Message from '@/components/HubMessage.vue';
 import MultiSelect from 'primevue/multiselect';
 import InputText from 'primevue/inputtext';
 import Password from 'primevue/password';
-import Button from 'primevue/button';
-import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
 
 export default {
     components: {
-        Window, Message, MultiSelect, InputText, Password, Button, PrimeMessage
+        LoadingSpinner,
+        Window, Message, MultiSelect, InputText, Password
     },
     props: {
         availableRoles: {
@@ -70,7 +63,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -93,13 +86,10 @@ export default {
     },
     mounted: function () {
         // Load password policy from features
-        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+        this.passwordPolicy = reg.features.value(Features.PASSWORD_POLICY);
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
-        close: function () {
-            this.$emit('onClose');
-        },
         clearError: function () {
             this.error = "";
         },
@@ -145,12 +135,12 @@ export default {
 
             this.adding = true;
             try {
-                const user = await reg.addUser(this.username, this.password, this.roles, this.email);
-                this.$toast.add({ severity: 'success', summary: 'User Added', detail: `User "${this.username}" created successfully`, life: 3000 });
+                const user = await reg.admin.addUser(this.username, this.password, this.roles, this.email);
+                this.$notify.success(`User "${this.username}" created successfully`, { summary: 'User Added' });
                 this.adding = false;
-                this.$emit('onClose', user);
+                this.$emit('close', user);
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to add user: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to add user: ' + e.message);
                 this.error = e.message;
                 this.adding = false;
             }

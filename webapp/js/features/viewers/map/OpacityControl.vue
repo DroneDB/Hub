@@ -1,11 +1,11 @@
 <template>
-    <div class="opacity-control" v-if="visible">
-        <i class="fa-solid fa-adjust"></i>
-        <input type="range" min="0" max="1" step="0.05" :value="modelValue" @input="$emit('update:modelValue', parseFloat($event.target.value))" title="Layer opacity">
+    <div v-if="visible" class="opacity-control">
+        <i class="fa-solid fa-adjust" />
+        <input type="range" min="0" max="1" step="0.05" :value="modelValue" title="Layer opacity" aria-label="Layer opacity" @input="$emit('update:modelValue', parseFloat($event.target.value))">
         <span class="opacity-value">{{ Math.round(modelValue * 100) }}%</span>
         <button v-if="showPlantHealthBtn" class="ph-btn" :class="{ active: plantHealthActive }"
-                title="Plant Health" @click.stop="$emit('plant-health')">
-            <i class="fa-solid fa-leaf"></i>
+                title="Plant Health" aria-label="Plant Health" @click.stop="$emit('plant-health')">
+            <i class="fa-solid fa-leaf" />
         </button>
     </div>
 </template>
@@ -82,10 +82,10 @@ export default {
 }
 
 .ph-btn:hover {
-    color: #fff;
+    color: var(--ddb-text-on-color);
 }
 
 .ph-btn.active {
-    color: #7bc67e;
+    color: var(--ddb-map-control-active);
 }
 </style>

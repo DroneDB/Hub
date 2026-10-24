@@ -1,5 +1,5 @@
 <template>
-    <div class="raster-opacity-panel" v-if="layers && layers.length > 1">
+    <div v-if="layers && layers.length > 1" class="raster-opacity-panel">
         <div v-for="(layer, index) in layers" :key="layer.path" class="raster-opacity-row">
             <span class="raster-label" :title="layer.name">{{ truncate(layer.name) }}</span>
             <input
@@ -8,31 +8,32 @@
                 max="1"
                 step="0.05"
                 :value="layer.opacity"
-                @input="onInput(layer, $event)"
                 :title="'Opacity: ' + Math.round(layer.opacity * 100) + '%'"
-            />
+                :aria-label="'Opacity of ' + layer.name"
+                @input="onInput(layer, $event)"
+            >
             <span class="opacity-value">{{ Math.round(layer.opacity * 100) }}%</span>
             <button v-if="layer.plantHealthCapable" class="ph-btn"
                     :class="{ active: activePlantHealthPath === layer.path }"
-                    title="Plant Health"
+                    title="Plant Health" aria-label="Plant Health"
                     @click.stop="$emit('plant-health', layer.path)">
-                <i class="fa-solid fa-leaf"></i>
+                <i class="fa-solid fa-leaf" />
             </button>
             <div class="order-buttons">
                 <button
                     class="order-btn"
                     :class="{ 'order-btn--hidden': index === 0 }"
                     :disabled="index === 0"
-                    @click="index > 0 && onReorder(index, index - 1)"
                     title="Move layer up"
-                ><i class="fa-solid fa-chevron-up"></i></button>
+                    @click="index > 0 && onReorder(index, index - 1)"
+                ><i class="fa-solid fa-chevron-up" /></button>
                 <button
                     class="order-btn"
                     :class="{ 'order-btn--hidden': index === layers.length - 1 }"
                     :disabled="index === layers.length - 1"
+                    title="Move layer down" aria-label="Move layer down"
                     @click="index < layers.length - 1 && onReorder(index, index + 1)"
-                    title="Move layer down"
-                ><i class="fa-solid fa-chevron-down"></i></button>
+                ><i class="fa-solid fa-chevron-down" /></button>
             </div>
         </div>
     </div>
@@ -101,7 +102,7 @@ export default {
     text-overflow: ellipsis;
     white-space: nowrap;
     opacity: 0.85;
-    font-size: var(--ddb-font-size-sm, 0.7rem);
+    font-size: var(--ddb-font-size-sm);
 }
 
 .raster-opacity-row input[type="range"] {
@@ -162,10 +163,10 @@ export default {
 }
 
 .ph-btn:hover {
-    color: #fff;
+    color: var(--ddb-text-on-color);
 }
 
 .ph-btn.active {
-    color: #7bc67e;
+    color: var(--ddb-map-control-active);
 }
 </style>

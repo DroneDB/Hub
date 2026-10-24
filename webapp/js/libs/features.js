@@ -10,5 +10,8 @@ export const Features = {
     DATASET_THUMBNAIL_CANDIDATES: 'datasetThumbnailCandidates',
     MAX_EXPORT_SIZE_BYTES: 'maxExportSizeBytes',
     DISABLE_ANONYMOUS_BULK_DOWNLOADS: 'disableAnonymousBulkDownloads',
-    BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES: 'bulkDownloadAsyncThresholdBytes'
+    BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES: 'bulkDownloadAsyncThresholdBytes',
+    // What libddb does with each entry type, and the archives the server extracts (D8, XI-04)
+    ENTRY_TYPES: 'entryTypes',
+    ARCHIVE_EXTENSIONS: 'archiveExtensions'
 };

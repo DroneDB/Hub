@@ -1,15 +1,16 @@
 <template>
-    <div class="tree-view" ref="treeView"
-        tabindex="0"
-        :class="{ dropping }"
-        @keydown="onKeyDown"
-        @drop="explorerDropHandler($event)"
-        @dragenter="explorerDragEnter($event)"
-        @dragleave="explorerDragLeave($event)"
-        @dragover.prevent>
-        <TreeNode v-for="(node, index) in nodes" :node="node" :key="node.path + ',' + index" ref="treeNodes"
-            :canWrite="canWrite"
-            @selected="handleSelection" @opened="handleOpen" :getChildren="getChildren" />
+    <div ref="treeView" class="tree-view"
+         tabindex="0" role="tree" aria-label="Folders" aria-multiselectable="true"
+         :aria-activedescendant="focusedNode ? focusedNode.domId : undefined"
+         :class="{ dropping }"
+         @keydown="onKeyDown"
+         @drop="explorerDropHandler($event)"
+         @dragenter="explorerDragEnter($event)"
+         @dragleave="explorerDragLeave($event)"
+         @dragover.prevent>
+        <TreeNode v-for="(node, index) in nodes" :key="node.path + ',' + index" ref="treeNodes" :node="node"
+                  :can-write="canWrite"
+                  :get-children="getChildren" @selected="handleSelection" @opened="handleOpen" />
     </div>
 </template>
 
@@ -17,18 +18,28 @@
 import TreeNode from './TreeNode.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
-import { dragDropMixin } from '@/libs/dragDropUtils';
+import { requestMove } from '@/libs/dragDropUtils';
 import emitter from '@/libs/eventBus';
 import ddb from 'ddb';
 import { isPathRemoved } from './treeSelection';
+import { useDragDrop } from '@/composables/useDragDrop';
 const { pathutils } = ddb;
 
 export default {
     components: {
         TreeNode
     },
-    mixins: [dragDropMixin],
-    emits: ['opened', 'selectionChanged'],
+    provide: function () {
+        // Nodes register themselves, so the tree listens to the file-system events once
+        // (instead of every node subscribing to the global bus)
+        return {
+            treeRegistry: {
+                add: node => this._nodes.add(node),
+                remove: node => this._nodes.delete(node),
+                moveSelected: (destItem, primaryPath) => this.moveSelected(destItem, primaryPath)
+            }
+        };
+    },
     props: {
         nodes: {
             type: Array,
@@ -38,7 +49,7 @@ export default {
             type: Function,
             required: true
         },
-        // dragDropMixin contract
+        // useDragDrop() contract
         canWrite: {
             type: Boolean,
             default: false
@@ -50,13 +61,19 @@ export default {
             default: null
         }
     },
+    emits: ['opened', 'selectionChanged'],
+    setup(props) {
+        return useDragDrop(props);
+    },
     data() {
         return {
-            dropping: false,
             focusedNode: null
         };
     },
 
+    created: function () {
+        this._nodes = new Set();
+    },
     mounted: function () {
         this.selectedNodes = [];
         this.rangeStartNode = null;
@@ -68,13 +85,35 @@ export default {
             this.selectedNodes = this.selectedNodes.filter(n => !removed(n));
             if (this.rangeStartNode && removed(this.rangeStartNode)) this.rangeStartNode = null;
             if (this.focusedNode && removed(this.focusedNode)) this.focusedNode = null;
+            for (const node of this._nodes) node.removeChildren(deleted);
+        };
+        this._onAddItems = items => {
+            for (const node of this._nodes) node.addItems(items);
+        };
+        this._onFolderOpened = tree => {
+            for (const node of this._nodes) node.openFromTree(tree);
         };
         emitter.on('deleteEntries', this._onDeleteEntries);
+        emitter.on('addItems', this._onAddItems);
+        emitter.on('folderOpened', this._onFolderOpened);
     },
     beforeUnmount: function () {
         emitter.off('deleteEntries', this._onDeleteEntries);
+        emitter.off('addItems', this._onAddItems);
+        emitter.off('folderOpened', this._onFolderOpened);
     },
     methods: {
+        // Drop of a node onto `destItem`: the other selected nodes move too
+        moveSelected: function (destItem, primaryPath) {
+            for (const node of this._nodes) {
+                if (!node.selected) continue;
+                node.selected = false;
+                // The dragged node itself was already moved by its drop handler
+                if (node.node.entry.path === primaryPath) continue;
+                requestMove(this.datasetDrop, node.node, destItem);
+            }
+        },
+
         handleOpen: function (component, sender) {
             if (!component) return;
             this.$emit("opened", component, sender);
@@ -182,6 +221,10 @@ export default {
             const tag = e.target && e.target.tagName ? e.target.tagName.toLowerCase() : '';
             if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
+            if (e.key === 'Enter') {
+                if (this.focusedNode) this.focusedNode.handleOpenDblClick(e);
+                return;
+            }
             if (['ArrowDown', 'ArrowUp', 'ArrowRight', 'ArrowLeft'].indexOf(e.key) === -1) return;
 
             const visible = this.buildVisibleNodes();

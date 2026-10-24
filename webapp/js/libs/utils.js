@@ -33,7 +33,7 @@ export function queryParams(location) {
 export function inIframe() {
     try {
         return window.self !== window.top;
-    } catch (e) {
+    } catch {
         return true;
     }
 }
@@ -122,7 +122,7 @@ export function requestFullScreen(element) {
     if (requestMethod) { // Native full screen.
         requestMethod.call(element);
     } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
-        var wscript = new ActiveXObject("WScript.Shell");
+        var wscript = new window.ActiveXObject("WScript.Shell");
         if (wscript !== null) {
             wscript.SendKeys("{F11}");
         }

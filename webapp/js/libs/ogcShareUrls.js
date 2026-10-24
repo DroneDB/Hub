@@ -26,8 +26,27 @@
  */
 
 import ddb from 'ddb';
+import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 
 const TYPE = ddb.entry.type;
+
+/**
+ * Build artifact a desktop GIS (QGIS) can stream directly, by entry type. Other
+ * types have none and are downloaded instead.
+ */
+const STREAMABLE_ARTIFACT_ROLES = Object.freeze({
+    [TYPE.POINTCLOUD]: ArtifactRole.POINTCLOUD_COPC,
+    [TYPE.GEORASTER]: ArtifactRole.RASTER_COG,
+    [TYPE.VECTOR]: ArtifactRole.VECTOR_GPKG
+});
+
+/**
+ * @param {number} entryType
+ * @returns {string|null} the ArtifactRole to stream, or null when the type has none
+ */
+export function streamableArtifactRole(entryType) {
+    return STREAMABLE_ARTIFACT_ROLES[entryType] ?? null;
+}
 
 const NA_OGC_API_FOLDER =
     'OGC API endpoints are not available for folder scoping. ' +

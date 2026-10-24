@@ -1,34 +1,35 @@
 <template>
-    <Window :title="title" id="feature-info" @onClose="close('close')" modal closeModalOnClick maxWidth="70%" fixedSize>
+    <Window id="feature-info" :title="title" modal close-modal-on-click max-width="70%" fixed-size @close="$emit('close', 'close')">
         <div class="feature-info-content">
             <template v-for="(categoryProps, category) in categorizedProperties" :key="category">
-            <div class="category-section" v-if="categoryProps && Object.keys(categoryProps).length > 0">
-                <h3 class="category-title">{{ category }}</h3>
-                <table class="properties-table">
-                    <tr v-for="(value, key) in categoryProps" :key="key">
-                        <td class="property-name">{{ key }}</td>
-                        <td class="property-value">
-                            <div class="empty-value" v-if="value === null || value === undefined"><i>(Empty)</i></div>
-                            <div class="date-value" v-else-if="isDateString(value)">{{ formatDate(value) }}</div>
-                            <ObjTable v-else-if="isComplex(value)" :obj="parseComplexValue(value)"></ObjTable>
-                            <div class="plain-value" v-else>{{ value }}</div>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+                <div v-if="categoryProps && Object.keys(categoryProps).length > 0" class="category-section">
+                    <h3 class="category-title">{{ category }}</h3>
+                    <table class="properties-table">
+                        <tr v-for="(value, key) in categoryProps" :key="key">
+                            <td class="property-name">{{ key }}</td>
+                            <td class="property-value">
+                                <div v-if="value === null || value === undefined" class="empty-value"><i>(Empty)</i></div>
+                                <div v-else-if="isDateString(value)" class="date-value">{{ formatDate(value) }}</div>
+                                <ObjTable v-else-if="isComplex(value)" :obj="parseComplexValue(value)" />
+                                <div v-else class="plain-value">{{ value }}</div>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
             </template>
         </div>
 
         <div class="text-end mt-3">
-            <Button @click="close('close')" severity="secondary" label="Close" />
+            <Button severity="secondary" label="Close" @click="$emit('close', 'close')" />
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import ObjTable from '@/components/ObjTable.vue';
+import Window from '@/components/HubWindow.vue';
+import ObjTable from '@/features/viewers/map/ObjTable.vue';
 import Button from 'primevue/button';
+import { formatDateTime } from '@/libs/format';
 
 export default {
     components: {
@@ -47,7 +48,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -99,9 +100,6 @@ export default {
     },
 
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
 
         formatValue: function(value) {
             if (value === null || value === undefined) {
@@ -126,7 +124,7 @@ export default {
                     try {
                         const parsed = JSON.parse(value);
                         return typeof parsed === 'object' && parsed !== null;
-                    } catch (e) {
+                    } catch {
                         // Not valid JSON
                         return false;
                     }
@@ -144,7 +142,7 @@ export default {
             if (typeof value === 'string') {
                 try {
                     return JSON.parse(value);
-                } catch (e) {
+                } catch {
                     console.warn('Failed to parse complex value:', value);
                     return value;
                 }
@@ -167,16 +165,8 @@ export default {
             return false;
         },
 
-        formatDate: function(dateString) {
-            const date = new Date(dateString);
-            return new Intl.DateTimeFormat(undefined, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit'
-            }).format(date);
+        formatDate(value) {
+            return formatDateTime(value, { seconds: true });
         }
     }
 }

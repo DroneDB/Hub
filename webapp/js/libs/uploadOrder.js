@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { pathutils } from 'ddb';
+
 /**
  * uploadOrder - best-effort ordering of files queued for upload.
  *
@@ -16,9 +18,7 @@ const MODEL_EXTENSIONS = new Set(['obj', 'ply', 'gltf', 'glb']);
 
 function isModelFile(file) {
     const name = file && typeof file.name === 'string' ? file.name : '';
-    const dot = name.lastIndexOf('.');
-    if (dot <= 0 || dot === name.length - 1) return false;
-    return MODEL_EXTENSIONS.has(name.substring(dot + 1).toLowerCase());
+    return MODEL_EXTENSIONS.has(pathutils.extname(name).slice(1));
 }
 
 /**

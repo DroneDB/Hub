@@ -2,11 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-const { DEFAULT_REGISTRY } = require('./constants');
+import { DEFAULT_REGISTRY } from './constants';
 const TagComponentInvalidChars = /[^a-z0-9_-]/g;
 const TagComponentValid = /^[a-z0-9][a-z0-9_-]{1,128}$/;
 
-module.exports = class Tag {
+export default class Tag {
 
     /*
     A tag name must be valid ASCII and may contain lowercase

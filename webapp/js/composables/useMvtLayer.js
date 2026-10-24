@@ -137,7 +137,7 @@ export function createMvtVectorLayer({ urlTemplate, styleFunction, useMarkRaw = 
  */
 export async function fetchMvtMetadata(ddbEntry) {
     try {
-        const resp = await fetch(ddbEntry.getMvtMetadataUrl());
+        const resp = await ddbEntry.dataset.registry.fetchRaw(ddbEntry.getMvtMetadataUrl());
         if (!resp.ok) return { maxZoom: 18, bounds: null };
         const meta = await resp.json();
         return {

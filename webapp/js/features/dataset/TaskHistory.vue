@@ -3,52 +3,52 @@
         <div class="filters">
             <div class="filter-bar">
                 <div class="d-flex gap-2 align-items-center flex-wrap">
-                    <Select v-model="selectedState" :options="stateOptions" optionLabel="label" optionValue="value"
-                        placeholder="All States" @change="onFilterChange" />
-                    <Select v-model="selectedTool" :options="toolFilterOptions" optionLabel="label" optionValue="value"
-                        placeholder="All Tools" @change="onFilterChange" />
-                    <Button @click="refreshData" icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary"
-                        :loading="loading" />
+                    <Select v-model="selectedState" aria-label="Filter by state" :options="stateOptions" option-label="label" option-value="value"
+                            placeholder="All States" @change="onFilterChange" />
+                    <Select v-model="selectedTool" aria-label="Filter by tool" :options="toolFilterOptions" option-label="label" option-value="value"
+                            placeholder="All Tools" @change="onFilterChange" />
+                    <Button icon="fa-solid fa-arrows-rotate" label="Refresh" severity="secondary" :loading="loading"
+                            @click="refreshData" />
                     <span v-if="showPhotogrammetryButton" class="d-inline-block"
-                        :title="photogrammetryGatingDisabled ? photogrammetryDisabledMsg : ''">
-                        <Button severity="success" @click="openPhotogrammetryDialog"
-                            :disabled="photogrammetryGatingDisabled"
-                            icon="fa-solid fa-camera" label="Run Photogrammetry" />
+                          :title="photogrammetryGatingDisabled ? photogrammetryDisabledMsg : ''">
+                        <Button severity="success" :disabled="photogrammetryGatingDisabled"
+                                icon="fa-solid fa-camera"
+                                label="Run Photogrammetry" @click="openPhotogrammetryDialog" />
                     </span>
-                    <Button severity="danger" @click="showClearDialog" :disabled="concludedCount === 0"
-                        icon="fa-solid fa-trash" label="Clear Concluded" />
+                    <Button severity="danger" :disabled="concludedCount === 0" icon="fa-solid fa-trash"
+                            label="Clear Concluded" @click="showClearDialog" />
                 </div>
             </div>
         </div>
 
         <div class="content">
             <TasksTable :tasks="filteredTasks" :tools="tools" :loading="loading" :rows="pageSize"
-                :total-items="filteredTasks.length"
-                :current-page-first="currentPageFirst"
-                :downloading-task-id="downloadingTaskId"
-                empty-message="No processing tasks have been run for this dataset yet."
-                @view-log="openLog" @download-result="downloadResult"
-                @cancel="cancelTask" @retry="retryTask" @delete="deleteTask"
-                @page-reset="onPageReset" />
+                        :total-items="filteredTasks.length"
+                        :current-page-first="currentPageFirst"
+                        :downloading-task-id="downloadingTaskId"
+                        empty-message="No processing tasks have been run for this dataset yet."
+                        @view-log="openLog" @download-result="downloadResult"
+                        @cancel="cancelTask" @retry="retryTask" @delete="deleteTask"
+                        @page-reset="onPageReset" />
         </div>
 
         <!-- Standalone paginator (outside scrollable area, hidden when < 10 items) -->
         <div v-if="filteredTasks.length >= 10" class="paginator-wrapper">
-            <Paginator :rows="pageSize" :totalRecords="filteredTasks.length" :first="currentPageFirst"
-                @page="onPageChange" :rowsPerPageOptions="[10, 20, 25, 50, 100]"
-                paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown" />
+            <Paginator :rows="pageSize" :total-records="filteredTasks.length" :first="currentPageFirst"
+                       :rows-per-page-options="[10, 20, 25, 50, 100]" paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
+                       @page="onPageChange" />
         </div>
 
         <!-- Photogrammetry launcher -->
-        <Dialog v-model:visible="photogrammetryDialogOpen" modal header="Run Photogrammetry (NodeODX)"
-            :style="{ width: '52rem' }">
+        <Window id="photogrammetry" v-model:visible="photogrammetryDialogOpen" modal title="Run Photogrammetry (NodeODX)"
+                fixed-position width="52rem" max-width="95vw" height="auto">
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
+                <label for="task-history-image-folder" class="d-block mb-1"><strong>Image folder</strong> <span class="muted">(optional)</span></label>
                 <div class="d-flex gap-2">
-                    <InputText v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
-                        placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
-                    <Button @click="openImageFolderPicker" icon="fa-regular fa-folder-open"
-                        severity="secondary" title="Browse dataset" />
+                    <InputText id="task-history-image-folder" v-model="photogrammetryForm.folder" class="flex-grow-1" style="min-width: 0"
+                               placeholder="Leave empty to use dataset root" @input="folderPathError = ''" />
+                    <Button icon="fa-regular fa-folder-open" severity="secondary"
+                            title="Browse dataset" aria-label="Browse dataset" @click="openImageFolderPicker" />
                 </div>
                 <small v-if="folderPathError" class="error-text d-block">{{ folderPathError }}</small>
                 <small v-else class="muted">All images under this folder will be processed.</small>
@@ -56,10 +56,10 @@
 
             <!-- Processing node: dropdown when several are configured, details for a single one -->
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Processing node</strong></label>
-                <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId"
-                    :options="photogrammetryNodes" optionLabel="label" optionValue="value"
-                    class="w-100" @change="onNodeChanged" />
+                <label id="task-history-processing-node-label" for="task-history-processing-node" class="d-block mb-1"><strong>Processing node</strong></label>
+                <Select v-if="photogrammetryNodes.length > 1" v-model="photogrammetryForm.nodeId" input-id="task-history-processing-node" aria-labelledby="task-history-processing-node-label"
+                        :options="photogrammetryNodes" option-label="label" option-value="value"
+                        class="w-100" @change="onNodeChanged" />
                 <div v-else-if="photogrammetryNodes.length === 1" class="pg-node-details">
                     <div><strong>{{ photogrammetryNodes[0].title }}</strong></div>
                     <div class="muted">ID: {{ photogrammetryNodes[0].id }}</div>
@@ -72,7 +72,7 @@
                     <template v-if="nodeStatus.reachable">
                         Node reachable - {{ nodeStatus.taskQueueCount }} task(s) queued,
                         max {{ nodeStatus.maxParallelTasks }} parallel.<span v-if="nodeStatus.engine">
-                        Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
+                            Engine: {{ nodeStatus.engine }}<span v-if="nodeStatus.engineVersion"> {{ nodeStatus.engineVersion }}</span>.</span>
                     </template>
                     <template v-else>
                         Node unreachable: {{ nodeStatus.errorMessage }}
@@ -80,61 +80,61 @@
                 </PrimeMessage>
             </div>
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
-                <InputText v-model="photogrammetryForm.name" class="w-100" placeholder="Auto-generated" />
+                <label for="task-history-task-name" class="d-block mb-1"><strong>Task name</strong> <span class="muted">(optional)</span></label>
+                <InputText id="task-history-task-name" v-model="photogrammetryForm.name" class="w-100" placeholder="Auto-generated" />
             </div>
             <!-- Processing profile -->
             <div class="mb-3">
-                <label class="d-block mb-1"><strong>Processing profile</strong></label>
-                <Select v-model="photogrammetryForm.preset"
-                    :options="odmPresetOptions" optionLabel="label" optionValue="id"
-                    class="w-100" />
+                <label id="task-history-processing-profile-label" for="task-history-processing-profile" class="d-block mb-1"><strong>Processing profile</strong></label>
+                <Select v-model="photogrammetryForm.preset" input-id="task-history-processing-profile" aria-labelledby="task-history-processing-profile-label"
+                        :options="odmPresetOptions" option-label="label" option-value="id"
+                        class="w-100" />
                 <small class="d-block muted mt-1">{{ selectedPreset.description }}</small>
             </div>
 
             <!-- Options editor (non-custom presets) -->
             <template v-if="photogrammetryForm.preset !== 'custom'">
                 <OdxOptionsEditor v-if="availableOdmOptions.length > 0"
-                    ref="odmEditor"
-                    v-model="customOptions"
-                    :available-options="availableOdmOptions"
-                    :preset-options="selectedPreset.options" class="mb-3" />
+                                  ref="odmEditor"
+                                  v-model="customOptions"
+                                  :available-options="availableOdmOptions"
+                                  :preset-options="selectedPreset.options" class="mb-3" />
                 <div v-if="customOptions.length > 0" class="mb-3 pg-preset-tags">
-                    <label class="d-block mb-1"><strong>Customized options ({{ customOptions.length }})</strong></label>
+                    <strong class="d-block mb-1">Customized options ({{ customOptions.length }})</strong>
                     <div class="d-flex flex-wrap gap-1">
-                        <span v-for="opt in customOptions" :key="opt.name"
-                            class="pg-option-chip pg-option-chip-clickable"
-                            @click="scrollToPresetOption(opt.name)"
-                            title="Click to scroll to option">
+                        <button v-for="opt in customOptions" :key="opt.name" type="button"
+                                class="btn-reset pg-option-chip pg-option-chip-clickable"
+                                title="Go to this option"
+                                @click="scrollToPresetOption(opt.name)">
                             {{ opt.name }}: {{ opt.value }}
-                        </span>
+                        </button>
                     </div>
                 </div>
             </template>
 
             <!-- Custom JSON (only when Custom preset is selected) -->
             <div v-if="photogrammetryForm.preset === 'custom'" class="mb-2">
-                <label class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
-                <Textarea v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
-                    placeholder='[{"name":"fast-orthophoto","value":true},{"name":"dsm","value":true}]' />
+                <label for="task-history-options" class="d-block mb-1"><strong>Options</strong> <span class="muted">(JSON array)</span></label>
+                <Textarea id="task-history-options" v-model="photogrammetryForm.optionsText" class="w-100" rows="5"
+                          placeholder="[{&quot;name&quot;:&quot;fast-orthophoto&quot;,&quot;value&quot;:true},{&quot;name&quot;:&quot;dsm&quot;,&quot;value&quot;:true}]" />
             </div>
             <small v-if="optionsError" class="error-text">{{ optionsError }}</small>
 
             <!-- Output destination -->
             <div class="mb-3">
                 <Checkbox v-model="photogrammetryForm.createNewDataset" :binary="true"
-                    input-id="pg-create-new-dataset" />
+                          input-id="pg-create-new-dataset" />
                 <label for="pg-create-new-dataset" class="d-inline-block ms-2"><strong>Create new dataset for results</strong></label>
                 <small class="d-block muted mt-1">If unchecked, results are extracted into a folder in this dataset.</small>
             </div>
 
             <div v-if="!photogrammetryForm.createNewDataset" class="mb-3">
-                <label class="d-block mb-1"><strong>Output folder</strong></label>
+                <label for="task-history-output-folder" class="d-block mb-1"><strong>Output folder</strong></label>
                 <div class="d-flex gap-2">
-                    <InputText v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
-                        placeholder="photogrammetry_output" @input="destPathError = ''" />
-                    <Button @click="openOutputFolderPicker" icon="fa-regular fa-folder-open"
-                        severity="secondary" title="Browse dataset" />
+                    <InputText id="task-history-output-folder" v-model="photogrammetryForm.destPath" class="flex-grow-1" style="min-width: 0"
+                               placeholder="photogrammetry_output" @input="destPathError = ''" />
+                    <Button icon="fa-regular fa-folder-open" severity="secondary"
+                            title="Browse dataset" aria-label="Browse dataset" @click="openOutputFolderPicker" />
                 </div>
                 <small v-if="destPathError" class="error-text d-block">{{ destPathError }}</small>
                 <small v-else class="muted">Extracted files will be placed in this folder.</small>
@@ -142,104 +142,66 @@
 
             <template v-if="photogrammetryForm.createNewDataset">
                 <div class="mb-3">
-                    <label class="d-block mb-1"><strong>New dataset name</strong></label>
-                    <InputText v-model="photogrammetryForm.newDatasetName" class="w-100"
-                        placeholder="photogrammetry-results" />
+                    <label for="task-history-new-dataset-name" class="d-block mb-1"><strong>New dataset name</strong></label>
+                    <InputText id="task-history-new-dataset-name" v-model="photogrammetryForm.newDatasetName" class="w-100"
+                               placeholder="photogrammetry-results" />
                     <small class="muted">Kebab-case slug, max 128 chars.</small>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1"><strong>Visibility</strong></label>
-                    <Select v-model="photogrammetryForm.newDatasetVisibility"
-                        :options="visibilityOptions" optionLabel="label" optionValue="value"
-                        class="w-100" />
+                    <label id="task-history-visibility-label" for="task-history-visibility" class="d-block mb-1"><strong>Visibility</strong></label>
+                    <Select v-model="photogrammetryForm.newDatasetVisibility" input-id="task-history-visibility" aria-labelledby="task-history-visibility-label"
+                            :options="visibilityOptions" option-label="label" option-value="value"
+                            class="w-100" />
                 </div>
             </template>
 
             <template #footer>
                 <Button label="Cancel" severity="secondary" @click="photogrammetryDialogOpen = false" />
                 <Button label="Check Node" icon="fa-solid fa-heart-pulse" severity="secondary"
-                    :loading="checkingNode" @click="checkNode" />
+                        :loading="checkingNode" @click="checkNode" />
                 <Button label="Start" icon="fa-solid fa-play" :loading="submitting" @click="submitPhotogrammetry" />
             </template>
-        </Dialog>
+        </Window>
 
         <!-- Log viewer -->
         <TaskLogDialog v-model:visible="logDialogOpen" :title="logTaskTitle" :log-text="logText"
-            :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
+                       :is-active="logTask && isActive(logTask.state)" @refresh="refreshLog" />
 
-        <ConfirmDialog v-if="clearDialogOpen"
-            title="Clear Concluded Tasks"
-            :message="`Delete all concluded tasks?<br/><strong>${concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`"
-            confirmText="Clear" cancelText="Cancel" confirmButtonClass="danger"
-            warningTitle="Warning" warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
-            @onClose="handleClearDialogClose">
-        </ConfirmDialog>
-
-        <!-- Invalid path error (#5) -->
-        <ConfirmDialog v-if="errorDialogOpen"
-            title="Invalid path"
-            :message="errorDialogMessage"
-            confirmText="OK" cancelText="Close" confirmButtonClass="primary"
-            @onClose="errorDialogOpen = false">
-        </ConfirmDialog>
-
-        <!-- Unreachable node confirmation before starting (#6) -->
-        <ConfirmDialog v-if="unreachableConfirmOpen"
-            title="Processing node unreachable"
-            :message="`The selected processing node did not respond${nodeStatus && nodeStatus.errorMessage ? ` (${nodeStatus.errorMessage})` : ''}.<br/>Do you want to start the task anyway?`"
-            confirmText="Start anyway" cancelText="Cancel" confirmButtonClass="primary"
-            warningTitle="Warning" warningMessage="The task may fail immediately if the node is offline."
-            @onClose="handleUnreachableConfirmClose">
-        </ConfirmDialog>
-
-        <!-- Cancel task confirmation -->
-        <ConfirmDialog v-if="cancelDialogOpen"
-            title="Cancel Task"
-            :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, tools)}</strong>${cancellingTask.path ? ' (path: ' + cancellingTask.path + ')' : ''} will be stopped.`"
-            confirmText="Cancel Task" cancelText="Don't Cancel" confirmButtonClass="danger"
-            @onClose="handleCancelDialogClose">
-        </ConfirmDialog>
-
-        <!-- Delete task confirmation -->
-        <ConfirmDialog v-if="deleteDialogOpen"
-            title="Delete Task"
-            :message="`Permanently delete this concluded task from the history?<br/><strong>${toolTitle(deletingTask.toolId, tools)}</strong> will be removed together with any downloadable results it produced.`"
-            confirmText="Delete" cancelText="Cancel" confirmButtonClass="danger"
-            warningTitle="Warning"
-            warningMessage="This action cannot be undone. Any task results still available for download will be deleted."
-            @onClose="handleDeleteDialogClose">
-        </ConfirmDialog>
+        <DialogHost :dialogs="dialogs" />
 
         <!-- Folder picker for output folder -->
         <FolderPicker v-if="outputFolderPickerOpen" :dataset="dataset" mode="folder"
-            :initialPath="photogrammetryForm.destPath || ''" title="Select output folder"
-            @onClose="handleOutputFolderPickerClose" />
+                      :initial-path="photogrammetryForm.destPath || ''" title="Select output folder"
+                      @close="handleOutputFolderPickerClose" />
 
         <!-- Folder picker for image folder -->
         <FolderPicker v-if="imageFolderPickerOpen" :dataset="dataset" mode="folder"
-            :initialPath="photogrammetryForm.folder || ''" title="Select image folder"
-            @onClose="handleImageFolderPickerClose" />
+                      :initial-path="photogrammetryForm.folder || ''" title="Select image folder"
+                      @close="handleImageFolderPickerClose" />
     </div>
 </template>
 
 <script>
-import useHeavyTask from '@/composables/useHeavyTask';
-import useTaskFormatting from '@/composables/useTaskFormatting';
-import emitter from '@/libs/eventBus';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DialogHost from '@/components/DialogHost.vue';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
+import { escapeHtml } from '@/libs/sanitize';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import Dialog from 'primevue/dialog';
+import Window from '@/components/HubWindow.vue';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
 import Checkbox from 'primevue/checkbox';
 import PrimeMessage from 'primevue/message';
-import OdxOptionsEditor from '@/components/OdxOptionsEditor.vue';
+import OdxOptionsEditor from '@/features/dataset/OdxOptionsEditor.vue';
 import FolderPicker from '@/components/FolderPicker.vue';
 import Paginator from 'primevue/paginator';
+import { useDatasetSessionStore } from '@/stores/datasetSession';
 
 // Curated processing profiles based on standard OpenDroneMap presets.
 const ODM_PRESETS = [
@@ -294,10 +256,14 @@ const ODM_PRESETS = [
 ];
 
 export default {
-    mixins: [useHeavyTask, useTaskFormatting],
 
     components: {
-        ConfirmDialog, Button, Select, Dialog, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
+        DialogHost, Button, Select, Window, InputText, Textarea, Checkbox, PrimeMessage, TasksTable, TaskLogDialog, OdxOptionsEditor, FolderPicker, Paginator
+    },
+
+    inject: {
+        registerTabChild: { default: null },
+        unregisterTabChild: { default: null }
     },
 
     props: {
@@ -305,6 +271,11 @@ export default {
         canWrite: { type: Boolean, default: false }
     },
 
+    setup() {
+        const { trackHeavyTask } = useHeavyTask();
+        const dialogs = useDialogs();
+        return { trackHeavyTask, dialogs, confirm: useConfirm(dialogs), ...useTaskFormatting() };
+    },
     data() {
         return {
             tasks: [],
@@ -316,7 +287,6 @@ export default {
             selectedTool: '',
             pageSize: 20,
             currentPageFirst: 0,
-            _refreshTimer: null,
             downloadingTaskId: null,
 
             photogrammetryDialogOpen: false,
@@ -336,12 +306,8 @@ export default {
             optionsError: '',
             folderPathError: '',
             destPathError: '',
-            errorDialogOpen: false,
-            errorDialogMessage: '',
             checkingNode: false,
             nodeStatus: null,
-            unreachableConfirmOpen: false,
-            _pendingParams: null,
             availableOdmOptions: [],
             customOptions: [],
             visibilityOptions: [
@@ -354,22 +320,9 @@ export default {
             logTask: null,
             logText: '',
 
-            clearDialogOpen: false,
-            deleteDialogOpen: false,
-            deletingTask: null,
-            deletingTask: null,
-
-            cancelDialogOpen: false,
-            cancellingTask: null,
-
             outputFolderPickerOpen: false,
             imageFolderPickerOpen: false
         };
-    },
-
-    inject: {
-        registerTabChild: { default: null },
-        unregisterTabChild: { default: null }
     },
 
     computed: {
@@ -452,8 +405,8 @@ export default {
         // Unregister from TabSwitcher
         if (this.unregisterTabChild) this.unregisterTabChild('tasks');
 
-        // Clear the global flag so the download button re-enables when leaving the dataset.
-        emitter.emit('setActiveBulkDownload', false);
+        // Clear the flag so the download button re-enables when leaving the dataset.
+        useDatasetSessionStore().setActiveBulkDownload(false);
     },
 
     methods: {
@@ -468,7 +421,7 @@ export default {
 
         async loadProcessingNodes() {
             try {
-                const nodes = await this.dataset.registry.getRequest('/sys/processingNodes') || [];
+                const nodes = await this.dataset.registry.sys.processingNodes() || [];
                 this.photogrammetryNodes = nodes.map(n => ({
                     value: n.id,
                     id: n.id,
@@ -549,11 +502,10 @@ export default {
                 this.currentPageFirst = Math.max(0, (Math.ceil(filtered.length / this.pageSize) - 1) * this.pageSize);
             }
 
-            // Broadcast whether there is an active (queued/running) bulk-download task so
-            // Header.vue and ViewDataset.vue can disable the download button globally.
-            const hasActiveBulkDownload = this.tasks.some(
-                t => t.toolId === 'bulk-download' && this.isActive(t.state));
-            emitter.emit('setActiveBulkDownload', hasActiveBulkDownload);
+            // An active (queued/running) bulk-download task disables the download buttons
+            // of the header and the dataset page.
+            useDatasetSessionStore().setActiveBulkDownload(this.tasks.some(
+                t => t.toolId === 'bulk-download' && this.isActive(t.state)));
         },
 
 
@@ -595,9 +547,7 @@ export default {
         async loadOdmOptions() {
             try {
                 const nodeId = this.photogrammetryForm.nodeId || 'default';
-                this.availableOdmOptions = await this.dataset.registry.getRequest(
-                    `/sys/processingNodes/${nodeId}/options`
-                ) || [];
+                this.availableOdmOptions = await this.dataset.registry.sys.processingNodeOptions(nodeId) || [];
             } catch (e) {
                 console.warn('Failed to load ODM options:', e);
                 this.availableOdmOptions = [];
@@ -636,25 +586,23 @@ export default {
             const nodeId = this.photogrammetryForm.nodeId
                 || (this.photogrammetryNodes[0] && this.photogrammetryNodes[0].value);
             if (!nodeId) {
-                this._toast('warn', 'No processing node', 'No NodeODX node is configured.');
+                this.$notify.warn('No NodeODX node is configured.', { summary: 'No processing node' });
                 return null;
             }
             this.checkingNode = true;
             this.nodeStatus = null;
             try {
-                const status = await this.dataset.registry.getRequest(
-                    `/sys/processingNodes/${encodeURIComponent(nodeId)}/status`);
+                const status = await this.dataset.registry.sys.processingNodeStatus(nodeId);
                 this.nodeStatus = status;
                 if (status.reachable) {
-                    this._toast('success', 'Node reachable',
-                        `${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`);
+                    this.$notify.success(`${status.taskQueueCount} task(s) queued, max ${status.maxParallelTasks} parallel.`, { summary: 'Node reachable' });
                 } else {
-                    this._toast('error', 'Node unreachable', status.errorMessage || 'The node did not respond.');
+                    this.$notify.error(status.errorMessage || 'The node did not respond.', { summary: 'Node unreachable' });
                 }
                 return status;
             } catch (e) {
                 this.nodeStatus = { reachable: false, errorMessage: e.message };
-                this._toast('error', 'Check failed', e.message);
+                this.$notify.error(e.message, { summary: 'Check failed' });
                 return this.nodeStatus;
             } finally {
                 this.checkingNode = false;
@@ -724,8 +672,7 @@ export default {
         },
 
         _showPathError(message) {
-            this.errorDialogMessage = message;
-            this.errorDialogOpen = true;
+            this.confirm({ title: 'Invalid path', message: escapeHtml(message), confirmText: 'OK', cancelText: 'Close' });
         },
 
         async submitPhotogrammetry() {
@@ -756,20 +703,17 @@ export default {
             // #6: pre-flight node check. We never hard-block on a full queue, but we
             // do ask for confirmation when the node appears unreachable.
             const status = await this.checkNode();
-            if (status && !status.reachable) {
-                this.unreachableConfirmOpen = true;
+            if (status && !status.reachable && !await this.confirm({
+                title: 'Processing node unreachable',
+                message: `The selected processing node did not respond${status.errorMessage ? ` (${escapeHtml(status.errorMessage)})` : ''}.<br/>Do you want to start the task anyway?`,
+                confirmText: 'Start anyway',
+                warningTitle: 'Warning',
+                warningMessage: 'The task may fail immediately if the node is offline.'
+            })) {
+                this._pendingParams = null;
                 return;
             }
             await this._doSubmit();
-        },
-
-        async handleUnreachableConfirmClose(buttonId) {
-            this.unreachableConfirmOpen = false;
-            if (buttonId === 'confirm') {
-                await this._doSubmit();
-            } else {
-                this._pendingParams = null;
-            }
         },
 
         async _doSubmit() {
@@ -791,21 +735,21 @@ export default {
                 this.trackHeavyTask(this.dataset, submit.taskId, { params })
                     .catch(e => {
                         if (e && e.status === 403) {
-                            this._toast('error', 'Not available', e.message || this.photogrammetryDisabledMsg);
+                            this.$notify.error(e.message || this.photogrammetryDisabledMsg, { summary: 'Not available' });
                         } else {
                             console.warn('Photogrammetry task ended with error:', e.message);
                         }
                     });
 
                 this.photogrammetryDialogOpen = false;
-                this._toast('info', 'Photogrammetry started', 'The task is now queued on the processing node.');
+                this.$notify.info('The task is now queued on the processing node.', { summary: 'Photogrammetry started' });
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
                 if (e && e.status === 403) {
-                    this._toast('error', 'Not available', e.message || this.photogrammetryDisabledMsg);
+                    this.$notify.error(e.message || this.photogrammetryDisabledMsg, { summary: 'Not available' });
                 } else {
-                    this._toast('error', 'Submit failed', e.message);
+                    this.$notify.error(e.message, { summary: 'Submit failed' });
                 }
             } finally {
                 this.submitting = false;
@@ -815,25 +759,18 @@ export default {
 
         // ---- per-task actions ----
 
-        cancelTask(task) {
-            this.cancellingTask = task;
-            this.cancelDialogOpen = true;
-        },
-
-        async handleCancelDialogClose(buttonId) {
-            this.cancelDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.cancellingTask) {
-                this.cancellingTask = null;
-                return;
-            }
-            const task = this.cancellingTask;
-            this.cancellingTask = null;
+        async cancelTask(task) {
+            const what = `<strong>${escapeHtml(this.toolTitle(task.toolId, this.tools))}</strong>${task.path ? ` (path: ${escapeHtml(task.path)})` : ''}`;
+            if (!await this.confirm({
+                title: 'Cancel Task', danger: true, confirmText: 'Cancel Task', cancelText: "Don't Cancel",
+                message: `Are you sure you want to cancel this task?<br/>${what} will be stopped.`
+            })) return;
             try {
                 await this.dataset.cancelTask(task.taskId);
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
-                this._toast('error', 'Cancel failed', e.message);
+                this.$notify.error(e.message, { summary: 'Cancel failed' });
             }
         },
 
@@ -843,7 +780,7 @@ export default {
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
-                this._toast('error', 'Retry failed', e.message);
+                this.$notify.error(e.message, { summary: 'Retry failed' });
             }
         },
 
@@ -870,46 +807,40 @@ export default {
             }
         },
 
-        showClearDialog() {
-            this.clearDialogOpen = true;
-        },
-
-        async handleClearDialogClose(buttonId) {
-            this.clearDialogOpen = false;
-            if (buttonId !== 'confirm') return;
+        async showClearDialog() {
+            if (!await this.confirm({
+                title: 'Clear Concluded Tasks', danger: true, confirmText: 'Clear',
+                message: `Delete all concluded tasks?<br/><strong>${this.concludedCount} task(s)</strong> will be permanently removed from the history, together with any downloadable results they produced.`,
+                warningTitle: 'Warning',
+                warningMessage: 'This action cannot be undone. Any task results still available for download will be deleted.'
+            })) return;
             try {
                 this.loading = true;
                 await this.dataset.clearTasks(this.selectedTool || undefined);
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
-                this._toast('success', 'Tasks cleared', 'The concluded tasks have been removed.');
+                this.$notify.success('The concluded tasks have been removed.', { summary: 'Tasks cleared' });
             } catch (e) {
-                this._toast('error', 'Clear failed', e.message);
+                this.$notify.error(e.message, { summary: 'Clear failed' });
             } finally {
                 this.loading = false;
             }
         },
 
-        deleteTask(task) {
-            this.deletingTask = task;
-            this.deleteDialogOpen = true;
-        },
-
-        async handleDeleteDialogClose(buttonId) {
-            this.deleteDialogOpen = false;
-            if (buttonId !== 'confirm' || !this.deletingTask) {
-                this.deletingTask = null;
-                return;
-            }
-            const task = this.deletingTask;
-            this.deletingTask = null;
+        async deleteTask(task) {
+            if (!await this.confirm({
+                title: 'Delete Task', danger: true, confirmText: 'Delete',
+                message: `Permanently delete this concluded task from the history?<br/><strong>${escapeHtml(this.toolTitle(task.toolId, this.tools))}</strong> will be removed together with any downloadable results it produced.`,
+                warningTitle: 'Warning',
+                warningMessage: 'This action cannot be undone. Any task results still available for download will be deleted.'
+            })) return;
             try {
                 await this.dataset.deleteTask(task.taskId);
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
-                this._toast('success', 'Task deleted', 'The task has been removed from history.');
+                this.$notify.success('The task has been removed from history.', { summary: 'Task deleted' });
             } catch (e) {
-                this._toast('error', 'Delete failed', e.message);
+                this.$notify.error(e.message, { summary: 'Delete failed' });
             }
         },
 
@@ -939,7 +870,7 @@ export default {
             }
         },
 
-        // ---- formatting helpers are provided by the useTaskFormatting mixin ----
+        // ---- formatting helpers come from useTaskFormatting() (setup) ----
 
         // ---- pagination ----
 
@@ -964,7 +895,7 @@ export default {
 
 .filters {
     padding: var(--ddb-spacing-lg);
-    background: var(--ddb-bg-secondary);
+    background: var(--ddb-bg-hover);
 }
 
 .content {
@@ -981,32 +912,32 @@ export default {
 }
 
 .muted {
-    color: var(--ddb-text-muted, #888);
+    color: var(--ddb-text-muted);
 }
 
 .error-text {
-    color: var(--ddb-danger, #d9534f);
+    color: var(--ddb-danger);
 }
 
 .pg-preset-tags {
-    border: 1px solid var(--ddb-border, #dee2e6);
+    border: 1px solid var(--ddb-border);
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
-    background: var(--ddb-bg-secondary, #f8f9fa);
+    background: var(--ddb-bg-light);
 }
 
 .pg-node-details {
-    border: 1px solid var(--ddb-border, #dee2e6);
+    border: 1px solid var(--ddb-border);
     border-radius: 6px;
     padding: 0.5rem 0.75rem;
-    background: var(--ddb-bg-secondary, #f8f9fa);
+    background: var(--ddb-bg-light);
     font-size: 0.9rem;
 }
 
 .pg-option-chip {
     display: inline-block;
-    background: var(--ddb-primary, #0d6efd);
-    color: #fff;
+    background: var(--ddb-primary);
+    color: var(--ddb-text-on-color);
     border-radius: 12px;
     padding: 0.15rem 0.6rem;
     font-size: 0.78rem;
@@ -1020,7 +951,7 @@ export default {
 }
 
 .pg-option-chip-clickable:hover {
-    background-color: var(--ddb-primary-hover, #0060bf);
+    background-color: var(--ddb-primary-hover);
 }
 
 .duration {
@@ -1029,18 +960,7 @@ export default {
 }
 
 .duration.running {
-    color: var(--ddb-warning, #f0ad4e);
+    color: var(--ddb-warning);
 }
 
-.task-log {
-    max-height: 24rem;
-    overflow: auto;
-    background: #1e1e1e;
-    color: #d4d4d4;
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
 </style>

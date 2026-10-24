@@ -1,6 +1,14 @@
 /**
  * Handles saving and loading of GeoJSON measurement files
  */
+import { pathutils } from 'ddb';
+import { downloadText } from '@/libs/download';
+
+/** Whether a path is a measurements file (`<name>_measurements.geojson` or `measurements.geojson`). */
+export function isMeasurementFile(path) {
+    return path.endsWith('_measurements.geojson') || pathutils.basename(path) === 'measurements.geojson';
+}
+
 export class MeasurementStorage {
     /**
      * @param {Dataset} dataset - ddb dataset
@@ -20,20 +28,14 @@ export class MeasurementStorage {
         const path = this.entry.path;
 
         // If the path is already a measurements file, use it directly
-        const fileName = path.split('/').pop();
-        if (path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
-            return path;
-        }
+        if (isMeasurementFile(path)) return path;
 
         // Remove extension and add _measurements.geojson
-        const lastDot = path.lastIndexOf('.');
-        const basePath = lastDot > 0 ? path.substring(0, lastDot) : path;
-
-        return `${basePath}_measurements.geojson`;
+        return `${pathutils.dropExtension(path)}_measurements.geojson`;
     }
 
     /**
-     * Default set of measurement types considered "owned" by olMeasure (2D map
+     * Default set of measurement types considered "owned" by the map measure control (2D map
      * viewer). When saving, features with these `measurementType` values are
      * replaced by the incoming GeoJSON; all others are preserved verbatim
      * (e.g. stockpiles or 3D viewer measurements).
@@ -52,7 +54,7 @@ export class MeasurementStorage {
      * Foreign feature types (anything written by other DroneDB subsystems
      * into the same file) are preserved verbatim - we only replace features
      * whose `measurementType` is in `ownedTypes`. Defaults to the 2D
-     * olMeasure types for backward compatibility; callers from the 3D
+     * map measure-control types for backward compatibility; callers from the 3D
      * Potree viewer must pass `POTREE_OWNED_TYPES`.
      *
      * @param {Object} geojsonData - GeoJSON FeatureCollection from the caller.
@@ -102,15 +104,13 @@ export class MeasurementStorage {
             return { path: this.measurementPath, fileName: this._fileName() };
         } catch (error) {
             console.error('Failed to save measurements:', error);
-            throw new Error(`Failed to save measurements: ${error.message}`);
+            throw new Error(`Failed to save measurements: ${error.message}`, { cause: error });
         }
     }
 
     /** Just the file name component of the storage path (for toasts). */
     _fileName() {
-        const p = this.measurementPath || '';
-        const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-        return idx >= 0 ? p.substring(idx + 1) : p;
+        return this.measurementPath ? pathutils.basename(this.measurementPath) : '';
     }
 
     /**
@@ -149,7 +149,7 @@ export class MeasurementStorage {
         try {
             await this.dataset.list(this.measurementPath);
             return true;
-        } catch (error) {
+        } catch {
             return false;
         }
     }
@@ -164,7 +164,7 @@ export class MeasurementStorage {
             console.log(`Measurements deleted: ${this.measurementPath}`);
         } catch (error) {
             console.error('Failed to delete measurements:', error);
-            throw new Error(`Failed to delete measurements: ${error.message}`);
+            throw new Error(`Failed to delete measurements: ${error.message}`, { cause: error });
         }
     }
 
@@ -175,17 +175,7 @@ export class MeasurementStorage {
      */
     exportToFile(geojsonData, filename = null) {
         const fname = filename || `measurements_${Date.now()}.geojson`;
-        const content = JSON.stringify(geojsonData, null, 2);
-        const blob = new Blob([content], { type: 'application/geo+json' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fname;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadText(JSON.stringify(geojsonData, null, 2), fname, 'application/geo+json');
 
         console.log(`Measurements exported as: ${fname}`);
     }
