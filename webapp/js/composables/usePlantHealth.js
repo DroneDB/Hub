@@ -18,10 +18,6 @@ const definition = {
             plantHealthVisible: false,
             plantHealthFilePath: null,
             plantHealthInitialParams: null,
-            // Latest viz params emitted by the currently-open analysis panel.
-            // Kept for backwards compatibility with consumers that still read
-            // it directly; the canonical store is `vizParamsByPath` below.
-            currentVizParams: {},
             // Per-file viz-params cache. Each Plant Health / Raster Analysis
             // panel writes its current params here when the user changes the
             // colormap, formula, or rescale, and reads them back on reopen so
@@ -49,9 +45,6 @@ const definition = {
             } else {
                 this.plantHealthInitialParams = null;
             }
-            if (cached && Object.keys(cached).length) {
-                this.currentVizParams = { ...cached };
-            }
         },
 
         closePlantHealth() {
@@ -60,15 +53,11 @@ const definition = {
             this.plantHealthInitialParams = null;
             // Note: `vizParamsByPath` is intentionally preserved so the next
             // panel that opens (or the next refreshRasterLayers tick) can
-            // restore the styling. `currentVizParams` is reset only because
-            // it represents the "active panel emitting" state, which no
-            // longer applies once the panel is closed.
-            this.currentVizParams = {};
+            // restore the styling.
             this.refreshRasterLayers();
         },
 
         handleVizParamsChanged(params) {
-            this.currentVizParams = params;
             const path = this.plantHealthFilePath;
             if (path) {
                 if (params && Object.keys(params).length) {
@@ -94,9 +83,9 @@ const definition = {
 
                 // Apply viz params from the per-file cache so layers stay
                 // styled across panel switches and panel close. The active
-                // panel's `currentVizParams` is mirrored into the cache by
-                // its `handle*VizParamsChanged` hook, so reading the cache
-                // is sufficient.
+                // panel's params are mirrored into the cache by its
+                // `handle*VizParamsChanged` hook, so reading the cache is
+                // sufficient.
                 const cached = this.vizParamsByPath && this.vizParamsByPath[layerPath];
                 const vizParams = cached && Object.keys(cached).length ? cached : {};
 
@@ -174,7 +163,6 @@ const definition = {
 
                 if (Object.keys(vizParams).length > 0) {
                     this.plantHealthInitialParams = vizParams;
-                    this.currentVizParams = vizParams;
                 }
 
                 this.openPlantHealth(path);

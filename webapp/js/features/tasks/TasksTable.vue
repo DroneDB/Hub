@@ -147,8 +147,6 @@ export default {
         // Task id whose result download is currently in flight: its Result button is
         // disabled + spinning to prevent repeated clicks overloading the server.
         downloadingTaskId: { type: String, default: null },
-        // Total number of items (for client-side paginator visibility threshold).
-        totalItems: { type: Number, default: 0 },
         // Current page offset (0-based), controlled by parent for client-side pagination.
         currentPageFirst: { type: Number, default: 0 }
     },

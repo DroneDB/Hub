@@ -91,9 +91,6 @@ const definition = {
             } else {
                 this.rasterInitialParams = null;
             }
-            if (cached && Object.keys(cached).length) {
-                this.currentVizParams = { ...cached };
-            }
         },
 
         closeRasterAnalysis() {
@@ -114,15 +111,12 @@ const definition = {
             // (just like length/area/point measurements would).
             this._currentProfileFeature = null;
             this._stopRasterInspect();
-            // Reset transient "active panel emitting" state. The per-file
-            // cache (`vizParamsByPath`, defined in usePlantHealth) is kept
-            // so reopening this file later reuses the colormap/rescale.
-            this.currentVizParams = {};
+            // The per-file cache (`vizParamsByPath`, defined in usePlantHealth)
+            // is kept so reopening this file later reuses the colormap/rescale.
             this.refreshRasterLayers();
         },
 
         handleRasterVizParamsChanged(params) {
-            this.currentVizParams = params;
             const path = this.rasterFilePath;
             if (path) {
                 if (params && Object.keys(params).length) {

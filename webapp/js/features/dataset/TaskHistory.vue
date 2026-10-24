@@ -23,7 +23,6 @@
 
         <div class="content">
             <TasksTable :tasks="filteredTasks" :tools="tools" :loading="loading" :rows="pageSize"
-                        :total-items="filteredTasks.length"
                         :current-page-first="currentPageFirst"
                         :downloading-task-id="downloadingTaskId"
                         empty-message="No processing tasks have been run for this dataset yet."
