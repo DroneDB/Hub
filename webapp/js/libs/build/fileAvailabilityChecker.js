@@ -10,9 +10,10 @@ import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 import { isLocalVector } from '@/libs/openItemDefaults';
-import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
+import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
+import { currentEntry } from '@/libs/build/entryBuild';
 
-// Build artifact each viewer needs, by role (libs/ddb/buildArtifacts.js owns the paths).
+// Build artifact each viewer needs, by role (the entry DTO lists the artifacts that exist).
 // An array is an any-of match.
 const VIEW_ARTIFACT_ROLES = {
     'pointcloud': ArtifactRole.POINTCLOUD_COPC,
@@ -64,9 +65,11 @@ class FileAvailabilityChecker {
      * @param {Object} dataset - DDB Dataset
      * @param {Object} entry - File entry
      * @param {string} viewType - Viewer type ('pointcloud', 'map', 'model', 'panorama', 'markdown')
+     * @param {{ current?: boolean }} [options] - current: the entry was just listed (a viewer page
+     *   reads it on load), so a missing artifact is not looked for in a fresh listing
      * @returns {Promise<AvailabilityResult>}
      */
-    async check(dataset, entry, viewType) {
+    async check(dataset, entry, viewType, options = {}) {
         // Normalize: .3tz files indexed by older ddb versions may appear as Generic.
         if (entry.type === ddb.entry.type.GENERIC && /\.3tz$/i.test(entry.path || '')) entry = { ...entry, type: ddb.entry.type.TILES3D };
 
@@ -82,7 +85,7 @@ class FileAvailabilityChecker {
         if (viewType === 'unified') {
             const roles = this.getRequiredArtifact(entry.type, viewType, entry);
             if (roles) {
-                const available = await this.hasArtifact(dataset.Entry(entry), roles);
+                const available = await this.hasArtifact(dataset, entry, roles, options.current);
                 if (available) {
                     return { available: true, status: 'ready', message: '', title: '', buildState: null, actions: [] };
                 }
@@ -98,7 +101,7 @@ class FileAvailabilityChecker {
         }
 
         // For buildable files, verify build state
-        return this.checkBuildableFile(dataset, entry, viewType);
+        return this.checkBuildableFile(dataset, entry, viewType, options);
     }
 
     /**
@@ -137,7 +140,7 @@ class FileAvailabilityChecker {
     /**
      * Checks buildable files (pointcloud, georaster, model, vector)
      */
-    async checkBuildableFile(dataset, entry, viewType) {
+    async checkBuildableFile(dataset, entry, viewType, options = {}) {
         try {
             const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
 
@@ -187,7 +190,7 @@ class FileAvailabilityChecker {
             // 3. No build found - check if output file exists anyway
             const roles = this.getRequiredArtifact(entry.type, viewType, entry);
             if (roles) {
-                const isAvailable = await this.hasArtifact(dataset.Entry(entry), roles);
+                const isAvailable = await this.hasArtifact(dataset, entry, roles, options.current);
 
                 if (isAvailable) {
                     const syntheticBuildState = {
@@ -284,17 +287,13 @@ class FileAvailabilityChecker {
     }
 
     /**
-     * Whether the entry has the artifact (a role, or an any-of list of roles).
+     * Whether the entry lists the artifact (a role, or an any-of list of roles). The entry DTO
+     * carries the artifacts that exist, so nothing is probed; one that was listed before its build
+     * finished lists none, and is checked once against a fresh listing (unless it is `current`).
      */
-    async hasArtifact(entryObj, roles) {
-        try {
-            for (const role of Array.isArray(roles) ? roles : [roles]) {
-                if (await entryObj.findArtifact(role)) return true;
-            }
-            return false;
-        } catch {
-            return false;
-        }
+    async hasArtifact(dataset, entry, roles, current = false) {
+        const listed = current ? entry : await currentEntry(dataset, entry, e => !!findArtifactIn(e, roles));
+        return !!findArtifactIn(listed, roles);
     }
 
     /**

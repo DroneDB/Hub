@@ -90,7 +90,7 @@ async function loadNexus() {
     // MeshLab-style shading for models without a texture
     material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0x444444, shininess: settings.shininess });
 
-    const model = await dataset.value.Entry(entry.value).getNxz();
+    const model = dataset.value.Entry(entry.value).getNxz();
     if (disposed) return;
     const nexusObj = new NexusObject(model, () => {
         const s = 1 / nexusObj.geometry.boundingSphere.radius;

@@ -270,7 +270,7 @@ export default {
                 this.entry = entry;
                 // A missing artifact (not built yet) only disables the QGIS mode
                 const role = streamableArtifactRole(entry.type);
-                if (role) this.buildUrl = await entry.findArtifact(role);
+                if (role) this.buildUrl = entry.findArtifact(role);
             }
 
             this.shareMode = this.pickDefaultMode();

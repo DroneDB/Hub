@@ -1,64 +1,100 @@
 /**
- * Build artifacts by role (plan XI-04): the Hub asks for what an artifact is for,
- * and one module knows where DroneDB puts it.
+ * Build artifacts by role (plan XI-04, D8): the entry DTO lists the artifacts that exist, the Hub
+ * asks by role and requests nothing to find out.
  */
 import { describe, it, expect, vi } from 'vitest';
 import ddb from 'ddb';
-import { ArtifactRole, ALL_ARTIFACT_ROLES, artifactPath } from './buildArtifacts';
+import { ArtifactRole, artifactsOf, findArtifactIn, artifactHref } from './buildArtifacts';
 import { streamableArtifactRole } from '@/libs/ogcShareUrls';
-import layout from './buildArtifacts.json';
 
 const T = ddb.entry.type;
 
-/** A fake dataset whose registry answers HEAD requests from a set of existing paths. */
-function datasetWith(existingPaths) {
-    const base = 'http://hub.test/orgs/o/ds/d';
+const GPKG = { role: 'vector.gpkg', url: 'http://hub.test/orgs/o/ds/d/build/h1/vec/source.gpkg', mediaType: 'application/geopackage+sqlite3' };
+const MVT = { role: 'vector.mvt', url: 'http://hub.test/orgs/o/ds/d/build/h1/mvt/metadata.json', mediaType: 'application/json' };
+const BOUNDS = { role: 'gsplat.bounds', url: 'http://hub.test/orgs/o/ds/d/build/h1/gsplat/bounds.json', mediaType: 'application/json' };
+
+/** A fake dataset: any request the Hub makes is recorded, none is expected for a lookup. */
+function datasetWith() {
     return {
-        baseApi: base,
+        baseApi: '/orgs/o/ds/d',
         registry: {
-            headRequest: vi.fn(async url => existingPaths.some(p => url === `${base}/build/h1/${p}`)),
-            fetchRaw: vi.fn(async () => new Response(JSON.stringify({ min: [0, 0, 0], max: [1, 1, 1] }), { status: 200 }))
+            fetchRaw: vi.fn(async () => new Response(JSON.stringify({ min: [0, 0, 0], max: [1, 1, 1] }), { status: 200 })),
+            headRequest: vi.fn()
         }
     };
 }
 
-const entryIn = (dataset, type = T.VECTOR) => new ddb.entry.Entry(dataset, { hash: 'h1', path: 'a/b.dxf', type });
+const entryWith = (artifacts, dataset = datasetWith(), type = T.VECTOR) =>
+    new ddb.entry.Entry(dataset, { hash: 'h1', path: 'a/b.dxf', type, ...(artifacts ? { artifacts } : {}) });
 
-describe('buildArtifacts', () => {
-    it('knows a build path for every role', () => {
-        for (const role of ALL_ARTIFACT_ROLES) expect(artifactPath(role)).toMatch(/^[a-z0-9]+\/[\w.]+$/);
+describe('artifact lookup on the entry DTO', () => {
+    it('lists nothing for an entry without artifacts (not built, not buildable, listed before its build)', () => {
+        expect(artifactsOf({})).toEqual([]);
+        expect(artifactsOf(null)).toEqual([]);
+        expect(artifactsOf({ artifacts: 'x' })).toEqual([]);
     });
 
-    it('has exactly one layout entry per role (the lint guard reads the same table)', () => {
-        expect(Object.keys(layout).sort()).toEqual([...ALL_ARTIFACT_ROLES].sort());
+    it('finds an artifact by role and returns null when the entry lacks it', () => {
+        const entry = { artifacts: [GPKG, MVT] };
+        expect(findArtifactIn(entry, ArtifactRole.VECTOR_GPKG)).toBe(GPKG);
+        expect(findArtifactIn(entry, ArtifactRole.VECTOR_LOCAL)).toBeNull();
+        expect(findArtifactIn({}, ArtifactRole.VECTOR_GPKG)).toBeNull();
     });
 
-    it('rejects an unknown role instead of guessing a path', () => {
-        expect(() => artifactPath('vector.fgb')).toThrow('Unknown build artifact role');
+    it('takes the first role of an any-of list that exists', () => {
+        const entry = { artifacts: [GPKG, MVT] };
+        expect(findArtifactIn(entry, [ArtifactRole.VECTOR_LOCAL, ArtifactRole.VECTOR_MVT, ArtifactRole.VECTOR_GPKG])).toBe(MVT);
+        expect(findArtifactIn(entry, [ArtifactRole.GSPLAT_LOD, ArtifactRole.GSPLAT_SPZ])).toBeNull();
     });
 
-    it('points vectors at the GeoPackage DroneDB writes (never the old vector.fgb)', () => {
-        expect(artifactPath(ArtifactRole.VECTOR_GPKG)).toBe('vec/source.gpkg');
-        expect(ALL_ARTIFACT_ROLES.map(artifactPath)).not.toContain('vec/vector.fgb');
+    it('ignores a role it does not know and keeps working with the ones it asks for (new libddb formats pass through)', () => {
+        const entry = { artifacts: [{ role: 'raster.pmtiles', url: '/orgs/o/ds/d/build/h1/pm/x.pmtiles' }, GPKG] };
+        expect(findArtifactIn(entry, ArtifactRole.VECTOR_GPKG)).toBe(GPKG);
+    });
+
+    it('requests an artifact on the Hub origin: the host Registry believes it has is dropped', () => {
+        expect(artifactHref(GPKG)).toBe('/orgs/o/ds/d/build/h1/vec/source.gpkg');
+        expect(artifactHref({ role: 'x', url: 'https://localhost:5000/orgs/o/ds/d/build/h/a%20b/c.tif?v=1' }))
+            .toBe('/orgs/o/ds/d/build/h/a%20b/c.tif?v=1');
+        expect(artifactHref({ role: 'x', url: '/orgs/o/ds/d/build/h/c.tif' })).toBe('/orgs/o/ds/d/build/h/c.tif');
     });
 });
 
 describe('Entry artifact helpers', () => {
-    it('findArtifact returns the URL of an artifact that exists and null otherwise', async () => {
-        const entry = entryIn(datasetWith(['vec/source.gpkg']));
-        expect(await entry.findArtifact(ArtifactRole.VECTOR_GPKG)).toBe('http://hub.test/orgs/o/ds/d/build/h1/vec/source.gpkg');
-        expect(await entry.findArtifact(ArtifactRole.VECTOR_MVT)).toBeNull();
+    it('findArtifact returns the URL of a listed artifact and null otherwise, without a request', () => {
+        const dataset = datasetWith();
+        const entry = entryWith([GPKG], dataset);
+        expect(entry.findArtifact(ArtifactRole.VECTOR_GPKG)).toBe('/orgs/o/ds/d/build/h1/vec/source.gpkg');
+        expect(entry.findArtifact(ArtifactRole.VECTOR_MVT)).toBeNull();
+        expect(dataset.registry.headRequest).not.toHaveBeenCalled();
+        expect(dataset.registry.fetchRaw).not.toHaveBeenCalled();
     });
 
-    it('requireArtifact names what is missing', async () => {
-        const entry = entryIn(datasetWith([]), T.POINTCLOUD);
-        await expect(entry.getCopc()).rejects.toThrow('The COPC file is not available.');
+    it('requireArtifact names what is missing', () => {
+        const entry = entryWith(undefined, datasetWith(), T.POINTCLOUD);
+        expect(() => entry.getCopc()).toThrow('The COPC file is not available.');
     });
 
-    it('reads an optional JSON artifact, and returns null when it is absent', async () => {
-        expect(await entryIn(datasetWith(['gsplat/bounds.json']), T.GAUSSIAN_SPLAT).getGsplatBounds())
-            .toEqual({ min: [0, 0, 0], max: [1, 1, 1] });
-        expect(await entryIn(datasetWith([]), T.GAUSSIAN_SPLAT).getGsplatBounds()).toBeNull();
+    it('requireArtifact returns the listed URL', () => {
+        const copc = { role: 'pointcloud.copc', url: 'http://x/orgs/o/ds/d/build/h1/copc/cloud.copc.laz', mediaType: 'application/vnd.laszip' };
+        expect(entryWith([copc], datasetWith(), T.POINTCLOUD).getCopc()).toBe('/orgs/o/ds/d/build/h1/copc/cloud.copc.laz');
+    });
+
+    it('reads an optional JSON artifact from its listed URL, and returns null when it is not listed', async () => {
+        const dataset = datasetWith();
+        expect(await entryWith([BOUNDS], dataset, T.GAUSSIAN_SPLAT).getGsplatBounds()).toEqual({ min: [0, 0, 0], max: [1, 1, 1] });
+        expect(dataset.registry.fetchRaw).toHaveBeenCalledWith('/orgs/o/ds/d/build/h1/gsplat/bounds.json');
+
+        const none = datasetWith();
+        expect(await entryWith(undefined, none, T.GAUSSIAN_SPLAT).getGsplatBounds()).toBeNull();
+        expect(none.registry.fetchRaw).not.toHaveBeenCalled();
+    });
+
+    it('the LOD splat is null when only the .spz is listed', () => {
+        const spz = { role: 'gsplat.spz', url: '/orgs/o/ds/d/build/h1/gsplat/model.spz' };
+        const entry = entryWith([spz], datasetWith(), T.GAUSSIAN_SPLAT);
+        expect(entry.getGsplatLod()).toBeNull();
+        expect(entry.getGsplat()).toBe('/orgs/o/ds/d/build/h1/gsplat/model.spz');
     });
 });
 
@@ -70,9 +106,8 @@ describe('Share/Embed streamable artifact', () => {
         expect(streamableArtifactRole(T.IMAGE)).toBeNull();
     });
 
-    it('resolves a built vector to its GeoPackage URL (Share/Embed used to fail for every vector)', async () => {
-        const entry = entryIn(datasetWith(['vec/source.gpkg', 'mvt/metadata.json']));
-        const url = await entry.findArtifact(streamableArtifactRole(T.VECTOR));
-        expect(url).toBe('http://hub.test/orgs/o/ds/d/build/h1/vec/source.gpkg');
+    it('resolves a built vector to its GeoPackage URL (Share/Embed used to fail for every vector)', () => {
+        const url = entryWith([GPKG, MVT]).findArtifact(streamableArtifactRole(T.VECTOR));
+        expect(url).toBe('/orgs/o/ds/d/build/h1/vec/source.gpkg');
     });
 });

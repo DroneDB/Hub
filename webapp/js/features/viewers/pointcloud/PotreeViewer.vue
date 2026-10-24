@@ -135,7 +135,7 @@ async function coordinateSystemOf(copcUrl) {
 async function addPointCloud(ddbEntry) {
     let copcUrl;
     try {
-        copcUrl = await ddbEntry.getCopc();
+        copcUrl = ddbEntry.getCopc();
     } catch (e) {
         throw new Error(`${ddbEntry.path} is being processed.\n\nReturn to the file list to check the status or try again in a few minutes.`, { cause: e });
     }

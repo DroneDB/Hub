@@ -204,8 +204,8 @@ async function loadSplat() {
     const splatEntry = dataset.value.Entry(entry.value);
     // The level-of-detail .rad streams by range requests; the plain .spz is the fallback of
     // datasets built before LOD (getGsplat throws when it is absent: not called with a .rad)
-    const radUrl = await splatEntry.getGsplatLod();
-    const spzUrl = radUrl ? null : await splatEntry.getGsplat();
+    const radUrl = splatEntry.getGsplatLod();
+    const spzUrl = radUrl ? null : splatEntry.getGsplat();
     streaming.value = !!radUrl;
     bounds = await splatEntry.getGsplatBounds();
     const georef = await splatEntry.getGeorefJson();

@@ -136,7 +136,7 @@ async function load() {
         // The build artifact must exist (3D Tiles, COPC, COG, MVT/FGB): a clear message, not an
         // empty scene (the dataset page checks before opening; a direct URL comes here)
         const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
-        const availability = await FileAvailabilityChecker.check(dataset.value, viewable, 'unified');
+        const availability = await FileAvailabilityChecker.check(dataset.value, viewable, 'unified', { current: true });
         if (!availability.available) throw new Error(availability.message || `${viewable.path} is not available in the 3D viewer.`);
 
         scene = new UnifiedScene(await loadGiro3dLibs(), viewEl.value, { settings, view, notify });

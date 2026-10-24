@@ -65,16 +65,3 @@ describe('AuthSession', () => {
         expect(onLogout).toHaveBeenCalled();
     });
 });
-
-describe('headRequest', () => {
-    it('answers whether a resource exists: false on 404, errors otherwise', async () => {
-        const reg = new Registry('http://head.test');
-        const status = { value: 200 };
-        vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(null, { status: status.value })));
-        expect(await reg.headRequest('/orgs/a/ds/b/build/h/gsplat/model.rad')).toBe(true);
-        status.value = 404;
-        expect(await reg.headRequest('/orgs/a/ds/b/build/h/gsplat/georef.json')).toBe(false);
-        status.value = 500;
-        await expect(reg.headRequest('/orgs/a/ds/b/build/h/x')).rejects.toMatchObject({ status: 500 });
-    });
-});

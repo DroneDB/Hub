@@ -2,7 +2,6 @@ import pluginVue from 'eslint-plugin-vue';
 import js from '@eslint/js';
 import globals from 'globals';
 import pairedListeners from './eslint-rules/paired-listeners.mjs';
-import noBuildLayout from './eslint-rules/no-build-layout.mjs';
 import { guardConfigs } from './eslint-rules/guards.mjs';
 import { a11yConfigs } from './eslint-rules/a11y.mjs';
 
@@ -25,11 +24,9 @@ export default [
                 NexusObject: 'readonly', PhotoSphereViewer: 'readonly', HubOptions: 'readonly'
             }
         },
-        plugins: { hub: { rules: { 'paired-listeners': pairedListeners, 'no-build-layout': noBuildLayout } } },
+        plugins: { hub: { rules: { 'paired-listeners': pairedListeners } } },
         rules: {
             'hub/paired-listeners': 'error',
-            // Plan XI-04: build paths only in libs/ddb/buildArtifacts.js
-            'hub/no-build-layout': 'error',
             // SFC templates are case-sensitive: <Button> (PrimeVue) is not <button>
             'vue/no-reserved-component-names': ['error', { htmlElementCaseSensitive: true }],
             // House style: 4-space template indent (.editorconfig). Line layout is left to the

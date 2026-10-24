@@ -117,7 +117,7 @@ async function loadLocalVector(scene, entry, dataset) {
 /** A model's 3D Tiles, in a flat local scene. */
 async function loadModel(scene, entry, dataset) {
     scene.view.loadingText = 'Loading 3D model...';
-    const url = await dataset.Entry(entry).get3DTiles();
+    const url = dataset.Entry(entry).get3DTiles();
     if (!url) throw new Error(`The 3D model '${name(entry)}' is not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been produced for this model yet.`);
     scene.setupInstance(scene.libs.CoordinateSystem.epsg3857);
     const tileset = await addTileset(scene, url, MODEL_TILES_ERROR_TARGET);
@@ -136,7 +136,7 @@ async function loadModel(scene, entry, dataset) {
  */
 async function loadTiles3D(scene, entry, dataset) {
     scene.view.loadingText = 'Loading 3D Tiles...';
-    const url = await dataset.Entry(entry).get3DTiles();
+    const url = dataset.Entry(entry).get3DTiles();
     if (!url) throw new Error(`The 3D Tiles '${name(entry)}' are not available in the 3D viewer.\n\nThe OGC 3D Tiles output has not been extracted for this archive yet.`);
     const georeferenced = !(entry.properties && entry.properties.georeferenced === false);
     if (georeferenced) scene.setupGlobe();
@@ -166,7 +166,7 @@ async function loadTiles3D(scene, entry, dataset) {
 async function loadPointCloud(scene, entry, dataset) {
     scene.view.loadingText = 'Loading point cloud...';
     const { COPCSource, PointCloud, CoordinateSystem } = scene.libs;
-    const source = new COPCSource({ url: await dataset.Entry(entry).getCopc() });
+    const source = new COPCSource({ url: dataset.Entry(entry).getCopc() });
     // lifetime: owner (the source goes with the scene)
     source.addEventListener('progress', () => { scene.view.progress = source.progress; });
     await source.initialize();

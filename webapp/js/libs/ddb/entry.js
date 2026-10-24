@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { ArtifactRole, artifactPath } from './buildArtifacts';
+import { ArtifactRole, findArtifactIn, artifactHref } from './buildArtifacts';
 
 const STILL_PROCESSING = 'The file may still be processing. Return to the file list to check the build status.';
 
@@ -15,35 +15,33 @@ class Entry {
         if (!this.hash) throw new Error("Not a valid file entry object");
     }
 
-    buildUrl(path) {
-        return `${this.dataset.baseApi}/build/${this.hash}/${path}`;
-    }
-
-    /** URL of a build artifact by role (see buildArtifacts.js), whether or not it exists. */
-    artifactUrl(role) {
-        return this.buildUrl(artifactPath(role));
-    }
-
-    /** URL of a build artifact by role when it exists, or null. */
-    async findArtifact(role) {
-        const url = this.artifactUrl(role);
-        return (await this.dataset.registry.headRequest(url)) ? url : null;
+    /**
+     * URL of a build artifact by role (or the first of an any-of list) when the entry lists it,
+     * or null. The entry DTO carries the artifacts that exist (libddb's build manifest): nothing
+     * is requested to find out, so an entry read before its build finished has none.
+     * @param {string | string[]} role
+     * @returns {string | null}
+     */
+    findArtifact(role) {
+        const artifact = findArtifactIn(this, role);
+        return artifact ? artifactHref(artifact) : null;
     }
 
     /**
      * URL of a build artifact that the caller cannot work without.
      * @param {string} role
      * @param {string} label  what the user is told is missing ("The COPC file")
+     * @returns {string}
      */
-    async requireArtifact(role, label) {
-        const url = await this.findArtifact(role);
+    requireArtifact(role, label) {
+        const url = this.findArtifact(role);
         if (url) return url;
         throw new Error(`${label} is not available.\n\n${STILL_PROCESSING}`);
     }
 
     /** Parsed JSON of an optional artifact, or null when absent or unreadable. */
     async readArtifactJson(role) {
-        const url = await this.findArtifact(role);
+        const url = this.findArtifact(role);
         if (!url) return null;
         try {
             const resp = await this.dataset.registry.fetchRaw(url);
