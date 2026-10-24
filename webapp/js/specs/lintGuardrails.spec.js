@@ -1,7 +1,6 @@
 /**
- * HQ-01 acceptance: lint is gated on zero warnings, the guard rules exist,
- * components can be mounted with @vue/test-utils, build tools are dev-only.
- * Fails today: `npm run lint` uses --quiet, no guard rules, no @vue/test-utils.
+ * Lint is gated on zero warnings, the guard rules exist, components can be mounted
+ * with @vue/test-utils, build tools are dev-only.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -12,7 +11,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
 const eslintConfig = fs.readFileSync(path.join(ROOT, 'eslint.config.mjs'), 'utf8')
     + fs.readFileSync(path.join(ROOT, 'eslint-rules', 'guards.mjs'), 'utf8');
 
-describe('HQ-01 guardrails', () => {
+describe('lint and build guardrails', () => {
     it('lint fails on any warning instead of hiding warnings', () => {
         expect(pkg.scripts.lint).not.toMatch(/--quiet/);
         expect(pkg.scripts.lint).toMatch(/--max-warnings 0/);

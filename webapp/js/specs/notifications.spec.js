@@ -1,6 +1,5 @@
 /**
- * HQ-03 acceptance: one notifier with named durations, typed API errors,
- * a prop-driven Message box. Fails today: none of these exist.
+ * One notifier with named durations, typed API errors, a prop-driven Message box.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';

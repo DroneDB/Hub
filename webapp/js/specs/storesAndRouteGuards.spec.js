@@ -1,6 +1,5 @@
 /**
- * HQ-04 acceptance: Pinia stores own session state; the router guards protected
- * routes. Fails today: no stores/ folder, no route meta, no guard.
+ * Pinia stores own the session state; the router guards protected routes.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';

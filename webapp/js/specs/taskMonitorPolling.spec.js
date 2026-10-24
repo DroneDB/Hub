@@ -1,10 +1,8 @@
 /**
- * HUB-05 baseline: taskMonitor keeps polling /tasks while the tab is hidden and
- * every open dataset screen polls independently.
+ * How taskMonitor polls /tasks: idle polling backs off, a hidden tab is not polled, and
+ * activity brings the fast cadence back.
  *
- * Run with: npx vitest run webapp/js/ImprovementBaselines/taskMonitorPolling.baseline.spec.js
- *
- * HUB-05 landed: the former baselines (15 s forever, polling while hidden) are inverted.
+ * Run with: npx vitest run webapp/js/specs/taskMonitorPolling.spec.js
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
@@ -17,7 +15,7 @@ function makeDataset(slug, calls) {
     };
 }
 
-describe('HUB-05 taskMonitor polling', () => {
+describe('taskMonitor polling', () => {
     beforeEach(async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-10-14T00:00:00Z'));
@@ -67,7 +65,7 @@ describe('HUB-05 taskMonitor polling', () => {
         taskMonitor.release(ds);
     });
 
-    it('baseline: every poll asks for up to 200 tasks', async () => {
+    it('every poll asks for up to 200 tasks', async () => {
         const calls = [];
         const ds = makeDataset('c', calls);
         taskMonitor.acquire(ds);
@@ -76,7 +74,7 @@ describe('HUB-05 taskMonitor polling', () => {
         taskMonitor.release(ds);
     });
 
-    it('target: no polling while the document is hidden', async () => {
+    it('no polling while the document is hidden', async () => {
         const calls = [];
         const ds = makeDataset('d', calls);
         taskMonitor.acquire(ds);
@@ -90,7 +88,7 @@ describe('HUB-05 taskMonitor polling', () => {
         taskMonitor.release(ds);
     });
 
-    it('target: idle polling backs off (≤ 2 fetches in the first idle minute after the initial one)', async () => {
+    it('idle polling backs off (≤ 2 fetches in the first idle minute after the initial one)', async () => {
         const calls = [];
         const ds = makeDataset('e', calls);
         taskMonitor.acquire(ds);

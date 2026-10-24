@@ -1,7 +1,6 @@
 /**
- * HQ-05 acceptance: one HTTP client owns auth headers, timeouts, error typing
- * and the 401 callback; task states have one definition.
- * Fails today: libs/ddb/http/httpClient.js and libs/tasks/taskStates.js do not exist.
+ * One HTTP client owns auth headers, timeouts, error typing and the 401 callback;
+ * task states have one definition.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 

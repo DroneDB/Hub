@@ -1,6 +1,5 @@
 /**
- * HQ-08 acceptance: one viewer shell, one entry loader, one undo stack.
- * Fails today: none of the modules exist.
+ * One viewer shell, one entry loader, one undo stack.
  */
 import { describe, it, expect } from 'vitest';
 

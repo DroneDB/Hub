@@ -1,13 +1,12 @@
 /**
- * HUB-07 baseline: Datasets.vue preloads a cover for every dataset in the organisation.
+ * Which dataset covers the organisation page preloads: the server returns one page
+ * (skip/take) with its covers checked, so the browser loads at most that page's covers.
  *
  * The component is heavy to mount (PrimeVue DataTable, router, dialogs), so this spec
- * exercises the preload policy exactly as written in Datasets.vue (preloadThumbnails ->
- * preloadDatasetThumbnail over `this.datasets`) with a counting Image stub, and states
- * the target policy: the server returns one page (skip/take) with its covers checked, so
- * the browser loads at most that page's covers.
+ * exercises the preload policy of Datasets.vue (preloadThumbnails -> preloadDatasetThumbnail
+ * over the datasets of the page) with a counting Image stub.
  *
- * Run with: npx vitest run webapp/js/ImprovementBaselines/datasetsPreload.baseline.spec.js
+ * Run with: npx vitest run webapp/js/specs/datasetsPreload.spec.js
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { datasetListQuery } from '@/libs/datasetList';
@@ -19,8 +18,8 @@ function makeDatasets(n) {
     return Array.from({ length: n }, (_, i) => ({ slug: `ds${i}`, hasThumbnail: true, thumbUrl: '/images/dataset-placeholder.svg', thumbLoaded: false }));
 }
 
-/** Verbatim logic of Datasets.vue preloadThumbnails()/preloadDatasetThumbnail(). */
-function currentPreloadPolicy(datasets, getUrl) {
+/** The logic of Datasets.vue preloadThumbnails()/preloadDatasetThumbnail(). */
+function preloadPolicy(datasets, getUrl) {
     datasets.forEach(ds => {
         if (!ds.hasThumbnail) return;
         const url = getUrl(ds);
@@ -30,7 +29,7 @@ function currentPreloadPolicy(datasets, getUrl) {
     });
 }
 
-describe('HUB-07 dataset cover preload policy', () => {
+describe('dataset cover preload policy', () => {
     let created;
     beforeEach(() => {
         created = [];
@@ -38,18 +37,13 @@ describe('HUB-07 dataset cover preload policy', () => {
     });
     afterEach(() => vi.unstubAllGlobals());
 
-    it('baseline (policy before HUB-07): one Image load per dataset in the organisation', () => {
-        currentPreloadPolicy(makeDatasets(DATASETS), ds => `/orgs/o/ds/${ds.slug}/thumb?size=150`);
-        expect(created.length).toBe(DATASETS);
-    });
-
     // What GET /orgs/{org}/ds?skip&take answers (DatasetListQuery, name order)
     const serverPage = (datasets, q) => datasets.slice(q.skip, q.skip + q.take);
 
-    it('target: covers are loaded for the page shown only (≤ page + next page)', () => {
+    it('covers are loaded for the page shown only (≤ page + next page)', () => {
         const datasets = makeDatasets(DATASETS);
         const query = datasetListQuery({ page: 1, pageSize: PAGE_SIZE, sortColumn: 'name', sortDirection: 'asc' });
-        currentPreloadPolicy(serverPage(datasets, query), ds => `/orgs/o/ds/${ds.slug}/thumb?size=150`);
+        preloadPolicy(serverPage(datasets, query), ds => `/orgs/o/ds/${ds.slug}/thumb?size=150`);
         expect(created.length).toBeLessThanOrEqual(2 * PAGE_SIZE);
         expect(created.length).toBe(PAGE_SIZE);
     });

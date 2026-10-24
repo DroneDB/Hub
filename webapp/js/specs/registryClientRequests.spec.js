@@ -1,10 +1,8 @@
 /**
- * HUB-06 baseline: the Registry client performs one HTTP round trip per call, with
- * no in-flight de-duplication, no short-lived read cache and no cancellation hook.
+ * How the Registry client sends requests: a short-lived read cache shared by the clients
+ * of an origin, in-flight de-duplication, conditional requests and cancellation.
  *
- * Run with: npx vitest run webapp/js/ImprovementBaselines/registryClient.baseline.spec.js
- *
- * HUB-06 landed: the former baselines are inverted into regression tests.
+ * Run with: npx vitest run webapp/js/specs/registryClientRequests.spec.js
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Registry from '@/libs/ddb/registry';
@@ -13,7 +11,7 @@ function jsonResponse(body) {
     return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
-describe('HUB-06 Registry client request behaviour', () => {
+describe('Registry client request behaviour', () => {
     let fetchMock;
     beforeEach(() => {
         // The read cache is shared per origin: every test starts from an empty one
@@ -71,13 +69,13 @@ describe('HUB-06 Registry client request behaviour', () => {
         expect(await reg.getRequest('/orgs/admin/ds/photos/tasks?take=200')).toEqual([{ id: 1 }]);
     });
 
-    it('target: concurrent identical GETs are coalesced into one request', async () => {
+    it('concurrent identical GETs are coalesced into one request', async () => {
         const reg = new Registry('http://registry.test');
         await Promise.all([reg.getRequest('/orgs/admin/'), reg.getRequest('/orgs/admin/')]);
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    it('target: a GET accepts an AbortSignal and aborts the underlying fetch', async () => {
+    it('a GET accepts an AbortSignal and aborts the underlying fetch', async () => {
         const reg = new Registry('http://registry.test');
         const ac = new AbortController();
         let seenSignal = null;
@@ -99,7 +97,7 @@ describe('HUB-06 Registry client request behaviour', () => {
         await expect(p).rejects.toMatchObject({ name: 'AbortError' });
     });
 
-    it('target: descriptors asked with a signal are still shared, and an abort stops only that caller', async () => {
+    it('descriptors asked with a signal are still shared, and an abort stops only that caller', async () => {
         const reg = new Registry('http://registry.test');
         let release;
         fetchMock.mockImplementation(() => new Promise(resolve => { release = () => resolve(jsonResponse({ slug: 'photos' })); }));

@@ -1,7 +1,6 @@
 /**
- * HQ-10 acceptance: no icon-only button without an accessible name, no clickable
- * div/span without a role (or hidden from screen readers, as a mouse shortcut for a key),
- * every <img> has alt. Failed on 2026-10-20 (63 / 27 / 24 findings).
+ * No icon-only button without an accessible name, no clickable div/span without a role
+ * (or hidden from screen readers, as a mouse shortcut for a key), every <img> has alt.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -18,7 +17,7 @@ function walk(dir, out = []) {
 const templates = walk(ROOT).map(p => [path.relative(ROOT, p), (fs.readFileSync(p, 'utf8').match(/<template>([\s\S]*)<\/template>/) || ['', ''])[1]]);
 const find = re => templates.flatMap(([f, t]) => [...t.matchAll(re)].map(m => `${f}: ${m[0].slice(0, 80)}`));
 
-describe('HQ-10 accessibility', () => {
+describe('accessibility of the templates', () => {
     it('icon-only buttons have an accessible name', () => {
         const prime = find(/<Button\b(?![^>]*\b(?::?label|:?aria-label)=)[^>]*\bicon=[^>]*>/g);
         const native = find(/<button\b(?![^>]*aria-label=)[^>]*>\s*<i\b[^>]*?\/?>\s*(?:<\/i>)?\s*<\/button>/g);

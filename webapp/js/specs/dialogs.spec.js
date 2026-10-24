@@ -1,7 +1,6 @@
 /**
- * HQ-09 acceptance: Window owns dialog behaviour; dialogs are opened through a
- * registry that resolves with a result; selection logic is shared.
- * Fails today: Window has no v-model:visible/keyboard; useDialogs/useFileSelection do not exist.
+ * Window owns dialog behaviour; dialogs are opened through a registry that resolves
+ * with a result; selection logic is shared.
  */
 import { describe, it, expect } from 'vitest';
 import { effectScope } from 'vue';

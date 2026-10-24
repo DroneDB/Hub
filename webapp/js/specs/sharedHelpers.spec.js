@@ -1,7 +1,6 @@
 /**
- * HQ-02 acceptance: shared helpers exist and behave consistently.
- * Fails today: libs/format.js, libs/download.js, libs/ids.js, libs/preferences.js,
- * composables/useCopyText.js and pathutils.extname/stem do not exist.
+ * The shared helpers (libs/format.js, libs/download.js, libs/ids.js, libs/preferences.js,
+ * composables/useCopyText.js, pathutils.extname/stem) behave consistently.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { effectScope, nextTick } from 'vue';

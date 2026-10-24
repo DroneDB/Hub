@@ -1,13 +1,9 @@
 /**
- * UPL-01 baseline: the drag-and-drop folder walker (libs/dragDropUtils.getFilesFromDrop)
- * resolves every File one at a time (one awaited entry.file() / readEntries() after the
- * other), so dropping a folder with N files costs N serial browser round trips before
- * the upload dialog even opens.
+ * The drag-and-drop folder walker (libs/dragDropUtils.getFilesFromDrop) resolves the
+ * files of a dropped folder in parallel, bounded by TRAVERSAL_CONCURRENCY, instead of
+ * paying one serial browser round trip per file before the upload dialog opens.
  *
- * Run with: npx vitest run webapp/js/ImprovementBaselines/dragDropTraversal.baseline.spec.js
- *
- * The walk is now parallel and bounded (TRAVERSAL_CONCURRENCY): the former "baseline" cases
- * (peak in flight = 1, wall time linear in N) are inverted into regression tests.
+ * Run with: npx vitest run webapp/js/specs/dragDropTraversal.spec.js
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -50,7 +46,7 @@ function dropEvent(entry) {
     return { dataTransfer: { items: [{ kind: 'file', webkitGetAsEntry: () => entry }] } };
 }
 
-describe('UPL-01 drag-and-drop folder traversal', () => {
+describe('drag-and-drop folder traversal', () => {
     it('keeps the tree order (depth first, reading order)', async () => {
         const stats = { inFlight: 0, peak: 0, calls: 0, readEntries: 0 };
         const files = await getFilesFromDrop(dropEvent(makeTree(4, 50, stats)));

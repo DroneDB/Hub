@@ -1,6 +1,6 @@
 /**
- * HQ-07 acceptance: OpenLayers controls live in libs/map/controls, a shared
- * MapCore exists, the map wrappers are thin. Fails today on all counts.
+ * OpenLayers controls live in libs/map/controls, one MapCore is shared by the map
+ * wrappers, and the wrappers are thin.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
