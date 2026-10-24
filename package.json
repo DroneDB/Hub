@@ -80,7 +80,6 @@
     "playwright": "^1.58.2",
     "sass": "^1.72.0",
     "sass-loader": "^14.1.0",
-    "style-loader": "^3.3.4",
     "typescript": "~5.9",
     "vitest": "^3.0.0",
     "vue-loader": "^17.4.0",
