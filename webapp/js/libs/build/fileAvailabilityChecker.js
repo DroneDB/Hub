@@ -13,6 +13,7 @@ import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
 import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
 import { isActiveState } from '@/libs/tasks/taskStates';
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
 // Build artifact each viewer needs, by role (the entry DTO lists the artifacts that exist).
 // An array is an any-of match.
@@ -38,16 +39,6 @@ const VIEW_ARTIFACT_ROLES = {
     'panorama': null, // Panoramas use the original file
     'markdown': null  // Markdown files use the original file
 };
-
-// File types that require a build
-const BUILDABLE_TYPES = [
-    ddb.entry.type.POINTCLOUD,
-    ddb.entry.type.GEORASTER,
-    ddb.entry.type.MODEL,
-    ddb.entry.type.VECTOR,
-    ddb.entry.type.GAUSSIAN_SPLAT,
-    ddb.entry.type.TILES3D
-];
 
 /**
  * Availability check result
@@ -75,7 +66,7 @@ class FileAvailabilityChecker {
         if (entry.type === ddb.entry.type.GENERIC && /\.3tz$/i.test(entry.path || '')) entry = { ...entry, type: ddb.entry.type.TILES3D };
 
         // For non-buildable files, only check if they exist
-        if (!this.isBuildableType(entry.type)) {
+        if (!isBuildableType(entry.type)) {
             return this.checkNonBuildableFile(dataset, entry, viewType);
         }
 
@@ -103,13 +94,6 @@ class FileAvailabilityChecker {
 
         // For buildable files, verify build state
         return this.checkBuildableFile(dataset, entry, viewType, options);
-    }
-
-    /**
-     * Checks if a file type requires a build
-     */
-    isBuildableType(entryType) {
-        return BUILDABLE_TYPES.includes(entryType);
     }
 
     /**

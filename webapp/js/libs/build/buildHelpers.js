@@ -1,10 +1,11 @@
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import { formatMissingDeps } from '@/libs/build/buildDepFormat';
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isBuilt, currentEntry, shownBuildStatus } from '@/libs/build/entryBuild';
 
 function isBuildableFile(dataset, file) {
     if (!dataset) return false;
-    return BuildManager.isBuildableType(file.entry.type);
+    return isBuildableType(file.entry.type);
 }
 
 function hasActiveBuild(dataset, file) {

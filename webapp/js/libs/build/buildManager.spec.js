@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import ddb from 'ddb';
+import reg from '@/libs/api/sharedRegistry';
 
 vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getTasks: vi.fn(() => []), acquire: vi.fn(), release: vi.fn(), forceRefresh: vi.fn(), onFilesAdded: vi.fn() } }));
 const { default: manager } = await import('./buildManager');
@@ -31,5 +32,15 @@ describe('hasNewBuildableFiles', () => {
         manager._buildByPath.set(manager.getDatasetKey(dataset), new Map([['a.tif', { path: 'a.tif', state: 'Succeeded' }]]));
         expect(manager.hasNewBuildableFiles(dataset, [{ path: 'a.tif', type: T.GEORASTER }])).toBe(true);
         manager._buildByPath.clear();
+    });
+});
+
+describe('buildable types come from the server', () => {
+    it('counts Tiles3D as buildable (the Hub list used to omit it) and follows a changed list', () => {
+        const tiles = [{ path: 'city.3tz', type: T.TILES3D }];
+        expect(manager.hasNewBuildableFiles(dataset, tiles)).toBe(true);
+        reg.features.values = { entryTypes: [{ id: T.TILES3D, buildable: false, thumbnail: 'none' }] };
+        expect(manager.hasNewBuildableFiles(dataset, tiles)).toBe(false);
+        reg.features.clear();
     });
 });

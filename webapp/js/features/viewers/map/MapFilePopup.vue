@@ -54,6 +54,7 @@ import Overlay from 'ol/Overlay';
 import { coordAll } from '@turf/meta';
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
+import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { useCopyText } from '@/composables/useCopyText';
 import { useTimeout } from '@/composables/useTimers';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
@@ -112,7 +113,7 @@ function show(file, coordinate) {
     nextTick(() => {
         // Set after the tick so v-show hides the previous image while this one loads
         if (!isVideo) {
-            if (thumbs.supportedForType(file.entry.type)) popup.thumbnail = thumbs.fetch(file.path, 512, file.entry.hash);
+            if (hasThumbnail(file.entry.type)) popup.thumbnail = thumbs.fetch(file.path, 512, file.entry.hash);
             else popup.loading = false;
         }
         if (!overlay && props.map) {

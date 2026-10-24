@@ -14,6 +14,7 @@ import { clone } from '@/libs/utils';
 import { lazyComponent } from '@/libs/lazyComponent';
 import { renameDataset } from '@/libs/api/registryUtils';
 import BuildManager from '@/libs/build/buildManager';
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import emitter from '@/libs/eventBus';
 import { itemFor } from '@/libs/dataset/explorerItems';
 import { confirmDelete, CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
@@ -152,7 +153,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             listing.drop([newPath]);
             listing.removed([oldPath]);
             listing.added([item]);
-            if (action === 'rename' && !BuildManager.isBuildableType(file.entry.type) && BuildManager.isBuildableType(item.entry.type)) {
+            if (action === 'rename' && !isBuildableType(file.entry.type) && isBuildableType(item.entry.type)) {
                 BuildManager.onFilesAdded(dataset, [item.entry]);
             }
             if (!silent) notify.success(action === 'move' ? 'File moved successfully' : 'File renamed successfully', { summary: action === 'move' ? 'Moved' : 'Renamed' });

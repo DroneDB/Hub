@@ -68,6 +68,7 @@
 <script>
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
+import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { isFileBuilt, formatMissingDeps } from '@/libs/build/buildHelpers';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
 import ddb from 'ddb';
@@ -107,11 +108,11 @@ export default {
         },
         hasThumbnailSupport() {
             if (!this.file || this.isDirectory) return false;
-            return thumbs.supportedForType(this.file.entry.type);
+            return hasThumbnail(this.file.entry.type);
         },
         isBuildableFile() {
             if (!this.file || !this.dataset) return false;
-            return BuildManager.isBuildableType(this.file.entry.type);
+            return isBuildableType(this.file.entry.type);
         },
         hasActiveBuild() {
             if (!this.file || !this.dataset) return false;
@@ -236,7 +237,7 @@ export default {
             if (!this.file) return;
 
             // Check for builds if applicable
-            if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
+            if (this.dataset && isBuildableType(this.file.entry.type)) {
                 const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
                 if (buildState) {
                     this.buildState = buildState;
@@ -267,7 +268,7 @@ export default {
             this.loading = true;
 
             try {
-                if (thumbs.supportedForType(this.file.entry.type)) {
+                if (hasThumbnail(this.file.entry.type)) {
                     this.thumbnail = await thumbs.fetch(this.file.path, 512, this.file.entry.hash);
                     this.buildLoading = false;
                 }

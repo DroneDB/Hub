@@ -1,5 +1,5 @@
 import { entry, pathutils } from 'ddb';
-import { isArchivePath } from '@/libs/entryTypes';
+import { isArchivePath } from '@/libs/entryTypeCapabilities';
 
 const typeIconMap = {
     [entry.type.DIRECTORY]: "fa-regular fa-folder",

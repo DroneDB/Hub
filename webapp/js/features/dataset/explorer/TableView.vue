@@ -89,6 +89,7 @@ import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip, buildFile } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
+import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 
 import ddb from 'ddb';
 const { pathutils, entry, thumbs } = ddb;
@@ -401,7 +402,7 @@ export default {
             if (!this.files) return;
 
             for (const file of this.files) {
-                if (!thumbs.supportedForType(file.entry.type)) continue;
+                if (!hasThumbnail(file.entry.type)) continue;
                 // Skip paths whose thumbnail already failed in this component
                 // instance; they heal on remount / dataset switch.
                 if (this.failedThumbs.has(file.entry.path)) continue;

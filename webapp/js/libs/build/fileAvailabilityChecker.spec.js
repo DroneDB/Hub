@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ddb from 'ddb';
+import reg from '@/libs/api/sharedRegistry';
 
 const buildManager = vi.hoisted(() => ({ getBuildState: vi.fn() }));
 const taskMonitor = vi.hoisted(() => ({ getTasks: vi.fn() }));
@@ -160,5 +161,28 @@ describe('buildable file: the artifacts decide, the job explains', () => {
         const dataset = datasetListing(raster());
         await checker.check(dataset, raster(), 'map');
         expect(dataset.registry.headRequest).not.toHaveBeenCalled();
+    });
+});
+
+describe('which types need a build (the server decides)', () => {
+    const served = (buildableIds) => ({
+        entryTypes: [3, 4, 14, 16].map(id => ({ id, name: String(id), buildable: buildableIds.includes(id), thumbnail: 'none', sidecarExtensions: [], roles: [] }))
+    });
+
+    it('opens a type the server does not build without looking at any build', async () => {
+        reg.features.values = served([14]);
+        const dataset = datasetListing(null);
+        const result = await checker.check(dataset, raster(), 'map');
+        expect(result).toMatchObject({ available: true, status: 'ready' });
+        expect(dataset.listOne).not.toHaveBeenCalled();
+        reg.features.clear();
+    });
+
+    it('asks for the build of a type the server builds and the Hub never listed', async () => {
+        reg.features.values = served([14, 16]);
+        const tiles = { path: 'city.3tz', hash: 't', type: T.TILES3D };
+        const result = await checker.check(datasetListing(tiles), tiles, 'unified', { current: true });
+        expect(result).toMatchObject({ available: false, status: 'not-found' });
+        reg.features.clear();
     });
 });

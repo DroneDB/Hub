@@ -35,6 +35,7 @@ import { thumbs } from 'ddb';
 import Mouse from '@/libs/mouse';
 import Keyboard from '@/libs/keyboard';
 import BuildManager from '@/libs/build/buildManager';
+import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { formatMissingDeps } from '@/libs/build/buildHelpers';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
@@ -215,7 +216,7 @@ export default {
                 clearTimeout(this.loadTimeout);
                 this.loadTimeout = null;
             }
-            if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
+            if (this.dataset && isBuildableType(this.file.entry.type)) {
                 // Buildable entry: show the file icon and let the
                 // queued/pending/failed badge explain the state (same rule as
                 // the loadThumbnail catch branch).
@@ -264,7 +265,7 @@ export default {
             }
 
             // For buildable files, check if there's an active build or if it needs building
-            if (this.dataset && BuildManager.isBuildableType(this.file.entry.type)) {
+            if (this.dataset && isBuildableType(this.file.entry.type)) {
                 try {
                     // Check BuildManager cache first (more reliable)
                     const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
@@ -318,7 +319,7 @@ export default {
             this.loading = true;
 
             try {
-                if (thumbs.supportedForType(this.file.entry.type)) {
+                if (hasThumbnail(this.file.entry.type)) {
                     // The tile's size times the pixel ratio, not a fixed 256 px
                     const url = await thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
                     this.buildLoading = false; // Clear build loading when thumbnail succeeds
@@ -333,7 +334,7 @@ export default {
 
                 // For buildable files without a build yet, show the icon and let the
                 // queued/pending badge explain the state instead of a perpetual spinner.
-                if (this.dataset && BuildManager.isBuildableType(this.file.entry.type) && !this.buildState) {
+                if (this.dataset && isBuildableType(this.file.entry.type) && !this.buildState) {
                     this.icon = this.file.icon;
                 } else {
                     this.buildLoading = false;

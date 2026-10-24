@@ -3,7 +3,8 @@ const { pathutils } = ddb;
 
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { isCadDrawing } from '@/libs/cadCrs';
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { hasDedicatedViewer, isMapViewable, isPanoramaType, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { hasThumbnail, isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
@@ -343,10 +344,11 @@ function setThumbnailItem(ctx) {
             if (!ctx.canWrite || sel.length !== 1) return false;
             const file = sel[0];
             const type = file.entry.type;
-            if (!isThumbnailCandidate(type)) return false;
+            if (!hasThumbnail(type)) return false;
             const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
             if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
-            if (type === ddb.entry.type.GEORASTER || type === ddb.entry.type.GAUSSIAN_SPLAT) {
+            // A thumbnail of a built type comes from its build: not while it failed or runs
+            if (isBuildableType(type)) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);
                 if (!buildState) return true;
                 return buildState.currentState !== BUILD_STATES.FAILED && !hasActiveBuild(ctx.dataset, file);

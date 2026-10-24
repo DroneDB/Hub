@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const buildManager = vi.hoisted(() => ({ getBuildState: vi.fn(), hasActiveBuild: vi.fn(), isBuildableType: vi.fn() }));
+const buildManager = vi.hoisted(() => ({ getBuildState: vi.fn(), hasActiveBuild: vi.fn() }));
 vi.mock('@/libs/build/buildManager', () => ({
     default: buildManager,
     BUILD_STATES: { AWAITING: 'Awaiting', CREATED: 'Created', ENQUEUED: 'Enqueued', FAILED: 'Failed', PROCESSING: 'Processing', SCHEDULED: 'Scheduled', SUCCEEDED: 'Succeeded' }

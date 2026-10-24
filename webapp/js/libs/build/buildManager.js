@@ -11,17 +11,9 @@
  */
 
 import taskMonitor from '@/libs/tasks/taskMonitor';
-import ddb from 'ddb';
 import { datasetKey, isActiveState } from '@/libs/tasks/taskStates';
 import { isBuilt } from '@/libs/build/entryBuild';
-
-const BUILDABLE_TYPES = [
-    ddb.entry.type.POINTCLOUD,
-    ddb.entry.type.GEORASTER,
-    ddb.entry.type.MODEL,
-    ddb.entry.type.VECTOR,
-    ddb.entry.type.GAUSSIAN_SPLAT
-];
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
 // Build job states according to Hangfire / JobIndex states (progress and failures, not availability)
 const BUILD_STATES = {
@@ -66,12 +58,6 @@ class BuildManager {
 
     getDatasetKey(dataset) {
         return datasetKey(dataset);
-    }
-
-    /* ---- buildable type helpers ---- */
-
-    isBuildableType(entryType) {
-        return BUILDABLE_TYPES.includes(entryType);
     }
 
     /* ---- dataset registration & initialisation ---- */
@@ -156,7 +142,7 @@ class BuildManager {
     async startBuild(dataset, filePath, force = false) {
         try {
             const entry = await dataset.listOne(filePath);
-            if (!this.isBuildableType(entry.type)) {
+            if (!isBuildableType(entry.type)) {
                 throw new Error(`File type ${entry.type} is not buildable`);
             }
             if (this.hasActiveBuild(dataset, filePath) && !force) {
@@ -198,7 +184,7 @@ class BuildManager {
     /* ---- file-added callbacks ---- */
 
     async startPollingForNewFiles(dataset, fileEntries = []) {
-        const buildableFiles = fileEntries.filter(e => e && this.isBuildableType(e.type));
+        const buildableFiles = fileEntries.filter(e => e && isBuildableType(e.type));
         if (buildableFiles.length > 0) {
             taskMonitor.onFilesAdded(dataset);
             this.emit('newBuildableFilesDetected', {
@@ -210,7 +196,7 @@ class BuildManager {
 
     /** Whether any of the entries (as just listed) is buildable and has no complete build. */
     hasNewBuildableFiles(dataset, fileEntries = []) {
-        return fileEntries.some(entry => entry && this.isBuildableType(entry.type) && !isBuilt(entry));
+        return fileEntries.some(entry => entry && isBuildableType(entry.type) && !isBuilt(entry));
     }
 
     async onFilesAdded(dataset, fileEntries) {
