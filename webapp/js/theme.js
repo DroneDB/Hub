@@ -11,7 +11,7 @@ const solid = c => ({
 const SEVERITIES = { success: 'green', info: 'sky', warn: 'orange', help: 'purple', danger: 'red' };
 const each = make => Object.fromEntries(Object.entries(SEVERITIES).map(([s, c]) => [s, make(c)]));
 
-export const DdbPreset = definePreset(Lara, {
+const DdbPreset = definePreset(Lara, {
     components: {
         dataview: {
             root: {

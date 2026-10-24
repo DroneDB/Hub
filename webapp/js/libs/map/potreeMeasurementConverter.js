@@ -9,7 +9,7 @@ import { EPSG } from '@/libs/constants';
  * @param {Object} coordinateSystem - Coordinate system from EPT
  * @returns {Object} GeoJSON Feature
  */
-export function measureToGeoJSON(measure, coordinateSystem) {
+function measureToGeoJSON(measure, coordinateSystem) {
     const points = measure.points.map(point => {
         // Convert local coordinates to geographic
         const coords = localToGeographic(point.position, coordinateSystem);
@@ -130,7 +130,7 @@ export function measureToGeoJSON(measure, coordinateSystem) {
  * @param {Object} coordinateSystem - Coordinate system
  * @returns {Potree.Measure} Potree measurement
  */
-export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
+function geoJSONToMeasure(feature, viewer, coordinateSystem) {
     const measure = new Potree.Measure();
     const props = feature.properties;
 

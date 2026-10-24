@@ -150,12 +150,7 @@ function formatContent(content, mode) {
 }
 
 export {
-    TEXT_EXTENSIONS,
-    BINARY_EXTENSIONS,
     MAX_TEXT_FILE_SIZE,
-    getExtension,
-    isDefaultTextFile,
-    isBinaryFile,
     isPdfFile,
     canOpenAsText,
     shouldOpenAsText,

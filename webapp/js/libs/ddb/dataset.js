@@ -8,7 +8,7 @@ import { failureMessageOf, isJsonType } from './http/httpClient';
 // The image format of map tiles is the extension of their URL, and the server sends exactly that format. WebP is the
 // default: smaller than PNG for the same tile (what a map pulls by the hundred). PNG is the universal one, for URLs
 // handed to other software (see ShareEmbed).
-export const TILE_FORMAT = "webp";
+const TILE_FORMAT = "webp";
 
 export default class Dataset {
     constructor(registry, org, ds) {

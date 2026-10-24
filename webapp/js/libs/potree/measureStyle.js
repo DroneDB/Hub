@@ -34,7 +34,7 @@ export function applyMeasureStyle(measure) {
 }
 
 /** Fill colour and opacity of an area measurement's polygon mesh. */
-export function applyAreaFill(measure) {
+function applyAreaFill(measure) {
     if (!measure.showArea || !measure.closed) return;
     const fill = measure.fillColor || measure.color;
     const opacity = measure.fillOpacity ?? 0.2;

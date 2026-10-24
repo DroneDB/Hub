@@ -8,7 +8,7 @@
 import { escapeHtml } from '@/libs/sanitize';
 
 /** A raycaster from the camera through the pointer. */
-export function pointerRaycaster(viewer, event) {
+function pointerRaycaster(viewer, event) {
     const rect = viewer.renderer.domElement.getBoundingClientRect();
     const mouse = new THREE.Vector2(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,

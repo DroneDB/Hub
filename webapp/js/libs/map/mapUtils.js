@@ -26,7 +26,7 @@ export const MEASUREMENT_SWATCHES = Object.freeze([
 /**
  * Color palette for vector layers - bright, distinct colors with good contrast
  */
-export const colorPalette = [
+const colorPalette = [
     'rgba(66, 133, 244, 0.8)',    // Blue
     'rgba(219, 68, 55, 0.8)',     // Red
     'rgba(15, 157, 88, 0.8)',     // Green
@@ -46,7 +46,7 @@ export const colorPalette = [
  * @param {string} str
  * @returns {number}
  */
-export function stringToHashCode(str) {
+function stringToHashCode(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         hash = ((hash << 5) - hash) + str.charCodeAt(i);

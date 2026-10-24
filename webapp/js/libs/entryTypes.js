@@ -8,7 +8,6 @@ const TYPES_WITH_DEDICATED_VIEWER = Object.keys(OpenItemDefaults).map(Number);
 // Type groupings used across the application
 const MAP_VIEWABLE_TYPES = [ddb.entry.type.GEORASTER, ddb.entry.type.GEOIMAGE, ddb.entry.type.POINTCLOUD, ddb.entry.type.VECTOR, ddb.entry.type.GEOVIDEO];
 const PANORAMA_TYPES = [ddb.entry.type.PANORAMA, ddb.entry.type.GEOPANORAMA];
-const VIDEO_TYPES = [ddb.entry.type.VIDEO, ddb.entry.type.GEOVIDEO];
 
 // Helper functions
 function hasDedicatedViewer(type) {
@@ -21,10 +20,6 @@ function isMapViewable(type) {
 
 function isPanoramaType(type) {
     return PANORAMA_TYPES.includes(type);
-}
-
-function isVideoType(type) {
-    return VIDEO_TYPES.includes(type);
 }
 
 function isDroneDB(type) {
@@ -105,15 +100,9 @@ function sortEntriesDirectoriesFirst(entries, getPath, descending = false) {
 }
 
 export {
-    TYPES_WITH_DEDICATED_VIEWER,
-    MAP_VIEWABLE_TYPES,
-    PANORAMA_TYPES,
-    VIDEO_TYPES,
-    TYPE_DISPLAY_NAMES,
     hasDedicatedViewer,
     isMapViewable,
     isPanoramaType,
-    isVideoType,
     isDroneDB,
     isPlantHealthCapable,
     isRasterAnalysisCapable,

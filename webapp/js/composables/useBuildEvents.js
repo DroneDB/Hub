@@ -70,4 +70,3 @@ export function useBuildEvents() {
     };
 }
 
-export default useBuildEvents;

@@ -42,4 +42,3 @@ export function useTaskFormatting() {
     };
 }
 
-export default useTaskFormatting;

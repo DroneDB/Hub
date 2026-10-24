@@ -27,13 +27,13 @@ export function isDDBUri(uri) {
     return uri.startsWith("ddb://") || uri.startsWith("ddb+unsafe://");
 }
 
-export function datasetPathFromUri(uri) {
+function datasetPathFromUri(uri) {
     const { registryUrl, org, ds, path } = parseUri(uri);
     const dataset = Registry.forUrl(registryUrl).Organization(org).Dataset(ds);
     return [dataset, path];
 }
 
-export function pathFromUri(uri) {
+function pathFromUri(uri) {
     if (isDDBUri(uri)) {
         const [, path] = datasetPathFromUri(uri);
         return path;
@@ -42,7 +42,7 @@ export function pathFromUri(uri) {
     } else throw Error("Cannot extract path from URI: " + uri);
 }
 
-export function entryLabel(entry) {
+function entryLabel(entry) {
     if (entry.properties?.meta?.name?.data !== undefined) {
         return entry.properties.meta.name.data;
     } else {

@@ -24,7 +24,7 @@ export const SOURCE_MIN_ZOOM = 14;
 // Upper bound to keep first-hit on-demand GDAL warping costs sane
 export const HARD_MAX_ZOOM = 26;
 // Extra zoom levels the view allows beyond the deepest native zoom
-export const VIEW_MAGNIFICATION = 1;
+const VIEW_MAGNIFICATION = 1;
 // OpenLayers default View maxZoom
 export const OL_DEFAULT_MAX_ZOOM = 28;
 

@@ -7,7 +7,7 @@ import { createLimiter } from '@/libs/concurrency';
 
 // Browser file-system calls (entry.file(), readEntries()) in flight while walking a drop
 // (UPL-01 B.4): one at a time costs a round trip per file; unbounded floods the browser
-export const TRAVERSAL_CONCURRENCY = 16;
+const TRAVERSAL_CONCURRENCY = 16;
 
 /**
  * Read all entries from a directory reader recursively.

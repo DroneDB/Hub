@@ -12,8 +12,8 @@
  */
 import { negotiatedProtocol, isMultiplexed, HTTP1_CONNECTIONS } from './protocolLimits';
 
-export const PROBE_BYTES = 8 * 1024 * 1024;
-export const PROBE_PARALLEL = HTTP1_CONNECTIONS;
+const PROBE_BYTES = 8 * 1024 * 1024;
+const PROBE_PARALLEL = HTTP1_CONNECTIONS;
 // The windows nginx (64 KB, the default) and the recommended tuning (1-2 MB) use
 const KNOWN_WINDOWS = [64 * 1024, 1024 * 1024, 2 * 1024 * 1024];
 

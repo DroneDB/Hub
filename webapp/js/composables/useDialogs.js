@@ -69,4 +69,3 @@ export function useDialogs() {
     return { stack, open, close, isOpen };
 }
 
-export default useDialogs;

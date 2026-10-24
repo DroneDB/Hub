@@ -23,7 +23,7 @@ const LEGACY_APP_IDS = new Set([APP_ID, 'Registry-Stockpile', 'Registry-Orthopho
  * @param {string} rasterPath - Dataset-relative path of the raster.
  * @returns {string|null} The storage path, or null if input is invalid.
  */
-export function getStockpilePath(rasterPath) {
+function getStockpilePath(rasterPath) {
     if (!rasterPath) return null;
     if (rasterPath.endsWith(SUFFIX)) return rasterPath;
     return `${pathutils.dropExtension(rasterPath)}${SUFFIX}`;

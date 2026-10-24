@@ -28,7 +28,7 @@ const EMPTY_OPTIONS = Object.freeze({});
  *
  * @param {object|null|undefined} hubOptions The `hubOptions` block from /sys/features.
  */
-export function applyHubBranding(hubOptions) {
+function applyHubBranding(hubOptions) {
     const opts = hubOptions || EMPTY_OPTIONS;
 
     // Replace any prior frozen object (initial bootstrap may have a stub).

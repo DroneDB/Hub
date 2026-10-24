@@ -86,7 +86,7 @@ export function formatModifiedDate(mtime) {
  * @param {Object} pointGeom - The point_geom object
  * @returns {string|null}
  */
-export function formatCoordinates(pointGeom) {
+function formatCoordinates(pointGeom) {
     if (!pointGeom || !pointGeom.geometry || !pointGeom.geometry.coordinates) return null;
     const coords = pointGeom.geometry.coordinates;
     let coordStr = '';

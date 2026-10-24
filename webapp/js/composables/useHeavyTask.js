@@ -224,4 +224,3 @@ export function useHeavyTask() {
     };
 }
 
-export default useHeavyTask;

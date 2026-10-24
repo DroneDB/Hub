@@ -18,7 +18,7 @@ export const DEFAULT_BASE_DELAY_MS = 1000;
 export const DEFAULT_MAX_DELAY_MS = 30000;
 // Misbehaving proxies/servers can demand absurd Retry-After values; cap the per-file
 // wait at 5 minutes
-export const DEFAULT_RETRY_AFTER_CAP_SECONDS = 300;
+const DEFAULT_RETRY_AFTER_CAP_SECONDS = 300;
 
 /**
  * Whether an HTTP status code returned by the server warrants a retry.

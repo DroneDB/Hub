@@ -25,7 +25,7 @@ export function featureAt(map, pixel, layerFilter) {
  * Explorer items of a feature: every shot of a cluster, or the feature's own file.
  * @returns {any[]}
  */
-export function filesOfFeature(feature) {
+function filesOfFeature(feature) {
     const clustered = feature.get && feature.get('features');
     if (clustered) return clustered.map(f => f.file).filter(Boolean);
     return feature.file ? [feature.file] : [];

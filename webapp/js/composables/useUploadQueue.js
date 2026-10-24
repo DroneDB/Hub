@@ -18,8 +18,6 @@ import { negotiatedProtocol, uploadConcurrency, MULTIPLEXED_STREAMS } from '@/li
 import { useResilientUpload } from '@/composables/useResilientUpload';
 import { UPLOAD_ACTIVITY_EVENT } from '@/libs/upload/uploadEvents';
 
-export { UPLOAD_ACTIVITY_EVENT };
-
 let nextItemId = 0;
 
 /**

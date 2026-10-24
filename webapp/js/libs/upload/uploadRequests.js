@@ -17,9 +17,9 @@ import { sendXhr } from './xhrTransport';
 import { newId } from '@/libs/ids';
 import { bearer, failureMessageOf } from '@/libs/ddb/http/httpClient';
 
-export const CHUNK_BYTES = 64 * 1024 * 1024;
-export const RECEIPT_POLL_MS = 2000;
-export const RECEIPT_MAX_WAIT_MS = 15 * 60 * 1000;
+const CHUNK_BYTES = 64 * 1024 * 1024;
+const RECEIPT_POLL_MS = 2000;
+const RECEIPT_MAX_WAIT_MS = 15 * 60 * 1000;
 
 // Failures after a complete body that may hide a successful upload
 const AMBIGUOUS_STATUSES = new Set([0, 502, 504]);
@@ -216,4 +216,4 @@ function statusText(status) {
     return status === 0 ? 'Network error' : `Upload failed (HTTP ${status})`;
 }
 
-export const newUploadId = newId;
+const newUploadId = newId;

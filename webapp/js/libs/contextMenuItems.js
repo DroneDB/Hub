@@ -636,41 +636,41 @@ function buildStandardContextMenu(ctx) {
 
 export {
     // Individual items
-    openItem,
-    openMapItem,
-    openPointCloudItem,
-    openModelItem,
-    openUnifiedItem,
-    openPanoramaItem,
-    openMarkdownItem,
-    openPdfItem,
-    plantHealthItem,
-    editItem,
-    renameItem,
-    propertiesItem,
-    shareEmbedItem,
-    downloadItem,
-    buildItem,
-    toolsItem,
-    transferItem,
-    setThumbnailItem,
-    mergeMultispectralItem,
-    alignGeoRasterItem,
-    extractItem,
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     setCoordinateSystemItem,
     deleteItem,
     deleteSeparator,
-    selectAllNoneItem,
-    createFolderItem,
-    selectionSeparator,
-    copyClipboardItem,
-    cutClipboardItem,
-    pasteClipboardItem,
-    clipboardSeparator,
+    
+    
+    
+    
+    
+    
+    
     // Grouped builders
     buildViewerMenuItems,
     buildActionMenuItems,
-    buildFooterMenuItems,
+    
     buildStandardContextMenu,
-    experimentalMenuItems
+    
 };

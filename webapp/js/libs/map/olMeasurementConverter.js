@@ -19,7 +19,7 @@ import { EPSG } from '@/libs/constants';
  * @param {string} unitPref - Unit preference ('metric' or 'imperial')
  * @returns {Object} GeoJSON Feature
  */
-export function featureToGeoJSON(feature, unitPref = 'metric') {
+function featureToGeoJSON(feature, unitPref = 'metric') {
     const geometry = feature.getGeometry();
     const geometryType = geometry.getType();
 
@@ -143,7 +143,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
  * @param {Function} formatLength - Function to format length values
  * @returns {ol.Feature} OpenLayers feature
  */
-export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
+function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     const format = new GeoJSON();
     const feature = format.readFeature(geoJsonFeature, {
         dataProjection: EPSG.WGS84,

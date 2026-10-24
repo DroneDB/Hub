@@ -71,4 +71,3 @@ export const notify = {
     error: (detail, options) => show('error', detail, options)
 };
 
-export default notify;
