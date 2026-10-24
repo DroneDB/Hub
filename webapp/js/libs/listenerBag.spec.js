@@ -1,5 +1,5 @@
 /**
- * Unit tests for libs/listenerBag.js and composables/useEventListener.js (HUB-08)
+ * Unit tests for libs/listenerBag.js and composables/useEventListener.js
  * Run with: npx vitest run webapp/js/libs/listenerBag.spec.js
  */
 import { describe, it, expect, vi } from 'vitest';

@@ -1,5 +1,5 @@
 /**
- * The splat viewer's camera rig (HQ-08, out of Splat.vue): the three.js camera, the
+ * The splat viewer's camera rig: the three.js camera, the
  * OrbitControls target it looks at, the scene "up" (tilted by the ground-plane
  * calibration) and the first-person yaw/pitch about that up. The fly and earth controls
  * and the presentation all move the camera through it.

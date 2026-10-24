@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Registry system endpoints (/sys/*) used by the Hub (HQ-05): configuration,
+ * Registry system endpoints (/sys/*) used by the Hub: configuration,
  * processing nodes, upload diagnostics. Pages call these instead of building paths.
  */
 export default class SysApi {

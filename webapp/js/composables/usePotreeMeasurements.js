@@ -1,6 +1,5 @@
 /**
- * usePotreeMeasurements - the measurements of the point-cloud viewer (HQ-08, out of
- * Potree.vue): count, saved file (load / save / delete), editing through the properties
+ * usePotreeMeasurements - the measurements of the point-cloud viewer: count, saved file (load / save / delete), editing through the properties
  * dialogs on double click, the delete tool, and undo / redo of deletions (Ctrl+Z / Ctrl+Y).
  *
  *   const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs });

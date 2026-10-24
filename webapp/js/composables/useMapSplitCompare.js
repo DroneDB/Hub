@@ -1,6 +1,5 @@
 /**
- * useMapSplitCompare - side-by-side comparison of the map's georasters (HQ-07, out of
- * Map.vue). Each raster is clipped to its own vertical band; the N-1 dividers are the
+ * useMapSplitCompare - side-by-side comparison of the map's georasters. Each raster is clipped to its own vertical band; the N-1 dividers are the
  * `splitPositions` fractions (RasterSplitOverlay drags them). rasterLayers[0] is the
  * leftmost band. Leaving the mode, or dropping below two rasters, removes the clips.
  *

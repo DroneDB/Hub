@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * When the task list of a dataset is fetched again (HUB-05).
+ * When the task list of a dataset is fetched again.
  *
  * - hidden page: never (one refresh when it shows again);
  * - tasks running: every 2.5 s;

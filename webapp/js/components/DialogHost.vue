@@ -5,7 +5,7 @@
 
 <script setup>
 /**
- * Renders the dialogs opened with useDialogs() (HQ-07/HQ-09). Named dialogs are looked
+ * Renders the dialogs opened with useDialogs(). Named dialogs are looked
  * up in `components` ({ name: component }, lazy imports welcome). Props given as a
  * function are re-read on every render, so they follow reactive state.
  */

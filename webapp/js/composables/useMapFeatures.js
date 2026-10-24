@@ -1,6 +1,5 @@
 /**
- * useMapFeatures - the features of the dataset map, wired together (HQ-07, the
- * composition root of MapCore): measurements, plant health, raster analysis, stockpile
+ * useMapFeatures - the features of the dataset map, wired together (the composition root of MapCore): measurements, plant health, raster analysis, stockpile
  * volume, contours, tooltip, basemap, the raster list, split compare and alerts.
  *
  * Features share the OpenLayers objects as refs (`map`, `measureControls`, `rasterLayer`,

@@ -3,13 +3,13 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * RequestCache - GET reads of the Registry client (HUB-06).
+ * RequestCache - GET reads of the Registry client.
  *
  * - Single flight: identical GETs in flight at the same time share one HTTP request.
  * - Short read cache: the answers of a few endpoints that every page asks for again and again
  *   (features, organization, dataset info, tools, storage) are reused for a few seconds.
  * - Conditional requests: an answer that came with an ETag is kept, and the next GET of the
- *   same URL sends If-None-Match; a 304 returns the kept body (the task list, HUB-05).
+ *   same URL sends If-None-Match; a 304 returns the kept body (the task list).
  * - Any write through the client (and invalidate()) drops the cached answers, and an answer
  *   whose request started before a drop is neither kept nor handed to a GET made after it.
  *

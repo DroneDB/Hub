@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * Alerts and short notices of the map viewers (HQ-07: a composable; was the
- * useMapAlertFlash mixin, and Potree had a copy of `showFlash`).
+ * Alerts and short notices of the map viewers.
  *
  *   const { alertDialogOpen, alertTitle, alertMessage, showAlert, handleAlertDialogClose, showFlash } = useMapAlerts();
  */

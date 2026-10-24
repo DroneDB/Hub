@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * The signed-in session of a Registry client (HQ-05, moved out of registry.js): sign-in
+ * The signed-in session of a Registry client: sign-in
  * and sign-out, the JWT and its expiry in storage, the same-origin cookie, the refresh
  * timer. `Registry` keeps the public methods (reg.login(), reg.getAuthToken(), ...) and
  * delegates here.

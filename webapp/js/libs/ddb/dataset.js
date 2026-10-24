@@ -57,7 +57,7 @@ export default class Dataset {
     }
 
     // hash: the entry hash, when known. It makes the URL change when the entry changes, so the
-    // server can let the browser reuse the response without revalidating (REG-03).
+    // server can let the browser reuse the response without revalidating.
     thumbUrl(path, size, hash) {
         let url = `${this.baseApi}/thumb?path=${encodeURIComponent(path)}`;
         if (size) url += `&size=${size}`;

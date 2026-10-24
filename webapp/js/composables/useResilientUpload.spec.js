@@ -92,7 +92,7 @@ describe('computeRetryDelayMs', () => {
 });
 
 describe('createAimdConcurrency', () => {
-    it('halves concurrency on failure, floored at 4 (UPL-01 B.3)', () => {
+    it('halves concurrency on failure, floored at 4', () => {
         const aimd = createAimdConcurrency(16);
         expect(aimd.current).toBe(16);
         expect(aimd.onFailure()).toBe(8);

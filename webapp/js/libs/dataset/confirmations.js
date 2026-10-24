@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * The dataset page's yes/no questions (HQ-09: DeleteDialog, RescanConfirmDialog and
- * BuildConfirmDialog re-implemented ConfirmDialog), as useConfirm() options.
+ * The dataset page's yes/no questions, as useConfirm() options.
  */
 import { escapeHtml } from '@/libs/sanitize';
 

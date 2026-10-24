@@ -140,7 +140,7 @@ const EMPTY_COUNTS = { total: 0, pending: 0, uploading: 0, processing: 0, done: 
 /**
  * DatasetUpload - upload panel for adding files to a dataset.
  *
- * Presentation over the upload queue (useUploadQueue, UPL-01): requests start as soon as a
+ * Presentation over the upload queue (useUploadQueue): requests start as soon as a
  * slot frees, small files go in bundles, large ones as resumable chunks, and a file whose
  * bytes are all sent shows "Processing on server" until the server has added it.
  */

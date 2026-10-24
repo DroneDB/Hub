@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * useUploadQueue - the upload scheduler wired for a Vue component (UPL-01): concurrency from
+ * useUploadQueue - the upload scheduler wired for a Vue component: concurrency from
  * the negotiated protocol, the shared retry policy, a snapshot refreshed at most 4 times a
  * second, and an "uploading" signal on the event bus (the task monitor pauses its event
  * stream meanwhile, so it does not take one of the browser's 6 HTTP/1.1 connections).

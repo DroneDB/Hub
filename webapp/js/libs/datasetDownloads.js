@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Dataset downloads (HQ-05): the one flow behind the header's Download button and the
+ * Dataset downloads: the one flow behind the header's Download button and the
  * dataset page's "Download" actions, which had diverged copies.
  *
  * Signed-in downloads of the whole dataset, or of a selection over the configured size,

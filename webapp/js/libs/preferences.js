@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * User preferences in Web Storage (HQ-02). The only module that touches
+ * User preferences in Web Storage. The only module that touches
  * localStorage/sessionStorage: access never throws (private mode, quota, disabled
  * storage fall back to memory for the page's lifetime) and values are encoded one way.
  *

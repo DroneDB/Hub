@@ -48,7 +48,7 @@
 <script setup>
 /**
  * ViewDataset - the dataset page: the folder tree, the file list (grid or table) with its
- * detail panel, the Map and Tasks tabs. HQ-09: the page composes; what it does lives in
+ * detail panel, the Map and Tasks tabs. The page composes; what it does lives in
  * useDatasetListing (the folder on show), useDatasetActions (every file operation through
  * its dialog, on the dialog registry), useDatasetClipboard, useOpenItem and
  * useDatasetShortcuts; the toolbar is libs/dataset/explorerTools; the lightbox is a component.
@@ -120,7 +120,7 @@ const mainTabs = [
     { label: 'Map', icon: 'fa-solid fa-map', key: 'map' },
     { label: 'Tasks', icon: 'fa-solid fa-list-check', key: 'tasks' }
 ];
-// Tabs whose code loads on first use (HUB-02) stay mounted once opened
+// Tabs whose code loads on first use stay mounted once opened
 const openedTabs = reactive({ map: false, tasks: false });
 const viewMode = usePreference(PREF.FILE_VIEW_MODE, 'grid');
 // Table view: thumbnails and relative times, or icons and dates

@@ -4,7 +4,7 @@
 
 /**
  * PotreeSession - owns everything one Potree viewer creates, so closing the viewer frees it
- * (HUB-04: every open/close used to leak the whole scene, about 130 MB and a WebGL context).
+ * (every open and close used to leak the whole scene, about 130 MB and a WebGL context).
  *
  * Potree 1.8 lives in globals (window.viewer, its render loop on the renderer, jQuery UI in
  * the page), so nothing is released by unmounting the component. The session:

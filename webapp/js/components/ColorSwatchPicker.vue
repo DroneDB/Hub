@@ -10,8 +10,7 @@
 
 <script setup>
 /**
- * A colour from the measurement swatches or a custom one (HQ-07: was copied into four
- * map dialogs as clickable divs). Swatches are radio buttons, so the keyboard reaches them.
+ * A colour from the measurement swatches or a custom one. Swatches are radio buttons, so the keyboard reaches them.
  *
  *   <label for="stroke">Stroke Color</label>
  *   <ColorSwatchPicker v-model="stroke" input-id="stroke" label="Stroke color" />

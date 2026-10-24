@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * uploadPlanner - groups queued files into requests (UPL-01 B.2, E.5).
+ * uploadPlanner - groups queued files into requests.
  *
  * Each request costs a round trip and a server commit, so files below 1 MB go in bundles
  * of up to 32 files / 8 MB in one request. Files above 256 MB go as resumable chunks, so a

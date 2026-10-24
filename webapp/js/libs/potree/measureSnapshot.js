@@ -1,5 +1,5 @@
 /**
- * Plain copies of Potree measurements (HQ-08, out of Potree.vue), so a deleted measure
+ * Plain copies of Potree measurements, so a deleted measure
  * can be recreated by undo and found again by redo (a recreated measure has a new uuid).
  */
 import { hexOf } from '@/libs/potree/measureStyle';

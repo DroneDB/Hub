@@ -1,8 +1,8 @@
 // @ts-check
 /**
- * State shared by the dataset page and the header toolbar (HQ-04). Replaces five
- * event-bus messages between the two (selection, active tab, bulk download, settings
- * request, download limit), so the toolbar reads the page's state instead of a copy.
+ * State shared by the dataset page and the header toolbar: the selection, the active
+ * tab, the bulk download, the settings request. The toolbar reads the page's state
+ * instead of a copy kept in step through events.
  */
 import { defineStore } from 'pinia';
 import { ref, shallowRef } from 'vue';

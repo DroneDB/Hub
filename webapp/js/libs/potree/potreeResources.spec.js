@@ -1,5 +1,5 @@
 /**
- * Unit tests for libs/potree/potreeResources.js (HUB-04 / HUB-09)
+ * Unit tests for libs/potree/potreeResources.js
  */
 import { describe, it, expect } from 'vitest';
 import { POTREE_RESOURCES, POTREE_BASE, versioned, fixPotreePaths } from './potreeResources';

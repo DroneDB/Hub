@@ -1,9 +1,9 @@
 // @ts-check
-/** The Hub's PrimeVue theme: Lara with the DroneDB blue (HQ-04, moved out of main.js). */
+/** The Hub's PrimeVue theme: Lara with the DroneDB blue. */
 import Lara from '@primevue/themes/lara';
 import { definePreset } from '@primevue/themes';
 
-// Lara's solid severities (500 shades) put white text below 4.5:1; the 700 shades pass (HQ-10)
+// Lara's solid severities (500 shades) put white text below 4.5:1; the 700 shades pass
 const solid = c => ({
     background: `{${c}.700}`, hoverBackground: `{${c}.800}`, activeBackground: `{${c}.900}`,
     borderColor: `{${c}.700}`, hoverBorderColor: `{${c}.800}`, activeBorderColor: `{${c}.900}`

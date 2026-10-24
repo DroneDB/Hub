@@ -18,7 +18,7 @@
 <script setup>
 /**
  * MarkdownViewer - renders a markdown file; users who can write edit it in place
- * (HQ-08: on ViewerShell and useViewerEntry; the edit button no longer shows to readers).
+ * (on ViewerShell and useViewerEntry; the edit button shows to writers only).
  */
 import { ref, computed, nextTick, onMounted } from 'vue';
 import Button from 'primevue/button';

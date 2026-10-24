@@ -1,7 +1,6 @@
 /**
- * useDatasetActions - what the dataset page does with its files, each through its dialog
- * (HQ-09: replaces the useDialogManager / useFileOperations mixins, 25 template blocks
- * and 18 open flags). Dialogs open on the registry (useDialogs + DialogHost); an action
+ * useDatasetActions - what the dataset page does with its files, each through its dialog.
+ * Dialogs open on the registry (useDialogs + DialogHost); an action
  * receives the items it acts on (the explorer selection or the tree's).
  *
  *   const actions = useDatasetActions({ dataset, listing, dialogs, busy, route });

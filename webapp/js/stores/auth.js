@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * The signed-in user (HQ-04): one reactive copy of what the Registry client knows,
+ * The signed-in user: one reactive copy of what the Registry client knows,
  * shared by the header, the route guards and the pages. The store is the only
  * subscriber to the client's login/logout events.
  */

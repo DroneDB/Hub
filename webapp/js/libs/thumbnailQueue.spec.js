@@ -1,5 +1,5 @@
 /**
- * Unit tests for libs/thumbnailQueue.js (HUB-03)
+ * Unit tests for libs/thumbnailQueue.js
  * Run with: npx vitest run webapp/js/libs/thumbnailQueue.spec.js
  */
 import { describe, it, expect, vi } from 'vitest';

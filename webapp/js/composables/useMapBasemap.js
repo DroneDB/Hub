@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Basemap of the map viewer (HQ-07: a composable; was a mixin with overrides in Map.vue).
+ * Basemap of the map viewer.
  * Owns the selection, the custom WMS/XYZ configuration and their persistence.
  *
  *   const basemap = useMapBasemap(map);    // map: ShallowRef<ol/Map|null>

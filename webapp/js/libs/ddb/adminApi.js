@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * User, role and task administration (HQ-05, moved out of registry.js): `reg.admin`.
+ * User, role and task administration: `reg.admin`.
  */
 
 export default class AdminApi {

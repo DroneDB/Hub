@@ -1,5 +1,5 @@
 /**
- * Raster tile layers of the dataset map (HQ-07, out of Map.vue): one factory for the
+ * Raster tile layers of the dataset map: one factory for the
  * file rasters and the clicked-photo footprints, and the View max-zoom cap that follows
  * the deepest native zoom of what is loaded.
  */

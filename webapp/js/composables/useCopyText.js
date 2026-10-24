@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Copy text to the clipboard and show "copied" for a moment (HQ-02).
+ * Copy text to the clipboard and show "copied" for a moment.
  * The reset timer is cleared when the owning component or scope goes away.
  */
 import { ref, getCurrentScope, onScopeDispose } from 'vue';

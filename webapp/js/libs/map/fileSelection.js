@@ -1,5 +1,5 @@
 /**
- * Hit testing and file selection on the dataset map (HQ-07, out of Map.vue): what was
+ * Hit testing and file selection on the dataset map: what was
  * clicked, what a lasso polygon covers, and the Ctrl/right-click selection toggle.
  * Features carry their explorer item as `feature.file` and vector layers as `layer.file`;
  * selecting means setting `file.selected` (the explorer item, shared with the file list).

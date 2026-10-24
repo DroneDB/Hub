@@ -4,7 +4,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * What libddb does with each entry type, as the server says it (plan decision D8, XI-04):
+ * What libddb does with each entry type, as the server says it:
  * `GET /sys/features` carries `entryTypes` (libddb's DDBGetEntryTypes: id, buildable, thumbnail
  * none|file|build, ...) and `archiveExtensions` (what the archive extractor accepts). The Hub
  * is loaded after the features are (see main.js), so every question here is answered from

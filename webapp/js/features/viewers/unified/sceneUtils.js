@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Small pure helpers of the 3D viewer (HQ-08, out of UnifiedViewer.vue).
+ * Small pure helpers of the 3D viewer.
  */
 
 /**

@@ -1,5 +1,5 @@
 /**
- * useOpenItem - what a double click on a dataset file does (HQ-09, out of ViewDataset):
+ * useOpenItem - what a double click on a dataset file does:
  * a folder opens, a viewer opens in a new tab once its build output exists (or the build
  * dialog explains why not), archives extract, text opens in the editor, PDFs in the
  * viewer, photos and videos in the lightbox, anything else in the browser.

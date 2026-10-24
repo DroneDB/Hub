@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * A ref backed by a stored preference (HQ-02): reads once, writes on every change.
+ * A ref backed by a stored preference: reads once, writes on every change.
  */
 import { ref, watch } from 'vue';
 import { getPref, setPref } from '@/libs/preferences';

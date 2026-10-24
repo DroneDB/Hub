@@ -1,6 +1,5 @@
 /**
- * Explorer items of the dataset page (HQ-09: built by hand in six places of the page and
- * its mixins). An item is what the file list, the tree, the map and the selection share:
+ * Explorer items of the dataset page. An item is what the file list, the tree, the map and the selection share:
  * { icon, label, path (ddb URI), entry, isExpandable, selected }.
  */
 import ddb from 'ddb';

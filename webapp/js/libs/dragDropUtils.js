@@ -5,8 +5,8 @@
 
 import { createLimiter } from '@/libs/concurrency';
 
-// Browser file-system calls (entry.file(), readEntries()) in flight while walking a drop
-// (UPL-01 B.4): one at a time costs a round trip per file; unbounded floods the browser
+// Browser file-system calls (entry.file(), readEntries()) in flight while walking a drop:
+// one at a time costs a round trip per file; unbounded floods the browser
 const TRAVERSAL_CONCURRENCY = 16;
 
 /**
@@ -139,8 +139,7 @@ export function syntheticFolderItem(currentPath) {
 }
 
 /**
- * Ask the dataset page to move items for an internal drag-drop (HQ-04: through the
- * `datasetDrop` the page provides, not the global event bus).
+ * Ask the dataset page to move items for an internal drag-drop (through the `datasetDrop` the page provides, not the global event bus).
  *
  * Multi-selection is supported: every currently-selected file in `extraSourceItems`
  * is also moved (deduplicated against the primary source).

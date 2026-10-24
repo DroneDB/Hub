@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * HTTP transport of the Registry client (HQ-05, moved out of registry.js): one
+ * HTTP transport of the Registry client: one
  * authenticated request, its timeout and abort signal, body encoding, response parsing
  * and typed errors (ApiError). Registry adds the request cache and the API methods.
  *
@@ -54,7 +54,7 @@ function inlineErrorOf(json) {
 /**
  * Error text of a failed (non-2xx) response: an RFC 9457 ProblemDetails body (`detail`,
  * then `title`) or the legacy `{ error }` body. Reading both lets the Hub run against a
- * Registry before and after its ProblemDetails switch (plan D1, RQ-05).
+ * Registry before and after its ProblemDetails switch.
  * @param {unknown} json @returns {string|null}
  */
 export function failureMessageOf(json) {

@@ -12,8 +12,8 @@
 
 <script setup>
 /**
- * Root component (HQ-04): the header and content route views, the one toast host
- * (HQ-03) and the one-shot "Hub was updated" notice.
+ * Root component: the header and content route views, the one toast host
+ * and the one-shot "Hub was updated" notice.
  */
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';

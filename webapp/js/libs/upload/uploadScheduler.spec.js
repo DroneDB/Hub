@@ -1,5 +1,5 @@
 /**
- * Unit tests for the upload pipeline of the Hub (UPL-01): scheduler, planner, requests.
+ * Unit tests for the upload pipeline of the Hub: scheduler, planner, requests.
  * Run with: npx vitest run webapp/js/libs/upload
  */
 import { describe, it, expect, vi } from 'vitest';

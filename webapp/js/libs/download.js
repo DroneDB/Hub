@@ -1,5 +1,5 @@
 // @ts-check
-/** Saving client-side data as a file (HQ-02). */
+/** Saving client-side data as a file. */
 
 /**
  * Save a Blob under `filename` through a temporary link.

@@ -1,5 +1,5 @@
 /**
- * Look of Potree measurements (HQ-08, out of Potree.vue): colour, line width and area
+ * Look of Potree measurements: colour, line width and area
  * fill applied to every part Potree draws (edges, spheres, circle and angle lines, Line2
  * children, edge labels), from the measure's own properties. One function for measures
  * loaded from a file and for measures edited in the properties dialog.

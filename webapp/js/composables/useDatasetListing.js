@@ -1,6 +1,5 @@
 /**
- * useDatasetListing - the items of the folder on show on the dataset page (HQ-09, out of
- * ViewDataset and its mixins): kept sorted, and every change announced on the event bus
+ * useDatasetListing - the items of the folder on show on the dataset page: kept sorted, and every change announced on the event bus
  * so the tree and the map follow (addItems / deleteEntries). The build fields of an item (the
  * artifacts the entry lists, its build status) are read again when its build job ends.
  *

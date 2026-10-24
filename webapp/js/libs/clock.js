@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * One shared 1-second ticker (HUB-05) instead of one interval per task row or table:
+ * One shared 1-second ticker instead of one interval per task row or table:
  * runs while someone listens and the page is visible.
  */
 const listeners = new Set();

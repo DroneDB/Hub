@@ -81,7 +81,7 @@
 <script>
 /**
  * MapCore - the map shared by the dataset Map tab (Map.vue) and the single-file map
- * (SingleMap.vue, `standalone`). HQ-07: it wires OpenLayers to the map features
+ * (SingleMap.vue, `standalone`). It wires OpenLayers to the map features
  * (composables), the file layers (libs/map/fileLayers) and its child components
  * (toolbar, popup, panels, dialogs).
  */

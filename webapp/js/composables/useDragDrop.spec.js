@@ -1,4 +1,4 @@
-/** HQ-06: drag-and-drop composables (were mixins). */
+/** Drag-and-drop composables. */
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { h, reactive } from 'vue';

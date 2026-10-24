@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Organisations and their members (HQ-05, moved out of registry.js): `reg.orgs`.
+ * Organisations and their members: `reg.orgs`.
  * Datasets of one organisation are reached with `reg.Organization(slug)`.
  */
 import Organization from './organization';

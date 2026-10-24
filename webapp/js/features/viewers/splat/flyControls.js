@@ -1,5 +1,5 @@
 /**
- * Fly navigation of the splat viewer (HQ-08, out of Splat.vue): left-drag looks around
+ * Fly navigation of the splat viewer: left-drag looks around
  * (first person, eased every frame), WASD / arrows / QE and the on-screen pad move with
  * smooth acceleration, Shift goes faster.
  */

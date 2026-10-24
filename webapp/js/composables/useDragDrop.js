@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * Drag-and-drop of the explorer, table and tree (HQ-06: composables; were the
- * itemDnDMixin/dragDropMixin of libs/dragDropUtils).
+ * Drag-and-drop of the explorer, table and tree.
  *
  * `useItemDragDrop` handles drags onto single items (a folder highlights; dropping on a
  * file means its folder). `useDragDrop` adds the view's background: dropping there moves

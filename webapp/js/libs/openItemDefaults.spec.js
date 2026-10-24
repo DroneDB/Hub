@@ -1,6 +1,6 @@
 /**
  * Unit tests for libs/openItemDefaults.js and the local-vector gate of
- * libs/build/fileAvailabilityChecker.js (DDB-12: CAD drawings without geolocation).
+ * libs/build/fileAvailabilityChecker.js (CAD drawings without geolocation).
  * Run with: npx vitest run webapp/js/libs/openItemDefaults.spec.js
  */
 import { describe, it, expect, vi } from 'vitest';

@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * OpenLayers styles of the dataset map's file layers (HQ-07, out of Map.vue loadMap):
+ * OpenLayers styles of the dataset map's file layers:
  * camera shots and their clusters, direction arrows, panoramas, the flight path and its
  * flags, and the invisible raster extents (vector files are styled by useMvtLayer).
  * Generated styles are memoized on the returned object: one `createFileLayerStyles()` per map.

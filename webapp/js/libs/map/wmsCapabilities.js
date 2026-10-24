@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * Layers of a third-party WMS server, from its GetCapabilities document (HQ-05; was an
- * XMLHttpRequest inside MapSettingsDialog). Not a Registry request: no session token.
+ * Layers of a third-party WMS server, from its GetCapabilities document. Not a Registry request: no session token.
  */
 
 const TIMEOUT_MS = 15000;

@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * The toolbar of the dataset explorer (HQ-09: a 195-line imperative builder in
- * ViewDataset, re-run from watchers; now a function of the state, used by a computed).
+ * The toolbar of the dataset explorer (a function of the page state, used by a computed).
  */
 import ddb from 'ddb';
 

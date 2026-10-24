@@ -28,8 +28,7 @@
 
 <script setup>
 /**
- * View settings of the splat viewer (HQ-08, out of Splat.vue; its styles now apply, the
- * old ones never reached the dialog): up-axis flip, point size, ground-plane calibration.
+ * View settings of the splat viewer: up-axis flip, point size, ground-plane calibration.
  */
 import Button from 'primevue/button';
 import RangeSetting from '@/components/RangeSetting.vue';

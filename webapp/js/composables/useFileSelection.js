@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * useFileSelection - click selection of a file list (HQ-09: Explorer and TableView each
- * had a copy): a click selects one item, Ctrl+click toggles, Shift+click selects the range
+ * useFileSelection - click selection of a file list: a click selects one item, Ctrl+click toggles, Shift+click selects the range
  * from the last clicked item, right click keeps a selection that contains the item.
  *
  * The selection is a Set of keys; the files are not touched. Views that share the

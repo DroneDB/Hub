@@ -1,8 +1,6 @@
 // @ts-check
 /**
- * useEntityDelete - delete a dataset or an organization from its list (HQ-09:
- * DeleteDatasetDialog and DeleteOrganizationDialog differed in three lines, and both list
- * pages copied the same handler): ask, mark the row as deleting, delete, report.
+ * useEntityDelete - delete a dataset or an organization from its list: ask, mark the row as deleting, delete, report.
  *
  *   const deleteEntity = useEntityDelete(dialogs);
  *   deleteEntity(ds, { kind: 'dataset', warning: 'All the files will be deleted too.',

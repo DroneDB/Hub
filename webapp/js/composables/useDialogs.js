@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useDialogs - dialogs opened on demand and rendered inside the app (HQ-07/HQ-09).
+ * useDialogs - dialogs opened on demand and rendered inside the app.
  * Replaces separate `createApp()` mounts (which got no theme, router, stores or toast
  * host) and per-dialog boolean flags.
  *
@@ -12,7 +12,7 @@
  * `onClose` among them receives every argument of the event.
  *
  * A dialog closes (and its promise resolves with the event's first argument) when it
- * emits `close` (Window's contract, HQ-09); the returned promise also has `close(result)`.
+ * emits `close` (Window's contract); the returned promise also has `close(result)`.
  */
 import { shallowRef, markRaw } from 'vue';
 

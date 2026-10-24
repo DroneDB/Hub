@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Open a dataset file or a web link in a new browser window (the dataset page's
- * "open" for files without a viewer). Was dynamic/web/shell.js (HQ-05).
+ * "open" for files without a viewer).
  */
 import { utils } from 'ddb';
 

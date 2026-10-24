@@ -17,7 +17,7 @@
 <script setup>
 /**
  * NexusViewer - a Nexus (.nxz) multiresolution model with arcball controls and MeshLab-style
- * lighting (HQ-08: on ViewerShell, useViewerEntry and useViewerSettings).
+ * lighting (on ViewerShell, useViewerEntry and useViewerSettings).
  */
 import { ref, reactive, watch, onMounted, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';

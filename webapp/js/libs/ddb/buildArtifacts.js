@@ -6,7 +6,7 @@
 /**
  * Build artifacts by role: what an artifact is for, never where it lives.
  *
- * libddb owns the build layout (plan decision D8, XI-04) and Registry puts the artifacts that
+ * libddb owns the build layout and Registry puts the artifacts that
  * exist on the entry DTO: `artifacts: [{role, url, mediaType}]`, from the same listing that gives
  * the entry. The Hub asks by role and uses the URL it is given: it holds no build path and does
  * not probe for files. The ArtifactRole values are the shared vocabulary (a role Registry sends

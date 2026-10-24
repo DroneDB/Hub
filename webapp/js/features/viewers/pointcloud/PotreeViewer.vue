@@ -57,9 +57,7 @@
 
 <script setup>
 /**
- * PotreeViewer - a point cloud (COPC) in Potree 1.8 with its measuring tools (HQ-08: the
- * measurements live in usePotreeMeasurements and libs/potree/*; the viewer and everything
- * it creates belong to a PotreeSession, released on leave, HUB-04).
+ * PotreeViewer - a point cloud (COPC) in Potree 1.8 with its measuring tools (the measurements live in usePotreeMeasurements and libs/potree/*; the viewer and everything it creates belong to a PotreeSession, released on leave).
  */
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
@@ -207,7 +205,7 @@ onMounted(async () => {
 });
 
 // Everything the viewer created goes with it: listeners, render loop, WebGL context,
-// the jQuery UI sidebar, window.viewer (HUB-04)
+// the jQuery UI sidebar, window.viewer
 onBeforeUnmount(() => {
     session.dispose();
     viewer = null;

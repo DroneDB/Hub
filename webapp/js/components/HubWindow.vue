@@ -18,7 +18,7 @@
 
 <script setup>
 /**
- * Window - the one dialog component (HQ-09): PrimeVue Dialog plus the behaviour every
+ * Window - the one dialog component: PrimeVue Dialog plus the behaviour every
  * dialog used to copy.
  *
  * - `close` (with an optional result) on the X, a mask click (closeModalOnClick) or Escape;

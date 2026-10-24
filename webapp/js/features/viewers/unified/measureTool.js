@@ -1,5 +1,5 @@
 /**
- * Point / distance / area measurement in the 3D viewer (HQ-08, out of UnifiedViewer.vue),
+ * Point / distance / area measurement in the 3D viewer,
  * with Giro3D's DrawTool. Navigation is suspended while a shape is drawn (the DrawTool does
  * not do it, so a drag would also move the camera); right click ends a shape.
  */

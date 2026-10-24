@@ -1,6 +1,5 @@
 /**
- * useDatasetClipboard - copy, cut and paste of dataset files (HQ-09, out of the
- * useFileOperations mixin), within a dataset or across datasets (server-side transfer).
+ * useDatasetClipboard - copy, cut and paste of dataset files, within a dataset or across datasets (server-side transfer).
  * Ctrl+C / Ctrl+X / Ctrl+V and the context menu end here.
  */
 import ddb from 'ddb';

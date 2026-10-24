@@ -20,7 +20,7 @@
                     This folder is empty
                 </div>
             </div>
-            <!-- Large folders: only the rows on screen are rendered (HUB-03) -->
+            <!-- Large folders: only the rows on screen are rendered -->
             <VirtualScroller v-else-if="virtualGrid" ref="grid" v-slot="{ item: row }" class="thumbnail-grid"
                              :items="gridRows" :item-size="gridRowHeight" :min-height="0">
                 <div class="thumbnail-row">
@@ -51,7 +51,7 @@ import Thumbnail from './EntryThumbnail.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import { createThumbnailQueue, createVisibilityTracker } from '@/libs/thumbnailQueue';
 
-// Folders at least this large render as a virtual grid (HUB-03)
+// Folders at least this large render as a virtual grid
 const VIRTUAL_GRID_MIN_FILES = 200;
 // One grid cell: the 128 px tile plus its margins and label
 const GRID_CELL_WIDTH = 140;
@@ -78,7 +78,7 @@ export default {
     components: {
         Thumbnail, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
     },
-    // Thumbnails load as they come into view, a few at a time (HUB-03)
+    // Thumbnails load as they come into view, a few at a time
     provide: function () {
         this.thumbnailLoader ??= {
             queue: createThumbnailQueue({ concurrency: 6 }),

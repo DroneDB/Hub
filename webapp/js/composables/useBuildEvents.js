@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * useBuildEvents - build notifications of the dataset page (HQ-06: a composable; was an
- * Options-API mixin). Listens to the BuildManager while the owning component lives and
+ * useBuildEvents - build notifications of the dataset page. Listens to the BuildManager while the owning component lives and
  * reports build progress as toasts; errors go to the page's error dialog.
  *
  *   setup() { return { ...useBuildEvents() }; }

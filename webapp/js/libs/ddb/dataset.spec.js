@@ -43,7 +43,7 @@ describe('Dataset URL builders — special characters in paths', () => {
         expect(url).toBe(`${base}/thumb?path=a%20%26%20b.tif&size=256`);
     });
 
-    it('tileUrl and thumbUrl append the entry hash as v when given (REG-03)', () => {
+    it('tileUrl and thumbUrl append the entry hash as v when given', () => {
         expect(ds.tileUrl('o.tif', 1, 2, 3, { retina: true, hash: 'abc' }))
             .toBe(`${base}/tiles/1/2/3@2x.webp?path=o.tif&v=abc`);
         expect(ds.thumbUrl('o.tif', 256, 'abc')).toBe(`${base}/thumb?path=o.tif&size=256&v=abc`);

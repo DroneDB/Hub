@@ -1,5 +1,5 @@
 // @ts-check
-/** App-wide constants (HQ-02). */
+/** App-wide constants. */
 
 /** Coordinate reference systems the map code names. */
 export const EPSG = Object.freeze({
@@ -10,7 +10,7 @@ export const EPSG = Object.freeze({
 /** Shown when the server refuses a download because the user's download slots are busy (HTTP 429). */
 export const DOWNLOAD_LIMIT_MESSAGE = 'Download limit reached. Please wait for a download to finish before starting a new one.';
 
-/** How long a toast stays, in milliseconds (HQ-03). */
+/** How long a toast stays, in milliseconds. */
 export const TOAST_LIFE = Object.freeze({
     short: 3000,
     normal: 5000,

@@ -1,4 +1,4 @@
-/** HQ-05: contract of the upload transport (statuses are results, aborts reject). */
+/** Contract of the upload transport (statuses are results, aborts reject). */
 import { describe, it, expect, vi } from 'vitest';
 import { sendXhr } from './xhrTransport';
 

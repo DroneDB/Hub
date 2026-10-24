@@ -1,5 +1,5 @@
 /**
- * Earth navigation of the splat viewer (HQ-08, out of Splat.vue), Potree style: left-drag
+ * Earth navigation of the splat viewer, Potree style: left-drag
  * (or one finger) grabs and pans the ground, right-drag orbits the pivot under the
  * pointer, the wheel and a pinch zoom toward the pointer. A marker shows the pivot.
  */

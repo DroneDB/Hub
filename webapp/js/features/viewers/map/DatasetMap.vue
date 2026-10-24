@@ -5,7 +5,7 @@
 
 <script setup>
 /**
- * The dataset page's Map tab (HQ-07): MapCore plus the tab plumbing. The tab switcher
+ * The dataset page's Map tab: MapCore plus the tab plumbing. The tab switcher
  * calls onTabActivated / onPanelResized; with `lazyload` the map is built the first
  * time the tab shows. ViewDataset opens Plant Health through openPlantHealth.
  */

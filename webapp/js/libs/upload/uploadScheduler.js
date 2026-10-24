@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * uploadScheduler - runs a queue of file uploads (UPL-01 B.1, B.3, B.5, E.3).
+ * uploadScheduler - runs a queue of file uploads.
  *
  * A pool of request slots: the moment a request settles its slot takes the next request
  * (no timer between files). Concurrency follows the protocol limit (6 on HTTP/1.1, 16 on

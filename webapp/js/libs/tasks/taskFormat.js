@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * Presentation of Processing Platform tasks (HQ-06; was part of the useTaskFormatting
- * mixin). Pure functions: the tool catalog and state machine come from the server's
+ * Presentation of Processing Platform tasks. Pure functions: the tool catalog and state machine come from the server's
  * /sys/features and are passed in.
  */
 import { formatTimeAgo, formatDateTime, formatDuration } from '@/libs/format';

@@ -57,7 +57,7 @@
 /**
  * SplatViewer - a Gaussian splat (Spark.js on three.js): streamed level of detail for paged
  * .rad files, fly and earth navigation, saved camera views with a tour, ground-plane
- * calibration. HQ-08: the camera rig, the two navigation modes, the presentation and the
+ * calibration. The camera rig, the two navigation modes, the presentation and the
  * camera sidecar are modules next to this view; the view wires them to the scene.
  */
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';

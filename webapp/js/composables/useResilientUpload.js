@@ -78,7 +78,7 @@ export function parseRetryAfterSeconds(headerValue) {
  * Additive-increase / multiplicative-decrease concurrency controller.
  *
  * onFailure(): halves concurrency (floor min(4, configured), capped at configured). Callers
- *   apply it only to server-declared backpressure (429/503 with Retry-After, UPL-01 B.3):
+ *   apply it only to server-declared backpressure (429/503 with Retry-After):
  *   a lone network error says nothing about the server's capacity.
  * onSuccess(): after `successesToGrow` consecutive successes, grows by 1 up to `configured`.
  * Concurrency never exceeds the originally configured value - the goal is cooperating with

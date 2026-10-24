@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Listeners that remove themselves with their owner (HUB-08).
+ * Listeners that remove themselves with their owner.
  *
  * Composition API (setup or another composable):
  *   useEventListener(window, 'resize', onResize);
@@ -11,8 +11,7 @@
  *   this.listeners.add(target, 'click', handler)          // DOM / EventDispatcher
  *   this.listeners.bus(emitter, 'addItems', handler)      // event bus
  *   this.listeners.ol(map.on('click', handler))           // OpenLayers key
- * Everything is removed when the scope is disposed / the component unmounts (HQ-06: the
- * lifecycleListenersMixin twin is gone).
+ * Everything is removed when the scope is disposed / the component unmounts.
  */
 import { getCurrentScope, onScopeDispose } from 'vue';
 import { ListenerBag } from '@/libs/listenerBag';

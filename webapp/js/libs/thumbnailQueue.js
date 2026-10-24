@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * thumbnailQueue - bounds how many thumbnails load at once (HUB-03).
+ * thumbnailQueue - bounds how many thumbnails load at once.
  *
  * Opening a folder used to start one request per visible tile at the same time (98 for a
  * 4K screen), all queueing on the server's render lane. Here a tile asks for a slot; the
@@ -94,7 +94,7 @@ export function createThumbnailQueue(opts = {}) {
 }
 
 /**
- * Calls back when an element comes within `rootMargin` of the scroll viewport (HUB-03):
+ * Calls back when an element comes within `rootMargin` of the scroll viewport:
  * no bounding-rect scan of every tile on each scroll or update.
  * @param {object} opts
  * @param {() => Element|null} opts.root the scroll container

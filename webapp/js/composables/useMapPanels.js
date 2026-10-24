@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * useMapPanels - the analysis panels of the dataset map open one at a time (HQ-07,
- * replaces the panel router of useMapAnalysisButtons). Each panel is described by its
+ * useMapPanels - the analysis panels of the dataset map open one at a time. Each panel is described by its
  * visibility and open/close functions, all getters, so the features stay unaware of
  * each other.
  *

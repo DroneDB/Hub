@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * Feature flags and server facts from /sys/features (HQ-05, moved out of registry.js):
+ * Feature flags and server facts from /sys/features:
  * `reg.features`. Loading returns data only; the app applies the branding it carries.
  */
 export default class FeaturesService {

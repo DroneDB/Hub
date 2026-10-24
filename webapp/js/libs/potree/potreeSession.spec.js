@@ -1,5 +1,5 @@
 /**
- * Unit tests for libs/potree/potreeSession.js (HUB-04)
+ * Unit tests for libs/potree/potreeSession.js
  * Run with: npx vitest run webapp/js/libs/potree/potreeSession.spec.js
  */
 import { describe, it, expect, vi } from 'vitest';

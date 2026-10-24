@@ -1,5 +1,5 @@
 /**
- * entryTypeCapabilities: what libddb does with each entry type comes from /sys/features (D8, XI-04);
+ * entryTypeCapabilities: what libddb does with each entry type comes from /sys/features;
  * the fallback is only for a features request that failed.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

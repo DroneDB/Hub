@@ -106,7 +106,7 @@ function formatCoordinates(pointGeom) {
  * @returns {Object|null}
  */
 /**
- * Readable origin of a CAD drawing's coordinate system (DDB-12), from the
+ * Readable origin of a CAD drawing's coordinate system, from the
  * properties.vector.crs that DroneDB records at index time. Returns null for
  * entries without that information (non-CAD vectors, other types).
  */

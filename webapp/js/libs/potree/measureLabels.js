@@ -1,5 +1,5 @@
 /**
- * Picking and labels of Potree measurements (HQ-08, out of Potree.vue): the measure under
+ * Picking and labels of Potree measurements: the measure under
  * the pointer, a name label that keeps its screen size, and the description tooltips of
  * measures and annotations. Listeners and body-level nodes go through the viewer's
  * PotreeSession, so they are released with the viewer. Names and descriptions come from

@@ -8,7 +8,7 @@ import '../css/ol-controls.css';
 
 // Font Awesome 6 icons
 import '@fortawesome/fontawesome-free/css/all.min.css';
-// Inter, self-hosted (HUB-01): no third-party request before the login page renders;
+// Inter, self-hosted: no third-party request before the login page renders;
 // each weight's CSS lists its unicode subsets, the browser fetches the ones it needs
 import '@fontsource/inter/400.css';
 import '@fontsource/inter/500.css';
@@ -116,11 +116,11 @@ window.addEventListener('load', function () {
         app.use(PrimeVue, primeVueOptions);
 
         // The server rejected the session or a private page needs one: one place
-        // decides (HQ-04) - end the session and sign in, then come back here
+        // decides - end the session and sign in, then come back here
         reg.onUnauthorized(() => handleUnauthorized(router, useAuthStore(pinia)));
         app.use(ToastService);
 
-        // The one toast host (root template) and the notifier every component uses (HQ-03)
+        // The one toast host (root template) and the notifier every component uses
         setToastService(app.config.globalProperties.$toast);
         app.config.globalProperties.$notify = notify;
 

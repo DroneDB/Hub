@@ -1,5 +1,5 @@
 /**
- * The 3D viewer's Giro3D scene (HQ-08, out of UnifiedViewer.vue): the instance in a flat
+ * The 3D viewer's Giro3D scene: the instance in a flat
  * CRS or on the globe, lights, the OSM basemap, the one navigation control, framing and the
  * Home pose, the layer list and teardown. The loaders (loaders.js) put the data in it.
  *

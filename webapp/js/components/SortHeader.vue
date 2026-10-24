@@ -7,9 +7,7 @@
 
 <script setup>
 /**
- * SortHeader - a clickable column header that shows the sort direction (HQ-10: the
- * same span was repeated for four columns in TableView and FolderPicker, without
- * keyboard access).
+ * SortHeader - a clickable column header that shows the sort direction.
  *
  *   <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
  */

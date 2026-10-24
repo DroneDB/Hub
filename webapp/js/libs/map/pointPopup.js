@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * HTML of the popup shown over a measured or imported map point (HQ-02): the optional
+ * HTML of the popup shown over a measured or imported map point: the optional
  * name, the coordinates in DMS and decimal degrees, the description and, for imported
  * points, edit/copy/delete buttons. Shared by the measure control and the importer.
  */

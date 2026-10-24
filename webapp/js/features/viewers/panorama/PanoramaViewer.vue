@@ -7,7 +7,7 @@
 <script setup>
 /**
  * PanoramaViewer - a 360° photo in Photo Sphere Viewer, posed from the entry's XMP
- * properties (HQ-08: on ViewerShell and useViewerEntry; the viewer is destroyed on leave).
+ * properties (on ViewerShell and useViewerEntry; the viewer is destroyed on leave).
  */
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';

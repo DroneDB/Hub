@@ -1,5 +1,5 @@
 /**
- * The dataset map's file layers (HQ-07, out of Map.vue): georasters, the footprint of a
+ * The dataset map's file layers: georasters, the footprint of a
  * clicked photo, invisible raster extents (so rasters can be clicked), the flight path,
  * the shot / panorama markers and the start and finish flags. Vector files are separate
  * layers (createVectorFileLayer) because they load asynchronously.

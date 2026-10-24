@@ -66,7 +66,7 @@
  * .3tz archives, on a globe when georeferenced), COPC point clouds, georasters (server XYZ
  * tiles) and vectors (MVT, or local CAD drawings), over an OSM basemap, with point /
  * distance / area measurements. Opt-in ("Open in 3D Viewer"); the default viewers of each
- * type are unchanged. HQ-08: the scene, the loaders and the measure tool are modules next
+ * type are unchanged. The scene, the loaders and the measure tool are modules next
  * to this view.
  */
 import LoadingSpinner from '@/components/LoadingSpinner.vue';

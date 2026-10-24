@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Error raised for a failed Registry request (HQ-03). `status` is the HTTP status
+ * Error raised for a failed Registry request. `status` is the HTTP status
  * (0 for network errors and timeouts); `message` is the server's error text when it
  * sent one. Callers test the status, never the message.
  */

@@ -53,7 +53,7 @@ export default {
         LoadingSpinner,
         TreeView, ContextMenu, InputText, InputIcon, IconField, Button
     },
-    // Listings in flight are aborted when the browser goes away (HUB-06)
+    // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {

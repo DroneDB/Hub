@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * Quick-share uploads (/share/*): a temporary dataset filled by an upload session
- * (HQ-05; Upload.vue built these paths itself).
+ * Quick-share uploads (/share/*): a temporary dataset filled by an upload session.
  */
 export default class ShareApi {
     /** @param {import('./registry').default} registry */

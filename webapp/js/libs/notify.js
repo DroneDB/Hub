@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * User notifications (HQ-03). The only caller of PrimeVue's toast service: pages say
+ * User notifications. The only caller of PrimeVue's toast service: pages say
  * what happened, this module decides how it looks and how long it stays. One <Toast>
  * host is mounted by the root app; code outside components (map controls, task
  * monitors) uses the same `notify`.

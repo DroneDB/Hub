@@ -46,7 +46,7 @@ export default {
     name: 'EntryThumbnail',
     components: {
     },
-    // Provided by the Explorer: load when visible, a few at a time (HUB-03)
+    // Provided by the Explorer: load when visible, a few at a time
     inject: { thumbnailLoader: { default: null } },
     props: {
         file: {

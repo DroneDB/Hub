@@ -1,6 +1,6 @@
 /**
  * Named user preferences of the dataset and organisation pages, stored through
- * libs/preferences.js (HQ-02).
+ * libs/preferences.js.
  */
 import { getPref, setPref, PREF } from '@/libs/preferences';
 

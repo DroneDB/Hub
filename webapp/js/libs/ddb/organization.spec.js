@@ -1,4 +1,4 @@
-/** HQ-05: Organization builds its endpoints and reads paged results. */
+/** Organization builds its endpoints and reads paged results. */
 import { describe, it, expect, vi } from 'vitest';
 import Organization from './organization';
 

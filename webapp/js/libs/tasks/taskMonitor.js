@@ -4,7 +4,7 @@
  * provides a single reactive source of truth for all task consumers
  * (buildManager, TaskHistory, useHeavyTask).
  *
- * Refresh schedule (HUB-05, see pollingPolicy):
+ * Refresh schedule (see pollingPolicy):
  *   - the server pushes a "tasks changed" event (server-sent events) and the list is
  *     fetched then; polling is only a 2-minute safety net while the stream is up;
  *   - otherwise 2.5 s while any task is active, 15 s doubling up to 2 minutes when idle;

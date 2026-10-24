@@ -50,7 +50,7 @@ import { runUploadProbe } from '@/libs/upload/uploadProbe';
 const DOCS_URL = 'https://docs.dronedb.app/docs/registry/admin/troubleshooting#tuning-the-reverse-proxy-for-large-uploads';
 
 /**
- * UploadDiagnostics - the upload self-test (UPL-01 A.2): throughput, protocol and round trip
+ * UploadDiagnostics - the upload self-test: throughput, protocol and round trip
  * to this Registry, and the reverse proxy window when it is the limit.
  */
 export default {

@@ -1,5 +1,5 @@
 /**
- * Unit tests for the CAD coordinate-system row of libs/propertiesUtils.js (DDB-12).
+ * Unit tests for the CAD coordinate-system row of libs/propertiesUtils.js.
  * Run with: npx vitest run webapp/js/libs/propertiesUtils.spec.js
  */
 import { describe, it, expect } from 'vitest';

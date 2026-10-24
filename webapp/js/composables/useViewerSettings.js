@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * useViewerSettings - a viewer's persisted display settings (HQ-08: Nexus and the 3D
- * viewer each had their own load/save/remove code). Stored values are merged over the
+ * useViewerSettings - a viewer's persisted display settings. Stored values are merged over the
  * defaults, so a setting added later starts at its default.
  *
  *   const { settings, resetSettings } = useViewerSettings(PREF.NEXUS_LIGHTING, { ambientIntensity: 0.4 });

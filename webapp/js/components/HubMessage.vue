@@ -7,7 +7,7 @@
 
 <script setup>
 /**
- * Message - a dismissible message box bound with v-model (HQ-03).
+ * Message - a dismissible message box bound with v-model.
  *
  *   <Message v-model="error" />            shows `error` while it is not empty;
  *                                          dismissing sets it to ''

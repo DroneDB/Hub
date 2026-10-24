@@ -1,5 +1,5 @@
 /**
- * The point-cloud viewer's delete tool (HQ-08, out of Potree.vue): while active, a click
+ * The point-cloud viewer's delete tool: while active, a click
  * on a measure removes it (onDelete decides how: the viewer records it for undo). Esc or
  * any Potree tool starting ends it. Its button sits in Potree's own toolbar.
  */

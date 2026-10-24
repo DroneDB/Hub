@@ -1,6 +1,5 @@
 /**
- * useDatasetShortcuts - the dataset page's keyboard and paste handling (HQ-09, out of
- * ViewDataset): Delete removes the selection, Ctrl/Cmd+C and +X copy and cut it, and an
+ * useDatasetShortcuts - the dataset page's keyboard and paste handling: Delete removes the selection, Ctrl/Cmd+C and +X copy and cut it, and an
  * OS paste uploads files, imports a URL, or pastes the Hub clipboard, in that order.
  * Keys typed in the tree go to the tree; nothing happens while typing or with a dialog open.
  */

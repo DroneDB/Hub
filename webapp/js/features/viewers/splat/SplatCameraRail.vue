@@ -30,7 +30,7 @@
 
 <script setup>
 /**
- * The splat viewer's left-edge camera rail (HQ-08, out of Splat.vue): jump to a saved
+ * The splat viewer's left-edge camera rail: jump to a saved
  * camera, toggle the orbit or the tour, save the current view and the cameras.
  */
 defineProps({

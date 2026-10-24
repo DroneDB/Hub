@@ -14,8 +14,7 @@
 
 <script setup>
 /**
- * PathBreadcrumb - the folder trail above a file list (HQ-10: was copied in Explorer,
- * TableView and FolderPicker). Every folder but the last one is a button that emits
+ * PathBreadcrumb - the folder trail above a file list. Every folder but the last one is a button that emits
  * `navigate` with its path; the root is a home icon that emits `rootPath`.
  *
  *   <PathBreadcrumb :path="currentPath" root-path="/" @navigate="goTo" />

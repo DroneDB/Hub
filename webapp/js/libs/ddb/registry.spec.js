@@ -1,5 +1,5 @@
 /**
- * HQ-05: Registry is a facade over the transport, the session and the API groups.
+ * Registry is a facade over the transport, the session and the API groups.
  * These tests pin its public surface and the session's storage/refresh behaviour.
  */
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';

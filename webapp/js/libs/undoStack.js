@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * An undo/redo history (HQ-08: the point-cloud viewer and the map measure control each
- * kept their own). Pushing a new action drops what was undone; each side holds at most
+ * An undo/redo history. Pushing a new action drops what was undone; each side holds at most
  * `limit` items, the oldest going first.
  *
  *   const history = createUndoStack({ limit: 50, onChange: h => { canUndo = h.canUndo(); } });

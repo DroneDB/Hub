@@ -15,7 +15,7 @@
 
 <script setup>
 /**
- * The splat viewer's movement pad (HQ-08, out of Splat.vue), laid out like the keys:
+ * The splat viewer's movement pad, laid out like the keys:
  *   Q (down)  W (forward)  E (up)
  *   A (left)  S (backward) D (right)
  */

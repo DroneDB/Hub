@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * uploadProbe - measures the upload path to the Registry (UPL-01 A.2): one 8 MB upload
+ * uploadProbe - measures the upload path to the Registry: one 8 MB upload
  * on its own, then six at once, to POST /sys/upload-probe (the server discards the body).
  *
  * A reverse proxy that streams uploads over HTTP/2 with a small flow-control window caps

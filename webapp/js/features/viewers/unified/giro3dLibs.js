@@ -1,5 +1,5 @@
 /**
- * The libraries of the 3D viewer (HQ-08, out of UnifiedViewer.vue): three.js, Giro3D and the
+ * The libraries of the 3D viewer: three.js, Giro3D and the
  * OpenLayers sources, loaded only when the viewer opens (one "giro3d" chunk).
  */
 export async function loadGiro3dLibs() {

@@ -1,5 +1,5 @@
 /**
- * What the 3D viewer can show, one loader per entry type (HQ-08, out of UnifiedViewer.vue):
+ * What the 3D viewer can show, one loader per entry type:
  * a new format adds an entry to LOADERS. Each loader builds the scene it needs (flat or
  * globe), adds its data and frames it. Rasters, vectors and models are placed in Web
  * Mercator (the server serves them so); point clouds in their own CRS, for precision.
@@ -65,7 +65,7 @@ async function loadVector(scene, entry, dataset) {
 }
 
 /**
- * A CAD drawing without a coordinate system (DDB-12): its features in drawing coordinates,
+ * A CAD drawing without a coordinate system: its features in drawing coordinates,
  * from OGC API Features over every layer of the built GeoPackage, in a local scene without
  * a basemap.
  */

@@ -7,8 +7,7 @@
 
 <script setup>
 /**
- * A labelled slider for a viewer setting (HQ-08: the lighting sliders of the model and
- * 3D viewers, whose labels were not tied to their inputs).
+ * A labelled slider for a viewer setting.
  *
  *   <RangeSetting v-model="settings.ambientIntensity" label="Ambient" :max="3" :step="0.1" />
  */

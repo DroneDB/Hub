@@ -2,7 +2,6 @@
 /**
  * useHeavyTask - Processing Platform heavy tasks (build, raster-export, photogrammetry,
  * ...): submit, poll status and log until a terminal state, expose reactive progress.
- * (HQ-06: a composable; was an Options-API mixin.)
  *
  *   setup() {
  *       const { runHeavyTask, trackHeavyTask } = useHeavyTask();

@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * useViewerEntry - the file a viewer route shows (HQ-08, replaces TabViewLoader and its
- * writes into the parent's data): loads the entry named by the route
+ * useViewerEntry - the file a viewer route shows: loads the entry named by the route
  * (/r/:org/:ds/view/:encodedPath/<viewer>), checks its type with one message, reads the
  * dataset permissions, selects the file in the session store and sets the page title.
  *

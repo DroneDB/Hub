@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * useTaskFormatting - task presentation for task lists (HQ-06: a composable; was an
- * Options-API mixin). The tool catalog and state machine come from the server's
+ * useTaskFormatting - task presentation for task lists. The tool catalog and state machine come from the server's
  * /sys/features (the single source of truth); `now` ticks every second (shared clock) so
  * running times and artifact expiries update live.
  *

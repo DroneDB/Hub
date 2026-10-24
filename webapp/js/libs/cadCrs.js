@@ -1,7 +1,7 @@
 import ddb from 'ddb';
 
 /**
- * CAD drawings (.dxf, .dwg) take a coordinate system through their same-name .prj (DDB-12):
+ * CAD drawings (.dxf, .dwg) take a coordinate system through their same-name .prj:
  * Tools › Set Coordinate System writes it.
  */
 export function isCadDrawing(entry) {

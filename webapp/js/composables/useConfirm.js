@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * useConfirm - a yes/no question as a promise (HQ-09), on the dialog registry:
+ * useConfirm - a yes/no question as a promise, on the dialog registry:
  *
  *   const confirm = useConfirm(dialogs);
  *   if (await confirm({ title: 'Replace cover', message: '...', confirmText: 'Replace', danger: true })) ...

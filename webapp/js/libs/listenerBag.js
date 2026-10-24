@@ -4,7 +4,7 @@
 
 /**
  * ListenerBag - every listener an owner (component, OpenLayers control, viewer session)
- * registers, removed in one dispose() (HUB-08). Registration goes through the bag, so a
+ * registers, removed in one dispose(). Registration goes through the bag, so a
  * listener cannot be added without the code that removes it.
  *
  * - add(target, type, handler, options): DOM EventTarget, three.js/Potree/Giro3D

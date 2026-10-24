@@ -1,8 +1,8 @@
 // @ts-check
-/** Route decisions that depend on the session (HQ-04); shared by the router, Login and the 401 handler. */
+/** Route decisions that depend on the session; shared by the router, Login and the 401 handler. */
 
 /**
- * Where to send a navigation to a protected route (HQ-04): anonymous users to Login
+ * Where to send a navigation to a protected route: anonymous users to Login
  * (coming back afterwards), signed-in non-admins to their organisations.
  * @param {import('vue-router').RouteLocationNormalized} to
  * @param {{ isLoggedIn: boolean, isAdmin: boolean }} auth

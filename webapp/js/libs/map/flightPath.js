@@ -1,11 +1,9 @@
 // @ts-check
 /**
- * Flight path of geotagged shots (HQ-07, out of Map.vue reloadFileLayers): order by
+ * Flight path of geotagged shots: order by
  * capture time and estimate the speed at each shot.
  *
- * Capture times are DroneDB's `captureTime`: milliseconds since the Unix epoch (the
- * pre-HQ-07 code divided metres by milliseconds, so its fallback speed was 1000× too low
- * and only computed for shots under 0.3 s apart).
+ * Capture times are DroneDB's `captureTime`: milliseconds since the Unix epoch (so the time between two shots is converted to seconds before a speed is computed).
  */
 
 const EARTH_RADIUS_M = 6371000;

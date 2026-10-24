@@ -8,8 +8,7 @@
 
 <script setup>
 /**
- * EmptyState - what a list says when it has nothing to show (HQ-09: repeated in the
- * datasets, organizations and users lists): a title, and either the search hint when a
+ * EmptyState - what a list says when it has nothing to show: a title, and either the search hint when a
  * filter is on, or the slot's own hint.
  *
  *   <EmptyState title="No datasets found" :filtered="!!searchQuery"><p>Create one ...</p></EmptyState>

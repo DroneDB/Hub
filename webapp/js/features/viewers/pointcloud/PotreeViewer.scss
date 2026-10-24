@@ -1,5 +1,5 @@
 // Point-cloud viewer and the DOM Potree builds inside it (sidebar, menus, map): every rule
-// is under #potree, so nothing applies outside the viewer (HQ-08: out of Potree.vue).
+// is under #potree, so nothing applies outside the viewer.
 #potree {
     #potree_quick_buttons {
         left: auto !important;

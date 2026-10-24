@@ -7,7 +7,7 @@
 <script setup>
 /**
  * SingleMap - the map of one file (route /r/:org/:ds/view/:encodedPath/map): MapCore in
- * standalone mode (HQ-07) on the viewer shell (HQ-08).
+ * standalone mode on the viewer shell.
  */
 import { computed } from 'vue';
 import ddb from 'ddb';

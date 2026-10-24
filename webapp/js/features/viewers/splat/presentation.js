@@ -1,5 +1,5 @@
 /**
- * The splat viewer's presentation (HQ-08, out of Splat.vue): a tour through the saved
+ * The splat viewer's presentation: a tour through the saved
  * cameras (move, pause, next), a slow auto-orbit when there are none, and the eased
  * flight to one camera. Any user navigation stops it.
  */

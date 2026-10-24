@@ -42,7 +42,7 @@
 
 <script setup>
 /**
- * The popup over a clicked photo or video on the dataset map (HQ-07, out of Map.vue):
+ * The popup over a clicked photo or video on the dataset map:
  * name, thumbnail or video details, open/download/play, and the coordinates with a copy
  * button. One popup at a time, on one OpenLayers overlay owned by this component.
  *

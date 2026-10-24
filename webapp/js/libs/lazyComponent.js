@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * lazyComponent - a component whose code loads the first time it renders (HUB-02).
+ * lazyComponent - a component whose code loads the first time it renders.
  *
  * Dialogs and tabs of the dataset page are rendered with v-if: as async components their
  * chunks (and the libraries they import: OpenLayers, CodeMirror, the upload queue) load when

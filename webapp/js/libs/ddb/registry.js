@@ -29,9 +29,9 @@ export default class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
         this.eventListeners = {};
-        // Shared by every client of this origin (HUB-06)
+        // Shared by every client of this origin
         this.requestCache = RequestCache.forOrigin(url);
-        // Transport: auth header, timeout, parsing, ApiError (HQ-05)
+        // Transport: auth header, timeout, parsing, ApiError
         this.http = createHttpClient({ baseUrl: url, getToken: () => this.getAuthToken() });
         this.sys = new SysApi(this);
         this.share = new ShareApi(this);
@@ -43,7 +43,7 @@ export default class Registry {
 
     /**
      * The shared client of a Registry URL (one per origin), so helpers do not build a new
-     * client, with its own feature list and token refresh, on every call (HUB-06).
+     * client, with its own feature list and token refresh, on every call.
      * @param {string} url
      * @returns {Registry}
      */
@@ -198,7 +198,7 @@ export default class Registry {
 
     /**
      * An authenticated fetch() that returns the raw Response, for blobs, streams and
-     * callers that treat HTTP statuses as results (HQ-05).
+     * callers that treat HTTP statuses as results.
      * @param {string} endpoint  path starting with '/', or an absolute URL of this registry
      * @param {RequestInit} [init]
      * @returns {Promise<Response>}
@@ -262,7 +262,7 @@ export default class Registry {
 
     /**
      * Called with the error when a request (other than sign-in or token refresh) is
-     * rejected with 401. The app decides what to do (HQ-04: end the session, go to Login).
+     * rejected with 401. The app decides what to do (end the session, go to Login).
      * @param {(error: Error) => void} handler
      */
     onUnauthorized(handler) {

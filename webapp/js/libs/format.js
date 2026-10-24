@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * User-visible formatting (HQ-02): dates, durations, sizes, numbers, coordinates and
+ * User-visible formatting: dates, durations, sizes, numbers, coordinates and
  * measures. Components format through this module only, so the app shows one format
  * per kind of value and a later i18n pass changes one file.
  *

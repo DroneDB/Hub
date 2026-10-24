@@ -1,5 +1,5 @@
 /**
- * Saved camera views of a splat (HQ-08, out of Splat.vue): the `<name>_cameras.json`
+ * Saved camera views of a splat: the `<name>_cameras.json`
  * sidecar next to the splat, with the cameras and the scene orientation (flip and
  * ground-plane calibration).
  */

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * The files of Potree 1.8 that the point cloud viewer loads (HUB-04), with the Hub version in
+ * The files of Potree 1.8 that the point cloud viewer loads, with the Hub version in
  * their URL: the Registry serves versioned URLs as immutable (HubCachePolicy), so a browser
  * fetches them once per Hub release instead of revalidating them every hour.
  */

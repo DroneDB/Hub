@@ -1,5 +1,5 @@
 /**
- * Build artifacts by role (plan XI-04, D8): the entry DTO lists the artifacts that exist, the Hub
+ * Build artifacts by role: the entry DTO lists the artifacts that exist, the Hub
  * asks by role and requests nothing to find out.
  */
 import { describe, it, expect, vi } from 'vitest';

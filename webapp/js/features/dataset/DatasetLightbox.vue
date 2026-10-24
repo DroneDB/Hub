@@ -20,7 +20,7 @@
 
 <script setup>
 /**
- * The dataset page's photo and video lightboxes (HQ-09, out of ViewDataset.vue): the
+ * The dataset page's photo and video lightboxes: the
  * photos of the folder on show, with the current one's name, position and altitude, or one
  * video.
  *

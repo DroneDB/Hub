@@ -52,7 +52,7 @@
                 </template>
             </Card>
 
-            <!-- Upload self-test (UPL-01) -->
+            <!-- Upload self-test -->
             <UploadDiagnostics />
 
             <!-- Security Section (only if account management is enabled) -->

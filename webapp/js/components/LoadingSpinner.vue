@@ -13,7 +13,7 @@
 
 <script setup>
 /**
- * LoadingSpinner - the one "loading" indicator (HQ-09: 47 inline spinners in 35 files):
+ * LoadingSpinner - the one "loading" indicator:
  * a centered block, or inline next to text. Announced to screen readers.
  *
  *   <LoadingSpinner v-if="loading" />

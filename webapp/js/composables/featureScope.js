@@ -1,7 +1,6 @@
 // @ts-check
 /**
- * createFeatureScope - turns a mixin-shaped feature definition into a composable
- * (HQ-06/HQ-07 migration helper for the map features).
+ * createFeatureScope - turns a mixin-shaped feature definition into a composable.
  *
  * The feature's state, methods, computed values and watchers live on their own reactive
  * scope object (`this` inside the methods), not on the host component, and everything

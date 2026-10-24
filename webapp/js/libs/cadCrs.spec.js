@@ -1,5 +1,5 @@
 /**
- * DDB-12 P4: "Set Coordinate System" for CAD drawings (libs/cadCrs.js, the Tools menu item
+ * "Set Coordinate System" for CAD drawings (libs/cadCrs.js, the Tools menu item
  * and the dialog's request).
  */
 import { describe, it, expect, vi } from 'vitest';

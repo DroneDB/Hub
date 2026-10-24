@@ -1,5 +1,5 @@
 /**
- * DatasetUpload.vue mounted for real (UPL-01): the queue must exist before the component's
+ * DatasetUpload.vue mounted for real: the queue must exist before the component's
  * watchers first read it, and the dialog must follow the queue from the file list to the
  * summary. The request layer is replaced by a fake that answers each job at once.
  */

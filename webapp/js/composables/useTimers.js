@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Timers owned by a component (HQ-06): cleared when the component (effect scope) goes
+ * Timers owned by a component: cleared when the component (effect scope) goes
  * away, so a callback never runs on an unmounted component. Outside a scope they behave
  * like plain timers and must be cleared by the caller.
  */

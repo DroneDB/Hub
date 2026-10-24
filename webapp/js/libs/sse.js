@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * A server-sent events stream read with fetch (HUB-05): EventSource cannot send the
+ * A server-sent events stream read with fetch: EventSource cannot send the
  * Authorization header the Registry needs.
  *
  * @param {object} opts

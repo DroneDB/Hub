@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Task states and the dataset key used to group tasks (HQ-05). The task monitor, the
+ * Task states and the dataset key used to group tasks. The task monitor, the
  * build manager and the heavy-task helpers read these, so "is this task still running"
  * has one answer. Mirrors the server's TaskStateCatalog.
  */

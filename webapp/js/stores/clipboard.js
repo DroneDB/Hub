@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Hub Copy/Cut/Paste clipboard (HQ-04; was the module-level composables/useClipboard.js).
+ * Hub Copy/Cut/Paste clipboard.
  *
  * Holds the selection captured by Ctrl+C / Ctrl+X / the context menu, and persists it in
  * sessionStorage so it survives a refresh but not closing the tab (like a file manager).

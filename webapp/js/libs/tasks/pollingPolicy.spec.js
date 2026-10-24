@@ -1,5 +1,5 @@
 /**
- * Unit tests for libs/tasks/pollingPolicy.js and libs/sse.js (HUB-05)
+ * Unit tests for libs/tasks/pollingPolicy.js and libs/sse.js
  * Run with: npx vitest run webapp/js/libs/tasks/pollingPolicy.spec.js
  */
 import { describe, it, expect, vi } from 'vitest';

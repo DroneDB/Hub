@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Dataset permissions (HQ-08): the server puts them on the dataset's root entry
+ * Dataset permissions: the server puts them on the dataset's root entry
  * (`ds.info()[0].properties.permissions`); missing means none.
  */
 

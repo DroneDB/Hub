@@ -1,5 +1,5 @@
 /**
- * RQ-01 (Registry): the server may set the auth cookie HttpOnly (Basic auth sign-in), which script
+ * The server may set the auth cookie HttpOnly (Basic auth sign-in), which script
  * cannot clear. Sign-out therefore asks the Registry to expire it (POST /users/logout), without
  * waiting for or depending on the answer. Sign-in asks the same before writing its cookie: the
  * browser silently drops a script-written cookie with the name of an HttpOnly one, so the previous

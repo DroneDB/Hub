@@ -3,8 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * protocolLimits - how many uploads can run at once on the connection to the Registry
- * (UPL-01 A.3).
+ * protocolLimits - how many uploads can run at once on the connection to the Registry.
  *
  * Over HTTP/1.1 a browser opens 6 connections per host: a 7th request only waits in the
  * browser's queue. Over HTTP/2 or HTTP/3 requests are streams on one connection, each

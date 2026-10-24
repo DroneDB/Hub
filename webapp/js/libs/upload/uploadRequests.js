@@ -6,12 +6,12 @@
  * uploadRequests - the HTTP side of dataset uploads: what one job of the scheduler sends.
  *
  * - single file: POST {dataset}/obj with `path` then `file`;
- * - bundle: POST {dataset}/obj with `path`, `file` pairs (UPL-01 B.2), one result per file;
- * - chunked: POST {dataset}/obj/chunk per missing chunk, then POST .../commit (UPL-01 E.5).
+ * - bundle: POST {dataset}/obj with `path`, `file` pairs, one result per file;
+ * - chunked: POST {dataset}/obj/chunk per missing chunk, then POST .../commit.
  *
  * Every request carries an `X-Upload-Id`. When a request fails after the whole body was
  * sent (a proxy timeout while the server is still adding the file, a dropped connection),
- * the outcome is asked for by that id instead of sending the file again (UPL-01 E.4).
+ * the outcome is asked for by that id instead of sending the file again.
  */
 import { sendXhr } from './xhrTransport';
 import { newId } from '@/libs/ids';

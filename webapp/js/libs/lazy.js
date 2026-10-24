@@ -3,7 +3,7 @@
  *
  * Every URL starts downloading at once; scripts run in the order given (they are inserted
  * with async = false, which keeps insertion order for dynamically added scripts), so one
- * call can load libraries that depend on each other without one round trip per file (HUB-04).
+ * call can load libraries that depend on each other without one round trip per file.
  * A URL requested again, even while it is still loading, shares the first request.
  *
  * @param {string|string[]} urls .js or .css URLs (a query string, such as a version, is allowed)

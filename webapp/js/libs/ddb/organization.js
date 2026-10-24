@@ -23,7 +23,7 @@ export default class Organization {
     }
 
     /**
-     * One page of the datasets, searched and sorted by the server (HUB-07).
+     * One page of the datasets, searched and sorted by the server.
      * @param {{skip: number, take: number, q?: string, sort?: string, desc?: boolean}} query (datasetListQuery)
      * @param {object} [opts]
      * @param {boolean} [opts.includeThumbnailCheck] whether each dataset of the page has a cover

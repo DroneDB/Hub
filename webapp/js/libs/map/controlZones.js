@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Toolbar zones of the dataset map (HQ-07, out of useMapAnalysisButtons): flex columns
+ * Toolbar zones of the dataset map: flex columns
  * inside the map's stop-event overlay container, so controls stack without overlapping
  * and clicks on them never reach the map. Vue toolbars teleport into them; OpenLayers
  * controls are moved in with `moveToZone`.

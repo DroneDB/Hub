@@ -44,7 +44,7 @@
 
 <script setup>
 /**
- * The dataset map's own buttons (HQ-07: Vue instead of 24 createElement('button') calls),
+ * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
  * - top right: Back (single-file map), Reset view, Fullscreen, Raster Analysis, Stockpile;
  * - top center: direction indicators, flight path, split compare.

@@ -250,7 +250,7 @@ export default {
             Visibility,
             skeletonRows: new Array(10).fill({}),
             error: "",
-            // The page shown (the server searches, sorts and pages, HUB-07)
+            // The page shown (the server searches, sorts and pages)
             datasets: [],
             totalDatasets: 0,
             // Every slug of the organization, for the create/rename/import dialogs (loaded when
@@ -697,7 +697,7 @@ export default {
             this.$router.push({ name: "Upload" });
         },
 
-        // One server page with the covers checked for its rows only (HUB-07); a newer request
+        // One server page with the covers checked for its rows only; a newer request
         // (another page, sort or search) aborts the one in flight
         async loadPage() {
             if (!this.org) return;

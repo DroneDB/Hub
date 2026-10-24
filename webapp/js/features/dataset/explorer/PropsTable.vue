@@ -97,7 +97,6 @@ import { copyText } from '@/composables/useCopyText';
 /**
  * PropsTable - Recursive object/array-to-PrimeVue-DataTable renderer.
  *
- * Replaces the legacy ObjTable with a PrimeVue-based implementation.
  * Supports drill-down into nested objects via an inline dialog.
  * Formats captureTime, bands, dimensions and other well-known keys.
  *

@@ -3,7 +3,7 @@
  * The raster renderer's colormaps (DroneDB src/library/vegetation.cpp, initColormaps),
  * as evenly spaced stops: the picker swatches and the histogram bars draw from here, so
  * they match what the server paints. One table for RasterAnalysisControls,
- * PlantHealthPanel and HistogramChart (HQ-10: two copies disagreed with the server).
+ * PlantHealthPanel and HistogramChart.
  */
 
 /** @typedef {{ id: string, name: string, colors: string[], discrete?: boolean }} Colormap */

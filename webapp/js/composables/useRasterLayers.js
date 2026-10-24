@@ -1,5 +1,5 @@
 /**
- * useRasterLayers - the georaster list of the dataset map (HQ-07, out of Map.vue): the
+ * useRasterLayers - the georaster list of the dataset map: the
  * rows of the opacity panel (top first, the reverse of the OpenLayers collection), the
  * global or per-layer opacity, reordering, and dimming of selected rasters.
  *

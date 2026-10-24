@@ -429,7 +429,7 @@ const definition = {
 };
 
 /**
- * HQ-07: a composable. The feature's state and methods live on their own scope
+ * The feature's state and methods live on their own scope
  * (createFeatureScope); `externals` supplies what it needs from the map view.
  * @param {Record<string, any>} externals
  */

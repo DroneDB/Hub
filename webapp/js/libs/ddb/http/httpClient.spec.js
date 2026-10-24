@@ -1,5 +1,5 @@
 /**
- * Error contract with Registry (plan D1/D2, RQ-05): the Hub reads both the legacy
+ * Error contract with Registry: the Hub reads both the legacy
  * `{ error }` body and RFC 9457 ProblemDetails, so it runs against a Registry before
  * and after the ProblemDetails switch.
  */

@@ -1,5 +1,5 @@
 /**
- * Unit tests for composables/useRequestScope.js (HUB-06)
+ * Unit tests for composables/useRequestScope.js
  * Run with: npx vitest run webapp/js/composables/useRequestScope.spec.js
  */
 import { describe, it, expect } from 'vitest';

@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 /**
- * datasetListQuery - the server page the organization page asks for (HUB-07): the server
+ * datasetListQuery - the server page the organization page asks for: the server
  * searches, sorts and pages the datasets, and checks the covers of that page only, so the
  * browser receives and loads the rows it shows and nothing else.
  */
