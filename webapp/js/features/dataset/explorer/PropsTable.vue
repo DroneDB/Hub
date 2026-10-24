@@ -87,6 +87,7 @@
 
 <script>
 import { clone, sortObjectKeys } from '@/libs/utils';
+import { tidyProperties, beautifyKey, isUrl } from '@/libs/propertiesUtils';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -189,29 +190,7 @@ export default {
                 let tObj = clone(this.obj);
 
                 if (tObj !== null && typeof tObj === 'object' && !Array.isArray(tObj)) {
-                    // GeoImage adjustments
-                    if (tObj.geotransform && Array.isArray(tObj.geotransform) && tObj.geotransform.length > 1) {
-                        tObj.resolution = (tObj.geotransform[1]).toFixed(2) + ' meters';
-                        delete tObj.geotransform;
-                    }
-
-                    // Image / GeoImage: merge width + height into Dimensions
-                    if (tObj.width !== undefined && tObj.height !== undefined) {
-                        tObj['Dimensions'] = `${tObj.width} x ${tObj.height}`;
-                        delete tObj.width;
-                        delete tObj.height;
-                    }
-
-                    // Point cloud / GeoImage adjustments
-                    delete tObj.projection;
-
-                    // GeoImage adjustments
-                    delete tObj.focalLength35;
-                    delete tObj.orientation;
-
-                    if (tObj.sensor) {
-                        tObj.sensor = tObj.sensor.toUpperCase();
-                    }
+                    tidyProperties(tObj);
 
                     if (!this.preserveOrder) {
                         tObj = sortObjectKeys(tObj);
@@ -225,20 +204,9 @@ export default {
             }
         },
 
-        beautify(name) {
-            if (typeof name !== 'string') return name;
-            return name[0].toUpperCase() + name.substring(1).replace(/([a-z])([A-Z0-9])/g, '$1 $2');
-        },
+        beautify: beautifyKey,
 
-        isUrl(str) {
-            if (!str) return false;
-            try {
-                const url = new URL(str);
-                return url.protocol === 'http:' || url.protocol === 'https:';
-            } catch {
-                return false;
-            }
-        },
+        isUrl,
 
         // True if the value is an object/array that should be collapsed
         // behind a drill-down button (nested too deep or too large).

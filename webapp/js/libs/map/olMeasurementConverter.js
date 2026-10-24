@@ -8,7 +8,7 @@ import Feature from 'ol/Feature';
 import Overlay from 'ol/Overlay';
 import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
-import { pointCoordinates, pointPopupHtml } from './pointPopup';
+import { pointCoordinates, showPointPopup } from './pointPopup';
 import { copyText } from '@/composables/useCopyText';
 import { areaParts, lengthParts } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
@@ -401,25 +401,7 @@ function createPointPopup(feature, map, source, onEdit) {
     if (lat === undefined || lon === undefined) return;
 
     const { ddLat, ddLon } = pointCoordinates(lat, lon);
-    const popupEl = document.createElement('div');
-    popupEl.className = 'ol-point-popup';
-    popupEl.innerHTML = pointPopupHtml({
-        lat, lon, name: feature.get('name'), accent: feature.get('stroke'),
-        description: feature.get('description') || '', actions: true
-    });
-
-    const popupOverlay = new Overlay({
-        element: popupEl,
-        offset: [0, -12],
-        positioning: 'bottom-center',
-        stopEvent: true,
-        insertFirst: false,
-    });
-    popupOverlay.setPosition(coords);
-    map.addOverlay(popupOverlay);
-
-    feature.set('measureTooltipElement', popupEl);
-    feature.set('measureTooltip', popupOverlay);
+    const { popupEl, popupOverlay } = showPointPopup(map, feature, { lat, lon, coords, actions: true });
 
     // Edit handler
     // lifetime: element (buttons of the popup created here)

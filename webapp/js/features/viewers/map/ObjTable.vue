@@ -46,6 +46,7 @@
 
 <script>
 import { clone, sortObjectKeys } from '@/libs/utils';
+import { tidyProperties, beautifyKey, isUrl } from '@/libs/propertiesUtils';
 /**
  * ObjTable - Recursive JSON/object-to-HTML-table renderer (legacy Semantic UI style).
  *
@@ -64,10 +65,6 @@ export default {
         obj: {
             type: [Object, Array],
             required: true
-        },
-        preserveOrder: {
-            type: Boolean,
-            default: false
         }
     },
     data() {
@@ -98,33 +95,7 @@ export default {
                 let tObj = clone(this.obj);
 
                 if (tObj !== null && typeof tObj === 'object') {
-                    // GeoImage adjustments
-                    if (tObj.geotransform && Array.isArray(tObj.geotransform) && tObj.geotransform.length > 1) {
-                        tObj.resolution = (tObj.geotransform[1]).toFixed(2) + ' meters';
-                        delete (tObj.geotransform);
-                    }
-
-                    // Image / GeoImage Adjustments
-                    if (tObj.width !== undefined && tObj.height !== undefined) {
-                        tObj["Dimensions"] = `${tObj.width} x ${tObj.height}`;
-                        delete (tObj.width);
-                        delete (tObj.height);
-                    }
-
-                    // Point cloud / GeoImage adjustments
-                    delete (tObj.projection);
-
-                    // GeoImage adjustments
-                    delete (tObj.focalLength35);
-                    delete (tObj.orientation);
-
-                    if (tObj.sensor) {
-                        tObj.sensor = tObj.sensor.toUpperCase();
-                    }
-
-                    if (!this.preserveOrder) {
-                        tObj = sortObjectKeys(tObj);
-                    }
+                    tObj = sortObjectKeys(tidyProperties(tObj));
                 }
 
                 this.tObj = tObj;
@@ -133,20 +104,8 @@ export default {
                 this.tObj = { error: "Error displaying data" };
             }
         },
-        beautify: function (name) {
-            if (typeof name !== 'string') return name;
-            return name[0].toUpperCase() + name.substring(1).replace(/([a-z])([A-Z0-9])/g, '$1 $2');
-        },
-        isUrl: function (str) {
-            if (!str) return false;
-            try {
-                // Check if string is a valid URL
-                const url = new URL(str);
-                return url.protocol === 'http:' || url.protocol === 'https:';
-            } catch {
-                return false;
-            }
-        }
+        beautify: beautifyKey,
+        isUrl
     }
 }
 </script>

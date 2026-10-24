@@ -102,6 +102,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { getTypeDisplayName } from '@/libs/entryTypes';
+import { sortFileRows, nextSort } from '@/libs/dataset/fileSort';
 import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 
 const { pathutils, entry } = ddb;
@@ -188,35 +189,7 @@ export default {
             return `The folder <strong>${this.pendingCreatePath}</strong> does not exist. Do you want to create it?`;
         },
         sortedFiles: function () {
-            const sorted = [...this.files];
-
-            sorted.sort((a, b) => {
-                let aDir = entry.isDirectory(a.entry);
-                let bDir = entry.isDirectory(b.entry);
-
-                if (aDir && !bDir) return -1;
-                else if (!aDir && bDir) return 1;
-
-                let result = 0;
-                switch (this.sortColumn) {
-                    case 'name':
-                        result = a.label.toLowerCase().localeCompare(b.label.toLowerCase());
-                        break;
-                    case 'type':
-                        result = this.getFileType(a).localeCompare(this.getFileType(b));
-                        break;
-                    case 'size':
-                        result = (a.entry.size || 0) - (b.entry.size || 0);
-                        break;
-                    case 'modified':
-                        result = (a.entry.mtime || 0) - (b.entry.mtime || 0);
-                        break;
-                }
-
-                return this.sortDirection === 'asc' ? result : -result;
-            });
-
-            return sorted;
+            return sortFileRows(this.files, this.sortColumn, this.sortDirection);
         }
     },
 
@@ -377,12 +350,9 @@ export default {
         },
 
         sortBy: function (column) {
-            if (this.sortColumn === column) {
-                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortColumn = column;
-                this.sortDirection = 'asc';
-            }
+            const next = nextSort(this.sortColumn, this.sortDirection, column);
+            this.sortColumn = next.column;
+            this.sortDirection = next.direction;
         },
 
         getFileType: function (file) {

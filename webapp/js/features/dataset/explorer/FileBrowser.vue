@@ -239,22 +239,7 @@ export default {
 
                 const entries = await ddb.searchEntries(rootPath, query);
 
-                var res = sortEntriesDirectoriesFirst(
-                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path),
-                    this.sortDescending
-                )
-                    .map(entry => {
-                        const base = pathutils.basename(entry.path);
-                        return {
-                            icon: icons.getForType(entry.type, entry.path),
-                            label: base,
-                            path: pathutils.join(rootPath, entry.path),
-                            selected: false,
-                            entry,
-                            isExpandable: ddb.entry.isDirectory(entry)
-                        }
-                    });
+                const res = this.nodesOf(entries, entry => pathutils.join(rootPath, entry.path));
 
                 this.searchStaticPaths = {};
                 this.searchStaticPaths[rootPath] = res;
@@ -273,6 +258,22 @@ export default {
             }
         },
 
+        // Tree nodes of listed entries: folders first, hidden entries left out
+        nodesOf: function (entries, pathOf) {
+            return sortEntriesDirectoriesFirst(
+                entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
+                e => pathutils.basename(e.path),
+                this.sortDescending
+            ).map(entry => ({
+                icon: icons.getForType(entry.type, entry.path),
+                label: pathutils.basename(entry.path),
+                path: pathOf(entry),
+                selected: false,
+                entry,
+                isExpandable: ddb.entry.isDirectory(entry)
+            }));
+        },
+
         getChildren: async function (path) {
 
             if (this.searchStaticPaths != null && (typeof this.searchStaticPaths[path] !== 'undefined')) {
@@ -289,24 +290,7 @@ export default {
                     signal: this.requestSignal
                 });
 
-                var res = sortEntriesDirectoriesFirst(
-                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path),
-                    this.sortDescending
-                )
-                    .map(entry => {
-                        const base = pathutils.basename(entry.path);
-
-                        return {
-                            icon: icons.getForType(entry.type, entry.path),
-                            label: base,
-                            path: pathutils.join(path, base),
-                            selected: false,
-                            entry,
-                            isExpandable: ddb.entry.isDirectory(entry)
-                        }
-                    });
-                return res;
+                return this.nodesOf(entries, entry => pathutils.join(path, pathutils.basename(entry.path)));
             } catch (e) {
                 // The browser is gone: nobody waits for this listing
                 if (isAbort(e)) return [];

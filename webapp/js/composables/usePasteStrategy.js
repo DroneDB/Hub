@@ -91,30 +91,12 @@ class IntraDatasetCopyStrategy {
     }
 }
 
-class CrossDatasetMoveStrategy {
-    async execute(items, source, target, options) {
-        const result = buildResult();
-        const sourceDs = source.dataset;
-        const overwrite = options.conflictMode === 'overwrite';
-
-        for (const item of items) {
-            const destPath = destFor(item, target);
-            try {
-                await sourceDs.transferObj(item.path, target.orgSlug, target.dsSlug, destPath, overwrite, false);
-                result.succeeded.push({ source: item.path, dest: destPath });
-            } catch (err) {
-                if (options.conflictMode === 'skip') {
-                    result.skipped.push(item.path);
-                } else {
-                    result.failed[item.path] = err.message || String(err);
-                }
-            }
-        }
-        return result;
+// The server's transfer endpoint moves or copies: `keepSource` is the difference
+class CrossDatasetStrategy {
+    constructor(keepSource) {
+        this.keepSource = keepSource;
     }
-}
 
-class CrossDatasetCopyStrategy {
     async execute(items, source, target, options) {
         const result = buildResult();
         const sourceDs = source.dataset;
@@ -123,8 +105,7 @@ class CrossDatasetCopyStrategy {
         for (const item of items) {
             const destPath = destFor(item, target);
             try {
-                // keepSource=true => copy semantics on the transfer endpoint
-                await sourceDs.transferObj(item.path, target.orgSlug, target.dsSlug, destPath, overwrite, true);
+                await sourceDs.transferObj(item.path, target.orgSlug, target.dsSlug, destPath, overwrite, this.keepSource);
                 result.succeeded.push({ source: item.path, dest: destPath });
             } catch (err) {
                 if (options.conflictMode === 'skip') {
@@ -152,14 +133,6 @@ export function resolvePasteStrategy(clipboardSource, mode, target) {
 
     if (sameDataset && mode === 'cut') return new IntraDatasetMoveStrategy();
     if (sameDataset && mode === 'copy') return new IntraDatasetCopyStrategy();
-    if (!sameDataset && mode === 'cut') return new CrossDatasetMoveStrategy();
-    if (!sameDataset && mode === 'copy') return new CrossDatasetCopyStrategy();
+    if (!sameDataset && (mode === 'cut' || mode === 'copy')) return new CrossDatasetStrategy(mode === 'copy');
     throw new Error(`Cannot resolve paste strategy for mode='${mode}'`);
 }
-
-export {
-    IntraDatasetMoveStrategy,
-    IntraDatasetCopyStrategy,
-    CrossDatasetMoveStrategy,
-    CrossDatasetCopyStrategy
-};

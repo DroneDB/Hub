@@ -170,3 +170,46 @@ export function buildAllProperties(file) {
 
     return Object.keys(props).length > 0 ? props : null;
 }
+
+/**
+ * Tidies an object of entry or feature properties for display, in place: the GeoImage
+ * geotransform becomes a resolution, width and height one "Dimensions" row, internal fields
+ * are dropped and the sensor is upper-cased.
+ * @param {Object} props  a copy of the properties (it is changed)
+ * @returns {Object} props
+ */
+export function tidyProperties(props) {
+    if (props.geotransform && Array.isArray(props.geotransform) && props.geotransform.length > 1) {
+        props.resolution = props.geotransform[1].toFixed(2) + ' meters';
+        delete props.geotransform;
+    }
+    if (props.width !== undefined && props.height !== undefined) {
+        props['Dimensions'] = `${props.width} x ${props.height}`;
+        delete props.width;
+        delete props.height;
+    }
+    delete props.projection;
+    delete props.focalLength35;
+    delete props.orientation;
+    if (props.sensor) {
+        props.sensor = props.sensor.toUpperCase();
+    }
+    return props;
+}
+
+/** A property key as a label: "focalLength" becomes "Focal Length". */
+export function beautifyKey(name) {
+    if (typeof name !== 'string') return name;
+    return name[0].toUpperCase() + name.substring(1).replace(/([a-z])([A-Z0-9])/g, '$1 $2');
+}
+
+/** True for an absolute http or https URL (a value shown as a link). */
+export function isUrl(str) {
+    if (!str) return false;
+    try {
+        const url = new URL(str);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}

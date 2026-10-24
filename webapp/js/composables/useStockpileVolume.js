@@ -19,7 +19,7 @@ import { unByKey } from 'ol/Observable';
 import { buildStockpileFeature, loadStockpile } from '@/libs/map/stockpileStorage';
 import {
     STOCKPILE_MATERIALS,
-    CUSTOM_MATERIAL_SLUG as SHARED_CUSTOM_MATERIAL_SLUG,
+    CUSTOM_MATERIAL_SLUG,
     findStockpileMaterialBySlug,
     computeMaterialEstimate
 } from '@/libs/stockpileMaterials';
@@ -63,11 +63,6 @@ function friendlyStockpileError(raw, fallback) {
     }
     return fallback;
 }
-
-// Re-exported here so existing imports of `CUSTOM_MATERIAL_SLUG` from this
-// composable keep working. The single source of truth lives in
-// `@/libs/stockpileMaterials`.
-export const CUSTOM_MATERIAL_SLUG = SHARED_CUSTOM_MATERIAL_SLUG;
 
 // Resolve the active material descriptor for the current panel state.
 // Returns null when no material is selected, or when the inline custom

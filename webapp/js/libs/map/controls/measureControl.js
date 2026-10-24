@@ -15,7 +15,7 @@ import { toLonLat } from 'ol/proj';
 import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
-import { pointPopupHtml } from '@/libs/map/pointPopup';
+import { showPointPopup } from '@/libs/map/pointPopup';
 import { formatArea as formatAreaText, formatLength as formatLengthText } from '@/libs/format';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 import { getPref, setPref, PREF } from '@/libs/preferences';
@@ -1005,25 +1005,7 @@ class MeasureControls extends Control {
         const coords = feature.getGeometry().getCoordinates();
         const [lon, lat] = toLonLat(coords);
 
-        const popupEl = document.createElement('div');
-        popupEl.className = 'ol-point-popup';
-        popupEl.innerHTML = pointPopupHtml({
-            lat, lon, name: feature.get('name'), accent: feature.get('stroke'), description: feature.get('description') || ''
-        });
-
-        const popupOverlay = new Overlay({
-            element: popupEl,
-            offset: [0, -12],
-            positioning: 'bottom-center',
-            stopEvent: true,
-            insertFirst: false,
-        });
-        popupOverlay.setPosition(coords);
-        map.addOverlay(popupOverlay);
-
-        feature.set('measureTooltipElement', popupEl);
-        feature.set('measureTooltip', popupOverlay);
-
+        showPointPopup(map, feature, { lat, lon, coords });
     }
 
     /**

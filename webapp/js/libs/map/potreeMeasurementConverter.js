@@ -345,6 +345,21 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
 // ============================================================================
 
 /**
+ * The SRS definition proj4 takes: an EPSG code string or WKT, from a string, from
+ * { wkt } or from the nested { srs: { wkt } } of an EPT file. Null when there is none.
+ * @param {string|object|null|undefined} srs
+ * @returns {string|null}
+ */
+function srsDefinitionOf(srs) {
+    if (typeof srs === 'string') return srs;
+    if (srs && typeof srs === 'object') {
+        if (srs.srs && srs.srs.wkt) return srs.srs.wkt;
+        if (srs.wkt) return srs.wkt;
+    }
+    return null;
+}
+
+/**
  * Convert local coordinates to geographic
  * @param {THREE.Vector3} localCoords - Local coordinates
  * @param {Object} coordinateSystem - Coordinate system from EPT
@@ -358,18 +373,7 @@ function localToGeographic(localCoords, coordinateSystem) {
     const y = localCoords.y * scale[1] + offset[1];
     const z = localCoords.z * scale[2] + offset[2];
 
-    // Extract SRS definition (can be string EPSG code or object with wkt property)
-    let srsDefinition = null;
-    if (typeof srs === 'string') {
-        srsDefinition = srs;
-    } else if (srs && typeof srs === 'object') {
-        // Handle nested structure like {"srs":{"wkt":"..."}}
-        if (srs.srs && srs.srs.wkt) {
-            srsDefinition = srs.srs.wkt;
-        } else if (srs.wkt) {
-            srsDefinition = srs.wkt;
-        }
-    }
+    const srsDefinition = srsDefinitionOf(srs);
 
     // If no SRS or already WGS84, return directly
     if (!srsDefinition) {
@@ -401,18 +405,7 @@ function geographicToLocal(geoCoords, coordinateSystem) {
     const { scale, offset, srs } = coordinateSystem;
     let [x, y, z] = geoCoords;
 
-    // Extract SRS definition (can be string EPSG code or object with wkt property)
-    let srsDefinition = null;
-    if (typeof srs === 'string') {
-        srsDefinition = srs;
-    } else if (srs && typeof srs === 'object') {
-        // Handle nested structure like {"srs":{"wkt":"..."}}
-        if (srs.srs && srs.srs.wkt) {
-            srsDefinition = srs.srs.wkt;
-        } else if (srs.wkt) {
-            srsDefinition = srs.wkt;
-        }
-    }
+    const srsDefinition = srsDefinitionOf(srs);
 
     // Transform from WGS84 to local system if necessary
     if (srsDefinition && typeof proj4 !== 'undefined') {

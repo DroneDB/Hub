@@ -4,6 +4,7 @@
  * name, the coordinates in DMS and decimal degrees, the description and, for imported
  * points, edit/copy/delete buttons. Shared by the measure control and the importer.
  */
+import Overlay from 'ol/Overlay';
 import { toDms } from '@/libs/format';
 import { escapeHtml } from '@/libs/sanitize';
 
@@ -55,4 +56,35 @@ export function pointPopupHtml({ lat, lon, name, accent, description, actions = 
             ${actionsHtml}
         </div>
     `;
+}
+
+/**
+ * Puts the popup of a point on the map, over its feature, and keeps the element and the
+ * overlay on the feature (`measureTooltipElement`, `measureTooltip`) for later cleanup.
+ * @param {import('ol/Map').default} map
+ * @param {import('ol/Feature').default} feature  the point; its name, stroke and description fill the popup
+ * @param {{ lat: number, lon: number, coords: number[], actions?: boolean }} where  coords are the map coordinates of the point
+ * @returns {{ popupEl: HTMLElement, popupOverlay: Overlay }}
+ */
+export function showPointPopup(map, feature, { lat, lon, coords, actions = false }) {
+    const popupEl = document.createElement('div');
+    popupEl.className = 'ol-point-popup';
+    popupEl.innerHTML = pointPopupHtml({
+        lat, lon, name: feature.get('name'), accent: feature.get('stroke'),
+        description: feature.get('description') || '', actions
+    });
+
+    const popupOverlay = new Overlay({
+        element: popupEl,
+        offset: [0, -12],
+        positioning: 'bottom-center',
+        stopEvent: true,
+        insertFirst: false,
+    });
+    popupOverlay.setPosition(coords);
+    map.addOverlay(popupOverlay);
+
+    feature.set('measureTooltipElement', popupEl);
+    feature.set('measureTooltip', popupOverlay);
+    return { popupEl, popupOverlay };
 }

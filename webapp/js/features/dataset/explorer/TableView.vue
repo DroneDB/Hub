@@ -89,6 +89,7 @@ import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip } from '@/libs/build/buildHelpers';
 import { getTypeDisplayName } from '@/libs/entryTypes';
+import { sortFileRows, nextSort } from '@/libs/dataset/fileSort';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 
 import ddb from 'ddb';
@@ -170,37 +171,7 @@ export default {
             return this.files.filter(f => f.selected);
         },
         sortedFiles: function() {
-            const sorted = [...this.files];
-
-            sorted.sort((a, b) => {
-                // Folders first
-                let aDir = ddb.entry.isDirectory(a.entry);
-                let bDir = ddb.entry.isDirectory(b.entry);
-
-                if (aDir && !bDir) return -1;
-                else if (!aDir && bDir) return 1;
-
-                // Then sort by column
-                let result = 0;
-                switch(this.sortColumn) {
-                    case 'name':
-                        result = a.label.toLowerCase().localeCompare(b.label.toLowerCase());
-                        break;
-                    case 'type':
-                        result = this.getFileType(a).localeCompare(this.getFileType(b));
-                        break;
-                    case 'size':
-                        result = (a.entry.size || 0) - (b.entry.size || 0);
-                        break;
-                    case 'modified':
-                        result = (a.entry.mtime || 0) - (b.entry.mtime || 0);
-                        break;
-                }
-
-                return this.sortDirection === 'asc' ? result : -result;
-            });
-
-            return sorted;
+            return sortFileRows(this.files, this.sortColumn, this.sortDirection);
         },
         // Row events find their file by the row's position (the header is row 0)
         rowPt: function () {
@@ -355,12 +326,9 @@ export default {
         },
 
         sortBy: function(column) {
-            if (this.sortColumn === column) {
-                this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
-            } else {
-                this.sortColumn = column;
-                this.sortDirection = 'asc';
-            }
+            const next = nextSort(this.sortColumn, this.sortDirection, column);
+            this.sortColumn = next.column;
+            this.sortDirection = next.direction;
         },
 
         getFileType: function(file) {
