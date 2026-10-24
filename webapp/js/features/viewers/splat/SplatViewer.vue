@@ -7,9 +7,6 @@
             <div v-if="loaded && activeCameraName" class="camera-hud" title="Current camera view">
                 <i class="fa-solid fa-camera" /> {{ activeCameraName }}
             </div>
-            <div v-if="loaded && crs" class="crs-badge" :title="`Coordinate reference system: ${crs}`">
-                <i class="fa-solid fa-location-crosshairs" /> {{ crs }}
-            </div>
         </div>
 
         <!-- Paged .rad: level-of-detail streaming -->
@@ -90,7 +87,6 @@ const canvas = ref(null);
 const loaded = ref(false);
 const showSettings = ref(false);
 const showCameraManager = ref(false);
-const crs = ref(null);
 const streaming = ref(false);
 // Most INRIA/3DGS scenes render upside down without the flip
 const flipped = ref(true);
@@ -208,8 +204,6 @@ async function loadSplat() {
     const spzUrl = radUrl ? null : splatEntry.getGsplat();
     streaming.value = !!radUrl;
     bounds = await splatEntry.getGsplatBounds();
-    const georef = await splatEntry.getGeorefJson();
-    crs.value = georef && georef.srs ? georef.srs : null;
     await loadCameras();
 
     // three.js, OrbitControls and Spark (WebGL + WASM) only load with the viewer

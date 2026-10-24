@@ -31,8 +31,7 @@ export const ArtifactRole = Object.freeze({
     MODEL_3DTILES: 'model.3dtiles',
     GSPLAT_SPZ: 'gsplat.spz',
     GSPLAT_LOD: 'gsplat.lod',
-    GSPLAT_BOUNDS: 'gsplat.bounds',
-    GSPLAT_GEOREF: 'gsplat.georef'
+    GSPLAT_BOUNDS: 'gsplat.bounds'
 });
 
 /**

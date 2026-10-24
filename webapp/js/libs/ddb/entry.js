@@ -94,11 +94,6 @@ class Entry {
         return b && Array.isArray(b.min) && Array.isArray(b.max) ? b : null;
     }
 
-    /** The parsed georeferencing sidecar, or null when absent or unreadable. */
-    getGeorefJson() {
-        return this.readArtifactJson(ArtifactRole.GSPLAT_GEOREF);
-    }
-
     /**
      * Returns the OpenLayers-compatible URL template for the MVT tile pyramid
      * served by Registry's MvtController at /orgs/{org}/ds/{ds}/mvt/{hash}/{z}/{x}/{y}.pbf.
