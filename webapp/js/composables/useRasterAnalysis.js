@@ -60,7 +60,6 @@ const definition = {
             _rasterInspectMoveKey: null,
             _rasterInspectKeyHandler: null,
             _rasterInspectTooltipEl: null,
-            _rasterInspectAbort: null,
             _rasterInspectThrottle: null,
             _rasterInspectClickKey: null,
             // VectorLayer / VectorSource that hold the click marker (red dot)

@@ -63,8 +63,7 @@ module.exports = {
                     path.resolve(__dirname, 'webapp'),
                     path.resolve(__dirname, 'node_modules/ol'),
                     path.resolve(__dirname, 'node_modules/color-parse'),
-                    path.resolve(__dirname, 'node_modules/color-rgba'),
-                    path.resolve(__dirname, 'vendor')
+                    path.resolve(__dirname, 'node_modules/color-rgba')
                 ],
                 use: [
                     {
@@ -199,9 +198,6 @@ module.exports = {
             __APP_PRODUCTION__: JSON.stringify(isProduction),
             __HUB_VERSION__: JSON.stringify(pkg.version),
         }),
-        new webpack.NormalModuleReplacementPlugin(/(.*)polyfills\/node\/(.*)/, function (resource) {
-            resource.request = resource.request.replace(/polyfills\/node\//, `polyfills/web/`);
-        }),
         new HtmlWebpackPlugin({
             template: path.join(__dirname, 'webapp/public/index.html'),
             inject: 'body',
@@ -281,8 +277,5 @@ module.exports = {
             path: false,
             punycode: false
         }
-    },
-
-    externals: {
     }
 }
