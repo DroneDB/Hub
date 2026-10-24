@@ -2,7 +2,7 @@
  * useResilientUpload - Shared retry/backoff/backpressure policy of the uploads.
  *
  * Consumed by the upload scheduler (libs/upload/uploadScheduler.js), which DatasetUpload.vue
- * and Upload.vue share.
+ * and UploadPage.vue share.
  *
  * Exposes:
  *   - shouldRetryStatus(status): whether an HTTP status is transient for this purpose

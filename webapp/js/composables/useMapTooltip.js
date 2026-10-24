@@ -1,6 +1,6 @@
 /**
- * Mixin for tooltip overlay on vector features.
- * Shared between Map.vue and SingleMap.vue.
+ * Feature scope for the tooltip overlay on vector features.
+ * Shared by the dataset map and the single-file map (MapCore).
  *
  * The consuming component should define a method `getLayerDisplayName(layer)`
  * that returns the fallback label for a layer (e.g. layer.file.name or layer.entry.name).

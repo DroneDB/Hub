@@ -1,6 +1,6 @@
 /**
- * Mixin for Plant Health (multispectral visualization) functionality.
- * Shared between Map.vue and SingleMap.vue.
+ * Feature scope for Plant Health (multispectral visualization) functionality.
+ * Shared by the dataset map and the single-file map (MapCore).
  *
  * Requirements:
  * - Component must have `this.dataset` (Dataset instance)
@@ -94,7 +94,7 @@ const definition = {
 
                 // Carry over the retina flag from the source we are replacing,
                 // and recompute its maxZoom from the native GSD zoom stamped on
-                // the layer by Map.vue ('rasterNativeZoom'). OL's XYZ source never
+                // the layer by the map ('rasterNativeZoom'). OL's XYZ source never
                 // exposes '.maxZoom', so reading it back would always yield 22.
                 const prevRetina = typeof source.getTilePixelRatio === 'function'
                     ? source.getTilePixelRatio(0) > 1
@@ -141,7 +141,7 @@ const definition = {
                 const path = params.get('path');
                 if (!path) return;
 
-                // Check if file exists in list (Map.vue) or matches entry (SingleMap.vue)
+                // Check if file exists in list (dataset map) or matches entry (single-file map)
                 if (files) {
                     const file = files.find(f => f.entry && f.entry.path === path);
                     if (!file) return;

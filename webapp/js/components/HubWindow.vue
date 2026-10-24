@@ -19,7 +19,7 @@
 <script setup>
 /**
  * Window - the one dialog component: PrimeVue Dialog plus the behaviour every
- * dialog used to copy.
+ * dialog needs.
  *
  * - `close` (with an optional result) on the X, a mask click (closeModalOnClick) or Escape;
  *   `update:visible` too, so `v-model:visible` works. Rendered with v-if, visible stays true.

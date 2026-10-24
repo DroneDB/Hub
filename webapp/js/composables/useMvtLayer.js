@@ -1,10 +1,9 @@
 /**
- * Helpers shared between Map.vue and SingleMap.vue for rendering MVT vector layers
+ * Helpers shared by the dataset map and the single-file map for rendering MVT vector layers
  * backed by the precomputed `/mvt/{hash}/{z}/{x}/{y}.pbf` tile pyramid served by Registry.
  *
- * Kept as plain JS helpers (not a Vue mixin) because the surrounding logic in the two
- * components - selection tracking, listener bookkeeping, zoom-to-extent - differs
- * enough that a mixin would be more confusing than helpful.
+ * Plain JS helpers rather than a feature scope because the surrounding logic of the two
+ * maps - selection tracking, listener bookkeeping, zoom-to-extent - differs.
  */
 import { VectorTile as VectorTileLayer } from 'ol/layer';
 import { VectorTile as VectorTileSource } from 'ol/source';

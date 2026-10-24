@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PotreeSession, pointBudgetFor } from './potreeSession';
 
-// The jQuery that Potree.vue loads (public/potree), bound to the test window
+// The jQuery that PotreeViewer.vue loads (public/potree), bound to the test window
 function vendoredJQuery() {
     const src = fs.readFileSync(path.resolve(__dirname, '../../../public/potree/libs/jquery/jquery-3.1.1.min.js'), 'utf8');
     const module = { exports: {} };

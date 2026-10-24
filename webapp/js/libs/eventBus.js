@@ -1,6 +1,5 @@
 /**
- * Global event bus using mitt.
- * Replaces Vue 2's $root.$on/$emit/$off pattern.
+ * Global event bus using mitt (emit / on / off), for events no parent or store owns.
  */
 import mitt from 'mitt';
 

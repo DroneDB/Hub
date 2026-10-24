@@ -20,15 +20,15 @@ export default class OrganizationsApi {
 
         const formData = new FormData();
 
-        // Support both old signature (slug, name, desc, isPublic) and new signature (object)
+        // Takes positional arguments (slug, name, desc, isPublic) or one object
         if (typeof slugOrData === 'object') {
-            // New signature: createOrganization({slug, name, description, isPublic})
+            // One object: createOrganization({slug, name, description, isPublic})
             if (slugOrData.slug) formData.append('slug', slugOrData.slug);
             if (slugOrData.name) formData.append('name', slugOrData.name);
             if (slugOrData.description) formData.append('description', slugOrData.description);
             if (slugOrData.isPublic !== undefined) formData.append('isPublic', slugOrData.isPublic);
         } else {
-            // Old signature: createOrganization(slug, name, description, isPublic)
+            // Positional: createOrganization(slug, name, description, isPublic)
             if (slugOrData) formData.append('slug', slugOrData);
             if (name) formData.append('name', name);
             if (description) formData.append('description', description);

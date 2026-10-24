@@ -21,22 +21,21 @@
 // 1. app.scss: html { font-size: 16px }
 //    Root font-size definition - required to establish rem base.
 //
-// 2. Loader.vue: spinner animation border widths (1.25rem)
-//    Use rem now; the spinner scales with the component's
-//    font-size token. Previously em-based for relative scaling.
+// 2. HubLoader.vue: spinner animation border widths (1.25rem)
+//    In rem; the spinner scales with the component's font-size token.
 //
-// 3. Potree.vue: vendor-prefixed radial gradients
+// 3. PotreeViewer.scss: vendor-prefixed radial gradients
 //    (-moz-, -webkit-, -o-, -ms-) contain rgba() fallbacks
 //    and 0px in -webkit-gradient(). The standard background
 //    line uses var(--ddb-viewer-gradient-*) tokens. Vendor
 //    lines are kept as fallbacks for legacy browsers.
 //
-// 4. Potree.vue / olMeasure.vue: tooltip positioning
+// 4. measureLabels.js: tooltip positioning
 //    tooltip.style.left/top use cursor-relative pixel offsets
 //    calculated from getBoundingClientRect(). These MUST stay
 //    as px because they're screen-coordinate offsets.
 //
-// 5. @media breakpoints (app.scss, TreeNode.vue, Datasets.vue)
+// 5. @media breakpoints (app.scss, TreeNode.vue, DatasetsPage.vue)
 //    CSS media queries use px values (767px, 575.98px, etc.)
 //    per Bootstrap convention. These are viewport breakpoints
 //    and must remain in px.
@@ -46,8 +45,8 @@
 //    and must NOT be modified.
 //
 // 7. OL / Canvas rendering colors in JS:
-//    Map.vue, SingleMap.vue, olMeasure.vue, olSelection.vue
-//    construct OpenLayers Style objects with rgba() color
+//    MapCore.vue, fileLayerStyles.js, measureControl.js and
+//    selectionControl.js construct OpenLayers Style objects with rgba() color
 //    strings. These are rendering-engine colors, not CSS.
 //
 // 8. Color picker palette arrays:
@@ -55,19 +54,19 @@
 //    contain hard-coded hex color arrays for user selection.
 //    These are application data, not styling constants.
 //
-// 9. Thumbnail.vue: dynamic size prop
+// 9. EntryThumbnail.vue: dynamic size prop
 //    The size prop (number) is converted from px to rem via
 //    (size / 16) + 'rem' in JS data. The division by 16
-//    maps the legacy pixel API to rem.
+//    maps the pixel size the callers pass to rem.
 //
 // RADIUS SCALE:
 //   sm = 0.25rem (rounded-1), md = 0.5rem (rounded-3)
 //
 // EXCEPTIONS (px still allowed):
 //   - Mouse-tracking positions (event.clientX/Y in JS)
-//   - Thumbnail.vue dynamic prop-based sizes
+//   - EntryThumbnail.vue dynamic prop-based sizes
 //   - Media queries (@media max-width)
-//   - CSS spinner animation borders (Loader.vue)
+//   - CSS spinner animation borders (HubLoader.vue)
 //   - Canvas font strings (OL Text API)
 //   - OL pseudo-element tooltip arrows (::before/::after)
 //

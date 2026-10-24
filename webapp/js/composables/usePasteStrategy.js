@@ -5,7 +5,7 @@
  *   async execute(items, target, dataset, options) -> { succeeded, failed, skipped }
  *
  * - items:   [{ path, type, size, entry? }]  (from clipboard; `entry` is the
- *             full source entry preserved by useClipboard, used by callers to
+ *             full source entry preserved by the clipboard store, used by callers to
  *             repopulate destination entries after paste)
  * - target:  { orgSlug, dsSlug, basePath, dataset }
  * - source:  { orgSlug, dsSlug, basePath, dataset }

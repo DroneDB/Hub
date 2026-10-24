@@ -3,8 +3,6 @@
  * useTaskFormatting - task presentation for task lists. The tool catalog and state machine come from the server's
  * /sys/features (the single source of truth); `now` ticks every second (shared clock) so
  * running times and artifact expiries update live.
- *
- * Returns the same names the mixin had, so templates are unchanged.
  */
 import { computed } from 'vue';
 import reg from '@/libs/api/sharedRegistry';

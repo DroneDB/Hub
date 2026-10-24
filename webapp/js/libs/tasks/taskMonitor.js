@@ -1,7 +1,6 @@
 /**
  * taskMonitor - Unified per-dataset task polling and in-memory store.
- * Replaces the previous separate `buildManager.startPolling` (GET /builds) and
- * provides a single reactive source of truth for all task consumers
+ * A single reactive source of truth for all task consumers
  * (buildManager, TaskHistory, useHeavyTask).
  *
  * Refresh schedule (see pollingPolicy):

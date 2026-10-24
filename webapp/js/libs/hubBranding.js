@@ -3,8 +3,7 @@
  *
  * The values are sourced from the backend `/sys/features` endpoint
  * (see `FeaturesDto.HubOptions` server-side) and surfaced as the
- * frozen global `window.HubOptions` for legacy components that
- * already read it directly.
+ * frozen global `window.HubOptions`, which components read directly.
  *
  * This module also injects favicon / manifest / theme-color tags
  * into <head> based on the optional `Favicon` block, so neither

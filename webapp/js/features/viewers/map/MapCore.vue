@@ -80,7 +80,7 @@
 
 <script>
 /**
- * MapCore - the map shared by the dataset Map tab (Map.vue) and the single-file map
+ * MapCore - the map shared by the dataset Map tab (DatasetMap.vue) and the single-file map
  * (SingleMap.vue, `standalone`). It wires OpenLayers to the map features
  * (composables), the file layers (libs/map/fileLayers) and its child components
  * (toolbar, popup, panels, dialogs).
@@ -399,7 +399,7 @@ export default {
             this.$refs.filePopup.close();
             this.fileLayers.clearFootprints();
 
-            // Raster extents no longer highlight on click (the outline mode was removed)
+            // Raster extents do not highlight on click
             const { shotLayer, extentLayer } = this.fileLayers;
             const hit = featureAt(this.map, e.pixel, l => l.getVisible() && (l === shotLayer || l === extentLayer));
             const shots = hit && hit.feature.get('features');

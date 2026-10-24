@@ -163,7 +163,7 @@ function normalizeUp(THREE, camera, getUpAxis) {
  *
  * Gain matches OrbitControls' rotateLeft/rotateUp exactly (full viewport height = 360 deg),
  * including its sign convention (drag down = camera rises over the top), so the feel is a
- * drop-in for the rotation that was disabled in createNavControls.
+ * drop-in for OrbitControls' rotation, which createNavControls disables.
  *
  * @param libs - { THREE } bundle of the viewer.
  * @param camera - camera to orbit; camera.up must equal the scene up axis (see createNavControls).
@@ -241,7 +241,7 @@ export function createTurntableRotate(libs, camera, controls, domElement, getUpA
         const up = normalizeUp(THREE, camera, getUpAxis);
 
         // Yaw about the absolute up axis through the pivot. OrbitControls' rotateLeft is
-        // -2π*rotateSpeed*dx/clientHeight too, so the gain matches the old rotation.
+        // -2π*rotateSpeed*dx/clientHeight too, so the gain matches OrbitControls' own rotation.
         dir.applyQuaternion(qYaw.setFromAxisAngle(up, -k * dx));
 
         // Pitch inside the great circle spanned by up and the view direction, written directly

@@ -13,8 +13,8 @@ import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
 
 /**
- * Mixin for Raster Analysis panel (thermal + DEM + generic value rasters).
- * Shared between Map.vue and SingleMap.vue.
+ * Feature scope for Raster Analysis panel (thermal + DEM + generic value rasters).
+ * Shared by the dataset map and the single-file map (MapCore).
  *
  * Requirements:
  * - Component must have `this.dataset` (Dataset instance)
@@ -582,8 +582,8 @@ const definition = {
 
         /**
          * Locate the OpenLayers tile layer that renders `this.rasterFilePath`.
-         * Falls back to scanning all map layers because Map.vue / SingleMap.vue
-         * may store the raster layers either directly on the map or grouped
+         * Falls back to scanning all map layers because the dataset map and the
+         * single-file map may store the raster layers either directly on the map or grouped
          * under `this.rasterLayer` (a LayerGroup).
          */
         _findRasterTileLayer() {

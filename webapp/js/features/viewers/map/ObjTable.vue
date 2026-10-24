@@ -48,7 +48,7 @@
 import { clone, sortObjectKeys } from '@/libs/utils';
 import { tidyProperties, beautifyKey, isUrl } from '@/libs/propertiesUtils';
 /**
- * ObjTable - Recursive JSON/object-to-HTML-table renderer (legacy Semantic UI style).
+ * ObjTable - Recursive JSON/object-to-HTML-table renderer (Semantic UI table markup).
  *
  * Handles nested objects and arrays by mounting itself recursively. Formats
  * known special keys (captureTime, bands, dimensions) for readability.

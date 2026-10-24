@@ -1,6 +1,6 @@
 /**
  * Shared drag-and-drop utilities for file upload from the OS file explorer.
- * Used by Explorer.vue and TableView.vue to avoid code duplication.
+ * Used by DatasetExplorer.vue and TableView.vue to avoid code duplication.
  */
 
 import { createLimiter } from '@/libs/concurrency';

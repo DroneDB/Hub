@@ -5,8 +5,8 @@
 /**
  * thumbnailQueue - bounds how many thumbnails load at once.
  *
- * Opening a folder used to start one request per visible tile at the same time (98 for a
- * 4K screen), all queueing on the server's render lane. Here a tile asks for a slot; the
+ * Starting one request per visible tile at the same time (98 for a 4K screen) would queue
+ * them all on the server's render lane. Instead a tile asks for a slot; the
  * queue starts at most `concurrency` loads (6: the browser's HTTP/1.1 connections per host),
  * visible tiles before prefetched ones, and forgets a tile that scrolled away before its
  * turn. A load holds its slot until the tile reports it finished (image load or error).

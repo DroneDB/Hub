@@ -51,9 +51,9 @@ body {
  * Disabling text selection globally prevents accidental text selection during:
  * - Map panning/zooming (OpenLayers, Leaflet)
  * - 3D model rotation/pan (Potree, Three.js)
- * - Window dragging (Window.vue)
- * - Panel resizing (Panel.vue)
- * - File selection in browsers (FileBrowser.vue, Explorer.vue)
+ * - Window dragging (HubWindow.vue)
+ * - Panel resizing (HubPanel.vue)
+ * - File selection in browsers (FileBrowser.vue, DatasetExplorer.vue)
  *
  * Use .text-selectable class on elements where text should be selectable.
  * Example: <div class="text-selectable">Copy me</div>
@@ -247,8 +247,7 @@ body:fullscreen {
 .dialog-xl  { max-width: 47rem;    }  // ~750px
 
 // ============================================================
-// Tooltip shared styles (replaces duplicated inline CSS in
-// Potree.vue, mapUtils.js, etc.)
+// Tooltip shared styles (used by the Potree viewer, mapUtils.js, etc.)
 // ============================================================
 .ddb-tooltip {
     position: absolute;

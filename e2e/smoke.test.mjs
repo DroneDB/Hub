@@ -216,7 +216,7 @@ test('dataset page: the extract dialog picks a destination folder', async () => 
     await page.waitForSelector('.p-dialog >> text=Select Destination Folder', { timeout: 10000 });
     await page.click('.p-dialog:has-text("Select Destination Folder") button:has-text("Confirm")');
     await page.waitForSelector('.p-dialog >> text=Select Destination Folder', { state: 'detached', timeout: 10000 });
-    // The extract dialog stays, and is now the window Escape closes
+    // The extract dialog stays, and is the window Escape closes
     await page.waitForSelector('.p-dialog >> text=Extract Archive', { timeout: 5000 });
     await page.keyboard.press('Escape');
     await page.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });

@@ -22,7 +22,7 @@ function fakeVm(tasks, { page = 0, selectedState = '', selectedTool = '' } = {})
         selectedTool,
         currentPageFirst: page,
         pageSize: 20,
-        // Present on the real component (useTaskFormatting mixin); unused unless
+        // Present on the real component (useTaskFormatting); unused unless
         // a task has toolId 'bulk-download', which these fixtures avoid.
         isActive: () => false,
     };

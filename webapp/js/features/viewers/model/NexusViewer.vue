@@ -146,7 +146,7 @@ onMounted(async () => {
     }
 });
 
-// The render loop and the WebGL context used to outlive the page
+// Stop the render loop and release the WebGL context with the page
 onBeforeUnmount(() => {
     disposed = true;
     cancelAnimationFrame(frame);

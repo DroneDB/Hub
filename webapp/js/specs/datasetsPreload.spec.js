@@ -3,7 +3,7 @@
  * (skip/take) with its covers checked, so the browser loads at most that page's covers.
  *
  * The component is heavy to mount (PrimeVue DataTable, router, dialogs), so this spec
- * exercises the preload policy of Datasets.vue (preloadThumbnails -> preloadDatasetThumbnail
+ * exercises the preload policy of DatasetsPage.vue (preloadDatasetThumbnail
  * over the datasets of the page) with a counting Image stub.
  *
  * Run with: npx vitest run webapp/js/specs/datasetsPreload.spec.js
@@ -18,7 +18,7 @@ function makeDatasets(n) {
     return Array.from({ length: n }, (_, i) => ({ slug: `ds${i}`, hasThumbnail: true, thumbUrl: '/images/dataset-placeholder.svg', thumbLoaded: false }));
 }
 
-/** The logic of Datasets.vue preloadThumbnails()/preloadDatasetThumbnail(). */
+/** The logic of DatasetsPage.vue preloadDatasetThumbnail(). */
 function preloadPolicy(datasets, getUrl) {
     datasets.forEach(ds => {
         if (!ds.hasThumbnail) return;

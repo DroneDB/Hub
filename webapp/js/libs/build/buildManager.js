@@ -5,9 +5,8 @@
  * Whether a build's output exists is not a job state: that is the artifacts the entry lists
  * (libs/build/entryBuild.js).
  *
- * Public API preserved for backward compatibility with existing consumers:
- * DetailPanel, Thumbnail, buildHelpers, fileAvailabilityChecker,
- * contextMenuItems, FileAvailabilityDialog, useDatasetActions, useDatasetListing.
+ * Used by DetailPanel, EntryThumbnail, buildHelpers, fileAvailabilityChecker,
+ * contextMenuItems, FileAvailabilityDialog, useDatasetActions and useDatasetListing.
  */
 
 import taskMonitor from '@/libs/tasks/taskMonitor';
@@ -128,7 +127,7 @@ class BuildManager {
         return isActiveState(cache.get(filePath).state);
     }
 
-    /** Get build info for a file. Returns { path, currentState } to match old BuildJobDto. */
+    /** Get build info for a file. Returns { path, currentState }. */
     getBuildState(dataset, filePath) {
         const key = this.getDatasetKey(dataset);
         const cache = this._buildByPath.get(key);
@@ -166,7 +165,7 @@ class BuildManager {
         }
     }
 
-    /* ---- load builds (backward compat, delegates to taskMonitor) ---- */
+    /* ---- load builds (delegates to taskMonitor) ---- */
 
     async loadBuilds(dataset) {
         const key = this.getDatasetKey(dataset);
@@ -178,7 +177,7 @@ class BuildManager {
             .map(t => ({ path: t.path, currentState: t.state }));
     }
 
-    // Legacy API that consumers may still call — a task was just started, so refresh now
+    // A task was just started: refresh now
     startPolling(dataset)  { taskMonitor.forceRefresh(dataset); }
 
     /* ---- file-added callbacks ---- */

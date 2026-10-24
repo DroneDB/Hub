@@ -1,8 +1,7 @@
 /**
- * A 401 while listing organisations ends the session and goes to Login.
- * Before, the page tested `e.noRetry` (set only by the upload layer), so it always
- * showed "Temporary authentication issue" and never redirected. The page now leaves
- * 401s to the app's handler (reg.onUnauthorized -> handleUnauthorized).
+ * A 401 while listing organisations ends the session and goes to Login: the page leaves
+ * 401s to the app's handler (reg.onUnauthorized -> handleUnauthorized) instead of showing
+ * a "Temporary authentication issue".
  */
 import { describe, it, expect, vi } from 'vitest';
 import { ApiError } from '@/libs/ddb/apiError';

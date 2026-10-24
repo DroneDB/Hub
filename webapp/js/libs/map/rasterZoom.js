@@ -2,8 +2,8 @@
  * rasterZoom - Zoom-range helpers for on-the-fly rendered raster XYZ layers.
  *
  * Raster tiles are generated on demand from the source file, so the only real
- * cap on zoom is the native GSD of the raster. The viewer used to hard-cap
- * layers at z22 (~3.7 cm/px at the equator), which hides sub-cm detail.
+ * cap on zoom is the native GSD of the raster. A fixed cap at z22 (~3.7 cm/px at
+ * the equator) would hide sub-cm detail.
  *
  * Source zoom ceilings derive from each entry's native GSD zoom; the view
  * maxZoom is the largest native zoom across entries plus a small

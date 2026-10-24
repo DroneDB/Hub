@@ -68,8 +68,7 @@ export function applyBuildFields(held, fresh) {
 /**
  * The entry as the server reports it now. A listing is a snapshot: a build that finished after it
  * is not in it. A snapshot that already answers (`isEnough`) is used as it is; otherwise the entry
- * is listed again, once: one request however many artifacts the caller wants, where each used to
- * cost a probe.
+ * is listed again, once: one request however many artifacts the caller wants.
  * @template {{ path: string }} T
  * @param {{ listOne: (path: string) => Promise<any> }} dataset
  * @param {T} entry

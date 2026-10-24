@@ -10,7 +10,7 @@ import { notify } from '@/libs/notify';
 const SEVERITY = { positive: 'success', negative: 'error', warning: 'warn', info: 'info' };
 
 /**
- * A short notice (toast summary only); `color` is the legacy name of the severity.
+ * A short notice (toast summary only); `color` is the severity: positive, negative, warning or info.
  * @param {string} message
  * @param {'positive'|'negative'|'warning'|'info'} [color]
  */

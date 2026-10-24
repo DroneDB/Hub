@@ -3,7 +3,7 @@ import { MAX_RETRIES, shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/
 
 /**
  * thumbRetryPolicy.spec - bounded thumbnail retry contract shared by
- * Thumbnail.vue, TableView.vue and the Map image popup.
+ * EntryThumbnail.vue, TableView.vue and the map image popup.
  */
 describe('thumbRetryPolicy', () => {
     it('allows retries below the cap and stops at/above it', () => {
@@ -35,7 +35,7 @@ describe('thumbRetryPolicy', () => {
     });
 
     it('cap composition: total loads per tile is 1 initial + MAX_RETRIES retries', () => {
-        // Simulate the Thumbnail.vue/Map.vue error loop: initial load failures
+        // Simulate the EntryThumbnail.vue / map popup error loop: initial load failures
         // drive retries while shouldRetry(retryNumber) holds.
         let retryNumber = 0;
         let loads = 1; // initial <img> load

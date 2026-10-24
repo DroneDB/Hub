@@ -1,8 +1,8 @@
 // @ts-check
 /**
  * useDialogs - dialogs opened on demand and rendered inside the app.
- * Replaces separate `createApp()` mounts (which got no theme, router, stores or toast
- * host) and per-dialog boolean flags.
+ * A dialog is a component in the app's own tree (so it has the theme, router, stores and
+ * toast host), opened by a call instead of a per-dialog boolean flag.
  *
  *   setup() { return { dialogs: useDialogs() }; }          // template: <DialogHost :dialogs="dialogs" />
  *   const result = await this.dialogs.open(RenameDialog, { entry, onSave: ... });

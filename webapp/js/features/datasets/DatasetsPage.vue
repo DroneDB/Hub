@@ -266,7 +266,7 @@ export default {
 
             importDialogOpen: false,
 
-            // Blocking overlay flag while a new dataset is being created (Loader.vue)
+            // Blocking overlay flag while a new dataset is being created (HubLoader.vue)
             creatingDataset: false,
 
             orgEditDialogOpen: false,
@@ -957,7 +957,7 @@ export default {
         height: 2rem;
     }
 
-    /* Loader.vue is position:absolute, so pin it to the viewport via this wrapper */
+    /* HubLoader.vue is position:absolute, so pin it to the viewport via this wrapper */
     .ds-overlay-wrapper {
         position: fixed;
         inset: 0;

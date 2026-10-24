@@ -154,12 +154,12 @@ export default {
         },
 
         /**
-         * Drop on a TreeNode entry. Reuses the mixin's `onDrop` (validates
+         * Drop on a TreeNode entry. Reuses useDragDrop's `onDrop` (validates
          * internal drag, gates on canWrite, asks the page to move) and then has
          * the tree move the other selected nodes too (multi-selection drag).
          */
         onItemDrop(evt, item) {
-            // Capture source path before mixin clears state.
+            // Capture source path before useDragDrop clears state.
             let primaryPath = null;
             if (isInternalDrag(evt)) {
                 try {
