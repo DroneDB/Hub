@@ -212,23 +212,6 @@ export function useHeavyTask() {
         return poll(dataset, taskId, options);
     }
 
-    /** @param {any} dataset @param {string} taskId */
-    async function cancelHeavyTask(dataset, taskId) {
-        endTask(taskId);
-        try {
-            await dataset.cancelTask(taskId);
-        } finally {
-            const entry = heavyTasks.value[taskId];
-            if (entry) setTask(taskId, { ...entry, state: 'Deleted' });
-        }
-    }
-
-    /** @param {any} dataset @param {string} taskId @param {HeavyTaskOptions} [options] */
-    async function retryHeavyTask(dataset, taskId, options = {}) {
-        await dataset.retryTask(taskId);
-        return poll(dataset, taskId, options);
-    }
-
     /** Stops every poll and releases the monitor (also called when the owner's scope ends). */
     function dispose() {
         disposed = true;
@@ -237,9 +220,7 @@ export function useHeavyTask() {
     if (getCurrentScope()) onScopeDispose(dispose);
 
     return {
-        heavyTasks, runHeavyTask, trackHeavyTask, cancelHeavyTask, retryHeavyTask, dispose,
-        /** For tests: polls still holding a timer or the monitor. */
-        activeCount: () => Object.keys(datasets).length + Object.keys(timers).length
+        heavyTasks, runHeavyTask, trackHeavyTask, dispose
     };
 }
 

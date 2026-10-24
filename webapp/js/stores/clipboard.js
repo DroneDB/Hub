@@ -48,7 +48,6 @@ export const useClipboardStore = defineStore('clipboard', () => {
 
     const isEmpty = computed(() => !mode.value || items.value.length === 0);
     const isCut = computed(() => mode.value === 'cut');
-    const isCopy = computed(() => mode.value === 'copy');
     const count = computed(() => items.value.length);
 
     function clear() {
@@ -71,9 +70,6 @@ export const useClipboardStore = defineStore('clipboard', () => {
     const copy = (src, files) => capture('copy', src, files);
     /** @param {ClipboardSource|null} src @param {Array<object>} files */
     const cut = (src, files) => capture('cut', src, files);
-
-    /** @param {string} path */
-    const contains = path => items.value.some(it => it.path === path);
 
     /** Drop deleted entries; an emptied clipboard resets so the panel disappears. @param {string[]} paths */
     function removePaths(paths) {
@@ -103,5 +99,5 @@ export const useClipboardStore = defineStore('clipboard', () => {
     // lifetime: app (the store lives as long as the page)
     emitter.on('deleteEntries', removePaths);
 
-    return { mode, source, items, capturedAt, isEmpty, isCut, isCopy, count, clear, copy, cut, contains, removePaths };
+    return { mode, source, items, capturedAt, isEmpty, isCut, count, clear, copy, cut, removePaths };
 });

@@ -5,7 +5,7 @@
  * subscriber to the client's login/logout events.
  */
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
 import { loadFeaturesAndBranding } from '@/libs/hubBranding';
 
@@ -57,7 +57,5 @@ export const useAuthStore = defineStore('auth', () => {
         return reg.features.get(name);
     }
 
-    const homeOrg = computed(() => username.value);
-
-    return { username, isLoggedIn, isAdmin, featuresVersion, homeOrg, sync, login, logout, refreshFeatures, feature };
+    return { username, isLoggedIn, isAdmin, featuresVersion, sync, login, logout, refreshFeatures, feature };
 });

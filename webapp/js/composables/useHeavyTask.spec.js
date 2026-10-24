@@ -50,7 +50,7 @@ describe('unmount during an in-flight tick', () => {
         await vi.advanceTimersByTimeAsync(10000);
 
         expect(dataset.getTaskLog).toHaveBeenCalledTimes(1);
-        expect(host.activeCount()).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
     });
 
     it('releases the taskMonitor reference so no snapshot is left behind', async () => {
@@ -63,7 +63,7 @@ describe('unmount during an in-flight tick', () => {
         host.$unmount();
 
         expect(taskMonitor.getTasks(dataset)).toHaveLength(0);
-        expect(host.activeCount()).toBe(0);
+        expect(vi.getTimerCount()).toBe(0);
     });
 
     it('never acquires when tracking starts after unmount', async () => {

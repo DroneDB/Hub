@@ -17,11 +17,8 @@ export function useTaskFormatting() {
 
     /** @type {import('vue').ComputedRef<import('@/libs/tasks/taskFormat').TaskTool[]>} */
     const taskTools = computed(() => reg.features.value('taskTools') || []);
-    const visibleTaskTools = computed(() => taskTools.value.filter(t => !t.hidden));
-    const accessibleTaskTools = computed(() => taskTools.value.filter(t => !t.hidden && !t.disabled));
     /** @type {import('vue').ComputedRef<import('@/libs/tasks/taskFormat').TaskState[]>} */
     const taskStates = computed(() => reg.features.value('taskStates') || []);
-    const terminalStates = computed(() => taskStates.value.filter(s => s.terminal).map(s => s.value));
     const stateOptions = computed(() => [{ label: 'All States', value: '' }]
         .concat(taskStates.value.map(s => ({ label: s.value, value: s.value }))));
 
@@ -29,7 +26,7 @@ export function useTaskFormatting() {
     const tools = (list = []) => (Array.isArray(list) && list.length ? list : taskTools.value);
 
     return {
-        now, taskTools, visibleTaskTools, accessibleTaskTools, taskStates, terminalStates, stateOptions,
+        now, taskTools, taskStates, stateOptions,
         isActive: state => fmt.isActiveTaskState(state, taskStates.value),
         getTagSeverity: fmt.tagSeverity,
         getStateIcon: fmt.stateIcon,
