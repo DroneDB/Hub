@@ -62,11 +62,9 @@ import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
-import ddb from 'ddb';
+import reg from '@/libs/api/sharedRegistry';
 import { useTimerGroup } from '@/composables/useTimers';
 
-const { Registry } = ddb;
-const reg = Registry.forUrl(window.location.origin);
 
 export default {
     components: {
