@@ -8,7 +8,7 @@
             <template v-else>
                 <Button v-if="canWrite" severity="secondary" outlined class="edit" icon="fa-solid fa-pen-to-square" aria-label="Edit"
                         @click="edit" />
-                <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
+                <!-- eslint-disable-next-line vue/no-v-html -- sanitised by renderMarkdown -->
                 <div class="content" v-html="content" />
             </template>
         </div>
@@ -22,11 +22,10 @@
  */
 import { ref, computed, nextTick, onMounted } from 'vue';
 import Button from 'primevue/button';
-import MarkdownIt from 'markdown-it';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
-import { sanitizeHtml } from '@/libs/sanitize';
+import { renderMarkdown } from '@/libs/markdown';
 
 defineOptions({ name: 'MarkdownViewer' });
 
@@ -37,8 +36,7 @@ const { entry, dataset, canWrite, loading, error, entryLoaded } = useViewerEntry
 const rawContent = ref('');
 const editing = ref(false);
 const editor = ref(null);
-const md = new MarkdownIt();
-const content = computed(() => sanitizeHtml(md.render(rawContent.value)));
+const content = computed(() => renderMarkdown(rawContent.value));
 
 onMounted(async () => {
     if (!await entryLoaded) return;

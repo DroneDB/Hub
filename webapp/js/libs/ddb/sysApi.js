@@ -14,6 +14,19 @@ export default class SysApi {
         return this.registry.getRequest('/sys/config');
     }
 
+    /** Update-check state: installed and latest version, release notes, usage declaration (admin). */
+    updateInfo() {
+        return this.registry.getRequest('/sys/update-info');
+    }
+
+    /**
+     * Save the usage declaration and contact e-mail (admin); answers with the fresh update info.
+     * @param {{ useDeclaration: string|null, contactEmail: string|null, contactConsent: boolean }} settings
+     */
+    saveUpdateCheckSettings(settings) {
+        return this.registry.putRequest('/sys/update-check/settings', settings);
+    }
+
     /** Configured processing nodes (NodeODX). */
     processingNodes() {
         return this.registry.getRequest('/sys/processingNodes');

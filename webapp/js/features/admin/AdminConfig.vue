@@ -16,6 +16,8 @@
         <LoadingSpinner v-if="loading" size="lg" label="Loading configuration..." />
 
         <div v-else class="config-scroll-container">
+            <UsageAndContactCard />
+
             <Accordion :active-index="activeIndex" class="config-accordion">
                 <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx">
                     <template #header>
@@ -34,7 +36,8 @@
                                 <div class="field-header">
                                     <label :for="`field-${sIdx}-${fIdx}`">{{ field.displayName }}</label>
                                     <div class="field-tags">
-                                        <Tag v-if="field.sensitive && isFieldModified(sIdx, fIdx)"
+                                        <Tag v-if="isInfoField(field)" value="Read-only" severity="secondary" size="small" />
+                                        <Tag v-else-if="field.sensitive && isFieldModified(sIdx, fIdx)"
                                              value="Modified" severity="warning" size="small" />
                                         <Tag v-else-if="field.sensitive && field.isSet"
                                              value="Set (masked)" severity="info" size="small" />
@@ -46,8 +49,14 @@
                                     </div>
                                 </div>
 
+                                <!-- info: shown, not a setting -->
+                                <InputText v-if="isInfoField(field)"
+                                           :id="`field-${sIdx}-${fIdx}`"
+                                           :model-value="field.currentValue"
+                                           readonly class="info-value" />
+
                                 <!-- text -->
-                                <InputText v-if="field.fieldType === 'text' && !field.sensitive"
+                                <InputText v-else-if="field.fieldType === 'text' && !field.sensitive"
                                            :id="`field-${sIdx}-${fIdx}`"
                                            :model-value="getFieldValue(sIdx, fIdx, field)"
                                            :pt="{ root: { class: fieldInputClass(sIdx, fIdx) } }"
@@ -152,6 +161,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import UsageAndContactCard from '@/features/admin/UsageAndContactCard.vue';
 import reg from '@/libs/api/sharedRegistry';
 import Accordion from 'primevue/accordion';
 import AccordionTab from 'primevue/accordiontab';
@@ -175,7 +185,7 @@ export default {
     name: 'AdminConfig',
 
     components: {
-        LoadingSpinner,
+        LoadingSpinner, UsageAndContactCard,
         Accordion, AccordionTab, Button, InputText, InputNumber,
         ToggleSwitch, Select, Password, Chips, Textarea, Tag
     },
@@ -214,6 +224,11 @@ export default {
         },
 
         // ---- state helpers ----
+
+        // A value the server shows (an identifier) that is not in appsettings.json
+        isInfoField(field) {
+            return field.fieldType === 'info';
+        },
 
         isSectionActive(sIdx) {
             return this.sections[sIdx]?.isActive || !!this.modifiedSections[sIdx];
@@ -303,6 +318,7 @@ export default {
 
                 for (let fIdx = 0; fIdx < section.fields.length; fIdx++) {
                     const field = section.fields[fIdx];
+                    if (this.isInfoField(field)) continue;
                     const key = sIdx + '-' + fIdx;
                     const isModified = key in this.modifiedFields;
 
@@ -459,6 +475,10 @@ export default {
     color: var(--ddb-text-secondary);
     font-size: 0.8rem;
     line-height: 1.3;
+}
+
+.info-value {
+    font-family: monospace;
 }
 
 .sensitive-display {

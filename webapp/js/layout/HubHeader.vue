@@ -15,6 +15,10 @@
                     @click="goToOrganization">
                 <i class="fa-solid fa-sitemap" />
             </Button>
+            <Button v-if="updateAvailable" class="update-available-btn" severity="warning" size="small" text
+                    :title="updateTitle" :aria-label="updateLabel" @click="updateNotesOpen = true">
+                <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
+            </Button>
             <Button v-if="showDownload && onFilesTab" severity="secondary" size="small" text :title="downloadTitle"
                     :disabled="isDownloading || downloadBlocked || activeBulkDownload" @click="handleDownload">
                 <i class="fa-solid fa-download" />
@@ -35,6 +39,8 @@
                            cancel-text="Cancel"
                            confirm-button-class="primary"
                            @close="handleDownloadConfirmClose" />
+
+            <UpdateNotesDialog v-if="updateNotesOpen && updateInfo" :info="updateInfo" @close="updateNotesOpen = false" />
 
             <Alert v-if="storageInfoDialogOpen" title="Storage Info" @close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
@@ -95,6 +101,7 @@ import { Features } from '@/libs/features';
 import Alert from '@/components/HubAlert';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
+import UpdateNotesDialog from '@/features/admin/UpdateNotesDialog.vue';
 import { xAuthLogout } from '@/libs/api/xauth';
 import { bytesToSize } from '@/libs/utils';
 import emitter from '@/libs/eventBus';
@@ -103,6 +110,7 @@ import Menu from 'primevue/menu';
 import ProgressBar from 'primevue/progressbar';
 import PrimeMessage from 'primevue/message';
 import { useHeavyTask } from '@/composables/useHeavyTask';
+import { useUpdateCheck } from '@/composables/useUpdateCheck';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
@@ -115,6 +123,7 @@ export default {
         Alert,
         ConfirmDialog,
         ShareEmbed,
+        UpdateNotesDialog,
         Button,
         Menu,
         ProgressBar,
@@ -122,7 +131,8 @@ export default {
     },
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask };
+        const { updateInfo, updateAvailable, enabled: updateCheckActive, load: loadUpdateInfo } = useUpdateCheck();
+        return { runHeavyTask, updateInfo, updateAvailable, updateCheckActive, loadUpdateInfo };
     },
     data: function () {
 
@@ -141,7 +151,8 @@ export default {
             storageInfoDialogOpen: false,
             usersManagement: false,
             accountManagement: false,
-            shareFile: null
+            shareFile: null,
+            updateNotesOpen: false
         }
     },
 
@@ -229,6 +240,13 @@ export default {
             // logo banner alone is shown (the banner already carries the
             // wordmark).
             return HubOptions.appName !== undefined ? HubOptions.appName : null;
+        },
+        updateTitle: function () {
+            const { latestVersion, currentVersion } = this.updateInfo;
+            return `Registry ${latestVersion} is available (current: ${currentVersion}) - what's new`;
+        },
+        updateLabel: function () {
+            return `Registry ${this.updateInfo.latestVersion} is available, show what's new`;
         },
         downloadConfirmMessage: function () {
             if (this.selectedFiles.length > 0) {
@@ -319,12 +337,20 @@ export default {
                 this.refreshStorageInfo();
             } else {
                 this.storageInfo = null;
+                this.updateNotesOpen = false;
                 this.usersManagement = false;
                 this.accountManagement = false;
             }
         },
         featuresVersion: function () {
             this.checkUserManagement();
+        },
+        // An admin signs in, or the feature flags arrive: ask for the update info (once per session)
+        updateCheckActive: {
+            immediate: true,
+            handler: function (active) {
+                if (active) this.loadUpdateInfo();
+            }
         },
         $route: function (to) {
             const { params } = to;

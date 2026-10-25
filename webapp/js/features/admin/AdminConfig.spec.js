@@ -1,0 +1,72 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { flushPromises, mount } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
+
+const h = vi.hoisted(() => ({
+    sys: { config: null },
+    copyText: null
+}));
+vi.mock('@/libs/api/sharedRegistry', () => ({ default: { sys: h.sys } }));
+vi.mock('@/composables/useCopyText', () => ({ copyText: text => h.copyText(text) }));
+
+const { default: AdminConfig } = await import('./AdminConfig.vue');
+
+const field = (key, fieldType, currentValue, defaultValue = currentValue) => ({
+    key, displayName: key, fieldType, currentValue, defaultValue, description: `${key} help`,
+    isSet: false, sensitive: false, enumOptions: fieldType === 'enum' ? ['security', 'all', 'off'] : null
+});
+const CONFIG = {
+    sections: [{
+        name: 'UpdateCheck',
+        title: 'Update check',
+        description: 'Update check: disabled (AppSettings:UpdateCheckCron). Docs: https://docs.dronedb.app/docs/registry/admin/update-check',
+        isActive: false,
+        fields: [
+            field('UpdateCheckEmail', 'enum', 'all', 'security'),
+            field('InstanceId', 'info', '0f8fad5b-d9cb-469f-a165-70867728950e')
+        ]
+    }]
+};
+
+let wrapper;
+async function show() {
+    h.sys.config = vi.fn(() => Promise.resolve(structuredClone(CONFIG)));
+    wrapper = mount(AdminConfig, {
+        attachTo: document.body,
+        global: {
+            plugins: [PrimeVue],
+            stubs: { UsageAndContactCard: true },
+            mocks: { $notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, $router: { push: vi.fn() } }
+        }
+    });
+    await flushPromises();
+    return wrapper;
+}
+const fieldOf = key => [...document.querySelectorAll('.config-field')].find(f => f.querySelector('label')?.textContent === key);
+
+beforeEach(() => {
+    h.copyText = vi.fn(() => Promise.resolve());
+});
+afterEach(() => wrapper?.unmount());
+
+describe('AdminConfig', () => {
+    it('shows an informational value read-only, not as a setting', async () => {
+        await show();
+        const info = fieldOf('InstanceId');
+        const input = info.querySelector('input');
+        expect(input.value).toBe('0f8fad5b-d9cb-469f-a165-70867728950e');
+        expect(input.readOnly).toBe(true);
+        expect(info.textContent).toContain('Read-only');
+        expect(info.textContent).not.toContain('Default');
+    });
+
+    it('leaves informational values out of the AppSettings JSON', async () => {
+        await show();
+        [...document.querySelectorAll('button')].find(b => b.textContent.includes('Copy AppSettings JSON')).click();
+        await flushPromises();
+
+        expect(h.copyText).toHaveBeenCalledTimes(1);
+        const { AppSettings } = JSON.parse(h.copyText.mock.calls[0][0]);
+        expect(AppSettings.UpdateCheck).toEqual({ UpdateCheckEmail: 'all' });
+    });
+});
