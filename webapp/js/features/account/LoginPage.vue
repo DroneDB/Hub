@@ -28,6 +28,11 @@
                     target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
             </div>
             <Message v-if="error" severity="error" :closable="false" class="login-error">{{ error }}</Message>
+            <!-- The same words on every deployment, branded or not: a search for them finds the
+                 sign-in pages of public Registry installs, so keep the wording stable -->
+            <footer class="login-signature">
+                Powered by <a href="https://dronedb.app" target="_blank" rel="noopener">DroneDB Registry</a>
+            </footer>
         </div>
     </div>
 </template>
@@ -142,6 +147,12 @@ export default {
 
     .login-error {
         margin-top: 1rem;
+    }
+
+    .login-signature {
+        margin-top: var(--ddb-spacing-xl);
+        font-size: var(--ddb-font-size-sm);
+        color: var(--ddb-text-muted);
     }
 }
 </style>
