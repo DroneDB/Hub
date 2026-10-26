@@ -5,19 +5,23 @@
  *
  * Signed-in downloads of the whole dataset, or of a selection over the configured size,
  * run as a background "bulk-download" task (a ZIP the browser fetches when ready);
- * everything else streams directly after a download-slot check.
+ * everything else streams directly after a download-slot check. A single file always
+ * streams, whatever its size: the server sends it as-is, while the task would wrap it
+ * in a ZIP (a .tar.gz would come back as a .zip holding it).
  */
+import ddb from 'ddb';
 import { notify } from '@/libs/notify';
 import { DOWNLOAD_LIMIT_MESSAGE } from '@/libs/constants';
 
 /**
  * Whether a selection goes through the background archive task. No selection (whole
- * dataset) always does; files of unknown size (folders) do, to be safe.
- * @param {Array<{ entry?: { size?: number } }>} files
+ * dataset) always does and one file never does; files of unknown size (folders) do, to be safe.
+ * @param {Array<{ entry?: { size?: number, type?: number } }>} files
  * @param {number|null|undefined} thresholdBytes  BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES
  */
 export function shouldDownloadAsync(files, thresholdBytes) {
     if (!files || files.length === 0) return true;
+    if (files.length === 1 && isSingleFile(files[0])) return false;
     if (!thresholdBytes || thresholdBytes <= 0) return false;
     let total = 0;
     for (const f of files) {
@@ -26,6 +30,11 @@ export function shouldDownloadAsync(files, thresholdBytes) {
         total += size;
     }
     return total > thresholdBytes;
+}
+
+/** A known entry that is not a folder (or a nested dataset). @param {{ entry?: { type?: number } }} file */
+function isSingleFile(file) {
+    return !!file.entry && typeof file.entry.type === 'number' && !ddb.entry.isDirectory(file.entry);
 }
 
 /**
