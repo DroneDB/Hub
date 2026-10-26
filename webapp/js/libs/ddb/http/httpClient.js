@@ -42,16 +42,6 @@ function fail(message, status, extra = {}) {
 }
 
 /**
- * Error text a 2xx JSON body may carry (some endpoints answer 200 with an error).
- * @param {unknown} json @returns {string|null}
- */
-function inlineErrorOf(json) {
-    if (!json || typeof json !== 'object') return null;
-    const j = /** @type {any} */ (json);
-    return j.error || j.message || null;
-}
-
-/**
  * Error text of a failed (non-2xx) response: an RFC 9457 ProblemDetails body (`detail`,
  * then `title`) or the legacy `{ error }` body. Reading both lets the Hub run against a
  * Registry before and after its ProblemDetails switch.
@@ -71,8 +61,9 @@ export const isJsonType = (/** @type {string} */ contentType) =>
     contentType.includes('application/json') || contentType.includes('+json');
 
 /**
- * Body of a successful response, by content type. A JSON body with an `error` field is
- * a failure even with a 2xx status (some endpoints answer 200 with an error).
+ * Body of a successful response, by content type. The Registry reports errors only with a
+ * non-2xx status, so a 2xx body is data even when it has an `error` or `message` field (the
+ * status of a failed task carries its error that way).
  * @param {Response} response
  * @param {number} status
  * @param {string|null} responseType  'text' or 'blob' to force the type
@@ -83,10 +74,7 @@ async function parseBody(response, status, responseType) {
         if (responseType === 'text') return await response.text();
 
         if (isJsonType(contentType)) {
-            const json = await response.json();
-            const message = inlineErrorOf(json);
-            if (message) fail(message, status, json);
-            return json;
+            return await response.json();
         }
 
         if (contentType.includes('text/')) return await response.text();
@@ -95,15 +83,11 @@ async function parseBody(response, status, responseType) {
             const text = await response.text();
             if (!text || !text.trim()) return true;
             if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-                let json;
                 try {
-                    json = JSON.parse(text);
+                    return JSON.parse(text);
                 } catch {
                     return text;
                 }
-                const message = inlineErrorOf(json);
-                if (message) fail(message, status, json);
-                return json;
             }
             return text;
         }
