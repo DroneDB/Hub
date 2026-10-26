@@ -1,7 +1,7 @@
 <template>
     <div id="browser" class="cui app">
         <Message v-model="error" />
-        <Panel split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%" mobile-collapsed>
+        <Panel split="vertical" class="main" amount="23.6%" mobile-amount="0%" tablet-amount="30%" storage-key="dataset" mobile-collapsed>
             <template #first>
                 <div class="sidebar">
                     <FileBrowser v-show="!isMobile" ref="fileBrowser" v-bind="treeProps" v-on="treeEvents" />

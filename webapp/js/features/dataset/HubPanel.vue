@@ -14,15 +14,23 @@
 import Splitter from 'primevue/splitter';
 import SplitterPanel from 'primevue/splitterpanel';
 import { isMobile, isTablet } from '@/libs/responsive';
+import { PREF, getPref, setPref } from '@/libs/preferences';
+
+/** The smallest size of a pane, in percent (SplitterPanel min-size). */
+const MIN_PANE = 2;
 
 /**
  * Panel - Two-pane resizable split layout backed by PrimeVue Splitter.
  *
- * Persists pane sizes to localStorage and adapts split direction on mobile.
+ * With a storageKey, the size the user drags the panes to is kept on this device
+ * (PREF.PANEL_SIZES), once for desktop and once for tablet screens, and restored on
+ * the next visit. Phones always start from mobileAmount.
  *
  * Props:
- *   split  - Orientation: 'vertical' (default) or 'horizontal'.
- *   amount - Initial size of the first pane as a percentage (default: '50%').
+ *   split        - Orientation: 'vertical' (default) or 'horizontal'.
+ *   amount       - Initial size of the first pane as a percentage (default: '50%').
+ *   mobileAmount, tabletAmount - The same on phones and tablets (default: amount).
+ *   storageKey   - Name under which the size is kept; none: not kept.
  */
 export default {
     name: 'HubPanel',
@@ -53,10 +61,14 @@ export default {
         tabletAmount: {
             type: String,
             default: ""
+        },
+        storageKey: {
+            type: String,
+            default: ""
         }
     },
     data: function () {
-        const size = parseFloat(this.panelSize());
+        const size = this.storedSize() ?? parseFloat(this.panelSize());
         return {
             size0: size,
             size1: 100 - size,
@@ -89,6 +101,25 @@ export default {
             else return this.amount;
         },
 
+        /** Where the size is kept for this screen class; null: not kept (no storageKey, or a phone). */
+        sizeKey: function () {
+            if (!this.storageKey || isMobile()) return null;
+            return `${this.storageKey}.${isTablet() ? 'tablet' : 'desktop'}`;
+        },
+        /** @returns {number|null} the kept size of the first pane, if a valid one is kept */
+        storedSize: function () {
+            const key = this.sizeKey();
+            if (!key) return null;
+            const size = getPref(PREF.PANEL_SIZES, {})?.[key];
+            return Number.isFinite(size) && size >= MIN_PANE && size <= 100 - MIN_PANE ? size : null;
+        },
+        storeSize: function (size) {
+            const key = this.sizeKey();
+            if (!key || !Number.isFinite(size)) return;
+            const sizes = getPref(PREF.PANEL_SIZES, {});
+            setPref(PREF.PANEL_SIZES, { ...(sizes && typeof sizes === 'object' ? sizes : {}), [key]: Math.round(size * 100) / 100 });
+        },
+
         registerChild(component) {
             this.registeredChildren.push(component);
         },
@@ -111,7 +142,14 @@ export default {
                 }
             }
         },
-        onResizeEnd: function () {
+        // Mouse, touch and keyboard resizing all end here
+        onResizeEnd: function (event) {
+            const size = event?.sizes?.[0];
+            if (Number.isFinite(size)) {
+                this.size0 = size;
+                this.size1 = 100 - size;
+                this.storeSize(size);
+            }
             this.onPanelResized();
         }
     }

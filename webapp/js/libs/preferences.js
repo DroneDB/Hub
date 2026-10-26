@@ -28,6 +28,7 @@ export const PREF = Object.freeze({
     ORG_PAGE_POSITION: 'org_page_position', // { currentPage, scrollTop } of the organisations page
     UNIFIED_VIEWER: 'unified-viewer-settings',
     NEXUS_LIGHTING: 'nexus-lighting-settings',
+    PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
     HUB_UPDATE_ATTEMPTED: 'hubUpdateAttempted', // sessionStorage
     CLIPBOARD: 'ddb:hub:clipboard' // sessionStorage
