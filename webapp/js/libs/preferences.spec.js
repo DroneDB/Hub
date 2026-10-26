@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    PREF, ACCOUNT_SECTIONS, PREF_DEFAULTS, onPrefChange, applyAccountValue, setPref, removePref, getPref,
+    PREF, ACCOUNT_SECTIONS, PREF_DEFAULTS, RENAMED_PREFS, onPrefChange, applyAccountValue, setPref, removePref, getPref,
     _resetPrefListenersForTests
 } from './preferences';
 
@@ -169,5 +169,61 @@ describe('catalog', () => {
         const pairs = Object.values(ACCOUNT_SECTIONS).map(([s, f]) => `${s}.${f}`);
         expect(new Set(pairs).size).toBe(pairs.length);
         expect(ACCOUNT_SECTIONS[PREF.MEASURE_UNIT]).toEqual(['units', 'measurement']);
+    });
+});
+
+describe('a preference stored under its old name', () => {
+    const NEW_KEY = PREF.MODEL_LIGHTING;
+    const OLD_KEY = RENAMED_PREFS[NEW_KEY].key;
+    const lighting = { ambientIntensity: 1.5, directionalIntensity: 0.2, shininess: 40 };
+
+    it('names a synced preference under a key and a field that differ from the new ones', () => {
+        expect(OLD_KEY).toBe('nexus-lighting-settings');
+        expect(OLD_KEY).not.toBe(NEW_KEY);
+        expect(RENAMED_PREFS[NEW_KEY].field).toBe('nexusLighting');
+        expect(ACCOUNT_SECTIONS[NEW_KEY][1]).toBe('modelLighting');
+    });
+
+    it('is read from the new key, and the old key is removed', () => {
+        localStorage.setItem(OLD_KEY, JSON.stringify(lighting));
+        expect(getPref(NEW_KEY, null)).toEqual(lighting);
+        expect(localStorage.getItem(OLD_KEY)).toBeNull();
+        expect(JSON.parse(localStorage.getItem(NEW_KEY))).toEqual(lighting);
+    });
+
+    it('is moved once: what the user sets afterwards stays', () => {
+        localStorage.setItem(OLD_KEY, JSON.stringify(lighting));
+        getPref(NEW_KEY, null);
+        removePref(NEW_KEY);
+        expect(getPref(NEW_KEY, null)).toBeNull();
+        expect(localStorage.getItem(OLD_KEY)).toBeNull();
+    });
+
+    it('keeps the value of the new key when both exist, and still removes the old key', () => {
+        localStorage.setItem(NEW_KEY, JSON.stringify({ ambientIntensity: 2 }));
+        localStorage.setItem(OLD_KEY, JSON.stringify(lighting));
+        expect(getPref(NEW_KEY, null)).toEqual({ ambientIntensity: 2 });
+        expect(localStorage.getItem(OLD_KEY)).toBeNull();
+    });
+
+    it('moves before a write, and tells the subscribers of the write only', () => {
+        localStorage.setItem(OLD_KEY, JSON.stringify(lighting));
+        setPref(NEW_KEY, { ...lighting, shininess: 10 });
+        expect(localStorage.getItem(OLD_KEY)).toBeNull();
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(listener).toHaveBeenCalledWith(NEW_KEY, { ...lighting, shininess: 10 }, 'local');
+    });
+
+    it('is not read for a session store, and a stored key that is not renamed is not touched', () => {
+        localStorage.setItem(OLD_KEY, JSON.stringify(lighting));
+        expect(getPref(NEW_KEY, null, { session: true })).toBeNull();
+        expect(localStorage.getItem(OLD_KEY)).not.toBeNull();
+        setPref(KEY, 'imperial');
+        expect(localStorage.getItem(OLD_KEY)).not.toBeNull();
+    });
+
+    it('does nothing when the old key is missing', () => {
+        expect(getPref(NEW_KEY, null)).toBeNull();
+        expect(localStorage.getItem(NEW_KEY)).toBeNull();
     });
 });

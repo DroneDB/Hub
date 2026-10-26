@@ -98,6 +98,30 @@ describe('Entry artifact helpers', () => {
     });
 });
 
+describe('the multiresolution model', () => {
+    const BM3D = { role: 'model.bm3d', url: 'http://hub.test/orgs/o/ds/d/build/h1/bm3d/model.bm3d' };
+    const NXZ = { role: 'model.nexus', url: 'http://hub.test/orgs/o/ds/d/build/h1/nxs/model.nxz' };
+    const model = artifacts => entryWith(artifacts, datasetWith(), T.MODEL);
+
+    it('is the bm3d model when the entry lists it', () => {
+        expect(model([BM3D]).getModelArtifact()).toBe('/orgs/o/ds/d/build/h1/bm3d/model.bm3d');
+    });
+
+    it('is the Nexus model of a build that predates bm3d', () => {
+        expect(model([NXZ]).getModelArtifact()).toBe('/orgs/o/ds/d/build/h1/nxs/model.nxz');
+    });
+
+    it('does not depend on the order of the listing', () => {
+        expect(model([NXZ, BM3D]).getModelArtifact()).toBe('/orgs/o/ds/d/build/h1/bm3d/model.bm3d');
+        expect(model([BM3D, NXZ]).getModelArtifact()).toBe('/orgs/o/ds/d/build/h1/bm3d/model.bm3d');
+    });
+
+    it('says the model is not available when neither role is listed', () => {
+        expect(() => model(undefined).getModelArtifact()).toThrow(/The 3D model is not available/);
+        expect(() => model([MVT]).getModelArtifact()).toThrow(/The 3D model is not available/);
+    });
+});
+
 describe('Share/Embed streamable artifact', () => {
     it('streams the artifact each geo type builds, and nothing for other types', () => {
         expect(streamableArtifactRole(T.POINTCLOUD)).toBe(ArtifactRole.POINTCLOUD_COPC);

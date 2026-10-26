@@ -24,7 +24,7 @@ if (!statsPath || !outDir) { console.error('usage: check_bundle_budget.mjs <stat
 const arg = (name, def) => { const i = process.argv.indexOf(name); return i > 0 ? Number(process.argv[i + 1]) : def; };
 const BUDGET_INITIAL_KB = arg('--budget-initial-kb', 2600);
 const BUDGET_INITIAL_GZIP_KB = arg('--budget-initial-gzip-kb', 1000);
-const LAZY_ONLY_PACKAGES = ['three', '@sparkjsdev/spark', '@giro3d/giro3d', 'ol', 'proj4', '@codemirror/view', 'chart.js', 'markdown-it', 'laz-perf', 'copc'];
+const LAZY_ONLY_PACKAGES = ['three', '@sparkjsdev/spark', '@giro3d/giro3d', 'ol', 'proj4', '@codemirror/view', 'chart.js', 'markdown-it', 'laz-perf', 'copc', 'bm3d-viewer'];
 // The dataset page loads the map, the text editor and the upload panel on first use
 const EAGER_VENDORS_FORBIDDEN_IN = { dataset: ['vendor-openlayers', 'vendor-codemirror', 'dataset-map', 'dataset-upload', 'dataset-editor'] };
 // What the Potree viewer ships (7.9 MB with its scripts minified at copy time)

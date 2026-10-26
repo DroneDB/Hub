@@ -4,7 +4,7 @@
  * defaults, so a setting added later starts at its default. A change that comes from elsewhere
  * (another tab, the account, the Preferences page) updates the settings.
  *
- *   const { settings, resetSettings } = useViewerSettings(PREF.NEXUS_LIGHTING, { ambientIntensity: 0.4 });
+ *   const { settings, resetSettings } = useViewerSettings(PREF.MODEL_LIGHTING, { ambientIntensity: 0.4 });
  *   settings.ambientIntensity = 1;   // saved
  */
 import { onScopeDispose, reactive, watch } from 'vue';

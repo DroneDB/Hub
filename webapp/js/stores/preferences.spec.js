@@ -511,18 +511,58 @@ describe('preferences store: reset', () => {
     it('resetAll removes every account value and sends every section as null in one PATCH', async () => {
         setPref(PREF.MEASURE_UNIT, 'imperial');
         setPref(PREF.FILE_VIEW_MODE, 'table');
-        setPref(PREF.NEXUS_LIGHTING, { ambientIntensity: 1 });
+        setPref(PREF.MODEL_LIGHTING, { ambientIntensity: 1 });
         setPref(PREF.PANEL_SIZES, { a: 1 });
-        await start({ units: { measurement: 'imperial' }, explorer: { viewMode: 'table' }, viewers: { nexusLighting: { ambientIntensity: 1 } } });
+        await start({ units: { measurement: 'imperial' }, explorer: { viewMode: 'table' }, viewers: { modelLighting: { ambientIntensity: 1 } } });
         store.resetAll();
         expect(localStorage.getItem(PREF.MEASURE_UNIT)).toBeNull();
         expect(localStorage.getItem(PREF.FILE_VIEW_MODE)).toBeNull();
-        expect(localStorage.getItem(PREF.NEXUS_LIGHTING)).toBeNull();
+        expect(localStorage.getItem(PREF.MODEL_LIGHTING)).toBeNull();
         // a device-only key is not an account value
         expect(localStorage.getItem(PREF.PANEL_SIZES)).not.toBeNull();
         await tick(600);
         expect(h.reg.patchRequest).toHaveBeenCalledTimes(1);
         expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, viewers: null });
+    });
+
+    describe('the lighting of the 3D models, stored as the Nexus lighting before', () => {
+        const OLD_KEY = 'nexus-lighting-settings';
+
+        it('carries the account\'s old field over to the new one and sends the section without the old name', async () => {
+            await start({ viewers: { nexusLighting: { ambientIntensity: 2 }, splatNavMode: 'fly' } });
+            expect(getPref(PREF.MODEL_LIGHTING, null)).toEqual({ ambientIntensity: 2 });
+            await tick(600);
+            expect(bodies()).toEqual([{ viewers: { splatNavMode: 'fly', modelLighting: { ambientIntensity: 2 }, unifiedLighting: null } }]);
+        });
+
+        it('lets the new field win when the account holds both, and drops the old one', async () => {
+            await start({ viewers: { nexusLighting: { ambientIntensity: 2 }, modelLighting: { ambientIntensity: 1 } } });
+            expect(getPref(PREF.MODEL_LIGHTING, null)).toEqual({ ambientIntensity: 1 });
+            await tick(600);
+            expect(bodies()[0].viewers).toMatchObject({ modelLighting: { ambientIntensity: 1 } });
+            expect(bodies()[0].viewers).not.toHaveProperty('nexusLighting');
+        });
+
+        it('takes the old field over the old key of the device, and removes that key', async () => {
+            localStorage.setItem(OLD_KEY, JSON.stringify({ ambientIntensity: 3 }));
+            await start({ viewers: { nexusLighting: { ambientIntensity: 2 } } });
+            expect(getPref(PREF.MODEL_LIGHTING, null)).toEqual({ ambientIntensity: 2 });
+            expect(localStorage.getItem(OLD_KEY)).toBeNull();
+        });
+
+        it('sends the old key of the device to an account that has neither field', async () => {
+            localStorage.setItem(OLD_KEY, JSON.stringify({ ambientIntensity: 3 }));
+            await start({ viewers: { splatNavMode: 'fly' } });
+            await tick(600);
+            expect(bodies()[0].viewers).toMatchObject({ modelLighting: { ambientIntensity: 3 } });
+            expect(localStorage.getItem(OLD_KEY)).toBeNull();
+        });
+
+        it('sends nothing for an account with the new field only', async () => {
+            await start({ ...SYNCED_ACCOUNT, viewers: { modelLighting: { ambientIntensity: 1 } } });
+            await tick(600);
+            expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        });
     });
 
     it('does not send a reset when logged out', async () => {

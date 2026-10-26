@@ -75,6 +75,30 @@ describe('unified viewer gate', () => {
     });
 });
 
+describe('model viewer gate: either multiresolution model opens it', () => {
+    const BM3D = { role: 'model.bm3d', url: '/orgs/o/ds/d/build/m/bm3d/model.bm3d' };
+    const NXZ = { role: 'model.nexus', url: '/orgs/o/ds/d/build/m/nxs/model.nxz' };
+
+    it.each([['bm3d', BM3D], ['Nexus', NXZ]])('is ready with the %s model listed: no request', async (_, artifact) => {
+        const dataset = datasetListing(null);
+        const result = await checker.check(dataset, model({ artifacts: [artifact] }), 'model');
+        expect(result).toMatchObject({ available: true, status: 'ready' });
+        expect(dataset.listOne).not.toHaveBeenCalled();
+    });
+
+    it('is not ready with only the 3D Tiles listed: the build of the model is awaited', async () => {
+        const result = await checker.check(datasetListing(model({ artifacts: [TILES] })), model({ artifacts: [TILES] }), 'model', { current: true });
+        expect(result).toMatchObject({ available: false, status: 'queued' });
+    });
+
+    it('lists the entry again when its snapshot has no model: a build may have finished since', async () => {
+        const dataset = datasetListing(model({ artifacts: [BM3D] }));
+        const result = await checker.check(dataset, model(), 'model');
+        expect(result).toMatchObject({ available: true, status: 'ready' });
+        expect(dataset.listOne).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('buildable file: the artifacts decide, the job explains', () => {
     const job = currentState => ({ path: 'ortho.tif', currentState });
 

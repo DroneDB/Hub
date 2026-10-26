@@ -8,7 +8,7 @@ import { a11yConfigs } from './eslint-rules/a11y.mjs';
 export default [
     {
         ignores: ['build/**', 'node_modules/**', 'webapp/js/vendor/**', 'webapp/public/**',
-            'potree/**', 'nexus/**', 'photosphereviewer/**', 'wasm/**', 'stats.json']
+            'potree/**', 'photosphereviewer/**', 'wasm/**', 'stats.json']
     },
     js.configs.recommended,
     ...pluginVue.configs['flat/recommended'],

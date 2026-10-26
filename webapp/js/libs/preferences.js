@@ -27,11 +27,23 @@ export const PREF = Object.freeze({
     ORG_PAGE: 'org_page_prefs',
     ORG_PAGE_POSITION: 'org_page_position', // { currentPage, scrollTop } of the organisations page
     UNIFIED_VIEWER: 'unified-viewer-settings',
-    NEXUS_LIGHTING: 'nexus-lighting-settings',
+    MODEL_LIGHTING: 'model-lighting-settings',
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
     HUB_UPDATE_ATTEMPTED: 'hubUpdateAttempted', // sessionStorage
     CLIPBOARD: 'ddb:hub:clipboard' // sessionStorage
+});
+
+/**
+ * Preferences that were stored under another name: PREF key -> the key on the device and the field
+ * in the account's section they had. A value found under the old name is carried over to the new
+ * one the first time the preference is read or written (`adoptRenamedPref`), and the account sync
+ * does the same with the old field (stores/preferences.js).
+ * @type {Readonly<Record<string, { key: string, field: string }>>}
+ */
+export const RENAMED_PREFS = Object.freeze({
+    // The lighting of the 3D models, kept as the Nexus viewer's before bm3d
+    [PREF.MODEL_LIGHTING]: Object.freeze({ key: 'nexus-lighting-settings', field: 'nexusLighting' })
 });
 
 /** @typedef {{ session?: boolean }} StoreOption  session: sessionStorage instead of localStorage */
@@ -88,6 +100,23 @@ export const safeStorage = {
 };
 
 /**
+ * Moves the value a renamed preference had under its old name to the new one: when the new key
+ * holds nothing and the old one does, the old value is copied; the old key is removed either way
+ * (a value under it is then out of date). Nothing is notified: it runs before the first read or
+ * write of the new key. Safe to call on every access (one lookup for the other keys).
+ * @param {string} key  a PREF key
+ * @param {StoreOption} [options]
+ */
+function adoptRenamedPref(key, options) {
+    const renamed = Object.hasOwn(RENAMED_PREFS, key) && !options?.session ? RENAMED_PREFS[key] : null;
+    if (!renamed) return;
+    const old = safeStorage.getItem(renamed.key);
+    if (old === null) return;
+    if (safeStorage.getItem(key) === null) safeStorage.setItem(key, old);
+    safeStorage.removeItem(renamed.key);
+}
+
+/**
  * @template T
  * @param {string} key
  * @param {T} [fallback]
@@ -95,6 +124,7 @@ export const safeStorage = {
  * @returns {T}
  */
 export function getPref(key, fallback, options) {
+    adoptRenamedPref(key, options);
     const raw = safeStorage.getItem(key, options);
     if (raw === null) return /** @type {T} */ (fallback ?? null);
     if (typeof fallback === 'string') return /** @type {T} */ (/** @type {unknown} */ (raw));
@@ -122,7 +152,7 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.OPEN_AFTER_CREATE]: ['datasets', 'openAfterCreate'],
     [PREF.ORG_PAGE]: ['orgs', 'list'],
     [PREF.SPLAT_NAV_MODE]: ['viewers', 'splatNavMode'],
-    [PREF.NEXUS_LIGHTING]: ['viewers', 'nexusLighting'],
+    [PREF.MODEL_LIGHTING]: ['viewers', 'modelLighting'],
     [PREF.UNIFIED_VIEWER]: ['viewers', 'unifiedLighting']
 });
 
@@ -146,7 +176,7 @@ export const PREF_DEFAULTS = frozen({
     [PREF.OPEN_AFTER_CREATE]: false,
     [PREF.ORG_PAGE]: frozen({ itemsPerPage: 10, ownedOnly: true }),
     [PREF.SPLAT_NAV_MODE]: 'fly',
-    [PREF.NEXUS_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),
+    [PREF.MODEL_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),
     [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 })
 });
 
@@ -216,6 +246,7 @@ export function _resetPrefListenersForTests() {
  * @param {PrefOrigin} origin
  */
 function write(key, value, options, origin) {
+    adoptRenamedPref(key, options);
     const before = safeStorage.getItem(key, options);
     let after = null;
     if (value === null || value === undefined) {

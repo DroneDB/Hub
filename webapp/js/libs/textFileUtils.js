@@ -25,7 +25,7 @@ const BINARY_EXTENSIONS = [
     'mp3', 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'wav', 'ogg', 'flac',
     'las', 'laz', 'ply', 'obj', 'fbx', 'glb', 'gltf', 'dae', 'stl', '3ds',
     'shp', 'dbf', 'shx', 'gpkg', 'mbtiles', 'sqlite', 'db',
-    'ddb', 'nxs', 'nxz'
+    'ddb', 'nxs', 'nxz', 'bm3d'
 ];
 
 // Maximum file size for text editing (5MB)

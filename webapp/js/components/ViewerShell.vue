@@ -29,7 +29,7 @@
  * ViewerShell - the frame every file viewer shares: the error message, the
  * loading indicator, the viewer area and an optional settings button and window.
  *
- *   <ViewerShell id="nexus" v-model:error="error" v-model:settings-open="showSettings" :loading="loading"
+ *   <ViewerShell id="model" v-model:error="error" v-model:settings-open="showSettings" :loading="loading"
  *                loading-text="Loading model..." :ready="loaded" settings-title="Lighting" settings-button="bottom-left">
  *       <canvas ref="canvas" />
  *       <template #settings>…</template>

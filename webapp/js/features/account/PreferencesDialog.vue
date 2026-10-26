@@ -111,7 +111,7 @@ const activeTab = ref('units');
 
 const datasetTable = useViewerSettings(PREF.DATASET_TABLE, PREF_DEFAULTS[PREF.DATASET_TABLE]).settings;
 const orgPage = useViewerSettings(PREF.ORG_PAGE, PREF_DEFAULTS[PREF.ORG_PAGE]).settings;
-const nexusLighting = useViewerSettings(PREF.NEXUS_LIGHTING, PREF_DEFAULTS[PREF.NEXUS_LIGHTING]).settings;
+const modelLighting = useViewerSettings(PREF.MODEL_LIGHTING, PREF_DEFAULTS[PREF.MODEL_LIGHTING]).settings;
 const unifiedViewer = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]).settings;
 
 /** @param {Array<string|number>} values @param {(v: any) => string} [label] */
@@ -190,11 +190,11 @@ const TABS = [
                 ]
             },
             {
-                title: 'Nexus models lighting',
+                title: '3D models lighting',
                 controls: [
-                    range('nexus-ambient', 'Ambient', toRef(nexusLighting, 'ambientIntensity'), 3),
-                    range('nexus-directional', 'Directional', toRef(nexusLighting, 'directionalIntensity'), 3),
-                    range('nexus-shininess', 'Shininess', toRef(nexusLighting, 'shininess'), 100, { step: 5, format: String })
+                    range('model-ambient', 'Ambient', toRef(modelLighting, 'ambientIntensity'), 3),
+                    range('model-directional', 'Directional', toRef(modelLighting, 'directionalIntensity'), 3),
+                    range('model-shininess', 'Shininess', toRef(modelLighting, 'shininess'), 100, { step: 5, format: String })
                 ]
             },
             {

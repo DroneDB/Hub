@@ -61,15 +61,15 @@ describe('useViewerSettings: changes from elsewhere', () => {
     });
 
     it('a change from another tab updates the settings with no local notification', async () => {
-        const nexus = PREF.NEXUS_LIGHTING;
+        const lighting = PREF.MODEL_LIGHTING;
         scope = effectScope();
-        const { settings } = scope.run(() => useViewerSettings(nexus, { a: 1, b: 2 }));
-        safeStorage.setItem(nexus, JSON.stringify({ a: 3, b: 4 }));
-        window.dispatchEvent(new StorageEvent('storage', { key: nexus, newValue: 'STALE', storageArea: globalThis.localStorage }));
+        const { settings } = scope.run(() => useViewerSettings(lighting, { a: 1, b: 2 }));
+        safeStorage.setItem(lighting, JSON.stringify({ a: 3, b: 4 }));
+        window.dispatchEvent(new StorageEvent('storage', { key: lighting, newValue: 'STALE', storageArea: globalThis.localStorage }));
         await nextTick();
         expect({ ...settings }).toEqual({ a: 3, b: 4 });
         expect(locals()).toHaveLength(0);
-        safeStorage.removeItem(nexus);
+        safeStorage.removeItem(lighting);
     });
 
     it('removePref puts the defaults back and does not store them', async () => {

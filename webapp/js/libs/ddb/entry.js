@@ -4,6 +4,9 @@
 
 import { ArtifactRole, findArtifactIn, artifactHref } from './buildArtifacts';
 
+// The roles a model can be listed under (see ArtifactRole)
+const MODEL_ROLES = [ArtifactRole.MODEL_BM3D, ArtifactRole.MODEL_NEXUS];
+
 const STILL_PROCESSING = 'The file may still be processing. Return to the file list to check the build status.';
 
 class Entry {
@@ -29,7 +32,7 @@ class Entry {
 
     /**
      * URL of a build artifact that the caller cannot work without.
-     * @param {string} role
+     * @param {string | string[]} role
      * @param {string} label  what the user is told is missing ("The COPC file")
      * @returns {string}
      */
@@ -55,15 +58,19 @@ class Entry {
         return this.requireArtifact(ArtifactRole.POINTCLOUD_COPC, 'The COPC file');
     }
 
-    getNxz() {
-        return this.requireArtifact(ArtifactRole.MODEL_NEXUS, 'The 3D model');
+    /**
+     * URL of the multiresolution model, whichever format the build made it in. libddb lists the
+     * legacy Nexus model only while the bm3d one is missing, so the Hub has no order to prefer.
+     */
+    getModelArtifact() {
+        return this.requireArtifact(MODEL_ROLES, 'The 3D model');
     }
 
     /**
      * URL of the OGC 3D Tiles root tileset when present, or null. 3D Tiles are produced for
-     * MODEL entries alongside the legacy Nexus output, so this artifact is optional: datasets
-     * built before 3D Tiles support (or with Obj2Tiles unavailable) only have the Nexus model.
-     * Callers must tolerate null and fall back to getNxz().
+     * MODEL entries alongside the multiresolution model, so this artifact is optional: datasets
+     * built before 3D Tiles support (or with Obj2Tiles unavailable) only have that model.
+     * Callers must tolerate null and fall back to getModelArtifact().
      */
     get3DTiles() {
         return this.findArtifact(ArtifactRole.MODEL_3DTILES);

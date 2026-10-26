@@ -108,13 +108,13 @@ const ENTRY_TYPE_INFO = {
     },
     [T.MODEL]: {
         summary: 'A textured 3D mesh: surfaces made of triangles, with images on them.',
-        detection: 'An OBJ file, a glTF or GLB file with a mesh, or a PLY file with faces.',
+        detection: 'An OBJ file, an STL file, a glTF or GLB file with a mesh, or a PLY file with faces.',
         contains: [
             'Whether the model is georeferenced (a reference_lla.json or georef.json next to it gives its position)',
             'Footprint on the map, when georeferenced'
         ],
         actions: [
-            'Built into Nexus and OGC 3D Tiles for streaming',
+            'Built into bm3d and OGC 3D Tiles for streaming',
             'Opens in the 3D model viewer',
             'Shown on the globe of the unified viewer when georeferenced'
         ],

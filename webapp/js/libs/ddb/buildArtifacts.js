@@ -27,6 +27,9 @@ export const ArtifactRole = Object.freeze({
     /** Drawing-coordinate metadata of a CAD vector without a CRS (no MVT pyramid). */
     VECTOR_LOCAL: 'vector.local',
     POINTCLOUD_COPC: 'pointcloud.copc',
+    /** The bm3d multiresolution model (.bm3d). */
+    MODEL_BM3D: 'model.bm3d',
+    /** The Nexus model (.nxz) of builds that predate bm3d; libddb lists it only while model.bm3d is missing. */
     MODEL_NEXUS: 'model.nexus',
     MODEL_3DTILES: 'model.3dtiles',
     GSPLAT_SPZ: 'gsplat.spz',

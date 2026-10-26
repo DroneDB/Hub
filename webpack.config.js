@@ -118,6 +118,14 @@ module.exports = {
                 type: 'asset/resource'
             },
             {
+                // The viewer's default place for its worker, new URL('.', import.meta.url), is a
+                // folder, which webpack takes for an asset it cannot resolve. The Hub always gives
+                // the folder (decoderPath, served by the CopyPlugin below), so the URL stays as written.
+                test: /\.js$/,
+                include: path.resolve(__dirname, 'node_modules/bm3d-viewer'),
+                parser: { url: false }
+            },
+            {
                 test: /\.(png|svg|jpg|gif)$/,
                 type: 'asset',
                 parser: {
@@ -237,7 +245,12 @@ module.exports = {
                 // passes ktx2DecoderPath: '/wasm/basis/' to Tiles3D so KTX2 / KHR_texture_basisu
                 // textures transcode without fetching the transcoder from a public CDN.
                 { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.js', to: 'wasm/basis/basis_transcoder.js' },
-                { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.wasm', to: 'wasm/basis/basis_transcoder.wasm' }
+                { from: 'node_modules/three/examples/jsm/libs/basis/basis_transcoder.wasm', to: 'wasm/basis/basis_transcoder.wasm' },
+                // Serve the bm3d decoder locally: the 3D model viewer passes decoderPath: '/wasm/bm3d/'
+                // to Bm3dObject, which starts the worker from there (a worker must come from the
+                // page's origin) and loads corto.wasm next to it.
+                { from: 'node_modules/bm3d-viewer/dist/corto-worker.js', to: 'wasm/bm3d/corto-worker.js' },
+                { from: 'node_modules/bm3d-viewer/dist/corto.wasm', to: 'wasm/bm3d/corto.wasm' }
             ]
         }),
         // CSS extraction for production builds

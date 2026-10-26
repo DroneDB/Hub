@@ -27,10 +27,10 @@ const VIEW_ARTIFACT_ROLES = {
     // A vector without geolocation (CAD drawing, no CRS) has no MVT pyramid; the local
     // viewer reads its drawing-coordinate metadata instead.
     'unified-vector-local': ArtifactRole.VECTOR_LOCAL,
-    // The model viewer renders 3D Tiles when present and the legacy Nexus model otherwise;
-    // every model build produces the Nexus model, so that is the gate.
-    'model': ArtifactRole.MODEL_NEXUS,
-    // The UnifiedViewer (georeferenced Giro3D scene) cannot render the legacy Nexus mesh.
+    // The model viewer renders the multiresolution model: a bm3d one, or the Nexus one of a build
+    // that predates bm3d (libddb lists the second only while the first is missing).
+    'model': [ArtifactRole.MODEL_BM3D, ArtifactRole.MODEL_NEXUS],
+    // The UnifiedViewer (georeferenced Giro3D scene) cannot render the multiresolution mesh.
     'unified-model': ArtifactRole.MODEL_3DTILES,
     // Uploaded OGC 3D Tiles (.3tz) are extracted to the same artifact.
     'unified-tiles3d': ArtifactRole.MODEL_3DTILES,

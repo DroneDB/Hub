@@ -49,7 +49,7 @@ describe('httpClient error messages', () => {
 
     // The status of a failed task carries its error as data: reading it must not fail
     it('returns a successful body with an error or message field as data', async () => {
-        const failedTask = { taskId: '7', state: 'Failed', logTail: ['Build failed: ddb-nexus not found'],
+        const failedTask = { taskId: '7', state: 'Failed', logTail: ['Build failed: bm3d_runner not found'],
             error: 'InvalidOperationException' };
         respondWith(200, failedTask, 'application/json');
         await expect(client().send('/orgs/x/ds/y/tasks/7')).resolves.toEqual(failedTask);
