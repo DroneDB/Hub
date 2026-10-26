@@ -12,7 +12,7 @@
                    :value="rows"
                    size="small"
                    class="props-datatable">
-            <Column field="displayKey" header="Property" style="white-space: nowrap; width: 40%;" />
+            <Column field="displayKey" header="Property" style="width: 40%;" />
             <Column header="Value">
                 <template #body="{ data }">
                     <div v-if="data.key === 'captureTime' && data.rawValue">
@@ -26,11 +26,17 @@
                     </div>
                     <div v-else-if="typeof data.rawValue === 'boolean' && data.rawValue" class="bool-true" title="true">✓</div>
                     <div v-else-if="typeof data.rawValue === 'boolean'" class="bool-false" title="false">✗</div>
+                    <div v-else-if="isEntryTypeRow(data)">
+                        <button type="button" class="type-info-link" title="What does this type mean?"
+                                @click="typeInfoVisible = true">
+                            {{ data.rawValue }}<i class="fa-regular fa-circle-question ms-1" aria-hidden="true" />
+                        </button>
+                    </div>
                     <div v-else-if="data.rawValue !== null && typeof data.rawValue === 'string'" class="wrap copyable-row">
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
                         <span v-else>
                             <template v-for="(part, i) in linkCrsCodes(data.rawValue)" :key="i">
-                                <a v-if="part.href" :href="part.href" target="_blank" rel="noopener noreferrer"
+                                <a v-if="part.href" :href="part.href" target="_blank" rel="noopener noreferrer" class="text-nowrap"
                                    :title="`What is ${part.text}? (epsg.io)`">{{ part.text }}</a>
                                 <template v-else>{{ part.text }}</template>
                             </template>
@@ -74,6 +80,8 @@
             {{ tObj !== undefined && tObj !== null ? tObj : '-' }}
         </div>
 
+        <EntryTypeInfoDialog v-if="typeInfoVisible" :type="Number(entryType)" @close="typeInfoVisible = false" />
+
         <!-- Drill-down dialog: only mounted from the top-level instance to avoid stacking -->
         <Window v-if="depth === 0"
                 v-model:visible="drillDownVisible"
@@ -93,10 +101,12 @@
 <script>
 import { clone, sortObjectKeys } from '@/libs/utils';
 import { tidyProperties, beautifyKey, isUrl, linkCrsCodes } from '@/libs/propertiesUtils';
+import { getEntryTypeInfo } from '@/libs/entryTypeInfo';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
 import Window from '@/components/HubWindow.vue';
+import EntryTypeInfoDialog from './EntryTypeInfoDialog.vue';
 import { copyText } from '@/composables/useCopyText';
 
 /**
@@ -111,6 +121,8 @@ import { copyText } from '@/composables/useCopyText';
  *   maxDepth - Maximum drill-down depth before showing raw JSON (default: 3).
  *   copyableValues - { rowKey: { text, label } }: a copy button on that top-level row
  *                    copies text (nested tables do not get it).
+ *   entryType - the entry type of the file shown: its top-level Type row opens a
+ *               dialog that explains the type.
  *
  * EPSG and ESRI codes in string values link to their epsg.io page.
  */
@@ -121,6 +133,7 @@ export default {
         Column,
         Button,
         Window,
+        EntryTypeInfoDialog,
         PropsTable: () => import('./PropsTable.vue')
     },
     // Root instance exposes a drill-down opener that any nested PropsTable can
@@ -156,6 +169,11 @@ export default {
         copyableValues: {
             type: Object,
             default: () => ({}),
+        },
+        // A number; a string from a list response is read as its number
+        entryType: {
+            type: [Number, String],
+            default: null
         }
     },
     data() {
@@ -163,7 +181,8 @@ export default {
             tObj: null,
             drillDownVisible: false,
             drillDownTitle: '',
-            drillDownData: null
+            drillDownData: null,
+            typeInfoVisible: false
         };
     },
     computed: {
@@ -217,6 +236,12 @@ export default {
         isUrl,
 
         linkCrsCodes,
+
+        // The top-level Type row of a file whose type has a description
+        isEntryTypeRow(data) {
+            return this.depth === 0 && data.key === 'type' && typeof data.rawValue === 'string' &&
+                this.entryType !== null && getEntryTypeInfo(Number(this.entryType)) !== null;
+        },
 
         // True if the value is an object/array that should be collapsed
         // behind a drill-down button (nested too deep or too large).
@@ -286,6 +311,21 @@ export default {
     padding-right: 8px;
 }
 
+.type-info-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--ddb-link);
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 2px;
+}
+
+.type-info-link:hover {
+    text-decoration-style: solid;
+}
+
 .copy-btn {
     flex-shrink: 0;
     padding: 2px !important;
@@ -301,10 +341,14 @@ export default {
     padding-left: 1rem;
 }
 
+/* Break at spaces first; a long hash or path still breaks anywhere */
 .wrap {
-    word-wrap: break-word;
-    word-break: break-all;
+    overflow-wrap: anywhere;
     white-space: normal;
+}
+
+.copyable-row a {
+    color: var(--ddb-link);
 }
 
 .bool-true {
@@ -321,9 +365,9 @@ export default {
     display: none;
 }
 
+/* Long labels wrap at spaces, so the table never gets wider than a narrow panel */
 .props-datatable :deep(.p-datatable-tbody > tr > td:first-child) {
     font-weight: 600;
-    white-space: nowrap;
     width: 40%;
     vertical-align: top;
 }

@@ -70,6 +70,7 @@ const TYPE_DISPLAY_NAMES = {
     [ddb.entry.type.DRONEDB]: 'DroneDB',
     [ddb.entry.type.MARKDOWN]: 'Markdown',
     [ddb.entry.type.VIDEO]: 'Video',
+    [ddb.entry.type.GEOVIDEO]: 'GeoVideo',
     [ddb.entry.type.MODEL]: '3D Model',
     [ddb.entry.type.PANORAMA]: 'Panorama',
     [ddb.entry.type.GEOPANORAMA]: 'GeoPanorama',

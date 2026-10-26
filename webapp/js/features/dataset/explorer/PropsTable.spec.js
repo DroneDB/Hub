@@ -1,6 +1,6 @@
 /**
- * PropsTable: EPSG codes in values link to epsg.io and the copy buttons copy
- * the value given for their row.
+ * PropsTable: EPSG codes in values link to epsg.io, the copy buttons copy the value
+ * given for their row and the Type row explains the entry type.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -13,7 +13,7 @@ import PropsTable from './PropsTable.vue';
 const notify = { success: vi.fn() };
 const mountTable = (props) => mount(PropsTable, {
     props: { preserveOrder: true, ...props },
-    global: { plugins: [PrimeVue], mocks: { $notify: notify }, stubs: { Window: true } }
+    global: { plugins: [PrimeVue], mocks: { $notify: notify }, stubs: { Window: true, EntryTypeInfoDialog: true } }
 });
 
 describe('PropsTable', () => {
@@ -57,5 +57,24 @@ describe('PropsTable', () => {
             copyableValues: { coordinates: { text: '1, 2', label: 'coordinates' } }
         });
         expect(wrapper.find('button[aria-label^="Copy"]').exists()).toBe(false);
+    });
+
+    it('opens the description of the entry type from the top-level Type row', async () => {
+        const wrapper = mountTable({ obj: { type: 'GeoRaster', meta: { type: 'Feature' } }, entryType: 4 });
+        const links = wrapper.findAll('button.type-info-link');
+        expect(links).toHaveLength(1);
+        expect(links[0].text()).toBe('GeoRaster');
+        expect(wrapper.findComponent({ name: 'EntryTypeInfoDialog' }).exists()).toBe(false);
+        await links[0].trigger('click');
+        expect(wrapper.findComponent({ name: 'EntryTypeInfoDialog' }).props('type')).toBe(4);
+    });
+
+    it('keeps the Type row plain without an entry type, or for a type without a description', () => {
+        expect(mountTable({ obj: { type: 'GeoRaster' } }).find('button.type-info-link').exists()).toBe(false);
+        expect(mountTable({ obj: { type: 'Unknown' }, entryType: 0 }).find('button.type-info-link').exists()).toBe(false);
+    });
+
+    it('reads an entry type given as a string', () => {
+        expect(mountTable({ obj: { type: 'Vector' }, entryType: '14' }).find('button.type-info-link').exists()).toBe(true);
     });
 });

@@ -3,7 +3,7 @@
             @close="$emit('close', $event, arguments[1])">
         <div v-if="files.length === 1" class="text-selectable">
             <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserve-order="true"
-                        :copyable-values="singleFileCopyableValues" />
+                        :copyable-values="singleFileCopyableValues" :entry-type="files[0].entry.type" />
         </div>
         <div v-if="files.length >= 2">
             <div class="multi-count">{{ files.length }} items</div>

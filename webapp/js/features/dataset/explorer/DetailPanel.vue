@@ -42,7 +42,8 @@
             <!-- Properties section -->
             <div class="properties-section text-selectable">
                 <h4 class="ui dividing header">Properties</h4>
-                <PropsTable v-if="allProperties" :obj="allProperties" :preserve-order="true" :copyable-values="copyableValues" />
+                <PropsTable v-if="allProperties" :obj="allProperties" :preserve-order="true" :copyable-values="copyableValues"
+                            :entry-type="file.entry.type" />
             </div>
 
             <!-- Actions section -->
