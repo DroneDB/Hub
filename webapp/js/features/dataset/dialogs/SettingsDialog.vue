@@ -1,50 +1,26 @@
 <template>
-    <Window id="settings" title="Settings" modal max-width="70%" fixed-size fixed-position close-modal-on-click
+    <Window id="settings" title="Dataset Settings" modal size-class="dialog-lg" fixed-position close-modal-on-click
             @close="$emit('close', 'close')">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
         <div v-else class="settings-body">
-            <div class="settings-section">
-                <div class="mb-2">
-                    <i class="fa-solid" :class="{ 'fa-unlock': noAuthRequired, 'fa-lock': !noAuthRequired }" />
-                    <label id="settings-visibility-label" for="settings-visibility">Visibility:</label>
-                    <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label" :options="visibilityOptions" option-label="label" option-value="value" @change="setVisibility" />
-                </div>
-                <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info">
-                    <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
-                    <span v-html="safeDescription" />
-                </PrimeMessage>
-            </div>
+            <section v-if="canWrite" class="settings-group" aria-labelledby="settings-general">
+                <h3 id="settings-general" class="settings-group-title">General</h3>
 
-            <div class="settings-section">
-                <div>
-                    <i class="fa-solid fa-scale-balanced" />
-                    <label id="settings-license-label" for="settings-license">License:</label>
-                    <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label" :options="licenseOptions" option-label="label" option-value="value" class="license-dropdown" :title="Licenses[license].name" @change="setLicense" />
+                <div class="settings-field">
+                    <label for="settings-tagline" class="settings-label"><i class="fa-solid fa-tag" aria-hidden="true" />Tagline</label>
+                    <div class="settings-control">
+                        <InputText id="settings-tagline" v-model="tagline" :maxlength="taglineMaxLength"
+                                   placeholder="A short description" aria-describedby="settings-tagline-count"
+                                   fluid @change="setTagline" />
+                        <small id="settings-tagline-count" class="char-count">{{ tagline ? tagline.length : 0 }}/{{ taglineMaxLength }}</small>
+                    </div>
                 </div>
-            </div>
 
-            <div v-if="canWrite" class="settings-section">
-                <div class="mb-2">
-                    <i class="fa-solid fa-tag" />
-                    Tagline
-                </div>
-                <div class="tagline-field">
-                    <InputText v-model="tagline" maxlength="256" aria-label="Tagline"
-                               placeholder="Brief description of your dataset (max 256 chars)"
-                               fluid @change="setTagline" />
-                    <small class="char-count">{{ tagline ? tagline.length : 0 }}/256</small>
-                </div>
-            </div>
-
-            <div v-if="canWrite" class="settings-section">
-                <div class="mb-2">
-                    <i class="fa-solid fa-image" />
-                    Thumbnail
-                </div>
-                <div class="thumbnail-upload">
-                    <div class="thumbnail-preview-container">
+                <div class="settings-field">
+                    <span id="settings-thumbnail-label" class="settings-label"><i class="fa-solid fa-image" aria-hidden="true" />Thumbnail</span>
+                    <div class="settings-control thumbnail-upload" role="group" aria-labelledby="settings-thumbnail-label">
                         <img v-if="thumbnailPreview && !thumbnailError"
                              :src="thumbnailPreview" alt="Dataset thumbnail"
                              class="thumbnail-preview"
@@ -52,39 +28,86 @@
                         <img v-else
                              src="/images/dataset-placeholder.svg" alt="No thumbnail"
                              class="thumbnail-preview thumbnail-placeholder">
-                    </div>
-                    <div class="thumbnail-actions">
-                        <input ref="thumbnailInput" type="file" aria-label="Thumbnail image"
-                               accept="image/webp,image/jpeg,image/png"
-                               style="display: none"
-                               @change="handleThumbnailSelect">
-                        <Button :loading="thumbnailUploading"
-                                icon="fa-solid fa-upload" label="Upload" @click="$refs.thumbnailInput.click()" />
-                        <Button v-if="thumbnailPreview && !thumbnailError"
-                                severity="danger"
-                                :loading="thumbnailRemoving"
-                                icon="fa-solid fa-trash" label="Remove" @click="removeThumbnail" />
+                        <div class="thumbnail-actions">
+                            <input ref="thumbnailInput" type="file" aria-label="Thumbnail image"
+                                   accept="image/webp,image/jpeg,image/png"
+                                   style="display: none"
+                                   @change="handleThumbnailSelect">
+                            <Button severity="secondary" :loading="thumbnailUploading"
+                                    icon="fa-solid fa-upload" label="Upload" @click="$refs.thumbnailInput.click()" />
+                            <Button v-if="thumbnailPreview && !thumbnailError"
+                                    severity="danger" text
+                                    :loading="thumbnailRemoving"
+                                    icon="fa-solid fa-trash" label="Remove" @click="removeThumbnail" />
+                            <small class="field-hint">WebP, JPEG or PNG. Shown in the dataset list.</small>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div v-if="readme == null" class="settings-section">
-                <Button icon="fa-solid fa-book" label="Add Readme" @click="addDocument('README.md')" />
-            </div>
-
-            <div v-if="canWrite" class="settings-section settings-maintenance">
-                <div class="mb-2">
-                    <i class="fa-solid fa-gear" />
-                    Maintenance
+                <div class="settings-field">
+                    <span class="settings-label"><i class="fa-solid fa-book" aria-hidden="true" />Readme</span>
+                    <div class="settings-control">
+                        <template v-if="readme == null">
+                            <Button severity="secondary" icon="fa-solid fa-plus" label="Add Readme" @click="addDocument('README.md')" />
+                            <small class="field-hint">Creates README.md, shown on the dataset page.</small>
+                        </template>
+                        <span v-else class="settings-value">{{ readme }}</span>
+                    </div>
                 </div>
-                <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-2">
-                    <strong>Rescan</strong> re-processes all indexed files to update their metadata
-                    (e.g. GPS coordinates, timestamps, thumbnails). This is useful after a DroneDB upgrade
-                    or if file metadata appears outdated or incorrect.
-                </PrimeMessage>
-                <Button icon="fa-solid fa-rotate" label="Rescan Dataset" @click="$emit('rescanRequested')" />
-            </div>
+            </section>
+
+            <section class="settings-group" aria-labelledby="settings-sharing">
+                <h3 id="settings-sharing" class="settings-group-title">Sharing</h3>
+
+                <div class="settings-field">
+                    <label id="settings-visibility-label" for="settings-visibility" class="settings-label">
+                        <i class="fa-solid" :class="noAuthRequired ? 'fa-unlock' : 'fa-lock'" aria-hidden="true" />Visibility
+                    </label>
+                    <div class="settings-control">
+                        <Select v-model="visibility" input-id="settings-visibility" aria-labelledby="settings-visibility-label"
+                                aria-describedby="settings-visibility-hint" :options="visibilityOptions" option-label="label"
+                                option-value="value" :disabled="!canWrite" class="settings-select" @change="setVisibility" />
+                        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
+                        <small id="settings-visibility-hint" class="field-hint" v-html="safeDescription" />
+                    </div>
+                </div>
+
+                <div class="settings-field">
+                    <label id="settings-license-label" for="settings-license" class="settings-label">
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true" />License
+                    </label>
+                    <div class="settings-control">
+                        <Select v-model="license" input-id="settings-license" aria-labelledby="settings-license-label"
+                                :options="licenseOptions" option-label="label" option-value="value" :disabled="!canWrite"
+                                class="settings-select" :title="licenseInfo.name" @change="setLicense" />
+                        <small v-if="licenseInfo.url" class="field-hint">
+                            <a :href="licenseInfo.url" target="_blank" rel="noopener">Read the license</a>
+                        </small>
+                    </div>
+                </div>
+            </section>
+
+            <section v-if="canWrite" class="settings-group" aria-labelledby="settings-maintenance">
+                <h3 id="settings-maintenance" class="settings-group-title">Maintenance</h3>
+
+                <div class="settings-field">
+                    <span class="settings-label"><i class="fa-solid fa-rotate" aria-hidden="true" />Rescan</span>
+                    <div class="settings-control">
+                        <Button severity="secondary" icon="fa-solid fa-rotate" label="Rescan Dataset"
+                                aria-describedby="settings-rescan-hint" @click="$emit('rescanRequested')" />
+                        <small id="settings-rescan-hint" class="field-hint">
+                            Reads the metadata of every file again (GPS position, timestamps, thumbnails).
+                            Use it after a DroneDB upgrade or when file metadata looks wrong.
+                        </small>
+                    </div>
+                </div>
+            </section>
         </div>
+
+        <template #footer>
+            <span class="save-note me-auto"><i class="fa-solid fa-circle-check" aria-hidden="true" /> Changes are saved as you make them</span>
+            <Button label="Close" severity="secondary" @click="$emit('close', 'close')" />
+        </template>
     </Window>
 </template>
 
@@ -96,14 +119,14 @@ import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
-import PrimeMessage from 'primevue/message';
 import ddb from 'ddb';
 import { sanitizeHtml } from '@/libs/sanitize';
+import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
 
 export default {
     components: {
         LoadingSpinner,
-        Message, Window, Button, Select, InputText, PrimeMessage
+        Message, Window, Button, Select, InputText
     },
     props: {
         dataset: {
@@ -118,6 +141,7 @@ export default {
     emits: ['close', 'rescanRequested', 'addMarkdown'],
     data: function () {
         return {
+            taglineMaxLength: TAGLINE_MAX_LENGTH,
             error: "",
             properties: null,
             loading: true,
@@ -153,6 +177,9 @@ export default {
                 return `Only you and people in your organization can see and download the data.`;
             }
         },
+        licenseInfo: function () {
+            return this.Licenses[this.license] ?? { name: this.license, url: null };
+        },
         safeDescription: function () {
             return sanitizeHtml(this.description);
         },
@@ -183,7 +210,6 @@ export default {
             this.thumbnailPreview = this.dataset.datasetThumbUrl(256) + '&t=' + Date.now();
             this.thumbnailError = false;
 
-            console.log(this.Visibilities);
         } catch (e) {
             this.error = e.message;
         }
@@ -311,67 +337,116 @@ export default {
 </script>
 
 <style scoped>
-.loading {
-    text-align: center;
-    padding: 1rem;
-}
-
 .settings-body {
-    padding: 0.25rem 0.5rem 0 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ddb-spacing-lg);
 }
 
-.settings-section {
-    padding: var(--ddb-spacing-md) 0;
-    border-bottom: var(--ddb-border-width) solid rgba(0, 0, 0, 0.08);
-}
-
-.settings-section:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-}
-
-.license-dropdown {
-    max-width: 16rem;
-}
-
-
-
-.tagline-field {
-    position: relative;
-}
-
-.tagline-field .char-count {
-    color: var(--ddb-text-muted);
-    float: right;
-    margin-top: var(--ddb-spacing-xs);
+.settings-group-title {
+    margin: 0 0 var(--ddb-spacing-sm);
+    padding-bottom: var(--ddb-spacing-xs);
+    border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-size: var(--ddb-font-size-sm);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ddb-text-secondary);
+}
+
+/* A label column and a control column; stacked on a phone */
+.settings-field {
+    display: grid;
+    grid-template-columns: 8rem minmax(0, 1fr);
+    gap: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+    align-items: start;
+    padding: var(--ddb-spacing-sm) 0;
+}
+
+.settings-label {
+    display: flex;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    min-height: 2.5rem;
+    font-weight: 600;
+    color: var(--ddb-text);
+}
+
+.settings-label i {
+    flex-shrink: 0;
+    width: 1.25em;
+    text-align: center;
+    color: var(--ddb-text-secondary);
+}
+
+.settings-control {
+    min-width: 0;
+}
+
+.settings-select {
+    width: min(18rem, 100%);
+}
+
+.settings-value {
+    display: flex;
+    align-items: center;
+    min-height: 2.5rem;
+    color: var(--ddb-text-secondary);
+}
+
+.field-hint {
+    display: block;
+    margin-top: var(--ddb-spacing-xs);
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
+    line-height: 1.4;
 }
 
 .thumbnail-upload {
     display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.thumbnail-preview-container {
-    flex-shrink: 0;
+    align-items: flex-start;
+    gap: var(--ddb-spacing-md);
 }
 
 .thumbnail-preview {
-    max-width: 7.5rem;
-    max-height: 5rem;
-    object-fit: contain;
+    flex-shrink: 0;
+    width: 7.5rem;
+    height: 5rem;
+    object-fit: cover;
     border: var(--ddb-border-width) solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
 }
 
 .thumbnail-placeholder {
-    opacity: 0.4;
+    object-fit: contain;
+    opacity: 0.6;
 }
 
 .thumbnail-actions {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ddb-spacing-sm);
+    min-width: 0;
+}
+
+.thumbnail-actions .field-hint {
+    flex-basis: 100%;
+    margin-top: 0;
+}
+
+.save-note {
+    align-self: center;
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
+}
+
+@media only screen and (max-width: 575.98px) {
+    .settings-field {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .settings-label {
+        min-height: 0;
+    }
 }
 </style>
