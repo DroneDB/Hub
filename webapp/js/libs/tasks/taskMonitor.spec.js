@@ -73,6 +73,28 @@ describe('tasksUpdated event', () => {
         expect(seen[0].dataset).toBe(dataset);
     });
 
+    it('emits on the first fetch of a dataset with no tasks, which is then loaded', async () => {
+        const dataset = makeDataset();
+        const seen = watch('tasksUpdated');
+        expect(taskMonitor.isLoaded(dataset)).toBe(false);
+
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(seen).toHaveLength(1);
+        expect(taskMonitor.isLoaded(dataset)).toBe(true);
+    });
+
+    it('is not loaded after a fetch that failed', async () => {
+        const dataset = makeDataset();
+        dataset.getTasks.mockRejectedValueOnce(new Error('offline'));
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(taskMonitor.isLoaded(dataset)).toBe(false);
+        error.mockRestore();
+    });
+
     it('does not emit when the fetched snapshot is identical to the previous one', async () => {
         const dataset = makeDataset();
         const snapshot = [makeTask(), makeTask({ taskId: 't2', state: 'Succeeded' })];

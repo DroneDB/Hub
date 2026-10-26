@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from 'vitest';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 
-vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getTasks: vi.fn(() => []), acquire: vi.fn(), release: vi.fn(), forceRefresh: vi.fn(), onFilesAdded: vi.fn() } }));
+vi.mock('@/libs/tasks/taskMonitor', () => ({ default: { on: vi.fn(), off: vi.fn(), getTasks: vi.fn(() => []), isLoaded: vi.fn(() => true), acquire: vi.fn(), release: vi.fn(), forceRefresh: vi.fn(), onFilesAdded: vi.fn() } }));
 const { default: manager } = await import('./buildManager');
 
 const T = ddb.entry.type;
@@ -49,14 +49,15 @@ describe('the build state of a file follows the task list', async () => {
     const { computed } = await import('vue');
     const { default: taskMonitor } = await import('@/libs/tasks/taskMonitor');
     const PATH = 'odm_texturing/model.obj';
-    const task = (taskId, state, createdAt) => ({ taskId, toolId: 'build', state, path: PATH, createdAt });
+    const task = (taskId, state, createdAt, path = PATH) => ({ taskId, toolId: 'build', state, path, createdAt });
     const failed = task('5264', 'Failed', '2026-10-26T01:34:31Z');
     const succeeded = task('5296', 'Succeeded', '2026-10-26T02:03:35Z');
 
     // A registered dataset and the 'tasksUpdated' notification of the task monitor
-    function setup(initialTasks) {
+    function setup(initialTasks, { loaded = true } = {}) {
         manager.cleanup();
         taskMonitor.on.mockClear();
+        taskMonitor.isLoaded.mockReturnValue(loaded);
         taskMonitor.getTasks.mockReturnValue(initialTasks);
         const ds = { baseApi: `/orgs/o/ds/${Math.random()}`, listOne: vi.fn(async () => ({ path: PATH, type: T.MODEL })), build: vi.fn(async () => true) };
         manager.registerDataset(ds);
@@ -65,6 +66,13 @@ describe('the build state of a file follows the task list', async () => {
         const events = [];
         manager.on('buildStateChanged', e => events.push(e));
         return { ds, listChanges, events, state: () => manager.getBuildState(ds, PATH)?.currentState ?? null };
+    }
+
+    // A dataset opened as the page does it: the task monitor has not fetched its list yet
+    function setupBeforeFetch() {
+        const page = setup([], { loaded: false });
+        const fetched = tasks => { taskMonitor.isLoaded.mockReturnValue(true); page.listChanges(tasks); };
+        return { ...page, fetched };
     }
 
     it('is the newest build of the file, not an older one that failed (the list is newest first)', () => {
@@ -90,6 +98,20 @@ describe('the build state of a file follows the task list', async () => {
     it('says nothing when the first look at the list loads it', () => {
         const { events } = setup([failed]);
         expect(events).toHaveLength(0);
+    });
+
+    it('says nothing when the list is fetched after the dataset opened: past builds did not just end', () => {
+        const { fetched, events, state } = setupBeforeFetch();
+        fetched([succeeded, task('7', 'Failed', '2026-10-26T01:00:00Z', 'model.gltf')]);
+        expect(state()).toBe('Succeeded');
+        expect(events).toHaveLength(0);
+    });
+
+    it('reports the builds that change after the first fetched list', () => {
+        const { fetched, listChanges, events } = setupBeforeFetch();
+        fetched([failed]);
+        listChanges([succeeded, failed]);
+        expect(events).toEqual([expect.objectContaining({ previousState: 'Failed', newState: 'Succeeded' })]);
     });
 
     it('keeps a build that was just started shown until the list has its task', async () => {

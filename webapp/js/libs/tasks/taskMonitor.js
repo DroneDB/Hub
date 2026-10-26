@@ -14,7 +14,8 @@
  *
  * Events:
  *   'tasksUpdated' - the store snapshot changed: a task was added or deleted, or changed state or
- *                    progress (buildManager derives the build state of each file from it).
+ *                    progress (buildManager derives the build state of each file from it). The
+ *                    first fetch of a dataset always fires it, even for an empty list.
  */
 import { nextPollDelay } from './pollingPolicy';
 import { openEventStream } from '@/libs/sse';
@@ -34,14 +35,16 @@ let uploading = false;
 // Stable identity of a dataset for store keys and event matching (libs/tasks/taskStates)
 export { datasetKey };
 
-const stores = new Map(); // datasetKey -> { tasks: Map, timerId, dataset, refs, _started }
+const stores = new Map(); // datasetKey -> { tasks: Map, loaded, timerId, dataset, refs, _started }
 
 function getStore(dataset) {
     const k = datasetKey(dataset);
     let ent = stores.get(k);
     if (!ent) {
         ent = {
-            tasks: new Map(), timerId: null, dataset, refs: 0, _started: false, _lastSig: '',
+            // loaded: the server returned the list at least once. Until then `tasks` is empty
+            // because nothing was fetched, not because the dataset has no tasks
+            tasks: new Map(), loaded: false, timerId: null, dataset, refs: 0, _started: false, _lastSig: null,
             idleStreak: 0, stream: null, streamUp: false, streamFailedAt: 0
         };
         stores.set(k, ent);
@@ -80,6 +83,7 @@ async function _fetch(ent) {
 
         ent.tasks.clear();
         for (const t of arr) ent.tasks.set(t.taskId, t);
+        ent.loaded = true;
 
         // Notify generic listeners (e.g. the Tasks tab) when the snapshot changed.
         const sig = computeSignature(ent);
@@ -260,6 +264,11 @@ const TaskMonitor = {
     onFilesAdded(dataset) {
         const ent = peekStore(dataset);
         if (ent && ent._started) _fetch(ent).then(() => _wake(ent));
+    },
+
+    /** Whether the server has returned this dataset's task list at least once. */
+    isLoaded(dataset) {
+        return peekStore(dataset)?.loaded === true;
     },
 
     /** Get all task summaries for a dataset (TaskSummaryDto[]). */

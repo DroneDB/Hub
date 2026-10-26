@@ -36,6 +36,7 @@ class BuildManager {
         this.eventListeners = {};
         this.datasets = new Map();
         this._acquired = new Set(); // datasetKeys holding a taskMonitor reference
+        this._listed = new Set(); // datasetKeys whose build states come from a fetched task list
     }
 
     /* ---- event system ---- */
@@ -89,12 +90,15 @@ class BuildManager {
         if (this._acquired.delete(key)) taskMonitor.release(dataset);
         this.datasets.delete(key);
         this._buildByPath.delete(key);
+        this._listed.delete(key);
     }
 
     /**
      * Sync _buildByPath from the taskMonitor store: the newest build task of each file, and emit
      * 'buildStateChanged' for each file whose shown build changed (another task, another state, or
-     * none). The first sync of a dataset only loads: nothing changed for the page yet.
+     * none). The first fetched list of a dataset only loads: nothing changed for the page yet.
+     * Before that fetch the list is empty, so comparing against it would report every past
+     * build as if it had just ended.
      */
     _sync(dataset) {
         const key = this.getDatasetKey(dataset);
@@ -110,7 +114,11 @@ class BuildManager {
             if (!listed || (held.knownTaskIds.has(listed.taskId) && !isActiveState(listed.state))) updated.set(path, held);
         }
         this._buildByPath.set(key, updated);
-        if (!prev) return;
+        if (!taskMonitor.isLoaded(dataset)) return;
+        if (!this._listed.has(key)) {
+            this._listed.add(key);
+            return;
+        }
 
         for (const path of new Set([...prev.keys(), ...updated.keys()])) {
             const before = prev.get(path);
@@ -225,6 +233,7 @@ class BuildManager {
         this._buildByPath.clear();
         this.datasets.clear();
         this._acquired.clear();
+        this._listed.clear();
         this.eventListeners = {};
     }
 }
