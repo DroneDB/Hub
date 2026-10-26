@@ -40,8 +40,17 @@
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
                         <span v-else>
                             <template v-for="(part, i) in linkCrsCodes(data.rawValue)" :key="i">
-                                <a v-if="part.href" :href="part.href" target="_blank" rel="noopener noreferrer" class="text-nowrap"
-                                   :title="`What is ${part.text}? (epsg.io)`">{{ part.text }}</a>
+                                <span v-if="part.href" class="text-nowrap">{{ part.text }}<Button
+                                    as="a"
+                                    :href="part.href"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    icon="fa-regular fa-circle-question"
+                                    size="small"
+                                    text
+                                    class="row-action-btn crs-info-btn"
+                                    :title="`What is ${part.text}? (opens epsg.io)`"
+                                    :aria-label="`What is ${part.text}? (opens epsg.io)`" /></span>
                                 <template v-else>{{ part.text }}</template>
                             </template>
                         </span>
@@ -131,7 +140,8 @@ import { copyText } from '@/composables/useCopyText';
  *   entryType - the entry type of the file shown: its top-level Type row opens a
  *               dialog that explains the type.
  *
- * EPSG and ESRI codes in string values link to their epsg.io page.
+ * EPSG and ESRI codes in string values stay plain text, followed by an info
+ * button that opens their epsg.io page in a new tab.
  */
 export default {
     name: 'PropsTable',
@@ -338,14 +348,26 @@ export default {
     padding-left: 1rem;
 }
 
-/* Break at spaces first; a long hash or path still breaks anywhere */
+/* Break at spaces first; a long hash or path still breaks anywhere. A line break
+   in the value starts a new line (the resolution row puts the extent under the pixel size) */
 .wrap {
     overflow-wrap: anywhere;
-    white-space: normal;
+    white-space: pre-line;
 }
 
-.copyable-row a {
+.copyable-row a:not(.p-button) {
     color: var(--ddb-link);
+}
+
+/* Sits right after the code in running text */
+.row-action-btn.crs-info-btn {
+    margin: 0 0.25rem !important;
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.crs-info-btn :deep(*) {
+    cursor: pointer;
 }
 
 .row-note {

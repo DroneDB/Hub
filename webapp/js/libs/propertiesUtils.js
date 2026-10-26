@@ -4,6 +4,8 @@
 import ddb from 'ddb';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { bytesToSize, formatTimeAgo } from '@/libs/utils';
+import { formatGroundResolution } from '@/libs/groundResolution';
+import { fixedLengthParts, formatSpeed } from '@/libs/format';
 
 /**
  * Extracts the best display name from a feature's properties, checking various property names
@@ -114,16 +116,21 @@ export function pointCoordinatesText(pointGeom) {
 }
 
 /**
- * Format coordinates from point_geom geometry: "EPSG:4326 lon, lat, altm"
+ * Format coordinates from point_geom geometry: "EPSG:4326 lon, lat, altm", the altitude
+ * in the user's units ("altft" for imperial)
  * @param {Object} pointGeom - The point_geom object
+ * @param {string} [units] - 'metric' or 'imperial'
  * @returns {string|null}
  */
-function formatCoordinates(pointGeom) {
+function formatCoordinates(pointGeom, units) {
     const coords = pointCoordinates(pointGeom);
     if (!coords) return null;
     const crsName = pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name;
     let text = (crsName ? crsName + ' ' : '') + coords[0] + ', ' + coords[1];
-    if (hasAltitude(coords)) text += ', ' + coords[2].toFixed(2) + 'm';
+    if (hasAltitude(coords)) {
+        const { value, unit } = fixedLengthParts(coords[2], units);
+        text += `, ${value}${unit}`;
+    }
     return text;
 }
 
@@ -214,7 +221,14 @@ export function formatCadCrs(entry) {
     }
 }
 
-export function buildAllProperties(file) {
+/**
+ * The rows of the properties table of a file: its type, path, size, dates, coordinates
+ * and entry properties, with lengths, speeds and areas in the user's units.
+ * @param {Object} file - The file object with entry property
+ * @param {string} [units] - 'metric' or 'imperial' (the measurement units preference)
+ * @returns {Object|null}
+ */
+export function buildAllProperties(file, units = 'metric') {
     if (!file) return null;
     const entry = file.entry;
     const props = {};
@@ -227,7 +241,7 @@ export function buildAllProperties(file) {
     if (entry.mtime) {
         props['modified'] = formatModifiedDate(entry.mtime);
     }
-    const coordStr = formatCoordinates(entry.point_geom);
+    const coordStr = formatCoordinates(entry.point_geom, units);
     if (coordStr) {
         props['coordinates'] = coordStr;
     }
@@ -247,25 +261,62 @@ export function buildAllProperties(file) {
                 props[key] = entry.properties[key];
             }
         }
+        formatMeasuredProperties(props, units);
+        // A georaster's resolution in ground units; tidyProperties falls back to its geotransform
+        if (entry.properties.geotransform) {
+            const resolution = formatGroundResolution(entry.polygon_geom, entry.properties.width, entry.properties.height, units);
+            if (resolution) props['resolution'] = resolution;
+        }
     }
 
     return Object.keys(props).length > 0 ? props : null;
 }
 
+// Image properties DroneDB stores in m/s and in metres
+const SPEED_PROPERTIES = ['flightSpeed', 'flightSpeed3D', 'flightSpeedX', 'flightSpeedY', 'flightSpeedZ'];
+const LENGTH_PROPERTIES = ['gpsXYAccuracy', 'gpsZAccuracy'];
+
+// Shows the speeds and lengths of the properties in the user's units, in place
+function formatMeasuredProperties(props, units) {
+    for (const key of SPEED_PROPERTIES) {
+        if (typeof props[key] === 'number') props[key] = formatSpeed(props[key], units);
+    }
+    for (const key of LENGTH_PROPERTIES) {
+        if (typeof props[key] === 'number') props[key] = fixedLengthParts(props[key], units).text;
+    }
+}
+
 /**
- * Tidies an object of entry or feature properties for display, in place: the GeoImage
- * geotransform becomes a resolution, width and height one "Dimensions" row, internal fields
+ * Width and height in pixels with the megapixels they make: "3581 x 3854 ~ 13.8Mpx".
+ * The megapixels are left out when either side is not a positive number.
+ * @param {number} width
+ * @param {number} height
+ * @returns {string}
+ */
+export function formatDimensions(width, height) {
+    const text = `${width} x ${height}`;
+    const pixels = Number(width) * Number(height);
+    if (!(pixels > 0)) return text;
+    return `${text} ~ ${(pixels / 1e6).toFixed(1)}Mpx`;
+}
+
+/**
+ * Tidies an object of entry or feature properties for display, in place: a geotransform
+ * becomes a resolution (unless buildAllProperties gave one in ground units), width and height one "Dimensions" row, internal fields
  * are dropped and the sensor is upper-cased.
  * @param {Object} props  a copy of the properties (it is changed)
  * @returns {Object} props
  */
 export function tidyProperties(props) {
-    if (props.geotransform && Array.isArray(props.geotransform) && props.geotransform.length > 1) {
-        props.resolution = props.geotransform[1].toFixed(2) + ' meters';
+    if (props.geotransform) {
+        // Without a footprint the pixel size is only known in the units of the coordinate system
+        if (props.resolution === undefined && Array.isArray(props.geotransform) && typeof props.geotransform[1] === 'number') {
+            props.resolution = `${Number(props.geotransform[1].toPrecision(3))} per pixel, in coordinate system units`;
+        }
         delete props.geotransform;
     }
     if (props.width !== undefined && props.height !== undefined) {
-        props['Dimensions'] = `${props.width} x ${props.height}`;
+        props['Dimensions'] = formatDimensions(props.width, props.height);
         delete props.width;
         delete props.height;
     }

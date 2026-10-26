@@ -1,5 +1,5 @@
 /**
- * PropsTable: EPSG codes in values link to epsg.io, the copy buttons copy the value
+ * PropsTable: EPSG codes in values get an info button to epsg.io, the copy buttons copy the value
  * given for their row and the Type row explains the entry type.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -19,11 +19,13 @@ const mountTable = (props) => mount(PropsTable, {
 describe('PropsTable', () => {
     beforeEach(() => { copyText.mockClear(); notify.success.mockClear(); });
 
-    it('links the EPSG code of the coordinates row to epsg.io, in a new tab', () => {
+    it('keeps the EPSG code as text, with an info button that opens epsg.io in a new tab', () => {
         const wrapper = mountTable({ obj: { coordinates: 'EPSG:4326 11.2, 46.1, 300.00m' } });
         const link = wrapper.find('a[href="https://epsg.io/4326"]');
         expect(link.exists()).toBe(true);
-        expect(link.text()).toBe('EPSG:4326');
+        expect(link.text()).toBe('');
+        expect(link.find('.fa-circle-question').exists()).toBe(true);
+        expect(link.attributes('aria-label')).toBe('What is EPSG:4326? (opens epsg.io)');
         expect(link.attributes('target')).toBe('_blank');
         expect(link.attributes('rel')).toContain('noopener');
         expect(wrapper.text()).toContain('EPSG:4326 11.2, 46.1, 300.00m');

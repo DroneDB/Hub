@@ -3,7 +3,8 @@
  * Run with: npx vitest run webapp/js/libs/propertiesUtils.spec.js
  */
 import { describe, it, expect } from 'vitest';
-import { formatCadCrs, tidyProperties, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties } from './propertiesUtils';
+import ddb from 'ddb';
+import { formatCadCrs, tidyProperties, formatDimensions, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties } from './propertiesUtils';
 
 const entry = (crs, units = 'm') => ({ properties: { vector: { crs, units } } });
 
@@ -32,14 +33,31 @@ describe('formatCadCrs', () => {
 });
 
 describe('tidyProperties', () => {
-    it('turns the geotransform into a resolution and merges width and height', () => {
+    it('turns the geotransform into a resolution in coordinate system units and merges width and height', () => {
         const props = tidyProperties({ geotransform: [0, 0.126, 0, 0, 0, -0.126], width: 400, height: 300 });
-        expect(props).toEqual({ resolution: '0.13 meters', Dimensions: '400 x 300' });
+        expect(props).toEqual({ resolution: '0.126 per pixel, in coordinate system units', Dimensions: '400 x 300 ~ 0.1Mpx' });
+    });
+
+    it('keeps a ground resolution it is given and drops the geotransform', () => {
+        const props = tidyProperties({ geotransform: [0, 0.126, 0, 0, 0, -0.126], resolution: '5.0 cm/px' });
+        expect(props).toEqual({ resolution: '5.0 cm/px' });
     });
 
     it('drops internal fields and upper-cases the sensor', () => {
         const props = tidyProperties({ projection: 'x', focalLength35: 24, orientation: 1, sensor: 'fc6310', make: 'DJI' });
         expect(props).toEqual({ sensor: 'FC6310', make: 'DJI' });
+    });
+});
+
+describe('formatDimensions', () => {
+    it('adds the megapixels, rounded to one decimal', () => {
+        expect(formatDimensions(3581, 3854)).toBe('3581 x 3854 ~ 13.8Mpx');
+        expect(formatDimensions(8000, 6000)).toBe('8000 x 6000 ~ 48.0Mpx');
+    });
+
+    it('leaves the megapixels out when a side is not a positive number', () => {
+        expect(formatDimensions(0, 300)).toBe('0 x 300');
+        expect(formatDimensions('a', 300)).toBe('a x 300');
     });
 });
 
@@ -102,11 +120,67 @@ const pointEntry = (coordinates, extra = {}) => ({
     }
 });
 
+describe('resolution row', () => {
+    // A 5 cm/px georaster in a projection whose unit is not the metre: the row is
+    // measured on the WGS84 footprint, not read from the geotransform
+    const ring = [[-91.9944, 46.8430], [-91.9932, 46.8430], [-91.9932, 46.8422], [-91.9944, 46.8422], [-91.9944, 46.8430]];
+    const entry = {
+        type: ddb.entry.type.GEORASTER,
+        path: 'ortho.tif',
+        polygon_geom: { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: {} },
+        properties: { geotransform: [0, 0.164, 0, 0, 0, -0.164], width: 1830, height: 1780 }
+    };
+
+    it('shows the ground resolution of a georaster', () => {
+        const props = tidyProperties(buildAllProperties({ entry }));
+        expect(props.resolution).toBe('5.0 cm/px\n91 x 89 m (8119 m²)');
+        expect(props.geotransform).toBeUndefined();
+    });
+
+    it('follows the imperial units', () => {
+        const props = tidyProperties(buildAllProperties({ entry }, 'imperial'));
+        expect(props.resolution).toBe('2.0 in/px\n299 x 292 ft (2.01 acres)');
+    });
+
+    it('falls back to the geotransform without a footprint', () => {
+        const props = tidyProperties(buildAllProperties({ entry: { ...entry, polygon_geom: undefined } }));
+        expect(props.resolution).toBe('0.164 per pixel, in coordinate system units');
+    });
+});
+
+describe('speed and length rows', () => {
+    const entry = {
+        type: ddb.entry.type.GEOIMAGE,
+        path: 'DJI_0001.JPG',
+        properties: { flightSpeed: 5, flightSpeedZ: -0.5, gpsXYAccuracy: 1.5, gpsZAccuracy: 3, focalLength: 4.5 }
+    };
+
+    it('shows speeds and GPS accuracies in metric units', () => {
+        const props = buildAllProperties({ entry });
+        expect(props.flightSpeed).toBe('18.0 km/h');
+        expect(props.flightSpeedZ).toBe('-1.8 km/h');
+        expect(props.gpsXYAccuracy).toBe('1.50 m');
+        expect(props.focalLength).toBe(4.5);
+    });
+
+    it('shows them in imperial units', () => {
+        const props = buildAllProperties({ entry }, 'imperial');
+        expect(props.flightSpeed).toBe('11.2 mph');
+        expect(props.gpsZAccuracy).toBe('9.84 ft');
+    });
+});
+
 describe('coordinates row', () => {
     it('shows the CRS, longitude first and the altitude in metres, and copies latitude first', () => {
         const file = pointEntry([11.2, 46.1, 300.456]);
         expect(buildAllProperties(file).coordinates).toBe('EPSG:4326 11.2, 46.1, 300.46m');
         expect(pointCoordinatesText(file.entry.point_geom)).toBe('46.1, 11.2, 300.46');
+    });
+
+    it('shows the altitude in feet for imperial and still copies it in metres', () => {
+        const file = pointEntry([11.2, 46.1, 300.456]);
+        expect(buildAllProperties(file, 'imperial').coordinates).toBe('EPSG:4326 11.2, 46.1, 985.75ft');
+        expect(buildCopyableValues(file).coordinates.text).toBe('46.1, 11.2, 300.46');
     });
 
     it('has no altitude part for a 2D point', () => {

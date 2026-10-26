@@ -33,6 +33,42 @@ describe('libs/format', () => {
         expect(f.formatLength(1500, 'metric')).toBe('1.5 km');
         expect(f.lengthParts(1, 'imperial')).toEqual({ value: 3.28, unit: 'ft', text: '3.28 ft' });
     });
+
+    it('formats lengths that keep their unit, with fixed decimals', async () => {
+        const f = await import('@/libs/format');
+        expect(f.fixedLengthParts(300.456)).toEqual({ value: '300.46', unit: 'm', text: '300.46 m' });
+        expect(f.fixedLengthParts(1, 'imperial')).toEqual({ value: '3.28', unit: 'ft', text: '3.28 ft' });
+        expect(f.fixedLengthParts(1.5, 'metric', 1).text).toBe('1.5 m');
+    });
+
+    it('formats the ground size of a raster pixel in cm or m, in or ft', async () => {
+        const f = await import('@/libs/format');
+        expect(f.formatPixelSize(0.05, 0.05)).toBe('5.0 cm/px');
+        expect(f.formatPixelSize(0.005, 0.005)).toBe('0.50 cm/px');
+        expect(f.formatPixelSize(0.043, 0.062)).toBe('4.3 x 6.2 cm/px');
+        expect(f.formatPixelSize(10, 10)).toBe('10.0 m/px');
+        expect(f.formatPixelSize(0.05, 0.05, 'imperial')).toBe('2.0 in/px');
+        expect(f.formatPixelSize(0.01, 0.01, 'imperial')).toBe('0.39 in/px');
+        expect(f.formatPixelSize(0.5, 0.5, 'imperial')).toBe('1.6 ft/px');
+    });
+
+    it('formats the ground extent of a raster in m or km, ft or mi', async () => {
+        const f = await import('@/libs/format');
+        expect(f.formatExtent(90, 88)).toBe('90 x 88 m');
+        expect(f.formatExtent(5, 4)).toBe('5.0 x 4.0 m');
+        expect(f.formatExtent(2000, 1500)).toBe('2.00 x 1.50 km');
+        expect(f.formatExtent(90, 88, 'imperial')).toBe('295 x 289 ft');
+        expect(f.formatExtent(2, 1.5, 'imperial')).toBe('6.6 x 4.9 ft');
+        expect(f.formatExtent(2000, 1500, 'imperial')).toBe('1.24 x 0.93 mi');
+    });
+
+    it('formats land areas with hectares, or acres for imperial', async () => {
+        const f = await import('@/libs/format');
+        expect(f.formatLandArea(7920)).toBe('7920 m²');
+        expect(f.formatLandArea(3e6)).toBe('300.0 ha');
+        expect(f.formatLandArea(4e8)).toBe('400 km²');
+        expect(f.formatLandArea(7920, 'imperial')).toBe('1.96 acres');
+    });
 });
 
 describe('pathutils', () => {

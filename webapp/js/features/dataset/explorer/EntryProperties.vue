@@ -22,6 +22,8 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import { buildAllProperties, buildCopyableValues, buildRowNotes, getFileTypeName } from '@/libs/propertiesUtils';
 import { bytesToSize } from '@/libs/utils';
+import { usePreference } from '@/composables/usePreference';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 export default {
     name: 'EntryProperties',
@@ -32,10 +34,14 @@ export default {
         files: { type: Array, default: () => [] }
     },
     emits: ['close'],
+    setup() {
+        // Lengths, speeds and areas follow the measurement units preference as it changes
+        return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
+    },
     computed: {
         singleFileProperties() {
             if (!this.files || this.files.length !== 1) return null;
-            return buildAllProperties(this.files[0]);
+            return buildAllProperties(this.files[0], this.measureUnit);
         },
         singleFileCopyableValues() {
             return this.files && this.files.length === 1 ? buildCopyableValues(this.files[0]) : {};

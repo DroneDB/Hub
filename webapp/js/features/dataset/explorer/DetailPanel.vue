@@ -75,6 +75,8 @@ import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
 import { buildAllProperties, buildCopyableValues, buildRowNotes, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
+import { usePreference } from '@/composables/usePreference';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 export default {
     components: { PropsTable, Button, Message },
@@ -92,6 +94,10 @@ export default {
         }
     },
     emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
+    setup() {
+        // Lengths, speeds and areas follow the measurement units preference as it changes
+        return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
+    },
     data: function () {
         return {
             thumbnail: null,
@@ -189,7 +195,7 @@ export default {
         },
         allProperties() {
             if (!this.file) return null;
-            return buildAllProperties(this.file);
+            return buildAllProperties(this.file, this.measureUnit);
         },
         copyableValues() {
             return buildCopyableValues(this.file);

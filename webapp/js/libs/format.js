@@ -150,3 +150,78 @@ export function formatSpeed(metersPerSecond, units = 'metric') {
         ? `${(metersPerSecond * 2.23694).toFixed(1)} mph`
         : `${(metersPerSecond * 3.6).toFixed(1)} km/h`;
 }
+
+const INCHES_PER_M = 39.3701;
+const FEET_PER_MILE = 5280;
+
+/**
+ * A length with fixed decimals that keeps its unit at any size: m, or ft for imperial
+ * (an altitude, a GPS accuracy).
+ * @param {number} meters
+ * @param {'metric'|'imperial'|string} [units]
+ * @param {number} [decimals]
+ * @returns {{ value: string, unit: string, text: string }}
+ */
+export function fixedLengthParts(meters, units = 'metric', decimals = 2) {
+    const [v, unit] = units === 'imperial' ? [meters * FEET_PER_M, 'ft'] : [meters, 'm'];
+    const value = v.toFixed(decimals);
+    return { value, unit, text: `${value} ${unit}` };
+}
+
+// Values in the unit given by factor (per metre), joined: "5.0", "4.3 x 6.2"
+function joinSides(sidesMeters, factor, decimals) {
+    return sidesMeters.map(s => (s * factor).toFixed(decimals)).join(' x ');
+}
+
+// Pixel sides that differ by less than this are shown as one value
+const SQUARE_PIXEL_TOLERANCE = 0.05;
+
+/**
+ * The ground size of a raster pixel: cm/px below 1 m, then m/px; in/px below 1 ft,
+ * then ft/px for imperial. A pixel whose sides differ by more than 5% shows both.
+ * "5.0 cm/px", "0.50 cm/px", "4.3 x 6.2 cm/px", "2.0 in/px"
+ * @param {number} xMeters
+ * @param {number} yMeters
+ * @param {'metric'|'imperial'|string} [units]
+ */
+export function formatPixelSize(xMeters, yMeters, units = 'metric') {
+    const square = Math.abs(xMeters - yMeters) <= SQUARE_PIXEL_TOLERANCE * Math.max(xMeters, yMeters);
+    const sides = square ? [(xMeters + yMeters) / 2] : [xMeters, yMeters];
+    const max = Math.max(...sides);
+    const [factor, unit] = units === 'imperial'
+        ? (max * INCHES_PER_M < 12 ? [INCHES_PER_M, 'in/px'] : [FEET_PER_M, 'ft/px'])
+        : (max < 1 ? [100, 'cm/px'] : [1, 'm/px']);
+    const scaled = max * factor;
+    const decimals = scaled < 1 ? 2 : scaled < 100 ? 1 : 0;
+    return `${joinSides(sides, factor, decimals)} ${unit}`;
+}
+
+/**
+ * The ground width and height of a raster: m below 1 km, then km; ft below 1 mile,
+ * then mi for imperial. "179 x 193 m", "8.4 x 6.2 m", "1.79 x 1.93 km", "295 x 289 ft"
+ * @param {number} widthMeters
+ * @param {number} heightMeters
+ * @param {'metric'|'imperial'|string} [units]
+ */
+export function formatExtent(widthMeters, heightMeters, units = 'metric') {
+    const sides = [widthMeters, heightMeters];
+    const max = Math.max(...sides);
+    const [smallFactor, smallUnit, largeFactor, largeUnit, largeFrom] = units === 'imperial'
+        ? [FEET_PER_M, 'ft', FEET_PER_M / FEET_PER_MILE, 'mi', FEET_PER_MILE / FEET_PER_M]
+        : [1, 'm', 1 / 1000, 'km', 1000];
+    if (max >= largeFrom) return `${joinSides(sides, largeFactor, 2)} ${largeUnit}`;
+    return `${joinSides(sides, smallFactor, max * smallFactor >= 10 ? 0 : 1)} ${smallUnit}`;
+}
+
+/**
+ * The area of a piece of land: m² below 1 ha, ha below 100 km², then km²; acres for
+ * imperial (as a measured area). "640 m²", "3.4 ha", "250 km²", "2.03 acres"
+ * @param {number} squareMeters
+ * @param {'metric'|'imperial'|string} [units]
+ */
+export function formatLandArea(squareMeters, units = 'metric') {
+    if (units !== 'metric') return formatArea(squareMeters, units);
+    if (squareMeters < 1e4) return `${Math.round(squareMeters)} m²`;
+    if (squareMeters < 1e8) return `${(squareMeters / 1e4).toFixed(1)} ha`;
+    return `${Math.round(squareMeters / 1e6)} km²`;
+}

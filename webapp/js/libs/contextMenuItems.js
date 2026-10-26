@@ -507,7 +507,7 @@ function extractItem(ctx) {
 
 function setCoordinateSystemItem(ctx) {
     return {
-        label: 'Set Coordinate System...',
+        label: 'Set Coordinate System',
         icon: 'fa-solid fa-earth-europe',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
@@ -636,41 +636,41 @@ function buildStandardContextMenu(ctx) {
 
 export {
     // Individual items
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     setCoordinateSystemItem,
     deleteItem,
     deleteSeparator,
-    
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
+
     // Grouped builders
     buildViewerMenuItems,
     buildActionMenuItems,
-    
+
     buildStandardContextMenu,
-    
+
 };
