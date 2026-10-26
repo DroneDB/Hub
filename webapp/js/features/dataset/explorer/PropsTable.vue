@@ -3,7 +3,7 @@
         <!-- Array at root level: render each item as a sub-table -->
         <div v-if="Array.isArray(tObj)" class="props-array-list">
             <div v-for="(item, index) in tObj" :key="index">
-                <PropsTable :obj="item" :depth="depth" :max-depth="maxDepth" :copyable-values="copyableValues" />
+                <PropsTable :obj="item" :depth="depth" :max-depth="maxDepth" />
             </div>
         </div>
 
@@ -28,13 +28,20 @@
                     <div v-else-if="typeof data.rawValue === 'boolean'" class="bool-false" title="false">✗</div>
                     <div v-else-if="data.rawValue !== null && typeof data.rawValue === 'string'" class="wrap copyable-row">
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
-                        <template v-else>{{ data.rawValue }}</template>
-                        <Button v-if="copyableValues && copyableValues[data.key]"
+                        <span v-else>
+                            <template v-for="(part, i) in linkCrsCodes(data.rawValue)" :key="i">
+                                <a v-if="part.href" :href="part.href" target="_blank" rel="noopener noreferrer"
+                                   :title="`What is ${part.text}? (epsg.io)`">{{ part.text }}</a>
+                                <template v-else>{{ part.text }}</template>
+                            </template>
+                        </span>
+                        <Button v-if="copyableValues[data.key]"
                                 icon="fa-regular fa-copy"
                                 size="small"
                                 text
                                 class="copy-btn"
-                                title="Copy hash to clipboard" aria-label="Copy hash to clipboard"
+                                :title="`Copy ${copyableValues[data.key].label} to clipboard`"
+                                :aria-label="`Copy ${copyableValues[data.key].label} to clipboard`"
                                 @click="copyValue(copyableValues[data.key])" />
                     </div>
                     <div v-else-if="typeof data.rawValue === 'number'">
@@ -51,8 +58,7 @@
                     <PropsTable v-else-if="data.rawValue !== null && data.rawValue !== undefined"
                                 :obj="data.rawValue"
                                 :depth="depth + 1"
-                                :max-depth="maxDepth"
-                                :copyable-values="copyableValues" />
+                                :max-depth="maxDepth" />
                     <span v-else>-</span>
                 </template>
             </Column>
@@ -79,15 +85,14 @@
                         :obj="drillDownData"
                         :depth="0"
                         :max-depth="Infinity"
-                        :preserve-order="preserveOrder"
-                        :copyable-values="copyableValues" />
+                        :preserve-order="preserveOrder" />
         </Window>
     </div>
 </template>
 
 <script>
 import { clone, sortObjectKeys } from '@/libs/utils';
-import { tidyProperties, beautifyKey, isUrl } from '@/libs/propertiesUtils';
+import { tidyProperties, beautifyKey, isUrl, linkCrsCodes } from '@/libs/propertiesUtils';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Button from 'primevue/button';
@@ -104,6 +109,10 @@ import { copyText } from '@/composables/useCopyText';
  *   obj      - The value to render (any JSON-compatible type).
  *   depth    - Current recursion depth (default: 0).
  *   maxDepth - Maximum drill-down depth before showing raw JSON (default: 3).
+ *   copyableValues - { rowKey: { text, label } }: a copy button on that top-level row
+ *                    copies text (nested tables do not get it).
+ *
+ * EPSG and ESRI codes in string values link to their epsg.io page.
  */
 export default {
     name: 'PropsTable',
@@ -207,6 +216,8 @@ export default {
 
         isUrl,
 
+        linkCrsCodes,
+
         // True if the value is an object/array that should be collapsed
         // behind a drill-down button (nested too deep or too large).
         shouldCollapse(value) {
@@ -251,10 +262,10 @@ export default {
         },
 
         // Copy a value to the clipboard and show a toast notification
-        async copyValue(text) {
+        async copyValue({ text, label }) {
             try {
                 await copyText(text);
-                this.$notify.success('Hash copied to clipboard', { summary: 'Copied' });
+                this.$notify.success(`${label[0].toUpperCase()}${label.slice(1)} copied to clipboard`, { summary: 'Copied' });
             } catch (e) {
                 console.error('Failed to copy to clipboard:', e);
             }

@@ -2,7 +2,8 @@
     <Window id="properties" height="80%" width="40%" title="Properties"
             @close="$emit('close', $event, arguments[1])">
         <div v-if="files.length === 1" class="text-selectable">
-            <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserve-order="true" />
+            <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserve-order="true"
+                        :copyable-values="singleFileCopyableValues" />
         </div>
         <div v-if="files.length >= 2">
             <div class="multi-count">{{ files.length }} items</div>
@@ -19,7 +20,7 @@ import Window from '@/components/HubWindow.vue';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-import { buildAllProperties, getFileTypeName } from '@/libs/propertiesUtils';
+import { buildAllProperties, buildCopyableValues, getFileTypeName } from '@/libs/propertiesUtils';
 import { bytesToSize } from '@/libs/utils';
 
 export default {
@@ -35,6 +36,9 @@ export default {
         singleFileProperties() {
             if (!this.files || this.files.length !== 1) return null;
             return buildAllProperties(this.files[0]);
+        },
+        singleFileCopyableValues() {
+            return this.files && this.files.length === 1 ? buildCopyableValues(this.files[0]) : {};
         },
         multiFileRows() {
             if (!this.files || this.files.length < 2) return [];

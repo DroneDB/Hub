@@ -82,22 +82,69 @@ export function formatModifiedDate(mtime) {
 }
 
 /**
- * Format coordinates from point_geom geometry
+ * The coordinates of a point_geom as plain numbers, in the order shown:
+ * "x, y" or "x, y, z" (z with two decimals). This is the text the copy button copies.
+ * @param {Object} pointGeom - The point_geom object
+ * @returns {string|null}
+ */
+export function pointCoordinatesText(pointGeom) {
+    const coords = pointGeom && pointGeom.geometry && pointGeom.geometry.coordinates;
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+    const parts = [coords[0], coords[1]];
+    if (typeof coords[2] === 'number') parts.push(coords[2].toFixed(2));
+    return parts.join(', ');
+}
+
+/**
+ * Format coordinates from point_geom geometry: "EPSG:4326 x, y, zm"
  * @param {Object} pointGeom - The point_geom object
  * @returns {string|null}
  */
 function formatCoordinates(pointGeom) {
-    if (!pointGeom || !pointGeom.geometry || !pointGeom.geometry.coordinates) return null;
-    const coords = pointGeom.geometry.coordinates;
-    let coordStr = '';
-    if (pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name) {
-        coordStr += pointGeom.crs.properties.name + ' ';
+    const text = pointCoordinatesText(pointGeom);
+    if (!text) return null;
+    const crsName = pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name;
+    const hasZ = typeof pointGeom.geometry.coordinates[2] === 'number';
+    return (crsName ? crsName + ' ' : '') + text + (hasZ ? 'm' : '');
+}
+
+// EPSG and ESRI codes ("EPSG:32633", "ESRI:102100", the "EPSG::4326" of an OGC URN).
+// epsg.io serves both authorities at https://epsg.io/<code>; the prefixed form is a 404.
+const CRS_CODE_RE = /\b(EPSG|ESRI)::?(\d+)\b/gi;
+
+/**
+ * Splits a text into parts, where each EPSG or ESRI code is a part with the
+ * epsg.io page that describes it. Text without a code is one part without href.
+ * @param {string} text
+ * @returns {{ text: string, href?: string }[]}
+ */
+export function linkCrsCodes(text) {
+    if (typeof text !== 'string' || !text) return [{ text: text ?? '' }];
+    const parts = [];
+    let last = 0;
+    for (const m of text.matchAll(CRS_CODE_RE)) {
+        if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+        parts.push({ text: m[0], href: `https://epsg.io/${m[2]}` });
+        last = m.index + m[0].length;
     }
-    coordStr += coords[0] + ', ' + coords[1];
-    if (coords[2] !== undefined) {
-        coordStr += ', ' + coords[2].toFixed(2) + 'm';
-    }
-    return coordStr;
+    if (last < text.length) parts.push({ text: text.slice(last) });
+    return parts;
+}
+
+/**
+ * The values the properties table copies, by row key: the size row copies the
+ * file hash, the coordinates row the plain coordinates.
+ * @param {Object} file - The file object with entry property
+ * @returns {Object<string, { text: string, label: string }>}
+ */
+export function buildCopyableValues(file) {
+    const entry = file && file.entry;
+    if (!entry) return {};
+    const values = {};
+    if (entry.hash) values.size = { text: entry.hash, label: 'hash' };
+    const coordinates = pointCoordinatesText(entry.point_geom);
+    if (coordinates) values.coordinates = { text: coordinates, label: 'coordinates' };
+    return values;
 }
 
 /**

@@ -75,7 +75,7 @@ import ddb from 'ddb';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
-import { buildAllProperties, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
+import { buildAllProperties, buildCopyableValues, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 
 export default {
     components: { PropsTable, Button, Message },
@@ -193,8 +193,7 @@ export default {
             return buildAllProperties(this.file);
         },
         copyableValues() {
-            if (!this.file || !this.file.entry || !this.file.entry.hash) return {};
-            return { size: this.file.entry.hash };
+            return buildCopyableValues(this.file);
         }
     },
     watch: {

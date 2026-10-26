@@ -1,0 +1,61 @@
+/**
+ * PropsTable: EPSG codes in values link to epsg.io and the copy buttons copy
+ * the value given for their row.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { mount, flushPromises } from '@vue/test-utils';
+import PrimeVue from 'primevue/config';
+
+vi.mock('@/composables/useCopyText', () => ({ copyText: vi.fn(() => Promise.resolve()) }));
+import { copyText } from '@/composables/useCopyText';
+import PropsTable from './PropsTable.vue';
+
+const notify = { success: vi.fn() };
+const mountTable = (props) => mount(PropsTable, {
+    props: { preserveOrder: true, ...props },
+    global: { plugins: [PrimeVue], mocks: { $notify: notify }, stubs: { Window: true } }
+});
+
+describe('PropsTable', () => {
+    beforeEach(() => { copyText.mockClear(); notify.success.mockClear(); });
+
+    it('links the EPSG code of the coordinates row to epsg.io, in a new tab', () => {
+        const wrapper = mountTable({ obj: { coordinates: 'EPSG:4326 11.2, 46.1, 300.00m' } });
+        const link = wrapper.find('a[href="https://epsg.io/4326"]');
+        expect(link.exists()).toBe(true);
+        expect(link.text()).toBe('EPSG:4326');
+        expect(link.attributes('target')).toBe('_blank');
+        expect(link.attributes('rel')).toContain('noopener');
+        expect(wrapper.text()).toContain('EPSG:4326 11.2, 46.1, 300.00m');
+    });
+
+    it('links codes in nested values too', () => {
+        const wrapper = mountTable({ obj: { vector: { crs: 'EPSG:32633 (from the .prj file)' } } });
+        expect(wrapper.find('a[href="https://epsg.io/32633"]').exists()).toBe(true);
+    });
+
+    it('copies the value given for the row and names it', async () => {
+        const wrapper = mountTable({
+            obj: { coordinates: 'EPSG:4326 11.2, 46.1', size: '10 B' },
+            copyableValues: {
+                coordinates: { text: '11.2, 46.1', label: 'coordinates' },
+                size: { text: 'abc123', label: 'hash' }
+            }
+        });
+        const button = wrapper.find('button[aria-label="Copy coordinates to clipboard"]');
+        expect(button.exists()).toBe(true);
+        expect(wrapper.find('button[aria-label="Copy hash to clipboard"]').exists()).toBe(true);
+        await button.trigger('click');
+        await flushPromises();
+        expect(copyText).toHaveBeenCalledWith('11.2, 46.1');
+        expect(notify.success).toHaveBeenCalledWith('Coordinates copied to clipboard', { summary: 'Copied' });
+    });
+
+    it('has no copy button on rows without a copy value, nor on nested rows with the same key', () => {
+        const wrapper = mountTable({
+            obj: { path: 'a.jpg', meta: { coordinates: 'x' } },
+            copyableValues: { coordinates: { text: '1, 2', label: 'coordinates' } }
+        });
+        expect(wrapper.find('button[aria-label^="Copy"]').exists()).toBe(false);
+    });
+});
