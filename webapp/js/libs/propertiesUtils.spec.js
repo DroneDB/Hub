@@ -3,7 +3,7 @@
  * Run with: npx vitest run webapp/js/libs/propertiesUtils.spec.js
  */
 import { describe, it, expect } from 'vitest';
-import { formatCadCrs, tidyProperties, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildAllProperties } from './propertiesUtils';
+import { formatCadCrs, tidyProperties, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties } from './propertiesUtils';
 
 const entry = (crs, units = 'm') => ({ properties: { vector: { crs, units } } });
 
@@ -118,6 +118,18 @@ describe('coordinates row', () => {
     it('is absent without a point geometry', () => {
         expect(pointCoordinatesText(undefined)).toBeNull();
         expect(pointCoordinatesText({ geometry: { coordinates: [] } })).toBeNull();
+    });
+});
+
+describe('buildRowNotes', () => {
+    it('shows how long ago the entry was modified under the modified row', () => {
+        const mtime = Math.floor(Date.now() / 1000) - 120;
+        expect(buildRowNotes({ entry: { type: 2, path: 'a.txt', mtime } })).toEqual({ modified: '2 minutes ago' });
+    });
+
+    it('has no notes without a modified time', () => {
+        expect(buildRowNotes({ entry: { type: 1, path: 'dir' } })).toEqual({});
+        expect(buildRowNotes(null)).toEqual({});
     });
 });
 

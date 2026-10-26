@@ -3,7 +3,7 @@
  */
 import ddb from 'ddb';
 import { getTypeDisplayName } from '@/libs/entryTypes';
-import { bytesToSize } from '@/libs/utils';
+import { bytesToSize, formatTimeAgo } from '@/libs/utils';
 
 /**
  * Extracts the best display name from a feature's properties, checking various property names
@@ -79,6 +79,15 @@ export function getFileSizeDisplay(entry) {
 export function formatModifiedDate(mtime) {
     if (!mtime) return '--';
     return new Date(mtime * 1000).toLocaleString();
+}
+
+/**
+ * How long ago an entry was modified, e.g. "2 minutes ago"
+ * @param {number} mtime - Unix timestamp (seconds)
+ * @returns {string} empty when there is no timestamp
+ */
+export function formatModifiedTimeAgo(mtime) {
+    return mtime ? formatTimeAgo(mtime * 1000) : '';
 }
 
 // The [x, y, z?] of a point_geom (GeoJSON order: longitude, latitude), or null
@@ -158,6 +167,18 @@ export function buildCopyableValues(file) {
         values.coordinates = { text: coordinates, label: `latitude, longitude${altitude}` };
     }
     return values;
+}
+
+/**
+ * The notes shown under the values of the rows of a file's properties table:
+ * { rowKey: text }. The modified row shows how long ago that was.
+ * @param {Object} file - The file object with entry property
+ * @returns {Object}
+ */
+export function buildRowNotes(file) {
+    const entry = file && file.entry;
+    if (!entry || !entry.mtime) return {};
+    return { modified: formatModifiedTimeAgo(entry.mtime) };
 }
 
 /**

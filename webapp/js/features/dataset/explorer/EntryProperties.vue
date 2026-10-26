@@ -3,12 +3,12 @@
             @close="$emit('close', $event, arguments[1])">
         <div v-if="files.length === 1" class="text-selectable">
             <PropsTable v-if="singleFileProperties" :obj="singleFileProperties" :preserve-order="true"
-                        :copyable-values="singleFileCopyableValues" :entry-type="files[0].entry.type" />
+                        :copyable-values="singleFileCopyableValues" :row-notes="singleFileRowNotes" :entry-type="files[0].entry.type" />
         </div>
         <div v-if="files.length >= 2">
             <div class="multi-count">{{ files.length }} items</div>
             <DataTable :value="multiFileRows" size="small" :show-gridlines="true" class="multi-props-datatable">
-                <Column field="key" style="font-weight: 600; width: 40%; white-space: nowrap;" />
+                <Column field="key" style="font-weight: 600; width: 40%;" />
                 <Column field="value" />
             </DataTable>
         </div>
@@ -20,7 +20,7 @@ import Window from '@/components/HubWindow.vue';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-import { buildAllProperties, buildCopyableValues, getFileTypeName } from '@/libs/propertiesUtils';
+import { buildAllProperties, buildCopyableValues, buildRowNotes, getFileTypeName } from '@/libs/propertiesUtils';
 import { bytesToSize } from '@/libs/utils';
 
 export default {
@@ -39,6 +39,9 @@ export default {
         },
         singleFileCopyableValues() {
             return this.files && this.files.length === 1 ? buildCopyableValues(this.files[0]) : {};
+        },
+        singleFileRowNotes() {
+            return this.files && this.files.length === 1 ? buildRowNotes(this.files[0]) : {};
         },
         multiFileRows() {
             if (!this.files || this.files.length < 2) return [];
@@ -81,5 +84,6 @@ export default {
     padding: 0.3rem 0.5rem;
     font-size: 0.85rem;
     vertical-align: top;
+    overflow-wrap: anywhere;
 }
 </style>

@@ -41,14 +41,12 @@
 
             <!-- Properties section -->
             <div class="properties-section text-selectable">
-                <h4 class="ui dividing header">Properties</h4>
                 <PropsTable v-if="allProperties" :obj="allProperties" :preserve-order="true" :copyable-values="copyableValues"
-                            :entry-type="file.entry.type" />
+                            :row-notes="rowNotes" :entry-type="file.entry.type" />
             </div>
 
             <!-- Actions section -->
             <div class="actions-section">
-                <h4 class="ui dividing header">Actions</h4>
                 <div class="action-buttons">
                     <Button severity="secondary" icon="fa-regular fa-folder-open" label="Open" @click="handleOpen" />
                     <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
@@ -76,7 +74,7 @@ import ddb from 'ddb';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
 import Button from 'primevue/button';
 import Message from 'primevue/message';
-import { buildAllProperties, buildCopyableValues, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
+import { buildAllProperties, buildCopyableValues, buildRowNotes, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 
 export default {
     components: { PropsTable, Button, Message },
@@ -195,6 +193,9 @@ export default {
         },
         copyableValues() {
             return buildCopyableValues(this.file);
+        },
+        rowNotes() {
+            return buildRowNotes(this.file);
         }
     },
     watch: {

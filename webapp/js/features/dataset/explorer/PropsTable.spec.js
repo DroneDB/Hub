@@ -59,22 +59,25 @@ describe('PropsTable', () => {
         expect(wrapper.find('button[aria-label^="Copy"]').exists()).toBe(false);
     });
 
-    it('opens the description of the entry type from the top-level Type row', async () => {
+    it('shows the type name as text and opens its description only from the ? button', async () => {
         const wrapper = mountTable({ obj: { type: 'GeoRaster', meta: { type: 'Feature' } }, entryType: 4 });
-        const links = wrapper.findAll('button.type-info-link');
-        expect(links).toHaveLength(1);
-        expect(links[0].text()).toBe('GeoRaster');
+        const buttons = wrapper.findAll('button.type-info-btn');
+        expect(buttons).toHaveLength(1);
+        expect(buttons[0].attributes('aria-label')).toBe('What is GeoRaster?');
+        const name = buttons[0].element.parentElement.querySelector('span');
+        expect(name.textContent).toBe('GeoRaster');
+        expect(name.closest('button')).toBeNull();
         expect(wrapper.findComponent({ name: 'EntryTypeInfoDialog' }).exists()).toBe(false);
-        await links[0].trigger('click');
+        await buttons[0].trigger('click');
         expect(wrapper.findComponent({ name: 'EntryTypeInfoDialog' }).props('type')).toBe(4);
     });
 
     it('keeps the Type row plain without an entry type, or for a type without a description', () => {
-        expect(mountTable({ obj: { type: 'GeoRaster' } }).find('button.type-info-link').exists()).toBe(false);
-        expect(mountTable({ obj: { type: 'Unknown' }, entryType: 0 }).find('button.type-info-link').exists()).toBe(false);
+        expect(mountTable({ obj: { type: 'GeoRaster' } }).find('button.type-info-btn').exists()).toBe(false);
+        expect(mountTable({ obj: { type: 'Unknown' }, entryType: 0 }).find('button.type-info-btn').exists()).toBe(false);
     });
 
     it('reads an entry type given as a string', () => {
-        expect(mountTable({ obj: { type: 'Vector' }, entryType: '14' }).find('button.type-info-link').exists()).toBe(true);
+        expect(mountTable({ obj: { type: 'Vector' }, entryType: '14' }).find('button.type-info-btn').exists()).toBe(true);
     });
 });

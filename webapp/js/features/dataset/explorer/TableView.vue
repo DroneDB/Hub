@@ -82,8 +82,7 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
-import { formatTimeAgo } from '@/libs/utils';
-import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
+import { getFileSizeDisplay, formatModifiedDate, formatModifiedTimeAgo } from '@/libs/propertiesUtils';
 import emitter from '@/libs/eventBus';
 import { buildStandardContextMenu } from '@/libs/contextMenuItems';
 import { isBuildableFile, hasActiveBuild, isBuildLoading, getBuildBadge, getBuildBadgeTooltip } from '@/libs/build/buildHelpers';
@@ -345,9 +344,7 @@ export default {
         },
 
         getFileModifiedDateRel: function(file) {
-            if (!file.entry.mtime) return '';
-
-            return formatTimeAgo(file.entry.mtime * 1000);
+            return formatModifiedTimeAgo(file.entry.mtime);
         },
 
         // Returns the cached thumbnail URL for a file, or null if unsupported/not yet available

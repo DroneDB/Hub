@@ -26,11 +26,15 @@
                     </div>
                     <div v-else-if="typeof data.rawValue === 'boolean' && data.rawValue" class="bool-true" title="true">✓</div>
                     <div v-else-if="typeof data.rawValue === 'boolean'" class="bool-false" title="false">✗</div>
-                    <div v-else-if="isEntryTypeRow(data)">
-                        <button type="button" class="type-info-link" title="What does this type mean?"
-                                @click="typeInfoVisible = true">
-                            {{ data.rawValue }}<i class="fa-regular fa-circle-question ms-1" aria-hidden="true" />
-                        </button>
+                    <div v-else-if="isEntryTypeRow(data)" class="copyable-row">
+                        <span>{{ data.rawValue }}</span>
+                        <Button icon="fa-regular fa-circle-question"
+                                size="small"
+                                text
+                                class="row-action-btn type-info-btn"
+                                :title="`What is ${data.rawValue}?`"
+                                :aria-label="`What is ${data.rawValue}?`"
+                                @click="typeInfoVisible = true" />
                     </div>
                     <div v-else-if="data.rawValue !== null && typeof data.rawValue === 'string'" class="wrap copyable-row">
                         <a v-if="isUrl(data.rawValue)" :href="data.rawValue" target="_blank" rel="noopener noreferrer">{{ data.rawValue }}</a>
@@ -45,7 +49,7 @@
                                 icon="fa-regular fa-copy"
                                 size="small"
                                 text
-                                class="copy-btn"
+                                class="row-action-btn"
                                 :title="`Copy ${copyableValues[data.key].label} to clipboard`"
                                 :aria-label="`Copy ${copyableValues[data.key].label} to clipboard`"
                                 @click="copyValue(copyableValues[data.key])" />
@@ -66,6 +70,7 @@
                                 :depth="depth + 1"
                                 :max-depth="maxDepth" />
                     <span v-else>-</span>
+                    <small v-if="rowNotes[data.key]" class="row-note">{{ rowNotes[data.key] }}</small>
                 </template>
             </Column>
         </DataTable>
@@ -121,6 +126,8 @@ import { copyText } from '@/composables/useCopyText';
  *   maxDepth - Maximum drill-down depth before showing raw JSON (default: 3).
  *   copyableValues - { rowKey: { text, label } }: a copy button on that top-level row
  *                    copies text (nested tables do not get it).
+ *   rowNotes - { rowKey: text }: a muted line under the value of that top-level row
+ *              (e.g. "2 minutes ago" under the modified date).
  *   entryType - the entry type of the file shown: its top-level Type row opens a
  *               dialog that explains the type.
  *
@@ -167,6 +174,10 @@ export default {
             default: 2
         },
         copyableValues: {
+            type: Object,
+            default: () => ({}),
+        },
+        rowNotes: {
             type: Object,
             default: () => ({}),
         },
@@ -311,22 +322,8 @@ export default {
     padding-right: 8px;
 }
 
-.type-info-link {
-    padding: 0;
-    border: 0;
-    background: none;
-    font: inherit;
-    color: var(--ddb-link);
-    cursor: pointer;
-    text-decoration: underline dotted;
-    text-underline-offset: 2px;
-}
-
-.type-info-link:hover {
-    text-decoration-style: solid;
-}
-
-.copy-btn {
+/* A small icon button after a value (copy, what is this type) */
+.row-action-btn {
     flex-shrink: 0;
     padding: 2px !important;
     margin-left: 0.5rem !important;
@@ -349,6 +346,12 @@ export default {
 
 .copyable-row a {
     color: var(--ddb-link);
+}
+
+.row-note {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--ddb-text-muted);
 }
 
 .bool-true {
