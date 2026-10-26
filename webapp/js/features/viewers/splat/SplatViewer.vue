@@ -64,7 +64,7 @@ import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useEventListener, useListenerBag } from '@/composables/useEventListener';
 import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
-import { PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import CameraManager from './CameraManager.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
 import SplatNavPad from './SplatNavPad.vue';
@@ -95,7 +95,7 @@ const pointScale = ref(1.0);
 const tiltRoll = ref(0);
 const tiltPitch = ref(0);
 const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-const navMode = usePreference(PREF.SPLAT_NAV_MODE, 'fly');
+const navMode = usePreference(PREF.SPLAT_NAV_MODE, PREF_DEFAULTS[PREF.SPLAT_NAV_MODE]);
 const pressed = reactive(Object.fromEntries(MOVE_KEYS.map(k => [k, false])));
 const presentationMode = ref(null);
 const cameras = ref([]);
@@ -301,7 +301,7 @@ function applyNavMode() {
     }
 }
 watch(navMode, mode => {
-    if (mode !== 'fly' && mode !== 'earth') navMode.value = 'fly';
+    if (mode !== 'fly' && mode !== 'earth') navMode.value = PREF_DEFAULTS[PREF.SPLAT_NAV_MODE];
     else applyNavMode();
 });
 

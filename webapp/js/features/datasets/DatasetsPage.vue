@@ -182,7 +182,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import Message from '@/components/HubMessage.vue';
 import { setTitle, bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
-import { getDatasetTablePreferences, saveDatasetTablePreferences } from '@/libs/storageUtils';
+import { getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences } from '@/libs/storageUtils';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useEntityDelete } from '@/composables/useEntityDelete';
@@ -279,12 +279,12 @@ export default {
             orgInfo: null,
 
             // Sorting - use saved preferences or defaults
-            sortColumn: prefs?.sortColumn || "name",
-            sortDirection: prefs?.sortDirection || "asc",
+            sortColumn: prefs.sortColumn,
+            sortDirection: prefs.sortDirection,
 
             // Pagination - use saved preferences or defaults
             currentPage: 1,
-            itemsPerPage: prefs?.itemsPerPage || 10,
+            itemsPerPage: prefs.itemsPerPage,
 
             // Filtering: what is typed, and what the server was asked for
             searchQuery: "",
@@ -396,6 +396,15 @@ export default {
             this.savePreferences();
         }
     },
+    created() {
+        // The table settings follow the Preferences page, other tabs and the account; the watchers
+        // above do not store them again (saveDatasetTablePreferences skips the values already stored)
+        this._stopFollowingPreferences = followDatasetTablePreferences(prefs => {
+            this.sortColumn = prefs.sortColumn;
+            this.sortDirection = prefs.sortDirection;
+            this.itemsPerPage = prefs.itemsPerPage;
+        });
+    },
     mounted: async function () {
         try {
             this.org = reg.Organization(this.$route.params.org);
@@ -417,6 +426,7 @@ export default {
         this.loading = false;
     },
     beforeUnmount() {
+        this._stopFollowingPreferences?.();
         clearTimeout(this._searchTimer);
         this._listRequest?.abort();
     }, methods: {

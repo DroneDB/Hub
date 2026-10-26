@@ -78,7 +78,7 @@ import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { useNotify } from '@/composables/useNotify';
 import keyboard from '@/libs/keyboard';
-import { PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { loadGiro3dLibs } from './giro3dLibs';
 import { UnifiedScene } from './unifiedScene';
 import { LOADERS, viewableEntry } from './loaders';
@@ -88,11 +88,7 @@ defineOptions({ name: 'UnifiedViewer' });
 
 // Type checks are the viewer's own (several types; .3tz indexed as generic)
 const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
-const { settings, resetSettings } = useViewerSettings(PREF.UNIFIED_VIEWER, {
-    ambientIntensity: 3,
-    directionalIntensity: 1.8,
-    hemisphereIntensity: 3
-});
+const { settings, resetSettings } = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]);
 const notify = useNotify();
 
 // What the scene reports (reactive); the Giro3D objects themselves never are

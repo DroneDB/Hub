@@ -29,7 +29,7 @@
                     </label>
                     <div class="layer-select-wrapper">
                         <Select v-model="customLayerName" input-id="map-settings-dialog-layer" aria-labelledby="map-settings-dialog-layer-label" :disabled="wmsLayers.length === 0" :options="wmsLayerOptions" option-label="label" option-value="value" :placeholder="wmsLayers.length === 0 ? (wmsLayersLoading ? 'Loading...' : 'Enter URL first') : ''" class="setting-select" style="flex: 1; min-width: 0;" />
-                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading" title="Fetch layers" icon="fa-solid fa-arrows-rotate" :loading="wmsLayersLoading" aria-label="Fetch layers"
+                        <Button v-if="customUrl.trim()" :disabled="wmsLayersLoading || !isCustomUrlValid" title="Fetch layers" icon="fa-solid fa-arrows-rotate" :loading="wmsLayersLoading" aria-label="Fetch layers"
                                 text @click="fetchLayers" />
                     </div>
                 </div>
@@ -39,8 +39,8 @@
                     </label>
                     <Select v-model="customTileSize" input-id="map-settings-dialog-tile-size" aria-labelledby="map-settings-dialog-tile-size-label" :options="tileSizeOptions" option-label="label" option-value="value" class="setting-select" />
                 </div>
-                <PrimeMessage v-if="customError" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
-                    {{ customError }}
+                <PrimeMessage v-if="customUrlError || customError" severity="error" :closable="false" icon="fa-solid fa-triangle-exclamation" size="small">
+                    {{ customUrlError || customError }}
                 </PrimeMessage>
                 <div class="setting-row" style="justify-content: flex-end;">
                     <Button severity="info" :disabled="!isCustomConfigValid || customLoading" icon="fa-solid fa-check" :loading="customLoading"
@@ -69,6 +69,7 @@ import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
 import { fetchWmsLayers } from '@/libs/map/wmsCapabilities';
+import { getAttributionFromUrl, isAbsoluteHttpUrl } from '@/libs/map/basemaps';
 
 export default {
     components: {
@@ -123,8 +124,17 @@ export default {
     },
 
     computed: {
+        /** The map drops a custom basemap whose URL is not absolute http(s), so the dialog refuses it too */
+        isCustomUrlValid: function () {
+            return isAbsoluteHttpUrl((this.customUrl || '').trim());
+        },
+        /** Hint for a typed URL the map would not draw; null while the field is empty */
+        customUrlError: function () {
+            if (!this.customUrl || !this.customUrl.trim() || this.isCustomUrlValid) return null;
+            return 'The URL must be absolute and start with http:// or https://.';
+        },
         isCustomConfigValid: function () {
-            if (!this.customUrl || !this.customUrl.trim()) return false;
+            if (!this.isCustomUrlValid) return false;
             if (this.customSourceType === 'wms' && !this.customLayerName) return false;
             return true;
         },
@@ -169,18 +179,6 @@ export default {
         },
 
         /**
-         * Extract hostname from a URL for auto-generated attribution
-         */
-        getAttributionFromUrl: function (url) {
-            try {
-                const hostname = new URL(url).hostname;
-                return '&copy; ' + hostname;
-            } catch {
-                return '';
-            }
-        },
-
-        /**
          * Reset WMS layer state when URL or source type changes
          */
         onSourceTypeChanged: function () {
@@ -200,7 +198,7 @@ export default {
          * Fetch WMS GetCapabilities and populate the layers dropdown
          */
         fetchLayers: async function () {
-            if (!this.customUrl.trim() || this.wmsLayersLoading) return;
+            if (!this.isCustomUrlValid || this.wmsLayersLoading) return;
 
             this.wmsLayersLoading = true;
             this.wmsLayers = [];
@@ -284,7 +282,7 @@ export default {
             this.customError = null;
 
             const url = this.customUrl.trim();
-            const attribution = this.getAttributionFromUrl(url);
+            const attribution = getAttributionFromUrl(url);
 
             try {
                 // Find the selected layer's defaultTime if available

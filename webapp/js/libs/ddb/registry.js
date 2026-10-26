@@ -139,11 +139,12 @@ export default class Registry {
      * One request to the Registry.
      *
      * makeRequest(endpoint, options) with options { method, body, contentType, responseType,
-     * signal, headers, cache, readOnly, onHeaders }; the positional form makeRequest(endpoint, method, body,
+     * signal, headers, cache, readOnly, invalidate, onHeaders }; the positional form makeRequest(endpoint, method, body,
      * contentType, responseType) still works.
      *
      * GETs go through the request cache (single flight, short read cache, conditional
-     * requests); with a `signal`, only the reused descriptors do. `cache: false` skips it. Any other method drops the cached answers.
+     * requests); with a `signal`, only the reused descriptors do. `cache: false` skips it. Any other method drops the cached answers
+     * (all, or the endpoints starting with `invalidate` when a write changes only those).
      * `signal` aborts the request (AbortError); requests time out after 5 minutes.
      * `onHeaders(headers)` receives the response headers (requests that skip the cache only).
      */
@@ -167,7 +168,7 @@ export default class Registry {
 
         if (method !== "GET") {
             // A write changes what the cached reads saw; a read sent as POST (`readOnly`) does not
-            if (!options.readOnly) this.requestCache.invalidate();
+            if (!options.readOnly) this.requestCache.invalidate(options.invalidate ?? '');
             return this._send(endpoint, method, options);
         }
 
@@ -231,6 +232,15 @@ export default class Registry {
 
     async putRequest(endpoint, body = {}) {
         return this.makeRequest(endpoint, "PUT", body);
+    }
+
+    /**
+     * @param {string} endpoint
+     * @param {object} [body]
+     * @param {{ invalidate?: string }} [options] invalidate: prefix of the cached GETs this write changes (default: all)
+     */
+    async patchRequest(endpoint, body = {}, { invalidate } = {}) {
+        return this.makeRequest(endpoint, { method: "PATCH", body, invalidate });
     }
 
     async deleteRequest(endpoint, body = {}) {

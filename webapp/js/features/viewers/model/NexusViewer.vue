@@ -27,16 +27,14 @@ import RangeSetting from '@/components/RangeSetting.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { loadResources } from '@/libs/lazy';
-import { PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 defineOptions({ name: 'NexusViewer' });
 
 const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.MODEL], typeLabel: 'a 3D model', title: 'Model'
 });
-const { settings, resetSettings } = useViewerSettings(PREF.NEXUS_LIGHTING, {
-    ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25
-});
+const { settings, resetSettings } = useViewerSettings(PREF.NEXUS_LIGHTING, PREF_DEFAULTS[PREF.NEXUS_LIGHTING]);
 
 const canvas = ref(null);
 const loaded = ref(false);

@@ -31,6 +31,7 @@ import { createAppRouter } from './router';
 import { handleUnauthorized } from '@/libs/authRoutes';
 import { createPinia } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
+import { usePreferencesStore } from '@/stores/preferences';
 
 import reg from '@/libs/api/sharedRegistry';
 import { loadFeaturesAndBranding } from '@/libs/hubBranding';
@@ -140,6 +141,11 @@ window.addEventListener('load', function () {
             }
             // In production, don't re-throw to avoid complete white screen
         };
+
+        // Account sync of the preferences, started once the boot token refresh has settled (a
+        // refresh that cleared the credentials has left the user logged out, so nothing loads).
+        // It watches the login state itself; an embedded view neither reads nor writes the account.
+        if (!embed) usePreferencesStore(pinia);
 
         app.mount("#app");
 

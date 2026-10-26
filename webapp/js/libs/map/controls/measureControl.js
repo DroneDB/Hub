@@ -18,7 +18,7 @@ import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.
 import { showPointPopup } from '@/libs/map/pointPopup';
 import { formatArea as formatAreaText, formatLength as formatLengthText } from '@/libs/format';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
-import { getPref, setPref, PREF } from '@/libs/preferences';
+import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 // Cursor shown over a measurement while the eraser tool is active. We use
 // the same static asset as the toolbar button (file URL, not an inline SVG
@@ -34,7 +34,7 @@ class MeasureControls extends Control {
     constructor(opt_options) {
         const options = opt_options || {};
 
-        const unitPref = getPref(PREF.MEASURE_UNIT, 'metric');
+        const unitPref = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 
         const btnPoint = document.createElement('button');
         btnPoint.title = 'Point Annotation - Click on the map to place an annotation.';
@@ -201,8 +201,19 @@ class MeasureControls extends Control {
     setMap(map) {
         super.setMap(map);
 
+        // The unit follows the Preferences page, other tabs and the account while on a map
+        if (this._unsubscribeUnitPref) {
+            this._unsubscribeUnitPref();
+            this._unsubscribeUnitPref = null;
+        }
+
         // Initialize button visibility when control is added to map
         if (map) {
+            this._unsubscribeUnitPref = onPrefChange(key => {
+                if (key !== PREF.MEASURE_UNIT) return;
+                const unit = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
+                if (unit !== this.unitPref) this.showUnit(unit);
+            });
             this.updateButtonsVisibility(this.hasMeasurements(), false);
             // Detail dialog: outside edit mode, double-clicking on a measurement
             // opens the properties dialog with a Delete button. We only act on
@@ -365,8 +376,16 @@ class MeasureControls extends Control {
      * @param {string} newUnit - The new unit preference ('metric' or 'imperial')
      */
     applyUnitsChange(newUnit) {
+        this.showUnit(newUnit);
         setPref(PREF.MEASURE_UNIT, newUnit);
-        this.unitPref = newUnit;
+    }
+
+    /**
+     * Show the measurements in a unit, without storing it (it is already stored, or about to be)
+     * @param {string} unit - 'metric' or 'imperial'
+     */
+    showUnit(unit) {
+        this.unitPref = unit;
 
         // Recalculate all existing measurement tooltips
         const features = this.source.getFeatures();

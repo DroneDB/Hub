@@ -65,3 +65,76 @@ describe('AuthSession', () => {
         expect(onLogout).toHaveBeenCalled();
     });
 });
+
+describe('Registry writes and the request cache', () => {
+    // /orgs/<org>/ and /sys/features are cached for seconds; /users/preferences is not
+    let calls;
+    let n = 0;
+    // The request cache is shared per origin: each test gets its own
+    const newRegistry = () => new Registry(`http://cache${++n}.test`);
+    beforeEach(() => {
+        calls = [];
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init = {}) => {
+            calls.push({ url: String(url), method: init.method, body: init.body });
+            return new Response(JSON.stringify({ n: calls.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        });
+    });
+    const gets = path => calls.filter(c => c.method === 'GET' && c.url.endsWith(path)).length;
+
+    it('patchRequest with invalidate keeps the cached reads of other endpoints', async () => {
+        const reg = newRegistry();
+        await reg.getRequest('/orgs/ann/');
+        await reg.getRequest('/sys/features');
+        await reg.patchRequest('/users/preferences', { units: { measurement: 'imperial' } }, { invalidate: '/users/preferences' });
+        await reg.getRequest('/orgs/ann/');
+        await reg.getRequest('/sys/features');
+        expect(gets('/orgs/ann/')).toBe(1);
+        expect(gets('/sys/features')).toBe(1);
+    });
+
+    it('patchRequest sends a PATCH with the JSON body', async () => {
+        const reg = newRegistry();
+        await reg.patchRequest('/users/preferences', { units: null }, { invalidate: '/users/preferences' });
+        const patch = calls.find(c => c.method === 'PATCH');
+        expect(patch.url).toBe(`http://cache${n}.test/users/preferences`);
+        expect(JSON.parse(patch.body)).toEqual({ units: null });
+    });
+
+    it('invalidate drops the cached reads that start with the prefix', async () => {
+        const reg = newRegistry();
+        await reg.getRequest('/orgs/ann/');
+        await reg.getRequest('/orgs/bob/');
+        await reg.patchRequest('/orgs/ann/x', {}, { invalidate: '/orgs/ann' });
+        await reg.getRequest('/orgs/ann/');
+        await reg.getRequest('/orgs/bob/');
+        expect(gets('/orgs/ann/')).toBe(2);
+        expect(gets('/orgs/bob/')).toBe(1);
+    });
+
+    it('a default write still drops every cached read', async () => {
+        const reg = newRegistry();
+        await reg.getRequest('/orgs/ann/');
+        await reg.getRequest('/sys/features');
+        await reg.patchRequest('/users/preferences', {});
+        await reg.postRequest('/anything', {});
+        await reg.getRequest('/orgs/ann/');
+        await reg.getRequest('/sys/features');
+        expect(gets('/orgs/ann/')).toBe(2);
+        expect(gets('/sys/features')).toBe(2);
+    });
+
+    it('other writes (put, post) drop everything as before', async () => {
+        const reg = newRegistry();
+        await reg.getRequest('/orgs/ann/');
+        await reg.putRequest('/x', {});
+        await reg.getRequest('/orgs/ann/');
+        expect(gets('/orgs/ann/')).toBe(2);
+    });
+
+    it('a read sent with cache:false is not cached (the preferences read)', async () => {
+        const reg = newRegistry();
+        await reg.getRequest('/users/preferences', { cache: false });
+        await reg.getRequest('/users/preferences', { cache: false });
+        expect(gets('/users/preferences')).toBe(2);
+    });
+});

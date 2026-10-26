@@ -43,7 +43,8 @@ import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
 import { useRequestScope, isAbort } from '@/composables/useRequestScope';
-import { getPref, setPref, PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { usePreference } from '@/composables/usePreference';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 
 const { pathutils } = ddb;
@@ -71,7 +72,7 @@ export default {
     },
     emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
     setup() {
-        return { requestSignal: useRequestScope().signal };
+        return { requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
@@ -119,7 +120,6 @@ export default {
             filter: null,
             searchStaticPaths: null,
             noResults: false,
-            sortDescending: getPref(PREF.SORT_DESCENDING, false),
         };
     },
     watch: {
@@ -209,7 +209,6 @@ export default {
 
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
-            setPref(PREF.SORT_DESCENDING, this.sortDescending);
             // Watcher handles the refresh
         },
 

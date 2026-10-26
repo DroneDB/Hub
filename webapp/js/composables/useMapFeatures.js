@@ -8,9 +8,10 @@
  *
  *   setup(props) { return { ...useMapFeatures(props), ... }; }
  */
-import { shallowRef, ref, computed } from 'vue';
+import { shallowRef, computed } from 'vue';
 import { toLonLat } from 'ol/proj';
-import { getPref, PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { usePreference } from '@/composables/usePreference';
 import { isRasterAnalysisCapable } from '@/libs/entryTypes';
 import { useDialogs } from '@/composables/useDialogs';
 import { useMapAlerts } from '@/composables/useMapAlerts';
@@ -33,7 +34,7 @@ export function useMapFeatures(props) {
     const measureControls = shallowRef(null);
     const rasterLayer = shallowRef(null);
     const vectorLayers = shallowRef([]);
-    const currentUnitPref = ref(getPref(PREF.MEASURE_UNIT, 'metric'));
+    const currentUnitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
     const dialogs = useDialogs();
     const alerts = useMapAlerts();
     const dataset = () => props.dataset;

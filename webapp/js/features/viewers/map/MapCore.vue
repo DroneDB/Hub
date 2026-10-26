@@ -95,7 +95,7 @@ import emitter from '@/libs/eventBus';
 import Keyboard from '@/libs/keyboard';
 import { requestFullScreen, exitFullScreen, isFullScreenCurrently } from '@/libs/utils';
 import { formatSpeed } from '@/libs/format';
-import { getPref, setPref, PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { sanitizeHtml } from '@/libs/sanitize';
 import SelectionControl from '@/libs/map/controls/selectionControl';
 import SettingsControl from '@/libs/map/controls/settingsControl';
@@ -108,6 +108,7 @@ import { getVectorColor } from '@/libs/map/mapUtils';
 import { useListenerBag } from '@/composables/useEventListener';
 import { useTimerGroup } from '@/composables/useTimers';
 import { useMapFeatures } from '@/composables/useMapFeatures';
+import { usePreference } from '@/composables/usePreference';
 
 import DialogHost from '@/components/DialogHost.vue';
 import MapToolbar from './MapToolbar.vue';
@@ -169,6 +170,8 @@ export default {
     setup(props) {
         return {
             ...useMapFeatures(props),
+            showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
+            showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
             // Toolbar zones (createControlZones), set when the map is built
             zones: shallowRef(null),
             later: useTimerGroup(),
@@ -183,9 +186,7 @@ export default {
             selectPolygon: false,
             initialExtent: null,
             vectorLayerColors: {},
-            mapSettingsDialogOpen: false,
-            showFlightPath: getPref(PREF.SHOW_FLIGHT_PATH, true),
-            showDirectionIndicators: getPref(PREF.SHOW_DIRECTION_INDICATORS, false)
+            mapSettingsDialogOpen: false
         };
     },
     computed: {
@@ -196,6 +197,19 @@ export default {
         }
     },
     watch: {
+        // Also changes from outside (the Preferences page, another tab, the account)
+        showFlightPath: {
+            flush: 'sync',
+            handler: function (on) {
+                if (this.fileLayers) this.fileLayers.setFlightPathVisible(on);
+            }
+        },
+        showDirectionIndicators: {
+            flush: 'sync',
+            handler: function () {
+                if (this.fileLayers) this.fileLayers.setShotStyle(this.shotStyleKey());
+            }
+        },
         filesKey: function () {
             // Coalesce bursts (the explorer replaces the array, then patches entries)
             this.later.clear();
@@ -221,6 +235,8 @@ export default {
         if (this.viewZoomCap) this.viewZoomCap.dispose();
         if (this.map) {
             if (this.tooltipOverlay) this.map.removeOverlay(this.tooltipOverlay);
+            // Releases the control's subscription to the unit preference
+            if (this.measureControls) this.map.removeControl(this.measureControls);
             this.vectorLayers.forEach(layer => this.map.removeLayer(layer));
         }
         this.tooltipOverlay = null;
@@ -503,14 +519,10 @@ export default {
 
         setDirectionIndicators: function (on) {
             this.showDirectionIndicators = on;
-            setPref(PREF.SHOW_DIRECTION_INDICATORS, on);
-            if (this.fileLayers) this.fileLayers.setShotStyle(this.shotStyleKey());
         },
 
         setFlightPath: function (on) {
             this.showFlightPath = on;
-            setPref(PREF.SHOW_FLIGHT_PATH, on);
-            if (this.fileLayers) this.fileLayers.setFlightPathVisible(on);
         },
 
         goBack: function () {

@@ -6,7 +6,7 @@
  *   const basemap = useMapBasemap(map);    // map: ShallowRef<ol/Map|null>
  *   new Map({ layers: [basemap.createBasemapLayer(), ...] })
  */
-import { ref } from 'vue';
+import { onScopeDispose, ref, watch } from 'vue';
 import { Tile as TileLayer } from 'ol/layer';
 import XYZ from 'ol/source/XYZ';
 import TileWMS from 'ol/source/TileWMS';
@@ -15,7 +15,8 @@ import { get as getProjection } from 'ol/proj';
 import { getWidth } from 'ol/extent';
 import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { EPSG } from '@/libs/constants';
-import { getPref, setPref, PREF } from '@/libs/preferences';
+import { onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { usePreference } from '@/composables/usePreference';
 
 /** Tile layer of a custom WMS/XYZ configuration. @param {any} config */
 function customLayer(config) {
@@ -41,14 +42,16 @@ function customLayer(config) {
 
 /** @param {import('vue').ShallowRef<any>} map */
 export function useMapBasemap(map) {
-    const selectedBasemap = ref(getPref(PREF.BASEMAP, 'satellite'));
+    const selectedBasemap = usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]);
     const customBasemapConfig = ref(getCustomBasemapConfig());
 
     /** Tile layer of the current selection. */
     function createBasemapLayer() {
         const config = customBasemapConfig.value;
-        if (selectedBasemap.value === 'custom' && config && config.url) return customLayer(config);
-        const basemap = Basemaps[selectedBasemap.value] || Basemaps.satellite;
+        if (selectedBasemap.value === 'custom' && config) return customLayer(config);
+        // A custom selection without a usable configuration (cleared, or invalid) or an unknown name: the default
+        const chosen = Basemaps[selectedBasemap.value];
+        const basemap = chosen?.url ? chosen : Basemaps[PREF_DEFAULTS[PREF.BASEMAP]];
         return new TileLayer({
             source: new XYZ({
                 url: basemap.url,
@@ -69,15 +72,20 @@ export function useMapBasemap(map) {
     /** Settings dialog: another basemap. @param {string} name */
     function handleBasemapChanged(name) {
         selectedBasemap.value = name;
-        setPref(PREF.BASEMAP, name);
-        updateBasemap();
     }
+
+    // Applies the selection however it changed: the dialog, the Preferences page, another tab, the account
+    watch(selectedBasemap, updateBasemap, { flush: 'sync' });
+    onScopeDispose(onPrefChange(key => {
+        if (key !== PREF.CUSTOM_BASEMAP) return;
+        customBasemapConfig.value = getCustomBasemapConfig();
+        if (selectedBasemap.value === 'custom') updateBasemap();
+    }));
 
     /** Settings dialog: a new custom configuration. @param {any} config */
     function handleCustomBasemapConfigChanged(config) {
+        // The preference listener above takes the stored configuration and applies it
         saveCustomBasemapConfig(config);
-        customBasemapConfig.value = config;
-        if (selectedBasemap.value === 'custom') updateBasemap();
     }
 
     return { selectedBasemap, basemaps: Basemaps, customBasemapConfig, createBasemapLayer, updateBasemap, handleBasemapChanged, handleCustomBasemapConfigChanged };

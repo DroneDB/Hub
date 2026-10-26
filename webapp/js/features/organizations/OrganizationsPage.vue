@@ -129,7 +129,7 @@ import OrganizationDialog from './OrganizationDialog.vue';
 import OrganizationMembersDialog from './OrganizationMembersDialog.vue';
 import MessageDialog from '@/features/dataset/dialogs/MessageDialog.vue';
 import { setTitle } from '@/libs/utils';
-import { getOrgPagePreferences, saveOrgPagePreferences } from '@/libs/storageUtils';
+import { getOrgPageSettings, saveOrgPageSettings, followOrgPageSettings, getOrgPagePosition, saveOrgPagePosition } from '@/libs/storageUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Button from 'primevue/button';
@@ -174,7 +174,7 @@ export default {
         return { dialogs, deleteEntity: useEntityDelete(dialogs) };
     },
     data: function () {
-        const prefs = getOrgPagePreferences();
+        const settings = getOrgPageSettings();
         return {
             error: "",
             organizations: [],
@@ -191,10 +191,10 @@ export default {
             membersDialogOpen: false,
             selectedOrgForMembers: null,
 
-            showAll: prefs?.ownedOnly === false,
+            showAll: !settings.ownedOnly,
             searchQuery: '',
-            currentPage: prefs?.currentPage || 1,
-            itemsPerPage: prefs?.itemsPerPage || 10
+            currentPage: getOrgPagePosition().currentPage || 1,
+            itemsPerPage: settings.itemsPerPage
         }
     },
 
@@ -224,31 +224,43 @@ export default {
     watch: {
         showAll: async function () {
             this.currentPage = 1;
-            this.savePreferences();
+            this.saveSettings();
             await this.fetchOrganizations();
         },
         itemsPerPage: function () {
             this.currentPage = 1;
-            this.savePreferences();
+            this.saveSettings();
+        },
+        currentPage: function () {
+            this.savePosition();
         },
         searchQuery: function () {
             this.currentPage = 1;
         }
     },
+    created() {
+        // The list settings follow the Preferences page, other tabs and the account; the watchers
+        // above do not store them again (saveOrgPageSettings skips the values already stored)
+        this._stopFollowingSettings = followOrgPageSettings(settings => {
+            this.itemsPerPage = settings.itemsPerPage;
+            this.showAll = !settings.ownedOnly;
+        });
+    },
     mounted: async function () {
         setTitle("Organizations");
         await this.fetchOrganizations();
-        const prefs = getOrgPagePreferences();
-        if (prefs?.scrollTop) {
+        const { scrollTop } = getOrgPagePosition();
+        if (scrollTop) {
             this.$nextTick(() => {
                 if (this.$refs.cardsArea) {
-                    this.$refs.cardsArea.scrollTop = prefs.scrollTop;
+                    this.$refs.cardsArea.scrollTop = scrollTop;
                 }
             });
         }
     },
     beforeUnmount() {
-        this.savePreferences();
+        this._stopFollowingSettings?.();
+        this.savePosition();
     },
     methods: {
 
@@ -280,14 +292,20 @@ export default {
             this.loading = false;
         },
 
-        savePreferences() {
-            saveOrgPagePreferences(this.itemsPerPage, !this.showAll, this.currentPage, this.$refs.cardsArea?.scrollTop ?? 0);
+        // Only a change of the user stores the list settings, which follow the account; leaving
+        // the page or turning a page stores the position alone
+        saveSettings() {
+            saveOrgPageSettings(this.itemsPerPage, !this.showAll);
         },
 
+        savePosition() {
+            saveOrgPagePosition(this.currentPage, this.$refs.cardsArea?.scrollTop ?? 0);
+        },
+
+        // The watchers store what changed
         onPageChange(event) {
             this.currentPage = event.page + 1;
             this.itemsPerPage = event.rows;
-            this.savePreferences();
         },
 
         handleDelete(org) {

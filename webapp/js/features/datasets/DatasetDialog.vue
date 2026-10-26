@@ -79,6 +79,7 @@ export default {
     emits: ['close'],
 
     data: function () {
+        const openAfterCreate = getOpenAfterCreatePreference();
         return {
             ds: {
                 slug: null,
@@ -87,7 +88,10 @@ export default {
                 tagline: ''
             },
             title: null,
-            openAfterCreate: getOpenAfterCreatePreference(),
+            openAfterCreate,
+            // What the checkbox started from: the preference is stored only when the user changed it,
+            // so a value that changed elsewhere since the dialog opened is not overwritten
+            openAfterCreateAtOpen: openAfterCreate,
             visibilityOptions: [
                 { value: Visibility.PRIVATE, label: 'Private' },
                 { value: Visibility.UNLISTED, label: 'Unlisted' },
@@ -113,7 +117,7 @@ export default {
     }, methods: {
         slugFromName,
         close: function (buttonId) {
-            if (buttonId === 'create') {
+            if (buttonId === 'create' && this.openAfterCreate !== this.openAfterCreateAtOpen) {
                 saveOpenAfterCreatePreference(this.openAfterCreate);
             }
             this.$emit('close', buttonId, {

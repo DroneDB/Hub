@@ -32,6 +32,13 @@ vi.mock('@/stores/auth', async () => {
     return { useAuthStore: () => h.auth };
 });
 
+// The window under test is the real one; the store that syncs it with the account is not the subject here
+vi.mock('@/stores/preferences', async () => {
+    const { reactive } = await import('vue');
+    const store = reactive({ status: 'idle', resetSection() {}, resetAll() {} });
+    return { usePreferencesStore: () => store };
+});
+
 const { default: HubHeader } = await import('./HubHeader.vue');
 const { resetUpdateCheck } = await import('@/composables/useUpdateCheck');
 
@@ -137,5 +144,98 @@ describe('HubHeader update indicator', () => {
         await render();
         await icon().trigger('click');
         expect(wrapper.find('.notes-stub').text()).toBe('2.1.0');
+    });
+});
+
+describe('HubHeader user menu: Preferences', () => {
+    let push;
+    beforeEach(() => {
+        h.reg.features.get = () => false;
+        h.auth.isAdmin = false;
+        push = vi.fn();
+    });
+
+    async function menuItems({ accountManagement, loggedIn = true }) {
+        h.reg.features.get = () => accountManagement;
+        h.auth.isLoggedIn = loggedIn;
+        h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(AVAILABLE));
+        wrapper = mount(HubHeader, {
+            global: {
+                plugins: [PrimeVue, createPinia()],
+                mocks: { $route: { params: {}, fullPath: '/r' }, $router: { push } },
+                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+            },
+            attachTo: document.body
+        });
+        await flushPromises();
+        return wrapper.vm.userMenuItems;
+    }
+    const labels = items => items.filter(i => !i.separator).map(i => i.label);
+
+    it('is there for a local user, right after My Account', async () => {
+        const items = await menuItems({ accountManagement: true });
+        const names = labels(items);
+        expect(names).toContain('My Account');
+        expect(names.indexOf('Preferences')).toBe(names.indexOf('My Account') + 1);
+        expect(items.find(i => i.label === 'Preferences').icon).toBe('fa-solid fa-sliders');
+    });
+
+    it('is there for an LDAP / remote user, who has no My Account', async () => {
+        const items = await menuItems({ accountManagement: false });
+        expect(labels(items)).toContain('Preferences');
+        expect(labels(items)).not.toContain('My Account');
+        // a separator precedes it, so it is not glued to the storage entries
+        const at = items.findIndex(i => i.label === 'Preferences');
+        expect(items[at - 1].separator).toBe(true);
+    });
+
+    it('is there for an admin too', async () => {
+        h.auth.isAdmin = true;
+        const items = await menuItems({ accountManagement: false });
+        expect(labels(items)).toContain('Preferences');
+    });
+
+    it('is absent when logged out', async () => {
+        const items = await menuItems({ accountManagement: true, loggedIn: false });
+        expect(labels(items)).not.toContain('Preferences');
+    });
+
+    describe('window', () => {
+        const preferencesWindow = () => document.body.querySelector('#preferencesDialog');
+        async function openIt() {
+            const items = await menuItems({ accountManagement: false });
+            items.find(i => i.label === 'Preferences').command();
+            await loaded();
+        }
+        // The window is a lazy chunk: the import resolves after a few turns of the event loop
+        const loaded = () => vi.waitFor(() => expect(preferencesWindow()).not.toBeNull());
+        beforeEach(() => { wrapper = null; });
+        afterEach(() => { wrapper?.unmount(); wrapper = null; document.body.innerHTML = ''; });
+
+        it('opens from the menu item, without leaving the page', async () => {
+            const items = await menuItems({ accountManagement: false });
+            expect(preferencesWindow()).toBeNull();
+            items.find(i => i.label === 'Preferences').command();
+            await loaded();
+            expect(preferencesWindow().querySelector('#pref-measurement-units')).not.toBeNull();
+            expect(push).not.toHaveBeenCalled();
+        });
+
+        it('closes with its Close button', async () => {
+            await openIt();
+            [...preferencesWindow().querySelectorAll('button')].find(b => b.textContent.includes('Close')).click();
+            await flushPromises();
+            expect(preferencesWindow()).toBeNull();
+            expect(wrapper.vm.preferencesOpen).toBe(false);
+        });
+
+        it('closes on logout', async () => {
+            await openIt();
+            expect(preferencesWindow()).not.toBeNull();
+            h.auth.isLoggedIn = false;
+            await flushPromises();
+            expect(preferencesWindow()).toBeNull();
+            expect(wrapper.vm.preferencesOpen).toBe(false);
+        });
     });
 });

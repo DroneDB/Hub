@@ -42,6 +42,8 @@
 
             <UpdateNotesDialog v-if="updateNotesOpen && updateInfo" :info="updateInfo" @close="updateNotesOpen = false" />
 
+            <PreferencesDialog v-if="preferencesOpen && loggedIn" @close="preferencesOpen = false" />
+
             <Alert v-if="storageInfoDialogOpen" title="Storage Info" @close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
                     <template v-if="storageInfo.used > 0">
@@ -101,7 +103,7 @@ import { Features } from '@/libs/features';
 import Alert from '@/components/HubAlert';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
-import UpdateNotesDialog from '@/features/admin/UpdateNotesDialog.vue';
+import { lazyComponent } from '@/libs/lazyComponent';
 import { xAuthLogout } from '@/libs/api/xauth';
 import { bytesToSize } from '@/libs/utils';
 import emitter from '@/libs/eventBus';
@@ -117,6 +119,11 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { loginLocation } from '@/libs/authRoutes';
 import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
 
+// Opened from the user menu only: its code loads the first time it is shown
+// Lazy: the release notes need the markdown renderer, which only admins who open them should load
+const UpdateNotesDialog = lazyComponent(() => import(/* webpackChunkName: "admin" */ '@/features/admin/UpdateNotesDialog.vue'));
+const PreferencesDialog = lazyComponent(() => import(/* webpackChunkName: "account" */ '@/features/account/PreferencesDialog.vue'));
+
 export default {
     name: 'HubHeader',
     components: {
@@ -124,6 +131,7 @@ export default {
         ConfirmDialog,
         ShareEmbed,
         UpdateNotesDialog,
+        PreferencesDialog,
         Button,
         Menu,
         ProgressBar,
@@ -152,7 +160,8 @@ export default {
             usersManagement: false,
             accountManagement: false,
             shareFile: null,
-            updateNotesOpen: false
+            updateNotesOpen: false,
+            preferencesOpen: false
         }
     },
 
@@ -308,11 +317,14 @@ export default {
                 }
             }
 
-            if ((this.accountManagement && this.loggedIn) || (this.usersManagement && this.isAdmin) || this.isAdmin) {
+            if (this.loggedIn || (this.usersManagement && this.isAdmin) || this.isAdmin) {
                 items.push({ separator: true });
             }
             if (this.accountManagement && this.loggedIn) {
                 items.push({ label: 'My Account', icon: 'fa-solid fa-user', command: () => this.manageAccount() });
+            }
+            if (this.loggedIn) {
+                items.push({ label: 'Preferences', icon: 'fa-solid fa-sliders', command: () => this.openPreferences() });
             }
             if (this.usersManagement && this.isAdmin) {
                 items.push({ label: 'Manage Users', icon: 'fa-solid fa-users', command: () => this.manageUsers() });
@@ -338,6 +350,7 @@ export default {
             } else {
                 this.storageInfo = null;
                 this.updateNotesOpen = false;
+                this.preferencesOpen = false;
                 this.usersManagement = false;
                 this.accountManagement = false;
             }
@@ -447,6 +460,9 @@ export default {
         },
         manageAccount: function () {
             this.$router.push({ name: "Account" });
+        },
+        openPreferences: function () {
+            this.preferencesOpen = true;
         },
         handleDownload: function () {
             this.downloadConfirmOpen = true;

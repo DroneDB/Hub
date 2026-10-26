@@ -70,7 +70,7 @@ import { usePreference } from '@/composables/usePreference';
 import { usePotreeMeasurements } from '@/composables/usePotreeMeasurements';
 import { loadResources } from '@/libs/lazy';
 import { isMobile } from '@/libs/responsive';
-import { PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
@@ -87,7 +87,7 @@ const {
     undo, redo, toggleDeleteTool, save: saveMeasurements, requestDelete, onDeleteDialogClose
 } = m;
 // Shared with the map's measure control
-const unitPref = usePreference(PREF.MEASURE_UNIT, 'metric');
+const unitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 
 const container = ref(null);
 const sidebar = ref(null);
