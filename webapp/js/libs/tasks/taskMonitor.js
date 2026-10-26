@@ -13,8 +13,8 @@
  * HTTP/1.1 connections; files added during an upload trigger refreshes anyway).
  *
  * Events:
- *   'buildStateChanged' - a build task changed state (consumed by buildManager).
- *   'tasksUpdated'      - the store snapshot actually changed (consume to re-render).
+ *   'tasksUpdated' - the store snapshot changed: a task was added or deleted, or changed state or
+ *                    progress (buildManager derives the build state of each file from it).
  */
 import { nextPollDelay } from './pollingPolicy';
 import { openEventStream } from '@/libs/sse';
@@ -77,25 +77,9 @@ async function _fetch(ent) {
     const ds = ent.dataset;
     try {
         const arr = await ds.getTasks({ take: TAKE }) || [];
-        const previous = new Map(ent.tasks);
 
         ent.tasks.clear();
         for (const t of arr) ent.tasks.set(t.taskId, t);
-
-        // Emit buildStateChanged for build tasks whose state changed
-        for (const [_taskId, task] of ent.tasks) {
-            if (task.toolId !== 'build') continue;
-            const prev = previous.get(_taskId);
-            if (prev && prev.state !== task.state) {
-                emit('buildStateChanged', {
-                    dataset: ds,
-                    filePath: task.path,
-                    previousState: prev.state,
-                    newState: task.state,
-                    buildInfo: { path: task.path, currentState: task.state },
-                });
-            }
-        }
 
         // Notify generic listeners (e.g. the Tasks tab) when the snapshot changed.
         const sig = computeSignature(ent);
@@ -297,7 +281,7 @@ const TaskMonitor = {
         return ent ? hasActive(ent) : false;
     },
 
-    /** Subscribe to events (buildStateChanged, buildStarted). */
+    /** Subscribe to events (tasksUpdated). */
     on(event, fn) {
         (this._listeners[event] || (this._listeners[event] = [])).push(fn);
     },
@@ -312,14 +296,6 @@ const TaskMonitor = {
     // Internal event listeners storage (accessed by emit())
     _listeners: {},
 
-    /** Start a new build task via the dataset API, then trigger a refresh. */
-    async startBuild(dataset, filePath, force = false) {
-        await dataset.build(filePath, force);
-        emit('buildStarted', { dataset, filePath, force });
-        const ent = peekStore(dataset);
-        if (ent) _fetch(ent).then(() => { if (ent._started) _wake(ent); });
-        return true;
-    },
 };
 
 export default TaskMonitor;

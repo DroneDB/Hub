@@ -2,7 +2,6 @@
  * Unit tests for libs/tasks/taskMonitor.js:
  * - datasetKey identity helper
  * - 'tasksUpdated' fires when a fetched snapshot changes, not when identical
- * - 'buildStateChanged' regression: only for build tasks whose state changed
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import taskMonitor, { datasetKey } from './taskMonitor';
@@ -132,77 +131,6 @@ describe('tasksUpdated event', () => {
         for (const d of seen) {
             expect(taskMonitor.getTasks(d.dataset)).not.toHaveLength(0);
         }
-    });
-});
-
-describe('buildStateChanged event (regression)', () => {
-    const listeners = [];
-
-    afterEach(() => {
-        for (const [evt, fn] of listeners.splice(0)) taskMonitor.off(evt, fn);
-    });
-
-    function watch() {
-        const seen = [];
-        const fn = (d) => seen.push(d);
-        taskMonitor.on('buildStateChanged', fn);
-        listeners.push(['buildStateChanged', fn]);
-        return seen;
-    }
-
-    it('fires for a build task whose state changed', async () => {
-        const dataset = makeDataset();
-        dataset.getTasks
-            .mockResolvedValueOnce([makeTask({ state: 'Enqueued' })])
-            .mockResolvedValueOnce([makeTask({ state: 'Processing' })]);
-        const seen = watch();
-
-        await taskMonitor.forceRefresh(dataset);
-        await taskMonitor.forceRefresh(dataset);
-
-        expect(seen).toHaveLength(1);
-        expect(seen[0].previousState).toBe('Enqueued');
-        expect(seen[0].newState).toBe('Processing');
-        expect(seen[0].filePath).toBe('/flight1/IMG_0001.jpg');
-    });
-
-    it('does not fire for non-build tasks', async () => {
-        const dataset = makeDataset();
-        dataset.getTasks
-            .mockResolvedValueOnce([makeTask({ toolId: 'extract' })])
-            .mockResolvedValueOnce([makeTask({ toolId: 'extract', state: 'Succeeded' })]);
-        const seen = watch();
-
-        await taskMonitor.forceRefresh(dataset);
-        await taskMonitor.forceRefresh(dataset);
-
-        expect(seen).toHaveLength(0);
-    });
-
-    it('does not fire for a brand-new build task (no previous snapshot)', async () => {
-        const dataset = makeDataset();
-        dataset.getTasks
-            .mockResolvedValueOnce([])
-            .mockResolvedValueOnce([makeTask({ state: 'Enqueued' })]);
-        const seen = watch();
-
-        await taskMonitor.forceRefresh(dataset);
-        await taskMonitor.forceRefresh(dataset);
-
-        expect(seen).toHaveLength(0);
-    });
-
-    it('does not fire when the state is unchanged', async () => {
-        const dataset = makeDataset();
-        dataset.getTasks
-            .mockResolvedValueOnce([makeTask({ state: 'Enqueued' })])
-            .mockResolvedValueOnce([makeTask({ state: 'Enqueued' })]);
-        const seen = watch();
-
-        await taskMonitor.forceRefresh(dataset);
-        await taskMonitor.forceRefresh(dataset);
-
-        expect(seen).toHaveLength(0);
     });
 });
 

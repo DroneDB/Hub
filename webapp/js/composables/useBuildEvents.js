@@ -20,11 +20,12 @@ export function useBuildEvents() {
     /** @type {(message: string, title: string) => void} */
     let showError = (message, title) => notify.error(message, { summary: title });
 
+    // How a build ended. Its start already has a toast ("Build started", or the buildable files
+    // detected after an upload), and the spinner shows that it runs
     const onStateChanged = data => {
         const name = fileNameOf(data);
         if (data.newState === 'Succeeded') notify.success(`Build completed for ${name}`, { summary: 'Build Completed' });
         else if (data.newState === 'Failed') notify.error(`Build failed for ${name}`, { summary: 'Build Failed' });
-        else if (data.newState === 'Processing') notify.info(`Building ${name}...`, { summary: 'Building' });
     };
     const onStarted = data => notify.info(`Build started for ${fileNameOf(data)}`, { summary: 'Build Started' });
     const onError = data => showError(data.error, 'Build Error');

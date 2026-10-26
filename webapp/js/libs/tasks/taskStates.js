@@ -24,3 +24,20 @@ export const isTerminalState = state => TERMINAL_STATES.includes(state);
 export function datasetKey(dataset) {
     return dataset.baseApi || `${dataset.org}/${dataset.ds}`;
 }
+
+/**
+ * The newest task of each path, by creation time, whatever order the list is in: a file whose
+ * build ran more than once is shown by its latest build, not by an older one that failed.
+ * @template {{ path?: string | null, createdAt?: string }} T
+ * @param {Iterable<T>} tasks
+ * @returns {Map<string, T>}
+ */
+export function latestTaskByPath(tasks) {
+    const latest = new Map();
+    for (const task of tasks) {
+        if (!task.path) continue;
+        const held = latest.get(task.path);
+        if (!held || Date.parse(task.createdAt ?? '') > Date.parse(held.createdAt ?? '')) latest.set(task.path, task);
+    }
+    return latest;
+}
