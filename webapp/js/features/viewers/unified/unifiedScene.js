@@ -9,7 +9,10 @@
 import ddb from 'ddb';
 import { createNavControls, applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV } from './navControls';
 import { alignContentUpAxis } from './contentOrientation';
-import { geojsonBbox, isFiniteBox, ELEVATION_RAMP } from './sceneUtils';
+import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
+
+// Direction (east, south, up) the camera looks at a framed model from
+const THREE_QUARTER_VIEW = [1.2, -1.2, 0.9];
 
 export class UnifiedScene {
     /**
@@ -362,7 +365,10 @@ export class UnifiedScene {
         this.instance.view.minNearPlane = Math.max(maxDim / 1000, 0.01);
         // Also the far plane while a tileset streams (distance.max = Infinity): contains the model
         this.instance.view.maxFarPlane = maxDim * 1000;
-        this.instance.view.camera.position.set(center.x + maxDim * 1.2, center.y - maxDim * 1.2, center.z + maxDim * 0.9);
+        // Far enough for the whole box to fit the screen, narrow (a phone upright) or wide
+        const camera = this.instance.view.camera;
+        const distance = fitDistance(size.length() / 2 || maxDim / 2, camera.fov, camera.aspect);
+        camera.position.set(THREE_QUARTER_VIEW[0], THREE_QUARTER_VIEW[1], THREE_QUARTER_VIEW[2]).normalize().multiplyScalar(distance).add(center);
         this.controls.target.copy(center);
         applySceneMetrics(this.controls, maxDim);
         this.controls.update();

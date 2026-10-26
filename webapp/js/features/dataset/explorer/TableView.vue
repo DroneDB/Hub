@@ -4,7 +4,6 @@
         <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
             <PathBreadcrumb :path="currentPath" root-path="/" class="m-3" @navigate="goToPath" />
-            <!--<div class="ui divider"></div>-->
         </div>
         <!-- A click on the empty area clears the selection, Escape does it from the keyboard -->
         <div id="table-view" ref="tableview" :class="{ dropping }" role="presentation"
@@ -40,7 +39,7 @@
                         <span class="file-name">{{ data.label }}</span>
                     </template>
                 </Column>
-                <Column style="width: 7.5rem;">
+                <Column style="width: 7.5rem;" v-bind="columnFrom('md')">
                     <template #header>
                         <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
@@ -56,7 +55,7 @@
                         <span class="file-size">{{ getFileSize(data) }}</span>
                     </template>
                 </Column>
-                <Column style="width: 12rem">
+                <Column style="width: 12rem" v-bind="columnFrom('lg')">
                     <template #header>
                         <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
@@ -103,6 +102,7 @@ import Column from 'primevue/column';
 import { getCurrentInstance } from 'vue';
 import { useDragDrop } from '@/composables/useDragDrop';
 import { useFileSelection } from '@/composables/useFileSelection';
+import { columnFrom } from '@/libs/responsiveColumns';
 
 /**
  * TableView - Flat-list table view for dataset files.
@@ -131,7 +131,8 @@ export default {
         return {
             ...useDragDrop(props, { selectedFiles: () => instance.proxy.selectedFiles }),
             // Ranges follow the rows as sorted on screen
-            selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path)
+            selection: useFileSelection(() => instance.proxy.sortedFiles, f => f.path),
+            columnFrom
         };
     },
     data: function () {
@@ -485,12 +486,21 @@ export default {
     }
 
     .file-name {
-        word-break: break-all;
+        overflow-wrap: anywhere;
+    }
+
+    /* A sort header is a tap target */
+    .sort-header {
+        min-height: 2rem;
     }
 
     .file-size, .file-date {
         text-align: right;
         display: block;
+    }
+
+    .file-size {
+        white-space: nowrap;
     }
 
     .file-date {

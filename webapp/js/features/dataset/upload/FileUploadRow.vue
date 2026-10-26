@@ -25,7 +25,7 @@
                 {{ file.errorMessage }}
             </div>
             <div v-else-if="file.status === 'error'" class="error-message" :title="file.errorMessage">
-                {{ truncatedError }}
+                <span class="error-text">{{ truncatedError }}</span>
                 <Button v-if="file.canRetry" size="small" severity="danger" outlined title="Retry upload" aria-label="Retry upload" icon="fa-solid fa-rotate-right"
                         class="retry-btn" @click="$emit('retry', file)" />
             </div>
@@ -107,6 +107,12 @@ export default {
     font-size: 1rem;
 }
 
+/* The status icons: the class names are the colours the template asks for */
+.file-icon .grey { color: var(--ddb-text-muted); }
+.file-icon .blue { color: var(--ddb-primary); }
+.file-icon .green { color: var(--ddb-success); }
+.file-icon .red { color: var(--ddb-danger); }
+
 .file-info {
     flex: 1;
     min-width: 0;
@@ -127,8 +133,9 @@ export default {
     margin-top: var(--ddb-spacing-xs);
 }
 
+/* A share of the row on narrow windows, so the name keeps room next to it */
 .file-progress {
-    width: 11.25rem;
+    width: min(11.25rem, 35%);
     flex-shrink: 0;
     text-align: center;
 }
@@ -150,8 +157,13 @@ export default {
 .progress-text {
     position: absolute;
     top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    left: 0;
+    right: 0;
+    padding: 0 var(--ddb-spacing-xs);
+    transform: translateY(-50%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: var(--ddb-font-size-sm);
     font-weight: bold;
     color: var(--ddb-text);
@@ -160,12 +172,21 @@ export default {
 .error-message {
     display: flex;
     align-items: center;
+    min-width: 0;
     color: var(--ddb-danger);
     font-size: 0.75rem;
 }
 
+.error-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .retry-btn {
     margin-left: 0.5rem;
+    flex-shrink: 0;
 }
 
 .done-label {

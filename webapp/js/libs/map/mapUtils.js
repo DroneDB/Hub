@@ -1,6 +1,7 @@
 /**
  * Shared utility functions for Map.vue and SingleMap.vue
  */
+import { PRIMARY } from '@/libs/palette';
 
 /** Default colour of measurements and point annotations (map and point cloud). */
 export const MEASURE_COLOR = '#ffcc33';
@@ -9,7 +10,7 @@ export const MEASURE_COLOR = '#ffcc33';
 export const ANALYSIS_COLOR = '#ff9800';
 
 /** Default colour of a new measurement group. */
-export const GROUP_COLOR = '#3388ff';
+export const GROUP_COLOR = PRIMARY[500];
 
 /** Swatches offered by the measurement, annotation and group dialogs. */
 export const MEASUREMENT_SWATCHES = Object.freeze([

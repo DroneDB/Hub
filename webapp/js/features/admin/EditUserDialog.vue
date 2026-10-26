@@ -115,7 +115,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-    <div v-if="visible" class="opacity-control">
+    <div v-if="visible" class="opacity-control map-bottom-panel">
         <i class="fa-solid fa-adjust" />
         <input type="range" min="0" max="1" step="0.05" :value="modelValue" title="Layer opacity" aria-label="Layer opacity" @input="$emit('update:modelValue', parseFloat($event.target.value))">
         <span class="opacity-value">{{ Math.round(modelValue * 100) }}%</span>
@@ -36,19 +36,11 @@ export default {
 
 <style scoped>
 .opacity-control {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1;
     display: flex;
+    align-items: center;
     gap: 0.5rem;
-    background: rgba(0, 0, 0, 0.6);
     padding: 0.25rem 0.75rem;
     border-radius: 1.25rem;
-    color: white;
-    font-size: 0.75rem;
-    user-select: none;
 }
 
 .opacity-control i {
@@ -58,34 +50,8 @@ export default {
 }
 
 .opacity-control input[type="range"] {
-    width: 7.5rem;
+    flex: 1 1 7.5rem;
+    min-width: 4rem;
     cursor: pointer;
-    accent-color: var(--ddb-secondary);
-}
-
-.opacity-control .opacity-value {
-    min-width: 2rem;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.ph-btn {
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.75);
-    cursor: pointer;
-    padding: 0 0.15rem;
-    font-size: var(--ddb-font-size-base);
-    display: flex;
-    align-items: center;
-    transition: color 0.15s;
-}
-
-.ph-btn:hover {
-    color: var(--ddb-text-on-color);
-}
-
-.ph-btn.active {
-    color: var(--ddb-map-control-active);
 }
 </style>

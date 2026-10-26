@@ -15,7 +15,7 @@
     --panel-option-bg: #2a2a2a;
     --panel-active: #ff9800;
     --panel-active-rgb: 255, 152, 0;
-    --panel-info: #66b3ff;
+    --panel-info: var(--ddb-primary-200);
     --panel-error-text: #ff8a80;
     --panel-warn: #ffb74d;
     --panel-warn-text: #ffcc80;
@@ -261,9 +261,10 @@
 }
 
 .analysis-panel--raster {
-    --panel-accent: #4fc3f7;
-    --panel-accent-rgb: 79, 195, 247;
-    --panel-primary-hover: #29b6f6;
+    --panel-accent: var(--ddb-primary-300); // 5.5:1 on the panel
+    --panel-accent-rgb: 77, 156, 240; // shade 300 as a triplet
+    --panel-primary: var(--ddb-primary); // white text on the button: 4.8:1
+    --panel-primary-hover: var(--ddb-primary-hover);
 }
 
 .analysis-panel--stockpile {

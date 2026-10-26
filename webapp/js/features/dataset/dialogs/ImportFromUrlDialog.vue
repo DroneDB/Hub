@@ -95,7 +95,7 @@
             </form>
 
             <!-- Action buttons -->
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
                 <Button severity="secondary" label="Close" @click="close('close')" />
                 <Button :disabled="!canImport" :loading="importing" severity="primary"
                         icon="fa-solid fa-cloud-arrow-down" label="Import" @click="runImport" />
@@ -316,7 +316,7 @@ export default {
 .import-url-dialog {
     display: flex;
     flex-direction: column;
-    min-width: 28rem;
+    min-width: min(28rem, var(--window-content-width, 100%));
 }
 
 .url-row {

@@ -126,7 +126,7 @@ export default {
 <style scoped>
 .measurement-properties-form {
     padding: 1rem;
-    min-width: 18.75rem;
+    min-width: min(18.75rem, var(--window-content-width, 100%));
 }
 
 .form-group {

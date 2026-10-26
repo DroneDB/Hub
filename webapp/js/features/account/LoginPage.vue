@@ -1,5 +1,5 @@
 <template>
-    <div id="login">
+    <div id="login" class="page-scroll">
         <div class="login-container">
             <div v-if="xAuthInProgress" class="login-loading">
                 <ProgressSpinner class="login-spinner" />
@@ -20,12 +20,12 @@
                                 <Password v-model="password" placeholder="Password" aria-label="Password" :feedback="false"
                                           toggle-mask fluid input-class="w-100" @keyup.enter="login" />
                             </IconField>
-                            <Button label="Login" :loading="loggingIn" severity="info" class="w-100" size="large" @click="login" />
+                            <Button label="Login" :loading="loggingIn" class="w-100" size="large" @click="login" />
                         </div>
                     </template>
                 </Card>
                 <div v-if="showRegistrationLink" style="margin-top:1rem">If you don't have an account, you can register for free on <a
-                    target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
+                    class="d-inline-block py-1" target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
             </div>
             <Message v-if="error" severity="error" :closable="false" class="login-error">{{ error }}</Message>
         </div>
@@ -112,7 +112,7 @@ export default {
 
 <style scoped>
 #login {
-    margin-top: 2rem;
+    padding-top: 2rem;
     text-align: center;
     display: flex;
     justify-content: center;

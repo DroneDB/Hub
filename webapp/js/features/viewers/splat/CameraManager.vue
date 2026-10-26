@@ -78,7 +78,7 @@ export default {
     display: flex;
     flex-direction: column;
     gap: var(--ddb-spacing-sm);
-    min-width: 22rem;
+    min-width: min(22rem, var(--window-content-width, 100%));
 }
 
 .cameras-manager .empty {
@@ -132,12 +132,13 @@ export default {
 
 .cameras-manager .actions {
     display: flex;
+    flex-shrink: 0;
     gap: 0.15rem;
 }
 
 .cameras-manager .act {
-    width: 1.9rem;
-    height: 1.9rem;
+    width: 2rem;
+    height: 2rem;
     border: none;
     border-radius: var(--ddb-radius-sm);
     background: transparent;

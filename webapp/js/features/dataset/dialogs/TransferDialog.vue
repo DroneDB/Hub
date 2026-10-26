@@ -234,7 +234,7 @@ export default {
 
 <style scoped>
 .transfer-dialog {
-    min-width: 31.25rem;
+    min-width: min(31.25rem, var(--window-content-width, 100%));
 }
 
 .help-text {

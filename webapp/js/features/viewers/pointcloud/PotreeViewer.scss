@@ -11,7 +11,7 @@
             visibility: hidden;
         }
 
-        margin: 0 3rem 0 0;
+        margin: 0;
         display: flex;
         width: 100%;
         height: 100%;
@@ -28,6 +28,11 @@
         #potree_render_area {
             -webkit-transition: right .35s;
             transition: right .35s;
+        }
+
+        // The sidebar lies under the view and shows where the open menu takes the room from it
+        &.sidebar-open #potree_render_area {
+            right: var(--ddb-sidebar-width);
         }
 
         #potree_render_area>canvas {
@@ -162,8 +167,11 @@
         position: absolute;
         top: var(--ddb-spacing-sm);
         left: var(--ddb-spacing-sm);
+        // Leaves the menu button at the right edge free
+        max-width: calc(100% - 4.5rem);
         z-index: 1001;
         display: flex;
+        flex-wrap: wrap;
         gap: 0.5rem;
         align-items: center;
     }
@@ -297,5 +305,43 @@
 
     .unit-selector-toolbar select:focus {
         border-color: var(--ddb-viewer-btn-primary);
+    }
+
+    /* Phones: the menu covers the view (below the menu button) instead of squeezing it to a strip */
+    @media (max-width: 767.98px) {
+        .potree-container {
+            &.sidebar-open #potree_render_area {
+                right: 0;
+            }
+
+            #potree_sidebar_container {
+                top: 4rem;
+                bottom: 0;
+                height: auto !important;
+                max-width: 100%;
+                z-index: 2;
+                visibility: hidden;
+            }
+
+            &.sidebar-open #potree_sidebar_container {
+                visibility: visible;
+            }
+        }
+
+        .unit-selector-toolbar label {
+            display: none;
+        }
+
+        .unit-selector-toolbar select {
+            min-height: 2.25rem;
+        }
+
+        // Out of the way of the toolbar above
+        .measurements-toolbar {
+            top: auto;
+            bottom: var(--ddb-spacing-sm);
+            flex-wrap: wrap;
+            max-width: calc(100% - 2 * var(--ddb-spacing-sm));
+        }
     }
 }

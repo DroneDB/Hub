@@ -22,7 +22,7 @@
 
 #unified-viewer .progress-fill {
     height: 100%;
-    background: var(--ddb-primary, #2978b4);
+    background: var(--ddb-primary);
     transition: width 0.2s ease;
 }
 
@@ -64,7 +64,7 @@
 }
 
 #unified-viewer .toolbar button.active {
-    background: var(--ddb-primary, #2978b4);
+    background: var(--ddb-primary);
 }
 
 #unified-viewer .toolbar button:disabled {

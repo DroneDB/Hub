@@ -93,6 +93,6 @@ export default {
 
 <style scoped>
 .org-dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
 }
 </style>

@@ -91,8 +91,8 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
 }
 
 .rail-btn.active {
-    background: rgba(40, 110, 190, 0.85);
-    border-color: rgba(120, 180, 255, 0.9);
+    background: rgba(var(--ddb-primary-rgb), 0.85);
+    border-color: var(--ddb-primary-300);
 }
 
 .rail-btn.dirty {

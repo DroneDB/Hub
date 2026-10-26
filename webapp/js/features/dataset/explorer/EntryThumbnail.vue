@@ -1,7 +1,7 @@
 <template>
     <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
          role="option" tabindex="0" :aria-selected="!!file.selected"
-         :style="{ 'maxWidth': (size / 16) + 'rem' }" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick"
+         :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick"
          @keydown.enter.self.prevent="onDblClick" @keydown.space.self.prevent="onClick">
         <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
             <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
@@ -26,7 +26,7 @@
                 <i class="icon" :class="buildBadgeIcon" />
             </div>
         </div>
-        {{ label }}
+        <span class="thumbnail-label">{{ label }}</span>
     </div>
 </template>
 
@@ -41,6 +41,7 @@ import { formatMissingDeps } from '@/libs/build/buildHelpers';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
+import { tileCssVars } from './tileGeometry';
 
 export default {
     name: 'EntryThumbnail',
@@ -92,6 +93,10 @@ export default {
         }
     },
     computed: {
+        // The spacing and the name height come from the tile geometry the virtual grid sizes its rows by
+        tileStyle() {
+            return { ...tileCssVars(), maxWidth: (this.size / 16) + 'rem' };
+        },
         // Effective badge status: the job gives failure (a running build shows the spinner), the
         // entry says whether the build exists. "ready" (built) is the default and never produces
         // a badge - only queued/pending/failed do.
@@ -400,13 +405,26 @@ export default {
 
 <style scoped>
 .thumbnail {
-    margin: var(--ddb-spacing-xs);
-    padding-top: var(--ddb-spacing-xs);
-    padding-bottom: var(--ddb-spacing-xs);
+    width: 100%;
+    margin: var(--tile-spacing);
+    padding-top: var(--tile-spacing);
+    padding-bottom: var(--tile-spacing);
     text-align: center;
-    word-break: break-all;
     border-radius: var(--ddb-radius-sm);
     transition: 0.25s background-color ease;
+}
+
+/* A name wraps at its words (inside one only when it is longer than the tile) and stops after two lines.
+   It always takes two lines, in em so that they follow the font size: the tile height is fixed. */
+.thumbnail .thumbnail-label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--tile-label-lines);
+    line-clamp: var(--tile-label-lines);
+    line-height: var(--tile-label-line-height);
+    height: calc(var(--tile-label-lines) * var(--tile-label-line-height) * 1em);
+    overflow: hidden;
+    overflow-wrap: anywhere;
 }
 
 .thumbnail:hover {
@@ -433,7 +451,7 @@ export default {
     justify-content: center;
     position: relative;
     pointer-events: none;
-    margin-bottom: 0.25rem;
+    margin-bottom: var(--tile-spacing);
 }
 
 /* .thumbnail .container.bordered - drop shadow removed */

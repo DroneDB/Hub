@@ -82,8 +82,8 @@
                 </div>
             </Alert>
 
-            <Button v-if="!loggedIn" severity="info" size="small" @click="login">
-                <i class="fa-solid fa-lock" /><span class="mobile hide"> Sign In</span>
+            <Button v-if="!loggedIn" size="small" title="Sign In" aria-label="Sign In" @click="login">
+                <i class="fa-solid fa-lock" /><span class="d-none d-sm-inline ms-1">Sign In</span>
             </Button>
             <Button v-else severity="secondary" size="small" text
                     :title="username" aria-haspopup="true" aria-controls="user_menu" @click="toggleUserMenu">
@@ -569,6 +569,8 @@ export default {
     .logo {
         display: flex;
         align-items: center;
+        /* A tap target of 2rem, whatever the height of the logo */
+        min-height: 2rem;
         text-decoration: none;
 
         &>img {

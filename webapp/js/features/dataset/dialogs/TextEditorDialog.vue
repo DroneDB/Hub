@@ -9,7 +9,7 @@
                 <PrimeMessage v-else-if="fileTooLarge" severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                     <p>File is too large to edit ({{ formattedSize }})</p>
                     <p class="text-muted">Maximum size: {{ formattedMaxSize }}</p>
-                    <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+                    <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
                         <Button severity="secondary" label="Close" @click="close" />
                         <Button severity="primary" icon="fa-solid fa-download" label="Download Instead" @click="downloadFile" />
                     </div>
@@ -29,7 +29,7 @@
                                     label="Format" @click="formatDocument" />
                         </div>
                         <div class="footer-right">
-                            <Button v-if="!readonly && isModified" :disabled="saving" severity="info"
+                            <Button v-if="!readonly && isModified" :disabled="saving"
                                     icon="fa-solid fa-floppy-disk"
                                     :label="saving ? 'Saving...' : 'Save'" @click="save" />
                             <Button severity="secondary" label="Close" @click="close" />

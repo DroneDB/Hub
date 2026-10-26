@@ -60,7 +60,7 @@ export default {
 
 <style scoped>
 .mask-borders-dialog {
-    min-width: 380px;
+    min-width: min(380px, var(--window-content-width, 100%));
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -69,7 +69,7 @@ export default {
 .mb-3 { margin-bottom: 0.75rem; }
 
 .mb-3 :deep(a) {
-    color: var(--p-blue-600);
+    color: var(--ddb-link-on-tint);
 }
 
 .section {

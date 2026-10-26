@@ -7,13 +7,13 @@
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="list"><i class="fa-solid fa-list me-1" />Organizations List</Tab>
-                    <Tab value="create"><i class="fa-solid fa-plus me-1" />Create Organization</Tab>
+                    <Tab value="list"><i class="fa-solid fa-list" aria-hidden="true" /><span class="tab-label">Organizations List</span></Tab>
+                    <Tab value="create"><i class="fa-solid fa-plus" aria-hidden="true" /><span class="tab-label">Create Organization</span></Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="list">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <div style="flex: 1; max-width: 18.75rem;">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div style="flex: 1 1 12rem; max-width: 18.75rem;">
                                 <IconField>
                                     <InputIcon class="fa-solid fa-magnifying-glass" />
                                     <InputText v-model="searchQuery" placeholder="Search organizations" aria-label="Search organizations" class="w-100" />
@@ -27,7 +27,7 @@
                                 <tr>
                                     <th>Name</th>
                                     <th>Slug</th>
-                                    <th>Description</th>
+                                    <th :class="showFrom('sm')">Description</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -35,7 +35,7 @@
                                 <tr v-for="org in filteredOrganizations" :key="org.slug">
                                     <td><strong>{{ org.name || org.slug }}</strong></td>
                                     <td><code>{{ org.slug }}</code></td>
-                                    <td>{{ org.description || '-' }}</td>
+                                    <td :class="showFrom('sm')">{{ org.description || '-' }}</td>
                                     <td>
                                         <Button severity="danger"
                                                 size="small" :disabled="org.slug.toLowerCase() === 'public' || deleting === org.slug"
@@ -120,6 +120,7 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
+import { showFrom } from '@/libs/responsiveColumns';
 
 export default {
     components: {
@@ -128,6 +129,9 @@ export default {
         InputIcon, IconField, Textarea, Tabs, TabList, Tab, TabPanels, TabPanel
     },
     emits: ['close'],
+    setup() {
+        return { showFrom };
+    },
 
     data: function () {
         return {
@@ -292,7 +296,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 25rem;
+    min-width: min(25rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 

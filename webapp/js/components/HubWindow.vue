@@ -104,15 +104,23 @@ useEventListener(document, 'keydown', e => {
 
 // ---- Look -------------------------------------------------------------------------------
 
+// The size reaches the stylesheet as custom properties (--window-width, --window-height,
+// --window-max-width), which is what lets app.scss clamp every window to the screen and
+// give phones their own sizes with a media query, not by overriding inline styles.
 const dialogStyle = computed(() => {
-    if (props.sizeClass) return { width: 'auto' };
-    const style = props.fixedSize ? { width: 'auto' } : { width: props.width, height: props.height };
-    if (props.maxWidth && props.maxWidth !== 'auto') style.maxWidth = props.maxWidth;
+    if (props.sizeClass) return {};
+    const style = props.fixedSize ? {} : { '--window-width': props.width, '--window-height': props.height };
+    if (props.maxWidth && props.maxWidth !== 'auto') style['--window-max-width'] = props.maxWidth;
     return style;
 });
 const contentStyle = computed(() => (props.fixedSize ? {} : { overflow: 'auto', flex: '1' }));
+
+// A window asked to fill most of the screen (a document, an editor) keeps the whole phone
+// screen; the others shrink to their content there
+const TALL_FROM_PERCENT = 60;
+const isTall = computed(() => !props.sizeClass && !props.fixedSize && /^\d+(\.\d+)?%$/.test(props.height) && parseFloat(props.height) >= TALL_FROM_PERCENT);
 const dialogPt = computed(() => ({
-    root: { id: props.id || generatedId, class: ['window-dialog', props.sizeClass].filter(Boolean).join(' ') }
+    root: { id: props.id || generatedId, class: ['window-dialog', props.sizeClass, isTall.value && 'window-tall'].filter(Boolean).join(' ') }
 }));
 
 const FIELD = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])';

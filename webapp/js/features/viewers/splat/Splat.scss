@@ -28,7 +28,7 @@
 }
 
 #splat .camera-hud {
-    background: rgba(20, 60, 110, 0.7);
+    background: color-mix(in srgb, var(--ddb-primary-800) 70%, transparent);
 }
 
 #splat .camera-hud i {
@@ -73,6 +73,6 @@
 }
 
 #splat .btn-overlay.active {
-    background: rgba(40, 110, 190, 0.85);
+    background: rgba(var(--ddb-primary-rgb), 0.85);
     color: var(--ddb-text-on-dark);
 }

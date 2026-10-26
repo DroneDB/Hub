@@ -19,7 +19,7 @@
                            :style="!canSelect(data) ? 'opacity: 0.4;' : ''" />
                     </template>
                 </Column>
-                <Column field="label" style="min-width: 12.5rem;">
+                <Column field="label" style="min-width: min(12.5rem, 35vw);">
                     <template #header>
                         <SortHeader label="Name" column="name" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
@@ -27,7 +27,7 @@
                         <span class="file-name" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ data.label }}</span>
                     </template>
                 </Column>
-                <Column style="width: 7.5rem;">
+                <Column style="width: 7.5rem;" v-bind="columnFrom('sm')">
                     <template #header>
                         <SortHeader label="Type" column="type" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
@@ -43,7 +43,7 @@
                         <span class="file-size" :style="!canSelect(data) ? 'opacity: 0.4;' : ''">{{ getFileSize(data) }}</span>
                     </template>
                 </Column>
-                <Column style="width: 12rem">
+                <Column style="width: 12rem" v-bind="columnFrom('sm')">
                     <template #header>
                         <SortHeader label="Modified" column="modified" :sort-column="sortColumn" :direction="sortDirection" @sort="sortBy" />
                     </template>
@@ -104,6 +104,7 @@ import icons from '@/libs/icons';
 import { getTypeDisplayName } from '@/libs/entryTypes';
 import { sortFileRows, nextSort } from '@/libs/dataset/fileSort';
 import { getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
+import { columnFrom } from '@/libs/responsiveColumns';
 
 const { pathutils, entry } = ddb;
 
@@ -153,6 +154,9 @@ export default {
     },
 
     emits: ['close'],
+    setup() {
+        return { columnFrom };
+    },
 
     data: function () {
         return {
@@ -418,6 +422,7 @@ export default {
 
 .folder-picker-new-folder {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     margin-top: 0.75rem;
@@ -430,11 +435,13 @@ export default {
 }
 
 .folder-picker-new-folder-input {
-    flex: 1;
+    flex: 1 1 8rem;
+    min-width: 0;
 }
 
 .folder-picker-selected {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     margin-top: 0.75rem;
@@ -447,7 +454,8 @@ export default {
 }
 
 .folder-picker-selected-input {
-    flex: 1;
+    flex: 1 1 8rem;
+    min-width: 0;
 }
 
 .row-disabled {

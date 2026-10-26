@@ -10,7 +10,7 @@
 
         <!-- Inline SVG chart (no external dependencies) -->
         <!-- A scrubber over the samples: the pointer or the arrow keys pick one -->
-        <svg class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
+        <svg :ref="observeWidth" class="profile-svg" :viewBox="viewBox" preserveAspectRatio="none"
              role="slider" tabindex="0" aria-label="Profile position"
              :aria-valuemin="0" :aria-valuemax="samples.length - 1" :aria-valuenow="hoverIdx ?? 0"
              :aria-valuetext="hoverText"
@@ -90,6 +90,8 @@ export default {
     emits: ['activeSample'],
     data() {
         return {
+            // The drawing's width: the panel's, once measured (a phone's bottom sheet and the
+            // desktop panel differ), so the text and the line keep their proportions
             width: 320,
             height: 160,
             padTop: 8,
@@ -177,7 +179,23 @@ export default {
     watch: {
         profile() { this.hoverIdx = null; }
     },
+    beforeUnmount() {
+        this.observeWidth(null);
+    },
     methods: {
+        // Ref of the chart: follows its width for as long as it is shown (called on every render)
+        observeWidth(el) {
+            if (el === this.observedEl) return;
+            if (this.resizeObserver) this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+            this.observedEl = el;
+            if (!el || typeof ResizeObserver === 'undefined') return;
+            this.resizeObserver = new ResizeObserver(([entry]) => {
+                const width = Math.round(entry.contentRect.width);
+                if (width > 0) this.width = width;
+            });
+            this.resizeObserver.observe(el);
+        },
         xFor(i) {
             const n = this.samples.length;
             if (n <= 1) return this.padLeft + this.chartWidth / 2;

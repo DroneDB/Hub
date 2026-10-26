@@ -46,7 +46,7 @@
                 <!-- Link / Embed / TMS (legacy single-entry modes) -->
                 <div v-else-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" class="mt-3">
                     <div v-if="needsAuth">
-                        <Button severity="info" icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
+                        <Button icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
                                 @click="handleSetUnlisted" />
                     </div>
                     <template v-else>
@@ -68,7 +68,7 @@
                 <!-- OGC modes (WMS/WMTS/WFS/WCS/OGC API) -->
                 <div v-else-if="currentOgcService" class="mt-3">
                     <div v-if="needsAuth">
-                        <Button severity="info" icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
+                        <Button icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
                                 @click="handleSetUnlisted" />
                     </div>
                     <template v-else>
@@ -309,7 +309,7 @@ export default {
 <style scoped>
 .share-type { margin-bottom: 0.75rem; display: flex; align-items: center; }
 label { font-weight: bold; }
-.content { min-width: 26.25rem; }
+.content { min-width: min(26.25rem, var(--window-content-width, 100%)); }
 .auth-note { margin-top: 0.5rem; }
 .share-url-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }
 .share-embed-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }

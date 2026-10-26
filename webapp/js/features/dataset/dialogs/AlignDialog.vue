@@ -315,7 +315,7 @@ export default {
 
 <style scoped>
 .align-dialog {
-    min-width: 380px;
+    min-width: min(380px, var(--window-content-width, 100%));
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -327,7 +327,7 @@ export default {
 }
 
 .align-info :deep(a) {
-    color: var(--p-blue-600);
+    color: var(--ddb-link-on-tint);
 }
 
 .section {
@@ -378,7 +378,7 @@ export default {
 }
 .task-row.Succeeded { background: var(--p-green-50); }
 .task-row.Failed    { background: var(--p-red-50);   }
-.task-row.Processing{ background: var(--p-blue-50);  }
+.task-row.Processing{ background: var(--ddb-primary-50); }
 
 .task-label { font-weight: 600; min-width: 45px; }
 .task-phase { flex: 1; color: var(--p-text-muted-color); }

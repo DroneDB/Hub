@@ -16,3 +16,6 @@ export const TOAST_LIFE = Object.freeze({
     normal: 5000,
     long: 8000
 });
+
+/** The longest dataset tagline the Hub lets a user type (the dataset dialogs show a counter against it). */
+export const TAGLINE_MAX_LENGTH = 256;

@@ -1166,7 +1166,7 @@ class MeasureControls extends Control {
                 // Lazy init
 
                 this.helpTooltipElement = document.createElement('div');
-                this.helpTooltipElement.className = 'ol-tooltip hidden';
+                this.helpTooltipElement.className = 'ol-tooltip ol-tooltip-help hidden';
                 this.helpTooltip = new Overlay({
                     element: this.helpTooltipElement,
                     offset: [15, 0],
@@ -1218,6 +1218,10 @@ class MeasureControls extends Control {
                 }
 
                 this.helpTooltipElement.innerHTML = helpMsg;
+                // On the side of the pointer that has the room, so the hint is never cut by the map's edge
+                const leftOfPointer = pixel[0] > evt.map.getSize()[0] / 2;
+                this.helpTooltip.setPositioning(leftOfPointer ? 'center-right' : 'center-left');
+                this.helpTooltip.setOffset(leftOfPointer ? [-15, 0] : [15, 0]);
                 this.helpTooltip.setPosition(evt.coordinate);
 
                 this.helpTooltipElement.classList.remove('hidden');

@@ -7,8 +7,9 @@
 import Overlay from 'ol/Overlay';
 import { toDms } from '@/libs/format';
 import { escapeHtml } from '@/libs/sanitize';
+import { PRIMARY } from '@/libs/palette';
 
-const DEFAULT_ACCENT = '#3b82f6';
+const DEFAULT_ACCENT = PRIMARY[500];
 
 /**
  * @param {number} lat

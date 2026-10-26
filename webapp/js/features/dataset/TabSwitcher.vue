@@ -7,9 +7,8 @@
                          :pt="{ root: { id: tabId(t.key), 'aria-controls': panelId(t.key) } }"
                          :aria-keyshortcuts="t.canClose ? 'Delete' : undefined"
                          @keydown.delete="t.canClose && removeTab(t.key)">
-                        <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label"
-                           style="margin-right: 0.5rem;" /><span v-if="!t.hideLabel" class="mobile hide"> {{
-                               t.label }}</span>
+                        <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label" /><span v-if="!t.hideLabel" class="tab-label">{{
+                            t.label }}</span>
                         <span v-if="!!t.canClose" class="close-btn" aria-hidden="true" title="Close (Delete)" @click.stop="removeTab(t.key)"><i
                             class="fa-solid fa-xmark" /></span>
                     </Tab>
@@ -309,6 +308,12 @@ export default {
 
     .icon.padded {
         padding-left: 0.25rem;
+        margin-right: 0.5rem;
+    }
+
+    /* A phone shows only the label of the active tab (the global .tab-label rule) */
+    .tab-label {
+        margin-inline-start: 0.5rem;
     }
 
     .tabs {

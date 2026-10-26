@@ -29,9 +29,11 @@
                 </div>
                 <div class="mb-3">
                     <label for="dataset-dialog-tagline" class="d-block mb-1 fw-semibold">Tagline</label>
-                    <InputText id="dataset-dialog-tagline" v-model="ds.tagline" maxlength="256"
-                               placeholder="Brief description of your dataset (max 256 chars)" class="w-100" />
-                    <small class="char-count">{{ ds.tagline ? ds.tagline.length : 0 }}/256</small>
+                    <!-- The counter under the field gives the limit: a placeholder that names it is cut on a phone -->
+                    <InputText id="dataset-dialog-tagline" v-model="ds.tagline" :maxlength="taglineMaxLength"
+                               placeholder="A short description" class="w-100"
+                               aria-describedby="dataset-dialog-tagline-count" />
+                    <small id="dataset-dialog-tagline-count" class="char-count">{{ ds.tagline ? ds.tagline.length : 0 }}/{{ taglineMaxLength }}</small>
                 </div>
 
             </form>
@@ -54,6 +56,7 @@ import Checkbox from 'primevue/checkbox';
 import { slugFromName } from '@/libs/api/registryUtils';
 import { getOpenAfterCreatePreference, saveOpenAfterCreatePreference } from '@/libs/storageUtils';
 import { Visibility } from 'ddb';
+import { TAGLINE_MAX_LENGTH } from '@/libs/constants';
 
 var re = /^[a-z0-9\-_]+$/;
 
@@ -88,6 +91,7 @@ export default {
                 tagline: ''
             },
             title: null,
+            taglineMaxLength: TAGLINE_MAX_LENGTH,
             openAfterCreate,
             // What the checkbox started from: the preference is stored only when the user changed it,
             // so a value that changed elsewhere since the dialog opened is not overwritten
@@ -159,12 +163,6 @@ export default {
 
 <style scoped>
 .ds-dialog {
-    min-width: 20rem;
-}
-
-.char-count {
-    color: var(--ddb-text-muted);
-    float: right;
-    margin-top: 0.25rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
 }
 </style>

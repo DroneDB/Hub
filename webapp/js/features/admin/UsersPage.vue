@@ -1,10 +1,10 @@
 <template>
-    <div id="users">
+    <div id="users" class="page-scroll">
         <Message v-model="error" />
 
         <LoadingSpinner v-if="loading" />
         <div v-else>
-            <div class="top-banner d-flex justify-content-between align-items-center">
+            <div class="top-banner d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <div>
                     <h1>User Management</h1>
                 </div>
@@ -16,14 +16,14 @@
             <!-- User Controls -->
             <div class="">
                 <div class="controls-row">
-                    <div class="search-col">
+                    <div class="search-col flex-grow-1">
                         <IconField>
                             <InputIcon class="fa-solid fa-magnifying-glass" />
                             <InputText v-model="searchQuery" placeholder="Search users" aria-label="Search users" style="width: 100%;" />
                         </IconField>
                     </div>
                     <!-- align right -->
-                    <div class="actions-col d-flex gap-2">
+                    <div class="actions-col d-flex flex-wrap gap-2">
                         <Button severity="secondary" icon="fa-solid fa-gears" label="Manage Roles" @click="showRoleManagement = true" />
                         <Button severity="secondary" icon="fa-solid fa-building" label="Manage Organizations" @click="showOrganizationManagement = true" />
                         <Button severity="secondary" icon="fa-solid fa-arrows-rotate" label="Refresh" @click="refreshUsers" />
@@ -33,7 +33,7 @@
 
             <!-- Users Table -->
             <DataTable :value="filteredUsers" data-key="userName"
-                       paginator :rows="10" :rows-per-page-options="[5, 10, 25, 50, 100]"
+                       paginator :rows="10" :rows-per-page-options="[5, 10, 25, 50, 100]" :page-link-size="3"
                        :always-show-paginator="false"
                        paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                        sort-field="userName" :sort-order="1"
@@ -46,12 +46,12 @@
                         <strong>{{ slotProps.data.userName }}</strong>
                     </template>
                 </Column>
-                <Column field="email" header="Email" :sortable="true">
+                <Column field="email" header="Email" :sortable="true" v-bind="columnFrom('lg')">
                     <template #body="slotProps">
                         {{ slotProps.data.email || '-' }}
                     </template>
                 </Column>
-                <Column header="Roles">
+                <Column header="Roles" v-bind="columnFrom('lg')">
                     <template #body="slotProps">
                         <div v-if="slotProps.data.roles && slotProps.data.roles.length > 0">
                             <Chip v-for="role in slotProps.data.roles" :key="role" :label="role" />
@@ -59,14 +59,14 @@
                         <span v-else class="text-muted">No roles</span>
                     </template>
                 </Column>
-                <Column field="organizationCount" header="Organizations" :sortable="true">
+                <Column field="organizationCount" header="Organizations" :sortable="true" v-bind="columnFrom('md')">
                     <template #body="slotProps">
                         <Button size="small" title="Manage Organizations" severity="secondary" icon="fa-solid fa-sitemap"
                                 :label="String(slotProps.data.organizationCount)" @click="showUserOrganizations(slotProps.data)" />
                     </template>
                 </Column>
-                <Column field="datasetCount" header="Datasets" :sortable="true" />
-                <Column field="storageUsed" header="Storage" :sortable="true">
+                <Column field="datasetCount" header="Datasets" :sortable="true" v-bind="columnFrom('lg')" />
+                <Column field="storageUsed" header="Storage" :sortable="true" v-bind="columnFrom('md')">
                     <template #body="slotProps">
                         <div v-if="slotProps.data.storageQuota">
                             {{ bytesToSize(slotProps.data.storageUsed) }} / {{ bytesToSize(slotProps.data.storageQuota) }}
@@ -77,7 +77,7 @@
                         </div>
                     </template>
                 </Column>
-                <Column field="createdDate" header="Created" :sortable="true">
+                <Column field="createdDate" header="Created" :sortable="true" v-bind="columnFrom('xl')">
                     <template #body="slotProps">
                         {{ formatDateTime(slotProps.data.createdDate) }}
                     </template>
@@ -85,7 +85,7 @@
                 <Column header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }">
                     <template #body="slotProps">
                         <div class="d-flex gap-1 justify-content-center">
-                            <Button severity="info" size="small" :loading="slotProps.data.editing"
+                            <Button size="small" :loading="slotProps.data.editing"
                                     :disabled="slotProps.data.editing || slotProps.data.deleting" title="Edit User" aria-label="Edit User"
                                     icon="fa-solid fa-pen-to-square" @click.stop="editUser(slotProps.data)" />
                             <Button severity="warn" size="small" :disabled="slotProps.data.editing || slotProps.data.deleting"
@@ -196,7 +196,7 @@
             </div>
 
             <div class="buttons mt-3 text-end">
-                <Button severity="info" icon="fa-solid fa-check" label="OK" @click="closeDeleteResultDialog" />
+                <Button icon="fa-solid fa-check" label="OK" @click="closeDeleteResultDialog" />
             </div>
         </Window>
     </div>
@@ -228,6 +228,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
 import { formatDateTime } from '@/libs/format';
 import { isUnauthorized } from '@/libs/ddb/apiError';
+import { columnFrom } from '@/libs/responsiveColumns';
 
 /**
  * Users - Admin panel for managing platform users.
@@ -259,6 +260,9 @@ export default {
         InputText,
         InputIcon,
         IconField
+    },
+    setup() {
+        return { columnFrom };
     },
     data: function () {
         return {
@@ -479,8 +483,23 @@ export default {
 
 <style scoped>
 #users {
-    margin: var(--ddb-spacing-md);
-    margin-top: 2.25rem;
+    padding: 2.25rem var(--ddb-page-padding-x) var(--ddb-spacing-md);
+}
+
+.search-col {
+    min-width: 12rem;
+}
+
+/* A phone shows 3 page links and no first/last jump, so the paginator stays on one row */
+@media only screen and (max-width: 575.98px) {
+    #users :deep(.p-paginator) {
+        flex-wrap: wrap;
+    }
+
+    #users :deep(.p-paginator-first),
+    #users :deep(.p-paginator-last) {
+        display: none;
+    }
 }
 
 .top-banner {

@@ -137,7 +137,7 @@
                 </div>
             </div>
 
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
                 <Button v-if="!importing" severity="secondary" label="Close" @click="emitClose('close')" />
                 <Button v-if="!importing" severity="primary" icon="fa-solid fa-download" :disabled="!canImport"
                         :loading="submitting" label="Import" @click="startImport" />
@@ -491,7 +491,7 @@ export default {
 
 <style scoped>
 .import-dialog {
-    min-width: 24rem;
+    min-width: min(24rem, var(--window-content-width, 100%));
 }
 
 .verify-stats {

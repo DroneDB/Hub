@@ -29,6 +29,9 @@ defineProps({
 
 <style scoped>
 .color-palette {
+    /* The side of a swatch and of the custom colour */
+    --swatch-size: 1.75rem;
+
     display: flex;
     flex-wrap: wrap;
     gap: var(--ddb-spacing-xs);
@@ -36,8 +39,8 @@ defineProps({
 }
 
 .color-swatch {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: var(--swatch-size);
+    height: var(--swatch-size);
     padding: 0;
     border-radius: var(--ddb-radius-sm);
     cursor: pointer;
@@ -55,12 +58,19 @@ defineProps({
 }
 
 .color-picker-custom {
-    width: 1.75rem;
-    height: 1.75rem;
+    width: var(--swatch-size);
+    height: var(--swatch-size);
     padding: 0;
     border: var(--ddb-border-width) solid var(--ddb-border);
     border-radius: var(--ddb-radius-sm);
     cursor: pointer;
     background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
+}
+
+/* Fingers: each swatch and the custom colour are a touch target */
+@media (pointer: coarse) {
+    .color-palette {
+        --swatch-size: 2rem;
+    }
 }
 </style>

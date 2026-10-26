@@ -43,7 +43,7 @@
                     {{ customUrlError || customError }}
                 </PrimeMessage>
                 <div class="setting-row" style="justify-content: flex-end;">
-                    <Button severity="info" :disabled="!isCustomConfigValid || customLoading" icon="fa-solid fa-check" :loading="customLoading"
+                    <Button :disabled="!isCustomConfigValid || customLoading" icon="fa-solid fa-check" :loading="customLoading"
                             :label="customLoading ? 'Checking...' : 'Apply'" @click="applyCustomConfig" />
                 </div>
             </div>

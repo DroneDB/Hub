@@ -81,8 +81,8 @@ function press(code, ev) {
 
 .nav-key:active,
 .nav-key.active {
-    background: rgba(40, 110, 190, 0.8);
-    border-color: rgba(120, 180, 255, 0.9);
+    background: rgba(var(--ddb-primary-rgb), 0.85);
+    border-color: var(--ddb-primary-300);
 }
 
 .nav-key .letter {

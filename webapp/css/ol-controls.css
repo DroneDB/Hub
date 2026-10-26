@@ -186,6 +186,77 @@
     font-size: 0.75rem;
 }
 
+/* The hint that follows the pointer while drawing: long, so it wraps (a phone screen is narrower
+   than one line of it) and sits on the side of the pointer that has the room */
+.ol-tooltip-help {
+    width: max-content;
+    max-width: min(16rem, 60vw);
+    white-space: normal;
+}
+
+/* Panels over the bottom centre of the map (layer opacity): as wide as their content but never
+   wider than the map, and above the bottom controls on a phone */
+.map-bottom-panel {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1;
+    width: max-content;
+    max-width: calc(100% - 1rem);
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 0.75rem;
+    user-select: none;
+}
+
+.map-bottom-panel .opacity-value {
+    min-width: 2.2rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.map-bottom-panel .ph-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    padding: 0 0.15rem;
+    font-size: var(--ddb-font-size-base);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+
+.map-bottom-panel .ph-btn:hover {
+    color: var(--ddb-text-on-color);
+}
+
+.map-bottom-panel .ph-btn.active {
+    color: var(--ddb-map-control-active);
+}
+
+@media (max-width: 575.98px) {
+    .map-bottom-panel {
+        bottom: 4rem;
+    }
+}
+
+/* Fingers: the buttons and sliders of the panel are as tall as the map buttons are wide */
+@media (pointer: coarse) {
+    .map-bottom-panel .ph-btn {
+        min-width: 2rem;
+        min-height: 2rem;
+        justify-content: center;
+    }
+
+    .map-bottom-panel input[type="range"] {
+        min-height: 2rem;
+    }
+}
+
 /* Point location popup */
 .ol-point-popup {
     background: white;

@@ -368,7 +368,7 @@ export default {
 
 <style scoped>
 .merge-ms-dialog {
-    min-width: 400px;
+    min-width: min(400px, var(--window-content-width, 100%));
 }
 
 .columns-row {
@@ -379,13 +379,13 @@ export default {
 
 .col-bands {
     flex: 0 0 auto;
-    min-width: 200px;
+    min-width: min(200px, 100%);
     max-width: 280px;
 }
 
 .col-info {
     flex: 1 1 0;
-    min-width: 200px;
+    min-width: min(200px, 100%);
 }
 
 .col-preview {

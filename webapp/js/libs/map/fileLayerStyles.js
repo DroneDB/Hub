@@ -7,10 +7,16 @@
  */
 import { Circle as CircleStyle, Fill, Stroke, Style, Text, Icon } from 'ol/style';
 import { isMobile } from '@/libs/responsive';
+import { primaryRgba } from '@/libs/palette';
 
-/** File-layer colours (one place; the measurement accent lives in CSS --ddb-measure-color). */
+/**
+ * File-layer colours (one place; the measurement accent lives in CSS --ddb-measure-color).
+ * Shots, clusters and the flight path are the brand blue at shade 300: a light blue that stands
+ * out on dark satellite imagery with the same weight as the sky blue these markers had before
+ * (the darker shades sink into vegetation and roofs). A selected shot is orange.
+ */
 export const FILE_COLORS = {
-    shot: 'rgba(75, 150, 243, 1)',
+    shot: primaryRgba(1, 300),
     shotSelected: 'rgba(255, 158, 103, 1)',
     halo: 'rgba(252, 252, 255, 1)'
 };

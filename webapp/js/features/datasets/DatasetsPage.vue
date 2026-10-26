@@ -13,16 +13,16 @@
                         <template #header><i class="fa-solid fa-database" /> Dataset</template>
                         <template #body><Skeleton width="70%" /><Skeleton width="50%" height="0.75rem" class="mt-1" /></template>
                     </Column>
-                    <Column header="Creation Date">
+                    <Column header="Creation Date" v-bind="columnFrom(COLUMNS_FROM.creationDate)">
                         <template #body><Skeleton width="6rem" /></template>
                     </Column>
-                    <Column header="Files">
+                    <Column header="Files" v-bind="columnFrom(COLUMNS_FROM.entries)">
                         <template #body><Skeleton width="2rem" /></template>
                     </Column>
-                    <Column header="Size">
+                    <Column header="Size" v-bind="columnFrom(COLUMNS_FROM.size)">
                         <template #body><Skeleton width="4rem" /></template>
                     </Column>
-                    <Column header="Visibility">
+                    <Column header="Visibility" v-bind="columnFrom(COLUMNS_FROM.visibility)">
                         <template #body><Skeleton width="5rem" height="1.5rem" border-radius="1rem" /></template>
                     </Column>
                 </DataTable>
@@ -63,7 +63,7 @@
                     </div>
                     <!-- Right: actions -->
                     <div class="org-actions">
-                        <div class="d-flex align-items-center gap-2">
+                        <div class="d-flex flex-wrap align-items-center gap-2">
                             <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
                             <Button v-if="canCreateDataset" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" @click.stop="openImportDialog()" />
                             <Button v-if="canCreateDataset" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" @click.stop="handleNew()" />
@@ -95,10 +95,13 @@
                     </template>
                     <template #body="slotProps">
                         <span class="ds-name">{{ slotProps.data.name || slotProps.data.slug }}</span>
+                        <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none ms-1"
+                           role="img" :aria-label="getVisibilityText(slotProps.data.visibility)" />
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
                     </template>
                 </Column>
                 <Column field="creationDate" header="Creation Date" :sortable="true"
+                        v-bind="columnFrom(COLUMNS_FROM.creationDate)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
                         <div class="file-date">
@@ -108,12 +111,15 @@
                     </template>
                 </Column>
                 <Column field="entries" header="Files" :sortable="true"
+                        v-bind="columnFrom(COLUMNS_FROM.entries)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }" />
                 <Column field="size" header="Size" :sortable="true"
+                        v-bind="columnFrom(COLUMNS_FROM.size)"
                         :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">{{ bytesToSize(slotProps.data.size) }}</template>
                 </Column>
-                <Column field="visibility" header="Visibility" :sortable="true" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                <Column field="visibility" header="Visibility" :sortable="true"
+                        v-bind="columnFrom(COLUMNS_FROM.visibility)" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
                         <Tag v-if="slotProps.data.visibility === Visibility.PUBLIC" severity="success" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
                         <Tag v-else-if="slotProps.data.visibility === Visibility.UNLISTED" severity="info" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
@@ -212,6 +218,12 @@ import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
 import { formatDateTime } from '@/libs/format';
 import { isUnauthorized } from '@/libs/ddb/apiError';
+import { columnFrom } from '@/libs/responsiveColumns';
+
+// The width each secondary column appears from, shared by the table and its loading skeleton.
+// Every column with the actions takes about 790 px, more than a 768 px screen holds: the creation
+// date, the widest, waits for 992 px so the actions stay on screen.
+const COLUMNS_FROM = Object.freeze({ creationDate: 'lg', entries: 'md', size: 'sm', visibility: 'sm' });
 
 export default {
     name: 'DatasetsPage',
@@ -240,7 +252,7 @@ export default {
     },
     setup() {
         const dialogs = useDialogs();
-        return { dialogs, deleteEntity: useEntityDelete(dialogs) };
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), columnFrom, COLUMNS_FROM };
     },
     data: function () {
         // Load preferences from Local Storage
@@ -887,11 +899,6 @@ export default {
             flex-shrink: 0;
         }
 
-        h1 {
-            font-size: 1.75rem;
-            line-height: 1.2;
-        }
-
         .org-title-row {
             display: flex;
             align-items: center;
@@ -921,16 +928,17 @@ export default {
                     justify-content: stretch;
                 }
             }
-
-            h1 {
-                font-size: var(--ddb-font-size-lg);
-            }
         }
     }
 
     .ds-table {
         flex: 1;
         min-height: 0;
+    }
+
+    /* A header never wraps; the columns that do not fit leave the table instead */
+    .ds-table :deep(th) {
+        white-space: nowrap;
     }
 
     .ds-pagination {
@@ -946,6 +954,17 @@ export default {
             > span {
                 font-size: var(--ddb-font-size-sm);
             }
+
+            :deep(.p-paginator) {
+                flex-wrap: wrap;
+            }
+        }
+    }
+
+    @media screen and (max-width: 575.98px) {
+        .ds-pagination :deep(.p-paginator-first),
+        .ds-pagination :deep(.p-paginator-last) {
+            display: none;
         }
     }
 

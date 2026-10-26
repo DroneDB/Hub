@@ -485,11 +485,6 @@ export default {
             flex-wrap: wrap;
         }
 
-        h1 {
-            font-size: 1.75rem;
-            line-height: 1.2;
-        }
-
         .org-description {
             color: var(--ddb-text-secondary);
             font-size: var(--ddb-font-size-sm);
@@ -563,10 +558,6 @@ export default {
 
             .org-actions {
                 width: 100%;
-            }
-
-            h1 {
-                font-size: var(--ddb-font-size-lg);
             }
         }
 

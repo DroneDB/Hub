@@ -17,11 +17,11 @@
             <div v-if="!loading" class="add-org-section">
                 <h4>Add Organization</h4>
                 <div class="d-flex gap-3 flex-wrap align-items-end">
-                    <div class="flex-grow-1" style="min-width: 12rem;">
+                    <div class="flex-grow-1" style="min-width: min(12rem, 100%);">
                         <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
                         <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter placeholder="Search organization..." class="w-100" />
                     </div>
-                    <div style="min-width: 10rem;">
+                    <div style="min-width: min(10rem, 100%);">
                         <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
                         <Select v-model="newOrg.permissions" input-id="organizations-dialog-permissions" aria-labelledby="organizations-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                     </div>
@@ -40,7 +40,7 @@
                     <tr>
                         <th>Organization</th>
                         <th>Permissions</th>
-                        <th>Granted</th>
+                        <th :class="showFrom('sm')">Granted</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -61,7 +61,7 @@
                                     @change="updatePermission(org)" />
                             <Tag v-else severity="info" value="Full Access" />
                         </td>
-                        <td>
+                        <td :class="showFrom('sm')">
                             <span v-if="org.grantedAt">
                                 {{ formatDate(org.grantedAt) }}
                                 <span v-if="org.grantedBy"> by {{ org.grantedBy }}</span>
@@ -113,6 +113,7 @@ import Divider from 'primevue/divider';
 import Tag from 'primevue/tag';
 import reg from '@/libs/api/sharedRegistry';
 import { formatDate } from '@/libs/format';
+import { showFrom } from '@/libs/responsiveColumns';
 
 export default {
     components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider, Tag },
@@ -124,6 +125,9 @@ export default {
         }
     },
     emits: ['close'],
+    setup() {
+        return { showFrom };
+    },
 
     data() {
         return {

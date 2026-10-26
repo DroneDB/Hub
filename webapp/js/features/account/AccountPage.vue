@@ -1,87 +1,89 @@
 <template>
-    <div id="account">
-        <Message v-model="error" />
+    <div id="account" class="page-scroll">
+        <div class="account-column">
+            <Message v-model="error" />
 
-        <LoadingSpinner v-if="loading" />
-        <div v-else>
-            <div class="top-header">
-                <h1>Account</h1>
+            <LoadingSpinner v-if="loading" />
+            <div v-else>
+                <div class="top-header">
+                    <h1>Account</h1>
+                </div>
+
+                <!-- User Info Section -->
+                <Card class="account-card">
+                    <template #content>
+                        <h3><i class="fa-solid fa-user" /> User Information</h3>
+                        <dl class="info-grid">
+                            <div class="info-item">
+                                <dt>Username</dt>
+                                <dd>{{ username }}</dd>
+                            </div>
+                            <div class="info-item">
+                                <dt>Email</dt>
+                                <dd>{{ email || 'Not set' }}</dd>
+                            </div>
+                            <div v-if="isAdmin" class="info-item">
+                                <dt>Role</dt>
+                                <dd><Tag severity="danger"><i class="fa-solid fa-shield" /> Administrator</Tag></dd>
+                            </div>
+                            <div class="info-item">
+                                <dt>Organizations</dt>
+                                <dd>{{ organizationsCount }} organization{{ organizationsCount !== 1 ? 's' : '' }}</dd>
+                            </div>
+                        </dl>
+                    </template>
+                </Card>
+
+                <!-- Storage Section -->
+                <Card class="account-card">
+                    <template #content>
+                        <h3><i class="fa-solid fa-database" /> Storage</h3>
+                        <div class="storage-bar-container">
+                            <div class="storage-details">
+                                <span class="used">{{ formatBytes(storageUsed) }} used</span>
+                                <span v-if="storageTotal" class="available">of {{ formatBytes(storageTotal) }}</span>
+                                <span v-else class="available">Unlimited</span>
+                            </div>
+                            <ProgressBar v-if="storageTotal" :value="storagePercentage" :show-value="true" />
+                            <ProgressBar v-else :value="100" :show-value="false" />
+                        </div>
+                        <div class="mt-3">
+                            <Button icon="fa-solid fa-upload" label="Upload Files" @click="handleUpload" />
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Upload self-test -->
+                <UploadDiagnostics />
+
+                <!-- Security Section (only if account management is enabled) -->
+                <Card v-if="accountManagement" class="account-card action-card" @click="handleChangePwd">
+                    <template #content>
+                        <div class="action-row">
+                            <div class="main">
+                                <i class="fa-solid fa-lock" /> Security
+                            </div>
+                            <div>
+                                <Button size="small" icon="fa-solid fa-pencil" label="Change Password" @click.stop="handleChangePwd" />
+                            </div>
+                        </div>
+                    </template>
+                </Card>
+
+                <!-- Session Section -->
+                <Card class="account-card action-card logout" @click="handleLogout">
+                    <template #content>
+                        <div class="action-row">
+                            <div class="main">
+                                <i class="fa-solid fa-right-from-bracket" /> Session
+                            </div>
+                            <div>
+                                <Button severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" @click.stop="handleLogout" />
+                            </div>
+                        </div>
+                    </template>
+                </Card>
             </div>
-
-            <!-- User Info Section -->
-            <Card class="account-card">
-                <template #content>
-                    <h3><i class="fa-solid fa-user" /> User Information</h3>
-                    <dl class="info-grid">
-                        <div class="info-item">
-                            <dt>Username</dt>
-                            <dd>{{ username }}</dd>
-                        </div>
-                        <div class="info-item">
-                            <dt>Email</dt>
-                            <dd>{{ email || 'Not set' }}</dd>
-                        </div>
-                        <div v-if="isAdmin" class="info-item">
-                            <dt>Role</dt>
-                            <dd><Tag severity="danger"><i class="fa-solid fa-shield" /> Administrator</Tag></dd>
-                        </div>
-                        <div class="info-item">
-                            <dt>Organizations</dt>
-                            <dd>{{ organizationsCount }} organization{{ organizationsCount !== 1 ? 's' : '' }}</dd>
-                        </div>
-                    </dl>
-                </template>
-            </Card>
-
-            <!-- Storage Section -->
-            <Card class="account-card">
-                <template #content>
-                    <h3><i class="fa-solid fa-database" /> Storage</h3>
-                    <div class="storage-bar-container">
-                        <div class="storage-details">
-                            <span class="used">{{ formatBytes(storageUsed) }} used</span>
-                            <span v-if="storageTotal" class="available">of {{ formatBytes(storageTotal) }}</span>
-                            <span v-else class="available">Unlimited</span>
-                        </div>
-                        <ProgressBar v-if="storageTotal" :value="storagePercentage" :show-value="true" />
-                        <ProgressBar v-else :value="100" :show-value="false" />
-                    </div>
-                    <div class="mt-3">
-                        <Button severity="success" icon="fa-solid fa-upload" label="Upload Files" @click="handleUpload" />
-                    </div>
-                </template>
-            </Card>
-
-            <!-- Upload self-test -->
-            <UploadDiagnostics />
-
-            <!-- Security Section (only if account management is enabled) -->
-            <Card v-if="accountManagement" class="account-card action-card" @click="handleChangePwd">
-                <template #content>
-                    <div class="action-row">
-                        <div class="main">
-                            <i class="fa-solid fa-lock" /> Security
-                        </div>
-                        <div>
-                            <Button severity="info" size="small" icon="fa-solid fa-pencil" label="Change Password" @click.stop="handleChangePwd" />
-                        </div>
-                    </div>
-                </template>
-            </Card>
-
-            <!-- Session Section -->
-            <Card class="account-card action-card logout" @click="handleLogout">
-                <template #content>
-                    <div class="action-row">
-                        <div class="main">
-                            <i class="fa-solid fa-right-from-bracket" /> Session
-                        </div>
-                        <div>
-                            <Button severity="danger" size="small" :loading="loggingOut" icon="fa-solid fa-right-from-bracket" label="Logout" @click.stop="handleLogout" />
-                        </div>
-                    </div>
-                </template>
-            </Card>
         </div>
 
         <ChangePwdDialog v-if="showChangePwd" @close="showChangePwd = false" />
@@ -215,10 +217,14 @@ export default {
 </script>
 
 <style scoped>
+/* The page scrolls itself (.page-scroll), so a phone reaches every card */
 #account {
-    margin: 0.75rem auto;
-    margin-top: 2.25rem;
+    padding: 2.25rem var(--ddb-page-padding-x) 0.75rem;
+}
+
+#account .account-column {
     max-width: 50rem;
+    margin: 0 auto;
 }
 
 #account .top-header {

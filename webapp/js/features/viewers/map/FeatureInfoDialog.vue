@@ -198,6 +198,7 @@ export default {
     border-bottom: var(--ddb-border-width) solid var(--ddb-border);
     font-weight: bold;
     width: 30%;
+    overflow-wrap: anywhere;
 }
 
 .property-value {
@@ -215,6 +216,6 @@ export default {
 }
 
 .property-value :deep(.ui.table td:first-child) {
-    width: 7.5rem;
+    width: min(7.5rem, 40%);
 }
 </style>

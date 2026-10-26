@@ -2,7 +2,7 @@
     <ViewerShell id="potree" v-model:error="error" dark :loading="loading" loading-text="Loading point cloud...">
         <DialogHost :dialogs="dialogs" />
 
-        <div class="potree-container" :class="{ loading }">
+        <div class="potree-container" :class="{ loading, 'sidebar-open': sidebarOpen }">
             <div v-if="loaded" class="top-left-toolbar">
                 <div v-if="hasMeasurements || hasSavedMeasurements" class="undo-redo-toolbar">
                     <button :disabled="!canUndo" class="btn-undo-redo" title="Undo (Ctrl+Z)" aria-label="Undo" @click="undo">
@@ -20,7 +20,7 @@
 
                 <div class="unit-selector-toolbar">
                     <label for="potree-unit-select">Units:</label>
-                    <select id="potree-unit-select" v-model="unitPref">
+                    <select id="potree-unit-select" v-model="unitPref" aria-label="Units">
                         <option value="metric">Metric (m)</option>
                         <option value="imperial">Imperial (ft)</option>
                     </select>
@@ -92,6 +92,7 @@ const unitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNI
 const container = ref(null);
 const sidebar = ref(null);
 const loaded = ref(false);
+const sidebarOpen = ref(false);
 // Owns the viewer and everything it creates (released on leave)
 let session = new PotreeSession();
 let viewer = null;
@@ -158,10 +159,8 @@ async function loadViewer() {
     session = new PotreeSession();
     viewer = session.create(() => new Potree.Viewer(container.value), [container.value, sidebar.value]);
 
-    viewer.toggleSidebar = () => {
-        const area = container.value;
-        area.style.right = area.style.right === 'var(--ddb-sidebar-width)' ? '0' : 'var(--ddb-sidebar-width)';
-    };
+    // The layout of the open menu (beside the view, or over it on phones) is the stylesheet's
+    viewer.toggleSidebar = () => { sidebarOpen.value = !sidebarOpen.value; };
     viewer.setEDLEnabled(false);
     viewer.setFOV(60);
     viewer.setPointBudget(pointBudgetFor(navigator.deviceMemory, isMobile()));

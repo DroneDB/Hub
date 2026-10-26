@@ -1,5 +1,5 @@
 <template>
-    <div id="upload">
+    <div id="upload" class="page-scroll">
         <div v-if="error" class="error-msg">
             <Message v-model="error" />
         </div>
@@ -30,7 +30,7 @@
         <!-- Drop files here, or use the button -->
         <div ref="droparea" class="droparea" :class="{ hidden: url || uploading }" role="presentation"
              @dragover.prevent @drop.prevent="handleDrop">
-            <Button ref="btnUpload" severity="info" size="large" icon="fa-solid fa-cloud-arrow-up" label="Upload Files" @click="handleUpload" />
+            <Button ref="btnUpload" size="large" icon="fa-solid fa-cloud-arrow-up" label="Upload Files" @click="handleUpload" />
         </div>
 
     </div>
@@ -216,9 +216,9 @@ export default {
     height: 100%;
 }
 
+/* A long list of uploads scrolls inside the page (.page-scroll) */
 #upload {
     text-align: center;
-    height: 100%;
 }
 
 .uploading {

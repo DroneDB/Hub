@@ -1,7 +1,7 @@
 <template>
-    <div id="admin-tasks" class="admin-tasks-page">
+    <div id="admin-tasks" class="admin-tasks-page page-scroll">
 
-        <div class="top-banner d-flex justify-content-between align-items-center">
+        <div class="top-banner d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h1>Tasks</h1>
             </div>
@@ -23,7 +23,7 @@
         <TasksTable :tasks="items" :tools="taskTools" :loading="loading" show-owner show-dataset lazy
                     :total-records="total" :rows="pageSize"
                     :downloading-task-id="downloadingTaskId"
-                    style="flex: 1; min-height: 0;"
+                    style="flex: 1; min-height: 18rem;"
                     empty-message="No tasks match the current filters."
                     @page="onPage" @view-log="openLog" @download-result="downloadResult"
                     @cancel="cancelTask" @retry="retryTask" @delete="deleteTask" />
@@ -277,12 +277,9 @@ export default {
 
 <style scoped>
 .admin-tasks-page {
-    padding: var(--ddb-spacing-lg);
-    height: 100%;
+    padding: var(--ddb-spacing-lg) var(--ddb-page-padding-x);
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    box-sizing: border-box;
 }
 
 .top-banner {
@@ -291,5 +288,12 @@ export default {
 
 .filter-select {
     min-width: 12rem;
+}
+
+/* On a phone each filter takes the whole row */
+@media only screen and (max-width: 575.98px) {
+    .filter-select {
+        flex: 1 1 100%;
+    }
 }
 </style>

@@ -1,11 +1,11 @@
 <template>
     <div id="admin-config" class="admin-config-page">
 
-        <div class="top-banner d-flex justify-content-between align-items-center">
+        <div class="top-banner d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h1>Configuration</h1>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2">
                 <Button severity="secondary" icon="fa-solid fa-rotate-left" label="Reset to Defaults"
                         :disabled="loading" @click="resetToDefaults" />
                 <Button severity="primary" icon="fa-solid fa-copy" label="Copy AppSettings JSON"
@@ -445,11 +445,12 @@ export default {
 
 .config-fields-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
     gap: 1.5rem;
 }
 
 .config-field {
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -457,8 +458,10 @@ export default {
 
 .field-header {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: 0.25rem;
 }
 
 .field-header label {
@@ -489,7 +492,7 @@ export default {
 }
 
 .sensitive-set {
-    color: var(--ddb-info);
+    color: var(--ddb-primary);
 }
 
 .sensitive-not-set {

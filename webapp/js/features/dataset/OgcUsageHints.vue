@@ -64,7 +64,7 @@ export default {
 </script>
 
 <style scoped>
-.content { min-width: 28rem; max-width: 38rem; }
+.content { min-width: min(28rem, var(--window-content-width, 100%)); max-width: 38rem; }
 .hint-section { margin-top: 0.75rem; }
 .hint-label {
     font-weight: 600;

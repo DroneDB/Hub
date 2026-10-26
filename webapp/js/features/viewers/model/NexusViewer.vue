@@ -28,8 +28,12 @@ import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import { loadResources } from '@/libs/lazy';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { fitDistance } from '@/features/viewers/unified/sceneUtils';
 
 defineOptions({ name: 'NexusViewer' });
+
+// Room around the unit sphere the model is scaled to (the mesh is not strictly inside it)
+const FIT_MARGIN = 1.25;
 
 const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.MODEL], typeLabel: 'a 3D model', title: 'Model'
@@ -65,6 +69,9 @@ async function loadNexus() {
 
     const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
     camera.position.z = 4.0;
+    // The model is scaled to a sphere of radius 1; the camera stands where that sphere (and some
+    // room, as the mesh reaches out of it) fits the canvas, whatever its shape
+    let fittedDistance = camera.position.length();
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x1a1a2e);
@@ -91,8 +98,11 @@ async function loadNexus() {
     const model = dataset.value.Entry(entry.value).getNxz();
     if (disposed) return;
     const nexusObj = new NexusObject(model, () => {
-        const s = 1 / nexusObj.geometry.boundingSphere.radius;
-        const p = nexusObj.geometry.boundingBox.getCenter(new THREE.Vector3()).negate();
+        // Centre and radius of the same sphere: the bounding box's centre is not the sphere's, and
+        // a model centred on the box stands off the middle of the view
+        const sphere = nexusObj.geometry.boundingSphere;
+        const s = 1 / sphere.radius;
+        const p = sphere.center.clone().negate();
         nexusObj.position.set(p.x * s, p.y * s, p.z * s);
         nexusObj.scale.set(s, s, s);
 
@@ -112,10 +122,20 @@ async function loadNexus() {
 
     const fitCanvas = () => {
         const el = renderer.domElement;
-        if (el.width !== el.clientWidth || el.height !== el.clientHeight) {
+        // The drawing buffer is the canvas size times the pixel ratio
+        const ratio = renderer.getPixelRatio();
+        if (el.width !== Math.floor(el.clientWidth * ratio) || el.height !== Math.floor(el.clientHeight * ratio)) {
             renderer.setSize(el.clientWidth, el.clientHeight, false);
             camera.aspect = el.clientWidth / el.clientHeight;
             camera.updateProjectionMatrix();
+            // Keeps the view the user has (zoom, angle and pan) and only follows the new shape: the
+            // camera moves along its line to the centre it orbits, not to the world origin, which
+            // a pan has moved off the middle of the view. ArcballControls keeps that centre on
+            // its gizmos (its target is only the centre set from outside; a pan does not move it).
+            const distance = fitDistance(1, camera.fov, camera.aspect, FIT_MARGIN);
+            const pivot = controls._gizmos?.position ?? controls.target;
+            camera.position.sub(pivot).multiplyScalar(distance / fittedDistance).add(pivot);
+            fittedDistance = distance;
         }
     };
     const animate = () => {

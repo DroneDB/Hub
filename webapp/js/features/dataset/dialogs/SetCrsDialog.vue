@@ -110,7 +110,7 @@ export default {
 
 <style scoped>
 .set-crs-dialog {
-    min-width: 380px;
+    min-width: min(380px, var(--window-content-width, 100%));
 }
 
 .crs-error {

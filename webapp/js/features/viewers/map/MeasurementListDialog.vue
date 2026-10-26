@@ -264,6 +264,7 @@ export default {
 /* Group row */
 .group-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.4rem;
     padding: 0.4rem 0.5rem;
@@ -313,6 +314,7 @@ export default {
 /* Measurement rows */
 .measurement-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
@@ -335,7 +337,8 @@ export default {
 }
 
 .measurement-name {
-    flex: 1;
+    flex: 1 1 6rem;
+    min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -353,6 +356,7 @@ export default {
 .measurement-actions {
     display: flex;
     align-items: center;
+    margin-left: auto;
     gap: 0.1rem;
     opacity: 0;
     transition: opacity 0.15s;
@@ -426,5 +430,30 @@ export default {
 
 .btn-new-group:hover {
     background-color: var(--ddb-bg-hover);
+}
+
+/* Touch: the row actions cannot wait for a hover, and the controls are big enough to hit */
+@media (hover: none), (max-width: 575.98px) {
+    .group-actions,
+    .measurement-actions {
+        opacity: 1;
+    }
+
+    .btn-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2rem;
+        min-height: 2rem;
+        font-size: 0.9rem;
+    }
+
+    .group-select {
+        min-height: 2rem;
+    }
+
+    .btn-new-group {
+        min-height: 2.5rem;
+    }
 }
 </style>

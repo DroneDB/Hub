@@ -46,12 +46,12 @@
                     </div>
                 </div>
             </div>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
                 <Button v-if="hasAction('close')" severity="secondary" label="Close" @click="handleClose" />
                 <Button v-if="hasAction('cancel')" severity="secondary" label="Cancel" @click="handleClose" />
                 <Button v-if="hasAction('details')" :label="showDetails ? 'Hide Details' : 'Show Details'"
                         @click="toggleDetails" />
-                <Button v-if="hasAction('start-build')" severity="info"
+                <Button v-if="hasAction('start-build')"
                         :disabled="processing" icon="fa-solid fa-play"
                         label="Start Processing" @click="handleStartBuild" />
                 <Button v-if="hasAction('retry-build')" severity="warn"

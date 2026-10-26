@@ -2,6 +2,7 @@
 /**
  * Small pure helpers of the 3D viewer.
  */
+import { PRIMARY, primaryRgba } from '@/libs/palette';
 
 /**
  * [minLon, minLat, maxLon, maxLat] of a GeoJSON Feature or geometry (DroneDB footprints are
@@ -34,6 +35,20 @@ export function isFiniteBox(box) {
     return v.every(Number.isFinite) && box.max.x >= box.min.x && box.max.y >= box.min.y && box.max.z >= box.min.z;
 }
 
+/**
+ * Distance at which a camera sees a sphere whole, whatever the shape of the screen: the
+ * vertical field of view limits a landscape view, the horizontal one a portrait view.
+ * @param {number} radius Radius of the sphere
+ * @param {number} fovDeg Vertical field of view in degrees
+ * @param {number} aspect Width / height of the view (1 when not known yet)
+ * @param {number} [margin] Room left around the sphere (1 = touching the narrower edges)
+ */
+export function fitDistance(radius, fovDeg, aspect, margin = 1.1) {
+    const halfVertical = fovDeg * Math.PI / 360;
+    const halfHorizontal = Math.atan(Math.tan(halfVertical) * (aspect > 0 ? aspect : 1));
+    return margin * radius / Math.sin(Math.min(halfVertical, halfHorizontal));
+}
+
 /** Low to high elevation colours (blue, cyan, green, yellow, red). */
 export const ELEVATION_RAMP = [0x2c7bb6, 0x00a6ca, 0x00ccbc, 0x90eb9d, 0xffff8c, 0xf9d057, 0xf29e2e, 0xe76818, 0xd7191c];
 
@@ -62,10 +77,10 @@ export function measureFormatters(scale) {
  * @param {any} olStyle  the ol/style module
  */
 export function vectorStyle({ Style, Fill, Stroke, Circle }) {
-    const stroke = new Stroke({ color: '#2978b4', width: 2 });
-    const polygon = new Style({ stroke, fill: new Fill({ color: 'rgba(41, 120, 180, 0.25)' }) });
+    const stroke = new Stroke({ color: PRIMARY[500], width: 2 });
+    const polygon = new Style({ stroke, fill: new Fill({ color: primaryRgba(0.25) }) });
     const line = new Style({ stroke });
-    const point = new Style({ image: new Circle({ radius: 4, fill: new Fill({ color: '#2978b4' }), stroke }) });
+    const point = new Style({ image: new Circle({ radius: 4, fill: new Fill({ color: PRIMARY[500] }), stroke }) });
     /** @param {any} feature */
     return feature => {
         const type = feature.getGeometry().getType();

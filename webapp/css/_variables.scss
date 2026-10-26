@@ -11,7 +11,7 @@
 //   lg = 1rem,  xl = 1.5rem,  2xl = 3rem
 //
 // FONT-SIZE SCALE:
-//   sm = 0.75rem, base = 1rem, lg = 1.5rem, xl = 3rem
+//   sm = 0.75rem, base = 1rem, md = 1.25rem, lg = 1.5rem, title = 1.75rem, xl = 3rem
 //
 // ALL rem values MUST be multiples of 0.25rem (n × 0.25).
 // NO px units except for the documented exceptions below.
@@ -74,10 +74,23 @@
 
 :root {
     // ── Brand ──────────────────────────────────────────────
-    --ddb-primary: #0070e0;
-    --ddb-primary-rgb: 0, 112, 224;
-    --ddb-primary-hover: #0060bf;
-    --ddb-secondary: #00C4CC;
+    // The DroneDB blue, shade 50 to 950: a copy of PRIMARY in js/libs/palette.js (the source
+    // PrimeVue builds its tokens from), held equal to it by libs/palette.spec.js. Every blue of
+    // the Hub is one of these shades; use the shade, never a blue of its own.
+    --ddb-primary-50: #e6f1fd;
+    --ddb-primary-100: #b3d5f9;
+    --ddb-primary-200: #80b8f5;
+    --ddb-primary-300: #4d9cf0;
+    --ddb-primary-400: #2685e8;
+    --ddb-primary-500: #0070e0;
+    --ddb-primary-600: #0060bf;
+    --ddb-primary-700: #004a95;
+    --ddb-primary-800: #00356b;
+    --ddb-primary-900: #001f40;
+    --ddb-primary-950: #001122;
+    --ddb-primary: var(--ddb-primary-500);
+    --ddb-primary-hover: var(--ddb-primary-600);
+    --ddb-primary-rgb: 0, 112, 224; // shade 500 as a triplet, for rgba(var(--ddb-primary-rgb), alpha)
 
     // ── Text ───────────────────────────────────────────────
     --ddb-text: #1A1A2E;
@@ -111,7 +124,9 @@
     // ── Font Size (strict scale) ───────────────────────────
     --ddb-font-size-sm: 0.75rem;   // 12px - small/captions
     --ddb-font-size-base: 1rem;    // 16px - body text
+    --ddb-font-size-md: 1.25rem;   // 20px - sub-headings
     --ddb-font-size-lg: 1.5rem;    // 24px - headings
+    --ddb-font-size-title: 1.75rem; // 28px - page titles (h1)
     --ddb-font-size-xl: 3rem;      // 48px - display/hero
 
     // ── Border Radius ──────────────────────────────────────
@@ -126,6 +141,7 @@
     --ddb-sidebar-width: 18.75rem;     // 300px
     --ddb-tooltip-max-width: 18.75rem; // 300px
     --ddb-login-max-width: 26.25rem;   // 420px
+    --ddb-page-padding-x: var(--ddb-spacing-md); // 12px - side padding of the routed pages
 
     // ── Status ─────────────────────────────────────────────
     --ddb-success: #20a96b;
@@ -136,17 +152,18 @@
     --ddb-warning-rgb: 255, 193, 7;
     --ddb-warning-text: #856404;
     --ddb-warning-bg: #fff3cd;
-    --ddb-info: #00bbe0;
 
     // ── Status Backgrounds (light tints) ───────────────────
     --ddb-success-bg: #f5fff5;
     --ddb-danger-bg: #fff5f5;
-    --ddb-info-bg: #f5f9ff;
-    --ddb-selected-bg: #e8f4ff;
-    --ddb-selected-active-bg: #d8e8f8;
+    --ddb-info-bg: var(--ddb-primary-50);
+    --ddb-selected-bg: var(--ddb-primary-50);
+    --ddb-selected-active-bg: color-mix(in srgb, var(--ddb-primary-100) 25%, var(--ddb-primary-50));
 
     // ── Link ───────────────────────────────────────────────
     --ddb-link: var(--ddb-primary);
+    --ddb-link-hover: var(--ddb-primary-hover);
+    --ddb-link-on-tint: var(--ddb-primary-700); // links inside an info message: 7.7:1 on its tint
     --ddb-console-bg: #1e1e1e;
     --ddb-console-text: #d4d4d4;
     --ddb-build-pending: #e67e22;
@@ -170,7 +187,7 @@
 
     // ── Viewer Dark UI (sidebar & toolbars) ────────────────
     --ddb-viewer-sidebar-bg: #19282c;
-    --ddb-viewer-sidebar-link: #8Aa1c4;
+    --ddb-viewer-sidebar-link: var(--ddb-primary-300); // 5.3:1 on the sidebar background
     --ddb-viewer-sidebar-muted: #9AA1A4;
     --ddb-viewer-toolbar-bg: rgba(0, 0, 0, 0.7);
     --ddb-viewer-toolbar-overlay: rgba(0, 0, 0, 0.5);
@@ -179,8 +196,8 @@
     --ddb-viewer-btn-disabled-bg: #333;
     --ddb-viewer-btn-disabled-color: #666;
     --ddb-viewer-btn-active-bg: #666;
-    --ddb-viewer-btn-primary: #4a90e2;
-    --ddb-viewer-btn-primary-hover: #357abd;
+    --ddb-viewer-btn-primary: var(--ddb-primary);
+    --ddb-viewer-btn-primary-hover: var(--ddb-primary-hover);
     --ddb-viewer-btn-danger: #e74c3c;
     --ddb-viewer-btn-danger-hover: #c0392b;
     --ddb-viewer-select-bg: #555;

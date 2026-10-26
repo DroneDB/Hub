@@ -9,7 +9,7 @@
                     <h3>Select files to upload</h3>
                     <p>Choose files or folders to upload to this dataset</p>
                     <div class="selection-buttons">
-                        <Button severity="info" icon="fa-solid fa-file" label="Select Files" @click="openFilePicker" />
+                        <Button icon="fa-solid fa-file" label="Select Files" @click="openFilePicker" />
                         <Button severity="secondary" icon="fa-solid fa-folder" label="Select Folder" @click="openFolderPicker" />
                         <Button severity="secondary" icon="fa-solid fa-link" label="Import from URL" @click="$emit('importFromUrl')" />
                     </div>
@@ -28,7 +28,7 @@
                         <span class="filter-count">{{ counts.total }}</span>
                     </Button>
                     <Button v-if="!done || counts.error > 0" class="filter-btn filter-uploading" :class="{ active: activeFilter === 'uploading' }" text
-                            :severity="activeFilter === 'uploading' ? 'info' : 'secondary'" @click="activeFilter = 'uploading'">
+                            :severity="activeFilter === 'uploading' ? undefined : 'secondary'" @click="activeFilter = 'uploading'">
                         <i class="fa-solid fa-circle-notch" :class="{ 'fa-spin': counts.uploading + counts.processing > 0 }" />
                         <span class="filter-label">In Progress</span>
                         <span class="filter-count">{{ counts.uploading + counts.processing + counts.pending }}</span>
@@ -339,7 +339,7 @@ export default {
 #upload-dialog {
     display: flex;
     flex-direction: column;
-    min-width: 31.25rem;
+    min-width: min(31.25rem, var(--window-content-width, 100%));
     max-width: 50rem;
     min-height: 18.75rem;
     max-height: 80vh;
@@ -354,6 +354,7 @@ export default {
 
 .upload-filters {
     display: flex;
+    flex-wrap: wrap;
     gap: var(--ddb-spacing-xs);
 }
 
@@ -515,6 +516,7 @@ export default {
 
 .upload-actions {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
     justify-content: flex-end;
@@ -543,7 +545,7 @@ export default {
     align-items: center;
     justify-content: center;
     padding: var(--ddb-spacing-xl) 3.75rem;
-    min-width: 25rem;
+    min-width: min(25rem, var(--window-content-width, 100%));
 }
 
 .selection-content {
@@ -570,6 +572,7 @@ export default {
 
 .selection-buttons {
     display: flex;
+    flex-wrap: wrap;
     gap: 0.75rem;
     justify-content: center;
     margin-bottom: 1.5rem;
@@ -618,5 +621,16 @@ export default {
     margin-top: var(--ddb-spacing-sm);
     font-size: 0.8rem;
     color: var(--ddb-text-muted);
+}
+
+/* A phone: the selection screen uses the whole width of the window */
+@media only screen and (max-width: 575.98px) {
+    .file-selection-screen {
+        padding-inline: 0;
+    }
+
+    .selection-content {
+        padding-inline: 0;
+    }
 }
 </style>

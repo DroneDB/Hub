@@ -1,5 +1,5 @@
 <template>
-    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" confirm-severity="info" :confirm-disabled="!isFilled()" :busy="changing" @confirm="changePwd()" @close="$emit('close')">
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" :confirm-disabled="!isFilled()" :busy="changing" @confirm="changePwd()" @close="$emit('close')">
         <div class="dialog">
             <form @submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
@@ -124,7 +124,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 

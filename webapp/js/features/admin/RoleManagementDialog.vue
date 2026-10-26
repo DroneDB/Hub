@@ -8,8 +8,8 @@
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="view"><i class="fa-solid fa-eye me-1" />View Roles</Tab>
-                    <Tab value="add"><i class="fa-solid fa-plus me-1" />Add Role</Tab>
+                    <Tab value="view"><i class="fa-solid fa-eye" aria-hidden="true" /><span class="tab-label">View Roles</span></Tab>
+                    <Tab value="add"><i class="fa-solid fa-plus" aria-hidden="true" /><span class="tab-label">Add Role</span></Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="view">
@@ -206,7 +206,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 25rem;
+    min-width: min(25rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 
@@ -225,8 +225,10 @@ export default {
 
 .role-item {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: var(--ddb-spacing-sm);
     padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     border: var(--ddb-border-width) solid var(--ddb-border-light);
     border-radius: var(--ddb-radius-sm);
@@ -236,6 +238,8 @@ export default {
     display: flex;
     align-items: center;
     gap: var(--ddb-spacing-sm);
+    flex: 1 1 12rem;
+    min-width: 0;
 }
 
 .role-name {

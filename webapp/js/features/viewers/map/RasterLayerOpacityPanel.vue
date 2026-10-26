@@ -1,5 +1,5 @@
 <template>
-    <div v-if="layers && layers.length > 1" class="raster-opacity-panel">
+    <div v-if="layers && layers.length > 1" class="raster-opacity-panel map-bottom-panel">
         <div v-for="(layer, index) in layers" :key="layer.path" class="raster-opacity-row">
             <span class="raster-label" :title="layer.name">{{ truncate(layer.name) }}</span>
             <input
@@ -73,21 +73,13 @@ export default {
 
 <style scoped>
 .raster-opacity-panel {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1;
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
-    background: rgba(0, 0, 0, 0.6);
     padding: 0.5rem 0.75rem;
     border-radius: 0.75rem;
-    color: white;
-    font-size: 0.75rem;
-    user-select: none;
-    min-width: 16rem;
+    max-height: 50%;
+    overflow-y: auto;
 }
 
 .raster-opacity-row {
@@ -97,7 +89,8 @@ export default {
 }
 
 .raster-label {
-    width: 10rem;
+    flex: 0 1 10rem;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -107,14 +100,8 @@ export default {
 
 .raster-opacity-row input[type="range"] {
     flex: 1;
+    min-width: 4rem;
     cursor: pointer;
-    accent-color: var(--ddb-secondary);
-}
-
-.opacity-value {
-    min-width: 2.2rem;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
 }
 
 .order-buttons {
@@ -149,24 +136,34 @@ export default {
     pointer-events: none;
 }
 
-.ph-btn {
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.75);
-    cursor: pointer;
-    padding: 0 0.15rem;
-    font-size: var(--ddb-font-size-base);
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    transition: color 0.15s;
+/* A phone: the name has a line of its own, so the slider keeps its length */
+@media (max-width: 575.98px) {
+    .raster-opacity-row {
+        flex-wrap: wrap;
+    }
+
+    .raster-label {
+        flex: 1 0 100%;
+    }
 }
 
-.ph-btn:hover {
-    color: var(--ddb-text-on-color);
-}
+/* Fingers: the two arrows side by side, each a touch target; the missing one keeps its place so
+   the sliders line up */
+@media (pointer: coarse) {
+    .order-buttons {
+        flex-direction: row;
+        gap: 0;
+    }
 
-.ph-btn.active {
-    color: var(--ddb-map-control-active);
+    .order-btn {
+        min-width: 2rem;
+        min-height: 2rem;
+        font-size: 0.75rem;
+    }
+
+    .order-btn--hidden {
+        display: flex;
+        visibility: hidden;
+    }
 }
 </style>

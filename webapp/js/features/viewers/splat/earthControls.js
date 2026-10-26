@@ -3,6 +3,7 @@
  * (or one finger) grabs and pans the ground, right-drag orbits the pivot under the
  * pointer, the wheel and a pinch zoom toward the pointer. A marker shows the pivot.
  */
+import { PRIMARY } from '@/libs/palette';
 
 const ROTATE_SPEED = 0.005;
 // Pitch stops ~5° from straight up/down so the view cannot flip over
@@ -42,7 +43,7 @@ export class EarthControls {
         // Pivot marker, drawn on top
         this.marker = new THREE.Mesh(
             new THREE.SphereGeometry(1, 16, 16),
-            new THREE.MeshBasicMaterial({ color: 0x3399ff, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false })
+            new THREE.MeshBasicMaterial({ color: PRIMARY[300], transparent: true, opacity: 0.9, depthTest: false, depthWrite: false })
         );
         this.marker.renderOrder = 999;
         this.marker.visible = false;

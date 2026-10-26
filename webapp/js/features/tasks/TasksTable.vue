@@ -1,15 +1,14 @@
 <template>
     <div class="tasks-table">
         <!-- Skeleton while first load is in flight -->
-        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows
-                   :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }">
+        <DataTable v-if="loading && tasks.length === 0" :value="skeletonRows" striped-rows>
             <Column header="State" style="width: 5rem;"><template #body><Skeleton width="2rem" height="1.5rem" /></template></Column>
             <Column header="Tool"><template #body><Skeleton width="80%" /></template></Column>
-            <Column v-if="showDataset" header="Dataset"><template #body><Skeleton width="70%" /></template></Column>
-            <Column v-if="showOwner" header="Owner"><template #body><Skeleton width="60%" /></template></Column>
-            <Column header="Progress"><template #body><Skeleton width="90%" /></template></Column>
-            <Column header="Created"><template #body><Skeleton width="70%" /></template></Column>
-            <Column header="Duration" style="width: 9rem;"><template #body><Skeleton width="60%" /></template></Column>
+            <Column v-if="showDataset" header="Dataset" v-bind="columnFrom('md')"><template #body><Skeleton width="70%" /></template></Column>
+            <Column v-if="showOwner" header="Owner" v-bind="columnFrom('xl')"><template #body><Skeleton width="60%" /></template></Column>
+            <Column header="Progress" v-bind="columnFrom('md')"><template #body><Skeleton width="90%" /></template></Column>
+            <Column header="Created" v-bind="columnFrom('lg')"><template #body><Skeleton width="70%" /></template></Column>
+            <Column header="Duration" style="width: 9rem;" v-bind="columnFrom('lg')"><template #body><Skeleton width="60%" /></template></Column>
             <Column header="Actions" style="width: 10rem;"><template #body><Skeleton width="90%" /></template></Column>
         </DataTable>
 
@@ -28,7 +27,7 @@
                    paginator-template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown"
                    :rows="lazy ? rows : undefined"
                    :rows-per-page-options="lazy ? rowsPerPageOptions : undefined"
-                   :pt="{ table: { style: 'table-layout: fixed; min-width: 50rem' } }" @page="onPage">
+                   :page-link-size="3" @page="onPage">
             <Column field="state" header="State" :sortable="!lazy" style="width: 5rem;">
                 <template #body="slotProps">
                     <Tag :severity="getTagSeverity(slotProps.data.state)"
@@ -42,22 +41,21 @@
                     <div :title="slotProps.data.path || ''">
                         <strong>{{ toolTitle(slotProps.data.toolId, tools) }}</strong>
                         <span class="muted"> v{{ slotProps.data.version }}</span>
-                        <br>
                         <small class="path-details">{{ formatPath(slotProps.data.path) }}</small>
                     </div>
                 </template>
             </Column>
-            <Column v-if="showDataset" header="Dataset">
+            <Column v-if="showDataset" header="Dataset" v-bind="columnFrom('md')">
                 <template #body="slotProps">
-                    <span class="dataset-cell">{{ slotProps.data.orgSlug }}/{{ slotProps.data.dsSlug }}</span>
+                    <span class="dataset-cell" :title="`${slotProps.data.orgSlug}/${slotProps.data.dsSlug}`">{{ slotProps.data.orgSlug }}/{{ slotProps.data.dsSlug }}</span>
                 </template>
             </Column>
-            <Column v-if="showOwner" header="Owner">
+            <Column v-if="showOwner" header="Owner" v-bind="columnFrom('xl')">
                 <template #body="slotProps">
-                    <span class="owner-cell">{{ slotProps.data.owner || slotProps.data.userId || 'System' }}</span>
+                    <span class="owner-cell" :title="slotProps.data.owner || slotProps.data.userId || 'System'">{{ slotProps.data.owner || slotProps.data.userId || 'System' }}</span>
                 </template>
             </Column>
-            <Column header="Progress">
+            <Column header="Progress" v-bind="columnFrom('md')">
                 <template #body="slotProps">
                     <template v-if="progressKind(slotProps.data) === 'bar'">
                         <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
@@ -70,7 +68,7 @@
                     <div v-else class="muted">-</div>
                 </template>
             </Column>
-            <Column field="createdAt" header="Created" :sortable="!lazy">
+            <Column field="createdAt" header="Created" :sortable="!lazy" v-bind="columnFrom('lg')">
                 <template #body="slotProps">
                     <div class="date-time">
                         <div>{{ formatDateTime(slotProps.data.createdAt) }}</div>
@@ -78,7 +76,7 @@
                     </div>
                 </template>
             </Column>
-            <Column header="Duration" style="width: 9rem;">
+            <Column header="Duration" style="width: 9rem;" v-bind="columnFrom('lg')">
                 <template #body="slotProps">
                     <div v-if="isActive(slotProps.data.state)" class="duration running" title="Running time">
                         <i class="fa-solid fa-stopwatch" /> {{ runningTime(slotProps.data) }}
@@ -121,6 +119,7 @@ import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Skeleton from 'primevue/skeleton';
 import ProgressBar from 'primevue/progressbar';
+import { columnFrom } from '@/libs/responsiveColumns';
 
 /**
  * Presentational task table shared by the per-dataset Task History tab and the
@@ -154,7 +153,8 @@ export default {
     emits: ['view-log', 'download-result', 'cancel', 'retry', 'delete', 'page', 'page-reset'],
 
     setup() {
-        return { ...useTaskFormatting() };
+        // Secondary columns leave a narrow screen, so a phone keeps the state, the tool and the actions
+        return { ...useTaskFormatting(), columnFrom };
     },
     data() {
         return {
@@ -243,9 +243,18 @@ export default {
     flex-direction: column;
 }
 
+/* Fixed columns: a cell never grows the table, long values are cut with an ellipsis */
+.tasks-table :deep(.p-datatable-table) {
+    table-layout: fixed;
+}
+
 .tasks-table :deep(.p-datatable-table-container) {
     flex: 1;
     min-height: 0;
+}
+
+.tasks-table :deep(.p-paginator) {
+    flex-wrap: wrap;
 }
 
 .muted {
@@ -257,12 +266,19 @@ export default {
 }
 
 .path-details {
+    display: block;
     color: var(--ddb-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .dataset-cell,
 .owner-cell {
-    word-break: break-all;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .paginator-wrapper {

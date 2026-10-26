@@ -279,7 +279,7 @@ export default {
 
 <style scoped>
 .extract-dialog {
-    min-width: 380px;
+    min-width: min(380px, var(--window-content-width, 100%));
 }
 
 .dest-path-row {

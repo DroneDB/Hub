@@ -22,17 +22,17 @@
                     <div v-if="canManageMembers" class="mb-3">
                         <h3>Add Member</h3>
                         <div class="d-flex gap-3 flex-wrap align-items-end">
-                            <div style="flex: 7;">
+                            <div style="flex: 7 1 12rem;">
                                 <label id="organization-members-dialog-user-label" for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User</label>
                                 <Select v-model="newMember.userName" input-id="organization-members-dialog-user" aria-labelledby="organization-members-dialog-user-label" :options="availableUsers" option-label="displayName" option-value="userName" filter placeholder="Search user..." class="w-100" />
                             </div>
-                            <div style="flex: 5;">
+                            <div style="flex: 5 1 9rem;">
                                 <label id="organization-members-dialog-permissions-label" for="organization-members-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
                                 <Select v-model="newMember.permissions" input-id="organization-members-dialog-permissions" aria-labelledby="organization-members-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                             </div>
-                            <div style="flex: 4;">
+                            <div style="flex: 0 0 auto;">
                                 <span class="d-block mb-1" aria-hidden="true">&nbsp;</span>
-                                <Button severity="info" :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" @click="addMember" />
+                                <Button :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" @click="addMember" />
                             </div>
                         </div>
                     </div>
@@ -43,16 +43,16 @@
                         <thead>
                             <tr>
                                 <th>Username</th>
-                                <th>Email</th>
+                                <th :class="showFrom('sm')">Email</th>
                                 <th>Permissions</th>
-                                <th>Granted</th>
+                                <th :class="showFrom('sm')">Granted</th>
                                 <th v-if="canManageMembers">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="member in members" :key="member.userName">
                                 <td>{{ member.userName }}</td>
-                                <td>{{ member.email }}</td>
+                                <td :class="showFrom('sm')">{{ member.email }}</td>
                                 <td>
                                     <Select v-if="canManageMembers"
                                             v-model="member.permissions"
@@ -64,7 +64,7 @@
                                             @change="updatePermission(member)" />
                                     <span v-else>{{ member.permissionName }}</span>
                                 </td>
-                                <td>
+                                <td :class="showFrom('sm')">
                                     <span v-if="member.grantedAt">
                                         {{ formatDate(member.grantedAt) }}
                                         <span v-if="member.grantedBy"> by {{ member.grantedBy }}</span>
@@ -86,7 +86,7 @@
                 </div>
 
                 <!-- Footer -->
-                <div class="d-flex justify-content-end gap-2 mt-4">
+                <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
                     <Button severity="secondary" label="Close" @click="$emit('close')" />
                 </div>
             </div>
@@ -111,6 +111,7 @@ import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { formatDate } from '@/libs/format';
+import { showFrom } from '@/libs/responsiveColumns';
 
 export default {
     components: { Window, ConfirmDialog, Select, Button, PrimeMessage },
@@ -120,6 +121,9 @@ export default {
         canManageMembers: { type: Boolean, default: false }
     },
     emits: ['close'],
+    setup() {
+        return { showFrom };
+    },
 
     data() {
         return {

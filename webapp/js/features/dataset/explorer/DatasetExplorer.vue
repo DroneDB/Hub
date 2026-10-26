@@ -4,27 +4,25 @@
         <Toolbar v-if="tools" :tools="tools" />
         <div v-if="currentPath">
             <PathBreadcrumb :path="currentPath" root-path="/" class="mt-3 ms-3" @navigate="goToPath" />
-            <!--<div class="ui divider"></div>-->
         </div>
         <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }"
+             :style="{ '--grid-cell-width': gridCellWidth + 'px' }"
              role="listbox" aria-label="Files" aria-multiselectable="true" tabindex="-1"
              @click="onClick" @keydown.esc="clearSelection"
              @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)" @dragover.prevent>
-            <div v-if="isLoadingFiles && files.length === 0" class="ui placeholder segment m-3 w-100">
-                <div class="ui active centered inline loader" />
+            <div v-if="isLoadingFiles && files.length === 0" class="explorer-notice m-3">
+                <LoadingSpinner />
             </div>
-            <div v-else-if="files.length === 0" class="ui placeholder segment m-3 w-100">
-                <div class="ui icon header">
-                    <i class="fa-regular fa-folder-open icon" />
-                    This folder is empty
-                </div>
+            <div v-else-if="files.length === 0" class="explorer-notice text-center m-3">
+                <i class="fa-regular fa-folder-open" style="font-size: 2rem; opacity: 0.5;" />
+                <p class="mt-2">This folder is empty</p>
             </div>
             <!-- Large folders: only the rows on screen are rendered -->
             <VirtualScroller v-else-if="virtualGrid" ref="grid" v-slot="{ item: row }" class="thumbnail-grid"
                              :items="gridRows" :item-size="gridRowHeight" :min-height="0">
-                <div class="thumbnail-row">
-                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" role="presentation" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
+                <div class="thumbnail-row" :style="{ '--grid-columns': gridColumns }">
+                    <div v-for="{ file: f, idx } in row.cells" :key="'E,' + f.path" class="grid-cell" role="presentation" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
                          @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                          @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                          @dragleave="itemDragLeave($event, f)">
@@ -34,7 +32,7 @@
                 </div>
             </VirtualScroller>
             <template v-else>
-                <div v-for="(f, idx) in files" :key="'E,' + f.path" role="presentation" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
+                <div v-for="(f, idx) in files" :key="'E,' + f.path" class="grid-cell" role="presentation" :draggable="canWrite" :class="{ 'drop-target': dropTargetPath !== null && dropTargetPath === f.entry.path }"
                      @dragstart="startDrag($event, f)" @drop="onDrop($event, f)"
                      @dragenter="itemDragEnter($event, f)" @dragover="itemDragOver($event, f)"
                      @dragleave="itemDragLeave($event, f)">
@@ -48,14 +46,19 @@
 
 <script>
 import Thumbnail from './EntryThumbnail.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import VirtualScroller from '@/components/VirtualScroller.vue';
 import { createThumbnailQueue, createVisibilityTracker } from '@/libs/thumbnailQueue';
+import { GRID_CELL_WIDTH, tileHeight } from './tileGeometry';
 
 // Folders at least this large render as a virtual grid
 const VIRTUAL_GRID_MIN_FILES = 200;
-// One grid cell: the 128 px tile plus its margins and label
-const GRID_CELL_WIDTH = 140;
-const GRID_ROW_HEIGHT = 180;
+
+// A computed font size in px, or 16 where there is none (no layout)
+const fontSizePx = el => {
+    const px = el ? parseFloat(getComputedStyle(el).fontSize) : NaN;
+    return Number.isFinite(px) && px > 0 ? px : 16;
+};
 import Toolbar from '@/features/dataset/explorer/HubToolbar.vue';
 import Keyboard from '@/libs/keyboard';
 import Mouse from '@/libs/mouse';
@@ -76,7 +79,7 @@ import { useFileSelection } from '@/composables/useFileSelection';
 export default {
     name: 'DatasetExplorer',
     components: {
-        Thumbnail, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
+        Thumbnail, LoadingSpinner, Toolbar, ContextMenu, PathBreadcrumb, VirtualScroller
     },
     // Thumbnails load as they come into view, a few at a time
     provide: function () {
@@ -129,7 +132,11 @@ export default {
         return {
             loading: false,
             contextMenu,
-            gridColumns: 6
+            gridColumns: 6,
+            gridCellWidth: GRID_CELL_WIDTH,
+            // The font sizes the tiles are laid out with (the body font grows on phones)
+            rootFontPx: 16,
+            fontPx: 16
         };
     },
     computed: {
@@ -139,8 +146,9 @@ export default {
         virtualGrid: function () {
             return this.files.length >= VIRTUAL_GRID_MIN_FILES;
         },
+        // As tall as a tile: the rows are placed absolutely, a taller tile would draw into the next one
         gridRowHeight: function () {
-            return GRID_ROW_HEIGHT;
+            return tileHeight({ rootFontPx: this.rootFontPx, fontPx: this.fontPx });
         },
         // The files in rows of `gridColumns`, each with its index in `files` (range selection)
         gridRows: function () {
@@ -156,11 +164,14 @@ export default {
         },
     },
     mounted: function () {
-        // Columns of the virtual grid follow the explorer's width
+        this.measureFonts();
+        // Columns of the virtual grid follow the explorer's width, its rows the font size (which
+        // changes with the viewport width, so a resize reads it again)
         if (typeof ResizeObserver !== 'undefined') {
             this._resizeObserver = new ResizeObserver(entries => {
                 const width = entries[0]?.contentRect?.width ?? 0;
                 if (width > 0) this.gridColumns = Math.max(1, Math.floor(width / GRID_CELL_WIDTH));
+                this.measureFonts();
             });
             this._resizeObserver.observe(this.$refs.explorer);
         }
@@ -170,8 +181,11 @@ export default {
         this.thumbnailLoader.visibility.disconnect();
     },
     methods: {
-
-
+        // The tile names inherit the explorer's font size; the tile spacing is in rem
+        measureFonts: function () {
+            this.rootFontPx = fontSizePx(document.documentElement);
+            this.fontPx = fontSizePx(this.$refs.explorer);
+        },
 
         goToPath: function (path) {
             emitter.emit("folderOpened", pathutils.getTree(path));
@@ -249,11 +263,12 @@ export default {
 </script>
 
 <style scoped>
+/* The cells share the width: as many as fit at the cell width (the virtual grid counts the same), stretched to fill it */
 #explorer {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    align-content: flex-start;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(var(--grid-cell-width), 1fr));
+    align-items: start;
+    align-content: start;
     width: 100%;
     height: 100%;
     padding: 0.5rem;
@@ -272,12 +287,10 @@ export default {
         cursor: copy;
     }
 
-    > div.drop-target {
-        outline: 2px dashed var(--ddb-primary);
-        outline-offset: -2px;
-        background-color: var(--ddb-bg-hover);
-        border-radius: var(--ddb-radius-sm);
+    > .explorer-notice {
+        grid-column: 1 / -1;
     }
+
 }
 
 #explorer-container {
@@ -296,8 +309,22 @@ export default {
 }
 
 .thumbnail-row {
+    display: grid;
+    grid-template-columns: repeat(var(--grid-columns), minmax(0, 1fr));
+    align-items: start;
+}
+
+.grid-cell {
     display: flex;
-    flex-wrap: nowrap;
-    align-items: flex-start;
+    justify-content: center;
+    min-width: 0;
+}
+
+/* The cell a drag is over, in both layouts (the virtual grid nests its cells in rows) */
+.grid-cell.drop-target {
+    outline: 2px dashed var(--ddb-primary);
+    outline-offset: -2px;
+    background-color: var(--ddb-bg-hover);
+    border-radius: var(--ddb-radius-sm);
 }
 </style>
