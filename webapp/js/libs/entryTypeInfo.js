@@ -41,7 +41,7 @@ const ENTRY_TYPE_INFO = {
     },
     [T.GEORASTER]: {
         summary: 'A raster map tied to real-world coordinates: every pixel has a known position on the ground.',
-        detection: 'A TIFF file (.tif, .tiff) that has a coordinate system.',
+        detection: 'A TIFF or JPEG 2000 file (.tif, .tiff, .jp2, .j2k) that has a coordinate system.',
         contains: [
             'Size in pixels and ground resolution (metres per pixel)',
             'Bands and what each holds (Red, Green, Blue, Alpha, Gray...)',
@@ -73,7 +73,7 @@ const ENTRY_TYPE_INFO = {
     },
     [T.IMAGE]: {
         summary: 'A picture without a position: DroneDB found no GPS data in it.',
-        detection: 'An image (JPG, DNG, TIFF, PNG, GIF, WEBP) with no GPS metadata, and not twice as wide as it is high.',
+        detection: 'An image (JPG, DNG, TIFF, JPEG 2000, PNG, GIF, WEBP) with no GPS metadata, and not twice as wide as it is high.',
         contains: ['Size in pixels and capture time', 'Camera make and model, when the file has them'],
         actions: ['Opens in the photo viewer; thumbnails come from the file'],
         examples: ['A screenshot or a scanned document', 'A photo taken with location turned off', 'A logo (logo.png)']
@@ -137,7 +137,7 @@ const ENTRY_TYPE_INFO = {
     },
     [T.VECTOR]: {
         summary: 'Geographic shapes: points, lines and polygons with attributes.',
-        detection: 'A GeoJSON, Shapefile (.shp, .shz), GeoPackage, KML/KMZ, FlatGeobuf, TopoJSON, DXF or DWG file.',
+        detection: 'A GeoJSON, Shapefile (.shp, .shz), GeoPackage, KML/KMZ, GPX, FlatGeobuf, TopoJSON, DXF or DWG file.',
         contains: [
             'Layers, with the number and the geometry type of their features',
             'Extent and coordinate system',

@@ -18,7 +18,7 @@ const TEXT_EXTENSIONS = [
 
 // Binary extensions that should never be opened as text
 const BINARY_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff',
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff', 'jp2', 'j2k',
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
     'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz',
     'exe', 'dll', 'so', 'dylib', 'bin',
@@ -100,6 +100,8 @@ function getLanguageMode(path) {
         case 'markdown':
             return 'markdown';
         case 'xml':
+        case 'gpx':
+        case 'kml':
         case 'html':
         case 'htm':
         case 'svg':
