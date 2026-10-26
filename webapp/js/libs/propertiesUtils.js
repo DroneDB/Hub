@@ -81,31 +81,41 @@ export function formatModifiedDate(mtime) {
     return new Date(mtime * 1000).toLocaleString();
 }
 
+// The [x, y, z?] of a point_geom (GeoJSON order: longitude, latitude), or null
+function pointCoordinates(pointGeom) {
+    const coords = pointGeom && pointGeom.geometry && pointGeom.geometry.coordinates;
+    return Array.isArray(coords) && coords.length >= 2 ? coords : null;
+}
+
+const hasAltitude = coords => typeof coords[2] === 'number';
+
 /**
- * The coordinates of a point_geom as plain numbers, in the order shown:
- * "x, y" or "x, y, z" (z with two decimals). This is the text the copy button copies.
+ * The coordinates of a point_geom to paste elsewhere: "latitude, longitude" or
+ * "latitude, longitude, altitude" (altitude with two decimals). Latitude comes first, as
+ * Google Maps and the OpenStreetMap search read a pasted pair; the row shows GeoJSON order.
  * @param {Object} pointGeom - The point_geom object
  * @returns {string|null}
  */
 export function pointCoordinatesText(pointGeom) {
-    const coords = pointGeom && pointGeom.geometry && pointGeom.geometry.coordinates;
-    if (!Array.isArray(coords) || coords.length < 2) return null;
-    const parts = [coords[0], coords[1]];
-    if (typeof coords[2] === 'number') parts.push(coords[2].toFixed(2));
+    const coords = pointCoordinates(pointGeom);
+    if (!coords) return null;
+    const parts = [coords[1], coords[0]];
+    if (hasAltitude(coords)) parts.push(coords[2].toFixed(2));
     return parts.join(', ');
 }
 
 /**
- * Format coordinates from point_geom geometry: "EPSG:4326 x, y, zm"
+ * Format coordinates from point_geom geometry: "EPSG:4326 lon, lat, altm"
  * @param {Object} pointGeom - The point_geom object
  * @returns {string|null}
  */
 function formatCoordinates(pointGeom) {
-    const text = pointCoordinatesText(pointGeom);
-    if (!text) return null;
+    const coords = pointCoordinates(pointGeom);
+    if (!coords) return null;
     const crsName = pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name;
-    const hasZ = typeof pointGeom.geometry.coordinates[2] === 'number';
-    return (crsName ? crsName + ' ' : '') + text + (hasZ ? 'm' : '');
+    let text = (crsName ? crsName + ' ' : '') + coords[0] + ', ' + coords[1];
+    if (hasAltitude(coords)) text += ', ' + coords[2].toFixed(2) + 'm';
+    return text;
 }
 
 // EPSG and ESRI codes ("EPSG:32633", "ESRI:102100", the "EPSG::4326" of an OGC URN).
@@ -133,7 +143,7 @@ export function linkCrsCodes(text) {
 
 /**
  * The values the properties table copies, by row key: the size row copies the
- * file hash, the coordinates row the plain coordinates.
+ * file hash, the coordinates row the latitude, longitude (and altitude).
  * @param {Object} file - The file object with entry property
  * @returns {Object<string, { text: string, label: string }>}
  */
@@ -143,7 +153,10 @@ export function buildCopyableValues(file) {
     const values = {};
     if (entry.hash) values.size = { text: entry.hash, label: 'hash' };
     const coordinates = pointCoordinatesText(entry.point_geom);
-    if (coordinates) values.coordinates = { text: coordinates, label: 'coordinates' };
+    if (coordinates) {
+        const altitude = hasAltitude(entry.point_geom.geometry.coordinates) ? ', altitude' : '';
+        values.coordinates = { text: coordinates, label: `latitude, longitude${altitude}` };
+    }
     return values;
 }
 

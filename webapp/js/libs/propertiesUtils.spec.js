@@ -103,16 +103,16 @@ const pointEntry = (coordinates, extra = {}) => ({
 });
 
 describe('coordinates row', () => {
-    it('shows the CRS and the altitude in metres, and copies the plain numbers', () => {
+    it('shows the CRS, longitude first and the altitude in metres, and copies latitude first', () => {
         const file = pointEntry([11.2, 46.1, 300.456]);
         expect(buildAllProperties(file).coordinates).toBe('EPSG:4326 11.2, 46.1, 300.46m');
-        expect(pointCoordinatesText(file.entry.point_geom)).toBe('11.2, 46.1, 300.46');
+        expect(pointCoordinatesText(file.entry.point_geom)).toBe('46.1, 11.2, 300.46');
     });
 
     it('has no altitude part for a 2D point', () => {
         const file = pointEntry([11.2, 46.1]);
         expect(buildAllProperties(file).coordinates).toBe('EPSG:4326 11.2, 46.1');
-        expect(pointCoordinatesText(file.entry.point_geom)).toBe('11.2, 46.1');
+        expect(pointCoordinatesText(file.entry.point_geom)).toBe('46.1, 11.2');
     });
 
     it('is absent without a point geometry', () => {
@@ -122,11 +122,13 @@ describe('coordinates row', () => {
 });
 
 describe('buildCopyableValues', () => {
-    it('copies the hash from the size row and the coordinates from the coordinates row', () => {
+    it('copies the hash from the size row and latitude, longitude, altitude from the coordinates row', () => {
         expect(buildCopyableValues(pointEntry([11.2, 46.1, 300]))).toEqual({
             size: { text: 'abc123', label: 'hash' },
-            coordinates: { text: '11.2, 46.1, 300.00', label: 'coordinates' }
+            coordinates: { text: '46.1, 11.2, 300.00', label: 'latitude, longitude, altitude' }
         });
+        expect(buildCopyableValues(pointEntry([11.2, 46.1])).coordinates)
+            .toEqual({ text: '46.1, 11.2', label: 'latitude, longitude' });
     });
 
     it('has only what the entry has', () => {
