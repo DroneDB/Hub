@@ -519,10 +519,6 @@ export default {
             border-radius: var(--ddb-radius-sm);
         }
 
-        &:hover .org-name {
-            text-decoration: underline;
-        }
-
         .org-card-description {
             color: var(--ddb-text-secondary);
             font-size: var(--ddb-font-size-sm);
