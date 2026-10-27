@@ -130,6 +130,59 @@ describe('the build state of a file follows the task list', async () => {
         expect(events.map(e => e.newState)).toEqual(['Processing', 'Succeeded']);
     });
 
+    describe('a background rebuild (the rebuilds queue serves them one at a time)', () => {
+        const rebuild = (state, createdAt = '2026-10-27T00:00:00Z') => ({ ...task('9001', state, createdAt), background: true });
+
+        it('is no build of the file while it waits, whatever its state before processing', () => {
+            for (const waiting of ['Enqueued', 'Scheduled', 'Created']) {
+                const { ds, state } = setup([rebuild(waiting)]);
+                expect(state()).toBeNull();
+                expect(manager.hasActiveBuild(ds, PATH)).toBe(false);
+            }
+        });
+
+        it('is a build in progress once it processes', () => {
+            const { ds, state } = setup([rebuild('Processing')]);
+            expect(state()).toBe('Processing');
+            expect(manager.hasActiveBuild(ds, PATH)).toBe(true);
+        });
+
+        it('is not a build that waits for a worker when somebody asked for it: a plain enqueued build is active', () => {
+            const { ds, state } = setup([task('9002', 'Enqueued', '2026-10-27T00:00:00Z')]);
+            expect(state()).toBe('Enqueued');
+            expect(manager.hasActiveBuild(ds, PATH)).toBe(true);
+        });
+
+        it('does not bring back an older failed build while it waits', () => {
+            const { state } = setup([rebuild('Enqueued'), failed]);
+            expect(state()).toBeNull();
+        });
+
+        it('starts to show when its turn comes, and says so once', () => {
+            const { listChanges, events, state } = setup([rebuild('Enqueued')]);
+            listChanges([rebuild('Processing')]);
+            expect(state()).toBe('Processing');
+            listChanges([rebuild('Succeeded')]);
+            expect(state()).toBe('Succeeded');
+            expect(events.map(e => [e.previousState, e.newState])).toEqual([[null, 'Processing'], ['Processing', 'Succeeded']]);
+        });
+
+        it('is shown when it failed: the failure is no wait', () => {
+            const { state } = setup([rebuild('Failed')]);
+            expect(state()).toBe('Failed');
+        });
+
+        it('leaves the build of a user shown while a rebuild of the file waits', () => {
+            const { state } = setup([rebuild('Enqueued', '2026-10-27T00:00:00Z'), task('9003', 'Processing', '2026-10-27T01:00:00Z')]);
+            expect(state()).toBe('Processing');
+        });
+
+        it('is left out of the builds loadBuilds returns while it waits', async () => {
+            const { ds } = setup([rebuild('Enqueued')]);
+            expect(await manager.loadBuilds(ds)).toEqual([]);
+        });
+    });
+
     it('is reactive: a view that reads it renders again when the list changes', () => {
         const { ds, listChanges } = setup([failed]);
         const shown = computed(() => manager.getBuildState(ds, PATH)?.currentState ?? null);

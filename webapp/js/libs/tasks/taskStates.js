@@ -18,6 +18,15 @@ export const isActiveState = state => ACTIVE_STATES.includes(state);
 export const isTerminalState = state => TERMINAL_STATES.includes(state);
 
 /**
+ * Whether a task is the background rebuild of an entry made with an older layout (the server marks it
+ * `background`) that has not started: a queue of one worker serves them, so it can wait for days, and the entry
+ * it will rebuild is usable meanwhile. Nothing is in progress for the file until it processes.
+ * @param {{ background?: boolean, state?: string } | null | undefined} task
+ */
+export const isWaitingBackgroundTask = task =>
+    task?.background === true && isActiveState(task.state) && task.state !== 'Processing';
+
+/**
  * Stable identity of a dataset for task stores and event matching.
  * @param {{ baseApi?: string, org?: string, ds?: string }} dataset
  */

@@ -11,7 +11,7 @@
 
 import { shallowReactive } from 'vue';
 import taskMonitor from '@/libs/tasks/taskMonitor';
-import { datasetKey, isActiveState, latestTaskByPath } from '@/libs/tasks/taskStates';
+import { datasetKey, isActiveState, isWaitingBackgroundTask, latestTaskByPath } from '@/libs/tasks/taskStates';
 import { isBuilt } from '@/libs/build/entryBuild';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
@@ -105,6 +105,10 @@ class BuildManager {
         const prev = this._buildByPath.get(key);
         const updated = latestTaskByPath(taskMonitor.getTasks(dataset).filter(t => t.toolId === 'build'));
 
+        // A background rebuild that waits for its turn is no build of the file (the entry is usable); it is the
+        // newest task, so an older failed one does not show in its place
+        for (const [path, task] of updated) if (isWaitingBackgroundTask(task)) updated.delete(path);
+
         // A build just started (startBuild) stays shown until the list has its task: a task of the
         // file that was not listed when it started, or one that is still running (a build already
         // in progress that the server reused)
@@ -192,7 +196,7 @@ class BuildManager {
         await taskMonitor.forceRefresh(dataset);
         this._sync(dataset);
         return taskMonitor.getTasks(dataset)
-            .filter(t => t.toolId === 'build')
+            .filter(t => t.toolId === 'build' && !isWaitingBackgroundTask(t))
             .map(t => ({ path: t.path, currentState: t.state }));
     }
 

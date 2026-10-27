@@ -12,7 +12,7 @@ import { formatMissingDeps } from '@/libs/build/buildDepFormat';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
 import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
-import { isActiveState } from '@/libs/tasks/taskStates';
+import { isActiveState, isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
 // Build artifact each viewer needs, by role (the entry DTO lists the artifacts that exist).
@@ -200,7 +200,7 @@ class FileAvailabilityChecker {
      */
     currentJob(dataset, path) {
         const cached = BuildManager.getBuildState(dataset, path);
-        const task = taskMonitor.getTasks(dataset).find(t => t.toolId === 'build' && t.path === path);
+        const task = taskMonitor.getTasks(dataset).find(t => t.toolId === 'build' && t.path === path && !isWaitingBackgroundTask(t));
         const jobs = [cached, task && { path: task.path, currentState: task.state }].filter(Boolean);
         return jobs.find(j => isActiveState(j.currentState)) || jobs[0] || null;
     }

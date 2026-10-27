@@ -149,6 +149,18 @@ describe('buildable file: the artifacts decide, the job explains', () => {
         expect(result.status).toBe('building');
     });
 
+    it('opens an entry that lists its output while a background rebuild of it only waits', async () => {
+        taskMonitor.getTasks.mockReturnValue([{ toolId: 'build', path: 'ortho.tif', state: 'Enqueued', background: true }]);
+        const result = await checker.check(datasetListing(null), raster({ artifacts: [COG] }), 'map', { current: true });
+        expect(result).toMatchObject({ available: true, status: 'ready' });
+    });
+
+    it('shows the progress of a background rebuild once it processes', async () => {
+        taskMonitor.getTasks.mockReturnValue([{ toolId: 'build', path: 'ortho.tif', state: 'Processing', background: true }]);
+        const result = await checker.check(datasetListing(null), raster({ artifacts: [COG] }), 'map', { current: true });
+        expect(result.status).toBe('building');
+    });
+
     it('shows the failure of the job', async () => {
         buildManager.getBuildState.mockReturnValue(job('Failed'));
         const result = await checker.check(datasetListing(raster({ buildStatus: 'failed' })), raster({ buildStatus: 'failed' }), 'map');

@@ -37,6 +37,7 @@ import Keyboard from '@/libs/keyboard';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import taskMonitor from '@/libs/tasks/taskMonitor';
+import { isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
 import { formatMissingDeps } from '@/libs/build/buildHelpers';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
@@ -290,6 +291,7 @@ export default {
                         const buildTasks = tasks.filter(t => t.toolId === 'build');
                         const activeBuild = buildTasks.find(build =>
                             build.path === this.file.entry.path &&
+                            !isWaitingBackgroundTask(build) &&
                             (build.state === 'Processing' ||
                              build.state === 'Enqueued' ||
                              build.state === 'Scheduled' ||
