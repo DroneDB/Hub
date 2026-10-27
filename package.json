@@ -43,7 +43,7 @@
     "@tanstack/vue-virtual": "^3.10.0",
     "@turf/bbox": "^6.0.1",
     "@turf/meta": "^6.0.2",
-    "bm3d-viewer": "file:../../../../tmp/bm3d-work/bm3d-viewer-0.2.0.tgz",
+    "bm3d-viewer": "https://github.com/DroneDB/bm3d/releases/download/v1.0.0/bm3d-viewer-1.0.0.tgz",
     "bootstrap": "^5.3.8",
     "chart.js": "^4.5.1",
     "clipboard-copy": "^4.0.1",

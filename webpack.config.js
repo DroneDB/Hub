@@ -118,14 +118,6 @@ module.exports = {
                 type: 'asset/resource'
             },
             {
-                // The viewer's default place for its worker, new URL('.', import.meta.url), is a
-                // folder, which webpack takes for an asset it cannot resolve. The Hub always gives
-                // the folder (decoderPath, served by the CopyPlugin below), so the URL stays as written.
-                test: /\.js$/,
-                include: path.resolve(__dirname, 'node_modules/bm3d-viewer'),
-                parser: { url: false }
-            },
-            {
                 test: /\.(png|svg|jpg|gif)$/,
                 type: 'asset',
                 parser: {
