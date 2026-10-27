@@ -17,7 +17,7 @@ import { ref, watch } from 'vue';
 import reg from '@/libs/api/sharedRegistry';
 import { useAuthStore } from '@/stores/auth';
 import { useNotify } from '@/composables/useNotify';
-import { ACCOUNT_SECTIONS, PREF, RENAMED_PREFS, applyAccountValue, getPref, onPrefChange, removePref } from '@/libs/preferences';
+import { ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF, RENAMED_PREFS, applyAccountValue, getPref, onPrefChange, removePref } from '@/libs/preferences';
 
 const ENDPOINT = '/users/preferences';
 const SAVE_DELAY_MS = 600;
@@ -123,8 +123,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
     /**
      * Reads the account and applies it to the sections that are not dirty or being sent (those
      * hold a newer local change): the account wins for the fields it has; a field it lacks that has a
-     * local value is marked dirty. A field the account holds under its old name (RENAMED_PREFS) counts
-     * as the new field, and its section is marked dirty so the next save leaves the old name out.
+     * local value is marked dirty, except for an ACCOUNT_OWNED key, whose local value is removed. A
+     * field the account holds under its old name (RENAMED_PREFS) counts as the new field, and its
+     * section is marked dirty so the next save leaves the old name out.
      * Returns false when it failed or the session ended meanwhile.
      * @param {number} sessionId
      */
@@ -153,6 +154,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
                 const oldField = RENAMED_PREFS[key]?.field;
                 if (holds(field)) applyAccountValue(key, stored[field]);
                 else if (holds(oldField)) applyAccountValue(key, stored[/** @type {string} */ (oldField)]);
+                else if (ACCOUNT_OWNED.includes(key)) applyAccountValue(key, null);
                 else if (hasLocalValue(key)) dirty.add(name);
                 if (holds(oldField)) dirty.add(name);
             }

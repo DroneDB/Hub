@@ -28,6 +28,7 @@ export const PREF = Object.freeze({
     ORG_PAGE_POSITION: 'org_page_position', // { currentPage, scrollTop } of the organisations page
     UNIFIED_VIEWER: 'unified-viewer-settings',
     MODEL_LIGHTING: 'model-lighting-settings',
+    BUILD_NOTIFICATIONS: 'buildNotifications', // 'none' | 'all' | 'failed': which ended builds the server e-mails
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
     HUB_UPDATE_ATTEMPTED: 'hubUpdateAttempted', // sessionStorage
@@ -153,8 +154,18 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.ORG_PAGE]: ['orgs', 'list'],
     [PREF.SPLAT_NAV_MODE]: ['viewers', 'splatNavMode'],
     [PREF.MODEL_LIGHTING]: ['viewers', 'modelLighting'],
-    [PREF.UNIFIED_VIEWER]: ['viewers', 'unifiedLighting']
+    [PREF.UNIFIED_VIEWER]: ['viewers', 'unifiedLighting'],
+    [PREF.BUILD_NOTIFICATIONS]: ['notifications', 'builds']
 });
+
+/**
+ * Account preferences the server acts on (it e-mails by them): the account's value is the
+ * user's decision, so on load a field the account lacks clears the device's value instead of
+ * being sent from it. Otherwise a value left on a shared device by another user, or one that
+ * another device has since reset, would turn e-mails on for an account that never asked.
+ * A change made here is still sent as usual.
+ */
+export const ACCOUNT_OWNED = /** @type {readonly string[]} */ (Object.freeze([PREF.BUILD_NOTIFICATIONS]));
 
 /** Object.freeze that keeps the property types wide (number, not 10). @template T @param {T} value @returns {Readonly<T>} */
 const frozen = value => Object.freeze(value);
@@ -177,7 +188,9 @@ export const PREF_DEFAULTS = frozen({
     [PREF.ORG_PAGE]: frozen({ itemsPerPage: 10, ownedOnly: true }),
     [PREF.SPLAT_NAV_MODE]: 'fly',
     [PREF.MODEL_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),
-    [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 })
+    [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 }),
+    // Opt-in: the server sends nothing for a missing or unknown value either
+    [PREF.BUILD_NOTIFICATIONS]: 'none'
 });
 
 /**

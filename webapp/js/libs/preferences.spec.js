@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    PREF, ACCOUNT_SECTIONS, PREF_DEFAULTS, RENAMED_PREFS, onPrefChange, applyAccountValue, setPref, removePref, getPref,
+    PREF, ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF_DEFAULTS, RENAMED_PREFS, onPrefChange, applyAccountValue, setPref, removePref, getPref,
     _resetPrefListenersForTests
 } from './preferences';
 
@@ -169,6 +169,17 @@ describe('catalog', () => {
         const pairs = Object.values(ACCOUNT_SECTIONS).map(([s, f]) => `${s}.${f}`);
         expect(new Set(pairs).size).toBe(pairs.length);
         expect(ACCOUNT_SECTIONS[PREF.MEASURE_UNIT]).toEqual(['units', 'measurement']);
+    });
+
+    it('build notifications are notifications.builds, off by default, and owned by the account', () => {
+        // The server reads this section and field, and treats a missing value as 'none'
+        expect(ACCOUNT_SECTIONS[PREF.BUILD_NOTIFICATIONS]).toEqual(['notifications', 'builds']);
+        expect(PREF_DEFAULTS[PREF.BUILD_NOTIFICATIONS]).toBe('none');
+        expect(ACCOUNT_OWNED).toEqual([PREF.BUILD_NOTIFICATIONS]);
+    });
+
+    it('every ACCOUNT_OWNED key follows the account', () => {
+        for (const key of ACCOUNT_OWNED) expect(ACCOUNT_SECTIONS).toHaveProperty(key);
     });
 });
 

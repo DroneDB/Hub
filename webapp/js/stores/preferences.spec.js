@@ -143,6 +143,43 @@ describe('preferences store: load', () => {
         expect(bodies()).toEqual([{ explorer: { viewMode: 'table', tableExpandedGrid: null, sortDescending: null } }]);
     });
 
+    describe('build notifications (the server e-mails by them)', () => {
+        it('are synced as notifications.builds', async () => {
+            await start();
+            setPref(PREF.BUILD_NOTIFICATIONS, 'failed');
+            await tick(600);
+            expect(bodies()).toEqual([{ notifications: { builds: 'failed' } }]);
+        });
+
+        it('take the account value over the device one', async () => {
+            setPref(PREF.BUILD_NOTIFICATIONS, 'all');
+            await start({ ...SYNCED_ACCOUNT, notifications: { builds: 'failed' } });
+            expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('failed');
+            expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        });
+
+        it('a value left on the device is dropped, never sent, for an account without one', async () => {
+            // Another user of this device, or a reset made on another device
+            setPref(PREF.BUILD_NOTIFICATIONS, 'all');
+            await start(SYNCED_ACCOUNT);
+            await tick(5000);
+            expect(localStorage.getItem(PREF.BUILD_NOTIFICATIONS)).toBeNull();
+            expect(h.reg.patchRequest).not.toHaveBeenCalled();
+        });
+
+        it('a change made during the load is still sent', async () => {
+            const read = deferred();
+            h.reg.getRequest.mockReturnValue(read.promise);
+            setActivePinia(createPinia());
+            store = usePreferencesStore();
+            setPref(PREF.BUILD_NOTIFICATIONS, 'all');
+            read.resolve(SYNCED_ACCOUNT);
+            await tick(600);
+            expect(getPref(PREF.BUILD_NOTIFICATIONS, '')).toBe('all');
+            expect(bodies()).toEqual([{ notifications: { builds: 'all' } }]);
+        });
+    });
+
     it('does not echo what it applied (account origin is not sent)', async () => {
         await start({ units: { measurement: 'imperial' } });
         await tick(5000);
@@ -174,7 +211,7 @@ describe('preferences store: load', () => {
 
     it('exposes the section names', async () => {
         await start();
-        expect(store.sections).toEqual(['units', 'map', 'explorer', 'datasets', 'orgs', 'viewers']);
+        expect(store.sections).toEqual(['units', 'map', 'explorer', 'datasets', 'orgs', 'viewers', 'notifications']);
     });
 });
 
@@ -522,7 +559,7 @@ describe('preferences store: reset', () => {
         expect(localStorage.getItem(PREF.PANEL_SIZES)).not.toBeNull();
         await tick(600);
         expect(h.reg.patchRequest).toHaveBeenCalledTimes(1);
-        expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, viewers: null });
+        expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, viewers: null, notifications: null });
     });
 
     describe('the lighting of the 3D models, stored as the Nexus lighting before', () => {

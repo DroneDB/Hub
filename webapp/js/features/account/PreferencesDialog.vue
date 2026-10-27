@@ -2,29 +2,33 @@
     <Window id="preferencesDialog" title="Preferences" modal fixed-size size-class="dialog-lg" @close="$emit('close')">
         <Tabs v-model:value="activeTab" class="pref-tabs">
             <TabList>
-                <Tab v-for="tab in TABS" :key="tab.value" :value="tab.value">
+                <Tab v-for="tab in visibleTabs" :key="tab.value" :value="tab.value">
                     <i :class="tab.icon" aria-hidden="true" /><span class="tab-label">{{ tab.label }}</span>
                 </Tab>
             </TabList>
             <TabPanels>
-                <TabPanel v-for="tab in TABS" :key="tab.value" :value="tab.value">
+                <TabPanel v-for="tab in visibleTabs" :key="tab.value" :value="tab.value">
                     <section v-for="group in tab.groups" :key="group.title ?? tab.value" class="pref-group">
                         <h3 v-if="group.title">{{ group.title }}</h3>
 
-                        <div v-for="control in group.controls" :key="control.id" class="pref-row">
-                            <template v-if="control.kind === 'range'">
-                                <RangeSetting v-model="control.model.value" :label="control.label" :min="control.min"
-                                              :max="control.max" :step="control.step" :format="control.format" />
-                            </template>
-                            <template v-else>
-                                <label :id="`pref-${control.id}-label`" :for="`pref-${control.id}`" class="pref-label">{{ control.label }}</label>
-                                <Select v-if="control.kind === 'select'" v-model="control.model.value"
-                                        :input-id="`pref-${control.id}`" :aria-labelledby="`pref-${control.id}-label`"
-                                        :options="control.options"
-                                        option-label="label" option-value="value" class="pref-select" />
-                                <ToggleSwitch v-else v-model="control.model.value" :input-id="`pref-${control.id}`" />
-                            </template>
-                        </div>
+                        <template v-for="control in group.controls" :key="control.id">
+                            <div class="pref-row">
+                                <template v-if="control.kind === 'range'">
+                                    <RangeSetting v-model="control.model.value" :label="control.label" :min="control.min"
+                                                  :max="control.max" :step="control.step" :format="control.format" />
+                                </template>
+                                <template v-else>
+                                    <label :id="`pref-${control.id}-label`" :for="`pref-${control.id}`" class="pref-label">{{ control.label }}</label>
+                                    <Select v-if="control.kind === 'select'" v-model="control.model.value"
+                                            :input-id="`pref-${control.id}`" :aria-labelledby="`pref-${control.id}-label`"
+                                            :pt="{ label: { 'aria-describedby': control.hint?.value ? `pref-${control.id}-hint` : undefined } }"
+                                            :options="control.options" :disabled="!!control.disabled?.value"
+                                            option-label="label" option-value="value" class="pref-select" />
+                                    <ToggleSwitch v-else v-model="control.model.value" :input-id="`pref-${control.id}`" />
+                                </template>
+                            </div>
+                            <p v-if="control.hint?.value" :id="`pref-${control.id}-hint`" class="pref-hint">{{ control.hint.value }}</p>
+                        </template>
                     </section>
 
                     <section v-if="tab.value === 'map'" class="pref-group">
@@ -79,8 +83,11 @@
  * here reaches the open views, and a change there (another tab, the account) shows here.
  * The preferences store sends what changes to the account. Each tab resets its own sections;
  * "Reset all" asks first, with a confirm window that opens above this one.
+ *
+ * The Notifications tab exists only on a server that sends e-mail; its setting is disabled,
+ * with the reason, when the server cannot e-mail this account.
  */
-import { computed, ref, toRef } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Tab from 'primevue/tab';
@@ -96,18 +103,24 @@ import { useConfirm } from '@/composables/useConfirm';
 import { useDialogs } from '@/composables/useDialogs';
 import { usePreference } from '@/composables/usePreference';
 import { useViewerSettings } from '@/composables/useViewerSettings';
+import reg from '@/libs/api/sharedRegistry';
+import { Features } from '@/libs/features';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
 
 defineOptions({ name: 'PreferencesDialog' });
+const props = defineProps({
+    /** The tab shown first (a tab `value`); the first tab when it is unknown or hidden */
+    initialTab: { type: String, default: 'units' }
+});
 defineEmits(['close']);
 
 const store = usePreferencesStore();
+const auth = useAuthStore();
 const dialogs = useDialogs();
 const confirm = useConfirm(dialogs);
-
-const activeTab = ref('units');
 
 const datasetTable = useViewerSettings(PREF.DATASET_TABLE, PREF_DEFAULTS[PREF.DATASET_TABLE]).settings;
 const orgPage = useViewerSettings(PREF.ORG_PAGE, PREF_DEFAULTS[PREF.ORG_PAGE]).settings;
@@ -119,8 +132,11 @@ const optionsOf = (values, label = String) => values.map(value => ({ value, labe
 
 const PAGE_SIZES = optionsOf([5, 10, 25, 50, 100]);
 
-/** @param {string} id @param {string} label @param {import('vue').Ref} model @param {Array<{label: string, value: any}>} options */
-const select = (id, label, model, options) => ({ id, label, kind: 'select', model, options });
+/**
+ * @param {string} id @param {string} label @param {import('vue').Ref} model @param {Array<{label: string, value: any}>} options
+ * @param {{ disabled?: import('vue').Ref<boolean>, hint?: import('vue').Ref<string|null> }} [extra]  hint: a line shown under the row
+ */
+const select = (id, label, model, options, extra) => ({ id, label, kind: 'select', model, options, ...extra });
 /** @param {string} id @param {string} label @param {import('vue').Ref} model */
 const toggle = (id, label, model) => ({ id, label, kind: 'switch', model });
 /** @param {string} id @param {string} label @param {import('vue').Ref} model @param {number} max @param {Record<string, any>} [extra] */
@@ -128,7 +144,46 @@ const range = (id, label, model, max, extra) => ({ id, label, kind: 'range', mod
 
 const basemapOptions = Object.entries(Basemaps).map(([value, { label }]) => ({ value, label }));
 
-/** `sections` are the account sections the tab shows: its "Reset section" returns them to the defaults. */
+// ---- Notifications: e-mail about the user's builds ----
+
+const BUILD_NOTIFICATION_OPTIONS = [
+    { value: 'none', label: 'None' },
+    { value: 'all', label: 'All' },
+    { value: 'failed', label: 'Only failed builds' }
+];
+/** Why the server cannot e-mail this account, by the status `reason` (emailDisabled hides the tab instead). */
+const CANNOT_RECEIVE = {
+    noAddress: 'Your account has no e-mail address. Ask an administrator to add one.'
+};
+
+/** The answer of /users/notifications/status, once asked. @type {import('vue').Ref<{ canReceiveEmail: boolean, reason: string|null }|null>} */
+const notificationStatus = ref(null);
+const notificationsShown = computed(() =>
+    !!auth.feature(Features.EMAIL_ENABLED) && notificationStatus.value?.reason !== 'emailDisabled');
+// Not known yet, or known to be impossible: the setting waits. A failed status request leaves it
+// usable, as the server applies the setting only when it can send anyway
+const cannotReceive = computed(() => notificationStatus.value?.canReceiveEmail === false);
+const notificationsDisabled = computed(() => notificationStatus.value === null || cannotReceive.value);
+const notificationsHint = computed(() => (cannotReceive.value
+    ? CANNOT_RECEIVE[notificationStatus.value?.reason ?? ''] ?? 'Your account cannot receive e-mail from this server.'
+    : 'An e-mail tells you when the builds of your files end; builds that end close together share one e-mail.'));
+
+let statusAsked = false;
+async function loadNotificationStatus() {
+    if (statusAsked) return;
+    statusAsked = true;
+    try {
+        notificationStatus.value = await reg.notificationStatus();
+    } catch (e) {
+        console.warn('The e-mail status of the account could not be read', e);
+        notificationStatus.value = { canReceiveEmail: true, reason: null };
+    }
+}
+
+/**
+ * `sections` are the account sections the tab shows: its "Reset section" returns them to the defaults.
+ * `shown`, when set, says whether the tab is there.
+ */
 const TABS = [
     {
         value: 'units', label: 'Units', icon: 'fa-solid fa-ruler', sections: ['units'],
@@ -206,8 +261,34 @@ const TABS = [
                 ]
             }
         ]
+    },
+    {
+        value: 'notifications', label: 'Notifications', icon: 'fa-solid fa-envelope', sections: ['notifications'],
+        shown: notificationsShown,
+        groups: [{
+            title: 'E-mail',
+            controls: [
+                select('build-notifications', 'Send build notifications',
+                    usePreference(PREF.BUILD_NOTIFICATIONS, PREF_DEFAULTS[PREF.BUILD_NOTIFICATIONS]), BUILD_NOTIFICATION_OPTIONS,
+                    { disabled: notificationsDisabled, hint: notificationsHint })
+            ]
+        }]
     }
 ];
+
+const visibleTabs = computed(() => TABS.filter(tab => !tab.shown || tab.shown.value));
+
+// The tab asked for stays chosen while it is hidden (the feature flags may arrive after the
+// window opens): the first tab shows meanwhile, and the chosen one as soon as it is there
+const chosenTab = ref(props.initialTab);
+// A link to another tab while the window is open
+watch(() => props.initialTab, tab => { chosenTab.value = tab; });
+const activeTab = computed({
+    get: () => (visibleTabs.value.some(tab => tab.value === chosenTab.value) ? chosenTab.value : visibleTabs.value[0].value),
+    set: value => { chosenTab.value = value; }
+});
+
+watch(activeTab, tab => { if (tab === 'notifications') void loadNotificationStatus(); }, { immediate: true });
 
 // The custom basemap: shown as the map reads it (an invalid one is ignored there too), cleared here
 const storedCustomBasemap = usePreference(PREF.CUSTOM_BASEMAP, PREF_DEFAULTS[PREF.CUSTOM_BASEMAP]);

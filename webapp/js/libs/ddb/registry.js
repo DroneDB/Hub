@@ -104,6 +104,14 @@ export default class Registry {
         }
     }
 
+    /**
+     * Whether the signed-in user can be sent e-mail: { canReceiveEmail, reason }, reason
+     * 'emailDisabled' (the server sends none), 'noAddress' (the account has no address) or null.
+     */
+    notificationStatus() {
+        return this.getRequest('/users/notifications/status', { cache: false });
+    }
+
     // ==================== Features ====================
 
     // ==================== Organization Member Management ==
@@ -147,6 +155,9 @@ export default class Registry {
      * (all, or the endpoints starting with `invalidate` when a write changes only those).
      * `signal` aborts the request (AbortError); requests time out after 5 minutes.
      * `onHeaders(headers)` receives the response headers (requests that skip the cache only).
+     * @param {string} endpoint
+     * @param {string | Record<string, any>} [methodOrOptions]
+     * @param {any} [body] @param {string|null} [contentType] @param {string|null} [responseType]
      */
     async makeRequest(endpoint, methodOrOptions = "GET", body = null, contentType = null, responseType = null) {
         const options = typeof methodOrOptions === 'object' && methodOrOptions !== null
