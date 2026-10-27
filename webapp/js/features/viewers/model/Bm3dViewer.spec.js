@@ -17,7 +17,8 @@ vi.mock('./modelStage', () => ({
         h.stage = {
             options,
             renderer: { name: 'renderer' },
-            material: { color: { set: vi.fn() }, needsUpdate: false, vertexColors: false },
+            material: { vertexColors: false },
+            setMaterialColor: vi.fn(),
             scene: { add: vi.fn() },
             frameModel: vi.fn(),
             start: vi.fn(),
@@ -70,8 +71,7 @@ describe('Bm3dViewer', () => {
         model.onLoad(model);
         expect(model.material).toBe(h.stage.material);
         expect(h.stage.material.vertexColors).toBe(true);
-        expect(h.stage.material.color.set).toHaveBeenCalledWith(0xffffff);
-        expect(h.stage.material.needsUpdate).toBe(true);
+        expect(h.stage.setMaterialColor).toHaveBeenCalledWith(0xffffff);
     });
 
     it('keeps the material the viewer made for a textured model', async () => {

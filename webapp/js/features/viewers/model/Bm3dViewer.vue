@@ -55,8 +55,7 @@ function chooseMaterial() {
     modelInfo.hasNormals = !!made.isMeshLambertMaterial;
     if (modelInfo.hasTexture || !modelInfo.hasNormals) return;
     stage.material.vertexColors = modelInfo.hasColors;
-    stage.material.color.set(modelInfo.hasColors ? 0xffffff : 0xaaaaaa);
-    stage.material.needsUpdate = true;
+    stage.setMaterialColor(modelInfo.hasColors ? 0xffffff : 0xaaaaaa);
     model.material = stage.material;
 }
 

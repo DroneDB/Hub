@@ -19,6 +19,30 @@ import { fitDistance } from '@/features/viewers/unified/sceneUtils';
 // Room around the unit sphere the model is scaled to (the mesh is not strictly inside it)
 const FIT_MARGIN = 1.25;
 const BACKGROUND = 0x1a1a2e;
+// From r165 three.js has only lights in physical units (a light of intensity 1 is 1/PI as bright as
+// one of the earlier releases, which scaled the light by PI)
+const PHYSICAL_LIGHTS_REVISION = 165;
+
+/**
+ * How the stage has to treat the three.js build it is given to look like the Nexus viewer (the
+ * three.js r124 of Potree), which the lighting of the Preferences was made for and the users are
+ * used to:
+ *  - lightScale: the factor of a light's intensity that gives the same shading as in r124 (the
+ *    PI that releases since r165 no longer put into their lights);
+ *  - colourManaged: the build has colour management (r152+). The bm3d viewer uploads the bytes of
+ *    its textures and vertex colours as they are, with no decoding of the sRGB they are in, so the
+ *    renderer must not encode its output to sRGB again (that washes the picture out) and the
+ *    colours of the stage are the raw values of their hex codes, as in r124, not converted from
+ *    sRGB to the linear working space.
+ * @param {any} THREE
+ * @returns {{ lightScale: number, colourManaged: boolean }}
+ */
+export function legacyLook(THREE) {
+    return {
+        lightScale: parseInt(THREE.REVISION, 10) >= PHYSICAL_LIGHTS_REVISION ? Math.PI : 1,
+        colourManaged: THREE.LinearSRGBColorSpace !== undefined
+    };
+}
 
 /**
  * @typedef {{ ambientIntensity: number, directionalIntensity: number, shininess: number }} Lighting
@@ -32,6 +56,11 @@ const BACKGROUND = 0x1a1a2e;
  * @param {Lighting} options.settings     the lighting (a reactive object: a change is applied to the lights)
  */
 export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
+    const { lightScale, colourManaged } = legacyLook(THREE);
+    // A colour of the stage from its hex code, as the build without colour management reads it
+    // (the colour space is not a parameter there)
+    const colour = hex => new THREE.Color().setHex(hex, THREE.LinearSRGBColorSpace);
+
     const camera = new THREE.PerspectiveCamera(35, 2, 0.1, 100);
     camera.position.z = 4.0;
     // The model is scaled to a sphere of radius 1; the camera stands where that sphere (and some
@@ -39,26 +68,27 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
     let fittedDistance = camera.position.length();
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(BACKGROUND);
-    scene.fog = new THREE.Fog(BACKGROUND, 2000, 3500);
+    scene.background = colour(BACKGROUND);
+    scene.fog = new THREE.Fog(colour(BACKGROUND), 2000, 3500);
 
     const lights = {
-        ambient: new THREE.AmbientLight(0xffffff, settings.ambientIntensity),
+        ambient: new THREE.AmbientLight(0xffffff, settings.ambientIntensity * lightScale),
         // Natural sky/ground fill
-        hemisphere: new THREE.HemisphereLight(0xffffff, 0x444444, 0.4),
-        key: new THREE.DirectionalLight(0xffffff, settings.directionalIntensity),
-        back: new THREE.DirectionalLight(0xffffff, settings.directionalIntensity)
+        hemisphere: new THREE.HemisphereLight(0xffffff, colour(0x444444), 0.4 * lightScale),
+        key: new THREE.DirectionalLight(0xffffff, settings.directionalIntensity * lightScale),
+        back: new THREE.DirectionalLight(0xffffff, settings.directionalIntensity * lightScale)
     };
     lights.key.position.set(1, 1, -1);
     lights.back.position.set(-1, -1, 1);
     Object.values(lights).forEach(light => scene.add(light));
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+    if (colourManaged) renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
     renderer.setClearColor(scene.fog.color);
     renderer.setPixelRatio(window.devicePixelRatio);
 
     // MeshLab-style shading for models without a texture
-    const material = new THREE.MeshPhongMaterial({ color: 0xaaaaaa, specular: 0x444444, shininess: settings.shininess });
+    const material = new THREE.MeshPhongMaterial({ color: colour(0xaaaaaa), specular: colour(0x444444), shininess: settings.shininess });
 
     const controls = new ArcballControls(camera, renderer.domElement, scene);
     controls.setGizmosVisible(false);
@@ -68,13 +98,19 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
 
     /** Puts the settings on the lights and on the shaded material. */
     function applyLighting() {
-        lights.ambient.intensity = settings.ambientIntensity;
-        lights.key.intensity = settings.directionalIntensity;
-        lights.back.intensity = settings.directionalIntensity;
+        lights.ambient.intensity = settings.ambientIntensity * lightScale;
+        lights.key.intensity = settings.directionalIntensity * lightScale;
+        lights.back.intensity = settings.directionalIntensity * lightScale;
         material.shininess = settings.shininess;
         material.needsUpdate = true;
     }
     const stopWatching = watch(settings, applyLighting, { deep: true });
+
+    /** Sets the colour of the shaded material from a hex code (the way the stage reads colours). */
+    function setMaterialColor(hex) {
+        material.color.copy(colour(hex));
+        material.needsUpdate = true;
+    }
 
     /**
      * Scales and moves a model so that its bounding sphere is the unit sphere at the origin. The
@@ -132,5 +168,5 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
         renderer.dispose();
     }
 
-    return { scene, camera, renderer, material, controls, frameModel, start, dispose };
+    return { scene, camera, renderer, material, controls, setMaterialColor, frameModel, start, dispose };
 }

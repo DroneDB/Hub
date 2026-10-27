@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { reactive, nextTick } from 'vue';
 import * as THREE_BUILD from 'three';
-import { createModelStage } from './modelStage';
+import { createModelStage, legacyLook } from './modelStage';
 import { fitDistance } from '@/features/viewers/unified/sceneUtils';
 
 /** A WebGL context is not available: the renderer is a recording stand-in on the real three.js classes. */
@@ -64,8 +64,8 @@ describe('lighting', () => {
     it('starts with the settings on the lights and the shaded material', () => {
         makeStage();
         const lights = stage.scene.children.filter(c => c.isLight);
-        expect(lights.find(l => l.isAmbientLight).intensity).toBe(0.4);
-        expect(lights.filter(l => l.isDirectionalLight).map(l => l.intensity)).toEqual([0.7, 0.7]);
+        expect(lights.find(l => l.isAmbientLight).intensity).toBe(0.4 * Math.PI);
+        expect(lights.filter(l => l.isDirectionalLight).map(l => l.intensity)).toEqual([0.7 * Math.PI, 0.7 * Math.PI]);
         expect(stage.material.shininess).toBe(25);
     });
 
@@ -76,8 +76,8 @@ describe('lighting', () => {
         settings.shininess = 80;
         await nextTick();
         const lights = stage.scene.children.filter(c => c.isLight);
-        expect(lights.find(l => l.isAmbientLight).intensity).toBe(2);
-        expect(lights.filter(l => l.isDirectionalLight).map(l => l.intensity)).toEqual([1.5, 1.5]);
+        expect(lights.find(l => l.isAmbientLight).intensity).toBe(2 * Math.PI);
+        expect(lights.filter(l => l.isDirectionalLight).map(l => l.intensity)).toEqual([1.5 * Math.PI, 1.5 * Math.PI]);
         expect(stage.material.shininess).toBe(80);
     });
 
@@ -86,8 +86,62 @@ describe('lighting', () => {
         stage.dispose();
         settings.ambientIntensity = 3;
         await nextTick();
-        expect(stage.scene.children.find(c => c.isAmbientLight).intensity).toBe(0.4);
+        expect(stage.scene.children.find(c => c.isAmbientLight).intensity).toBe(0.4 * Math.PI);
         stage = null;
+    });
+});
+
+// The build the Nexus viewer works with (three.js r124): lights as they are, no colour management
+const LEGACY_THREE = { ...THREE, REVISION: '124', LinearSRGBColorSpace: undefined };
+const LEGACY_COLOR_SPACE = undefined;
+
+const lightsOf = s => s.scene.children.filter(c => c.isLight);
+const intensitiesOf = s => ({
+    ambient: lightsOf(s).find(l => l.isAmbientLight).intensity,
+    hemisphere: lightsOf(s).find(l => l.isHemisphereLight).intensity,
+    directional: lightsOf(s).filter(l => l.isDirectionalLight).map(l => l.intensity)
+});
+const channels = c => [c.r, c.g, c.b];
+
+describe('the look of the Nexus viewer on a modern three.js', () => {
+    it('legacyLook: PI for the physical lights of r165 and later, 1 before, colour management from r152', () => {
+        expect(legacyLook(THREE)).toEqual({ lightScale: Math.PI, colourManaged: true });
+        expect(legacyLook({ REVISION: '164', LinearSRGBColorSpace: 'srgb-linear' })).toEqual({ lightScale: 1, colourManaged: true });
+        expect(legacyLook({ REVISION: '151' })).toEqual({ lightScale: 1, colourManaged: false });
+        expect(legacyLook(LEGACY_THREE)).toEqual({ lightScale: 1, colourManaged: false });
+    });
+
+    it('scales every light by PI so that a setting gives the shading of r124 (the fill of the hemisphere too)', () => {
+        makeStage();
+        expect(intensitiesOf(stage)).toEqual({
+            ambient: 0.4 * Math.PI, hemisphere: 0.4 * Math.PI, directional: [0.7 * Math.PI, 0.7 * Math.PI]
+        });
+    });
+
+    it('renders without sRGB encoding, as the bm3d textures and vertex colours are not decoded from it', () => {
+        makeStage();
+        expect(stage.renderer.outputColorSpace).toBe(THREE_BUILD.LinearSRGBColorSpace);
+    });
+
+    it('reads the colours of the stage as the raw values of their hex codes, with no conversion to linear', () => {
+        makeStage();
+        expect(channels(stage.scene.background)).toEqual([0x1a / 255, 0x1a / 255, 0x2e / 255]);
+        expect(channels(stage.scene.fog.color)).toEqual(channels(stage.scene.background));
+        expect(channels(stage.scene.children.find(l => l.isHemisphereLight).groundColor)).toEqual([0x44 / 255, 0x44 / 255, 0x44 / 255]);
+        expect(channels(stage.material.color)).toEqual([0xaa / 255, 0xaa / 255, 0xaa / 255]);
+        expect(channels(stage.material.specular)).toEqual([0x44 / 255, 0x44 / 255, 0x44 / 255]);
+        stage.setMaterialColor(0xffffff);
+        expect(channels(stage.material.color)).toEqual([1, 1, 1]);
+        stage.setMaterialColor(0x808080);
+        expect(channels(stage.material.color)).toEqual([0x80 / 255, 0x80 / 255, 0x80 / 255]);
+    });
+});
+
+describe('the legacy three.js (r124)', () => {
+    it('is left as it was: the settings are the intensities, the output colour space is not touched', () => {
+        stage = createModelStage({ THREE: LEGACY_THREE, ArcballControls: FakeControls, canvas, settings });
+        expect(intensitiesOf(stage)).toEqual({ ambient: 0.4, hemisphere: 0.4, directional: [0.7, 0.7] });
+        expect(stage.renderer.outputColorSpace).toBe(LEGACY_COLOR_SPACE);
     });
 });
 
