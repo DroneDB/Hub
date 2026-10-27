@@ -1,6 +1,6 @@
 <template>
     <Window id="preferencesDialog" title="Preferences" modal fixed-size size-class="dialog-lg" @close="$emit('close')">
-        <Tabs v-model:value="activeTab" class="pref-tabs">
+        <Tabs ref="tabsRef" v-model:value="activeTab" class="pref-tabs">
             <TabList>
                 <Tab v-for="tab in visibleTabs" :key="tab.value" :value="tab.value">
                     <i :class="tab.icon" aria-hidden="true" /><span class="tab-label">{{ tab.label }}</span>
@@ -87,7 +87,7 @@
  * The Notifications tab exists only on a server that sends e-mail; its setting is disabled,
  * with the reason, when the server cannot e-mail this account.
  */
-import { computed, ref, toRef, watch } from 'vue';
+import { computed, nextTick, ref, toRef, watch } from 'vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import Tab from 'primevue/tab';
@@ -290,6 +290,13 @@ const activeTab = computed({
 
 watch(activeTab, tab => { if (tab === 'notifications') void loadNotificationStatus(); }, { immediate: true });
 
+// The tab list scrolls when the tabs do not fit the window: a tab opened by a link (or chosen
+// before its flag arrived) is brought into view, else it can sit cut off at the edge
+// (the window renders its content after it opens, so the tabs mounting is watched too)
+const tabsRef = ref(null);
+watch([activeTab, tabsRef], () => nextTick(() => tabsRef.value?.$el?.querySelector('[role="tab"][aria-selected="true"]')
+    ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })), { flush: 'post' });
+
 // The custom basemap: shown as the map reads it (an invalid one is ignored there too), cleared here
 const storedCustomBasemap = usePreference(PREF.CUSTOM_BASEMAP, PREF_DEFAULTS[PREF.CUSTOM_BASEMAP]);
 const customBasemap = computed(() => (storedCustomBasemap.value ? getCustomBasemapConfig() : null));
@@ -360,9 +367,10 @@ async function resetAll() {
     color: var(--ddb-text);
 }
 
-/* 12rem when there is room; narrower (never past the panel edge) on a phone */
+/* 14rem when there is room (the longest option, "Only failed builds", fits); narrower (never past
+   the panel edge) on a phone */
 .pref-select {
-    flex: 0 1 12rem;
+    flex: 0 1 14rem;
     min-width: 0;
 }
 

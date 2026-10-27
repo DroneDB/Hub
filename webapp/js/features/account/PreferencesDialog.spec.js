@@ -134,6 +134,19 @@ describe('PreferencesDialog', () => {
             expect(h.reg.notificationStatus).toHaveBeenCalledTimes(1);
         });
 
+        it('brings the tab given by initialTab into view (the tab list scrolls when the tabs do not fit)', async () => {
+            const scrolled = [];
+            const original = HTMLElement.prototype.scrollIntoView;
+            HTMLElement.prototype.scrollIntoView = function () { scrolled.push(this.textContent.trim()); };
+            try {
+                await render({ initialTab: 'notifications' });
+                await flushPromises();
+                expect(scrolled).toContain('Notifications');
+            } finally {
+                HTMLElement.prototype.scrollIntoView = original;
+            }
+        });
+
         it('opens on the tab given by initialTab, with None, All and Only failed builds, None first', async () => {
             await render({ initialTab: 'notifications' });
             expect(activeTab()).toBe('Notifications');

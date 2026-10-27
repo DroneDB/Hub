@@ -56,6 +56,27 @@ describe('AdminConfig', () => {
         expect(wrapper.findComponent({ name: 'EmailTemplatesCard' }).exists()).toBe(true);
     });
 
+    it('mounts the cards once, after the configuration is loaded (each card loads its own data on mount)', async () => {
+        let mounts = 0;
+        const Card = { name: 'EmailTemplatesCard', template: '<div />', mounted: () => { mounts++; } };
+        let resolveConfig;
+        h.sys.config = vi.fn(() => new Promise(resolve => { resolveConfig = resolve; }));
+        wrapper = mount(AdminConfig, {
+            attachTo: document.body,
+            global: {
+                plugins: [PrimeVue],
+                stubs: { UsageAndContactCard: true, EmailTemplatesCard: Card },
+                mocks: { $notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, $router: { push: vi.fn() } }
+            }
+        });
+        await flushPromises();
+        expect(mounts).toBe(0);
+
+        resolveConfig(structuredClone(CONFIG));
+        await flushPromises();
+        expect(mounts).toBe(1);
+    });
+
     it('shows an informational value read-only, not as a setting', async () => {
         await show();
         const info = fieldOf('InstanceId');

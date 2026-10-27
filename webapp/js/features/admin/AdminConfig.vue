@@ -195,7 +195,8 @@ export default {
     data() {
         return {
             sections: [],
-            loading: false,
+            // The page loads on mount: the cards below the spinner are mounted once, after the load
+            loading: true,
             activeIndex: [0],
             // Map<"sIdx-fIdx", newValue>
             modifiedFields: {},
