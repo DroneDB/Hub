@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
+import { reactive } from 'vue';
 
 const h = vi.hoisted(() => ({
     reg: null,
@@ -14,6 +15,7 @@ vi.mock('@/libs/api/sharedRegistry', () => {
         features: { get: () => false, value: () => null },
         Organization: () => ({ info: () => Promise.resolve({ isPublic: true }) }),
         storageInfo: () => Promise.resolve(null),
+        notificationStatus: () => Promise.resolve({ canReceiveEmail: true, reason: null }),
         sys: { updateInfo: null }
     };
     return { default: h.reg };
@@ -237,5 +239,71 @@ describe('HubHeader user menu: Preferences', () => {
             expect(preferencesWindow()).toBeNull();
             expect(wrapper.vm.preferencesOpen).toBe(false);
         });
+    });
+});
+
+describe('HubHeader: a link to the Preferences window', () => {
+    const preferencesWindow = () => document.body.querySelector('#preferencesDialog');
+    const selectedTab = () => preferencesWindow()?.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim();
+    let replace;
+
+    async function land(query, { loggedIn = true } = {}) {
+        h.auth.isLoggedIn = loggedIn;
+        h.auth.isAdmin = false;
+        h.auth.flags.emailEnabled = true;
+        h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(AVAILABLE));
+        replace = vi.fn(() => Promise.resolve());
+        const route = reactive({ params: {}, path: '/r', fullPath: '/r', hash: '', query });
+        wrapper = mount(HubHeader, {
+            global: {
+                plugins: [PrimeVue, createPinia()],
+                mocks: { $route: route, $router: { push: vi.fn(), replace } },
+                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+            },
+            attachTo: document.body
+        });
+        await flushPromises();
+        return route;
+    }
+    beforeEach(() => { wrapper = null; });
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        document.body.innerHTML = '';
+        delete h.auth.flags.emailEnabled;
+    });
+
+    it('opens the window on the tab it names and removes the query, keeping the others', async () => {
+        await land({ preferences: 'notifications', q: 'x' });
+        await vi.waitFor(() => expect(preferencesWindow()).not.toBeNull());
+        await vi.waitFor(() => expect(selectedTab()).toBe('Notifications'));
+        expect(replace).toHaveBeenCalledWith({ path: '/r', query: { q: 'x' }, hash: '' });
+    });
+
+    it('opens the window on its first tab for an empty or unknown tab', async () => {
+        await land({ preferences: 'nonsense' });
+        await vi.waitFor(() => expect(selectedTab()).toBe('Units'));
+        expect(replace).toHaveBeenCalledTimes(1);
+    });
+
+    it('does nothing for an anonymous user (the router guard signs them in first)', async () => {
+        await land({ preferences: 'notifications' }, { loggedIn: false });
+        expect(wrapper.vm.preferencesOpen).toBe(false);
+        expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('opens the window once the user is signed in and back on the link', async () => {
+        const route = await land({}, { loggedIn: false });
+        h.auth.isLoggedIn = true;
+        route.query = { preferences: 'notifications' };
+        await flushPromises();
+        await vi.waitFor(() => expect(selectedTab()).toBe('Notifications'));
+        expect(replace).toHaveBeenCalled();
+    });
+
+    it('does not open the window without the query', async () => {
+        await land({});
+        expect(wrapper.vm.preferencesOpen).toBe(false);
+        expect(replace).not.toHaveBeenCalled();
     });
 });

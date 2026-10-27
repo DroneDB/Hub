@@ -39,6 +39,18 @@ describe('router guard', () => {
         expect(guard(router.resolve('/admin/users'), { isLoggedIn: true, isAdmin: true })).toBe(true);
     });
 
+    it('signs an anonymous user in before a link to the Preferences window, keeping the link', async () => {
+        const { createAppRouter } = await import('@/router');
+        const { guard } = await import('@/libs/authRoutes');
+        const router = createAppRouter(true);
+        const link = '/r?preferences=notifications';
+        expect(guard(router.resolve(link), { isLoggedIn: false, isAdmin: false }))
+            .toEqual({ name: 'Login', query: { redirect: link } });
+        expect(guard(router.resolve(link), { isLoggedIn: true, isAdmin: false })).toBe(true);
+        // On the Login page itself the link is dropped: no loop
+        expect(guard(router.resolve('/login?preferences=notifications'), { isLoggedIn: false, isAdmin: false })).toEqual({ name: 'Login' });
+    });
+
     it('marks protected routes in meta', async () => {
         const { createAppRouter } = await import('@/router');
         const router = createAppRouter(true);

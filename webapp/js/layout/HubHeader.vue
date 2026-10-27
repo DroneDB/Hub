@@ -42,7 +42,7 @@
 
             <UpdateNotesDialog v-if="updateNotesOpen && updateInfo" :info="updateInfo" @close="updateNotesOpen = false" />
 
-            <PreferencesDialog v-if="preferencesOpen && loggedIn" @close="preferencesOpen = false" />
+            <PreferencesDialog v-if="preferencesOpen && loggedIn" :initial-tab="preferencesTab" @close="preferencesOpen = false" />
 
             <Alert v-if="storageInfoDialogOpen" title="Storage Info" @close="handleStorageInfoDialogClose">
                 <div class="storage-info-content">
@@ -116,7 +116,7 @@ import { useUpdateCheck } from '@/composables/useUpdateCheck';
 import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
-import { loginLocation } from '@/libs/authRoutes';
+import { loginLocation, PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
 
 // Opened from the user menu only: its code loads the first time it is shown
@@ -161,7 +161,9 @@ export default {
             accountManagement: false,
             shareFile: null,
             updateNotesOpen: false,
-            preferencesOpen: false
+            preferencesOpen: false,
+            // The tab the window opens on (undefined: its first)
+            preferencesTab: undefined
         }
     },
 
@@ -347,6 +349,7 @@ export default {
         loggedIn: function (loggedIn) {
             if (loggedIn) {
                 this.refreshStorageInfo();
+                this.openPreferencesFromLink();
             } else {
                 this.storageInfo = null;
                 this.updateNotesOpen = false;
@@ -377,6 +380,7 @@ export default {
 
             this.params = params;
             this.updateBackToOrgVisibility();
+            this.openPreferencesFromLink();
         }
     },
     mounted: function () {
@@ -394,6 +398,7 @@ export default {
         this.refreshStorageInfo();
         this.checkUserManagement();
         this.updateBackToOrgVisibility();
+        this.openPreferencesFromLink();
     },
     beforeUnmount: function () {
 
@@ -461,8 +466,21 @@ export default {
         manageAccount: function () {
             this.$router.push({ name: "Account" });
         },
-        openPreferences: function () {
+        /** @param {string} [tab] the tab to show first */
+        openPreferences: function (tab) {
+            this.preferencesTab = tab;
             this.preferencesOpen = true;
+        },
+
+        // A link with ?preferences=<tab> (e.g. the opt-out link of an e-mail) opens the window on
+        // that tab, then leaves the URL as it would be without it, so a reload or a shared URL does
+        // not open it again. The router guard signs an anonymous user in first, keeping the link.
+        openPreferencesFromLink: function () {
+            const { query = {}, path, hash } = this.$route;
+            if (!this.loggedIn || !Object.hasOwn(query, PREFERENCES_QUERY)) return;
+            const { [PREFERENCES_QUERY]: tab, ...rest } = query;
+            this.openPreferences(typeof tab === 'string' && tab ? tab : undefined);
+            this.$router.replace({ path, query: rest, hash }).catch(() => { });
         },
         handleDownload: function () {
             this.downloadConfirmOpen = true;

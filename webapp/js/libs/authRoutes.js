@@ -2,15 +2,23 @@
 /** Route decisions that depend on the session; shared by the router, Login and the 401 handler. */
 
 /**
+ * The query that opens the Preferences window on any page, on the tab it names
+ * (`/r?preferences=notifications`, the opt-out link of the e-mails). The header opens the
+ * window and removes the query; the window needs a session, so the guard signs the user in first.
+ */
+export const PREFERENCES_QUERY = 'preferences';
+
+/**
  * Where to send a navigation to a protected route: anonymous users to Login
- * (coming back afterwards), signed-in non-admins to their organisations.
+ * (coming back afterwards), signed-in non-admins to their organisations. A link to the
+ * Preferences window (PREFERENCES_QUERY) counts as protected.
  * @param {import('vue-router').RouteLocationNormalized} to
  * @param {{ isLoggedIn: boolean, isAdmin: boolean }} auth
  * @returns {true|import('vue-router').RouteLocationRaw}
  */
 export function guard(to, auth) {
     const needsAdmin = to.matched.some(r => r.meta.requiresAdmin);
-    const needsAuth = needsAdmin || to.matched.some(r => r.meta.requiresAuth);
+    const needsAuth = needsAdmin || to.matched.some(r => r.meta.requiresAuth) || Object.hasOwn(to.query ?? {}, PREFERENCES_QUERY);
     if (needsAuth && !auth.isLoggedIn) return loginLocation(to.fullPath);
     if (needsAdmin && !auth.isAdmin) return { name: 'Organizations' };
     return true;
