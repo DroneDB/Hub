@@ -21,6 +21,8 @@ class ApiError extends Error {
 /** @param {unknown} e @param {number} status */
 const hasStatus = (e, status) => !!e && typeof e === 'object' && /** @type {any} */ (e).status === status;
 
+/** The server refused the request's content (its `message` says why). @param {unknown} e */
+export const isBadRequest = e => hasStatus(e, 400);
 /** @param {unknown} e */
 export const isUnauthorized = e => hasStatus(e, 401);
 /** @param {unknown} e */

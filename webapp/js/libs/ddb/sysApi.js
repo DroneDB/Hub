@@ -3,6 +3,10 @@
  * Registry system endpoints (/sys/*) used by the Hub: configuration,
  * processing nodes, upload diagnostics. Pages call these instead of building paths.
  */
+const EMAIL_TEMPLATES = '/sys/email/templates';
+/** @param {string} name */
+const emailTemplatePath = name => `${EMAIL_TEMPLATES}/${encodeURIComponent(name)}`;
+
 export default class SysApi {
     /** @param {import('./registry').default} registry */
     constructor(registry) {
@@ -25,6 +29,50 @@ export default class SysApi {
      */
     saveUpdateCheckSettings(settings) {
         return this.registry.putRequest('/sys/update-check/settings', settings);
+    }
+
+    // ---- E-mail templates the admin can edit (admin) ----
+
+    /** The editable templates: [{ name, title, isDefault }]. */
+    emailTemplates() {
+        return this.registry.getRequest(EMAIL_TEMPLATES, { cache: false });
+    }
+
+    /**
+     * One template: its current and default subject and body, and the placeholders it accepts.
+     * @param {string} name
+     */
+    emailTemplate(name) {
+        return this.registry.getRequest(emailTemplatePath(name), { cache: false });
+    }
+
+    /**
+     * Saves the text (the server checks the placeholders: 400 names the bad one); answers with the template.
+     * @param {string} name @param {{ subject: string, body: string }} text
+     */
+    saveEmailTemplate(name, text) {
+        return this.registry.makeRequest(emailTemplatePath(name), { method: 'PUT', body: text, invalidate: EMAIL_TEMPLATES });
+    }
+
+    /** Back to the built-in text; answers with the template. @param {string} name */
+    resetEmailTemplate(name) {
+        return this.registry.makeRequest(emailTemplatePath(name), { method: 'DELETE', invalidate: EMAIL_TEMPLATES });
+    }
+
+    /**
+     * The e-mail an unsaved text gives with sample data: { subject, text, html }.
+     * @param {string} name @param {{ subject: string, body: string }} text
+     */
+    previewEmailTemplate(name, text) {
+        return this.registry.makeRequest(`${emailTemplatePath(name)}/preview`, { method: 'POST', body: text, readOnly: true });
+    }
+
+    /**
+     * Sends the sample e-mail of an unsaved text to the signed-in admin (nothing is saved).
+     * @param {string} name @param {{ subject: string, body: string }} text
+     */
+    testEmailTemplate(name, text) {
+        return this.registry.makeRequest(`${emailTemplatePath(name)}/test`, { method: 'POST', body: text, readOnly: true });
     }
 
     /** Configured processing nodes (NodeODX). */

@@ -17,6 +17,7 @@
 
         <div v-else class="config-scroll-container">
             <UsageAndContactCard />
+            <EmailTemplatesCard />
 
             <Accordion :active-index="activeIndex" class="config-accordion">
                 <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx">
@@ -161,6 +162,7 @@
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import EmailTemplatesCard from '@/features/admin/EmailTemplatesCard.vue';
 import UsageAndContactCard from '@/features/admin/UsageAndContactCard.vue';
 import reg from '@/libs/api/sharedRegistry';
 import Accordion from 'primevue/accordion';
@@ -185,7 +187,7 @@ export default {
     name: 'AdminConfig',
 
     components: {
-        LoadingSpinner, UsageAndContactCard,
+        LoadingSpinner, UsageAndContactCard, EmailTemplatesCard,
         Accordion, AccordionTab, Button, InputText, InputNumber,
         ToggleSwitch, Select, Password, Chips, Textarea, Tag
     },

@@ -61,3 +61,43 @@ describe('taskStates', () => {
         expect(datasetKey({ baseApi: '/orgs/o/ds/d', org: 'o', ds: 'd' })).toBe('/orgs/o/ds/d');
     });
 });
+
+describe('e-mail templates and notification status', () => {
+    /** The requests a client sends, answered with `status` and a JSON `body`. */
+    async function client(status = 200, body = {}) {
+        const { default: Registry } = await import('@/libs/ddb/registry');
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response(JSON.stringify(body), { status, headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' } }));
+        const sent = () => fetchMock.mock.calls.map(([url, init]) => [init.method, new URL(url).pathname, init.body ? JSON.parse(init.body) : undefined]);
+        return { reg: new Registry('http://hub.test'), sent };
+    }
+    const text = { subject: 'S', body: 'B' };
+
+    it('reach the endpoints of the Registry with the name encoded', async () => {
+        const { reg, sent } = await client();
+        await reg.sys.emailTemplates();
+        await reg.sys.emailTemplate('build-notification');
+        await reg.sys.saveEmailTemplate('a/b', text);
+        await reg.sys.resetEmailTemplate('build-notification');
+        await reg.sys.previewEmailTemplate('build-notification', text);
+        await reg.sys.testEmailTemplate('build-notification', text);
+        await reg.notificationStatus();
+        expect(sent()).toEqual([
+            ['GET', '/sys/email/templates', undefined],
+            ['GET', '/sys/email/templates/build-notification', undefined],
+            ['PUT', '/sys/email/templates/a%2Fb', text],
+            ['DELETE', '/sys/email/templates/build-notification', undefined],
+            ['POST', '/sys/email/templates/build-notification/preview', text],
+            ['POST', '/sys/email/templates/build-notification/test', text],
+            ['GET', '/users/notifications/status', undefined]
+        ]);
+    });
+
+    it('a refused text rejects with status 400 and the ProblemDetails detail', async () => {
+        const { isBadRequest } = await import('@/libs/ddb/apiError');
+        const { reg } = await client(400, { title: 'Bad Request', status: 400, detail: 'Unknown placeholder {{foo}} in the body' });
+        const error = await reg.sys.saveEmailTemplate('build-notification', text).catch(e => e);
+        expect(isBadRequest(error)).toBe(true);
+        expect(error.message).toBe('Unknown placeholder {{foo}} in the body');
+    });
+});

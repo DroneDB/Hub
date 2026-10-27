@@ -35,7 +35,7 @@ async function show() {
         attachTo: document.body,
         global: {
             plugins: [PrimeVue],
-            stubs: { UsageAndContactCard: true },
+            stubs: { UsageAndContactCard: true, EmailTemplatesCard: true },
             mocks: { $notify: { success: vi.fn(), error: vi.fn(), info: vi.fn() }, $router: { push: vi.fn() } }
         }
     });
@@ -50,6 +50,12 @@ beforeEach(() => {
 afterEach(() => wrapper?.unmount());
 
 describe('AdminConfig', () => {
+    it('has the usage and the e-mail templates cards (each decides whether it shows)', async () => {
+        await show();
+        expect(wrapper.findComponent({ name: 'UsageAndContactCard' }).exists()).toBe(true);
+        expect(wrapper.findComponent({ name: 'EmailTemplatesCard' }).exists()).toBe(true);
+    });
+
     it('shows an informational value read-only, not as a setting', async () => {
         await show();
         const info = fieldOf('InstanceId');
