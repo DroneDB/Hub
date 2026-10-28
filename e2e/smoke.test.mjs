@@ -148,7 +148,7 @@ test('the header downloads the selected file', async () => {
 
 test('the header Settings button opens the dataset settings', async () => {
     await page.click('button[title="Settings"]');
-    await page.waitForSelector('text=License:', { timeout: 15000 });
+    await page.waitForSelector('.p-dialog >> text=License', { timeout: 15000 });
     await page.keyboard.press('Escape');
 });
 
@@ -315,6 +315,19 @@ test('dataset Map tab: split compare and the display toggles', async () => {
     await page.click(flight);
     assert.notEqual(await page.locator(flight).getAttribute('aria-pressed'), before);
     await page.click(flight);
+});
+
+test('compare view: georasters side by side, saved and listed under the tree', async () => {
+    const paths = [path.basename(FILES.raster), path.basename(FILES.dem)];
+    const query = paths.map(p => `p=${Buffer.from(p, 'utf8').toString('base64url')}`).join('&');
+    await page.goto(`${URL_}/r/${USER}/${DS}/compare?${query}`);
+    await page.waitForSelector('.split-overlay', { timeout: 30000 });
+    assert.deepEqual(await page.locator('.split-label-text').allInnerTexts(), paths);
+    await page.click('.compare-toolbar button:has-text("Save")');
+    await page.fill('.p-dialog input', 'Smoke comparison');
+    await Promise.all([page.waitForURL(/\?c=c_/, { timeout: 15000 }), page.click('.p-dialog button[data-confirm]')]);
+    await page.goto(`${URL_}/r/${USER}/${DS}`);
+    await page.waitForSelector('.saved-comparisons >> text=Smoke comparison', { timeout: 20000 });
 });
 
 test('dataset Map tab: clicking a photo opens its popup', async () => {
