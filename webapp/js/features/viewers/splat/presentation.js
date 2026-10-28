@@ -1,11 +1,12 @@
 /**
  * The splat viewer's presentation: a tour through the saved
- * cameras (move, pause, next), a slow auto-orbit when there are none, and the eased
- * flight to one camera. Any user navigation stops it. Every flight is the unified viewer's camera
+ * cameras and the pins that have a view (move, pause, next), a slow auto-orbit when there are none,
+ * and the eased flight to one camera or view. Any user navigation stops it. Every flight is the unified viewer's camera
  * tweener (one easing, one way to retarget or cancel a flight); only the pauses between the
  * cameras of a tour are counted per frame.
  */
 import { poseOf } from './cameraPresets';
+import { tourStops } from './sceneData';
 import { createCameraTweener } from '@/features/viewers/unified/navControls';
 
 const TOUR_MOVE_MS = 2500;
@@ -16,14 +17,19 @@ export class Presentation {
      * @param {import('./cameraRig').CameraRig} rig
      * @param {object} hooks
      * @param {() => any[]} hooks.cameras
+     * @param {() => { view: any, cameraIndex: number | null, annotationIndex: number | null }[]} [hooks.stops]
+     *   the stops of the tour, in order (the cameras, then the pins with a view: sceneData.tourStops); the cameras alone by default
      * @param {(mode: null|'tour'|'orbit'|'transition') => void} hooks.onMode
      * @param {(index: number|null) => void} hooks.onCamera   the camera on show (null between cameras)
+     * @param {(index: number|null) => void} [hooks.onPin]    the pin on show (null between stops)
      */
-    constructor(rig, { cameras, onMode, onCamera }) {
+    constructor(rig, { cameras, stops = () => tourStops(cameras(), []), onMode, onCamera, onPin = () => {} }) {
         this.rig = rig;
         this.cameras = cameras;
+        this.stops = stops;
         this.onMode = onMode;
         this.onCamera = onCamera;
+        this.onPin = onPin;
         this.state = null;
         this.tweener = createCameraTweener();
     }
@@ -42,32 +48,51 @@ export class Presentation {
         this.onMode(state ? state.mode : null);
     }
 
-    /** A tour through the cameras, or a slow orbit when there are none. */
+    /** Whether there is anything to tour: a camera or a pin with a view. */
+    get hasTour() {
+        return this.stops().length > 0;
+    }
+
+    /** A tour through the stops, or a slow orbit when there are none. */
     start() {
-        this.onCamera(null);
-        const cameras = this.cameras();
-        if (cameras.length) {
+        this.leave();
+        const stops = this.stops();
+        if (stops.length) {
             this.set({ mode: 'tour', target: 0, phase: 'move', elapsed: 0, dwellDur: 2.0 });
-            this.moveTo(poseOf(this.rig, cameras[0]), TOUR_MOVE_MS, () => this.arrive());
+            this.moveTo(poseOf(this.rig, stops[0].view), TOUR_MOVE_MS, () => this.arrive());
         } else {
             this.set({ mode: 'orbit' }, 0.2);
         }
     }
 
     orbit() {
-        this.onCamera(null);
+        this.leave();
         this.set({ mode: 'orbit' }, 0.5);
+    }
+
+    /** Nothing is on show: no camera, no pin. */
+    leave() {
+        this.onCamera(null);
+        this.onPin(null);
     }
 
     /** Eased flight to a camera (accelerate, cruise, decelerate). */
     flyTo(index) {
         const c = this.cameras()[index];
         if (!c) return;
-        this.onCamera(null);
-        this.set({ mode: 'transition', targetIndex: index });
-        this.moveTo(poseOf(this.rig, c), TRANSITION_MS, () => {
+        this.flyToView(c, () => this.onCamera(index));
+    }
+
+    /**
+     * The same flight to a view (a camera, or the view saved with a pin); `onArrive` runs when it is there.
+     * @param {any} view @param {() => void} onArrive
+     */
+    flyToView(view, onArrive) {
+        this.leave();
+        this.set({ mode: 'transition' });
+        this.moveTo(poseOf(this.rig, view), TRANSITION_MS, () => {
             this.stop();
-            this.onCamera(index);
+            onArrive();
         });
     }
 
@@ -79,12 +104,14 @@ export class Presentation {
             e => rig.setFov(fromFov + (pose.fov - fromFov) * e));
     }
 
-    /** A tour reached its camera: it stays for the dwell time. */
+    /** A tour reached its stop: it stays for the dwell time, with the camera or the pin on show. */
     arrive() {
         const st = this.state;
         st.phase = 'dwell';
         st.elapsed = 0;
-        this.onCamera(st.target);
+        const stop = this.stops()[st.target];
+        this.onCamera(stop ? stop.cameraIndex : null);
+        this.onPin(stop ? stop.annotationIndex : null);
     }
 
     /** Stops; returns whether something was running. */
@@ -101,17 +128,17 @@ export class Presentation {
         if (!st || st.mode !== 'tour' || st.phase !== 'dwell') return;
         st.elapsed += dt;
         if (st.elapsed < st.dwellDur) return;
-        const cameras = this.cameras();
-        // The cameras were all deleted during the tour
-        if (!cameras.length) {
+        const stops = this.stops();
+        // The stops were all deleted during the tour
+        if (!stops.length) {
             this.stop();
             return;
         }
-        st.target = (st.target + 1) % cameras.length;
+        st.target = (st.target + 1) % stops.length;
         st.phase = 'move';
         st.elapsed = 0;
-        this.onCamera(null);
-        this.moveTo(poseOf(this.rig, cameras[st.target]), TOUR_MOVE_MS, () => this.arrive());
+        this.leave();
+        this.moveTo(poseOf(this.rig, stops[st.target].view), TOUR_MOVE_MS, () => this.arrive());
     }
 
     /** Ends a flight that is still running (the viewer is going away). */

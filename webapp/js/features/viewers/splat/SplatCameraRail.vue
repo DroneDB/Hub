@@ -11,7 +11,7 @@
                 :aria-label="mode === 'orbit' ? 'Stop orbit' : 'Start orbit'" @click="emit('toggle-orbit')">
             <i :class="mode === 'orbit' ? 'fa-solid fa-pause' : 'fa-solid fa-arrows-rotate'" />
         </button>
-        <button v-if="cameras.length" class="rail-btn" :class="{ active: mode === 'tour' }"
+        <button v-if="hasTour" class="rail-btn" :class="{ active: mode === 'tour' }"
                 :title="mode === 'tour' ? 'Stop cycling' : 'Start cycling'" :aria-label="mode === 'tour' ? 'Stop cycling' : 'Start cycling'"
                 @click="emit('toggle-tour')">
             <i class="fa-solid fa-camera-rotate" />
@@ -20,8 +20,8 @@
             <button class="rail-btn" title="Save current view as a camera" aria-label="Save current view as a camera" @click="emit('add')">
                 <i class="fa-solid fa-camera" />
             </button>
-            <button class="rail-btn" :class="{ dirty }" :disabled="!dirty" title="Save cameras to dataset"
-                    aria-label="Save cameras to dataset" @click="emit('save')">
+            <button class="rail-btn" :class="{ dirty }" :disabled="!dirty" title="Save the views to the dataset"
+                    aria-label="Save the views to the dataset" @click="emit('save')">
                 <i class="fa-solid fa-floppy-disk" />
             </button>
         </template>
@@ -39,7 +39,9 @@ defineProps({
     /** Presentation mode: 'orbit', 'tour', 'transition' or null */
     mode: { type: String, default: null },
     canWrite: { type: Boolean, default: false },
-    dirty: { type: Boolean, default: false }
+    dirty: { type: Boolean, default: false },
+    /** There is something to tour: a camera, or a pin with a view */
+    hasTour: { type: Boolean, default: false }
 });
 const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save']);
 </script>

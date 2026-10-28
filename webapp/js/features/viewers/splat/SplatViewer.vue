@@ -8,13 +8,15 @@
 
         <canvas ref="canvas" />
         <!-- The labels of the measurements: HTML over the canvas, drawn by the stage -->
-        <div ref="labelLayer" class="label-layer" />
+        <div ref="labelLayer" class="label-layer" :class="{ drawing: !!measureKind }" />
         <DialogHost :dialogs="dialogs" />
 
         <div class="top-right-stack">
             <div v-if="loaded && activeCameraName" class="camera-hud" title="Current camera view">
                 <i class="fa-solid fa-camera" /> {{ activeCameraName }}
             </div>
+            <PinCard v-if="loaded && shownPin" :pin="shownPin" :image-url="shownPinImage" :can-write="canWrite"
+                     @close="activePin = null" @edit="showPins = true" />
         </div>
 
         <div v-if="loaded" class="top-left-stack">
@@ -42,10 +44,13 @@
             <button class="btn-overlay" title="Manage camera views" aria-label="Manage camera views" @click="showCameraManager = !showCameraManager">
                 <i class="fa-solid fa-camera" />
             </button>
+            <button class="btn-overlay" title="Pins" aria-label="Pins" @click="showPins = !showPins">
+                <i class="fa-solid fa-map-pin" />
+            </button>
         </div>
 
         <SplatCameraRail v-if="loaded" :cameras="cameras" :active-index="activeCameraIndex" :mode="presentationMode" :can-write="canWrite"
-                         :dirty="camerasDirty" @goto="flyTo" @toggle-orbit="toggleOrbit" @toggle-tour="toggleTour" @add="addCurrentCamera"
+                         :dirty="camerasDirty" :has-tour="tourAvailable" @goto="flyTo" @toggle-orbit="toggleOrbit" @toggle-tour="toggleTour" @add="addCurrentCamera"
                          @save="saveCameras" />
         <SplatNavPad v-if="loaded" :pressed="pressed" :touch="isTouch" @press="pressKey" @release="releaseKey" />
 
@@ -60,6 +65,10 @@
                        :active-index="activeCameraIndex" @goto="flyTo" @add-current="addCurrentCamera" @update-current="updateCameraToCurrent"
                        @delete="deleteCamera" @move="moveCamera" @rename="renameCamera" @save="saveCameras"
                        @close="showCameraManager = false" />
+        <AnnotationManager v-if="showPins" :pins="annotations" :can-write="canWrite" :dirty="camerasDirty" :active-index="activePin"
+                           @goto="selectPin" @update-view="updatePinView" @move="movePin" @delete="removePin" @rename="renamePin"
+                           @edit="({ index, changes }) => editPin(index, changes)" @add="addPin" @save="saveCameras"
+                           @close="showPins = false" />
     </ViewerShell>
 </template>
 
@@ -84,7 +93,9 @@ import { useNotify } from '@/composables/useNotify';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import AnnotationManager from './AnnotationManager.vue';
 import CameraManager from './CameraManager.vue';
+import PinCard from './PinCard.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
 import SplatMeasureToolbar from './SplatMeasureToolbar.vue';
 import SplatNavPad from './SplatNavPad.vue';
@@ -100,6 +111,8 @@ import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
 import { SplatMeasureTool } from './measureTool';
+import { createPinLayer } from './pinLayer';
+import { tourStops } from './sceneData';
 import ScaleDialog from './ScaleDialog.vue';
 import { sceneScale, distanceBetween, metersPerUnitFrom } from './measureMath';
 import { useSplatScene } from './useSplatScene';
@@ -120,6 +133,7 @@ const loaded = ref(false);
 const progress = ref(null);
 const showSettings = ref(false);
 const showCameraManager = ref(false);
+const showPins = ref(false);
 const streaming = ref(false);
 // The view settings start at the defaults (most INRIA/3DGS scenes render upside down without the
 // half turn of the -y axis); loadSplat sets what this device remembers for the entry, and the
@@ -149,6 +163,12 @@ const measureKind = ref(/** @type {string | null} */ (null));
 const measureCount = ref(0);
 const georeferenced = computed(() => entry.value?.properties?.georeferenced === true);
 const measureScale = computed(() => sceneScale({ georeferenced: georeferenced.value, metersPerUnit: views.scale.value?.metersPerUnit }));
+// The pins: the one on show (clicked, picked in the panel, or visited by the tour) opens its card
+const { annotations, activePin } = views;
+const { removePin, movePin, renamePin, editPin, updatePinView } = views;
+const shownPin = computed(() => (activePin.value === null ? null : annotations.value[activePin.value] ?? null));
+const shownPinImage = computed(() => (shownPin.value?.image ? dataset.value.thumbUrl(shownPin.value.image, 800) : ''));
+const tourAvailable = computed(() => tourStops(cameras.value, annotations.value).length > 0);
 const activeCameraName = computed(() => {
     const i = activeCameraIndex.value;
     const c = i === null ? null : cameras.value[i];
@@ -166,6 +186,7 @@ let presentation = null;
 let pointSize = null;
 let bounds = null;
 let measureTool = null;
+let pinLayer = null;
 // Drawing a measurement owns the pointer: the navigation controls stand by
 let navigationSuspended = false;
 let lastFrameTime = 0;
@@ -174,7 +195,7 @@ let unmounted = false;
 let userInteracted = false;
 
 // Any dialog: the settings, the camera views, or one opened through the dialog host (a confirmation)
-const dialogOpen = computed(() => showSettings.value || showCameraManager.value || dialogs.stack.value.length > 0);
+const dialogOpen = computed(() => showSettings.value || showCameraManager.value || showPins.value || dialogs.stack.value.length > 0);
 
 // Explicit navigation stops the presentation and leaves the camera on show
 function onUserInteract() {
@@ -299,8 +320,10 @@ async function loadSplat() {
     earth.attach((t, type, fn, opts) => listeners.add(t, type, fn, opts));
     presentation = new Presentation(rig, {
         cameras: () => cameras.value,
+        stops: () => tourStops(cameras.value, annotations.value),
         onMode: mode => { presentationMode.value = mode; },
-        onCamera: index => { activeCameraIndex.value = index; }
+        onCamera: index => { activeCameraIndex.value = index; },
+        onPin: index => { activePin.value = index; }
     });
 
     // Paged .rad: chunks on demand by range requests; .spz: whole file, LOD built in a worker.
@@ -320,8 +343,12 @@ async function loadSplat() {
         onChange: list => views.setMeasurements(list),
         onMiss: () => notify.info('No splat there: click on the scene.', { summary: 'Measure' })
     }, count => { measureCount.value = count; });
+    pinLayer = createPinLayer({
+        CSS2DObject: libraries.CSS2DObject, overlay: stage.overlay, listen: (target, type, fn) => listeners.add(target, type, fn), onSelect: selectPin
+    });
     applyOrientation();
     measureTool.show(views.measurements.value);
+    syncPins();
     // Nothing was in view while loading: a drag then did not choose a view
     userInteracted = false;
     frameRetry.start();
@@ -430,6 +457,34 @@ async function setScale() {
     views.setScale(metersPerUnit);
 }
 
+// ---- Pins -------------------------------------------------------------------------------
+
+function syncPins() {
+    if (pinLayer) pinLayer.sync(annotations.value, activePin.value);
+}
+watch([annotations, activePin], syncPins, { deep: true });
+
+// A click on a pin (or its row in the panel) shows it and flies to the view saved with it
+function selectPin(index) {
+    const pin = annotations.value[index];
+    if (!pin || !presentation) return;
+    userInteracted = true;
+    fly.stop();
+    if (pin.view) presentation.flyToView(pin.view, () => {});
+    else presentation.stop();
+    // After the flight started: starting it clears what was on show
+    activePin.value = index;
+}
+
+// The place of a new pin is picked on the splats, then its panel opens to name it
+async function addPin() {
+    if (!measureTool || !canWrite.value) return;
+    onUserInteract();
+    const picked = await measureTool.measure('pin');
+    if (!picked) return;
+    views.addPin({ position: picked.points[0] });
+}
+
 // ---- Keyboard and pad -------------------------------------------------------------------
 
 function pressKey(code) {
@@ -525,8 +580,9 @@ onBeforeUnmount(() => {
     if (presentation) presentation.dispose();
     if (earth) earth.dispose();
     if (measureTool) measureTool.dispose();
+    if (pinLayer) pinLayer.dispose();
     if (stage) stage.dispose();
-    stage = splatMesh = rig = fly = earth = presentation = pointSize = measureTool = null;
+    stage = splatMesh = rig = fly = earth = presentation = pointSize = measureTool = pinLayer = null;
 });
 </script>
 

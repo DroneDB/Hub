@@ -210,7 +210,7 @@ describe('navigation', () => {
     });
 });
 
-describe('the scale', () => {
+describe('the scale and the places of pins', () => {
     it('picks two points and keeps nothing', async () => {
         const drawing = tool.measure('scale');
         pick([0, 0, 0], [0, 0, 4]);
@@ -222,6 +222,16 @@ describe('the scale', () => {
         // The pair stays out of the scene
         expect(dots()).toBe(0);
         expect(labels()).toEqual([]);
+    });
+
+    it('picks the place of a pin the same way, and keeps nothing', async () => {
+        const drawing = tool.measure('pin');
+        expect(tool.activeKind).toBe('pin');
+        pick([1, 2, 3]);
+        expect((await drawing).points).toEqual([[1, 2, 3]]);
+        expect(tool.measurements).toEqual([]);
+        expect(labels()).toEqual([]);
+        expect(host.onChange).not.toHaveBeenCalled();
     });
 
     it('changes the labels when the shapes are drawn again after a change of scale', async () => {

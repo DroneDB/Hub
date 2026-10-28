@@ -52,6 +52,11 @@
     pointer-events: none;
 }
 
+/* A pin in the way of a click would take it from the shape being drawn under it */
+#splat .label-layer.drawing .splat-pin {
+    pointer-events: none;
+}
+
 #splat .streaming-badge {
     background: rgba(0, 0, 0, 0.55);
     color: var(--ddb-text-on-dark);

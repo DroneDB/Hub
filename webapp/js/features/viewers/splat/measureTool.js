@@ -12,8 +12,9 @@
  * camera): a click adds a point, Enter or a right click ends the shape, Escape cancels it. A
  * shape with a fixed number of points (a point, a height) ends by itself.
  *
- * The same drawing, with `measure('scale')`, picks the two points of a length the user knows:
- * the pair is returned and nothing is kept.
+ * The same drawing picks points that are not measurements: `measure('scale')` the two points of a
+ * length the user knows, `measure('pin')` the place of a pin. The points are returned and nothing
+ * is kept.
  */
 import { MEASURE_COLOR } from '@/features/viewers/unified/sceneUtils';
 import { MEASURE_KINDS, sceneLabels, shapeLabels } from './measureMath';
@@ -23,9 +24,9 @@ import { newId } from './sceneData';
 const CLICK_MOVE_PX = 6;
 const CLICK_MS = 600;
 
-/** The two points of a known length: drawn like a distance, but not kept. */
-const SCALE_KIND = 'scale';
-const SPECS = { ...MEASURE_KINDS, [SCALE_KIND]: { min: 2, max: 2 } };
+/** What can be picked but is not a measurement: the two points of a known length, the place of a pin. Not kept. */
+const PICK_ONLY = { scale: { min: 2, max: 2 }, pin: { min: 1, max: 1 } };
+const SPECS = { ...MEASURE_KINDS, ...PICK_ONLY };
 
 /**
  * @typedef {object} MeasureHost
@@ -37,7 +38,7 @@ const SPECS = { ...MEASURE_KINDS, [SCALE_KIND]: { min: 2, max: 2 } };
  * @property {() => { metersPerUnit: number, unit: string }} getScale
  * @property {(target: any, type: string, listener: (e: any) => void) => void} listen   adds a listener for the life of the viewer
  * @property {(enabled: boolean) => void} setNavigationEnabled
- * @property {(kind: string | null) => void} [onActive]   the kind being drawn changed (null: none)
+ * @property {(kind: string | null) => void} [onActive]   the kind being drawn or picked changed (null: none)
  * @property {(measurements: import('./sceneData').Measurement[]) => void} [onChange]   the user drew a shape or cleared them
  * @property {() => void} [onMiss]                a click that found no splat
  */
@@ -72,8 +73,9 @@ export class SplatMeasureTool {
     }
 
     /**
-     * Draws one shape of `kind` ('point', 'distance', 'height', 'area', or 'scale'); a new one
-     * cancels the current. Resolves with the shape when it ends, null when it was cancelled.
+     * Draws one shape of `kind` ('point', 'distance', 'height', 'area'), or picks points for
+     * 'scale' or 'pin'; a new one cancels the current. Resolves with the shape (the points for a
+     * pick) when it ends, null when it was cancelled.
      * @param {string} kind
      * @returns {Promise<import('./sceneData').Measurement | null>}
      */
@@ -95,7 +97,7 @@ export class SplatMeasureTool {
         /** @type {import('./sceneData').Measurement} */
         const measurement = { id: newId(), kind: /** @type {any} */ (s.kind), points: s.points.map(p => p.slice()) };
         this.end(measurement);
-        if (s.kind === SCALE_KIND) return;
+        if (Object.hasOwn(PICK_ONLY, s.kind)) return;
         this.measurements.push(measurement);
         this.draw(measurement);
         this.onCount(this.measurements.length);
@@ -194,7 +196,7 @@ export class SplatMeasureTool {
             group.add(line);
         }
         points.forEach(p => labels.push(this.element(CSS2DObject, 'splat-vertex', '', p)));
-        if (kind !== SCALE_KIND) {
+        if (!Object.hasOwn(PICK_ONLY, kind)) {
             shapeLabels(kind, points, up, this.labels).forEach(l => labels.push(this.element(CSS2DObject, `splat-measure-label ${l.kind}`, l.text, l.at)));
         }
         labels.forEach(l => group.add(l));

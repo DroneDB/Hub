@@ -33,7 +33,7 @@
 import { computed } from 'vue';
 
 const props = defineProps({
-    /** The kind being drawn: 'point' | 'distance' | 'height' | 'area' | 'scale' | null */
+    /** The kind being drawn or picked: 'point' | 'distance' | 'height' | 'area' | 'scale' | 'pin' | null */
     activeKind: { type: String, default: null },
     /** How many shapes are shown */
     count: { type: Number, default: 0 },
@@ -56,7 +56,8 @@ const HINTS = {
     distance: 'Click the points of the line. Right click or Enter ends it, Escape cancels.',
     height: 'Click two points: the height is the difference along the scene\'s up.',
     area: 'Click the corners of the area (3 or more). Right click or Enter ends it, Escape cancels.',
-    scale: 'Click the two ends of something whose length you know.'
+    scale: 'Click the two ends of something whose length you know.',
+    pin: 'Click where the pin goes.'
 };
 const hint = computed(() => HINTS[props.activeKind] ?? '');
 </script>
