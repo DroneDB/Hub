@@ -154,9 +154,24 @@ module.exports = {
                     name: 'vendor-primevue',
                     priority: 20
                 },
+                // One group per 3D library, so a viewer downloads only its own: the splat viewer
+                // three.js and Spark (~4.8 MB), the unified viewer three.js and Giro3D with the
+                // point cloud decoders, the model viewers three.js alone
                 three: {
-                    test: /[\\/]node_modules[\\/](three|@giro3d|@sparkjsdev|laz-perf|copc)[\\/]/,
-                    name: 'vendor-3d',
+                    test: /[\\/]node_modules[\\/]three[\\/]/,
+                    name: 'vendor-three',
+                    chunks: 'async',
+                    priority: 25
+                },
+                spark: {
+                    test: /[\\/]node_modules[\\/]@sparkjsdev[\\/]/,
+                    name: 'vendor-spark',
+                    chunks: 'async',
+                    priority: 25
+                },
+                giro3d: {
+                    test: /[\\/]node_modules[\\/](@giro3d|laz-perf|copc)[\\/]/,
+                    name: 'vendor-giro3d',
                     chunks: 'async',
                     priority: 25
                 },
