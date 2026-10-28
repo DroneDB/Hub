@@ -76,18 +76,49 @@ export function formatEstimatedUp(bounds) {
     return `${direction}, ${confidence}${source}`;
 }
 
+/** @param {unknown} list @returns {any[]} */
+const listOf = list => (Array.isArray(list) ? list : []);
+
+/**
+ * How many chunks of its wanted list the pager has still to fetch. Spark's `fetchPriority` is every
+ * chunk the view wants, in priority order, including those already in a page, so it is walked the
+ * way the pager's own fetch loop walks it: a resident chunk, or one in flight or fetched but not yet
+ * uploaded, takes a page and is not counted here; any other is waiting for a fetcher if it still
+ * fits in the pool (`maxPages`), and one that does not fit is never fetched, so it is not on the way
+ * either. Without `getSplatsChunk` which entries are resident is unknown and none is counted.
+ * @param {any} pager
+ * @param {any[]} inFlight  the fetchers and the fetched chunks, each { splats, chunk }
+ */
+function waitingChunks(pager, inFlight) {
+    if (typeof pager.getSplatsChunk !== 'function') return 0;
+    const maxPages = isCount(pager.maxPages) ? pager.maxPages : Infinity;
+    let pages = 0;
+    let waiting = 0;
+    for (const wanted of listOf(pager.fetchPriority)) {
+        const taken = pager.getSplatsChunk(wanted?.splats, wanted?.chunk)
+            || inFlight.some(f => f?.splats === wanted?.splats && f?.chunk === wanted?.chunk);
+        if (!taken) {
+            if (pages >= maxPages) continue;
+            waiting += 1;
+        }
+        pages += 1;
+    }
+    return waiting;
+}
+
 /**
  * What the pager of Spark says about the streaming of a paged file: how many chunks are being
- * fetched or waiting to be, and how many pages of its pool are filled. `null` without a pager.
+ * fetched, fetched but not yet uploaded, or waiting for a fetcher, and how many pages of its pool
+ * are filled. `null` without a pager.
  * @param {any} pager  spark.pager
  * @returns {{ pending: number, pages: number, maxPages: number } | null}
  */
 export function pagerState(pager) {
     if (!pager) return null;
-    const size = (/** @type {unknown} */ list) => (Array.isArray(list) ? list.length : 0);
+    const inFlight = [...listOf(pager.fetchers), ...listOf(pager.fetched)];
     return {
-        pending: size(pager.fetchers) + size(pager.fetchPriority) + size(pager.fetched),
-        pages: Array.isArray(pager.pageToSplatsChunk) ? pager.pageToSplatsChunk.filter(Boolean).length : 0,
+        pending: inFlight.length + waitingChunks(pager, inFlight),
+        pages: listOf(pager.pageToSplatsChunk).filter(Boolean).length,
         maxPages: isCount(pager.maxPages) ? pager.maxPages : 0
     };
 }

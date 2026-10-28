@@ -73,10 +73,38 @@ describe('estimated up', () => {
 });
 
 describe('level-of-detail streaming', () => {
-    const pager = { fetchers: [1, 2], fetchPriority: [3], fetched: [], pageToSplatsChunk: [{}, undefined, {}, {}], maxPages: 256 };
+    const splats = {};
+    const want = (...chunks) => chunks.map(chunk => ({ splats, chunk }));
+    /** A stub of Spark's pager whose resident chunks are `resident` (chunk index -> page). */
+    const pagerOf = ({ resident = [], fetchers = [], fetched = [], fetchPriority = [], maxPages = 256 }) => ({
+        fetchers, fetched, fetchPriority, maxPages,
+        pageToSplatsChunk: resident.map(chunk => ({ splats, chunk })),
+        getSplatsChunk: (s, chunk) => (s === splats && resident.includes(chunk) ? { page: resident.indexOf(chunk), lru: 0 } : undefined)
+    });
 
-    it('reads the pending chunks and the filled pages of the pager', () => {
-        expect(pagerState(pager)).toEqual({ pending: 3, pages: 3, maxPages: 256 });
+    it('counts no wanted chunk that is already in a page, so a fully loaded file is up to date', () => {
+        const state = pagerState(pagerOf({ resident: [0, 1, 2, 3], fetchPriority: want(0, 1, 2, 3) }));
+        expect(state).toEqual({ pending: 0, pages: 4, maxPages: 256 });
+        expect(formatLodState(true, state)).toBe('Up to date for this view (4 of 256 pages in memory)');
+        const rows = splatInfoRows({ entry: { path: 'a.rad' }, bounds: null, scale: UNITS, streaming: true, lod: state });
+        expect(rows.find(r => r.id === 'lod').value).toBe('Up to date for this view (4 of 256 pages in memory)');
+    });
+
+    it('counts the fetches in flight, the fetched chunks not yet uploaded and the wanted chunks waiting, each once', () => {
+        const state = pagerState(pagerOf({
+            resident: [0], fetchers: want(1), fetched: want(2), fetchPriority: want(0, 1, 2, 3, 4)
+        }));
+        expect(state?.pending).toBe(4);
+    });
+
+    it('does not count a wanted chunk that no longer fits in the pool, as the pager never fetches it', () => {
+        const state = pagerState(pagerOf({ resident: [0, 1], fetchers: want(2), fetchPriority: want(0, 1, 2, 3, 4), maxPages: 4 }));
+        expect(state).toEqual({ pending: 2, pages: 2, maxPages: 4 });
+    });
+
+    it('counts only the fetches in flight and the fetched chunks when it cannot tell which are resident', () => {
+        const pager = { fetchers: want(1, 2), fetchPriority: want(0, 1, 2, 3), fetched: [], pageToSplatsChunk: [{}, undefined, {}, {}], maxPages: 256 };
+        expect(pagerState(pager)).toEqual({ pending: 2, pages: 3, maxPages: 256 });
         expect(pagerState({})).toEqual({ pending: 0, pages: 0, maxPages: 0 });
         expect(pagerState(null)).toBeNull();
     });
