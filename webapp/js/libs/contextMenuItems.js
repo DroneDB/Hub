@@ -11,7 +11,9 @@ import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { useClipboardStore } from '@/stores/clipboard';
-import { SPLAT_DOWNLOADS, splatDownloadsOf, runSplatDownload } from '@/features/viewers/splat/splatDownloads';
+import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
+import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
+import { taskToolOffered } from '@/libs/tasks/taskTools';
 
 /**
  * Context object interface:
@@ -544,7 +546,9 @@ function makeDownloadItem(label, icon, entryType, ctx) {
 
 /**
  * The downloads of a Gaussian splat: one item per row of SPLAT_DOWNLOADS, shown when the selected
- * splat has it (the original always, an artifact once it is built). Adding a download is adding a row there.
+ * splat has it (the original always, an artifact once it is built, the .spz for other tools once it is
+ * built from a format that converts and the server offers the task). Adding a download is adding a row there.
+ * The original goes through the browser's own download, the others through the page ('downloadSplat').
  * @param {object} ctx - Context menu context object
  */
 function splatDownloadItems(ctx) {
@@ -552,7 +556,7 @@ function splatDownloadItems(ctx) {
         const sel = ctx.getSelectedEntries();
         return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GAUSSIAN_SPLAT ? sel[0] : null;
     };
-    const available = (file, row) => splatDownloadsOf(file.entry, { building: hasActiveBuild(ctx.dataset, file) }).find(d => d.id === row.id);
+    const available = (file, row) => splatDownloadsOf(file.entry, { building: hasActiveBuild(ctx.dataset, file), canExport: splatExportOffered() }).find(d => d.id === row.id);
     return SPLAT_DOWNLOADS.map(row => ({
         label: row.label,
         icon: row.icon,
@@ -563,9 +567,29 @@ function splatDownloadItems(ctx) {
         click: () => {
             const file = selected();
             const download = file && available(file, row);
-            if (download) runSplatDownload(download, () => ctx.emit('downloadItems', [file]));
+            if (!download) return;
+            if (download.kind === 'original') ctx.emit('downloadItems', [file]);
+            else ctx.emit('downloadSplat', file, download.id);
         }
     }));
+}
+
+/**
+ * Export of the training data of a Gaussian splat from the ODM project in the selected folder (the
+ * root of the dataset included), shown when the server offers the task. The file list does not know
+ * what a folder holds, so the dialog reads it and says if it does not look like an ODM project.
+ * @param {object} ctx - Context menu context object
+ */
+function splatTrainingExportItem(ctx) {
+    return {
+        label: 'Export splat training data',
+        icon: 'fa-solid fa-camera',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1 && isTrainingExportFolder(sel[0].entry) && taskToolOffered(TRAINING_EXPORT_TOOL);
+        },
+        click: () => ctx.emit('exportSplatTrainingData', ctx.getSelectedEntries()[0])
+    };
 }
 
 function toolsItem(ctx) {
@@ -573,6 +597,7 @@ function toolsItem(ctx) {
     const copcItem = makeDownloadItem('Download COPC', 'fa-solid fa-cube', ddb.entry.type.POINTCLOUD, ctx);
     const gpkgItem = makeDownloadItem('Download GPKG', 'fa-solid fa-map', ddb.entry.type.VECTOR, ctx);
     const splatItems = splatDownloadItems(ctx);
+    const trainingExport = splatTrainingExportItem(ctx);
 
     const mergeMultispectral = mergeMultispectralItem(ctx);
     const maskBorders = maskBordersItem(ctx);
@@ -600,12 +625,14 @@ function toolsItem(ctx) {
             transfer,
             {
                 type: 'separator',
-                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible() || splatItems.some(i => i.isVisible())
+                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible() || splatItems.some(i => i.isVisible()) ||
+                    trainingExport.isVisible()
             },
             cogItem,
             copcItem,
             gpkgItem,
-            ...splatItems
+            ...splatItems,
+            trainingExport
         ]
     };
 }
@@ -688,6 +715,7 @@ export {
 
     setCoordinateSystemItem,
     splatDownloadItems,
+    splatTrainingExportItem,
     deleteItem,
     deleteSeparator,
 

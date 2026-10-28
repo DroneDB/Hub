@@ -68,6 +68,8 @@ import { isUnauthorized } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import BuildManager from '@/libs/build/buildManager';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError } from '@/libs/datasetDownloads';
+import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
+import { splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
 import { explorerTools } from '@/libs/dataset/explorerTools';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { useRequestScope, isAbort } from '@/composables/useRequestScope';
@@ -108,6 +110,7 @@ const notify = useNotify();
 const later = useTimerGroup();
 const requestSignal = useRequestScope().signal;
 const { runHeavyTask } = useHeavyTask();
+const splatDownloads = useSplatDownloads(() => dataset);
 const { watchBuildEvents, handleBuildStarted, handleBuildError } = useBuildEvents();
 
 const error = ref('');
@@ -226,6 +229,13 @@ async function downloadArtifact(file) {
     await downloadBuildArtifact(dataset, file.entry.path).catch(notifyDownloadError);
 }
 
+// A download of a splat other than the original: its artifact, or the .spz made for other tools
+function downloadSplat(file, downloadId) {
+    if (!file || !file.entry) return;
+    const row = splatDownloadsOf(file.entry, { canExport: splatExportOffered() }).find(d => d.id === downloadId);
+    if (row) splatDownloads.download(row, file.entry, () => downloadItems([file]));
+}
+
 // ---- Selection and the detail panel ----------------------------------------------------
 
 const selectAll = on => listing.files.value.forEach(f => { f.selected = on; });
@@ -295,6 +305,8 @@ const commonEvents = items => ({
     shareEmbed: actions.share,
     downloadItems,
     downloadBuildArtifact: downloadArtifact,
+    downloadSplat,
+    exportSplatTrainingData: actions.exportSplatTrainingData,
     openAsText: node => actions.editText(node.entry),
     mergeMultispectral: actions.mergeMultispectral,
     maskBorders: actions.maskBorders,

@@ -101,7 +101,6 @@ import { useNotify } from '@/composables/useNotify';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
 import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
-import { notifyDownloadError } from '@/libs/datasetDownloads';
 import AnnotationManager from './AnnotationManager.vue';
 import CameraManager from './CameraManager.vue';
 import PinCard from './PinCard.vue';
@@ -121,7 +120,8 @@ import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
 import { createQualityController, describeQuality } from './qualityPresets';
-import { splatDownloadsOf, runSplatDownload } from './splatDownloads';
+import { splatDownloadsOf, splatExportOffered } from './splatDownloads';
+import { useSplatDownloads } from './useSplatDownloads';
 import { SplatMeasureTool } from './measureTool';
 import { createPinLayer } from './pinLayer';
 import { tourStops } from './sceneData';
@@ -206,7 +206,7 @@ const infoSource = computed(() => ({
 }));
 // Spark's pager (the streaming of a paged .rad), for the popover; there is none before the stage
 const readPager = () => stage?.spark.pager ?? null;
-const downloads = computed(() => splatDownloadsOf(entry.value));
+const downloads = computed(() => splatDownloadsOf(entry.value, { canExport: splatExportOffered() }));
 const tourAvailable = computed(() => tourStops(cameras.value, annotations.value).length > 0);
 const activeCameraName = computed(() => {
     const i = activeCameraIndex.value;
@@ -474,13 +474,8 @@ watch(qualitySetting, value => { if (quality) quality.setSetting(value); });
 
 // ---- Downloads --------------------------------------------------------------------------
 
-async function startDownload(download) {
-    try {
-        await runSplatDownload(download, () => dataset.value.downloadWithCheck(entry.value.path));
-    } catch (e) {
-        notifyDownloadError(e);
-    }
-}
+const splatDownloads = useSplatDownloads(() => dataset.value);
+const startDownload = download => splatDownloads.download(download, entry.value, () => dataset.value.downloadWithCheck(entry.value.path));
 
 // ---- Measurements -----------------------------------------------------------------------
 

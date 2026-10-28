@@ -37,6 +37,7 @@ const AlignDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ 
 const MaskBordersDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/dataset/dialogs/MaskBordersDialog.vue'));
 const ExtractDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/dataset/dialogs/ExtractDialog.vue'));
 const SetCrsDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/dataset/dialogs/SetCrsDialog.vue'));
+const SplatTrainingExportDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/dataset/dialogs/SplatTrainingExportDialog.vue'));
 const ImportFromUrlDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/dataset/dialogs/ImportFromUrlDialog.vue'));
 
 const { pathutils } = ddb;
@@ -378,6 +379,11 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         });
     }
 
+    function exportSplatTrainingData(file) {
+        if (!file) return;
+        dialogs.open(SplatTrainingExportDialog, { file, dataset });
+    }
+
     function maskBorders(item) {
         dialogs.open(MaskBordersDialog, {
             entry: item,
@@ -412,6 +418,6 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     return {
         showError, upload, newFolder, remove, rename, move, transfer, properties, share, settings, confirmBuild,
-        setAsCover, mergeMultispectral, align, importFromUrl, setCrs, extract, maskBorders, editText, viewPdf
+        setAsCover, mergeMultispectral, align, importFromUrl, setCrs, extract, exportSplatTrainingData, maskBorders, editText, viewPdf
     };
 }

@@ -612,9 +612,15 @@ export default class Dataset {
         return this.registry.makeRequest(this.taskResultUrl(id), { responseType: 'blob' });
     }
 
-    /** URL of a built file's main artifact (e.g. a COG, a point-cloud EPT). */
-    buildArtifactUrl(path) {
-        return `${this.baseApi}/build-artifact?path=${encodeURIComponent(path)}`;
+    /**
+     * URL of a built file's artifact, served with its download name: the main one (e.g. a COG, a
+     * point-cloud EPT) or, with a role, the one of that role (e.g. the .spz made for other tools).
+     * @param {string} path
+     * @param {string} [role]
+     */
+    buildArtifactUrl(path, role) {
+        const url = `${this.baseApi}/build-artifact?path=${encodeURIComponent(path)}`;
+        return role ? `${url}&role=${encodeURIComponent(role)}` : url;
     }
 
     /**

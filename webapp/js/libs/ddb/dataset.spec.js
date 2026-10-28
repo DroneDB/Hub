@@ -143,3 +143,15 @@ describe('Dataset.checkDownloadSlot — error message of a refused download', ()
         await expect(ds.checkDownloadSlot('/x')).rejects.toMatchObject({ message: 'Busy', status: 429 });
     });
 });
+
+describe('Dataset.buildArtifactUrl', () => {
+    const ds = makeDataset();
+
+    it('asks for the main artifact of a file when no role is given', () => {
+        expect(ds.buildArtifactUrl('flights/ortho & crop.tif')).toBe('/orgs/my_org/ds/my_ds/build-artifact?path=flights%2Fortho%20%26%20crop.tif');
+    });
+
+    it('asks for the artifact of a role, so the server names the file of a splat', () => {
+        expect(ds.buildArtifactUrl('site.ply', 'gsplat.export')).toBe('/orgs/my_org/ds/my_ds/build-artifact?path=site.ply&role=gsplat.export');
+    });
+});

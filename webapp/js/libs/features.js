@@ -18,5 +18,7 @@ export const Features = {
     BULK_DOWNLOAD_ASYNC_THRESHOLD_BYTES: 'bulkDownloadAsyncThresholdBytes',
     // What libddb does with each entry type, and the archives the server extracts
     ENTRY_TYPES: 'entryTypes',
-    ARCHIVE_EXTENSIONS: 'archiveExtensions'
+    ARCHIVE_EXTENSIONS: 'archiveExtensions',
+    // The heavy tools the server runs (id, title, hidden, disabled): a feature that needs one is offered only when it is listed
+    TASK_TOOLS: 'taskTools'
 };
