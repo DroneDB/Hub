@@ -1,7 +1,13 @@
 <template>
     <ViewerShell id="splat" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
-                 loading-text="Loading Gaussian Splat..." settings-title="View settings" settings-id="splat-settings">
+                 settings-title="View settings" settings-id="splat-settings">
+        <template #loading>
+            <LoadingSpinner label="Loading Gaussian Splat..." />
+            <LoadProgress :progress="progress" />
+        </template>
+
         <canvas ref="canvas" />
+        <DialogHost :dialogs="dialogs" />
 
         <div class="top-right-stack">
             <div v-if="loaded && activeCameraName" class="camera-hud" title="Current camera view">
@@ -54,16 +60,22 @@
 /**
  * SplatViewer - a Gaussian splat (Spark.js on three.js): streamed level of detail for paged
  * .rad files, fly and earth navigation, saved camera views with a tour, ground-plane
- * calibration. The camera rig, the two navigation modes, the presentation and the
- * camera sidecar are modules next to this view; the view wires them to the scene.
+ * calibration. The stage (renderer, Spark, loop, disposal), the camera rig, the two navigation
+ * modes, the presentation and the camera sidecar are modules next to this view; the view wires
+ * them to each other.
  */
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import LoadProgress from '@/components/LoadProgress.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useEventListener, useListenerBag } from '@/composables/useEventListener';
 import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
+import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import CameraManager from './CameraManager.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
@@ -73,7 +85,8 @@ import { CameraRig } from './cameraRig';
 import { FlyControls, MOVE_KEYS } from './flyControls';
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
-import { camerasPathFor, parseCamerasFile, serializeCamerasFile, cameraFromRig, activeAfterDelete, activeAfterMove } from './cameraPresets';
+import { createSplatStage, assertWebGL2 } from './splatStage';
+import { useSplatCameras } from './useSplatCameras';
 
 defineOptions({ name: 'SplatViewer' });
 
@@ -81,10 +94,13 @@ const { entry, dataset, canWrite, loading, error, entryLoaded } = useViewerEntry
     types: [ddb.entry.type.GAUSSIAN_SPLAT], typeLabel: 'a Gaussian Splat', title: 'Gaussian Splat'
 });
 const notify = useNotify();
+const dialogs = useDialogs();
 const listeners = useListenerBag();
 
 const canvas = ref(null);
 const loaded = ref(false);
+// Fraction of the splat downloaded (null while the total is not known)
+const progress = ref(null);
 const showSettings = ref(false);
 const showCameraManager = ref(false);
 const streaming = ref(false);
@@ -98,9 +114,12 @@ const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const navMode = usePreference(PREF.SPLAT_NAV_MODE, PREF_DEFAULTS[PREF.SPLAT_NAV_MODE]);
 const pressed = reactive(Object.fromEntries(MOVE_KEYS.map(k => [k, false])));
 const presentationMode = ref(null);
-const cameras = ref([]);
-const activeCameraIndex = ref(null);
-const camerasDirty = ref(false);
+const cams = useSplatCameras({
+    dataset, entry, canWrite, notify, confirm: useConfirm(dialogs), getRig: () => rig,
+    orientation: { flipped, tiltRoll, tiltPitch }
+});
+const { cameras, activeIndex: activeCameraIndex, dirty: camerasDirty } = cams;
+const { add: addCurrentCamera, update: updateCameraToCurrent, remove: deleteCamera, move: moveCamera, rename: renameCamera, save: saveCameras } = cams;
 const activeCameraName = computed(() => {
     const i = activeCameraIndex.value;
     const c = i === null ? null : cameras.value[i];
@@ -109,9 +128,7 @@ const activeCameraName = computed(() => {
 
 // three.js / Spark objects: never reactive (a proxy breaks their identity checks)
 let THREE = null;
-let renderer = null;
-let scene = null;
-let controls = null;
+let stage = null;
 let splatMesh = null;
 let rig = null;
 let fly = null;
@@ -119,9 +136,8 @@ let earth = null;
 let presentation = null;
 let bounds = null;
 let frameTimer = null;
-let resizeObserver = null;
 let lastFrameTime = 0;
-let camerasPath = null;
+let unmounted = false;
 
 const dialogOpen = () => showSettings.value || showCameraManager.value;
 
@@ -136,16 +152,6 @@ function onUserInteract() {
 function applyOrientation() {
     // 180° about X, or none
     if (splatMesh) splatMesh.quaternion.set(flipped.value ? 1 : 0, 0, 0, flipped.value ? 0 : 1);
-}
-
-function resizeCanvas() {
-    const el = renderer && renderer.domElement;
-    if (!el || !el.clientWidth || !el.clientHeight) return;
-    if (el.width !== el.clientWidth || el.height !== el.clientHeight) {
-        renderer.setSize(el.clientWidth, el.clientHeight, false);
-        rig.camera.aspect = el.clientWidth / el.clientHeight;
-        rig.camera.updateProjectionMatrix();
-    }
 }
 
 /**
@@ -177,12 +183,11 @@ function renderFrame(time) {
     const now = time || performance.now();
     const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.1) : 0;
     lastFrameTime = now;
-    resizeCanvas();
 
     // Moving with the keys or the pad stops the presentation
     if (fly.update(dt)) onUserInteract();
     else presentation.update(dt);
-    controls.update();
+    stage.controls.update();
 
     // controls.update() looks at the target: reassert our own orientation
     const mode = presentation.mode;
@@ -193,50 +198,54 @@ function renderFrame(time) {
         rig.syncYawPitch();
     }
     earth.updateMarker();
-    renderer.render(scene, rig.camera);
+}
+
+// three.js, OrbitControls and Spark (WebGL + WASM) only load with the viewer
+async function importLibraries() {
+    const [three, orbit, spark] = await Promise.all([
+        import(/* webpackChunkName: "three" */ 'three'),
+        import(/* webpackChunkName: "three" */ 'three/examples/jsm/controls/OrbitControls.js'),
+        import(/* webpackChunkName: "spark" */ '@sparkjsdev/spark')
+    ]);
+    return { THREE: three, OrbitControls: orbit.OrbitControls, Spark: spark };
 }
 
 async function loadSplat() {
+    assertWebGL2();
+    // The build artifact must exist (the level-of-detail .rad, or the .spz of older builds): the
+    // build state says why not when a direct link opens a splat that is not built (yet)
+    const { default: FileAvailabilityChecker } = await import(/* webpackChunkName: "buildcheck" */ '@/libs/build/fileAvailabilityChecker');
+    const availability = await FileAvailabilityChecker.check(dataset.value, entry.value, 'splat', { current: true });
+    if (!availability.available) throw new Error(availability.message || `${entry.value.path} is not available in the splat viewer.`);
+
     const splatEntry = dataset.value.Entry(entry.value);
     // The level-of-detail .rad streams by range requests; the plain .spz is the fallback of
     // datasets built before LOD (getGsplat throws when it is absent: not called with a .rad)
     const radUrl = splatEntry.getGsplatLod();
     const spzUrl = radUrl ? null : splatEntry.getGsplat();
     streaming.value = !!radUrl;
-    bounds = await splatEntry.getGsplatBounds();
-    await loadCameras();
 
-    // three.js, OrbitControls and Spark (WebGL + WASM) only load with the viewer
-    THREE = await import(/* webpackChunkName: "three" */ 'three');
-    const { OrbitControls } = await import(/* webpackChunkName: "three" */ 'three/examples/jsm/controls/OrbitControls.js');
-    const { SparkRenderer, SplatMesh } = await import(/* webpackChunkName: "spark" */ '@sparkjsdev/spark');
+    // None of the three needs another
+    const [boundsData, , libraries] = await Promise.all([splatEntry.getGsplatBounds(), cams.load(), importLibraries()]);
+    if (unmounted) return;
+    bounds = boundsData;
+    THREE = libraries.THREE;
 
-    const el = canvas.value;
-    renderer = new THREE.WebGLRenderer({ canvas: el, antialias: false });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(el.clientWidth || 1, el.clientHeight || 1, false);
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1a2e);
-    const camera = new THREE.PerspectiveCamera(60, (el.clientWidth || 1) / (el.clientHeight || 1), 0.1, 1000);
-    camera.position.set(0, 0, 4);
-
-    // Paged .rad: foveation spends the splat budget toward the view direction
-    scene.add(streaming.value
-        ? new SparkRenderer({ renderer, pagedExtSplats: true, coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4 })
-        : new SparkRenderer({ renderer }));
-
-    // OrbitControls pans, zooms and auto-rotates; looking around is ours
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableRotate = false;
-    controls.enableDamping = false;
+    stage = createSplatStage({
+        ...libraries, canvas: canvas.value, streaming: streaming.value, onFrame: renderFrame,
+        onContextLost: () => notify.warn('The browser took the graphics context away. The view comes back when it gives it back.', { summary: 'Graphics' }),
+        onContextRestored: () => notify.info('The graphics context is back.', { summary: 'Graphics' })
+    });
+    const { camera, controls } = stage;
     listeners.add(controls, 'start', onUserInteract);
 
     rig = new CameraRig(THREE, camera, controls);
     rig.setTilt(tiltRoll.value, tiltPitch.value);
     const hooks = mode => ({ enabled: () => navMode.value === mode && !dialogOpen(), onInteract: onUserInteract });
+    const el = canvas.value;
     fly = new FlyControls(rig, hooks('fly'));
     fly.attach(el, (t, type, fn, opts) => listeners.add(t, type, fn, opts));
-    earth = new EarthControls(rig, el, scene, hooks('earth'));
+    earth = new EarthControls(rig, el, stage.scene, hooks('earth'));
     earth.attach((t, type, fn, opts) => listeners.add(t, type, fn, opts));
     presentation = new Presentation(rig, {
         cameras: () => cameras.value,
@@ -246,9 +255,10 @@ async function loadSplat() {
 
     // Paged .rad: chunks on demand by range requests; .spz: whole file, LOD built in a worker.
     // Authentication rides on the same-origin jwtToken cookie.
-    splatMesh = streaming.value ? new SplatMesh({ url: radUrl, paged: true }) : new SplatMesh({ url: spzUrl, lod: true });
-    scene.add(splatMesh);
-    await splatMesh.initialized;
+    const mesh = await stage.loadMesh(streaming.value ? { url: radUrl, paged: true } : { url: spzUrl, lod: true }, fraction => { progress.value = fraction; });
+    // The page was left meanwhile: the stage released everything
+    if (!mesh) return;
+    splatMesh = mesh;
 
     applyOrientation();
     frameCameraWhenReady();
@@ -257,10 +267,7 @@ async function loadSplat() {
     // A tour through the saved cameras, else a slow orbit; any navigation stops it, P resumes
     startPresentation();
 
-    // Spark streams and traverses its LOD from renderer.render: render every frame
-    renderer.setAnimationLoop(renderFrame);
-    resizeObserver = new ResizeObserver(resizeCanvas);
-    resizeObserver.observe(el);
+    stage.start();
 }
 
 // ---- Settings ---------------------------------------------------------------------------
@@ -289,10 +296,10 @@ function setTilt(roll, pitch) {
 
 // Earth mode: our pointer handlers pan / orbit / zoom; fly mode: OrbitControls pans and zooms
 function applyNavMode() {
-    if (!controls) return;
+    if (!stage) return;
     const earthMode = navMode.value === 'earth';
-    controls.enablePan = !earthMode;
-    controls.enableZoom = !earthMode;
+    stage.controls.enablePan = !earthMode;
+    stage.controls.enableZoom = !earthMode;
     if (earthMode) {
         presentation.stop();
     } else {
@@ -388,73 +395,6 @@ function stepCamera(step) {
     flyTo(current === null ? (step > 0 ? 0 : n - 1) : (current + step + n) % n);
 }
 
-// The sidecar next to the splat (absent for most datasets)
-async function loadCameras() {
-    camerasPath = camerasPathFor(entry.value.path);
-    try {
-        const { cameras: list, orientation } = parseCamerasFile(await dataset.value.getFileContents(camerasPath));
-        cameras.value = list;
-        if (orientation.flipped !== undefined) flipped.value = orientation.flipped;
-        if (orientation.tiltRoll !== undefined) tiltRoll.value = orientation.tiltRoll;
-        if (orientation.tiltPitch !== undefined) tiltPitch.value = orientation.tiltPitch;
-    } catch {
-        cameras.value = [];
-    }
-}
-
-function addCurrentCamera() {
-    cameras.value.push(cameraFromRig(rig, `Camera ${cameras.value.length + 1}`));
-    camerasDirty.value = true;
-    activeCameraIndex.value = cameras.value.length - 1;
-}
-
-function updateCameraToCurrent(index) {
-    const c = cameras.value[index];
-    if (!c) return;
-    const { position, quaternion, fov, target } = cameraFromRig(rig, c.name);
-    Object.assign(c, { position, quaternion, fov, target });
-    camerasDirty.value = true;
-    activeCameraIndex.value = index;
-}
-
-function deleteCamera(index) {
-    if (index < 0 || index >= cameras.value.length) return;
-    cameras.value.splice(index, 1);
-    camerasDirty.value = true;
-    activeCameraIndex.value = activeAfterDelete(activeCameraIndex.value, index);
-}
-
-function moveCamera({ index, dir }) {
-    const dest = index + dir;
-    const list = cameras.value;
-    if (index < 0 || index >= list.length || dest < 0 || dest >= list.length) return;
-    list.splice(dest, 0, list.splice(index, 1)[0]);
-    camerasDirty.value = true;
-    activeCameraIndex.value = activeAfterMove(activeCameraIndex.value, index, dest);
-}
-
-function renameCamera({ index, name }) {
-    const c = cameras.value[index];
-    if (!c) return;
-    c.name = name;
-    camerasDirty.value = true;
-}
-
-async function saveCameras() {
-    if (!canWrite.value) {
-        error.value = "You don't have permission to save camera views in this dataset.";
-        return;
-    }
-    try {
-        await dataset.value.writeObj(camerasPath, serializeCamerasFile(cameras.value,
-            { flipped: flipped.value, tiltRoll: tiltRoll.value, tiltPitch: tiltPitch.value }));
-        camerasDirty.value = false;
-        notify.success({ summary: 'Camera views saved' });
-    } catch (e) {
-        error.value = `Failed to save camera views: ${e.message}`;
-    }
-}
-
 // ---- Lifecycle --------------------------------------------------------------------------
 
 onMounted(async () => {
@@ -463,27 +403,24 @@ onMounted(async () => {
     try {
         await loadSplat();
     } catch (e) {
-        error.value = e.message;
+        // A page that was left has nobody to tell
+        if (!unmounted) error.value = e.message;
     } finally {
         loading.value = false;
+        progress.value = null;
     }
 });
 
 // The render loop, the streaming, the WebGL context and the pivot marker go with the page
-// (the listeners go with the component scope)
+// (the listeners go with the component scope). A load still running finds the stage disposed
+// and stops there.
 onBeforeUnmount(() => {
-    if (renderer) renderer.setAnimationLoop(null);
+    unmounted = true;
     clearTimeout(frameTimer);
-    if (resizeObserver) resizeObserver.disconnect();
     if (fly) fly.stop();
     if (earth) earth.dispose();
-    if (controls) controls.dispose();
-    if (splatMesh && splatMesh.dispose) splatMesh.dispose();
-    if (renderer) {
-        renderer.dispose();
-        if (renderer.forceContextLoss) renderer.forceContextLoss();
-    }
-    renderer = scene = controls = splatMesh = rig = fly = earth = presentation = null;
+    if (stage) stage.dispose();
+    stage = splatMesh = rig = fly = earth = presentation = null;
 });
 </script>
 
