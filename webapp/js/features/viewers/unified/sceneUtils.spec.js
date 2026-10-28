@@ -25,6 +25,31 @@ describe('3D viewer helpers', () => {
         expect(f.area({ area: 3e6 })).toBe('3.00 km²');
     });
 
+    it('writes a length below a metre in centimetres, and below a centimetre in millimetres', () => {
+        const f = measureFormatters(() => 1);
+        expect(f.length({ length: 1 })).toBe('1.0 m');
+        expect(f.length({ length: 0.042 })).toBe('4.2 cm');
+        expect(f.length({ length: 0.5 })).toBe('50.0 cm');
+        expect(f.length({ length: 0.01 })).toBe('1.0 cm');
+        expect(f.length({ length: 0.0035 })).toBe('3.5 mm');
+        expect(f.length({ length: 0 })).toBe('0.0 mm');
+    });
+
+    it('writes an area below a square metre in square centimetres, and below one in square millimetres', () => {
+        const f = measureFormatters(() => 1);
+        expect(f.area({ area: 1 })).toBe('1 m²');
+        expect(f.area({ area: 0.25 })).toBe('2500 cm²');
+        expect(f.area({ area: 0.0012 })).toBe('12 cm²');
+        expect(f.area({ area: 0.00005 })).toBe('50 mm²');
+    });
+
+    it('writes the lengths of a scene with no known scale in its own unit, however small', () => {
+        const f = measureFormatters(() => 1, () => 'units');
+        expect(f.length({ length: 0.042 })).toBe('0.04 units');
+        expect(f.area({ area: 0.5 })).toBe('0.50 units²');
+        expect(f.length({ length: 4000 })).toBe('4000.00 units');
+    });
+
     it('keeps a sphere inside a portrait view as well as a landscape one', () => {
         // Landscape: the vertical field of view limits (45 degrees: 1 / sin(22.5 degrees))
         expect(fitDistance(1, 45, 2, 1)).toBeCloseTo(1 / Math.sin(Math.PI / 8), 6);

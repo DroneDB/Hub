@@ -70,10 +70,39 @@ export const ELEVATION_RAMP = [0x2c7bb6, 0x00a6ca, 0x00ccbc, 0x90eb9d, 0xffff8c,
 export const MEASURE_COLOR = '#f2a51a';
 
 /**
+ * The metric units of the measurement labels, largest first: a value is written in the first
+ * unit it reaches (`min`, in metres or square metres), with the unit's decimals. Below a metre a
+ * length is in centimetres (millimetres below one) and below a square metre an area in square
+ * centimetres (square millimetres below one), so the short lengths of a small scene, such as a
+ * splat given a scale, do not read "0.0 m" or "0 m²".
+ * @typedef {{ min: number, size: number, unit: string, digits: number }} MetricUnit
+ */
+/** @type {MetricUnit[]} */
+const LENGTH_UNITS = [
+    { min: 1000, size: 1000, unit: 'km', digits: 2 },
+    { min: 1, size: 1, unit: 'm', digits: 1 },
+    { min: 0.01, size: 0.01, unit: 'cm', digits: 1 },
+    { min: 0, size: 0.001, unit: 'mm', digits: 1 }
+];
+/** @type {MetricUnit[]} */
+const AREA_UNITS = [
+    { min: 1e6, size: 1e6, unit: 'km²', digits: 2 },
+    { min: 1, size: 1, unit: 'm²', digits: 0 },
+    { min: 1e-4, size: 1e-4, unit: 'cm²', digits: 0 },
+    { min: 0, size: 1e-6, unit: 'mm²', digits: 0 }
+];
+
+/** A metric value in the first of these units it reaches. @param {number} v @param {MetricUnit[]} units */
+function formatMetric(v, units) {
+    const { size, unit, digits } = units.find(u => Math.abs(v) >= u.min) ?? units[units.length - 1];
+    return `${(v / size).toFixed(digits)} ${unit}`;
+}
+
+/**
  * Measurement labels. `scale` corrects Web Mercator lengths to ground lengths (cos latitude;
  * 1 in metric CRSs) and is read at call time. `unit` names what the lengths are in: metres, or
  * (a scene with no known scale) anything else, which is written as it is and never turned into
- * kilometres. It is read at call time too.
+ * another unit. It is read at call time too.
  * @param {() => number} scale
  * @param {() => string} [unit]
  */
@@ -83,15 +112,13 @@ export function measureFormatters(scale, unit = () => 'm') {
         length: ({ length }) => {
             const v = length * scale();
             const u = unit();
-            if (u !== 'm') return `${v.toFixed(2)} ${u}`;
-            return v >= 1000 ? `${(v / 1000).toFixed(2)} km` : `${v.toFixed(1)} m`;
+            return u === 'm' ? formatMetric(v, LENGTH_UNITS) : `${v.toFixed(2)} ${u}`;
         },
         /** @param {{ area: number }} m */
         area: ({ area }) => {
             const v = area * scale() * scale();
             const u = unit();
-            if (u !== 'm') return `${v.toFixed(2)} ${u}²`;
-            return v >= 1e6 ? `${(v / 1e6).toFixed(2)} km²` : `${v.toFixed(0)} m²`;
+            return u === 'm' ? formatMetric(v, AREA_UNITS) : `${v.toFixed(2)} ${u}²`;
         }
     };
 }
