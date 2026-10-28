@@ -97,23 +97,55 @@ export function toDms(degrees, axis) {
 }
 
 const round2 = v => Math.round(v * 100) / 100;
-const ACRES_PER_M2 = 0.00024710538146717;
 const FEET_PER_M = 3.28084;
+const M2_PER_ACRE = 4046.8564224;
+// A square foot is 0.09290304 m² by definition
+const SQUARE_FEET_PER_M2 = 1 / 0.09290304;
 
 /**
- * Measured area in the user's units: m² up to 1 ha, then km²; acres for imperial.
+ * @typedef {{ below: number, factor: number, unit: string, landDecimals: number }} AreaStep
+ *   one unit of an area scale: it applies below `below` m², `factor` turns m² into it, and a
+ *   land area shows `landDecimals` decimals in it
+ */
+
+/**
+ * The units an area is shown in, smallest first: m², then ha from 1 ha, then km² from 100 km²;
+ * ft², then acres from 1 acre. The last step applies at any size.
+ * @type {Readonly<Record<'metric'|'imperial', readonly AreaStep[]>>}
+ */
+const AREA_SCALES = Object.freeze({
+    metric: Object.freeze([
+        { below: 1e4, factor: 1, unit: 'm²', landDecimals: 0 },
+        { below: 1e8, factor: 1e-4, unit: 'ha', landDecimals: 1 },
+        { below: Infinity, factor: 1e-6, unit: 'km²', landDecimals: 0 }
+    ]),
+    imperial: Object.freeze([
+        { below: M2_PER_ACRE, factor: SQUARE_FEET_PER_M2, unit: 'ft²', landDecimals: 0 },
+        { below: Infinity, factor: 1 / M2_PER_ACRE, unit: 'acres', landDecimals: 2 }
+    ])
+});
+
+/**
+ * The unit an area is shown in, for every view that shows one: a measured area, the area of a
+ * piece of land, a stockpile footprint. Any units other than 'metric' are imperial.
+ * @param {number} squareMeters
+ * @param {'metric'|'imperial'|string} [units]
+ * @returns {AreaStep}
+ */
+export function areaScale(squareMeters, units = 'metric') {
+    const scale = units === 'metric' ? AREA_SCALES.metric : AREA_SCALES.imperial;
+    return scale.find(step => squareMeters < step.below) ?? scale[scale.length - 1];
+}
+
+/**
+ * Measured area in the user's units (see areaScale): "640 m²", "1.5 ha", "1200 ft²", "3.71 acres".
  * @param {number} squareMeters
  * @param {'metric'|'imperial'|string} [units]
  * @returns {{ value: number, unit: string, text: string }}  value rounded to 2 decimals
  */
 export function areaParts(squareMeters, units = 'metric') {
-    let value, unit;
-    if (units === 'metric') {
-        [value, unit] = squareMeters > 10000 ? [squareMeters / 1000000, 'km²'] : [squareMeters, 'm²'];
-    } else {
-        [value, unit] = [squareMeters * ACRES_PER_M2, 'acres'];
-    }
-    value = round2(value);
+    const { factor, unit } = areaScale(squareMeters, units);
+    const value = round2(squareMeters * factor);
     return { value, unit, text: `${value} ${unit}` };
 }
 
@@ -214,16 +246,14 @@ export function formatExtent(widthMeters, heightMeters, units = 'metric') {
 }
 
 /**
- * The area of a piece of land: m² below 1 ha, ha below 100 km², then km²; acres for
- * imperial (as a measured area). "640 m²", "3.4 ha", "250 km²", "2.03 acres"
+ * The area of a piece of land, in the units of areaScale with fixed decimals per unit.
+ * "640 m²", "3.4 ha", "250 km²", "10764 ft²", "2.03 acres"
  * @param {number} squareMeters
  * @param {'metric'|'imperial'|string} [units]
  */
 export function formatLandArea(squareMeters, units = 'metric') {
-    if (units !== 'metric') return formatArea(squareMeters, units);
-    if (squareMeters < 1e4) return `${Math.round(squareMeters)} m²`;
-    if (squareMeters < 1e8) return `${(squareMeters / 1e4).toFixed(1)} ha`;
-    return `${Math.round(squareMeters / 1e6)} km²`;
+    const { factor, unit, landDecimals } = areaScale(squareMeters, units);
+    return `${(squareMeters * factor).toFixed(landDecimals)} ${unit}`;
 }
 
 // A cubic yard and a short ton by definition

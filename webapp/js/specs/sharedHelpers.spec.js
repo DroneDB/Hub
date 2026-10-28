@@ -27,8 +27,6 @@ describe('libs/format', () => {
     it('formats measured areas and lengths in the chosen units', async () => {
         const f = await import('@/libs/format');
         expect(f.formatArea(5000, 'metric')).toBe('5000 m²');
-        expect(f.formatArea(2500000, 'metric')).toBe('2.5 km²');
-        expect(f.formatArea(4046.8564224, 'imperial')).toBe('1 acres');
         expect(f.formatLength(50, 'metric')).toBe('50 m');
         expect(f.formatLength(1500, 'metric')).toBe('1.5 km');
         expect(f.lengthParts(1, 'imperial')).toEqual({ value: 3.28, unit: 'ft', text: '3.28 ft' });
@@ -62,12 +60,36 @@ describe('libs/format', () => {
         expect(f.formatExtent(2000, 1500, 'imperial')).toBe('1.24 x 0.93 mi');
     });
 
-    it('formats land areas with hectares, or acres for imperial', async () => {
+    it('shows a measured area in m², ha or km², or in ft² below 1 acre and acres from it', async () => {
+        const f = await import('@/libs/format');
+        // A 1,200 ft² roof is readable, not "0.03 acres"
+        expect(f.formatArea(111.4836, 'imperial')).toBe('1200 ft²');
+        expect(f.areaParts(1000, 'imperial')).toEqual({ value: 10763.91, unit: 'ft²', text: '10763.91 ft²' });
+        expect(f.formatArea(4046.8564224, 'imperial')).toBe('1 acres');
+        expect(f.formatArea(15000, 'imperial')).toBe('3.71 acres');
+        expect(f.formatArea(9999, 'metric')).toBe('9999 m²');
+        // Hectares between 1 ha and 100 km², not km² rounded to 2 decimals ("0.02 km²")
+        expect(f.formatArea(15000, 'metric')).toBe('1.5 ha');
+        expect(f.formatArea(2500000, 'metric')).toBe('250 ha');
+        expect(f.formatArea(2e8, 'metric')).toBe('200 km²');
+    });
+
+    it('chooses one area unit for every view, from the size and the units', async () => {
+        const f = await import('@/libs/format');
+        const unitOf = (m2, units) => f.areaScale(m2, units).unit;
+        expect([unitOf(9999.99), unitOf(1e4), unitOf(1e8 - 1), unitOf(1e8)]).toEqual(['m²', 'ha', 'ha', 'km²']);
+        expect([unitOf(4046, 'imperial'), unitOf(4046.8564224, 'imperial'), unitOf(1e9, 'imperial')])
+            .toEqual(['ft²', 'acres', 'acres']);
+        expect(f.areaScale(1, 'imperial').factor).toBeCloseTo(10.7639104, 6);
+    });
+
+    it('formats land areas with hectares, or ft² and acres for imperial', async () => {
         const f = await import('@/libs/format');
         expect(f.formatLandArea(7920)).toBe('7920 m²');
         expect(f.formatLandArea(3e6)).toBe('300.0 ha');
         expect(f.formatLandArea(4e8)).toBe('400 km²');
         expect(f.formatLandArea(7920, 'imperial')).toBe('1.96 acres');
+        expect(f.formatLandArea(1000, 'imperial')).toBe('10764 ft²');
     });
 });
 

@@ -185,7 +185,7 @@
 
 <script>
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
-import { bulkUnits, DEFAULT_CURRENCY, formatMoney } from '@/libs/format';
+import { areaScale, bulkUnits, DEFAULT_CURRENCY, formatMoney } from '@/libs/format';
 import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { useAuthStore } from '@/stores/auth';
@@ -333,14 +333,8 @@ export default {
         },
         formatArea(v) {
             if (v == null || !isFinite(v)) return '-';
-            if (this.isImperial) {
-                // For very large areas use acres; below ~1 acre stay in ft².
-                const acres = v / 4046.8564224;
-                if (acres >= 1) return `${this._fmt(acres)} ac`;
-                return `${this._fmt(v * 10.7639)} ft²`;
-            }
-            if (v >= 10000) return `${this._fmt(v / 10000)} ha`;
-            return `${this._fmt(v)} m²`;
+            const { factor, unit } = areaScale(v, this.unitPref);
+            return `${this._fmt(v * factor)} ${unit}`;
         },
         formatElevation(v) {
             if (v == null || !isFinite(v)) return '-';
