@@ -8,10 +8,16 @@
  * The three.js and Spark modules are given, not imported: the viewer loads them (in parallel with
  * its data) and a spec gives stand-ins.
  *
+ * What is drawn on top of the splats (measurements, pins) lives in `stage.overlay`, a group the
+ * viewer turns like the splat mesh, and its HTML labels are drawn by a CSS2DRenderer into the
+ * `labelLayer` element when one is given. `pickSplat(ndc)` finds the point of the splats under a
+ * point of the screen: the one thing the measurement and the pins need from the splats.
+ *
  *   assertWebGL2();                                   // a friendly error before anything loads
  *   const stage = createSplatStage({ THREE, OrbitControls, Spark, canvas, streaming, onFrame });
  *   const mesh = await stage.loadMesh({ url, paged: true }, onProgress);   // null when disposed meanwhile
  *   if (mesh) stage.start();                          // ...and stage.dispose() when the viewer goes away
+ *   const hit = stage.pickSplat({ x: 0, y: 0 });      // { point, distance } or null
  */
 import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 
@@ -19,6 +25,12 @@ import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 // pixels of a ratio of 2 for a sharpness no one sees on soft splats
 export const MAX_PIXEL_RATIO = 2;
 const BACKGROUND = 0x1a1a2e;
+
+// How many splats of the level of detail Spark keeps up to date for picking, which a paged .rad
+// needs to be picked at all (only part of it is in memory, and which part changes with the view).
+// Spark's own defaults, written down because the viewer depends on them
+const PICK_SPLATS = 25000;
+const PICK_SPLATS_TOUCH = 10000;
 
 /**
  * Whether the browser can create a WebGL 2 context (Spark needs it).
@@ -65,8 +77,12 @@ export function progressFraction(event) {
  * @param {(time: number) => void} [options.onFrame]  called every frame, after the canvas was fitted and before it is drawn
  * @param {() => void} [options.onContextLost]
  * @param {() => void} [options.onContextRestored]
+ * @param {any} [options.CSS2DRenderer]             the CSS2DRenderer class, to draw HTML labels in the scene
+ * @param {HTMLElement} [options.labelLayer]        the element the labels are drawn in (over the canvas)
  */
-export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streaming, up, onFrame, onContextLost, onContextRestored }) {
+export function createSplatStage({
+    THREE, OrbitControls, Spark, canvas, streaming, up, onFrame, onContextLost, onContextRestored, CSS2DRenderer, labelLayer
+}) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
     renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
@@ -79,10 +95,19 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
     if (up) camera.up.set(up.x, up.y, up.z);
 
     // Kept: its sort and level-of-detail workers, its pager and its GPU textures end only with dispose()
+    const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    const lodRaycast = touch ? PICK_SPLATS_TOUCH : PICK_SPLATS;
     const spark = new Spark.SparkRenderer(streaming
-        ? { renderer, pagedExtSplats: true, coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4 }
-        : { renderer });
+        ? { renderer, lodRaycast, pagedExtSplats: true, coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4 }
+        : { renderer, lodRaycast });
     scene.add(spark);
+
+    // Measurements and pins: in the frame of the splats, so the viewer turns it with the mesh
+    const overlay = new THREE.Group();
+    scene.add(overlay);
+    const labels = CSS2DRenderer && labelLayer ? new CSS2DRenderer({ element: labelLayer }) : null;
+    labels?.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1);
+    const raycaster = new THREE.Raycaster();
 
     // OrbitControls pans, zooms and auto-rotates; looking around is the viewer's
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -99,6 +124,7 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
         renderer.setSize(el.clientWidth, el.clientHeight, false);
         camera.aspect = el.clientWidth / el.clientHeight;
         camera.updateProjectionMatrix();
+        labels?.setSize(el.clientWidth, el.clientHeight);
     }
 
     // The browser may take the context away (a phone under memory pressure): preventDefault asks
@@ -125,7 +151,9 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
      */
     async function loadMesh(meshOptions, onProgress) {
         if (disposed) return null;
+        // raycastable: the splats can be picked (measurements and pins)
         const loading = new Spark.SplatMesh({
+            raycastable: true,
             ...meshOptions,
             onProgress: onProgress && (event => { if (!disposed) onProgress(progressFraction(event)); })
         });
@@ -140,6 +168,20 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
         return disposed ? null : loading;
     }
 
+    /**
+     * The nearest point of the splats under a point of the screen, or null (nothing there, or no
+     * mesh yet). Spark casts the ray against the splats it has in memory: all of a plain file, and
+     * for a paged .rad the level of detail it keeps for picking.
+     * @param {{ x: number, y: number }} ndc  normalised device coordinates, -1 to 1 with y up
+     * @returns {{ point: any, distance: number } | null}
+     */
+    function pickSplat(ndc) {
+        if (disposed || !mesh) return null;
+        raycaster.setFromCamera(new THREE.Vector2(ndc.x, ndc.y), camera);
+        const hit = raycaster.intersectObject(mesh, false)[0];
+        return hit ? { point: hit.point.clone(), distance: hit.distance } : null;
+    }
+
     /** Draws every frame: Spark streams and traverses its level of detail from render(). */
     function start() {
         if (disposed) return;
@@ -148,6 +190,7 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
             fitCanvas();
             onFrame?.(time);
             renderer.render(scene, camera);
+            labels?.render(scene, camera);
         });
     }
 
@@ -164,6 +207,7 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
             mesh.dispose?.();
             mesh = null;
         }
+        scene.remove(overlay);
         scene.remove(spark);
         spark.dispose?.();
         renderer.dispose();
@@ -171,7 +215,7 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
     }
 
     return {
-        renderer, scene, camera, controls, spark, loadMesh, start, dispose,
+        renderer, scene, camera, controls, spark, overlay, loadMesh, pickSplat, start, dispose,
         get disposed() { return disposed; }
     };
 }

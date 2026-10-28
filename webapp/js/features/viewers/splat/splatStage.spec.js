@@ -98,7 +98,7 @@ describe('renderer', () => {
     });
 
     it('gives Spark the renderer, and the foveation options only for a paged file', () => {
-        expect(makeStage().spark.options).toEqual({ renderer: stage.renderer });
+        expect(makeStage().spark.options).toEqual({ renderer: stage.renderer, lodRaycast: expect.any(Number) });
         stage.dispose();
         expect(makeStage({ streaming: true }).spark.options).toMatchObject({ renderer: stage.renderer, pagedExtSplats: true });
         expect(stage.scene.children).toContain(stage.spark);
@@ -135,6 +135,116 @@ describe('render loop', () => {
         runFrame(16);
         expect(order).toEqual([['frame', 16], ['render']]);
         expect(stage.renderer.render).toHaveBeenCalledWith(stage.scene, stage.camera);
+    });
+});
+
+describe('picking', () => {
+    /** A mesh at the origin whose splats a ray meets at the given distances along it. */
+    async function loadPickable(distances) {
+        const loading = stage.loadMesh({ url: 'a.rad', paged: true });
+        const mesh = FakeSplatMesh.last;
+        // What Spark's raycast does: every splat the ray meets, in no order
+        mesh.raycast = vi.fn((raycaster, intersects) => {
+            for (const distance of distances) {
+                intersects.push({ distance, point: raycaster.ray.direction.clone().multiplyScalar(distance).add(raycaster.ray.origin), object: mesh });
+            }
+        });
+        mesh.finish();
+        await loading;
+        return mesh;
+    }
+
+    it('is on for the splats and for the level of detail Spark keeps for picking, which a paged file needs', async () => {
+        makeStage({ streaming: true });
+        expect(stage.spark.options.lodRaycast).toBeGreaterThan(0);
+        await loadPickable([]);
+        expect(FakeSplatMesh.last.options.raycastable).toBe(true);
+        // A plain file is picked too
+        stage.dispose();
+        makeStage();
+        expect(stage.spark.options.lodRaycast).toBeGreaterThan(0);
+    });
+
+    it('returns the nearest splat the ray from the camera meets, as a point in the world and its distance', async () => {
+        makeStage();
+        stage.camera.position.set(1, 2, 10);
+        stage.camera.lookAt(1, 2, 0);
+        stage.camera.updateMatrixWorld(true);
+        const mesh = await loadPickable([7, 3, 5]);
+
+        // The middle of the screen looks straight along -z
+        const hit = stage.pickSplat({ x: 0, y: 0 });
+
+        expect(mesh.raycast).toHaveBeenCalledTimes(1);
+        expect(hit.distance).toBeCloseTo(3, 6);
+        expect(hit.point.toArray().map(v => Math.round(v * 1e6) / 1e6)).toEqual([1, 2, 7]);
+    });
+
+    it('casts through the point of the screen it is given', async () => {
+        makeStage();
+        stage.camera.position.set(0, 0, 0);
+        stage.camera.lookAt(0, 0, -1);
+        stage.camera.updateMatrixWorld(true);
+        const mesh = await loadPickable([1]);
+
+        stage.pickSplat({ x: 1, y: 0 });
+
+        // The right edge of a 60 degree field of view (aspect 2): the ray leans to +x
+        const ray = mesh.raycast.mock.calls[0][0].ray;
+        expect(ray.direction.x).toBeGreaterThan(0.5);
+        expect(ray.direction.y).toBeCloseTo(0, 6);
+    });
+
+    it('finds nothing where the ray meets no splat, before a mesh is loaded, or after the stage is gone', async () => {
+        makeStage();
+        expect(stage.pickSplat({ x: 0, y: 0 })).toBeNull();
+        await loadPickable([]);
+        expect(stage.pickSplat({ x: 0, y: 0 })).toBeNull();
+        stage.dispose();
+        expect(stage.pickSplat({ x: 0, y: 0 })).toBeNull();
+    });
+});
+
+describe('overlay and labels', () => {
+    class FakeLabels {
+        constructor(options) {
+            this.options = options;
+            this.setSize = vi.fn();
+            this.render = vi.fn();
+            FakeLabels.last = this;
+        }
+    }
+    beforeEach(() => { FakeLabels.last = undefined; });
+
+    it('keeps what is drawn over the splats in a group of the scene that goes with the stage', () => {
+        makeStage();
+        expect(stage.scene.children).toContain(stage.overlay);
+        stage.dispose();
+        expect(stage.scene.children).toEqual([]);
+    });
+
+    it('draws the HTML labels into the layer after the scene, and sizes them with the canvas', () => {
+        vi.stubGlobal('devicePixelRatio', 1);
+        const order = [];
+        const labelLayer = document.createElement('div');
+        makeStage({ CSS2DRenderer: FakeLabels, labelLayer });
+        stage.renderer.render.mockImplementation(() => order.push('scene'));
+        const labels = FakeLabels.last;
+        labels.render.mockImplementation(() => order.push('labels'));
+        expect(labels.options).toEqual({ element: labelLayer });
+        stage.start();
+        runFrame();
+        expect(order).toEqual(['scene', 'labels']);
+        expect(labels.render).toHaveBeenCalledWith(stage.scene, stage.camera);
+
+        sizeCanvas(300, 200);
+        runFrame();
+        expect(labels.setSize).toHaveBeenLastCalledWith(300, 200);
+    });
+
+    it('has no labels to draw when the viewer gave no layer', () => {
+        makeStage({ CSS2DRenderer: FakeLabels });
+        expect(FakeLabels.last).toBeUndefined();
     });
 });
 
