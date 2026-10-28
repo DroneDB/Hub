@@ -14,9 +14,9 @@
  *   added to the dataset, so the user is told what to upload;
  * - it is on hold for another reason (a temporary error): the server retries it by itself.
  *
- * libddb reports a build as waiting for files exactly when its pending marker lists missing
- * dependencies, which is what an entry carries (buildMissingDependencies); the items of
- * GET builds/pending say it as awaitingFiles, which wins when the caller has it.
+ * Which kind it is comes from the server, never from the names: libddb decides it and Registry
+ * passes it on, as buildAwaitingFiles on an entry and as awaitingFiles on an item of
+ * GET builds/pending.
  *
  * A leaf module (no other build/* imports), so buildHelpers.js and fileAvailabilityChecker.js can
  * both use it without a circular dependency.
@@ -33,15 +33,13 @@
 
 /**
  * @param {string[] | null | undefined} missingDependencies  the missing names the server reports
- * @param {boolean} [awaitingFiles]  the awaitingFiles of a GET builds/pending item; without it, a
- *        build that lists missing names waits for them (libddb's rule)
+ * @param {boolean | null | undefined} awaitingFiles  the server says the build waits for files;
+ *        anything but true is a build on hold
  * @returns {PendingBuildText}
  */
 export function describePendingBuild(missingDependencies, awaitingFiles) {
     const files = Array.isArray(missingDependencies) ? missingDependencies.filter(Boolean) : [];
-    const waits = awaitingFiles ?? files.length > 0;
-
-    if (!waits) {
+    if (awaitingFiles !== true) {
         return {
             awaitingFiles: false,
             files,
@@ -66,9 +64,9 @@ export function describePendingBuild(missingDependencies, awaitingFiles) {
 
 /**
  * The words of the deferred build of an entry (see describePendingBuild).
- * @param {{ buildMissingDependencies?: string[] } | null | undefined} entry
+ * @param {{ buildMissingDependencies?: string[], buildAwaitingFiles?: boolean } | null | undefined} entry
  * @returns {PendingBuildText}
  */
 export function describeEntryPendingBuild(entry) {
-    return describePendingBuild(entry?.buildMissingDependencies);
+    return describePendingBuild(entry?.buildMissingDependencies, entry?.buildAwaitingFiles);
 }

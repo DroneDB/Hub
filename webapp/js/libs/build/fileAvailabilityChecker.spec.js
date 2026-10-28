@@ -120,14 +120,14 @@ describe('buildable file: the artifacts decide, the job explains', () => {
 
     it('says the build is on hold when the job succeeded but the server reports missing dependencies', async () => {
         buildManager.getBuildState.mockReturnValue(job('Succeeded'));
-        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'] }));
+        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'], buildAwaitingFiles: true }));
         const result = await checker.check(dataset, raster(), 'map');
         expect(result).toMatchObject({ available: false, status: 'blocked' });
         expect(result.message).toContain('ortho.tfw');
     });
 
     it('says a build waits for files, names them and says that uploading them starts it', async () => {
-        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'] }));
+        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'], buildAwaitingFiles: true }));
         const result = await checker.check(dataset, raster(), 'map');
         expect(result).toMatchObject({ available: false, status: 'blocked', title: 'Waiting for Files' });
         expect(result.message).toContain('Waiting for files: ortho.tfw.');
@@ -135,7 +135,7 @@ describe('buildable file: the artifacts decide, the job explains', () => {
     });
 
     it('says a build on hold without missing files will be retried automatically', async () => {
-        const dataset = datasetListing(raster({ buildStatus: 'pending' }));
+        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: [], buildAwaitingFiles: false }));
         const result = await checker.check(dataset, raster(), 'map');
         expect(result).toMatchObject({ available: false, status: 'blocked', title: 'Processing On Hold' });
         expect(result.message).toContain('will be retried automatically');

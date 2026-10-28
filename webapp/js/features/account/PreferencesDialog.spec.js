@@ -228,7 +228,7 @@ describe('PreferencesDialog', () => {
             }
         });
 
-        it('opens on the tab given by initialTab, with None, All and Only failed builds, None first', async () => {
+        it('opens on the tab given by initialTab, with None, All and Failed or waiting for files, None first', async () => {
             await render({ initialTab: 'notifications' });
             expect(activeTab()).toBe('Notifications');
             expect(document.body.textContent).toContain('Send build notifications');
@@ -236,8 +236,9 @@ describe('PreferencesDialog', () => {
             expect(selectRoot().textContent).toContain('None');
             const options = wrapper.findAllComponents({ name: 'Select' }).at(-1).props('options');
             expect(options).toEqual([
-                { value: 'none', label: 'None' }, { value: 'all', label: 'All' }, { value: 'failed', label: 'Only failed builds' }
+                { value: 'none', label: 'None' }, { value: 'all', label: 'All' }, { value: 'failed', label: 'Failed or waiting for files' }
             ]);
+            expect(hint().textContent).toContain('once when a build waits for files to be uploaded');
         });
 
         it('stores the choice as the build notifications preference', async () => {

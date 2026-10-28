@@ -46,7 +46,7 @@ describe('build status shown', () => {
 
 describe('applyBuildFields', () => {
     it('copies the build fields of a fresh listing and clears the ones the server omits', () => {
-        const held = { path: 'a.tif', hash: 'h', buildStatus: 'queued', buildMissingDependencies: ['x'], polygon_geom: { a: 1 } };
+        const held = { path: 'a.tif', hash: 'h', buildStatus: 'pending', buildMissingDependencies: ['x'], buildAwaitingFiles: true, polygon_geom: { a: 1 } };
         applyBuildFields(held, { path: 'a.tif', hash: 'h2', artifacts: [COG] });
         expect(held).toEqual({ path: 'a.tif', hash: 'h', artifacts: [COG], polygon_geom: { a: 1 } });
         expect('buildStatus' in held).toBe(false);

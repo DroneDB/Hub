@@ -171,7 +171,7 @@ const currency = computed({
 const BUILD_NOTIFICATION_OPTIONS = [
     { value: 'none', label: 'None' },
     { value: 'all', label: 'All' },
-    { value: 'failed', label: 'Only failed builds' }
+    { value: 'failed', label: 'Failed or waiting for files' }
 ];
 /** Why the server cannot e-mail this account, by the status `reason` (emailDisabled hides the tab instead). */
 const CANNOT_RECEIVE = {
@@ -188,7 +188,8 @@ const cannotReceive = computed(() => notificationStatus.value?.canReceiveEmail =
 const notificationsDisabled = computed(() => notificationStatus.value === null || cannotReceive.value);
 const notificationsHint = computed(() => (cannotReceive.value
     ? CANNOT_RECEIVE[notificationStatus.value?.reason ?? ''] ?? 'Your account cannot receive e-mail from this server.'
-    : 'An e-mail tells you when the builds of your files end; builds that end close together share one e-mail.'));
+    : 'An e-mail tells you when the builds of your files end, and once when a build waits for files to be uploaded; '
+        + 'builds that end close together share one e-mail.'));
 
 let statusAsked = false;
 async function loadNotificationStatus() {
@@ -397,10 +398,10 @@ async function resetAll() {
     color: var(--ddb-text);
 }
 
-/* 14rem when there is room (the longest option, "Only failed builds", fits); narrower (never past
-   the panel edge) on a phone */
+/* 17rem when there is room (the longest option, "Failed or waiting for files", fits); narrower
+   (never past the panel edge) on a phone */
 .pref-select {
-    flex: 0 1 14rem;
+    flex: 0 1 17rem;
     min-width: 0;
 }
 

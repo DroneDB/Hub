@@ -14,7 +14,7 @@ import { artifactsOf } from '@/libs/ddb/buildArtifacts';
 import { isActiveState } from '@/libs/tasks/taskStates';
 
 /** The build fields Registry puts on an entry DTO (the ones a finished build changes). */
-const BUILD_FIELDS = Object.freeze(['artifacts', 'buildStatus', 'buildMissingDependencies']);
+const BUILD_FIELDS = Object.freeze(['artifacts', 'buildStatus', 'buildMissingDependencies', 'buildAwaitingFiles']);
 
 /**
  * Whether the entry's build is complete: it has artifacts and the server reports no build state
