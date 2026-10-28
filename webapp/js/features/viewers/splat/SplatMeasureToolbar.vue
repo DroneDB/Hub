@@ -89,15 +89,7 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 }
 
 .toolbar-buttons button {
-    @include overlay-button(
-        $size: 2.25rem,
-        $radius: 4px,
-        $background: transparent,
-        $hover-background: rgba(255, 255, 255, 0.15),
-        $active-background: var(--ddb-primary),
-        $font-size: var(--ddb-font-size-base),
-        $transition-time: 0.2s
-    );
+    @include toolbar-button;
 }
 
 .measure-hint {

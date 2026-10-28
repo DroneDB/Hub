@@ -45,3 +45,18 @@
         cursor: default;
     }
 }
+
+// The button of a toolbar: a square button with square-ish corners and no fill of its own, inside a
+// bar that has the translucent background. The 3D viewer's toolbars and the splat viewer's measure
+// toolbar use it, so the two look the same.
+@mixin toolbar-button {
+    @include overlay-button(
+        $size: 2.25rem,
+        $radius: 4px,
+        $background: transparent,
+        $hover-background: rgba(255, 255, 255, 0.15),
+        $active-background: var(--ddb-primary),
+        $font-size: var(--ddb-font-size-base),
+        $transition-time: 0.2s
+    );
+}
