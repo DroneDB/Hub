@@ -1,5 +1,5 @@
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
-import { formatMissingDeps } from '@/libs/build/buildDepFormat';
+import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isBuilt, currentEntry, shownBuildStatus } from '@/libs/build/entryBuild';
 
@@ -51,7 +51,7 @@ function getBuildBadgeTooltip(dataset, file) {
         case 'failed':
             return 'Build failed';
         case 'pending':
-            return `Waiting for: ${formatMissingDeps(file.entry.buildMissingDependencies)}`;
+            return describeEntryPendingBuild(file.entry).text;
         case 'queued':
             return 'Queued for processing';
         default:
@@ -96,7 +96,6 @@ export {
     isBuildLoading,
     getBuildBadge,
     getBuildBadgeTooltip,
-    formatMissingDeps,
     buildFile,
     isBuildComplete,
     isFileBuilt

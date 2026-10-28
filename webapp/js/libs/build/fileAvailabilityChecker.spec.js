@@ -126,6 +126,22 @@ describe('buildable file: the artifacts decide, the job explains', () => {
         expect(result.message).toContain('ortho.tfw');
     });
 
+    it('says a build waits for files, names them and says that uploading them starts it', async () => {
+        const dataset = datasetListing(raster({ buildStatus: 'pending', buildMissingDependencies: ['ortho.tfw'] }));
+        const result = await checker.check(dataset, raster(), 'map');
+        expect(result).toMatchObject({ available: false, status: 'blocked', title: 'Waiting for Files' });
+        expect(result.message).toContain('Waiting for files: ortho.tfw.');
+        expect(result.message).toContain('Upload the missing file to this dataset and processing starts by itself.');
+    });
+
+    it('says a build on hold without missing files will be retried automatically', async () => {
+        const dataset = datasetListing(raster({ buildStatus: 'pending' }));
+        const result = await checker.check(dataset, raster(), 'map');
+        expect(result).toMatchObject({ available: false, status: 'blocked', title: 'Processing On Hold' });
+        expect(result.message).toContain('will be retried automatically');
+        expect(result.message).not.toContain('Waiting for files');
+    });
+
     it('finds a build that finished after the explorer listed the entry, with one listing and no job', async () => {
         const dataset = datasetListing(raster({ artifacts: [COG] }));
         const result = await checker.check(dataset, raster({ buildStatus: 'queued' }), 'map');

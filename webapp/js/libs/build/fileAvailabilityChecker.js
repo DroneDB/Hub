@@ -8,7 +8,7 @@
 import ddb from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import taskMonitor from '@/libs/tasks/taskMonitor';
-import { formatMissingDeps } from '@/libs/build/buildDepFormat';
+import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { ArtifactRole, findArtifactIn } from '@/libs/ddb/buildArtifacts';
 import { currentEntry, isBuilt } from '@/libs/build/entryBuild';
@@ -146,15 +146,16 @@ class FileAvailabilityChecker {
                 return { available: true, status: 'ready', message: '', title: '', buildState: job, actions: [] };
             }
 
-            // Deferred because a dependency (companion file or external tool) is missing. Checked
+            // Deferred: it waits for files the dataset lacks, or for a retry after a temporary error. Checked
             // before any terminal job: a build that succeeded once can become pending again (its
             // companion file was removed) and the job history still says "Succeeded".
             if (listed.buildStatus === 'pending') {
+                const pending = describeEntryPendingBuild(listed);
                 return {
                     available: false,
                     status: 'blocked',
-                    message: `Processing of '${this.getFileName(entry.path)}' is on hold.\n\nMissing: ${formatMissingDeps(listed.buildMissingDependencies)}.`,
-                    title: 'Processing On Hold',
+                    message: `The file '${this.getFileName(entry.path)}' cannot be opened yet.\n\n${pending.text}`,
+                    title: pending.title,
                     buildState: null,
                     actions: ['cancel', 'retry-build']
                 };

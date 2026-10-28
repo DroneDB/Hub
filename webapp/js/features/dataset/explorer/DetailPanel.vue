@@ -68,7 +68,8 @@
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
-import { isFileBuilt, formatMissingDeps } from '@/libs/build/buildHelpers';
+import { isFileBuilt } from '@/libs/build/buildHelpers';
+import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
 import ddb from 'ddb';
 import PropsTable from '@/features/dataset/explorer/PropsTable.vue';
@@ -161,11 +162,11 @@ export default {
                     return '';
             }
         },
+        // A job that succeeded can leave a build on hold: the entry's reason wins over the job's state
         buildBadgeLabel() {
+            if (this.effectiveBuildStatus === 'pending') return this.pendingBuild.label;
             if (this.buildState) return this.buildState.currentState;
             switch (this.effectiveBuildStatus) {
-                case 'pending':
-                    return 'On Hold';
                 case 'queued':
                     return 'Queued';
                 case 'failed':
@@ -174,19 +175,17 @@ export default {
                     return '';
             }
         },
+        pendingBuild() {
+            return describeEntryPendingBuild(this.file && this.file.entry);
+        },
         // Human-readable explanation of the current build status, shown below the
         // thumbnail so the user understands why the file isn't ready yet.
         buildExplanation() {
             if (!this.isBuildableFile) return null;
 
             switch (this.effectiveBuildStatus) {
-                case 'pending': {
-                    const deps = this.file.entry.buildMissingDependencies;
-                    return {
-                        severity: 'warn',
-                        text: `Processing is on hold - waiting for: ${formatMissingDeps(deps)}.`
-                    };
-                }
+                case 'pending':
+                    return { severity: 'warn', text: this.pendingBuild.text };
                 case 'queued':
                     return { severity: 'info', text: 'This file is queued for processing.' };
                 default:

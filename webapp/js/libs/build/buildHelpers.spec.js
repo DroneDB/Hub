@@ -42,6 +42,14 @@ describe('build badge', () => {
         expect(getBuildBadge({}, held)).toContain('fa-triangle-exclamation');
         expect(getBuildBadgeTooltip({}, held)).toContain('ortho.tfw');
     });
+
+    it('says a build waits for files and what to do in the tooltip, and that one on hold without them is retried', () => {
+        const waiting = file({ buildStatus: 'pending', buildMissingDependencies: ['model.mtl', 'wall.png'] });
+        expect(getBuildBadgeTooltip({}, waiting))
+            .toBe('Waiting for files: model.mtl, wall.png. Upload the missing files to this dataset and processing starts by itself.');
+        expect(getBuildBadgeTooltip({}, file({ buildStatus: 'pending' })))
+            .toBe('Processing is on hold and will be retried automatically.');
+    });
 });
 
 describe('isBuildComplete (download menu)', () => {

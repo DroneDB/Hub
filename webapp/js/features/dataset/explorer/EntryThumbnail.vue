@@ -38,7 +38,7 @@ import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
-import { formatMissingDeps } from '@/libs/build/buildHelpers';
+import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
@@ -111,7 +111,7 @@ export default {
                 return `${this.file.path}\nBuild Status: ${this.buildState.currentState}`;
             }
             if (this.effectiveBuildStatus === 'pending') {
-                return `${this.file.path}\nWaiting for: ${formatMissingDeps(this.file.entry.buildMissingDependencies)}`;
+                return `${this.file.path}\n${describeEntryPendingBuild(this.file.entry).text}`;
             }
             if (this.effectiveBuildStatus === 'queued') {
                 return `${this.file.path}\nQueued for processing`;
