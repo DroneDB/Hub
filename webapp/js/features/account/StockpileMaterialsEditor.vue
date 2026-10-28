@@ -2,8 +2,8 @@
     <div class="materials-editor" data-testid="stockpile-materials-editor">
         <p class="pref-hint">
             The stockpile panel weighs a pile with the density of its material and prices it with the price per
-            {{ units.perWeight.unit === 't' ? 'tonne' : 'short ton' }}. Change the values to yours, hide the materials you do not use,
-            or add your own.
+            {{ units.perWeight.unit === 't' ? 'tonne' : 'short ton' }}, in the currency of the Units tab. Change the values to yours,
+            hide the materials you do not use, or add your own.
         </p>
 
         <div class="materials-table" role="table" aria-label="Stockpile materials">
@@ -11,7 +11,7 @@
                 <span role="columnheader" class="col-shown">Shown</span>
                 <span role="columnheader" class="col-name">Material</span>
                 <span role="columnheader" class="col-density">Density ({{ units.density.unit }})</span>
-                <span role="columnheader" class="col-price">Price ({{ settingsNow.currency }}/{{ units.perWeight.unit }})</span>
+                <span role="columnheader" class="col-price">Price ({{ currency }}/{{ units.perWeight.unit }})</span>
                 <span role="columnheader" class="col-action"><span class="visually-hidden">Actions</span></span>
             </div>
 
@@ -42,7 +42,7 @@
                 </span>
                 <span role="cell" class="col-price">
                     <InputNumber :model-value="shownValue(row, 'costPerTon')" size="small" :min-fraction-digits="0" :max-fraction-digits="MATERIAL_DECIMALS.costPerTon"
-                                 :min="0" :aria-label="`Price of ${row.name} in ${settingsNow.currency} per ${units.perWeight.unit}`"
+                                 :min="0" :aria-label="`Price of ${row.name} in ${currency} per ${units.perWeight.unit}`"
                                  :invalid="!!errors[`${row.slug}:costPerTon`]"
                                  :input-id="`price-${row.slug}`"
                                  @update:model-value="v => setValue(row, 'costPerTon', v)" />
@@ -76,7 +76,7 @@
  * is offered in the stockpile panel, and materials of the user's own.
  *
  * Values are shown in the user's units (t/m³ and per tonne, or ST/yd³ and per short ton) and
- * stored metric. An invalid value is shown as such and not stored. The changes are the pure
+ * currency (both general settings, on the Units tab) and stored metric. An invalid value is shown as such and not stored. The changes are the pure
  * functions of libs/stockpileMaterials.js; the preference follows the account as any other.
  */
 import { computed, nextTick, reactive } from 'vue';
@@ -86,7 +86,7 @@ import InputText from 'primevue/inputtext';
 import ToggleSwitch from 'primevue/toggleswitch';
 import { usePreference } from '@/composables/usePreference';
 import { useViewerSettings } from '@/composables/useViewerSettings';
-import { bulkUnits } from '@/libs/format';
+import { bulkUnits, normalizeCurrency } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import {
     MATERIAL_DECIMALS,
@@ -114,10 +114,13 @@ defineOptions({ name: 'StockpileMaterialsEditor' });
 const stored = useViewerSettings(PREF.STOCKPILE_MATERIALS, PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]).settings;
 const unitPref = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 const units = computed(() => bulkUnits(unitPref.value));
+// The currency is a general setting (the Units tab)
+const storedCurrency = usePreference(PREF.CURRENCY, PREF_DEFAULTS[PREF.CURRENCY]);
+const currency = computed(() => normalizeCurrency(storedCurrency.value));
 
 /** The settings as the stockpile panel reads them */
 const settingsNow = computed(() => normalizeStockpileSettings(stored));
-const rows = computed(() => resolveStockpileCatalog(settingsNow.value));
+const rows = computed(() => resolveStockpileCatalog(settingsNow.value, currency.value));
 
 /** `${slug}:${field}` -> why the value typed there is not stored */
 const errors = reactive(/** @type {Record<string, string>} */ ({}));

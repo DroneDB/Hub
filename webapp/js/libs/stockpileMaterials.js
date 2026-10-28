@@ -5,8 +5,8 @@
  *
  * The built-in catalog holds typical values. Each user adapts it in their preferences
  * (PREF.STOCKPILE_MATERIALS): a different density or price for a built-in material, a built-in
- * material hidden from the list, materials of their own, and the currency the prices are in.
- * The currency is a label: changing it does not convert any price.
+ * material hidden from the list, and materials of their own. The prices are in the user's
+ * currency (PREF.CURRENCY, a general setting); it is a label: changing it converts no price.
  *
  * Densities are in t/m³ and prices per metric tonne, whatever units the user reads them in.
  */
@@ -16,17 +16,17 @@
  * @typedef {{ densityTonPerM3?: number, costPerTon?: number, hidden?: boolean }} MaterialOverride
  *   the changes of the user to a built-in material; a value left out is the built-in one
  * @typedef {{ id: string, name: string, category: string, densityTonPerM3: number, costPerTon: number }} CustomMaterial
- * @typedef {{ currency: string, overrides: Record<string, MaterialOverride>, custom: CustomMaterial[] }} StockpileSettings
+ * @typedef {{ overrides: Record<string, MaterialOverride>, custom: CustomMaterial[] }} StockpileSettings
  * @typedef {{ slug: string, name: string, category: string, densityTonPerM3: number, costPerTon: number,
  *             currency: string, builtIn: boolean, edited: boolean, hidden: boolean }} CatalogMaterial
  *   a material as the panel and the preferences show it; `edited`: a built-in material with a value
  *   of the user
  * @typedef {{ densityTonPerM3: number, costPerTon?: number, currency?: string }} PricedMaterial
  */
+import { DEFAULT_CURRENCY, normalizeCurrency } from './format';
 
 /** The material typed in the panel for one pile, not kept in the catalog. */
 export const CUSTOM_MATERIAL_SLUG = '__custom__';
-export const DEFAULT_CURRENCY = 'USD';
 export const MAX_CUSTOM_MATERIALS = 100;
 export const MAX_MATERIAL_TEXT = 64;
 /** Above any bulk material (iron ore is about 2.5 t/m³, lead 11.3): a typing error, not a density. */
@@ -35,7 +35,6 @@ export const MAX_COST_PER_TON = 1e9;
 
 // The ids of the user's materials can never be a built-in slug or the custom slug
 const CUSTOM_ID = /^u-[a-z0-9]{1,32}$/;
-const CURRENCY_CODE = /^[A-Z]{3}$/;
 
 /** @type {readonly BuiltInMaterial[]} */
 export const STOCKPILE_MATERIALS = Object.freeze([
@@ -70,12 +69,6 @@ export const isValidCost = value => typeof value === 'number' && Number.isFinite
 /** Trimmed, at most MAX_MATERIAL_TEXT characters; '' for anything that is not text. @param {unknown} value */
 const text = value => (typeof value === 'string' ? value.trim().slice(0, MAX_MATERIAL_TEXT) : '');
 
-/** @param {unknown} value @returns {string} an ISO 4217 code; the default for anything else */
-export function normalizeCurrency(value) {
-    const code = typeof value === 'string' ? value.trim().toUpperCase() : '';
-    return CURRENCY_CODE.test(code) ? code : DEFAULT_CURRENCY;
-}
-
 /** @param {unknown} raw @returns {MaterialOverride|null} */
 function normalizeOverride(raw) {
     if (!isObject(raw)) return null;
@@ -105,7 +98,8 @@ function normalizeCustom(raw) {
  * The stockpile settings as the views use them, from whatever is stored: a value written by hand,
  * by a newer Hub or cut short reads as the nearest valid settings instead of failing. Unknown
  * built-in slugs, densities that are not positive, negative prices, materials without a name or
- * with a repeated id are left out; the user's materials are capped at MAX_CUSTOM_MATERIALS.
+ * with a repeated id are left out; the user's materials are capped at MAX_CUSTOM_MATERIALS. A
+ * `currency` stored here by an earlier version is dropped: the currency is PREF.CURRENCY.
  * @param {unknown} raw
  * @returns {StockpileSettings}
  */
@@ -129,17 +123,17 @@ export function normalizeStockpileSettings(raw) {
         custom.push(material);
         if (custom.length === MAX_CUSTOM_MATERIALS) break;
     }
-    return { currency: normalizeCurrency(source.currency), overrides, custom };
+    return { overrides, custom };
 }
 
 /**
  * Every material of the user: the built-in ones (with the user's values, hidden ones included)
  * then the user's own, in their order. All are priced in the user's currency.
  * @param {StockpileSettings} settings  normalized
+ * @param {string} [currency]  the user's (PREF.CURRENCY)
  * @returns {CatalogMaterial[]}
  */
-export function resolveStockpileCatalog(settings) {
-    const { currency } = settings;
+export function resolveStockpileCatalog(settings, currency = DEFAULT_CURRENCY) {
     const builtIn = STOCKPILE_MATERIALS.map(m => {
         const override = settings.overrides[m.slug] ?? {};
         return {

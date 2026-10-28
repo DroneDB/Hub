@@ -3,7 +3,7 @@
  * units, and back without drift.
  */
 import { describe, it, expect } from 'vitest';
-import { bulkUnits, currencyChoices, formatMoney } from './format';
+import { bulkUnits, currencyChoices, formatMoney, normalizeCurrency } from './format';
 
 describe('bulkUnits', () => {
     it('is the metric units as they are', () => {
@@ -42,6 +42,14 @@ describe('formatMoney', () => {
 
     it('writes an unknown code after the number instead of failing', () => {
         expect(formatMoney(12.345, 'X1')).toBe(`${(12.35).toLocaleString()} X1`);
+    });
+});
+
+describe('normalizeCurrency', () => {
+    it('keeps a currency code, upper-cased, and falls back to USD for anything else', () => {
+        expect(normalizeCurrency('eur')).toBe('EUR');
+        expect(normalizeCurrency(' GBP ')).toBe('GBP');
+        for (const bad of ['EURO', 'E1R', '', null, 7, undefined]) expect(normalizeCurrency(bad)).toBe('USD');
     });
 });
 

@@ -277,6 +277,22 @@ export function formatMoney(amount, currency) {
     }
 }
 
+/** The currency of prices while the user has not chosen one (PREF.CURRENCY) */
+export const DEFAULT_CURRENCY = 'USD';
+
+const CURRENCY_CODE = /^[A-Z]{3}$/;
+
+/**
+ * The currency a stored value names: an ISO 4217 code, upper-cased; the default for anything else
+ * (a value written by hand or cut short).
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function normalizeCurrency(value) {
+    const code = typeof value === 'string' ? value.trim().toUpperCase() : '';
+    return CURRENCY_CODE.test(code) ? code : DEFAULT_CURRENCY;
+}
+
 // The currencies offered first, before the others in code order
 const COMMON_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'CNY', 'INR', 'BRL', 'MXN', 'ZAR'];
 

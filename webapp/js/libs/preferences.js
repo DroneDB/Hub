@@ -14,6 +14,7 @@
 /** Keys, so a preference shared by several views has one spelling. */
 export const PREF = Object.freeze({
     MEASURE_UNIT: 'measureUnitPref',
+    CURRENCY: 'currency', // ISO 4217 code of the prices the user sees (a label: nothing is converted)
     BASEMAP: 'selectedBasemap',
     CUSTOM_BASEMAP: 'customBasemap',
     SHOW_DIRECTION_INDICATORS: 'showDirectionIndicators',
@@ -31,7 +32,7 @@ export const PREF = Object.freeze({
     UNIFIED_VIEWER: 'unified-viewer-settings',
     MODEL_LIGHTING: 'model-lighting-settings',
     BUILD_NOTIFICATIONS: 'buildNotifications', // 'none' | 'all' | 'failed': which ended builds the server e-mails
-    STOCKPILE_MATERIALS: 'stockpileMaterials', // { currency, overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
+    STOCKPILE_MATERIALS: 'stockpileMaterials', // { overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
     HUB_UPDATE_ATTEMPTED: 'hubUpdateAttempted', // sessionStorage
@@ -145,6 +146,7 @@ export function getPref(key, fallback, options) {
  */
 export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.MEASURE_UNIT]: ['units', 'measurement'],
+    [PREF.CURRENCY]: ['units', 'currency'],
     [PREF.BASEMAP]: ['map', 'basemap'],
     [PREF.CUSTOM_BASEMAP]: ['map', 'customBasemap'],
     [PREF.SHOW_DIRECTION_INDICATORS]: ['map', 'showDirectionIndicators'],
@@ -181,6 +183,7 @@ const frozen = value => Object.freeze(value);
  */
 export const PREF_DEFAULTS = frozen({
     [PREF.MEASURE_UNIT]: 'metric',
+    [PREF.CURRENCY]: 'USD',
     [PREF.BASEMAP]: 'satellite',
     [PREF.CUSTOM_BASEMAP]: null,
     [PREF.SHOW_DIRECTION_INDICATORS]: false,
@@ -197,8 +200,8 @@ export const PREF_DEFAULTS = frozen({
     [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 }),
     // Opt-in: the server sends nothing for a missing or unknown value either
     [PREF.BUILD_NOTIFICATIONS]: 'none',
-    // The built-in materials as they are, priced in US dollars
-    [PREF.STOCKPILE_MATERIALS]: frozen({ currency: 'USD', overrides: frozen({}), custom: frozen([]) })
+    // The built-in materials as they are
+    [PREF.STOCKPILE_MATERIALS]: frozen({ overrides: frozen({}), custom: frozen([]) })
 });
 
 /**

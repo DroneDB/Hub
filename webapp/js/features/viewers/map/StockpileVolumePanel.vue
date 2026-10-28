@@ -185,8 +185,8 @@
 
 <script>
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
-import { bulkUnits, formatMoney } from '@/libs/format';
-import { CUSTOM_MATERIAL_SLUG, DEFAULT_CURRENCY, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
+import { bulkUnits, DEFAULT_CURRENCY, formatMoney } from '@/libs/format';
+import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { useAuthStore } from '@/stores/auth';
 

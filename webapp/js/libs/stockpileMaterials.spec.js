@@ -6,7 +6,6 @@
 import { describe, it, expect } from 'vitest';
 import {
     CUSTOM_MATERIAL_SLUG,
-    DEFAULT_CURRENCY,
     MAX_CUSTOM_MATERIALS,
     MAX_MATERIAL_TEXT,
     STOCKPILE_MATERIALS,
@@ -14,7 +13,6 @@ import {
     materialNameProblem,
     materialOfSavedPile,
     newCustomMaterialId,
-    normalizeCurrency,
     normalizeStockpileSettings,
     resolveStockpileCatalog,
     samePricing,
@@ -35,19 +33,17 @@ const custom = (id, extra = {}) => ({ id, name: `Mat ${id}`, category: '', densi
 const find = (settings, slug) => resolveStockpileCatalog(settings).find(m => m.slug === slug);
 
 describe('normalizeStockpileSettings', () => {
-    it('reads the preference default as the built-in catalog in US dollars', () => {
-        expect(normalizeStockpileSettings(PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]))
-            .toEqual({ currency: 'USD', overrides: {}, custom: [] });
+    it('reads the preference default as the built-in catalog', () => {
+        expect(normalizeStockpileSettings(PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS])).toEqual({ overrides: {}, custom: [] });
     });
 
     it.each([undefined, null, 'gravel', 42, [], { overrides: 'x', custom: {} }])('reads %j as the defaults', raw => {
-        expect(normalizeStockpileSettings(raw)).toEqual({ currency: DEFAULT_CURRENCY, overrides: {}, custom: [] });
+        expect(normalizeStockpileSettings(raw)).toEqual({ overrides: {}, custom: [] });
     });
 
-    it('keeps a currency code, upper-cased, and falls back to USD for anything else', () => {
-        expect(normalizeCurrency('eur')).toBe('EUR');
-        expect(normalizeCurrency(' GBP ')).toBe('GBP');
-        for (const bad of ['EURO', 'E1R', '', null, 7]) expect(normalizeCurrency(bad)).toBe('USD');
+    it('drops a currency stored with the materials: the currency is a general setting', () => {
+        expect(normalizeStockpileSettings({ currency: 'EUR', overrides: { sand: { costPerTon: 3 } } }))
+            .toEqual({ overrides: { sand: { costPerTon: 3 } }, custom: [] });
     });
 
     it('keeps the valid values of an override and drops the rest', () => {
@@ -102,7 +98,7 @@ describe('normalizeStockpileSettings', () => {
 
 describe('resolveStockpileCatalog', () => {
     it('lists the built-in materials, then the user ones, all priced in the user currency', () => {
-        const catalog = resolveStockpileCatalog({ currency: 'EUR', overrides: {}, custom: [custom('u-x')] });
+        const catalog = resolveStockpileCatalog({ overrides: {}, custom: [custom('u-x')] }, 'EUR');
         expect(catalog.map(m => m.slug)).toEqual([...STOCKPILE_MATERIALS.map(m => m.slug), 'u-x']);
         expect(new Set(catalog.map(m => m.currency))).toEqual(new Set(['EUR']));
         expect(catalog.at(-1)).toMatchObject({ name: 'Mat u-x', builtIn: false, edited: false, hidden: false });
@@ -119,7 +115,8 @@ describe('resolveStockpileCatalog', () => {
     });
 
     it('a currency is a label: the prices keep their numbers', () => {
-        expect(find({ ...EMPTY, currency: 'JPY' }, 'gravel')).toMatchObject({ costPerTon: 15, currency: 'JPY' });
+        expect(resolveStockpileCatalog(EMPTY, 'JPY').find(m => m.slug === 'gravel')).toMatchObject({ costPerTon: 15, currency: 'JPY' });
+        expect(find(EMPTY, 'gravel').currency).toBe('USD');
     });
 });
 

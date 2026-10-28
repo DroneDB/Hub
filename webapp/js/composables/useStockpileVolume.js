@@ -8,9 +8,10 @@
  *  - this.map (OpenLayers Map instance) for interactive drawing/click flows.
  *  - optional: this.getMapCenterLatLon() → [lon, lat] for "detect at center" flow
  *
- * The materials are the user's (PREF.STOCKPILE_MATERIALS): the weight and the cost follow a
- * change of the material, of the values typed for a custom one, or of the user's materials, and
- * the pile on the map is updated with them.
+ * The materials are the user's (PREF.STOCKPILE_MATERIALS), priced in the user's currency
+ * (PREF.CURRENCY): the weight and the cost follow a change of the material, of the values typed
+ * for a custom one, of the user's materials or currency, and the pile on the map is updated
+ * with them.
  */
 import Draw from 'ol/interaction/Draw';
 import { Vector as VectorLayer } from 'ol/layer';
@@ -32,6 +33,7 @@ import {
     samePricing
 } from '@/libs/stockpileMaterials';
 import { usePreference } from '@/composables/usePreference';
+import { normalizeCurrency } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
@@ -117,13 +119,13 @@ const definition = {
         };
     },
     computed: {
+        /** The currency of the user's prices (a general setting) */
+        stockpileCurrency() {
+            return normalizeCurrency(this.userCurrency);
+        },
         /** The user's materials, hidden ones included */
         stockpileCatalog() {
-            return resolveStockpileCatalog(normalizeStockpileSettings(this.stockpileSettings));
-        },
-        /** The currency of the user's prices */
-        stockpileCurrency() {
-            return normalizeStockpileSettings(this.stockpileSettings).currency;
+            return resolveStockpileCatalog(normalizeStockpileSettings(this.stockpileSettings), this.stockpileCurrency);
         },
         /** The materials the panel offers: a restored pile's own one first, then the shown ones */
         stockpileMaterials() {
@@ -826,5 +828,6 @@ const definition = {
  */
 export function useStockpileVolume(externals) {
     const stockpileSettings = usePreference(PREF.STOCKPILE_MATERIALS, PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]);
-    return createFeatureScope({ ...definition, externals: { ...externals, stockpileSettings } });
+    const userCurrency = usePreference(PREF.CURRENCY, PREF_DEFAULTS[PREF.CURRENCY]);
+    return createFeatureScope({ ...definition, externals: { ...externals, stockpileSettings, userCurrency } });
 }

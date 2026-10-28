@@ -142,24 +142,40 @@ describe('PreferencesDialog', () => {
         });
     });
 
-    describe('Stockpiles', () => {
-        const currency = () => document.getElementById('pref-stockpile-currency');
-        beforeEach(() => setPref(PREF.STOCKPILE_MATERIALS, null));
+    describe('Currency', () => {
+        const currency = () => document.getElementById('pref-currency');
+        beforeEach(() => setPref(PREF.CURRENCY, null));
 
-        it('has the currency, US dollars by default, and the materials', async () => {
-            await render({ initialTab: 'stockpiles' });
+        it('is a general setting on the Units tab, US dollars by default', async () => {
+            await render();
             expect(currency().closest('.p-select').textContent).toContain('USD');
-            expect(document.body.querySelector('[data-testid="stockpile-materials-editor"]')).not.toBeNull();
             expect(document.body.textContent).toContain('Changing it does not convert them');
         });
 
-        it('stores the currency with the materials, leaving them as they are', async () => {
-            setPref(PREF.STOCKPILE_MATERIALS, { currency: 'USD', overrides: { gravel: { costPerTon: 9 } }, custom: [] });
-            await render({ initialTab: 'stockpiles' });
-            const select = wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-stockpile-currency');
+        it('stores the choice as the currency preference, not with the stockpile materials', async () => {
+            setPref(PREF.STOCKPILE_MATERIALS, { overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+            await render();
+            const select = wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-currency');
             select.vm.$emit('update:modelValue', 'EUR');
             await flushPromises();
-            expect(getPref(PREF.STOCKPILE_MATERIALS, null)).toEqual({ currency: 'EUR', overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+            expect(getPref(PREF.CURRENCY, null)).toBe('EUR');
+            expect(getPref(PREF.STOCKPILE_MATERIALS, null)).toEqual({ overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+        });
+
+        it('shows the default for a stored value that is not a currency code', async () => {
+            setPref(PREF.CURRENCY, 'euros');
+            await render();
+            expect(currency().closest('.p-select').textContent).toContain('USD');
+        });
+    });
+
+    describe('Stockpiles', () => {
+        beforeEach(() => setPref(PREF.STOCKPILE_MATERIALS, null));
+
+        it('has the materials, and no currency of its own', async () => {
+            await render({ initialTab: 'stockpiles' });
+            expect(document.body.querySelector('[data-testid="stockpile-materials-editor"]')).not.toBeNull();
+            expect(document.getElementById('pref-stockpile-currency')).toBeNull();
         });
 
         it('Reset section resets the stockpiles section', async () => {

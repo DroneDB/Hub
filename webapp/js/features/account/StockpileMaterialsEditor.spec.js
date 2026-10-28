@@ -27,6 +27,7 @@ beforeEach(() => {
     _resetPrefListenersForTests();
     setPref(PREF.STOCKPILE_MATERIALS, null);
     setPref(PREF.MEASURE_UNIT, null);
+    setPref(PREF.CURRENCY, null);
 });
 afterEach(() => {
     wrapper?.unmount();
@@ -112,7 +113,8 @@ describe('StockpileMaterialsEditor', () => {
 
     it('follows a change made elsewhere (the account, another tab)', async () => {
         await render();
-        setPref(PREF.STOCKPILE_MATERIALS, { currency: 'EUR', overrides: { coal: { costPerTon: 99 } } });
+        setPref(PREF.STOCKPILE_MATERIALS, { overrides: { coal: { costPerTon: 99 } } });
+        setPref(PREF.CURRENCY, 'EUR');
         await flushPromises();
         expect(numberIn('coal', 1).props('modelValue')).toBe(99);
         expect(wrapper.find('.materials-head').text()).toContain('Price (EUR/t)');

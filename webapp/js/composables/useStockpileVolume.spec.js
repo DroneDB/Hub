@@ -73,6 +73,7 @@ const savedPile = properties => ({
 beforeEach(() => {
     _resetPrefListenersForTests();
     setPref(PREF.STOCKPILE_MATERIALS, null);
+    setPref(PREF.CURRENCY, null);
     savedFile = null;
     start();
 });
@@ -110,17 +111,23 @@ describe('weight and cost of a measured pile', () => {
     });
 
     it('follow the user values and currency, also when they change with the panel open', async () => {
-        setPref(PREF.STOCKPILE_MATERIALS, { currency: 'EUR', overrides: { gravel: { costPerTon: 20 } } });
+        setPref(PREF.CURRENCY, 'EUR');
+        setPref(PREF.STOCKPILE_MATERIALS, { overrides: { gravel: { costPerTon: 20 } } });
         await measure('gravel');
         expect(pile.stockpileResult.value.costEstimate).toEqual({ amount: 3360, currency: 'EUR' });
-        setPref(PREF.STOCKPILE_MATERIALS, { currency: 'EUR', overrides: { gravel: { densityTonPerM3: 2, costPerTon: 20 } } });
+        setPref(PREF.STOCKPILE_MATERIALS, { overrides: { gravel: { densityTonPerM3: 2, costPerTon: 20 } } });
         await flushPromises();
         expect(pile.stockpileResult.value.weightEstimate.tons).toBe(200);
         expect(draft().get('costEstimate')).toEqual({ amount: 4000, currency: 'EUR' });
+        // The general currency setting changes from the Units tab
+        setPref(PREF.CURRENCY, 'GBP');
+        await flushPromises();
+        expect(draft().get('costEstimate')).toEqual({ amount: 4000, currency: 'GBP' });
+        expect(draft().get('currency')).toBe('GBP');
     });
 
     it('a custom material: the typed density and price, in the user currency, and a price change weighs again', async () => {
-        setPref(PREF.STOCKPILE_MATERIALS, { currency: 'CHF' });
+        setPref(PREF.CURRENCY, 'CHF');
         pile.stockpileCustomDensity.value = 2;
         pile.stockpileCustomCostPerTon.value = 5;
         await measure('__custom__');
@@ -166,7 +173,7 @@ describe('a restored pile', () => {
     });
 
     it('priced otherwise keeps its own material, offered first, and its saved slug', async () => {
-        setPref(PREF.STOCKPILE_MATERIALS, { currency: 'EUR' });
+        setPref(PREF.CURRENCY, 'EUR');
         await restore({
             material: 'u-other', materialName: 'Their ballast', materialDensity: 1.8, costPerTon: 22, currency: 'GBP',
             weightEstimate: { tons: 180, basedOn: 'cutVolume' }, costEstimate: { amount: 3960, currency: 'GBP' }

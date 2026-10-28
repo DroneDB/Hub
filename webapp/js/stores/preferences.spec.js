@@ -87,7 +87,7 @@ describe('preferences store: load', () => {
         expect(options).toEqual(OPTS);
         // A section is whole: unset fields are explicit nulls
         expect(body).toEqual({
-            units: { measurement: 'imperial' },
+            units: { measurement: 'imperial', currency: null },
             map: { basemap: null, customBasemap: null, showDirectionIndicators: null, showFlightPath: false }
         });
         expect(store.status).toBe('idle');
@@ -103,7 +103,7 @@ describe('preferences store: load', () => {
     it('a null account body counts as empty', async () => {
         setPref(PREF.MEASURE_UNIT, 'imperial');
         await start(null);
-        expect(bodies()).toEqual([{ units: { measurement: 'imperial' } }]);
+        expect(bodies()).toEqual([{ units: { measurement: 'imperial', currency: null } }]);
     });
 
     it('a non-empty account overwrites the local values and sends no PATCH', async () => {
@@ -229,7 +229,7 @@ describe('preferences store: sending changes', () => {
         await tick(1);
         expect(h.reg.patchRequest).toHaveBeenCalledTimes(1);
         expect(bodies()[0]).toEqual({
-            units: { measurement: 'imperial' },
+            units: { measurement: 'imperial', currency: null },
             explorer: { viewMode: 'table', tableExpandedGrid: null, sortDescending: null }
         });
         expect(h.reg.patchRequest.mock.calls[0][2]).toEqual(OPTS);
@@ -281,7 +281,7 @@ describe('preferences store: sending changes', () => {
         await tick(600);
         first.resolve({});
         await tick();
-        expect(bodies()).toEqual([{ units: { measurement: 'imperial' } }, { units: { measurement: 'metric' } }]);
+        expect(bodies()).toEqual([{ units: { measurement: 'imperial', currency: null } }, { units: { measurement: 'metric', currency: null } }]);
     });
 
     it('409 reads the account, applies the clean sections and sends the dirty ones', async () => {
@@ -294,7 +294,7 @@ describe('preferences store: sending changes', () => {
         expect(h.reg.getRequest).toHaveBeenLastCalledWith(ENDPOINT, { cache: false });
         expect(h.reg.patchRequest).toHaveBeenCalledTimes(2);
         // the dirty section is not overwritten by the account, and is sent again
-        expect(bodies()[1]).toEqual({ units: { measurement: 'imperial' } });
+        expect(bodies()[1]).toEqual({ units: { measurement: 'imperial', currency: null } });
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
         // a section that was not dirty took the account's values
         expect(getPref(PREF.FILE_VIEW_MODE, '')).toBe('table');
@@ -402,7 +402,7 @@ describe('preferences store: sending changes', () => {
         await store.load();
         // the section is dirty: the account does not overwrite it, and it goes out
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
-        expect(bodies()[1]).toEqual({ units: { measurement: 'imperial' } });
+        expect(bodies()[1]).toEqual({ units: { measurement: 'imperial', currency: null } });
     });
 });
 
@@ -424,7 +424,7 @@ describe('preferences store: local change during load', () => {
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
         // the other section took the account
         expect(getPref(PREF.SHOW_FLIGHT_PATH, true)).toBe(false);
-        expect(bodies()).toEqual([{ units: { measurement: 'imperial' } }]);
+        expect(bodies()).toEqual([{ units: { measurement: 'imperial', currency: null } }]);
     });
 });
 

@@ -110,10 +110,9 @@ import { usePreference } from '@/composables/usePreference';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { currencyChoices } from '@/libs/format';
+import { currencyChoices, normalizeCurrency } from '@/libs/format';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
-import { normalizeCurrency } from '@/libs/stockpileMaterials';
 import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -134,7 +133,6 @@ const datasetTable = useViewerSettings(PREF.DATASET_TABLE, PREF_DEFAULTS[PREF.DA
 const orgPage = useViewerSettings(PREF.ORG_PAGE, PREF_DEFAULTS[PREF.ORG_PAGE]).settings;
 const modelLighting = useViewerSettings(PREF.MODEL_LIGHTING, PREF_DEFAULTS[PREF.MODEL_LIGHTING]).settings;
 const unifiedViewer = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]).settings;
-const stockpileSettings = useViewerSettings(PREF.STOCKPILE_MATERIALS, PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]).settings;
 
 /** @param {Array<string|number>} values @param {(v: any) => string} [label] */
 const optionsOf = (values, label = String) => values.map(value => ({ value, label: label(value) }));
@@ -161,11 +159,11 @@ const splatQuality = computed({
 
 const basemapOptions = Object.entries(Basemaps).map(([value, { label }]) => ({ value, label }));
 
-// ---- Stockpiles: the currency of the material prices (the materials have their own editor) ----
-
-const stockpileCurrency = computed({
-    get: () => normalizeCurrency(stockpileSettings.currency),
-    set: value => { stockpileSettings.currency = normalizeCurrency(value); }
+// A stored value that is not a currency code shows as the default, which is what the views use
+const storedCurrency = usePreference(PREF.CURRENCY, PREF_DEFAULTS[PREF.CURRENCY]);
+const currency = computed({
+    get: () => normalizeCurrency(storedCurrency.value),
+    set: value => { storedCurrency.value = normalizeCurrency(value); }
 });
 
 // ---- Notifications: e-mail about the user's builds ----
@@ -214,7 +212,9 @@ const TABS = [
         groups: [{
             controls: [
                 select('measurement-units', 'Measurement units', usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]),
-                    [{ value: 'metric', label: 'Metric' }, { value: 'imperial', label: 'Imperial' }])
+                    [{ value: 'metric', label: 'Metric' }, { value: 'imperial', label: 'Imperial' }]),
+                select('currency', 'Currency', currency, currencyChoices(),
+                    { filter: true, hint: ref('Prices are shown in this currency, for example the cost of a stockpile. Changing it does not convert them.') })
             ]
         }]
     },
@@ -290,15 +290,7 @@ const TABS = [
     },
     {
         value: 'stockpiles', label: 'Stockpiles', icon: 'fa-solid fa-layer-group', sections: ['stockpiles'],
-        groups: [
-            {
-                controls: [
-                    select('stockpile-currency', 'Currency', stockpileCurrency, currencyChoices(),
-                        { filter: true, hint: ref('The prices of the materials are in this currency. Changing it does not convert them.') })
-                ]
-            },
-            { title: 'Materials', component: StockpileMaterialsEditor }
-        ]
+        groups: [{ title: 'Materials', component: StockpileMaterialsEditor }]
     },
     {
         value: 'notifications', label: 'Notifications', icon: 'fa-solid fa-envelope', sections: ['notifications'],
