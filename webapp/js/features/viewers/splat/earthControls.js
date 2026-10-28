@@ -4,8 +4,11 @@
  * pointer, the wheel and a pinch zoom toward the pointer. A marker shows the pivot.
  */
 import { PRIMARY } from '@/libs/palette';
+import { groundPlaneHit, wheelNotches } from '@/features/viewers/unified/navControls';
 
 const ROTATE_SPEED = 0.005;
+// Fraction of the distance to the point under the pointer that one wheel notch moves the camera
+const WHEEL_ZOOM = 0.15;
 // Pitch stops ~5° from straight up/down so the view cannot flip over
 const POLE = 0.996;
 
@@ -36,7 +39,8 @@ export class EarthControls {
         this.plane = new THREE.Plane();
         this._raycaster = new THREE.Raycaster();
         this._ray = new THREE.Ray();
-        this._planeScratch = new THREE.Plane();
+        // What groundPlaneHit needs of a viewer: the element its events are relative to
+        this._surface = { domElement: canvas };
         this._v = [1, 2, 3, 4].map(() => new THREE.Vector3());
         this._q = [1, 2, 3].map(() => new THREE.Quaternion());
 
@@ -79,15 +83,24 @@ export class EarthControls {
     }
 
     /**
-     * Where the ray through a screen point meets `plane` (a new vector, or null). With
-     * fromAnchor the ray starts at the gesture's start camera, so a pan stays stable.
+     * The ground point under a screen point: where its ray meets the plane through the look
+     * target perpendicular to the scene up (a new vector, or null).
      */
-    screenToPlane(clientX, clientY, plane, fromAnchor) {
+    groundPoint(clientX, clientY) {
+        const { camera, controls } = this.rig;
+        return groundPlaneHit(this.rig.THREE, this._surface, camera, controls, { clientX, clientY });
+    }
+
+    /**
+     * Where the ray through a screen point meets `plane`, the ray starting at the gesture's start
+     * camera so a pan stays stable while the camera moves (a new vector, or null).
+     */
+    screenToPlaneFromStart(clientX, clientY, plane) {
         const rect = this.canvas.getBoundingClientRect();
         const ndc = { x: ((clientX - rect.left) / (rect.width || 1)) * 2 - 1, y: -((clientY - rect.top) / (rect.height || 1)) * 2 + 1 };
         this._raycaster.setFromCamera(ndc, this.rig.camera);
         this._ray.direction.copy(this._raycaster.ray.direction);
-        this._ray.origin.copy(fromAnchor && this.camStart ? this.camStart : this._raycaster.ray.origin);
+        this._ray.origin.copy(this.camStart || this._raycaster.ray.origin);
         const hit = this._ray.intersectPlane(plane, this._v[0]);
         return hit ? hit.clone() : null;
     }
@@ -98,7 +111,7 @@ export class EarthControls {
         this.plane.setFromNormalAndCoplanarPoint(sceneUp, controls.target);
         this.camStart = camera.position.clone();
         this.targetStart = controls.target.clone();
-        this.pivot = this.screenToPlane(clientX, clientY, this.plane, false) || controls.target.clone();
+        this.pivot = this.groundPoint(clientX, clientY) || controls.target.clone();
         this.lastX = clientX;
         this.lastY = clientY;
     }
@@ -174,15 +187,17 @@ export class EarthControls {
         if (!this.enabled()) return;
         e.preventDefault();
         this.onInteract();
-        const { controls, sceneUp } = this.rig;
-        this._planeScratch.setFromNormalAndCoplanarPoint(sceneUp, controls.target);
-        const point = this.screenToPlane(e.clientX, e.clientY, this._planeScratch, false) || controls.target.clone();
-        this.zoomToward(point, (e.deltaY < 0 ? 1 : -1) * 0.15);
+        // Notches, not events: a trackpad sends many small deltas for one gesture, and Firefox
+        // reports lines where Chrome reports pixels. Wheel up (negative delta) zooms in.
+        const notches = wheelNotches(e);
+        if (!notches) return;
+        const point = this.groundPoint(e.clientX, e.clientY) || this.rig.controls.target.clone();
+        this.zoomToward(point, -notches * WHEEL_ZOOM);
     }
 
     // Keeps the ground point grabbed at the start under the pointer
     pan(clientX, clientY) {
-        const hit = this.screenToPlane(clientX, clientY, this.plane, true);
+        const hit = this.screenToPlaneFromStart(clientX, clientY, this.plane);
         if (!hit || !this.pivot || !this.camStart) return;
         const moved = this._v[1].subVectors(hit, this.pivot);
         this.rig.camera.position.copy(this.camStart).sub(moved);
