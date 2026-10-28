@@ -13,7 +13,7 @@
  *    instead of a count so a preset means the same thing on every device;
  *  - `pixelRatio`: the cap on the pixel ratio the canvas is drawn at.
  *
- * Spark 2.1 reads all of them again every frame (`maxSh` once the mesh is told its pipeline
+ * Spark reads all of them again every frame (`maxSh` once the mesh is told its pipeline
  * changed), so a preset takes effect on a scene that is already open.
  */
 import { PREF, PREF_CHOICES, prefChoice } from '@/libs/preferences';

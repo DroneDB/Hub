@@ -1,6 +1,6 @@
 /**
  * The point size of a splat scene: every splat grows or shrinks about its own centre, so the
- * scene keeps its extent (framing, fly speed and where things are do not change). Spark 2.1 has no
+ * scene keeps its extent (framing, fly speed and where things are do not change). Spark has no
  * option for it, so it is an object modifier of the splat mesh (a dyno program run for every splat on
  * the GPU) that multiplies the splats' scales by one uniform factor.
  *

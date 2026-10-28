@@ -80,47 +80,33 @@ export function formatEstimatedUp(bounds) {
 const listOf = list => (Array.isArray(list) ? list : []);
 
 /**
- * How many chunks of its wanted list the pager has still to fetch. Spark's `fetchPriority` is every
- * chunk the view wants, in priority order, including those already in a page, so it is walked the
- * way the pager's own fetch loop walks it: a resident chunk, or one in flight or fetched but not yet
- * uploaded, takes a page and is not counted here; any other is waiting for a fetcher if it still
- * fits in the pool (`maxPages`), and one that does not fit is never fetched, so it is not on the way
- * either. Without `getSplatsChunk` which entries are resident is unknown and none is counted.
- * @param {any} pager
- * @param {any[]} inFlight  the fetchers and the fetched chunks, each { splats, chunk }
- */
-function waitingChunks(pager, inFlight) {
-    if (typeof pager.getSplatsChunk !== 'function') return 0;
-    const maxPages = isCount(pager.maxPages) ? pager.maxPages : Infinity;
-    let pages = 0;
-    let waiting = 0;
-    for (const wanted of listOf(pager.fetchPriority)) {
-        const taken = pager.getSplatsChunk(wanted?.splats, wanted?.chunk)
-            || inFlight.some(f => f?.splats === wanted?.splats && f?.chunk === wanted?.chunk);
-        if (!taken) {
-            if (pages >= maxPages) continue;
-            waiting += 1;
-        }
-        pages += 1;
-    }
-    return waiting;
-}
-
-/**
- * What the pager of Spark says about the streaming of a paged file: how many chunks are being
- * fetched, fetched but not yet uploaded, or waiting for a fetcher, and how many pages of its pool
- * are filled. `null` without a pager.
+ * What the pager of Spark says about the streaming of a paged file: how many chunks the view still
+ * waits for, and how many pages of its pool are filled. `null` without a pager.
+ *
+ * Only the public members of the pager are read. `fetchPriority` is every chunk the view wants, in
+ * priority order, including those already in a page, so it is walked the way the pager's own fetch
+ * loop walks it: each wanted chunk takes a page, a resident one (`getSplatsChunk`) is not on the
+ * way, and one that is not resident is on the way (in flight, fetched and waiting for a page, or
+ * waiting for a fetcher) while it fits in the pool (`maxPages`); one that does not fit is never
+ * fetched, so it is not counted. Without `getSplatsChunk` which chunks are resident is unknown and
+ * none is counted.
  * @param {any} pager  spark.pager
  * @returns {{ pending: number, pages: number, maxPages: number } | null}
  */
 export function pagerState(pager) {
     if (!pager) return null;
-    const inFlight = [...listOf(pager.fetchers), ...listOf(pager.fetched)];
-    return {
-        pending: inFlight.length + waitingChunks(pager, inFlight),
-        pages: listOf(pager.pageToSplatsChunk).filter(Boolean).length,
-        maxPages: isCount(pager.maxPages) ? pager.maxPages : 0
-    };
+    const maxPages = isCount(pager.maxPages) ? pager.maxPages : 0;
+    let pending = 0;
+    if (typeof pager.getSplatsChunk === 'function') {
+        const pool = maxPages || Infinity;
+        let pages = 0;
+        for (const wanted of listOf(pager.fetchPriority)) {
+            if (pages >= pool) break;
+            if (!pager.getSplatsChunk(wanted?.splats, wanted?.chunk)) pending += 1;
+            pages += 1;
+        }
+    }
+    return { pending, pages: listOf(pager.pageToSplatsChunk).filter(Boolean).length, maxPages };
 }
 
 /**
