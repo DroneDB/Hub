@@ -5,7 +5,9 @@
  * how much the GPU draws:
  *
  *  - `maxSh`: the spherical-harmonics degree of the view-dependent colour (0 = flat colour);
- *  - `lodScale`: the level-of-detail scale of the mesh, how fine the splats picked for the view are;
+ *  - `lodScale`: the level-of-detail scale of the mesh, how fine the splats picked for the view are
+ *    (Spark multiplies the size a splat would have on screen by it before deciding to refine it,
+ *    so above 1 is finer and 0.5 stops at splats about twice as large);
  *  - `lodSplatScale`: the share of the platform's splat budget Spark spends on the level of detail
  *    (1 = its default for the device: 2.5 million splats on a desktop, less on a phone), a scale
  *    instead of a count so a preset means the same thing on every device;
