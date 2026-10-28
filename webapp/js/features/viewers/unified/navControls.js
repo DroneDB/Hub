@@ -302,8 +302,9 @@ export function applySceneMetrics(controls, sceneSize, maxDistanceFactor = NAV.m
 // Ground-plane fallback for double-click recentring, used when the click misses all geometry
 // (empty sky, gaps in a sparse point cloud). The plane is the one through the pivot perpendicular
 // to the camera's up axis, which is the world XY plane in a flat scene and the local horizontal
-// plane in an ECEF globe scene.
-function groundPlaneHit(THREE, instance, camera, controls, event) {
+// plane in an ECEF globe scene. `instance` only needs the `domElement` the event is relative to
+// (the splat viewer's earth controls use it for the point under the pointer too).
+export function groundPlaneHit(THREE, instance, camera, controls, event) {
     const domElement = instance.domElement;
     const rect = domElement.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
@@ -340,22 +341,24 @@ export function createDoubleClickRecenter(libs, instance, camera, controls, shou
     return () => instance.domElement.removeEventListener('dblclick', onDoubleClick);
 }
 
+/** Cubic ease in and out of a progress t (0..1): the one easing of every camera flight. */
+export function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
 // rAF-driven position+target tween (no tween dependency). Camera/controls are passed per call
 // (not bound at construction) since the viewer rebuilds its Giro3D scene, and therefore the
 // camera, on every entry load. Cancels any tween already in flight so a second dbl-click / Home
-// press before the first one finishes retargets smoothly.
+// press before the first one finishes retargets smoothly. `onStep(e)` (optional) is told the eased
+// progress after each step, for what the tween does not move itself (the splat viewer's field of view).
 export function createCameraTweener() {
     let rafId = null;
-
-    function easeInOutCubic(t) {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-    }
 
     function stop() {
         if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
     }
 
-    function tweenTo(camera, controls, targetPosition, targetTarget, durationMs, onDone) {
+    function tweenTo(camera, controls, targetPosition, targetTarget, durationMs, onDone, onStep) {
         stop();
         const startPosition = camera.position.clone();
         const startTarget = controls.target.clone();
@@ -366,6 +369,7 @@ export function createCameraTweener() {
             const e = easeInOutCubic(t);
             camera.position.lerpVectors(startPosition, targetPosition, e);
             controls.target.lerpVectors(startTarget, targetTarget, e);
+            if (onStep) onStep(e);
             controls.update();
             if (t < 1) {
                 rafId = requestAnimationFrame(step);
