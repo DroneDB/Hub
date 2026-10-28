@@ -1,7 +1,8 @@
 /**
- * Fly navigation of the splat viewer: left-drag looks around
- * (first person, eased every frame), WASD / arrows / QE and the on-screen pad move with
- * smooth acceleration, Shift goes faster.
+ * Fly navigation of the splat viewer: dragging with the left button, a pen or one finger looks
+ * around (first person, eased every frame), WASD / arrows / QE and the on-screen pad move with
+ * smooth acceleration, Shift goes faster. The look runs on pointer events, so touch works like
+ * the mouse and the browser's coalesced samples (finer than the frame rate) are used.
  */
 
 export const MOVE_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
@@ -20,6 +21,10 @@ export class FlyControls {
         this.onInteract = onInteract;
         this.keys = new Set();
         this.dragging = false;
+        // The pointers that are down, and the one that is looking (a second finger belongs to OrbitControls' pinch)
+        this.down = new Set();
+        this.pointerId = null;
+        this.canvas = null;
         this.lastX = 0;
         this.lastY = 0;
         this.velocity = new rig.THREE.Vector3();
@@ -27,21 +32,33 @@ export class FlyControls {
         this._fwd = new rig.THREE.Vector3();
         this._right = new rig.THREE.Vector3();
         this.handlers = {
-            mousedown: e => this.onMouseDown(e),
-            mousemove: e => this.onMouseMove(e),
-            mouseup: () => { this.dragging = false; },
-            mouseleave: () => { this.dragging = false; }
+            pointerdown: e => this.onPointerDown(e),
+            pointermove: e => this.onPointerMove(e),
+            pointerup: e => this.onPointerUp(e),
+            pointercancel: e => this.onPointerUp(e)
         };
     }
 
-    /** Registers the mouse-look listeners on the canvas through `listen(target, type, fn)`. */
+    /** Registers the look listeners on the canvas through `listen(target, type, fn)`. */
     attach(canvas, listen) {
+        this.canvas = canvas;
         Object.entries(this.handlers).forEach(([type, fn]) => listen(canvas, type, fn));
     }
 
-    onMouseDown(e) {
-        if (e.button !== 0 || !this.enabled()) return;
+    onPointerDown(e) {
+        if (!this.enabled()) return;
+        this.down.add(e.pointerId);
+        // A second finger is a pinch: it ends the look instead of joining it
+        if (this.down.size > 1) {
+            this.endLook();
+            return;
+        }
+        // Other mouse buttons are OrbitControls' (pan, dolly)
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
         this.dragging = true;
+        this.pointerId = e.pointerId;
+        // The drag goes on when the pointer leaves the canvas, and its release is seen
+        try { this.canvas?.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
         this.lastX = e.clientX;
         this.lastY = e.clientY;
         // The presentation or a pan may have moved the camera since the last drag
@@ -51,8 +68,8 @@ export class FlyControls {
         this.onInteract();
     }
 
-    onMouseMove(e) {
-        if (!this.dragging) return;
+    onPointerMove(e) {
+        if (!this.dragging || e.pointerId !== this.pointerId) return;
         // Every coalesced sample, so sub-frame movements are not lost
         const samples = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
         for (const ev of samples.length ? samples : [e]) {
@@ -62,6 +79,19 @@ export class FlyControls {
             this.lastY = ev.clientY;
         }
         this.rig.targetPitch = Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, this.rig.targetPitch));
+    }
+
+    onPointerUp(e) {
+        this.down.delete(e.pointerId);
+        if (e.pointerId === this.pointerId) this.endLook();
+    }
+
+    endLook() {
+        if (this.pointerId !== null) {
+            try { this.canvas?.releasePointerCapture(this.pointerId); } catch { /* not captured */ }
+        }
+        this.dragging = false;
+        this.pointerId = null;
     }
 
     /** Eases the look toward the drag target (snaps when not dragging); once per frame. */
