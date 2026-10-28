@@ -36,7 +36,7 @@
                                   v-model:custom-density="stockpileCustomDensity" v-model:custom-cost-per-ton="stockpileCustomCostPerTon"
                                   v-model:title="stockpileTitle" v-model:description="stockpileDescription"
                                   :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
-                                  :result="stockpileResult" :materials="stockpileMaterials" :mode="stockpileMode" :unit-pref="currentUnitPref"
+                                  :result="stockpileResult" :materials="stockpileMaterials" :currency="stockpileCurrency" :mode="stockpileMode" :unit-pref="currentUnitPref"
                                   @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
                                   @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
                                   @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson" />

@@ -7,6 +7,10 @@
  *  - this.rasterFilePath (shared with useRasterAnalysis)
  *  - this.map (OpenLayers Map instance) for interactive drawing/click flows.
  *  - optional: this.getMapCenterLatLon() → [lon, lat] for "detect at center" flow
+ *
+ * The materials are the user's (PREF.STOCKPILE_MATERIALS): the weight and the cost follow a
+ * change of the material, of the values typed for a custom one, or of the user's materials, and
+ * the pile on the map is updated with them.
  */
 import Draw from 'ol/interaction/Draw';
 import { Vector as VectorLayer } from 'ol/layer';
@@ -16,13 +20,19 @@ import { Polygon } from 'ol/geom';
 import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
-import { buildStockpileFeature, loadStockpile } from '@/libs/map/stockpileStorage';
+import { buildStockpileFeature, loadStockpile, STOCKPILE_PROPERTIES } from '@/libs/map/stockpileStorage';
 import {
-    STOCKPILE_MATERIALS,
     CUSTOM_MATERIAL_SLUG,
-    findStockpileMaterialBySlug,
-    computeMaterialEstimate
+    computeMaterialEstimate,
+    isValidCost,
+    isValidDensity,
+    materialOfSavedPile,
+    normalizeStockpileSettings,
+    resolveStockpileCatalog,
+    samePricing
 } from '@/libs/stockpileMaterials';
+import { usePreference } from '@/composables/usePreference';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
@@ -64,23 +74,12 @@ function friendlyStockpileError(raw, fallback) {
     return fallback;
 }
 
-// Resolve the active material descriptor for the current panel state.
-// Returns null when no material is selected, or when the inline custom
-// entry has invalid density.
-function resolveSelectedMaterial(slug, customDensity, customCostPerTon) {
-    if (!slug) return null;
-    if (slug === CUSTOM_MATERIAL_SLUG) {
-        const d = Number(customDensity);
-        if (!isFinite(d) || d <= 0) return null;
-        return {
-            slug: CUSTOM_MATERIAL_SLUG,
-            densityTonPerM3: d,
-            costPerTon: Math.max(0, Number(customCostPerTon) || 0),
-            currency: 'USD'
-        };
-    }
-    return findStockpileMaterialBySlug(slug);
-}
+// The material of a restored pile whose values are not those of any of the user's materials
+const SAVED_MATERIAL_SLUG = '__saved__';
+
+// What the draft feature takes from the panel when it changes (its id and save time stay)
+const DRAFT_PROPERTIES = ['name', 'description', 'tooltipText',
+    ...STOCKPILE_PROPERTIES.filter(k => k !== 'id' && k !== 'savedAt')];
 
 const definition = {
     data() {
@@ -90,10 +89,10 @@ const definition = {
             stockpileSensitivity: 0.5,
             stockpileRadius: 50,
             stockpileMaterial: null,
-            // Materials catalog is bundled with the SPA; no network call.
-            stockpileMaterials: STOCKPILE_MATERIALS,
             stockpileCustomDensity: 1.5,    // t/m³
             stockpileCustomCostPerTon: 0,   // currency unit per ton
+            // A restored pile's material when it is not one of the user's (see _restoreStockpileMaterial)
+            _savedStockpileMaterial: null,
             stockpileLoading: false,
             stockpileError: null,
             stockpileResult: null,
@@ -117,14 +116,41 @@ const definition = {
             _draftStockpileFeatureId: null
         };
     },
+    computed: {
+        /** The user's materials, hidden ones included */
+        stockpileCatalog() {
+            return resolveStockpileCatalog(normalizeStockpileSettings(this.stockpileSettings));
+        },
+        /** The currency of the user's prices */
+        stockpileCurrency() {
+            return normalizeStockpileSettings(this.stockpileSettings).currency;
+        },
+        /** The materials the panel offers: a restored pile's own one first, then the shown ones */
+        stockpileMaterials() {
+            const shown = this.stockpileCatalog.filter(m => !m.hidden);
+            return this._savedStockpileMaterial ? [this._savedStockpileMaterial, ...shown] : shown;
+        }
+    },
     watch: {
         // Keep the in-memory draft feature's properties in sync with what the
         // user types in the panel so the toolbar Save button captures the
         // latest title / notes / material without an extra "Apply" click.
-        stockpileTitle() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileDescription() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileMaterial() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); },
-        stockpileCustomDensity() { this._patchDraftStockpileProps && this._patchDraftStockpileProps(); }
+        stockpileTitle() { this._patchDraftStockpileProps(); },
+        stockpileDescription() { this._patchDraftStockpileProps(); },
+        // The weight and the cost follow the material and its values
+        stockpileMaterial() { this._refreshStockpileEstimate(); },
+        stockpileCustomDensity() { this._refreshStockpileEstimate(); },
+        stockpileCustomCostPerTon() { this._refreshStockpileEstimate(); },
+        // The user's materials changed (here, in the Preferences, on another device)
+        stockpileMaterials(materials) {
+            const slug = this.stockpileMaterial;
+            if (slug && slug !== CUSTOM_MATERIAL_SLUG && !materials.some(m => m.slug === slug)) {
+                // Removed or hidden: nothing to weigh the pile with (the watcher above refreshes)
+                this.stockpileMaterial = null;
+            } else {
+                this._refreshStockpileEstimate();
+            }
+        }
     },
     methods: {
         async openStockpileVolume(file) {
@@ -138,6 +164,7 @@ const definition = {
             this.stockpileDetectedPolygon = null;
             this.stockpileTitle = '';
             this.stockpileDescription = '';
+            this._savedStockpileMaterial = null;
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
             this._loadSavedStockpile();
         },
@@ -175,7 +202,7 @@ const definition = {
                         _restored: true
                     };
                 }
-                if (p.material) this.stockpileMaterial = p.material;
+                this._restoreStockpileMaterial(p);
                 if (p.title) this.stockpileTitle = p.title;
                 // `description` is the canonical key; `notes` is read for
                 // backwards compatibility with stockpiles saved before the
@@ -188,6 +215,74 @@ const definition = {
             } catch (e) {
                 console.warn('Could not restore saved stockpile:', e);
             }
+        },
+
+        /**
+         * Select the material a restored pile was weighed and priced with. When it is one of the
+         * user's materials with the same values it is selected as such; otherwise (another
+         * user's material, a hidden one, prices changed since) the panel offers it as it was
+         * saved, so the saved weight and cost stay what they were.
+         * @param {Record<string, any>} p  the saved feature's properties
+         */
+        _restoreStockpileMaterial(p) {
+            const slug = p.material;
+            if (!slug) return;
+            const saved = materialOfSavedPile(p);
+            if (slug === CUSTOM_MATERIAL_SLUG) {
+                if (saved) {
+                    this.stockpileCustomDensity = saved.densityTonPerM3;
+                    this.stockpileCustomCostPerTon = saved.costPerTon;
+                }
+                this.stockpileMaterial = slug;
+                return;
+            }
+            const current = this.stockpileCatalog.find(m => m.slug === slug && !m.hidden);
+            if (current && (!saved || samePricing(current, saved))) {
+                this.stockpileMaterial = slug;
+            } else if (saved) {
+                this._savedStockpileMaterial = {
+                    ...saved, slug: SAVED_MATERIAL_SLUG, sourceSlug: slug, category: '',
+                    builtIn: false, edited: false, hidden: false, saved: true
+                };
+                this.stockpileMaterial = SAVED_MATERIAL_SLUG;
+            } else {
+                this.stockpileMaterial = null;
+            }
+        },
+
+        /**
+         * The material the pile is weighed with: one of the offered materials, or the values
+         * typed for a custom one; null without a material or with an invalid custom density.
+         * `sourceSlug` is the slug saved with the pile when it differs from `slug`.
+         */
+        _selectedStockpileMaterial() {
+            const slug = this.stockpileMaterial;
+            if (!slug) return null;
+            if (slug === CUSTOM_MATERIAL_SLUG) {
+                const density = Number(this.stockpileCustomDensity);
+                if (!isValidDensity(density)) return null;
+                const cost = Number(this.stockpileCustomCostPerTon);
+                return {
+                    slug, name: 'Custom material', densityTonPerM3: density,
+                    costPerTon: isValidCost(cost) ? cost : 0, currency: this.stockpileCurrency
+                };
+            }
+            return this.stockpileMaterials.find(m => m.slug === slug) ?? null;
+        },
+
+        /** `result` with the weight and the cost of the selected material (none without one). */
+        _withStockpileEstimate(result) {
+            const rest = { ...result };
+            delete rest.weightEstimate;
+            delete rest.costEstimate;
+            const estimate = computeMaterialEstimate(rest, this._selectedStockpileMaterial());
+            return estimate ? { ...rest, ...estimate } : rest;
+        },
+
+        /** Weigh the current result again, and update the pile on the map with it. */
+        _refreshStockpileEstimate() {
+            if (this.stockpileResult) this.stockpileResult = this._withStockpileEstimate(this.stockpileResult);
+            this._patchDraftStockpileProps();
         },
 
         /**
@@ -228,6 +323,7 @@ const definition = {
             this.stockpileError = null;
             this.stockpileResult = null;
             this.stockpileDetectedPolygon = null;
+            this._savedStockpileMaterial = null;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
             // Forget the draft id so the next session can adopt a fresh
@@ -287,18 +383,11 @@ const definition = {
                         flatElevation: 0
                     }
                 );
-                const material = resolveSelectedMaterial(
-                    this.stockpileMaterial,
-                    this.stockpileCustomDensity,
-                    this.stockpileCustomCostPerTon
-                );
-                const estimate = computeMaterialEstimate(volume, material);
-                this.stockpileResult = {
+                this.stockpileResult = this._withStockpileEstimate({
                     ...volume,
-                    ...(estimate || {}),
                     confidence: detection.confidence,
                     estimatedFromDetection: detection.estimatedVolume
-                };
+                });
                 this._adoptDraftStockpile(detection.polygon);
             } catch (e) {
                 console.error('Stockpile detection/calculation failed:', e);
@@ -337,13 +426,7 @@ const definition = {
                         flatElevation: 0
                     }
                 );
-                const material = resolveSelectedMaterial(
-                    this.stockpileMaterial,
-                    this.stockpileCustomDensity,
-                    this.stockpileCustomCostPerTon
-                );
-                const estimate = computeMaterialEstimate(volume, material);
-                this.stockpileResult = { ...volume, ...(estimate || {}) };
+                this.stockpileResult = this._withStockpileEstimate(volume);
                 this.stockpileDetectedPolygon = polygonGeoJson;
                 this._adoptDraftStockpile(polygonGeoJson);
             } catch (e) {
@@ -584,19 +667,18 @@ const definition = {
          * Save and Export so the two outputs stay consistent).
          */
         _buildStockpileProperties() {
-            const props = { material: this.stockpileMaterial || null };
+            const material = this._selectedStockpileMaterial();
+            const props = { material: material?.sourceSlug ?? (this.stockpileMaterial || null) };
             const title = (this.stockpileTitle || '').trim();
             const description = (this.stockpileDescription || '').trim();
             if (title) props.title = title;
             if (description) props.description = description;
-            // Resolve material density (preferred sources: predefined entry,
-            // custom inline density, or backend-supplied weightEstimate).
-            const mat = (this.stockpileMaterials || []).find(m => m && m.slug === this.stockpileMaterial);
-            if (mat && isFinite(mat.densityTonPerM3)) {
-                props.materialDensity = Number(mat.densityTonPerM3);
-            } else if (this.stockpileMaterial === CUSTOM_MATERIAL_SLUG
-                && isFinite(this.stockpileCustomDensity) && this.stockpileCustomDensity > 0) {
-                props.materialDensity = Number(this.stockpileCustomDensity);
+            // What the pile is weighed and priced with, so it reads the same for every user
+            if (material) {
+                props.materialName = material.name;
+                props.materialDensity = material.densityTonPerM3;
+                props.costPerTon = material.costPerTon;
+                props.currency = material.currency;
             }
             if (this.currentUnitPref) props.unitSystem = this.currentUnitPref;
             const r = this.stockpileResult;
@@ -624,7 +706,7 @@ const definition = {
             const parts = [];
             if (p.title) parts.push(p.title);
             if (typeof p.netVolume === 'number') parts.push(`${p.netVolume.toFixed(1)} m³`);
-            if (p.material && p.material !== CUSTOM_MATERIAL_SLUG) parts.push(p.material);
+            if (p.materialName) parts.push(p.materialName);
             if (p.materialDensity) parts.push(`${p.materialDensity} t/m³`);
             return parts.join(' - ') || 'Stockpile';
         },
@@ -701,10 +783,7 @@ const definition = {
             if (!feature) return;
             const props = this._buildStockpileProperties();
             // Don't touch geometry/style props that were set at build time.
-            const updatable = ['name', 'title', 'description', 'material', 'materialDensity',
-                'tooltipText', 'unitSystem', 'netVolume', 'cutVolume', 'fillVolume',
-                'area2d', 'area3d', 'baseElevation', 'confidence', 'weightEstimate', 'costEstimate'];
-            updatable.forEach(k => {
+            DRAFT_PROPERTIES.forEach(k => {
                 if (props[k] !== undefined) feature.set(k, props[k]);
                 else feature.unset && feature.unset(k);
             });
@@ -746,5 +825,6 @@ const definition = {
  * @param {Record<string, any>} externals
  */
 export function useStockpileVolume(externals) {
-    return createFeatureScope({ ...definition, externals });
+    const stockpileSettings = usePreference(PREF.STOCKPILE_MATERIALS, PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]);
+    return createFeatureScope({ ...definition, externals: { ...externals, stockpileSettings } });
 }

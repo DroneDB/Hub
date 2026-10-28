@@ -38,23 +38,35 @@
                        class="panel-input" data-testid="stockpile-radius">
             </div>
 
-            <div v-if="materials && materials.length" class="section">
-                <label for="stockpile-volume-panel-material" class="section-label">Material (optional)</label>
+            <div class="section">
+                <div class="section-label-row">
+                    <label for="stockpile-volume-panel-material" class="section-label">Material (optional)</label>
+                    <button v-if="canEditMaterials" type="button" class="link-btn" data-testid="stockpile-edit-materials"
+                            title="Change the densities and prices of your materials, add your own"
+                            @click="editMaterials">
+                        Edit materials…
+                    </button>
+                </div>
                 <select id="stockpile-volume-panel-material" v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
                     <option :value="null">- none -</option>
-                    <option v-for="m in materials" :key="m.slug" :value="m.slug">
-                        {{ m.name }} ({{ m.densityTonPerM3 }} t/m³)
+                    <option v-for="m in savedMaterials" :key="m.slug" :value="m.slug">
+                        {{ m.name }} (saved, {{ formatDensity(m.densityTonPerM3) }})
                     </option>
+                    <optgroup v-for="group in materialGroups" :key="group.label" :label="group.label">
+                        <option v-for="m in group.materials" :key="m.slug" :value="m.slug">
+                            {{ m.name }} ({{ formatDensity(m.densityTonPerM3) }})
+                        </option>
+                    </optgroup>
                     <option :value="customSlug">+ Custom…</option>
                 </select>
                 <div v-if="localMaterial === customSlug" class="custom-material-grid">
                     <label>
-                        <span>Density (t/m³)</span>
+                        <span>Density ({{ units.density.unit }})</span>
                         <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
                                class="panel-input" data-testid="stockpile-custom-density">
                     </label>
                     <label>
-                        <span>Cost / ton</span>
+                        <span>Cost / {{ units.perWeight.unit }} ({{ currency }})</span>
                         <input v-model.number="localCustomCostPerTon" type="number" min="0" step="1"
                                class="panel-input" data-testid="stockpile-custom-cost">
                     </label>
@@ -143,14 +155,14 @@
                         <span class="result-value">{{ (result.confidence * 100).toFixed(0) }}%</span>
                     </template>
 
-                    <template v-if="derivedWeightTons != null">
+                    <template v-if="result.weightEstimate">
                         <span class="result-label">Weight</span>
-                        <span class="result-value" data-testid="stockpile-weight">{{ formatTons(derivedWeightTons) }}</span>
+                        <span class="result-value" data-testid="stockpile-weight">{{ formatTons(result.weightEstimate.tons) }}</span>
                     </template>
 
-                    <template v-if="derivedCost != null">
+                    <template v-if="result.costEstimate">
                         <span class="result-label">Est. cost</span>
-                        <span class="result-value" data-testid="stockpile-cost">{{ formatCost(derivedCost) }}</span>
+                        <span class="result-value" data-testid="stockpile-cost">{{ formatCost(result.costEstimate) }}</span>
                     </template>
                 </div>
                 <div v-if="!showFillRow" class="fill-hint" data-testid="stockpile-fill-hint">
@@ -173,8 +185,10 @@
 
 <script>
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
-
-const CUSTOM_SLUG = '__custom__';
+import { bulkUnits, formatMoney } from '@/libs/format';
+import { CUSTOM_MATERIAL_SLUG, DEFAULT_CURRENCY, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
+import { PREFERENCES_QUERY } from '@/libs/authRoutes';
+import { useAuthStore } from '@/stores/auth';
 
 /**
  * StockpileVolumePanel - Stockpile volume measurement panel.
@@ -182,10 +196,16 @@ const CUSTOM_SLUG = '__custom__';
  * Provides auto-detect (click-based) and manual polygon drawing workflows
  * to calculate stockpile volumes from DEM/DSM rasters via the
  * useStockpileVolume composable.
+ *
+ * The weight and the cost are the composable's (`result.weightEstimate`, `result.costEstimate`),
+ * the ones the pile is saved with. Densities, prices, volumes and weights are metric in the props
+ * and shown in the user's units. "Edit materials…" opens the Preferences on the user's materials.
  */
 export default {
     name: 'StockpileVolumePanel',
     components: { StockpileBaseMethodsDialog },
+    // An embedded map has no header, so no Preferences window to open
+    inject: { embed: { default: false } },
     props: {
         visible: { type: Boolean, default: false },
         loading: { type: Boolean, default: false },
@@ -195,7 +215,9 @@ export default {
         sensitivity: { type: Number, default: 0.5 },
         radius: { type: Number, default: 50 },
         material: { type: String, default: null },
+        // The offered materials (useStockpileVolume): { slug, name, category, densityTonPerM3, builtIn, saved? }
         materials: { type: Array, default: () => [] },
+        currency: { type: String, default: DEFAULT_CURRENCY },
         mode: { type: String, default: null }, // 'click' | 'draw' | null
         customDensity: { type: Number, default: 1.5 },
         customCostPerTon: { type: Number, default: 0 },
@@ -212,8 +234,11 @@ export default {
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
         'update:title', 'update:description'],
+    setup() {
+        return { auth: useAuthStore() };
+    },
     data() {
-        return { customSlug: CUSTOM_SLUG, showBaseMethodsInfo: false };
+        return { customSlug: CUSTOM_MATERIAL_SLUG, showBaseMethodsInfo: false };
     },
     computed: {
         localBaseMethod: {
@@ -232,13 +257,14 @@ export default {
             get() { return this.material; },
             set(v) { this.$emit('update:material', v); }
         },
+        // The custom values in the user's units; the props stay t/m³ and per tonne
         localCustomDensity: {
-            get() { return this.customDensity; },
-            set(v) { this.$emit('update:customDensity', Number(v)); }
+            get() { return shownMaterialValue(this.customDensity, 'densityTonPerM3', this.units); },
+            set(v) { this.$emit('update:customDensity', storedMaterialValue(Number(v), 'densityTonPerM3', this.units)); }
         },
         localCustomCostPerTon: {
-            get() { return this.customCostPerTon; },
-            set(v) { this.$emit('update:customCostPerTon', Number(v)); }
+            get() { return shownMaterialValue(this.customCostPerTon, 'costPerTon', this.units); },
+            set(v) { this.$emit('update:customCostPerTon', storedMaterialValue(Number(v), 'costPerTon', this.units)); }
         },
         localTitle: {
             get() { return this.title; },
@@ -248,51 +274,24 @@ export default {
             get() { return this.description; },
             set(v) { this.$emit('update:description', v); }
         },
-        // Resolves the active material parameters: predefined slug, custom inputs, or null.
-        effectiveMaterial() {
-            if (!this.material) return null;
-            if (this.material === CUSTOM_SLUG) {
-                const d = Number(this.customDensity);
-                if (!isFinite(d) || d <= 0) return null;
-                return {
-                    densityTonPerM3: d,
-                    costPerTon: Math.max(0, Number(this.customCostPerTon) || 0),
-                    currency: this.result && this.result.costEstimate && this.result.costEstimate.currency || ''
-                };
+        units() { return bulkUnits(this.unitPref); },
+        /** A restored pile's own material, offered as it was saved */
+        savedMaterials() { return this.materials.filter(m => m.saved); },
+        /** The built-in materials by category, in catalog order, then the user's own */
+        materialGroups() {
+            const groups = new Map();
+            for (const m of this.materials) {
+                if (m.saved) continue;
+                const label = m.builtIn ? m.category || 'Other' : 'My materials';
+                if (!groups.has(label)) groups.set(label, []);
+                groups.get(label).push(m);
             }
-            const m = (this.materials || []).find(x => x.slug === this.material);
-            return m ? {
-                densityTonPerM3: Number(m.densityTonPerM3) || 0,
-                costPerTon: Number(m.costPerTon) || 0,
-                currency: m.currency || (this.result && this.result.costEstimate && this.result.costEstimate.currency) || ''
-            } : null;
+            const mine = groups.get('My materials');
+            groups.delete('My materials');
+            if (mine) groups.set('My materials', mine);
+            return [...groups].map(([label, materials]) => ({ label, materials }));
         },
-        // Volume base for tonnage: prefer net (DSM-DTM) when positive, fall back to cut.
-        derivedVolumeM3() {
-            if (!this.result) return null;
-            const net = Number(this.result.netVolume);
-            if (isFinite(net) && net > 0) return net;
-            const cut = Number(this.result.cutVolume);
-            if (isFinite(cut) && cut > 0) return cut;
-            return null;
-        },
-        derivedWeightTons() {
-            const v = this.derivedVolumeM3;
-            const m = this.effectiveMaterial;
-            if (v == null || !m || !m.densityTonPerM3) {
-                // Fallback to backend-provided estimate if no material is selected.
-                return this.result && this.result.weightEstimate ? this.result.weightEstimate.tons : null;
-            }
-            return v * m.densityTonPerM3;
-        },
-        derivedCost() {
-            const tons = this.derivedWeightTons;
-            const m = this.effectiveMaterial;
-            if (tons == null || !m || !isFinite(m.costPerTon)) {
-                return this.result && this.result.costEstimate ? this.result.costEstimate : null;
-            }
-            return { amount: tons * m.costPerTon, currency: m.currency || '' };
-        },
+        canEditMaterials() { return !this.embed && this.auth.isLoggedIn; },
         // Clear should be available whenever there is something visible to clear
         // (a result, a banner error, an active mode, or a loading request the
         // user wants to abandon).
@@ -329,8 +328,8 @@ export default {
         },
         formatVolume(v) {
             if (v == null || !isFinite(v)) return '-';
-            // 1 m³ = 1.30795 yd³
-            return this.isImperial ? `${this._fmt(v * 1.30795)} yd³` : `${this._fmt(v)} m³`;
+            const { factor, unit } = this.units.volume;
+            return `${this._fmt(v * factor)} ${unit}`;
         },
         formatArea(v) {
             if (v == null || !isFinite(v)) return '-';
@@ -349,12 +348,20 @@ export default {
         },
         formatTons(t) {
             if (t == null || !isFinite(t)) return '-';
-            // 1 metric tonne = 1.10231 short tons
-            return this.isImperial ? `${this._fmt(t * 1.10231)} ST` : `${this._fmt(t)} t`;
+            const { factor, unit } = this.units.weight;
+            return `${this._fmt(t * factor)} ${unit}`;
+        },
+        formatDensity(d) {
+            const { factor, unit } = this.units.density;
+            return `${this._fmt(d * factor, 3)} ${unit}`;
         },
         formatCost(c) {
             if (!c || !isFinite(c.amount)) return '-';
-            return `${this._fmt(c.amount)} ${c.currency || ''}`.trim();
+            return formatMoney(c.amount, c.currency || DEFAULT_CURRENCY);
+        },
+        // The Preferences window opens on the materials (HubHeader reads the query and removes it)
+        editMaterials() {
+            this.$router.push({ query: { ...this.$route.query, [PREFERENCES_QUERY]: 'stockpiles' } });
         }
     }
 };
@@ -459,6 +466,27 @@ export default {
     font-size: 0.85rem;
 }
 .banner-cancel:hover { color: var(--ddb-text-on-color); }
+
+.section-label-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--panel-accent);
+    font-size: 0.7rem;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.link-btn:hover,
+.link-btn:focus-visible {
+    text-decoration: underline;
+}
 
 .custom-material-grid {
     display: grid;

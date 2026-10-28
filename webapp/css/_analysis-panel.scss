@@ -152,7 +152,8 @@
         border-color: rgba(var(--panel-accent-rgb), 0.6);
     }
 
-    .panel-select option {
+    .panel-select option,
+    .panel-select optgroup {
         background: var(--panel-option-bg);
         color: var(--panel-text);
 

@@ -12,6 +12,7 @@ import { pointCoordinates, showPointPopup } from './pointPopup';
 import { copyText } from '@/composables/useCopyText';
 import { areaParts, lengthParts } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
+import { STOCKPILE_PROPERTIES } from './stockpileStorage';
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -35,11 +36,7 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
         'stroke', 'stroke-width', 'stroke-opacity',
         'fill', 'fill-opacity',
         'groupId',
-        // Stockpile metadata
-        'id', 'title', 'material', 'materialDensity',
-        'netVolume', 'cutVolume', 'fillVolume',
-        'area2d', 'area3d', 'baseElevation', 'confidence',
-        'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
+        ...STOCKPILE_PROPERTIES
     ];
     safeProperties.forEach(prop => {
         const value = feature.get(prop);
@@ -112,13 +109,7 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
 
     // Stockpile features: persist all metadata fields without overwriting calculated values.
     if (measurementType === 'stockpile') {
-        const stockpileFields = [
-            'id', 'title', 'material', 'materialDensity',
-            'netVolume', 'cutVolume', 'fillVolume',
-            'area2d', 'area3d', 'baseElevation', 'confidence',
-            'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
-        ];
-        stockpileFields.forEach(k => {
+        STOCKPILE_PROPERTIES.forEach(k => {
             const v = feature.get(k);
             if (v !== undefined && v !== null) properties[k] = v;
         });
@@ -164,13 +155,7 @@ function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
 
     // Restore stockpile-specific metadata so the panel can re-hydrate.
     if (props.measurementType === 'stockpile') {
-        const stockpileFields = [
-            'id', 'title', 'material', 'materialDensity',
-            'netVolume', 'cutVolume', 'fillVolume',
-            'area2d', 'area3d', 'baseElevation', 'confidence',
-            'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
-        ];
-        stockpileFields.forEach(k => {
+        STOCKPILE_PROPERTIES.forEach(k => {
             if (props[k] !== undefined && props[k] !== null) feature.set(k, props[k]);
         });
         // Backwards compatibility: stockpiles persisted before the

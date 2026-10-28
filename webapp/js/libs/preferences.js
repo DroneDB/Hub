@@ -31,6 +31,7 @@ export const PREF = Object.freeze({
     UNIFIED_VIEWER: 'unified-viewer-settings',
     MODEL_LIGHTING: 'model-lighting-settings',
     BUILD_NOTIFICATIONS: 'buildNotifications', // 'none' | 'all' | 'failed': which ended builds the server e-mails
+    STOCKPILE_MATERIALS: 'stockpileMaterials', // { currency, overrides, custom }: the user's stockpile materials (libs/stockpileMaterials.js)
     PANEL_SIZES: 'panelSizes', // { '<storageKey>.<desktop|tablet>': first pane % } of HubPanel
     HUB_UPDATE_NOTICE: 'hubUpdateNotice',
     HUB_UPDATE_ATTEMPTED: 'hubUpdateAttempted', // sessionStorage
@@ -158,7 +159,8 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.SPLAT_QUALITY]: ['viewers', 'splatQuality'],
     [PREF.MODEL_LIGHTING]: ['viewers', 'modelLighting'],
     [PREF.UNIFIED_VIEWER]: ['viewers', 'unifiedLighting'],
-    [PREF.BUILD_NOTIFICATIONS]: ['notifications', 'builds']
+    [PREF.BUILD_NOTIFICATIONS]: ['notifications', 'builds'],
+    [PREF.STOCKPILE_MATERIALS]: ['stockpiles', 'materials']
 });
 
 /**
@@ -194,7 +196,9 @@ export const PREF_DEFAULTS = frozen({
     [PREF.MODEL_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),
     [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 }),
     // Opt-in: the server sends nothing for a missing or unknown value either
-    [PREF.BUILD_NOTIFICATIONS]: 'none'
+    [PREF.BUILD_NOTIFICATIONS]: 'none',
+    // The built-in materials as they are, priced in US dollars
+    [PREF.STOCKPILE_MATERIALS]: frozen({ currency: 'USD', overrides: frozen({}), custom: frozen([]) })
 });
 
 /**

@@ -22,13 +22,14 @@
                                     <Select v-if="control.kind === 'select'" v-model="control.model.value"
                                             :input-id="`pref-${control.id}`" :aria-labelledby="`pref-${control.id}-label`"
                                             :pt="{ label: { 'aria-describedby': control.hint?.value ? `pref-${control.id}-hint` : undefined } }"
-                                            :options="control.options" :disabled="!!control.disabled?.value"
+                                            :options="control.options" :disabled="!!control.disabled?.value" :filter="!!control.filter"
                                             option-label="label" option-value="value" class="pref-select" />
                                     <ToggleSwitch v-else v-model="control.model.value" :input-id="`pref-${control.id}`" />
                                 </template>
                             </div>
                             <p v-if="control.hint?.value" :id="`pref-${control.id}-hint`" class="pref-hint">{{ control.hint.value }}</p>
                         </template>
+                        <component :is="group.component" v-if="group.component" />
                     </section>
 
                     <section v-if="tab.value === 'map'" class="pref-group">
@@ -86,6 +87,9 @@
  *
  * The Notifications tab exists only on a server that sends e-mail; its setting is disabled,
  * with the reason, when the server cannot e-mail this account.
+ *
+ * A group is a list of controls (select, toggle, range) or, for a setting those cannot show, a
+ * component of its own (the stockpile materials).
  */
 import { computed, nextTick, ref, toRef, watch } from 'vue';
 import Button from 'primevue/button';
@@ -99,14 +103,17 @@ import ToggleSwitch from 'primevue/toggleswitch';
 import DialogHost from '@/components/DialogHost.vue';
 import Window from '@/components/HubWindow.vue';
 import RangeSetting from '@/components/RangeSetting.vue';
+import StockpileMaterialsEditor from './StockpileMaterialsEditor.vue';
 import { useConfirm } from '@/composables/useConfirm';
 import { useDialogs } from '@/composables/useDialogs';
 import { usePreference } from '@/composables/usePreference';
 import { useViewerSettings } from '@/composables/useViewerSettings';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
+import { currencyChoices } from '@/libs/format';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
+import { normalizeCurrency } from '@/libs/stockpileMaterials';
 import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -127,6 +134,7 @@ const datasetTable = useViewerSettings(PREF.DATASET_TABLE, PREF_DEFAULTS[PREF.DA
 const orgPage = useViewerSettings(PREF.ORG_PAGE, PREF_DEFAULTS[PREF.ORG_PAGE]).settings;
 const modelLighting = useViewerSettings(PREF.MODEL_LIGHTING, PREF_DEFAULTS[PREF.MODEL_LIGHTING]).settings;
 const unifiedViewer = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]).settings;
+const stockpileSettings = useViewerSettings(PREF.STOCKPILE_MATERIALS, PREF_DEFAULTS[PREF.STOCKPILE_MATERIALS]).settings;
 
 /** @param {Array<string|number>} values @param {(v: any) => string} [label] */
 const optionsOf = (values, label = String) => values.map(value => ({ value, label: label(value) }));
@@ -135,7 +143,8 @@ const PAGE_SIZES = optionsOf([5, 10, 25, 50, 100]);
 
 /**
  * @param {string} id @param {string} label @param {import('vue').Ref} model @param {Array<{label: string, value: any}>} options
- * @param {{ disabled?: import('vue').Ref<boolean>, hint?: import('vue').Ref<string|null> }} [extra]  hint: a line shown under the row
+ * @param {{ disabled?: import('vue').Ref<boolean>, hint?: import('vue').Ref<string|null>, filter?: boolean }} [extra]
+ *   hint: a line shown under the row; filter: a search box above a long list of options
  */
 const select = (id, label, model, options, extra) => ({ id, label, kind: 'select', model, options, ...extra });
 /** @param {string} id @param {string} label @param {import('vue').Ref} model */
@@ -151,6 +160,13 @@ const splatQuality = computed({
 });
 
 const basemapOptions = Object.entries(Basemaps).map(([value, { label }]) => ({ value, label }));
+
+// ---- Stockpiles: the currency of the material prices (the materials have their own editor) ----
+
+const stockpileCurrency = computed({
+    get: () => normalizeCurrency(stockpileSettings.currency),
+    set: value => { stockpileSettings.currency = normalizeCurrency(value); }
+});
 
 // ---- Notifications: e-mail about the user's builds ----
 
@@ -270,6 +286,18 @@ const TABS = [
                     range('unified-hemisphere', 'Sky / ground fill', toRef(unifiedViewer, 'hemisphereIntensity'), 5)
                 ]
             }
+        ]
+    },
+    {
+        value: 'stockpiles', label: 'Stockpiles', icon: 'fa-solid fa-layer-group', sections: ['stockpiles'],
+        groups: [
+            {
+                controls: [
+                    select('stockpile-currency', 'Currency', stockpileCurrency, currencyChoices(),
+                        { filter: true, hint: ref('The prices of the materials are in this currency. Changing it does not convert them.') })
+                ]
+            },
+            { title: 'Materials', component: StockpileMaterialsEditor }
         ]
     },
     {

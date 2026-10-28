@@ -53,7 +53,7 @@ describe('PreferencesDialog', () => {
         expect(document.body.querySelector('#preferencesDialog')).not.toBeNull();
         expect(document.body.querySelector('.p-dialog-mask')).not.toBeNull();
         expect(dom().find('.p-dialog-title').text()).toBe('Preferences');
-        expect(tabs().map(t => t.text())).toEqual(['Units', 'Map', 'Files', 'Lists', 'Viewers', 'Notifications']);
+        expect(tabs().map(t => t.text())).toEqual(['Units', 'Map', 'Files', 'Lists', 'Viewers', 'Stockpiles', 'Notifications']);
         expect(dom().find('.sync-status').text()).toContain('Saved to your account');
         h.store.status = 'error';
         await flushPromises();
@@ -142,6 +142,34 @@ describe('PreferencesDialog', () => {
         });
     });
 
+    describe('Stockpiles', () => {
+        const currency = () => document.getElementById('pref-stockpile-currency');
+        beforeEach(() => setPref(PREF.STOCKPILE_MATERIALS, null));
+
+        it('has the currency, US dollars by default, and the materials', async () => {
+            await render({ initialTab: 'stockpiles' });
+            expect(currency().closest('.p-select').textContent).toContain('USD');
+            expect(document.body.querySelector('[data-testid="stockpile-materials-editor"]')).not.toBeNull();
+            expect(document.body.textContent).toContain('Changing it does not convert them');
+        });
+
+        it('stores the currency with the materials, leaving them as they are', async () => {
+            setPref(PREF.STOCKPILE_MATERIALS, { currency: 'USD', overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+            await render({ initialTab: 'stockpiles' });
+            const select = wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-stockpile-currency');
+            select.vm.$emit('update:modelValue', 'EUR');
+            await flushPromises();
+            expect(getPref(PREF.STOCKPILE_MATERIALS, null)).toEqual({ currency: 'EUR', overrides: { gravel: { costPerTon: 9 } }, custom: [] });
+        });
+
+        it('Reset section resets the stockpiles section', async () => {
+            await render({ initialTab: 'stockpiles' });
+            const panel = dom().findAll('[role="tabpanel"]').find(p => p.find('[data-testid="stockpile-materials-editor"]').exists());
+            await buttonWith('Reset section', panel).trigger('click');
+            expect(h.store.resetSection).toHaveBeenCalledWith('stockpiles');
+        });
+    });
+
     it('Close emits close', async () => {
         await render();
         expect(wrapper.emitted('close')).toBeUndefined();
@@ -166,7 +194,7 @@ describe('PreferencesDialog', () => {
         it('asks for the e-mail status only when the tab is shown', async () => {
             await render();
             expect(h.reg.notificationStatus).not.toHaveBeenCalled();
-            await tabs()[5].trigger('click');
+            await tabs().find(t => t.text() === 'Notifications').trigger('click');
             await flushPromises();
             expect(h.reg.notificationStatus).toHaveBeenCalledTimes(1);
         });

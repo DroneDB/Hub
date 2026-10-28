@@ -225,3 +225,75 @@ export function formatLandArea(squareMeters, units = 'metric') {
     if (squareMeters < 1e8) return `${(squareMeters / 1e4).toFixed(1)} ha`;
     return `${Math.round(squareMeters / 1e6)} km²`;
 }
+
+// A cubic yard and a short ton by definition
+const M3_PER_CUBIC_YARD = 0.764554857984;
+const TONNES_PER_SHORT_TON = 0.90718474;
+
+/**
+ * @typedef {{ factor: number, unit: string }} UnitStep  `factor` turns the metric value into `unit`
+ * @typedef {{ volume: UnitStep, weight: UnitStep, density: UnitStep, perWeight: UnitStep }} BulkUnits
+ *   the units of a pile of material: volume (m³), weight (t), density (t/m³) and the weight a price
+ *   is per (t: its factor turns a price per tonne into a price per `unit`)
+ */
+
+/** @type {Readonly<Record<'metric'|'imperial', BulkUnits>>} */
+const BULK_UNITS = Object.freeze({
+    metric: Object.freeze({
+        volume: { factor: 1, unit: 'm³' },
+        weight: { factor: 1, unit: 't' },
+        density: { factor: 1, unit: 't/m³' },
+        perWeight: { factor: 1, unit: 't' }
+    }),
+    imperial: Object.freeze({
+        volume: { factor: 1 / M3_PER_CUBIC_YARD, unit: 'yd³' },
+        weight: { factor: 1 / TONNES_PER_SHORT_TON, unit: 'ST' },
+        density: { factor: M3_PER_CUBIC_YARD / TONNES_PER_SHORT_TON, unit: 'ST/yd³' },
+        perWeight: { factor: TONNES_PER_SHORT_TON, unit: 'ST' }
+    })
+});
+
+/**
+ * The units a stockpile is shown in: m³, t, t/m³ and prices per tonne; yd³, short tons, ST/yd³
+ * and prices per short ton for imperial. Values are kept metric and converted for display only.
+ * @param {'metric'|'imperial'|string} [units]
+ * @returns {BulkUnits}
+ */
+export function bulkUnits(units = 'metric') {
+    return units === 'metric' ? BULK_UNITS.metric : BULK_UNITS.imperial;
+}
+
+/**
+ * An amount of money in a currency, as the locale writes it: "$1,234.50", "€1,234.50".
+ * An unknown currency code is written after the number.
+ * @param {number} amount
+ * @param {string} currency  an ISO 4217 code
+ */
+export function formatMoney(amount, currency) {
+    try {
+        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+    } catch {
+        return `${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`.trim();
+    }
+}
+
+// The currencies offered first, before the others in code order
+const COMMON_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'CHF', 'JPY', 'CNY', 'INR', 'BRL', 'MXN', 'ZAR'];
+
+/**
+ * The currencies to choose from, the common ones first: [{ value: 'EUR', label: 'EUR - Euro' }, ...].
+ * Without Intl.supportedValuesOf (an older browser) only the common ones.
+ * @returns {{ value: string, label: string }[]}
+ */
+export function currencyChoices() {
+    const all = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('currency') : [];
+    const rest = all.filter(code => !COMMON_CURRENCIES.includes(code)).sort();
+    let names = null;
+    try {
+        names = new Intl.DisplayNames(undefined, { type: 'currency' });
+    } catch { /* codes only */ }
+    return [...COMMON_CURRENCIES, ...rest].map(code => {
+        const name = names?.of(code);
+        return { value: code, label: name && name !== code ? `${code} - ${name}` : code };
+    });
+}

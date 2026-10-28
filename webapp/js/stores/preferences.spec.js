@@ -211,7 +211,7 @@ describe('preferences store: load', () => {
 
     it('exposes the section names', async () => {
         await start();
-        expect(store.sections).toEqual(['units', 'map', 'explorer', 'datasets', 'orgs', 'viewers', 'notifications']);
+        expect(store.sections).toEqual(['units', 'map', 'explorer', 'datasets', 'orgs', 'viewers', 'notifications', 'stockpiles']);
     });
 });
 
@@ -559,7 +559,7 @@ describe('preferences store: reset', () => {
         expect(localStorage.getItem(PREF.PANEL_SIZES)).not.toBeNull();
         await tick(600);
         expect(h.reg.patchRequest).toHaveBeenCalledTimes(1);
-        expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, viewers: null, notifications: null });
+        expect(bodies()[0]).toEqual({ units: null, map: null, explorer: null, datasets: null, orgs: null, viewers: null, notifications: null, stockpiles: null });
     });
 
     describe('the lighting of the 3D models, stored as the Nexus lighting before', () => {
