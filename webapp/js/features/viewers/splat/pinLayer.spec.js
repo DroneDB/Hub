@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { createPinLayer } from './pinLayer';
+import { parseCamerasFile } from './cameraPresets';
 
 let overlay;
 let onSelect;
@@ -75,5 +76,15 @@ describe('pin markers', () => {
         expect(overlay.children).toEqual([]);
         expect(removed).toBe(2);
         expect(layer.count).toBe(0);
+    });
+});
+
+describe('the pins of a views file', () => {
+    it('all get a marker when the file repeats an id', () => {
+        const { annotations } = parseCamerasFile(JSON.stringify({
+            annotations: [{ id: 'gate', title: 'Gate', position: [1, 0, 0] }, { id: 'gate', title: 'Door', position: [2, 0, 0] }]
+        }));
+        layer.sync(annotations, null);
+        expect(buttons().map(b => b.title)).toEqual(['Gate', 'Door']);
     });
 });

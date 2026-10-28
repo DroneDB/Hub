@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { SIDECAR_VERSION, camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove } from './cameraPresets';
+import { MAX_SAVED_ITEMS, MAX_SHAPE_POINTS } from './sceneData';
 
 describe('camera presets', () => {
     it('sit next to the splat', () => {
@@ -104,6 +105,71 @@ describe('camera presets', () => {
             expect(parsed.annotations).toHaveLength(1);
             expect(parsed.annotations[0]).toMatchObject({ link: '', image: '', view: null, text: '' });
             expect(parsed.measurements).toEqual([{ id: 2, kind: 'point', points: [[1, 2, 3]] }]);
+        });
+    });
+
+    describe('a file written by hand or by another program', () => {
+        afterEach(() => vi.restoreAllMocks());
+
+        const ids = items => items.map(item => item.id);
+        const allDistinct = values => new Set(values).size === values.length;
+
+        it('gives a new id to an item whose id an earlier one has, and keeps the first', () => {
+            const parsed = parseCamerasFile(JSON.stringify({
+                cameras: [{ id: 'a', position: [0, 0, 0] }, { id: 'a', position: [1, 0, 0] }],
+                annotations: [{ id: 7, position: [0, 0, 0] }, { id: 7, position: [1, 0, 0] }, { id: 7, position: [2, 0, 0] }],
+                // The second has no id and is read with its place, 1, which the first has
+                measurements: [{ id: 1, kind: 'point', points: [[0, 0, 0]] }, { kind: 'point', points: [[1, 0, 0]] }]
+            }));
+            for (const list of [parsed.cameras, parsed.annotations, parsed.measurements]) expect(allDistinct(ids(list))).toBe(true);
+            expect(parsed.cameras[0].id).toBe('a');
+            expect(parsed.annotations[0].id).toBe(7);
+            expect(parsed.measurements[0].id).toBe(1);
+            expect(parsed.annotations.map(a => a.position[0])).toEqual([0, 1, 2]);
+        });
+
+        it('reads an id that is neither a number nor a text as the place of the item', () => {
+            const parsed = parseCamerasFile(JSON.stringify({ cameras: [{ id: { x: 1 }, position: [0, 0, 0] }, { id: null, position: [0, 0, 0] }] }));
+            expect(ids(parsed.cameras)).toEqual([0, 1]);
+        });
+
+        it(`reads at most ${MAX_SAVED_ITEMS} cameras, pins and measurements, with a warning`, () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const many = make => Array.from({ length: MAX_SAVED_ITEMS + 5 }, (_, i) => make(i));
+            const parsed = parseCamerasFile(JSON.stringify({
+                cameras: many(i => ({ id: i, position: [i, 0, 0] })),
+                annotations: many(i => ({ id: i, position: [i, 0, 0] })),
+                measurements: many(i => ({ id: i, kind: 'point', points: [[i, 0, 0]] }))
+            }));
+            expect(parsed.cameras).toHaveLength(MAX_SAVED_ITEMS);
+            expect(parsed.annotations).toHaveLength(MAX_SAVED_ITEMS);
+            expect(parsed.measurements).toHaveLength(MAX_SAVED_ITEMS);
+            expect(parsed.cameras[MAX_SAVED_ITEMS - 1].id).toBe(MAX_SAVED_ITEMS - 1);
+            expect(warn).toHaveBeenCalledTimes(3);
+        });
+
+        it(`reads a shape with at most ${MAX_SHAPE_POINTS} points, the first ones, with a warning`, () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const points = Array.from({ length: MAX_SHAPE_POINTS + 10 }, (_, i) => [i, 0, 0]);
+            const [shape] = parseCamerasFile(JSON.stringify({ measurements: [{ id: 1, kind: 'distance', points }] })).measurements;
+            expect(shape.points).toHaveLength(MAX_SHAPE_POINTS);
+            expect(shape.points[MAX_SHAPE_POINTS - 1]).toEqual([MAX_SHAPE_POINTS - 1, 0, 0]);
+            expect(warn).toHaveBeenCalledOnce();
+        });
+
+        it('drops a camera whose position is not made of numbers, and defaults a rotation, a target or a field of view that is not', () => {
+            const parsed = parseCamerasFile(JSON.stringify({
+                cameras: [
+                    { id: 1, position: ['x', 0, 0] },
+                    { id: 2, position: [0, 0, 0], quaternion: [0, 'x', 0, 1], target: [0, 'y', 0], fov: 'wide' },
+                    { id: 3, position: [0, 0, 0], fov: -10 }
+                ]
+            }));
+            expect(ids(parsed.cameras)).toEqual([2, 3]);
+            expect(parsed.cameras[0]).toMatchObject({ quaternion: [0, 0, 0, 1], target: null, fov: 60 });
+            expect(parsed.cameras[1].fov).toBe(60);
+            expect(normalizeCamera({ position: [0, NaN, 0] }, 0)).toBeNull();
+            expect(normalizeCamera({ position: [0, 0, 0], fov: NaN }, 0).fov).toBe(60);
         });
     });
 

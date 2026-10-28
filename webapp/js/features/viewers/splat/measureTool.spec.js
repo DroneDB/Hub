@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { SplatMeasureTool } from './measureTool';
+import { parseCamerasFile } from './cameraPresets';
 
 let canvas;
 let overlay;
@@ -304,5 +305,16 @@ describe('the shapes that are shown', () => {
         expect(await drawing).toBeNull();
         expect(overlay.children).toEqual([]);
         expect(await tool.measure('point')).toBeNull();
+    });
+});
+
+describe('the measurements of a views file', () => {
+    it('are all drawn when the file repeats an id', () => {
+        const { measurements } = parseCamerasFile(JSON.stringify({
+            measurements: [{ id: 5, kind: 'distance', points: [[0, 0, 0], [3, 4, 0]] }, { id: 5, kind: 'distance', points: [[0, 0, 0], [0, 0, 2]] }]
+        }));
+        tool.show(measurements);
+        expect(labels()).toEqual(['5.0 m', '2.0 m']);
+        expect(tool.shapes.size).toBe(2);
     });
 });

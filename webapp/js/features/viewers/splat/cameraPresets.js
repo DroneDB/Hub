@@ -7,7 +7,7 @@
  */
 import { upAxisOfOrientation, isFlippedAxis, AUTO_UP } from './upAxis';
 import { isVec3 } from './measureMath';
-import { newId, normalizeScale, normalizeAnnotation, normalizeMeasurement } from './sceneData';
+import { newId, idOf, normalizeList, normalizeScale, normalizeAnnotation, normalizeMeasurement } from './sceneData';
 
 /** The version this viewer writes. */
 export const SIDECAR_VERSION = 2;
@@ -15,23 +15,32 @@ export const SIDECAR_VERSION = 2;
 /** Sidecar path of a splat entry. */
 export const camerasPathFor = entryPath => `${entryPath.replace(/\.[^./\\]+$/, '')}_cameras.json`;
 
-const nums = (a, n) => (Array.isArray(a) && a.length >= n ? a.slice(0, n).map(Number) : null);
+/**
+ * The first `n` values of a list as numbers (a number written as text is read), or null when the
+ * list is shorter or one of them is not a finite number: a NaN would put the camera nowhere.
+ * @param {unknown} a @param {number} n
+ */
+const nums = (a, n) => {
+    if (!Array.isArray(a) || a.length < n) return null;
+    const v = a.slice(0, n).map(Number);
+    return v.every(Number.isFinite) ? v : null;
+};
 
 /**
- * A camera in the canonical (three.js) shape, or null when it has no position.
+ * A camera in the canonical (three.js) shape, or null when it has no position. A rotation, a
+ * target or a field of view that is not made of finite numbers is replaced by the default.
  * @param {any} c @param {number} i
  */
 export function normalizeCamera(c, i) {
     const position = c && nums(c.position, 3);
     if (!position) return null;
-    const quaternion = Array.isArray(c.quaternion) && c.quaternion.length === 4 ? c.quaternion.map(Number) : [0, 0, 0, 1];
     return {
-        id: c.id !== undefined ? c.id : i,
+        id: idOf(c, i),
         name: c.name || `Camera ${i + 1}`,
         position,
-        quaternion,
-        fov: typeof c.fov === 'number' ? c.fov : 60,
-        target: Array.isArray(c.target) && c.target.length === 3 ? c.target.map(Number) : null
+        quaternion: (c.quaternion?.length === 4 && nums(c.quaternion, 4)) || [0, 0, 0, 1],
+        fov: Number.isFinite(c.fov) && c.fov > 0 ? c.fov : 60,
+        target: (c.target?.length === 3 && nums(c.target, 3)) || null
     };
 }
 
@@ -53,14 +62,13 @@ export function parseCamerasFile(text) {
     if (isVec3(o.up) && Math.hypot(...o.up) > 1e-9) orientation.up = o.up.slice();
     if (typeof o.tiltRoll === 'number') orientation.tiltRoll = o.tiltRoll;
     if (typeof o.tiltPitch === 'number') orientation.tiltPitch = o.tiltPitch;
-    const many = (/** @type {any} */ v, /** @type {(item: any, i: number) => any} */ normalize) => (Array.isArray(v) ? v.map(normalize).filter(Boolean) : []);
     const fields = Array.isArray(data) || !data ? {} : data;
     return {
-        cameras: list.map(normalizeCamera).filter(Boolean),
+        cameras: normalizeList(list, normalizeCamera, 'cameras'),
         orientation,
         scale: normalizeScale(fields.scale),
-        annotations: many(fields.annotations, normalizeAnnotation),
-        measurements: many(fields.measurements, normalizeMeasurement)
+        annotations: normalizeList(fields.annotations, normalizeAnnotation, 'pins'),
+        measurements: normalizeList(fields.measurements, normalizeMeasurement, 'measurements')
     };
 }
 

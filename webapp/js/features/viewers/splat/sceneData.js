@@ -11,6 +11,48 @@ import { isWebUrl } from '@/libs/sanitize';
 /** A number to tell two things made in the same millisecond apart. */
 export const newId = () => Date.now() + Math.floor(Math.random() * 1000);
 
+/**
+ * The most cameras, pins or measurements a views file is read with, and the most points a shape
+ * is read with: a file is written by hand or by other versions, and one with millions would make
+ * the viewer draw for minutes. The rest is dropped with a warning.
+ */
+export const MAX_SAVED_ITEMS = 1000;
+export const MAX_SHAPE_POINTS = 1000;
+
+/**
+ * The id an item of the file is read with: its own when it is a number or a text, else its place
+ * in the list.
+ * @param {any} item @param {number} i
+ * @returns {number | string}
+ */
+export const idOf = (item, i) => (typeof item.id === 'string' || Number.isFinite(item.id) ? item.id : i);
+
+/**
+ * A list of the views file read item by item: the items that normalize (a bad one is dropped), at
+ * most MAX_SAVED_ITEMS of them, and each with an id of its own. The pins and the shapes are drawn
+ * and found by id, so a repeated id (a copied entry, or an id equal to the place of an item without
+ * one) would hide all but one of them: the later ones get a new id.
+ * @template {{ id: number | string }} T
+ * @param {unknown} values
+ * @param {(item: any, i: number) => T | null} normalize
+ * @param {string} what  what the items are, for the warning ("cameras")
+ * @returns {T[]}
+ */
+export function normalizeList(values, normalize, what) {
+    if (!Array.isArray(values)) return [];
+    const items = /** @type {T[]} */ (values.map(normalize).filter(Boolean));
+    if (items.length > MAX_SAVED_ITEMS) {
+        console.warn(`The views file holds ${items.length} ${what}: the first ${MAX_SAVED_ITEMS} are shown, the rest is dropped.`);
+        items.length = MAX_SAVED_ITEMS;
+    }
+    const seen = new Set();
+    for (const item of items) {
+        while (seen.has(item.id)) item.id = newId();
+        seen.add(item.id);
+    }
+    return items;
+}
+
 /** @typedef {{ position: number[], quaternion: number[], fov: number, target: number[] | null }} View */
 /** @typedef {{ id: number | string, title: string, text: string, link: string, image: string, position: number[], view: View | null }} Annotation */
 /** @typedef {{ id: number | string, kind: keyof typeof MEASURE_KINDS, points: number[][] }} Measurement */
@@ -57,7 +99,7 @@ export function isDatasetPath(path) {
 export function normalizeAnnotation(a, i) {
     if (!a || !isVec3(a.position)) return null;
     return {
-        id: a.id !== undefined ? a.id : i,
+        id: idOf(a, i),
         title: typeof a.title === 'string' && a.title ? a.title : `Pin ${i + 1}`,
         text: typeof a.text === 'string' ? a.text : '',
         link: isWebUrl(a.link) ? a.link : '',
@@ -68,16 +110,21 @@ export function normalizeAnnotation(a, i) {
 }
 
 /**
- * A saved measurement, or null when its kind is unknown or it has too few points.
+ * A saved measurement, or null when its kind is unknown or it has too few points. A shape with
+ * more than MAX_SHAPE_POINTS points keeps the first ones.
  * @param {any} m @param {number} i
  * @returns {Measurement | null}
  */
 export function normalizeMeasurement(m, i) {
     if (!m || !isMeasureKind(m.kind) || !Array.isArray(m.points)) return null;
-    const points = m.points.filter(isVec3).map((/** @type {number[]} */ p) => p.slice());
+    let points = m.points.filter(isVec3);
+    if (points.length > MAX_SHAPE_POINTS) {
+        console.warn(`A measurement of the views file has ${points.length} points: the first ${MAX_SHAPE_POINTS} are kept.`);
+        points = points.slice(0, MAX_SHAPE_POINTS);
+    }
     const { min, max } = MEASURE_KINDS[m.kind];
     if (points.length < min || points.length > max) return null;
-    return { id: m.id !== undefined ? m.id : i, kind: m.kind, points };
+    return { id: idOf(m, i), kind: m.kind, points: points.map((/** @type {number[]} */ p) => p.slice()) };
 }
 
 /**
