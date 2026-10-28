@@ -8,8 +8,8 @@
             <ul v-else class="camera-list">
                 <li v-for="(cam, i) in cameras" :key="cam.id"
                     class="camera-row" :class="{ active: i === activeIndex }">
-                    <span class="idx" :title="`Press ${i} to jump here`">{{ i }}</span>
-                    <input v-model.trim="cam.name" class="name" type="text" :aria-label="`Name of view ${i}`"
+                    <span class="idx" :title="i < 9 ? `Press ${i + 1} to jump here` : null">{{ i + 1 }}</span>
+                    <input v-model.trim="cam.name" class="name" type="text" :aria-label="`Name of view ${i + 1}`"
                            :readonly="!canWrite"
                            @change="$emit('rename', { index: i, name: cam.name })">
                     <div class="actions">
@@ -37,7 +37,7 @@
             </ul>
 
             <small class="hint">
-                Tips: press <b>0-9</b> to jump to a view, <b>-</b>/<b>+</b> to cycle, <b>P</b> to resume the tour.
+                Tips: press <b>1-9</b> to jump to a view, <b>-</b>/<b>+</b> to cycle, <b>P</b> to resume the tour.
             </small>
 
             <div class="manager-footer">

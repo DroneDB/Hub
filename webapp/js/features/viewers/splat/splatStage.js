@@ -61,11 +61,12 @@ export function progressFraction(event) {
  * @param {{ SparkRenderer: any, SplatMesh: any }} options.Spark
  * @param {HTMLCanvasElement} options.canvas
  * @param {boolean} options.streaming               a paged .rad: Spark spends its splat budget toward the view direction
+ * @param {{ x: number, y: number, z: number }} [options.up]  the scene's up axis, set on the camera before the controls exist
  * @param {(time: number) => void} [options.onFrame]  called every frame, after the canvas was fitted and before it is drawn
  * @param {() => void} [options.onContextLost]
  * @param {() => void} [options.onContextRestored]
  */
-export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streaming, onFrame, onContextLost, onContextRestored }) {
+export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streaming, up, onFrame, onContextLost, onContextRestored }) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
     renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
@@ -74,6 +75,8 @@ export function createSplatStage({ THREE, OrbitControls, Spark, canvas, streamin
     scene.background = new THREE.Color(BACKGROUND);
     const camera = new THREE.PerspectiveCamera(60, (canvas.clientWidth || 1) / (canvas.clientHeight || 1), 0.1, 1000);
     camera.position.set(0, 0, 4);
+    // OrbitControls reads camera.up once, in its constructor: it has to be final by then
+    if (up) camera.up.set(up.x, up.y, up.z);
 
     // Kept: its sort and level-of-detail workers, its pager and its GPU textures end only with dispose()
     const spark = new Spark.SparkRenderer(streaming

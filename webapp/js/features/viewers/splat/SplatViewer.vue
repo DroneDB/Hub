@@ -81,8 +81,11 @@ import CameraManager from './CameraManager.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
 import SplatNavPad from './SplatNavPad.vue';
 import SplatSettings from './SplatSettings.vue';
-import { CameraRig } from './cameraRig';
+import { CameraRig, tiltUp } from './cameraRig';
 import { FlyControls, MOVE_KEYS } from './flyControls';
+import { keyAction, consumesKey } from './splatKeys';
+import { createPointSize } from './pointSize';
+import { createFrameRetry } from './framing';
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
@@ -134,15 +137,19 @@ let rig = null;
 let fly = null;
 let earth = null;
 let presentation = null;
+let pointSize = null;
 let bounds = null;
-let frameTimer = null;
 let lastFrameTime = 0;
 let unmounted = false;
+// The user moved the camera: a late framing (bounds that arrive with the first chunks) must not take it back
+let userInteracted = false;
 
-const dialogOpen = () => showSettings.value || showCameraManager.value;
+// Any dialog: the settings, the camera views, or one opened through the dialog host (a confirmation)
+const dialogOpen = computed(() => showSettings.value || showCameraManager.value || dialogs.stack.value.length > 0);
 
 // Explicit navigation stops the presentation and leaves the camera on show
 function onUserInteract() {
+    userInteracted = true;
     if (presentation) presentation.stop();
     activeCameraIndex.value = null;
 }
@@ -164,20 +171,14 @@ function frameCamera() {
     if (!box || box.isEmpty()) box = splatMesh.getBoundingBox ? splatMesh.getBoundingBox(true) : null;
     const real = !!box && !box.isEmpty();
     if (!real) box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
-    // The mesh stays at the origin and unit scale (point size is its scale)
-    splatMesh.scale.setScalar(pointScale.value);
+    // The mesh stays at the origin and unit scale: the point size is in the splats, not the mesh
     splatMesh.position.set(0, 0, 0);
     rig.frame(box, splatMesh.quaternion);
     return real;
 }
 
-// A paged .rad has no bounds until its first chunks arrive: retry for ~10 s
-function frameCameraWhenReady(attempt = 0) {
-    clearTimeout(frameTimer);
-    if (!splatMesh || frameCamera() || attempt >= 40) return;
-    // lifetime: paired (cleared in onBeforeUnmount)
-    frameTimer = setTimeout(() => frameCameraWhenReady(attempt + 1), 250);
-}
+// A paged .rad has no bounds until its first chunks arrive: retried for ~10 s, until the user moves
+const frameRetry = createFrameRetry({ frame: () => !!splatMesh && frameCamera(), userInteracted: () => userInteracted });
 
 function renderFrame(time) {
     const now = time || performance.now();
@@ -187,7 +188,7 @@ function renderFrame(time) {
     // Moving with the keys or the pad stops the presentation
     if (fly.update(dt)) onUserInteract();
     else presentation.update(dt);
-    stage.controls.update();
+    rig.updateControls(dt);
 
     // controls.update() looks at the target: reassert our own orientation
     const mode = presentation.mode;
@@ -231,8 +232,9 @@ async function loadSplat() {
     bounds = boundsData;
     THREE = libraries.THREE;
 
+    // The tilt is known before the controls exist: they are built on the final up (and follow setTilt)
     stage = createSplatStage({
-        ...libraries, canvas: canvas.value, streaming: streaming.value, onFrame: renderFrame,
+        ...libraries, canvas: canvas.value, streaming: streaming.value, up: tiltUp(THREE, tiltRoll.value, tiltPitch.value), onFrame: renderFrame,
         onContextLost: () => notify.warn('The browser took the graphics context away. The view comes back when it gives it back.', { summary: 'Graphics' }),
         onContextRestored: () => notify.info('The graphics context is back.', { summary: 'Graphics' })
     });
@@ -241,7 +243,7 @@ async function loadSplat() {
 
     rig = new CameraRig(THREE, camera, controls);
     rig.setTilt(tiltRoll.value, tiltPitch.value);
-    const hooks = mode => ({ enabled: () => navMode.value === mode && !dialogOpen(), onInteract: onUserInteract });
+    const hooks = mode => ({ enabled: () => navMode.value === mode && !dialogOpen.value, onInteract: onUserInteract });
     const el = canvas.value;
     fly = new FlyControls(rig, hooks('fly'));
     fly.attach(el, (t, type, fn, opts) => listeners.add(t, type, fn, opts));
@@ -255,13 +257,17 @@ async function loadSplat() {
 
     // Paged .rad: chunks on demand by range requests; .spz: whole file, LOD built in a worker.
     // Authentication rides on the same-origin jwtToken cookie.
-    const mesh = await stage.loadMesh(streaming.value ? { url: radUrl, paged: true } : { url: spzUrl, lod: true }, fraction => { progress.value = fraction; });
+    pointSize = createPointSize(libraries.Spark.dyno, pointScale.value);
+    const meshOptions = streaming.value ? { url: radUrl, paged: true } : { url: spzUrl, lod: true };
+    const mesh = await stage.loadMesh({ ...meshOptions, objectModifier: pointSize.modifier }, fraction => { progress.value = fraction; });
     // The page was left meanwhile: the stage released everything
     if (!mesh) return;
     splatMesh = mesh;
 
     applyOrientation();
-    frameCameraWhenReady();
+    // Nothing was in view while loading: a drag then did not choose a view
+    userInteracted = false;
+    frameRetry.start();
     loaded.value = true;
     applyNavMode();
     // A tour through the saved cameras, else a slow orbit; any navigation stops it, P resumes
@@ -280,7 +286,7 @@ function setFlipped(value) {
 
 function setPointScale(value) {
     pointScale.value = value;
-    if (splatMesh) splatMesh.scale.setScalar(value);
+    if (pointSize) pointSize.set(value, splatMesh);
 }
 
 // Re-levels the current view on the new scene up
@@ -326,41 +332,26 @@ function releaseKey(code) {
 }
 
 function onKeyDown(e) {
-    const t = e.target;
-    if (!loaded.value || e.ctrlKey || e.metaKey || e.altKey) return;
-    // Not while typing (the camera name input)
-    if (t instanceof Element && (t.closest('input, textarea') || t.isContentEditable)) return;
-    if (MOVE_KEYS.includes(e.code)) {
-        pressKey(e.code);
-        e.preventDefault();
-    } else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
-        fly.press(e.code);
-    } else if (/^Digit[0-9]$/.test(e.code)) {
-        // 0-9 fly to that camera
-        const index = Number(e.code.slice(5));
-        if (index < cameras.value.length) {
-            flyTo(index);
-            e.preventDefault();
-        }
-    } else if (e.key === '-' || e.key === '_') {
-        stepCamera(-1);
-        e.preventDefault();
-    } else if (e.key === '+' || e.key === '=') {
-        stepCamera(1);
-        e.preventDefault();
-    } else if (e.key === 'p' || e.key === 'P') {
-        startPresentation();
-        e.preventDefault();
-    }
+    const action = keyAction(e, { loaded: loaded.value, dialogOpen: dialogOpen.value, cameraCount: cameras.value.length });
+    if (!action) return;
+    if (action.type === 'move') pressKey(action.code);
+    else if (action.type === 'speed') fly.press(action.code);
+    else if (action.type === 'camera') flyTo(action.index);
+    else if (action.type === 'step') stepCamera(action.step);
+    else startPresentation();
+    if (consumesKey(action)) e.preventDefault();
 }
 
 useEventListener(window, 'keydown', onKeyDown);
 useEventListener(window, 'keyup', e => releaseKey(e.code));
 // Keys released outside the window never send keyup
-useEventListener(window, 'blur', () => {
+function releaseAllKeys() {
     if (fly) fly.stop();
     MOVE_KEYS.forEach(k => { pressed[k] = false; });
-});
+}
+useEventListener(window, 'blur', releaseAllKeys);
+// A dialog that opens while a key is held would not see it released
+watch(dialogOpen, open => { if (open) releaseAllKeys(); });
 
 // ---- Presentation and cameras -----------------------------------------------------------
 
@@ -384,6 +375,7 @@ function toggleTour() {
 }
 
 function flyTo(index) {
+    userInteracted = true;
     fly.stop();
     presentation.flyTo(index);
 }
@@ -416,11 +408,12 @@ onMounted(async () => {
 // and stops there.
 onBeforeUnmount(() => {
     unmounted = true;
-    clearTimeout(frameTimer);
+    frameRetry.cancel();
     if (fly) fly.stop();
+    if (presentation) presentation.dispose();
     if (earth) earth.dispose();
     if (stage) stage.dispose();
-    stage = splatMesh = rig = fly = earth = presentation = null;
+    stage = splatMesh = rig = fly = earth = presentation = pointSize = null;
 });
 </script>
 

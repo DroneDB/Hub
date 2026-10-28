@@ -40,6 +40,8 @@ class FakeSplatMesh extends THREE_BUILD.Object3D {
 class FakeControls {
     constructor(camera, dom) {
         Object.assign(this, { camera, dom });
+        // What OrbitControls reads in its constructor and never again
+        this.upAtConstruction = camera.up.clone();
         this.update = vi.fn();
         this.dispose = vi.fn();
     }
@@ -70,6 +72,19 @@ afterEach(() => {
     stage?.dispose();
     stage = null;
     vi.unstubAllGlobals();
+});
+
+describe('scene up', () => {
+    it('is on the camera before the controls are built, because they read it once', () => {
+        makeStage({ up: { x: 0, y: 0.6, z: 0.8 } });
+        expect(stage.camera.up.toArray()).toEqual([0, 0.6, 0.8]);
+        expect(stage.controls.upAtConstruction.toArray()).toEqual([0, 0.6, 0.8]);
+    });
+
+    it('is the world up when none is given', () => {
+        makeStage();
+        expect(stage.controls.upAtConstruction.toArray()).toEqual([0, 1, 0]);
+    });
 });
 
 describe('renderer', () => {
