@@ -43,7 +43,9 @@ function press(code, ev) {
 }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../../css/overlay-button' as *;
+
 /* Immersive navigation recap / touch pad (bottom-right). */
 .nav-controls {
     position: absolute;
@@ -61,30 +63,23 @@ function press(code, ev) {
 
 .nav-key {
     position: relative;
-    width: 2.6rem;
-    height: 2.6rem;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: var(--ddb-radius-sm);
-    background: rgba(0, 0, 0, 0.4);
-    color: var(--ddb-text-on-dark);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    transition: background 0.1s ease;
-}
+    @include overlay-button(
+        $size: 2.6rem,
+        $radius: var(--ddb-radius-sm),
+        $background: rgba(0, 0, 0, 0.4),
+        $hover-background: rgba(0, 0, 0, 0.6),
+        $active-background: rgba(var(--ddb-primary-rgb), 0.85),
+        $border: 1px solid rgba(255, 255, 255, 0.25),
+        $active-border-color: var(--ddb-primary-300),
+        $font-size: 1rem
+    );
 
-.nav-key:hover {
-    background: rgba(0, 0, 0, 0.6);
+    /* The key held down by a pointer, as one held on the keyboard (.active) */
+    &:active {
+        background: rgba(var(--ddb-primary-rgb), 0.85);
+        border-color: var(--ddb-primary-300);
+    }
 }
-
-.nav-key:active,
-.nav-key.active {
-    background: rgba(var(--ddb-primary-rgb), 0.85);
-    border-color: var(--ddb-primary-300);
-}
-
 .nav-key .letter {
     position: absolute;
     bottom: 0.1rem;

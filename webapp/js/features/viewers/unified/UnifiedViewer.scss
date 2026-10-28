@@ -1,4 +1,18 @@
 // The 3D viewer's overlays: toolbars, layer panel, badges.
+@use '../../../../css/overlay-button' as *;
+
+@mixin toolbar-button {
+    @include overlay-button(
+        $size: 2.25rem,
+        $radius: 4px,
+        $background: transparent,
+        $hover-background: rgba(255, 255, 255, 0.15),
+        $active-background: var(--ddb-primary),
+        $font-size: var(--ddb-font-size-base),
+        $transition-time: 0.2s
+    );
+}
+
 #unified-viewer .giro3d-view {
     position: absolute;
     top: 0;
@@ -25,31 +39,7 @@
 }
 
 #unified-viewer .toolbar button {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 4px;
-    background: transparent;
-    border: none;
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-}
-
-#unified-viewer .toolbar button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-#unified-viewer .toolbar button.active {
-    background: var(--ddb-primary);
-}
-
-#unified-viewer .toolbar button:disabled {
-    opacity: 0.4;
-    cursor: default;
+    @include toolbar-button;
 }
 
 #unified-viewer .layer-panel {
@@ -102,22 +92,7 @@
 }
 
 #unified-viewer .nav-toolbar button {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 4px;
-    background: transparent;
-    border: none;
-    color: var(--ddb-text-on-dark);
-    font-size: var(--ddb-font-size-base);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-}
-
-#unified-viewer .nav-toolbar button:hover {
-    background: rgba(255, 255, 255, 0.15);
+    @include toolbar-button;
 }
 
 #unified-viewer .local-coords-badge {

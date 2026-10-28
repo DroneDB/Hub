@@ -44,7 +44,9 @@ defineProps({
 const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save']);
 </script>
 
-<style scoped>
+<style scoped lang="scss">
+@use '../../../../css/overlay-button' as *;
+
 /* Left-edge camera rail (vertically centered): jump between saved cameras,
    toggle the auto-orbit, save the current view, and persist to the dataset. */
 .camera-rail {
@@ -71,38 +73,21 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
 }
 
 .rail-btn {
-    width: 2.1rem;
-    height: 2.1rem;
-    flex: 0 0 auto;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: var(--ddb-radius-sm);
-    background: rgba(0, 0, 0, 0.5);
-    color: var(--ddb-text-on-dark);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.85rem;
-    transition: background 0.1s ease, border-color 0.1s ease;
+    @include overlay-button(
+        $size: 2.1rem,
+        $radius: var(--ddb-radius-sm),
+        $background: rgba(0, 0, 0, 0.5),
+        $hover-background: rgba(0, 0, 0, 0.75),
+        $active-background: rgba(var(--ddb-primary-rgb), 0.85),
+        $border: 1px solid rgba(255, 255, 255, 0.2),
+        $active-border-color: var(--ddb-primary-300),
+        $font-size: 0.85rem
+    );
 }
-
-.rail-btn:hover:not(:disabled) {
-    background: rgba(0, 0, 0, 0.75);
-}
-
-.rail-btn.active {
-    background: rgba(var(--ddb-primary-rgb), 0.85);
-    border-color: var(--ddb-primary-300);
-}
-
 .rail-btn.dirty {
     border-color: rgba(240, 180, 60, 0.9);
 }
 
-.rail-btn:disabled {
-    opacity: 0.4;
-    cursor: default;
-}
 
 .camera-rail .rail-sep {
     width: 70%;

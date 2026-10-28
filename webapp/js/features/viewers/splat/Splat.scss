@@ -1,4 +1,6 @@
 // Splat viewer overlays: badges and the bottom-left buttons.
+@use '../../../../css/overlay-button' as *;
+
 #splat canvas {
     display: flex;
     width: 100%;
@@ -19,16 +21,12 @@
 }
 
 #splat .camera-hud {
-    background: rgba(0, 0, 0, 0.55);
+    background: color-mix(in srgb, var(--ddb-primary-800) 70%, transparent);
     color: var(--ddb-text-on-dark);
     padding: 0.25rem 0.6rem;
     border-radius: var(--ddb-border-radius, 4px);
     font-size: var(--ddb-font-size-sm, 0.8rem);
     white-space: nowrap;
-}
-
-#splat .camera-hud {
-    background: color-mix(in srgb, var(--ddb-primary-800) 70%, transparent);
 }
 
 #splat .camera-hud i {
@@ -59,20 +57,11 @@
 }
 
 #splat .btn-overlay {
-    width: 2.25rem;
-    height: 2.25rem;
-    border: none;
-    border-radius: 50%;
-    background: rgba(0, 0, 0, 0.55);
-    color: var(--ddb-text-on-dark);
-    cursor: pointer;
-}
-
-#splat .btn-overlay:hover {
-    background: rgba(0, 0, 0, 0.75);
-}
-
-#splat .btn-overlay.active {
-    background: rgba(var(--ddb-primary-rgb), 0.85);
-    color: var(--ddb-text-on-dark);
+    @include overlay-button(
+        $size: 2.25rem,
+        $radius: 50%,
+        $background: rgba(0, 0, 0, 0.55),
+        $hover-background: rgba(0, 0, 0, 0.75),
+        $active-background: rgba(var(--ddb-primary-rgb), 0.85)
+    );
 }
