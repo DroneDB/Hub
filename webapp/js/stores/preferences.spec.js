@@ -569,7 +569,7 @@ describe('preferences store: reset', () => {
             await start({ viewers: { nexusLighting: { ambientIntensity: 2 }, splatNavMode: 'fly' } });
             expect(getPref(PREF.MODEL_LIGHTING, null)).toEqual({ ambientIntensity: 2 });
             await tick(600);
-            expect(bodies()).toEqual([{ viewers: { splatNavMode: 'fly', modelLighting: { ambientIntensity: 2 }, unifiedLighting: null } }]);
+            expect(bodies()).toEqual([{ viewers: { splatNavMode: 'fly', modelLighting: { ambientIntensity: 2 }, splatQuality: null, unifiedLighting: null } }]);
         });
 
         it('lets the new field win when the account holds both, and drops the old one', async () => {

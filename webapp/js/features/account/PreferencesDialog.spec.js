@@ -105,6 +105,43 @@ describe('PreferencesDialog', () => {
         expect(document.body.textContent).toContain('No custom basemap is set');
     });
 
+    describe('Gaussian splat quality', () => {
+        const quality = () => document.getElementById('pref-splat-quality');
+        const open = async () => {
+            await render();
+            await tabs()[4].trigger('click');
+            await flushPromises();
+        };
+
+        beforeEach(() => setPref(PREF.SPLAT_QUALITY, null));
+
+        it('is a select in the Viewers tab with auto, low, medium and high, automatic by default', async () => {
+            await open();
+            expect(quality()).not.toBeNull();
+            expect(quality().closest('.p-select').textContent).toContain('Auto');
+            quality().closest('.p-select').click();
+            await flushPromises();
+            expect(Array.from(document.body.querySelectorAll('[role="option"]')).map(o => o.textContent.trim())).toEqual(['Auto', 'Low', 'Medium', 'High']);
+        });
+
+        it('shows what is stored, and the default for a value that is not a quality', async () => {
+            setPref(PREF.SPLAT_QUALITY, 'medium');
+            await open();
+            expect(quality().closest('.p-select').textContent).toContain('Medium');
+            wrapper.unmount();
+            setPref(PREF.SPLAT_QUALITY, 'turbo');
+            await open();
+            expect(quality().closest('.p-select').textContent).toContain('Auto');
+        });
+
+        it('follows a change that comes from the account', async () => {
+            await open();
+            applyAccountValue(PREF.SPLAT_QUALITY, 'low');
+            await flushPromises();
+            expect(quality().closest('.p-select').textContent).toContain('Low');
+        });
+    });
+
     it('Close emits close', async () => {
         await render();
         expect(wrapper.emitted('close')).toBeUndefined();

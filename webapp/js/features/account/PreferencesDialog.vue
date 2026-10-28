@@ -106,7 +106,8 @@ import { useViewerSettings } from '@/composables/useViewerSettings';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
-import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
+import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
 
@@ -141,6 +142,13 @@ const select = (id, label, model, options, extra) => ({ id, label, kind: 'select
 const toggle = (id, label, model) => ({ id, label, kind: 'switch', model });
 /** @param {string} id @param {string} label @param {import('vue').Ref} model @param {number} max @param {Record<string, any>} [extra] */
 const range = (id, label, model, max, extra) => ({ id, label, kind: 'range', model, min: 0, max, ...extra });
+
+// A stored value that is not a quality shows as the default, which is what the viewer draws at
+const storedQuality = usePreference(PREF.SPLAT_QUALITY, PREF_DEFAULTS[PREF.SPLAT_QUALITY]);
+const splatQuality = computed({
+    get: () => prefChoice(PREF.SPLAT_QUALITY, storedQuality.value),
+    set: value => { storedQuality.value = value; }
+});
 
 const basemapOptions = Object.entries(Basemaps).map(([value, { label }]) => ({ value, label }));
 
@@ -241,7 +249,9 @@ const TABS = [
                 title: 'Gaussian splats',
                 controls: [
                     select('splat-nav-mode', 'Navigation mode', usePreference(PREF.SPLAT_NAV_MODE, PREF_DEFAULTS[PREF.SPLAT_NAV_MODE]),
-                        [{ value: 'fly', label: 'Fly' }, { value: 'earth', label: 'Earth' }])
+                        [{ value: 'fly', label: 'Fly' }, { value: 'earth', label: 'Earth' }]),
+                    select('splat-quality', 'Quality', splatQuality, QUALITY_CHOICES,
+                        { hint: ref('Auto lowers the detail on a slow device and raises it again when there is room.') })
                 ]
             },
             {

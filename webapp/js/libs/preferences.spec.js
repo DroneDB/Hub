@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    PREF, ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF_DEFAULTS, RENAMED_PREFS, onPrefChange, applyAccountValue, setPref, removePref, getPref,
+    PREF, ACCOUNT_OWNED, ACCOUNT_SECTIONS, PREF_DEFAULTS, PREF_CHOICES, RENAMED_PREFS, prefChoice, onPrefChange, applyAccountValue, setPref, removePref, getPref,
     _resetPrefListenersForTests
 } from './preferences';
 
@@ -178,6 +178,16 @@ describe('catalog', () => {
         expect(ACCOUNT_OWNED).toEqual([PREF.BUILD_NOTIFICATIONS]);
     });
 
+    it('the splat quality is an account preference in the viewers section, automatic by default', () => {
+        expect(ACCOUNT_SECTIONS[PREF.SPLAT_QUALITY]).toEqual(['viewers', 'splatQuality']);
+        expect(PREF_DEFAULTS[PREF.SPLAT_QUALITY]).toBe('auto');
+        expect(PREF_CHOICES[PREF.SPLAT_QUALITY]).toEqual(['auto', 'low', 'medium', 'high']);
+    });
+
+    it('every preference with choices has its default among them', () => {
+        for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key]);
+    });
+
     it('every ACCOUNT_OWNED key follows the account', () => {
         for (const key of ACCOUNT_OWNED) expect(ACCOUNT_SECTIONS).toHaveProperty(key);
     });
@@ -236,5 +246,27 @@ describe('a preference stored under its old name', () => {
     it('does nothing when the old key is missing', () => {
         expect(getPref(NEW_KEY, null)).toBeNull();
         expect(localStorage.getItem(NEW_KEY)).toBeNull();
+    });
+});
+
+describe('prefChoice', () => {
+    it('keeps a value that is one of the choices', () => {
+        for (const quality of PREF_CHOICES[PREF.SPLAT_QUALITY]) expect(prefChoice(PREF.SPLAT_QUALITY, quality)).toBe(quality);
+        expect(prefChoice(PREF.SPLAT_NAV_MODE, 'earth')).toBe('earth');
+    });
+
+    it('reads a value that is not one as the default of the preference', () => {
+        for (const bad of ['ultra', 'AUTO', '', null, undefined, 2, true, ['low'], { low: 1 }]) {
+            expect(prefChoice(PREF.SPLAT_QUALITY, bad)).toBe('auto');
+            expect(prefChoice(PREF.SPLAT_NAV_MODE, bad)).toBe('fly');
+        }
+    });
+
+    it('reads what the account or the device stored', () => {
+        setPref(PREF.SPLAT_QUALITY, 'medium');
+        expect(prefChoice(PREF.SPLAT_QUALITY, getPref(PREF.SPLAT_QUALITY, PREF_DEFAULTS[PREF.SPLAT_QUALITY]))).toBe('medium');
+        applyAccountValue(PREF.SPLAT_QUALITY, 'turbo');
+        expect(prefChoice(PREF.SPLAT_QUALITY, getPref(PREF.SPLAT_QUALITY, PREF_DEFAULTS[PREF.SPLAT_QUALITY]))).toBe('auto');
+        removePref(PREF.SPLAT_QUALITY);
     });
 });

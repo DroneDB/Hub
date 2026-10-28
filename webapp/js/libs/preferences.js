@@ -22,6 +22,7 @@ export const PREF = Object.freeze({
     TABLE_EXPANDED_GRID: 'tableExpandedGrid',
     SORT_DESCENDING: 'sortDescending',
     SPLAT_NAV_MODE: 'ddb.splat.navMode',
+    SPLAT_QUALITY: 'ddb.splat.quality', // 'auto' | 'low' | 'medium' | 'high': how much detail the splat viewer draws
     SPLAT_VIEW_SETTINGS: 'ddb.splat.viewSettings', // [[remote URI, { upAxis, tiltRoll, tiltPitch, pointScale }], ...] of the splats opened, oldest first; device only (a list that grows with use)
     DATASET_TABLE: 'dataset_table_prefs',
     OPEN_AFTER_CREATE: 'open_dataset_after_create',
@@ -154,6 +155,7 @@ export const ACCOUNT_SECTIONS = Object.freeze({
     [PREF.OPEN_AFTER_CREATE]: ['datasets', 'openAfterCreate'],
     [PREF.ORG_PAGE]: ['orgs', 'list'],
     [PREF.SPLAT_NAV_MODE]: ['viewers', 'splatNavMode'],
+    [PREF.SPLAT_QUALITY]: ['viewers', 'splatQuality'],
     [PREF.MODEL_LIGHTING]: ['viewers', 'modelLighting'],
     [PREF.UNIFIED_VIEWER]: ['viewers', 'unifiedLighting'],
     [PREF.BUILD_NOTIFICATIONS]: ['notifications', 'builds']
@@ -188,11 +190,32 @@ export const PREF_DEFAULTS = frozen({
     [PREF.OPEN_AFTER_CREATE]: false,
     [PREF.ORG_PAGE]: frozen({ itemsPerPage: 10, ownedOnly: true }),
     [PREF.SPLAT_NAV_MODE]: 'fly',
+    [PREF.SPLAT_QUALITY]: 'auto',
     [PREF.MODEL_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),
     [PREF.UNIFIED_VIEWER]: frozen({ ambientIntensity: 3, directionalIntensity: 1.8, hemisphereIntensity: 3 }),
     // Opt-in: the server sends nothing for a missing or unknown value either
     [PREF.BUILD_NOTIFICATIONS]: 'none'
 });
+
+/**
+ * The values a preference with a fixed set of choices accepts. A stored value outside the set (a
+ * hand-edited store, an account written by a newer Hub) is not one of them: `prefChoice` reads it
+ * as the default instead of letting a view act on a value it does not know.
+ */
+export const PREF_CHOICES = frozen({
+    [PREF.SPLAT_NAV_MODE]: frozen(['fly', 'earth']),
+    [PREF.SPLAT_QUALITY]: frozen(['auto', 'low', 'medium', 'high'])
+});
+
+/**
+ * `value` when it is one of the choices of the preference, else the preference's default.
+ * @param {keyof typeof PREF_CHOICES} key
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function prefChoice(key, value) {
+    return PREF_CHOICES[key].includes(/** @type {never} */ (value)) ? /** @type {string} */ (value) : PREF_DEFAULTS[key];
+}
 
 /**
  * 'local': setPref/removePref in this tab. 'tab': another tab, through the storage event.

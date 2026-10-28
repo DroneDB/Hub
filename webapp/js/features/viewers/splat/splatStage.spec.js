@@ -32,6 +32,10 @@ class FakeSplatMesh extends THREE_BUILD.Object3D {
         super();
         this.options = options;
         this.dispose = vi.fn();
+        // What Spark's mesh has: the degree of colour detail and the call that tells it to draw again
+        this.maxSh = 3;
+        this.lodScale = 1;
+        this.updateGenerator = vi.fn();
         this.initialized = new Promise((resolve, reject) => { this.finish = () => resolve(this); this.fail = reject; });
         FakeSplatMesh.last = this;
     }
@@ -154,15 +158,35 @@ describe('picking', () => {
         return mesh;
     }
 
-    it('is on for the splats and for the level of detail Spark keeps for picking, which a paged file needs', async () => {
-        makeStage({ streaming: true });
-        expect(stage.spark.options.lodRaycast).toBeGreaterThan(0);
-        await loadPickable([]);
-        expect(FakeSplatMesh.last.options.raycastable).toBe(true);
-        // A plain file is picked too
-        stage.dispose();
+    it('is on for the splats, and Spark keeps its set of splats for picking only while the viewer asks', async () => {
+        for (const streaming of [true, false]) {
+            makeStage({ streaming });
+            // Nothing is being measured: no worker pass for a set that nothing reads
+            expect(stage.spark.options.lodRaycast).toBe(0);
+            await loadPickable([]);
+            expect(FakeSplatMesh.last.options.raycastable).toBe(true);
+
+            stage.setPicking(true);
+            expect(stage.spark.lodRaycast).toBeGreaterThan(0);
+            FakeSplatMesh.last.raycastIndices = { numSplats: 3, indices: new Uint32Array(3) };
+            stage.setPicking(false);
+            expect(stage.spark.lodRaycast).toBe(0);
+            // The set Spark stopped updating is dropped: picking falls back to the splats being drawn
+            expect(FakeSplatMesh.last.raycastIndices).toBeUndefined();
+            stage.dispose();
+        }
+    });
+
+    it('asks for fewer splats on a touch screen', () => {
+        vi.stubGlobal('navigator', { ...navigator, maxTouchPoints: 5 });
         makeStage();
-        expect(stage.spark.options.lodRaycast).toBeGreaterThan(0);
+        stage.setPicking(true);
+        const touch = stage.spark.lodRaycast;
+        stage.dispose();
+        vi.stubGlobal('navigator', { ...navigator, maxTouchPoints: 0 });
+        makeStage();
+        stage.setPicking(true);
+        expect(touch).toBeLessThan(stage.spark.lodRaycast);
     });
 
     it('returns the nearest splat the ray from the camera meets, as a point in the world and its distance', async () => {
@@ -202,6 +226,92 @@ describe('picking', () => {
         expect(stage.pickSplat({ x: 0, y: 0 })).toBeNull();
         stage.dispose();
         expect(stage.pickSplat({ x: 0, y: 0 })).toBeNull();
+    });
+});
+
+describe('quality', () => {
+    const LOW = { maxSh: 0, lodScale: 0.5, lodSplatScale: 0.25, pixelRatio: 1 };
+    const HIGH = { maxSh: 3, lodScale: 1, lodSplatScale: 1, pixelRatio: 2 };
+
+    async function loaded() {
+        const loading = stage.loadMesh({ url: 'a.rad', paged: true });
+        const mesh = FakeSplatMesh.last;
+        mesh.finish();
+        await loading;
+        return mesh;
+    }
+
+    it('sets what Spark reads again every frame on a scene that is open, and tells the mesh its pipeline changed', async () => {
+        makeStage({ streaming: true });
+        const mesh = await loaded();
+        stage.applyQuality(LOW);
+        expect(stage.spark.lodSplatScale).toBe(0.25);
+        expect(mesh.lodScale).toBe(0.5);
+        expect(mesh.maxSh).toBe(0);
+        expect(mesh.updateGenerator).toHaveBeenCalledTimes(1);
+
+        stage.applyQuality(HIGH);
+        expect(stage.spark.lodSplatScale).toBe(1);
+        expect(mesh.lodScale).toBe(1);
+        expect(mesh.maxSh).toBe(3);
+        expect(mesh.updateGenerator).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not rebuild the draw program when the degree of colour detail did not change', async () => {
+        makeStage();
+        const mesh = await loaded();
+        stage.applyQuality(HIGH);
+        stage.applyQuality({ ...HIGH, lodScale: 0.8 });
+        expect(mesh.updateGenerator).not.toHaveBeenCalled();
+        expect(mesh.lodScale).toBe(0.8);
+    });
+
+    it('is in force on the mesh made after it, before the mesh loads', async () => {
+        makeStage();
+        stage.applyQuality(LOW);
+        const loading = stage.loadMesh({ url: 'a.spz' });
+        const mesh = FakeSplatMesh.last;
+        expect(mesh.maxSh).toBe(0);
+        expect(mesh.lodScale).toBe(0.5);
+        mesh.finish();
+        await loading;
+    });
+
+    it('caps the pixel ratio the canvas is drawn at, never above what the screen has or the stage allows', () => {
+        vi.stubGlobal('devicePixelRatio', 3);
+        makeStage();
+        expect(stage.renderer.ratio).toBe(MAX_PIXEL_RATIO);
+        stage.applyQuality(LOW);
+        expect(stage.renderer.ratio).toBe(1);
+        stage.applyQuality({ ...LOW, pixelRatio: 1.5 });
+        expect(stage.renderer.ratio).toBe(1.5);
+        stage.applyQuality({ ...LOW, pixelRatio: 5 });
+        expect(stage.renderer.ratio).toBe(MAX_PIXEL_RATIO);
+        stage.dispose();
+        vi.stubGlobal('devicePixelRatio', 1);
+        makeStage();
+        stage.applyQuality(HIGH);
+        expect(stage.renderer.ratio).toBe(1);
+    });
+
+    it('sizes the canvas to the new ratio on the next frame', () => {
+        vi.stubGlobal('devicePixelRatio', 2);
+        makeStage();
+        stage.start();
+        expect(canvas.width).toBe(1600);
+        stage.applyQuality(LOW);
+        runFrame();
+        expect(stage.renderer.setSize).toHaveBeenLastCalledWith(800, 400, false);
+        expect(canvas.width).toBe(800);
+    });
+
+    it('does nothing once the stage is gone', () => {
+        makeStage();
+        stage.dispose();
+        stage.applyQuality(LOW);
+        stage.setPicking(true);
+        expect(stage.spark.lodSplatScale).toBeUndefined();
+        expect(stage.spark.lodRaycast).toBeUndefined();
     });
 });
 

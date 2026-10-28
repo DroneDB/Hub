@@ -6,6 +6,13 @@
             <small>The axis of the scene that points up. Change it if the scene appears upside down or on its side.<template v-if="autoUp"> Auto follows the up estimated when the splat was built.</template></small>
         </div>
 
+        <div class="form-group">
+            <label :id="`${qualityId}-label`" :for="qualityId">Quality</label>
+            <Select v-model="quality" :input-id="qualityId" :aria-labelledby="`${qualityId}-label`" :options="QUALITY_CHOICES" option-label="label" option-value="value" class="up-axis-select" />
+            <small v-if="quality === 'auto'">Auto lowers the detail when the view runs under 30 frames per second and raises it again when there is room. Drawing at {{ levelLabel }} now.</small>
+            <small v-else>How much the viewer draws: colour detail, level of detail and sharpness. Lower it on a slow device. Also in your preferences.</small>
+        </div>
+
         <RangeSetting v-model="pointScale" label="Point size" :min="POINT_SCALE_RANGE.min" :max="POINT_SCALE_RANGE.max" :step="0.05" :format="v => `${v.toFixed(2)}x`" />
 
         <div class="form-group">
@@ -26,7 +33,7 @@
 
 <script setup>
 /**
- * View settings of the splat viewer: up axis (or the estimated up), point size, ground-plane calibration.
+ * View settings of the splat viewer: up axis (or the estimated up), quality, point size, ground-plane calibration.
  */
 import { computed, useId } from 'vue';
 import Button from 'primevue/button';
@@ -34,16 +41,25 @@ import Select from 'primevue/select';
 import RangeSetting from '@/components/RangeSetting.vue';
 import { upChoices } from './upAxis';
 import { POINT_SCALE_RANGE, TILT_LIMIT } from './viewSettings';
+import { QUALITY_CHOICES } from './qualityPresets';
 
 const upAxis = defineModel('upAxis', { type: String, required: true });
 // The up the build estimated ({ label }), when it is confident: offered as the Auto choice
-const props = defineProps({ autoUp: { type: Object, default: null } });
+const props = defineProps({
+    autoUp: { type: Object, default: null },
+    // The preset in force ('low' | 'medium' | 'high'): what Auto is drawing at
+    qualityLevel: { type: String, default: 'high' }
+});
+// The quality setting: 'auto' or a preset (the same preference as the Preferences window)
+const quality = defineModel('quality', { type: String, required: true });
+const levelLabel = computed(() => (QUALITY_CHOICES.find(c => c.value === props.qualityLevel)?.label ?? props.qualityLevel).toLowerCase());
 const choices = computed(() => upChoices(props.autoUp));
 const pointScale = defineModel('pointScale', { type: Number, required: true });
 const tiltRoll = defineModel('tiltRoll', { type: Number, required: true });
 const tiltPitch = defineModel('tiltPitch', { type: Number, required: true });
 const emit = defineEmits(['close']);
 const upAxisId = useId();
+const qualityId = useId();
 const degrees = v => `${v.toFixed(1)}°`;
 </script>
 

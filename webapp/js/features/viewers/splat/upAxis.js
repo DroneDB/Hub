@@ -80,7 +80,7 @@ export const isFlippedAxis = id => id === '-y';
 // ---- The up the build estimated -----------------------------------------------------------
 
 /** How the sources of bounds.json `up` are named in the choice. */
-const ESTIMATE_LABELS = Object.freeze({ georef: 'georeferenced', 'ground-plane': 'ground plane', pca: 'principal axes' });
+export const ESTIMATE_LABELS = Object.freeze({ georef: 'georeferenced', 'ground-plane': 'ground plane', pca: 'principal axes' });
 
 /**
  * The up estimated at build time (bounds.json), when it can be trusted: a unit vector of three

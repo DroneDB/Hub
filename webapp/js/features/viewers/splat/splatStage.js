@@ -18,6 +18,11 @@
  *   const mesh = await stage.loadMesh({ url, paged: true }, onProgress);   // null when disposed meanwhile
  *   if (mesh) stage.start();                          // ...and stage.dispose() when the viewer goes away
  *   const hit = stage.pickSplat({ x: 0, y: 0 });      // { point, distance } or null
+ *
+ * Quality (`applyQuality`) and picking (`setPicking`) change while the scene is open: Spark reads
+ * the level-of-detail budget, the mesh's level-of-detail scale and the picking set again every
+ * frame, a mesh's `maxSh` once it is told its pipeline changed, and the pixel ratio is the
+ * renderer's, followed by the canvas on the next frame.
  */
 import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 
@@ -26,9 +31,10 @@ import { canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 export const MAX_PIXEL_RATIO = 2;
 const BACKGROUND = 0x1a1a2e;
 
-// How many splats of the level of detail Spark keeps up to date for picking, which a paged .rad
-// needs to be picked at all (only part of it is in memory, and which part changes with the view).
-// Spark's own defaults, written down because the viewer depends on them
+// How many splats of the level of detail Spark keeps up to date for picking, while a measurement
+// or a pin is being placed. Picking a paged .rad is best against that set: it is the detail of the
+// view at the full budget, where the splats being drawn are foveated. Spark's own defaults,
+// written down because the viewer depends on them
 const PICK_SPLATS = 25000;
 const PICK_SPLATS_TOUCH = 10000;
 
@@ -84,7 +90,10 @@ export function createSplatStage({
     THREE, OrbitControls, Spark, canvas, streaming, up, onFrame, onContextLost, onContextRestored, CSS2DRenderer, labelLayer
 }) {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+    // The cap on the pixel ratio: the quality preset moves it (up to MAX_PIXEL_RATIO)
+    let pixelCap = MAX_PIXEL_RATIO;
+    const drawRatio = () => Math.min(window.devicePixelRatio || 1, pixelCap);
+    renderer.setPixelRatio(drawRatio());
     renderer.setSize(canvas.clientWidth || 1, canvas.clientHeight || 1, false);
 
     const scene = new THREE.Scene();
@@ -96,10 +105,12 @@ export function createSplatStage({
 
     // Kept: its sort and level-of-detail workers, its pager and its GPU textures end only with dispose()
     const touch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-    const lodRaycast = touch ? PICK_SPLATS_TOUCH : PICK_SPLATS;
+    const pickSplats = touch ? PICK_SPLATS_TOUCH : PICK_SPLATS;
+    // No picking set until a measurement asks for one (setPicking): a worker pass every 500 ms that
+    // nothing reads would be spent for the whole visit
     const spark = new Spark.SparkRenderer(streaming
-        ? { renderer, lodRaycast, pagedExtSplats: true, coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4 }
-        : { renderer, lodRaycast });
+        ? { renderer, lodRaycast: 0, pagedExtSplats: true, coneFov0: 70.0, coneFov: 120.0, behindFoveate: 0.2, coneFoveate: 0.4 }
+        : { renderer, lodRaycast: 0 });
     scene.add(spark);
 
     // Measurements and pins: in the frame of the splats, so the viewer turns it with the mesh
@@ -115,6 +126,8 @@ export function createSplatStage({
     controls.enableDamping = false;
 
     let mesh = null;
+    /** @type {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number } | null} */
+    let quality = null;
     let disposed = false;
     let contextLost = false;
 
@@ -141,6 +154,45 @@ export function createSplatStage({
     canvas.addEventListener('webglcontextlost', lost);
     canvas.addEventListener('webglcontextrestored', restored);
 
+    /** What a mesh takes from the quality: its detail scale and its spherical-harmonics degree. @param {any} target */
+    function qualifyMesh(target) {
+        if (!quality) return;
+        target.lodScale = quality.lodScale;
+        if (target.maxSh !== quality.maxSh) {
+            target.maxSh = quality.maxSh;
+            // maxSh is part of the program that draws the splats: Spark runs it again on this call
+            target.updateGenerator?.();
+        }
+    }
+
+    /**
+     * Puts a quality preset in force: now on a scene that is open, and on the mesh a later
+     * `loadMesh` makes.
+     * @param {{ maxSh: number, lodScale: number, lodSplatScale: number, pixelRatio: number }} preset
+     */
+    function applyQuality(preset) {
+        if (disposed) return;
+        quality = preset;
+        spark.lodSplatScale = preset.lodSplatScale;
+        pixelCap = Math.min(preset.pixelRatio, MAX_PIXEL_RATIO);
+        // The canvas follows the new ratio on the next frame (fitCanvas compares its buffer with it)
+        if (renderer.getPixelRatio() !== drawRatio()) renderer.setPixelRatio(drawRatio());
+        if (mesh) qualifyMesh(mesh);
+    }
+
+    /**
+     * Whether Spark keeps a set of level-of-detail splats for picking (`pickSplat`): worth its
+     * cost only while something is being measured or placed. Without it picking uses the splats
+     * being drawn, which is what an unpaged file always did.
+     * @param {boolean} on
+     */
+    function setPicking(on) {
+        if (disposed) return;
+        spark.lodRaycast = on ? pickSplats : 0;
+        // The set Spark stopped updating describes a view that is gone
+        if (!on && mesh) mesh.raycastIndices = undefined;
+    }
+
     /**
      * Creates the splat mesh, adds it to the scene and waits for it to load. Spark has no way to
      * cancel a download: when the stage is disposed meanwhile the mesh is already disposed, and
@@ -158,6 +210,7 @@ export function createSplatStage({
             onProgress: onProgress && (event => { if (!disposed) onProgress(progressFraction(event)); })
         });
         mesh = loading;
+        qualifyMesh(loading);
         scene.add(loading);
         try {
             await loading.initialized;
@@ -215,7 +268,7 @@ export function createSplatStage({
     }
 
     return {
-        renderer, scene, camera, controls, spark, overlay, loadMesh, pickSplat, start, dispose,
+        renderer, scene, camera, controls, spark, overlay, loadMesh, pickSplat, applyQuality, setPicking, start, dispose,
         get disposed() { return disposed; }
     };
 }

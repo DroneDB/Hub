@@ -38,6 +38,10 @@
                     title="Earth navigation: drag to pan, right-drag to orbit, wheel to zoom" aria-label="Earth navigation" @click="navMode = 'earth'">
                 <i class="fa-solid fa-earth-americas" />
             </button>
+            <button class="btn-overlay" :class="{ active: showInfo }" title="About this splat and its downloads" aria-label="About this splat"
+                    :aria-expanded="showInfo" @click="showInfo = !showInfo">
+                <i class="fa-solid fa-circle-info" />
+            </button>
             <button class="btn-overlay" title="View settings" aria-label="View settings" @click="showSettings = !showSettings">
                 <i class="fa-solid fa-gear" />
             </button>
@@ -49,13 +53,17 @@
             </button>
         </div>
 
+        <SplatInfoPanel v-if="loaded && showInfo" :info="infoSource" :read-pager="readPager" :downloads="downloads"
+                        @download="startDownload" @close="showInfo = false" />
+
         <SplatCameraRail v-if="loaded" :cameras="cameras" :active-index="activeCameraIndex" :mode="presentationMode" :can-write="canWrite"
                          :dirty="camerasDirty" :has-tour="tourAvailable" @goto="flyTo" @toggle-orbit="toggleOrbit" @toggle-tour="toggleTour" @add="addCurrentCamera"
                          @save="saveCameras" />
         <SplatNavPad v-if="loaded" :pressed="pressed" :touch="isTouch" @press="pressKey" @release="releaseKey" />
 
         <template #settings>
-            <SplatSettings :up-axis="upAxis" :auto-up="autoUp" :point-scale="pointScale" :tilt-roll="tiltRoll" :tilt-pitch="tiltPitch"
+            <SplatSettings v-model:quality="qualitySetting" :up-axis="upAxis" :auto-up="autoUp" :point-scale="pointScale" :tilt-roll="tiltRoll"
+                           :tilt-pitch="tiltPitch" :quality-level="qualityLevel"
                            @update:up-axis="setUpAxis" @update:point-scale="setPointScale"
                            @update:tilt-roll="v => setTilt(v, tiltPitch)" @update:tilt-pitch="v => setTilt(tiltRoll, v)"
                            @close="showSettings = false" />
@@ -92,10 +100,12 @@ import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
 import { useDialogs } from '@/composables/useDialogs';
 import { useConfirm } from '@/composables/useConfirm';
-import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
+import { notifyDownloadError } from '@/libs/datasetDownloads';
 import AnnotationManager from './AnnotationManager.vue';
 import CameraManager from './CameraManager.vue';
 import PinCard from './PinCard.vue';
+import SplatInfoPanel from './SplatInfoPanel.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
 import SplatMeasureToolbar from './SplatMeasureToolbar.vue';
 import SplatNavPad from './SplatNavPad.vue';
@@ -110,6 +120,8 @@ import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSet
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
+import { createQualityController, describeQuality } from './qualityPresets';
+import { splatDownloadsOf, runSplatDownload } from './splatDownloads';
 import { SplatMeasureTool } from './measureTool';
 import { createPinLayer } from './pinLayer';
 import { tourStops } from './sceneData';
@@ -134,6 +146,7 @@ const progress = ref(null);
 const showSettings = ref(false);
 const showCameraManager = ref(false);
 const showPins = ref(false);
+const showInfo = ref(false);
 const streaming = ref(false);
 // The view settings start at the defaults (most INRIA/3DGS scenes render upside down without the
 // half turn of the -y axis); loadSplat sets what this device remembers for the entry, and the
@@ -150,6 +163,13 @@ const tiltRoll = ref(VIEW_DEFAULTS.tiltRoll);
 const tiltPitch = ref(VIEW_DEFAULTS.tiltPitch);
 const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const navMode = usePreference(PREF.SPLAT_NAV_MODE, PREF_DEFAULTS[PREF.SPLAT_NAV_MODE]);
+// The quality: the stored choice ('auto' or a preset; one that is not a choice is auto) and the preset in force
+const qualityPref = usePreference(PREF.SPLAT_QUALITY, PREF_DEFAULTS[PREF.SPLAT_QUALITY]);
+const qualitySetting = computed({
+    get: () => prefChoice(PREF.SPLAT_QUALITY, qualityPref.value),
+    set: value => { qualityPref.value = value; }
+});
+const qualityLevel = ref('high');
 const pressed = reactive(Object.fromEntries(MOVE_KEYS.map(k => [k, false])));
 const presentationMode = ref(null);
 const views = useSplatScene({
@@ -161,6 +181,8 @@ const { add: addCurrentCamera, update: updateCameraToCurrent, remove: deleteCame
 // Measurements: the kind being drawn, how many are shown, and what their values are in
 const measureKind = ref(/** @type {string | null} */ (null));
 const measureCount = ref(0);
+// What the info popover shows besides the entry: the bounds the build wrote (shallow: only replaced)
+const boundsInfo = shallowRef(null);
 const georeferenced = computed(() => entry.value?.properties?.georeferenced === true);
 const measureScale = computed(() => sceneScale({ georeferenced: georeferenced.value, metersPerUnit: views.scale.value?.metersPerUnit }));
 // The pins: the one on show (clicked, picked in the panel, or visited by the tour) opens its card
@@ -168,6 +190,13 @@ const { annotations, activePin } = views;
 const { removePin, movePin, renamePin, editPin, updatePinView } = views;
 const shownPin = computed(() => (activePin.value === null ? null : annotations.value[activePin.value] ?? null));
 const shownPinImage = computed(() => (shownPin.value?.image ? dataset.value.thumbUrl(shownPin.value.image, 800) : ''));
+const infoSource = computed(() => ({
+    entry: entry.value, bounds: boundsInfo.value, scale: measureScale.value, streaming: streaming.value,
+    quality: describeQuality(qualitySetting.value, qualityLevel.value)
+}));
+// Spark's pager (the streaming of a paged .rad), for the popover; there is none before the stage
+const readPager = () => stage?.spark.pager ?? null;
+const downloads = computed(() => splatDownloadsOf(entry.value));
 const tourAvailable = computed(() => tourStops(cameras.value, annotations.value).length > 0);
 const activeCameraName = computed(() => {
     const i = activeCameraIndex.value;
@@ -187,6 +216,7 @@ let pointSize = null;
 let bounds = null;
 let measureTool = null;
 let pinLayer = null;
+let quality = null;
 // Drawing a measurement owns the pointer: the navigation controls stand by
 let navigationSuspended = false;
 let lastFrameTime = 0;
@@ -239,8 +269,11 @@ const frameRetry = createFrameRetry({ frame: () => !!splatMesh && frameCamera(),
 
 function renderFrame(time) {
     const now = time || performance.now();
-    const dt = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.1) : 0;
+    // The time the frame really took: the quality reads it as it is, the controls get it capped
+    const frameMs = lastFrameTime ? now - lastFrameTime : 0;
+    const dt = Math.min(frameMs / 1000, 0.1);
     lastFrameTime = now;
+    if (quality) quality.frame(frameMs);
 
     // Moving with the keys or the pad stops the presentation
     if (fly.update(dt)) onUserInteract();
@@ -296,6 +329,7 @@ async function loadSplat() {
     const [boundsData, , libraries] = await Promise.all([splatEntry.getGsplatBounds(), views.load(), importLibraries()]);
     if (unmounted) return;
     bounds = boundsData;
+    boundsInfo.value = boundsData;
     autoUp.value = resolvedAutoUp(bounds, views.savedUp.value);
     // The sidecar's up (the ref, if it had one), else the user's choice on this device, else the build's estimate
     upAxis.value = openingUpChoice({ saved: upAxis.value ?? undefined, savedUp: views.savedUp.value, local: stored.upAxis, bounds });
@@ -309,6 +343,11 @@ async function loadSplat() {
     });
     const { camera, controls } = stage;
     listeners.add(controls, 'start', onUserInteract);
+    // In force before the mesh exists: it is made at the preset's detail (a low preset never loads the colour detail)
+    quality = createQualityController({
+        setting: qualitySetting.value, apply: preset => stage.applyQuality(preset), onLevel: level => { qualityLevel.value = level; }
+    });
+    quality.start();
 
     rig = new CameraRig(THREE, camera, controls);
     rig.setTilt(tiltRoll.value, tiltPitch.value);
@@ -339,7 +378,8 @@ async function loadSplat() {
         THREE, CSS2DObject: libraries.CSS2DObject, stage, canvas: canvas.value, getUp: fileUp, getScale: () => measureScale.value,
         listen: (target, type, fn) => listeners.add(target, type, fn),
         setNavigationEnabled: enabled => { navigationSuspended = !enabled; stage.controls.enabled = enabled; },
-        onActive: kind => { measureKind.value = kind; },
+        // Spark keeps its extra set of splats for picking only while something is being picked
+        onActive: kind => { measureKind.value = kind; stage?.setPicking(kind !== null); },
         onChange: list => views.setMeasurements(list),
         onMiss: () => notify.info('No splat there: click on the scene.', { summary: 'Measure' })
     }, count => { measureCount.value = count; });
@@ -414,9 +454,23 @@ function applyNavMode() {
     }
 }
 watch(navMode, mode => {
-    if (mode !== 'fly' && mode !== 'earth') navMode.value = PREF_DEFAULTS[PREF.SPLAT_NAV_MODE];
+    const valid = prefChoice(PREF.SPLAT_NAV_MODE, mode);
+    if (valid !== mode) navMode.value = valid;
     else applyNavMode();
 });
+
+// A change of quality (here, in the settings or in the Preferences window) takes effect at once
+watch(qualitySetting, value => { if (quality) quality.setSetting(value); });
+
+// ---- Downloads --------------------------------------------------------------------------
+
+async function startDownload(download) {
+    try {
+        await runSplatDownload(download, () => dataset.value.downloadWithCheck(entry.value.path));
+    } catch (e) {
+        notifyDownloadError(e);
+    }
+}
 
 // ---- Measurements -----------------------------------------------------------------------
 
@@ -582,7 +636,7 @@ onBeforeUnmount(() => {
     if (measureTool) measureTool.dispose();
     if (pinLayer) pinLayer.dispose();
     if (stage) stage.dispose();
-    stage = splatMesh = rig = fly = earth = presentation = pointSize = measureTool = pinLayer = null;
+    stage = splatMesh = rig = fly = earth = presentation = pointSize = measureTool = pinLayer = quality = null;
 });
 </script>
 
