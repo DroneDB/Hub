@@ -43,7 +43,7 @@
         <SplatNavPad v-if="loaded" :pressed="pressed" :touch="isTouch" @press="pressKey" @release="releaseKey" />
 
         <template #settings>
-            <SplatSettings :up-axis="upAxis" :point-scale="pointScale" :tilt-roll="tiltRoll" :tilt-pitch="tiltPitch"
+            <SplatSettings :up-axis="upAxis" :auto-up="autoUp" :point-scale="pointScale" :tilt-roll="tiltRoll" :tilt-pitch="tiltPitch"
                            @update:up-axis="setUpAxis" @update:point-scale="setPointScale"
                            @update:tilt-roll="v => setTilt(v, tiltPitch)" @update:tilt-pitch="v => setTilt(tiltRoll, v)"
                            @close="showSettings = false" />
@@ -64,7 +64,7 @@
  * modes, the presentation and the camera sidecar are modules next to this view; the view wires
  * them to each other.
  */
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, shallowRef, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
@@ -86,7 +86,7 @@ import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
 import { createFrameRetry } from './framing';
-import { upAxisQuaternion } from './upAxis';
+import { upChoiceQuaternion, estimatedUp, openingUpChoice } from './upAxis';
 import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSettings';
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
@@ -111,8 +111,12 @@ const showCameraManager = ref(false);
 const streaming = ref(false);
 // The view settings start at the defaults (most INRIA/3DGS scenes render upside down without the
 // half turn of the -y axis); loadSplat sets what this device remembers for the entry, and the
-// orientation saved in the sidecar replaces that
-const upAxis = ref(VIEW_DEFAULTS.upAxis);
+// orientation saved in the sidecar replaces that. The up axis is the exception: it stays unset
+// (null) until the sidecar was read, because what the sidecar says, what the device remembers
+// and the up the build estimated are told apart to choose between them (openingUpChoice)
+const upAxis = ref(/** @type {string | null} */ (VIEW_DEFAULTS.upAxis));
+// The up the build estimated when it is confident (the "Auto" choice of the Up axis select), else null
+const autoUp = shallowRef(null);
 const pointScale = ref(VIEW_DEFAULTS.pointScale);
 // Ground-plane calibration (degrees), saved with the cameras: levels off-gravity reconstructions
 const tiltRoll = ref(VIEW_DEFAULTS.tiltRoll);
@@ -161,8 +165,8 @@ function onUserInteract() {
 // ---- Scene ------------------------------------------------------------------------------
 
 function applyOrientation() {
-    // The turn that lays the chosen axis of the splat along world up
-    if (splatMesh) splatMesh.quaternion.set(...upAxisQuaternion(upAxis.value));
+    // The turn that lays the chosen axis (or the estimated up) of the splat along world up
+    if (splatMesh) splatMesh.quaternion.set(...upChoiceQuaternion(upAxis.value, bounds));
 }
 
 /**
@@ -231,8 +235,9 @@ async function loadSplat() {
     streaming.value = !!radUrl;
 
     // What this device remembers for the entry (the sidecar, read next, takes precedence)
-    const remembered = openingViewSettings(viewSettingsStore.get(ddbURI.value));
-    upAxis.value = remembered.upAxis;
+    const stored = viewSettingsStore.get(ddbURI.value);
+    const remembered = openingViewSettings(stored);
+    upAxis.value = null;
     pointScale.value = remembered.pointScale;
     tiltRoll.value = remembered.tiltRoll;
     tiltPitch.value = remembered.tiltPitch;
@@ -241,6 +246,9 @@ async function loadSplat() {
     const [boundsData, , libraries] = await Promise.all([splatEntry.getGsplatBounds(), cams.load(), importLibraries()]);
     if (unmounted) return;
     bounds = boundsData;
+    autoUp.value = estimatedUp(bounds);
+    // The sidecar's up (the ref, if it had one), else the user's choice on this device, else the build's estimate
+    upAxis.value = openingUpChoice({ saved: upAxis.value ?? undefined, local: stored.upAxis, bounds });
     THREE = libraries.THREE;
 
     // The tilt is known before the controls exist: they are built on the final up (and follow setTilt)

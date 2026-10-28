@@ -3,14 +3,15 @@
  * What the user chose to see a splat with, remembered per entry on this device: the up axis,
  * the tilt calibration and the point size. A user who cannot write the dataset has no sidecar to
  * save them in, and for everyone they are the default when the sidecar has no orientation.
- * Precedence: the sidecar's orientation, then what is remembered here, then the defaults.
+ * Precedence: the sidecar's orientation, then what is remembered here, then the up the build
+ * estimated, then the defaults (upAxis.openingUpChoice): a choice of the user beats an estimate.
  *
  * The map of entries only ever grows with the splats a user opens, so it keeps the most recent
  * MAX_ENTRIES and drops the least recently changed. It is local to the device (not in the
  * account preferences): it would be an unbounded list to send with every change.
  */
 import { getPref, setPref, PREF } from '@/libs/preferences';
-import { DEFAULT_UP_AXIS, isUpAxis } from './upAxis';
+import { DEFAULT_UP_AXIS, isUpChoice } from './upAxis';
 
 /** Entries kept; the least recently changed is dropped past it. */
 export const MAX_ENTRIES = 200;
@@ -22,7 +23,7 @@ export const POINT_SCALE_RANGE = Object.freeze({ min: 0.25, max: 3 });
 /** The view settings of an entry that has none. */
 export const VIEW_DEFAULTS = Object.freeze({ upAxis: DEFAULT_UP_AXIS, tiltRoll: 0, tiltPitch: 0, pointScale: 1 });
 
-/** @typedef {{ upAxis: import('./upAxis').UpAxis, tiltRoll: number, tiltPitch: number, pointScale: number }} ViewSettings */
+/** @typedef {{ upAxis: import('./upAxis').UpChoice, tiltRoll: number, tiltPitch: number, pointScale: number }} ViewSettings */
 
 /** @param {unknown} v @param {number} min @param {number} max @returns {number | undefined} */
 const finiteIn = (v, min, max) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : undefined);
@@ -37,7 +38,7 @@ export function sanitizeViewSettings(raw) {
     /** @type {Partial<ViewSettings>} */
     const out = {};
     if (!raw || typeof raw !== 'object') return out;
-    if (isUpAxis(raw.upAxis)) out.upAxis = raw.upAxis;
+    if (isUpChoice(raw.upAxis)) out.upAxis = raw.upAxis;
     const roll = finiteIn(raw.tiltRoll, -TILT_LIMIT, TILT_LIMIT);
     if (roll !== undefined) out.tiltRoll = roll;
     const pitch = finiteIn(raw.tiltPitch, -TILT_LIMIT, TILT_LIMIT);

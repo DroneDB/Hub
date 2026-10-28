@@ -2,8 +2,8 @@
     <div class="splat-settings">
         <div class="form-group">
             <label :id="`${upAxisId}-label`" :for="upAxisId">Up axis</label>
-            <Select v-model="upAxis" :input-id="upAxisId" :aria-labelledby="`${upAxisId}-label`" :options="UP_AXES" option-label="label" option-value="id" class="up-axis-select" />
-            <small>The axis of the scene that points up. Change it if the scene appears upside down or on its side.</small>
+            <Select v-model="upAxis" :input-id="upAxisId" :aria-labelledby="`${upAxisId}-label`" :options="choices" option-label="label" option-value="id" class="up-axis-select" />
+            <small>The axis of the scene that points up. Change it if the scene appears upside down or on its side.<template v-if="autoUp"> Auto follows the up estimated when the splat was built.</template></small>
         </div>
 
         <RangeSetting v-model="pointScale" label="Point size" :min="POINT_SCALE_RANGE.min" :max="POINT_SCALE_RANGE.max" :step="0.05" :format="v => `${v.toFixed(2)}x`" />
@@ -26,16 +26,19 @@
 
 <script setup>
 /**
- * View settings of the splat viewer: up axis, point size, ground-plane calibration.
+ * View settings of the splat viewer: up axis (or the estimated up), point size, ground-plane calibration.
  */
-import { useId } from 'vue';
+import { computed, useId } from 'vue';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
 import RangeSetting from '@/components/RangeSetting.vue';
-import { UP_AXES } from './upAxis';
+import { upChoices } from './upAxis';
 import { POINT_SCALE_RANGE, TILT_LIMIT } from './viewSettings';
 
 const upAxis = defineModel('upAxis', { type: String, required: true });
+// The up the build estimated ({ label }), when it is confident: offered as the Auto choice
+const props = defineProps({ autoUp: { type: Object, default: null } });
+const choices = computed(() => upChoices(props.autoUp));
 const pointScale = defineModel('pointScale', { type: Number, required: true });
 const tiltRoll = defineModel('tiltRoll', { type: Number, required: true });
 const tiltPitch = defineModel('tiltPitch', { type: Number, required: true });

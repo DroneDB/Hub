@@ -93,6 +93,15 @@ describe('the store', () => {
         expect(store.get('b')).toEqual({ upAxis: '-x' });
     });
 
+    it('keeps "auto" as the up axis, in range like the axes', () => {
+        const { store } = memoryStore();
+        store.set('a', { upAxis: 'auto' });
+        expect(store.get('a')).toEqual({ upAxis: 'auto' });
+        expect(sanitizeViewSettings({ upAxis: 'auto', tiltRoll: 3 })).toEqual({ upAxis: 'auto', tiltRoll: 3 });
+        store.set('a', { upAxis: '+z' });
+        expect(store.get('a')).toEqual({ upAxis: '+z' });
+    });
+
     it('tolerates storage that throws on read or on write', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         const broken = createViewSettingsStore({ load: () => { throw new Error('denied'); }, save: () => { throw new Error('quota'); } });

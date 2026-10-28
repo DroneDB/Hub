@@ -50,6 +50,12 @@ describe('camera presets', () => {
             expect(written('+y')).toMatchObject({ upAxis: '+y', flipped: false });
             expect(written('+z')).toMatchObject({ upAxis: '+z', flipped: false });
         });
+
+        it('keeps "auto" as its own value, without a flag that would make older versions show it unflipped', () => {
+            const text = serializeCamerasFile([], { upAxis: 'auto', tiltRoll: 1, tiltPitch: 2 });
+            expect(JSON.parse(text).orientation).toEqual({ upAxis: 'auto', tiltRoll: 1, tiltPitch: 2 });
+            expect(parseCamerasFile(text).orientation).toEqual({ upAxis: 'auto', tiltRoll: 1, tiltPitch: 2 });
+        });
     });
 
     it('keep the active camera when the list changes', () => {

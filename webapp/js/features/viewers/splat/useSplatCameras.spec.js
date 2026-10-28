@@ -44,6 +44,22 @@ describe('loading the sidecar', () => {
         expect(notify.warn).not.toHaveBeenCalled();
     });
 
+    it('reads "auto" from the sidecar and writes it back as it is', async () => {
+        dataset.getFileContents.mockResolvedValue(JSON.stringify({ orientation: { upAxis: 'auto', tiltRoll: 1 }, cameras: [] }));
+        const cams = make();
+        await cams.load();
+        expect(orientation.upAxis.value).toBe('auto');
+        await cams.save();
+        expect(JSON.parse(dataset.writeObj.mock.calls[0][1]).orientation).toEqual({ upAxis: 'auto', tiltRoll: 1, tiltPitch: 0 });
+    });
+
+    it('leaves the up axis as it was (unset) for a sidecar without one, so the viewer can choose', async () => {
+        dataset.getFileContents.mockResolvedValue(JSON.stringify({ orientation: { tiltRoll: 1 }, cameras: [] }));
+        orientation.upAxis.value = null;
+        await make().load();
+        expect(orientation.upAxis.value).toBeNull();
+    });
+
     it('treats a missing sidecar as none, with no warning', async () => {
         dataset.getFileContents.mockRejectedValue(new Error('Not found'));
         const cams = make();

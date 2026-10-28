@@ -3,7 +3,7 @@
  * sidecar next to the splat, with the cameras and the scene orientation (up axis and
  * ground-plane calibration).
  */
-import { upAxisOfOrientation, isFlippedAxis } from './upAxis';
+import { upAxisOfOrientation, isFlippedAxis, AUTO_UP } from './upAxis';
 
 /** Sidecar path of a splat entry. */
 export const camerasPathFor = entryPath => `${entryPath.replace(/\.[^./\\]+$/, '')}_cameras.json`;
@@ -33,7 +33,7 @@ export function normalizeCamera(c, i) {
  * the fields the file has: `upAxis` (from its `upAxis`, else from the `flipped` flag of files
  * saved before the axis could be chosen), `tiltRoll` and `tiltPitch`.
  * @param {string} text
- * @returns {{ cameras: any[], orientation: { upAxis?: import('./upAxis').UpAxis, tiltRoll?: number, tiltPitch?: number } }}
+ * @returns {{ cameras: any[], orientation: { upAxis?: import('./upAxis').UpChoice, tiltRoll?: number, tiltPitch?: number } }}
  */
 export function parseCamerasFile(text) {
     const data = JSON.parse(text);
@@ -48,15 +48,16 @@ export function parseCamerasFile(text) {
 }
 
 /**
- * The sidecar's JSON. The orientation is written with `upAxis` and, next to it, the `flipped`
- * flag older versions of the viewer read (true for the -y half turn).
+ * The sidecar's JSON. The orientation is written with `upAxis` (an axis, or "auto" for the up the
+ * build estimated) and, next to an axis, the `flipped` flag older versions of the viewer read (true
+ * for the -y half turn). "auto" has no flag: those versions do not know it and use their default.
  * @param {any[]} cameras
  * @param {{ upAxis: string, tiltRoll: number, tiltPitch: number }} orientation
  */
 export function serializeCamerasFile(cameras, orientation) {
     return JSON.stringify({
         version: 1,
-        orientation: { upAxis: orientation.upAxis, flipped: isFlippedAxis(orientation.upAxis), tiltRoll: orientation.tiltRoll, tiltPitch: orientation.tiltPitch },
+        orientation: { upAxis: orientation.upAxis, flipped: orientation.upAxis === AUTO_UP ? undefined : isFlippedAxis(orientation.upAxis), tiltRoll: orientation.tiltRoll, tiltPitch: orientation.tiltPitch },
         cameras: cameras.map(({ id, name, position, quaternion, fov, target }) => ({ id, name, position, quaternion, fov, target }))
     }, null, 2);
 }

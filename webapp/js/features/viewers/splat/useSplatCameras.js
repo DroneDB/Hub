@@ -8,7 +8,9 @@
  *   cams.cameras.value, cams.activeIndex.value, cams.dirty.value, cams.add() / update(i) / remove(i) / move({ index, dir }) / rename({ index, name }) / save()
  *
  * The orientation refs hold what the viewer remembers for the entry when load() runs; a field the
- * sidecar has replaces it (the sidecar wins), a field it lacks leaves it.
+ * sidecar has replaces it (the sidecar wins), a field it lacks leaves it (the up axis may be null
+ * then: the viewer tells a sidecar's up from the rest to choose the one the scene opens with).
+ * The up axis is an axis or "auto" (the up the build estimated), written and read as it is.
  *
  * A sidecar that cannot be read is not the same as none: it is reported, and saving, which would
  * replace it, asks first.
