@@ -43,8 +43,8 @@
         <SplatNavPad v-if="loaded" :pressed="pressed" :touch="isTouch" @press="pressKey" @release="releaseKey" />
 
         <template #settings>
-            <SplatSettings :flipped="flipped" :point-scale="pointScale" :tilt-roll="tiltRoll" :tilt-pitch="tiltPitch"
-                           @update:flipped="setFlipped" @update:point-scale="setPointScale"
+            <SplatSettings :up-axis="upAxis" :point-scale="pointScale" :tilt-roll="tiltRoll" :tilt-pitch="tiltPitch"
+                           @update:up-axis="setUpAxis" @update:point-scale="setPointScale"
                            @update:tilt-roll="v => setTilt(v, tiltPitch)" @update:tilt-pitch="v => setTilt(tiltRoll, v)"
                            @close="showSettings = false" />
         </template>
@@ -86,6 +86,8 @@ import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
 import { createFrameRetry } from './framing';
+import { upAxisQuaternion } from './upAxis';
+import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSettings';
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
@@ -93,7 +95,7 @@ import { useSplatCameras } from './useSplatCameras';
 
 defineOptions({ name: 'SplatViewer' });
 
-const { entry, dataset, canWrite, loading, error, entryLoaded } = useViewerEntry({
+const { entry, dataset, ddbURI, canWrite, loading, error, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.GAUSSIAN_SPLAT], typeLabel: 'a Gaussian Splat', title: 'Gaussian Splat'
 });
 const notify = useNotify();
@@ -107,19 +109,21 @@ const progress = ref(null);
 const showSettings = ref(false);
 const showCameraManager = ref(false);
 const streaming = ref(false);
-// Most INRIA/3DGS scenes render upside down without the flip
-const flipped = ref(true);
-const pointScale = ref(1.0);
+// The view settings start at the defaults (most INRIA/3DGS scenes render upside down without the
+// half turn of the -y axis); loadSplat sets what this device remembers for the entry, and the
+// orientation saved in the sidecar replaces that
+const upAxis = ref(VIEW_DEFAULTS.upAxis);
+const pointScale = ref(VIEW_DEFAULTS.pointScale);
 // Ground-plane calibration (degrees), saved with the cameras: levels off-gravity reconstructions
-const tiltRoll = ref(0);
-const tiltPitch = ref(0);
+const tiltRoll = ref(VIEW_DEFAULTS.tiltRoll);
+const tiltPitch = ref(VIEW_DEFAULTS.tiltPitch);
 const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const navMode = usePreference(PREF.SPLAT_NAV_MODE, PREF_DEFAULTS[PREF.SPLAT_NAV_MODE]);
 const pressed = reactive(Object.fromEntries(MOVE_KEYS.map(k => [k, false])));
 const presentationMode = ref(null);
 const cams = useSplatCameras({
     dataset, entry, canWrite, notify, confirm: useConfirm(dialogs), getRig: () => rig,
-    orientation: { flipped, tiltRoll, tiltPitch }
+    orientation: { upAxis, tiltRoll, tiltPitch }
 });
 const { cameras, activeIndex: activeCameraIndex, dirty: camerasDirty } = cams;
 const { add: addCurrentCamera, update: updateCameraToCurrent, remove: deleteCamera, move: moveCamera, rename: renameCamera, save: saveCameras } = cams;
@@ -157,8 +161,8 @@ function onUserInteract() {
 // ---- Scene ------------------------------------------------------------------------------
 
 function applyOrientation() {
-    // 180° about X, or none
-    if (splatMesh) splatMesh.quaternion.set(flipped.value ? 1 : 0, 0, 0, flipped.value ? 0 : 1);
+    // The turn that lays the chosen axis of the splat along world up
+    if (splatMesh) splatMesh.quaternion.set(...upAxisQuaternion(upAxis.value));
 }
 
 /**
@@ -226,6 +230,13 @@ async function loadSplat() {
     const spzUrl = radUrl ? null : splatEntry.getGsplat();
     streaming.value = !!radUrl;
 
+    // What this device remembers for the entry (the sidecar, read next, takes precedence)
+    const remembered = openingViewSettings(viewSettingsStore.get(ddbURI.value));
+    upAxis.value = remembered.upAxis;
+    pointScale.value = remembered.pointScale;
+    tiltRoll.value = remembered.tiltRoll;
+    tiltPitch.value = remembered.tiltPitch;
+
     // None of the three needs another
     const [boundsData, , libraries] = await Promise.all([splatEntry.getGsplatBounds(), cams.load(), importLibraries()]);
     if (unmounted) return;
@@ -278,15 +289,28 @@ async function loadSplat() {
 
 // ---- Settings ---------------------------------------------------------------------------
 
-function setFlipped(value) {
-    flipped.value = value;
+// A change is remembered for the entry on this device (what a user who cannot save the sidecar has)
+// and marks the sidecar out of date (for one who can)
+function remember(changes) {
+    viewSettingsStore.set(ddbURI.value, changes);
+}
+
+function setUpAxis(value) {
+    upAxis.value = value;
     applyOrientation();
+    // The scene turned about its own origin: frame it again, so the view is not left beside it
+    if (splatMesh) {
+        presentation.stop();
+        frameCamera();
+    }
     camerasDirty.value = true;
+    remember({ upAxis: value });
 }
 
 function setPointScale(value) {
     pointScale.value = value;
     if (pointSize) pointSize.set(value, splatMesh);
+    remember({ pointScale: value });
 }
 
 // Re-levels the current view on the new scene up
@@ -294,6 +318,7 @@ function setTilt(roll, pitch) {
     tiltRoll.value = roll;
     tiltPitch.value = pitch;
     camerasDirty.value = true;
+    remember({ tiltRoll: roll, tiltPitch: pitch });
     if (!rig) return;
     presentation.stop();
     rig.setTilt(roll, pitch);

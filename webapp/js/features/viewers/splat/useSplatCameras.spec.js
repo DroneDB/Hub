@@ -8,7 +8,7 @@ const rig = {
 };
 const SAVED = JSON.stringify({
     version: 1,
-    orientation: { flipped: false, tiltRoll: 3, tiltPitch: -2 },
+    orientation: { upAxis: '+z', flipped: false, tiltRoll: 3, tiltPitch: -2 },
     cameras: [{ id: 1, name: 'Front', position: [0, 0, 5], quaternion: [0, 0, 0, 1], fov: 50, target: null }]
 });
 
@@ -30,7 +30,7 @@ beforeEach(() => {
     notify = { success: vi.fn(), warn: vi.fn(), error: vi.fn() };
     confirm = vi.fn().mockResolvedValue(true);
     canWrite = ref(true);
-    orientation = { flipped: ref(true), tiltRoll: ref(0), tiltPitch: ref(0) };
+    orientation = { upAxis: ref('-y'), tiltRoll: ref(0), tiltPitch: ref(0) };
 });
 
 describe('loading the sidecar', () => {
@@ -39,7 +39,7 @@ describe('loading the sidecar', () => {
         await cams.load();
         expect(dataset.getFileContents).toHaveBeenCalledWith('scenes/site_cameras.json');
         expect(cams.cameras.value.map(c => c.name)).toEqual(['Front']);
-        expect([orientation.flipped.value, orientation.tiltRoll.value, orientation.tiltPitch.value]).toEqual([false, 3, -2]);
+        expect([orientation.upAxis.value, orientation.tiltRoll.value, orientation.tiltPitch.value]).toEqual(['+z', 3, -2]);
         expect(cams.unreadable.value).toBe(false);
         expect(notify.warn).not.toHaveBeenCalled();
     });
@@ -51,7 +51,7 @@ describe('loading the sidecar', () => {
         expect(cams.cameras.value).toEqual([]);
         expect(cams.unreadable.value).toBe(false);
         expect(notify.warn).not.toHaveBeenCalled();
-        expect(orientation.flipped.value).toBe(true);
+        expect(orientation.upAxis.value).toBe('-y');
     });
 
     it('warns about a sidecar that does not parse, and keeps the orientation as it was', async () => {
@@ -62,7 +62,27 @@ describe('loading the sidecar', () => {
         expect(cams.unreadable.value).toBe(true);
         expect(notify.warn).toHaveBeenCalledTimes(1);
         expect(notify.warn.mock.calls[0][0]).toMatch(/could not be read/);
-        expect(orientation.flipped.value).toBe(true);
+        expect(orientation.upAxis.value).toBe('-y');
+    });
+});
+
+describe('precedence of the sidecar over what is remembered', () => {
+    it('replaces the fields it has and leaves the others as the viewer set them', async () => {
+        // An old sidecar: a flip and one tilt angle only
+        dataset.getFileContents.mockResolvedValue(JSON.stringify({ orientation: { flipped: false, tiltRoll: 7 }, cameras: [] }));
+        orientation.upAxis.value = '-z';
+        orientation.tiltRoll.value = 20;
+        orientation.tiltPitch.value = -12;
+        await make().load();
+        expect([orientation.upAxis.value, orientation.tiltRoll.value, orientation.tiltPitch.value]).toEqual(['+y', 7, -12]);
+    });
+
+    it('leaves what is remembered when the sidecar has no orientation', async () => {
+        dataset.getFileContents.mockResolvedValue(JSON.stringify([{ position: [0, 0, 1] }]));
+        orientation.upAxis.value = '+x';
+        orientation.tiltPitch.value = 4;
+        await make().load();
+        expect([orientation.upAxis.value, orientation.tiltRoll.value, orientation.tiltPitch.value]).toEqual(['+x', 0, 4]);
     });
 });
 
@@ -77,7 +97,7 @@ describe('saving', () => {
         expect(await cams.save()).toBe(true);
         const [path, content] = dataset.writeObj.mock.calls[0];
         expect(path).toBe('scenes/site_cameras.json');
-        expect(JSON.parse(content)).toMatchObject({ orientation: { flipped: false, tiltRoll: 3, tiltPitch: -2 } });
+        expect(JSON.parse(content)).toMatchObject({ orientation: { upAxis: '+z', flipped: false, tiltRoll: 3, tiltPitch: -2 } });
         expect(JSON.parse(content).cameras).toHaveLength(2);
         expect(cams.dirty.value).toBe(false);
         expect(notify.success).toHaveBeenCalledWith({ summary: 'Camera views saved' });

@@ -50,14 +50,23 @@ export class CameraRig {
     }
 
     /**
-     * Scene up from the calibration angles (degrees). OrbitControls bakes the camera's up into a
-     * rotation once, in its constructor (the same pitfall createNavControls documents), so the
-     * controls are rebuilt on the new up here; orbit, pan and zoom then follow the tilt.
+     * Scene up from any direction in world space (it is normalised). OrbitControls bakes the
+     * camera's up into a rotation once, in its constructor (the same pitfall createNavControls
+     * documents), so the controls are rebuilt on the new up here; orbit, pan and zoom then follow it.
+     * @param {{ x: number, y: number, z: number }} up
      */
-    setTilt(rollDeg, pitchDeg) {
-        this.sceneUp.copy(tiltUp(this.THREE, rollDeg, pitchDeg));
+    setUp(up) {
+        this.sceneUp.set(up.x, up.y, up.z);
+        // A zero vector has no direction: fall back to world up rather than NaN everywhere
+        if (this.sceneUp.lengthSq() < 1e-12) this.sceneUp.set(0, 1, 0);
+        this.sceneUp.normalize();
         this.camera.up.copy(this.sceneUp);
         this.rebuildControlsUp();
+    }
+
+    /** Scene up from the calibration angles (degrees): `setUp` on the tilted world up. */
+    setTilt(rollDeg, pitchDeg) {
+        this.setUp(tiltUp(this.THREE, rollDeg, pitchDeg));
     }
 
     /** Makes OrbitControls use camera.up as it is now (a no-op for controls that keep no such rotation). */

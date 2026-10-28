@@ -13,15 +13,43 @@ describe('camera presets', () => {
         expect(bare.cameras[0]).toMatchObject({ id: 0, name: 'Camera 1', quaternion: [0, 0, 0, 1], fov: 60, target: null });
         const full = parseCamerasFile(JSON.stringify({ cameras: [{ position: ['1', 2, 3], fov: 40 }], orientation: { flipped: false, tiltRoll: 2 } }));
         expect(full.cameras[0].position).toEqual([1, 2, 3]);
-        expect(full.orientation).toEqual({ flipped: false, tiltRoll: 2 });
+        // A sidecar saved before the axis could be chosen holds the flipped flag only
+        expect(full.orientation).toEqual({ upAxis: '+y', tiltRoll: 2 });
     });
 
     it('round-trip through the sidecar', () => {
         const cams = [normalizeCamera({ id: 'a', name: 'Door', position: [0, 1, 2], target: [0, 0, 0] }, 0)];
-        const text = serializeCamerasFile(cams, { flipped: true, tiltRoll: 0, tiltPitch: 1.5 });
+        const text = serializeCamerasFile(cams, { upAxis: '-y', tiltRoll: 0, tiltPitch: 1.5 });
         const back = parseCamerasFile(text);
         expect(back.cameras).toEqual(cams);
-        expect(back.orientation).toEqual({ flipped: true, tiltRoll: 0, tiltPitch: 1.5 });
+        expect(back.orientation).toEqual({ upAxis: '-y', tiltRoll: 0, tiltPitch: 1.5 });
+    });
+
+    describe('orientation', () => {
+        const orientationOf = orientation => parseCamerasFile(JSON.stringify({ cameras: [], orientation })).orientation;
+
+        it('reads the flipped flag of a sidecar saved before the up axis could be chosen', () => {
+            expect(orientationOf({ flipped: true, tiltRoll: 1, tiltPitch: 2 })).toEqual({ upAxis: '-y', tiltRoll: 1, tiltPitch: 2 });
+            expect(orientationOf({ flipped: false })).toEqual({ upAxis: '+y' });
+        });
+
+        it('reads the up axis, which wins over a flipped flag that disagrees', () => {
+            expect(orientationOf({ upAxis: '+z', flipped: false })).toEqual({ upAxis: '+z' });
+            expect(orientationOf({ upAxis: '+y', flipped: true })).toEqual({ upAxis: '+y' });
+        });
+
+        it('leaves an unknown axis and a missing orientation out', () => {
+            expect(orientationOf({ upAxis: 'sideways' })).toEqual({});
+            expect(orientationOf(undefined)).toEqual({});
+            expect(parseCamerasFile('[]').orientation).toEqual({});
+        });
+
+        it('is written with the up axis and the flipped flag that older versions read', () => {
+            const written = axis => JSON.parse(serializeCamerasFile([], { upAxis: axis, tiltRoll: 0, tiltPitch: 0 })).orientation;
+            expect(written('-y')).toEqual({ upAxis: '-y', flipped: true, tiltRoll: 0, tiltPitch: 0 });
+            expect(written('+y')).toMatchObject({ upAxis: '+y', flipped: false });
+            expect(written('+z')).toMatchObject({ upAxis: '+z', flipped: false });
+        });
     });
 
     it('keep the active camera when the list changes', () => {

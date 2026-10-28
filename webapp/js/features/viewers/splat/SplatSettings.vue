@@ -1,23 +1,21 @@
 <template>
     <div class="splat-settings">
         <div class="form-group">
-            <label class="checkbox-row">
-                <input v-model="flipped" type="checkbox">
-                <span>Flip up axis</span>
-            </label>
-            <small>Toggle if the scene appears upside down.</small>
+            <label :id="`${upAxisId}-label`" :for="upAxisId">Up axis</label>
+            <Select v-model="upAxis" :input-id="upAxisId" :aria-labelledby="`${upAxisId}-label`" :options="UP_AXES" option-label="label" option-value="id" class="up-axis-select" />
+            <small>The axis of the scene that points up. Change it if the scene appears upside down or on its side.</small>
         </div>
 
-        <RangeSetting v-model="pointScale" label="Point size" :min="0.25" :max="3" :step="0.05" :format="v => `${v.toFixed(2)}x`" />
+        <RangeSetting v-model="pointScale" label="Point size" :min="POINT_SCALE_RANGE.min" :max="POINT_SCALE_RANGE.max" :step="0.05" :format="v => `${v.toFixed(2)}x`" />
 
         <div class="form-group">
             <div class="calib-header">
                 <span>Ground plane calibration</span>
                 <button type="button" class="calib-reset" @click="tiltRoll = 0; tiltPitch = 0">Reset</button>
             </div>
-            <small>Drag until vertical lines (walls, doors) look vertical.</small>
-            <RangeSetting v-model="tiltRoll" label="Roll" :min="-45" :max="45" :step="0.5" :format="degrees" />
-            <RangeSetting v-model="tiltPitch" label="Pitch" :min="-45" :max="45" :step="0.5" :format="degrees" />
+            <small>A fine adjustment on top of the up axis: drag until vertical lines (walls, doors) look vertical.</small>
+            <RangeSetting v-model="tiltRoll" label="Roll" :min="-TILT_LIMIT" :max="TILT_LIMIT" :step="0.5" :format="degrees" />
+            <RangeSetting v-model="tiltPitch" label="Pitch" :min="-TILT_LIMIT" :max="TILT_LIMIT" :step="0.5" :format="degrees" />
         </div>
 
         <div class="settings-actions">
@@ -28,16 +26,21 @@
 
 <script setup>
 /**
- * View settings of the splat viewer: up-axis flip, point size, ground-plane calibration.
+ * View settings of the splat viewer: up axis, point size, ground-plane calibration.
  */
+import { useId } from 'vue';
 import Button from 'primevue/button';
+import Select from 'primevue/select';
 import RangeSetting from '@/components/RangeSetting.vue';
+import { UP_AXES } from './upAxis';
+import { POINT_SCALE_RANGE, TILT_LIMIT } from './viewSettings';
 
-const flipped = defineModel('flipped', { type: Boolean, required: true });
+const upAxis = defineModel('upAxis', { type: String, required: true });
 const pointScale = defineModel('pointScale', { type: Number, required: true });
 const tiltRoll = defineModel('tiltRoll', { type: Number, required: true });
 const tiltPitch = defineModel('tiltPitch', { type: Number, required: true });
 const emit = defineEmits(['close']);
+const upAxisId = useId();
 const degrees = v => `${v.toFixed(1)}°`;
 </script>
 
@@ -53,11 +56,15 @@ const degrees = v => `${v.toFixed(1)}°`;
     margin-bottom: var(--ddb-spacing-md);
 }
 
-.checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
+.form-group > label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--ddb-viewer-label-color);
+}
+
+.up-axis-select {
+    width: 100%;
 }
 
 small {

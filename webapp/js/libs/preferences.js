@@ -22,6 +22,7 @@ export const PREF = Object.freeze({
     TABLE_EXPANDED_GRID: 'tableExpandedGrid',
     SORT_DESCENDING: 'sortDescending',
     SPLAT_NAV_MODE: 'ddb.splat.navMode',
+    SPLAT_VIEW_SETTINGS: 'ddb.splat.viewSettings', // [[remote URI, { upAxis, tiltRoll, tiltPitch, pointScale }], ...] of the splats opened, oldest first; device only (a list that grows with use)
     DATASET_TABLE: 'dataset_table_prefs',
     OPEN_AFTER_CREATE: 'open_dataset_after_create',
     ORG_PAGE: 'org_page_prefs',

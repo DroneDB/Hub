@@ -1,8 +1,9 @@
 /**
  * Saved camera views of a splat: the `<name>_cameras.json`
- * sidecar next to the splat, with the cameras and the scene orientation (flip and
+ * sidecar next to the splat, with the cameras and the scene orientation (up axis and
  * ground-plane calibration).
  */
+import { upAxisOfOrientation, isFlippedAxis } from './upAxis';
 
 /** Sidecar path of a splat entry. */
 export const camerasPathFor = entryPath => `${entryPath.replace(/\.[^./\\]+$/, '')}_cameras.json`;
@@ -28,26 +29,34 @@ export function normalizeCamera(c, i) {
 }
 
 /**
- * Reads a sidecar (a bare array of cameras, or { cameras, orientation }).
+ * Reads a sidecar (a bare array of cameras, or { cameras, orientation }). The orientation holds
+ * the fields the file has: `upAxis` (from its `upAxis`, else from the `flipped` flag of files
+ * saved before the axis could be chosen), `tiltRoll` and `tiltPitch`.
  * @param {string} text
- * @returns {{ cameras: any[], orientation: { flipped?: boolean, tiltRoll?: number, tiltPitch?: number } }}
+ * @returns {{ cameras: any[], orientation: { upAxis?: import('./upAxis').UpAxis, tiltRoll?: number, tiltPitch?: number } }}
  */
 export function parseCamerasFile(text) {
     const data = JSON.parse(text);
     const list = Array.isArray(data) ? data : (data && Array.isArray(data.cameras) ? data.cameras : []);
     const o = (data && data.orientation) || {};
     const orientation = {};
-    if (typeof o.flipped === 'boolean') orientation.flipped = o.flipped;
+    const upAxis = upAxisOfOrientation(o);
+    if (upAxis !== undefined) orientation.upAxis = upAxis;
     if (typeof o.tiltRoll === 'number') orientation.tiltRoll = o.tiltRoll;
     if (typeof o.tiltPitch === 'number') orientation.tiltPitch = o.tiltPitch;
     return { cameras: list.map(normalizeCamera).filter(Boolean), orientation };
 }
 
-/** The sidecar's JSON. */
+/**
+ * The sidecar's JSON. The orientation is written with `upAxis` and, next to it, the `flipped`
+ * flag older versions of the viewer read (true for the -y half turn).
+ * @param {any[]} cameras
+ * @param {{ upAxis: string, tiltRoll: number, tiltPitch: number }} orientation
+ */
 export function serializeCamerasFile(cameras, orientation) {
     return JSON.stringify({
         version: 1,
-        orientation: { flipped: orientation.flipped, tiltRoll: orientation.tiltRoll, tiltPitch: orientation.tiltPitch },
+        orientation: { upAxis: orientation.upAxis, flipped: isFlippedAxis(orientation.upAxis), tiltRoll: orientation.tiltRoll, tiltPitch: orientation.tiltPitch },
         cameras: cameras.map(({ id, name, position, quaternion, fov, target }) => ({ id, name, position, quaternion, fov, target }))
     }, null, 2);
 }

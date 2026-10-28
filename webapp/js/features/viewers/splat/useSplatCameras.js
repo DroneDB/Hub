@@ -7,6 +7,9 @@
  *   await cams.load();                       // before the scene is built: the orientation it reads is applied
  *   cams.cameras.value, cams.activeIndex.value, cams.dirty.value, cams.add() / update(i) / remove(i) / move({ index, dir }) / rename({ index, name }) / save()
  *
+ * The orientation refs hold what the viewer remembers for the entry when load() runs; a field the
+ * sidecar has replaces it (the sidecar wins), a field it lacks leaves it.
+ *
  * A sidecar that cannot be read is not the same as none: it is reported, and saving, which would
  * replace it, asks first.
  */
@@ -21,7 +24,7 @@ import { camerasPathFor, parseCamerasFile, serializeCamerasFile, cameraFromRig, 
  * @param {{ success: Function, warn: Function, error: Function }} options.notify
  * @param {(options: { title: string, message: string, confirmText: string, danger: boolean }) => Promise<boolean>} options.confirm
  * @param {() => any} options.getRig                  the camera rig (null before the scene exists)
- * @param {{ flipped: { value: boolean }, tiltRoll: { value: number }, tiltPitch: { value: number } }} options.orientation
+ * @param {{ upAxis: { value: string }, tiltRoll: { value: number }, tiltPitch: { value: number } }} options.orientation
  *   the orientation refs of the viewer: set by load(), written by save()
  */
 export function useSplatCameras({ dataset, entry, canWrite, notify, confirm, getRig, orientation }) {
@@ -46,7 +49,7 @@ export function useSplatCameras({ dataset, entry, canWrite, notify, confirm, get
         try {
             const parsed = parseCamerasFile(text);
             cameras.value = parsed.cameras;
-            if (parsed.orientation.flipped !== undefined) orientation.flipped.value = parsed.orientation.flipped;
+            if (parsed.orientation.upAxis !== undefined) orientation.upAxis.value = parsed.orientation.upAxis;
             if (parsed.orientation.tiltRoll !== undefined) orientation.tiltRoll.value = parsed.orientation.tiltRoll;
             if (parsed.orientation.tiltPitch !== undefined) orientation.tiltPitch.value = parsed.orientation.tiltPitch;
         } catch (e) {
@@ -112,7 +115,7 @@ export function useSplatCameras({ dataset, entry, canWrite, notify, confirm, get
         }
         try {
             await dataset.value.writeObj(path, serializeCamerasFile(cameras.value, {
-                flipped: orientation.flipped.value, tiltRoll: orientation.tiltRoll.value, tiltPitch: orientation.tiltPitch.value
+                upAxis: orientation.upAxis.value, tiltRoll: orientation.tiltRoll.value, tiltPitch: orientation.tiltPitch.value
             }));
         } catch (e) {
             notify.error(`Failed to save camera views: ${e instanceof Error ? e.message : e}`, { summary: 'Camera views' });

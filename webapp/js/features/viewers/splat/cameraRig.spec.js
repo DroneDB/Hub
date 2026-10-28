@@ -85,7 +85,61 @@ describe('yaw and pitch', () => {
     });
 });
 
+describe('setUp', () => {
+    it('normalises the direction and gives it to the camera and the scene', () => {
+        const { rig, camera } = makeRig();
+        rig.setUp(new THREE.Vector3(0, 0, 5));
+        expect(rig.sceneUp.distanceTo(new THREE.Vector3(0, 0, 1))).toBeLessThan(1e-12);
+        expect(camera.up.distanceTo(rig.sceneUp)).toBe(0);
+    });
+
+    it('makes OrbitControls turn about any up, not only a tilt of world Y', () => {
+        for (const up of [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 2, 3)]) {
+            const { rig, camera, controls } = makeRig();
+            up.normalize();
+            // A start off the axis and the target; the height along the up is kept while it orbits
+            camera.position.set(3, -2, 1).projectOnPlane(up).addScaledVector(up, 1.5);
+            controls.target.set(0, 0, 0);
+            rig.setUp(up);
+            controls.autoRotate = true;
+            controls.update();
+            const height = camera.position.dot(up);
+            const radius = camera.position.clone().addScaledVector(up, -height).length();
+            const before = camera.position.clone();
+            for (let i = 0; i < 20; i++) controls.update();
+            expect(camera.position.dot(up)).toBeCloseTo(height, 6);
+            expect(camera.position.clone().addScaledVector(up, -camera.position.dot(up)).length()).toBeCloseTo(radius, 6);
+            expect(camera.position.distanceTo(before)).toBeGreaterThan(0.05);
+        }
+    });
+
+    it('frames and looks level about the new up', () => {
+        const { rig, camera } = makeRig();
+        rig.setUp(new THREE.Vector3(1, 0, 0));
+        rig.frame(unitBox, identity);
+        rig.yaw = 0.8;
+        rig.pitch = 0.2;
+        rig.applyYawPitch();
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+        expect(Math.abs(right.dot(rig.sceneUp))).toBeLessThan(1e-9);
+    });
+
+    it('falls back to world up for a direction of no length', () => {
+        const { rig, camera } = makeRig();
+        rig.setUp(new THREE.Vector3(0, 0, 1));
+        rig.setUp(new THREE.Vector3(0, 0, 0));
+        expect(rig.sceneUp.toArray()).toEqual([0, 1, 0]);
+        expect(camera.up.toArray()).toEqual([0, 1, 0]);
+    });
+});
+
 describe('setTilt', () => {
+    it('is setUp on the tilted world up', () => {
+        const { rig } = makeRig();
+        rig.setTilt(20, -35);
+        expect(rig.sceneUp.distanceTo(tiltUp(THREE, 20, -35))).toBeLessThan(1e-12);
+    });
+
     it('makes OrbitControls turn about the tilted up (it baked world Y in when it was built)', () => {
         const { rig, camera, controls } = makeRig();
         camera.position.set(5, 0, 0);
