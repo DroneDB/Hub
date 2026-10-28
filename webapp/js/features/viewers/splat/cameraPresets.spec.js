@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove } from './cameraPresets';
+import { SIDECAR_VERSION, camerasPathFor, parseCamerasFile, serializeCamerasFile, normalizeCamera, activeAfterDelete, activeAfterMove } from './cameraPresets';
 
 describe('camera presets', () => {
     it('sit next to the splat', () => {
@@ -55,6 +55,55 @@ describe('camera presets', () => {
             const text = serializeCamerasFile([], { upAxis: 'auto', tiltRoll: 1, tiltPitch: 2 });
             expect(JSON.parse(text).orientation).toEqual({ upAxis: 'auto', tiltRoll: 1, tiltPitch: 2 });
             expect(parseCamerasFile(text).orientation).toEqual({ upAxis: 'auto', tiltRoll: 1, tiltPitch: 2 });
+        });
+    });
+
+    describe('version 2', () => {
+        const pin = { id: 1, title: 'Gate', text: 'Open', link: 'https://example.com', image: 'a/b.jpg', position: [1, 2, 3], view: { position: [0, 0, 5], quaternion: [0, 0, 0, 1], fov: 45, target: [1, 2, 3] } };
+        const extras = {
+            scale: { metersPerUnit: 0.5 }, annotations: [pin], measurements: [{ id: 2, kind: 'area', points: [[0, 0, 0], [1, 0, 0], [1, 1, 0]] }]
+        };
+
+        it('is written with its version, the scale, the pins and the measurements', () => {
+            const written = JSON.parse(serializeCamerasFile([], { upAxis: '+z', tiltRoll: 0, tiltPitch: 0 }, extras));
+            expect(written.version).toBe(SIDECAR_VERSION);
+            expect(SIDECAR_VERSION).toBe(2);
+            expect(written).toMatchObject({ scale: { metersPerUnit: 0.5 }, annotations: [pin], measurements: extras.measurements });
+        });
+
+        it('round trips, the vector "auto" resolved to included', () => {
+            const text = serializeCamerasFile([], { upAxis: 'auto', up: [0, 0, 1], tiltRoll: 1, tiltPitch: 2 }, extras);
+            expect(parseCamerasFile(text)).toEqual({
+                cameras: [], orientation: { upAxis: 'auto', up: [0, 0, 1], tiltRoll: 1, tiltPitch: 2 },
+                scale: { metersPerUnit: 0.5 }, annotations: [pin], measurements: extras.measurements
+            });
+        });
+
+        it('keeps the vector out of the file for an axis, where it would mean nothing', () => {
+            const text = serializeCamerasFile([], { upAxis: '-y', up: [0, 0, 1], tiltRoll: 0, tiltPitch: 0 });
+            expect(JSON.parse(text).orientation.up).toBeUndefined();
+        });
+
+        it('is read from version 1, which has none of it, and from the first layout', () => {
+            const v1 = parseCamerasFile(JSON.stringify({ version: 1, orientation: { upAxis: '+z' }, cameras: [{ position: [0, 0, 1] }] }));
+            expect(v1).toMatchObject({ scale: null, annotations: [], measurements: [] });
+            expect(v1.cameras).toHaveLength(1);
+            expect(parseCamerasFile('[]')).toMatchObject({ scale: null, annotations: [], measurements: [] });
+            expect(parseCamerasFile('null')).toMatchObject({ cameras: [], scale: null, annotations: [], measurements: [] });
+        });
+
+        it('drops what cannot be used and keeps the rest', () => {
+            const parsed = parseCamerasFile(JSON.stringify({
+                orientation: { upAxis: 'auto', up: [0, 0, 0] },
+                scale: { metersPerUnit: -1 },
+                annotations: [{ title: 'no position' }, { position: [1, 2, 3], link: 'javascript:alert(1)', image: '../secret.jpg' }, 'x'],
+                measurements: [{ kind: 'volume', points: [[0, 0, 0]] }, { kind: 'distance', points: [[0, 0, 0]] }, { kind: 'point', points: [[1, 2, 3]] }]
+            }));
+            expect(parsed.scale).toBeNull();
+            expect(parsed.orientation.up).toBeUndefined();
+            expect(parsed.annotations).toHaveLength(1);
+            expect(parsed.annotations[0]).toMatchObject({ link: '', image: '', view: null, text: '' });
+            expect(parsed.measurements).toEqual([{ id: 2, kind: 'point', points: [[1, 2, 3]] }]);
         });
     });
 

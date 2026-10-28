@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import {
     UP_AXES, DEFAULT_UP_AXIS, AUTO_UP, MIN_UP_CONFIDENCE, isUpAxis, isUpChoice, upAxisVector, upAxisQuaternion, upAxisOfOrientation, isFlippedAxis,
-    estimatedUp, upChoices, openingUpChoice, quaternionToWorldUp, upChoiceQuaternion
+    estimatedUp, resolvedAutoUp, upChoices, openingUpChoice, quaternionToWorldUp, upChoiceQuaternion
 } from './upAxis';
 
 describe('up axes', () => {
@@ -128,6 +128,29 @@ describe('upChoices', () => {
     });
 });
 
+describe('resolvedAutoUp', () => {
+    it('is the up the views file saved for "auto", normalised, over the build\'s estimate', () => {
+        const saved = resolvedAutoUp(GROUND, [0, 0, 2]);
+        expect(saved.up).toEqual([0, 0, 1]);
+        expect(saved.source).toBe('saved');
+        // The label still says where the estimate came from, so the select does not change
+        expect(saved.label).toBe(estimatedUp(GROUND).label);
+    });
+
+    it('is the estimate when the file saved no usable vector', () => {
+        expect(resolvedAutoUp(GROUND, undefined)).toEqual(estimatedUp(GROUND));
+        expect(resolvedAutoUp(GROUND, [0, 0, 0])).toEqual(estimatedUp(GROUND));
+        expect(resolvedAutoUp(GROUND, [0, 1])).toEqual(estimatedUp(GROUND));
+        expect(resolvedAutoUp(GROUND, [0, 1, NaN])).toEqual(estimatedUp(GROUND));
+        expect(resolvedAutoUp(null, null)).toBeNull();
+    });
+
+    it('lets a saved vector stand when a rebuild lost the estimate', () => {
+        expect(resolvedAutoUp(null, [1, 0, 0])).toMatchObject({ up: [1, 0, 0], source: 'saved' });
+        expect(openingUpChoice({ saved: 'auto', savedUp: [1, 0, 0], bounds: null })).toBe('auto');
+    });
+});
+
 describe('openingUpChoice', () => {
     const bounds = GROUND;
 
@@ -199,15 +222,15 @@ describe('the turn for an arbitrary up', () => {
     });
 
     it('chooses the turn by the choice: the table for an axis, the estimate for auto', () => {
-        expect(upChoiceQuaternion('+z', GROUND)).toEqual(upAxisQuaternion('+z'));
+        expect(upChoiceQuaternion('+z', estimatedUp(GROUND))).toEqual(upAxisQuaternion('+z'));
         expect(upChoiceQuaternion('-y', null)).toEqual([1, 0, 0, 0]);
         const tilted = { ...GROUND, up: [0, 0.6, 0.8] };
-        const q = upChoiceQuaternion('auto', tilted);
+        const q = upChoiceQuaternion('auto', estimatedUp(tilted));
         expect(turned(q, [0, 0.6, 0.8]).distanceTo(new THREE.Vector3(0, 1, 0))).toBeLessThan(1e-12);
     });
 
     it('falls back to the default turn when "auto" has no confident estimate', () => {
         expect(upChoiceQuaternion('auto', null)).toEqual(upAxisQuaternion('+y'));
-        expect(upChoiceQuaternion('auto', { ...GROUND, upConfidence: 0.2 })).toEqual(upAxisQuaternion('+y'));
+        expect(upChoiceQuaternion('auto', estimatedUp({ ...GROUND, upConfidence: 0.2 }))).toEqual(upAxisQuaternion('+y'));
     });
 });

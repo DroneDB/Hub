@@ -86,12 +86,12 @@ import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
 import { createFrameRetry } from './framing';
-import { upChoiceQuaternion, estimatedUp, openingUpChoice } from './upAxis';
+import { upChoiceQuaternion, resolvedAutoUp, openingUpChoice } from './upAxis';
 import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSettings';
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
-import { useSplatCameras } from './useSplatCameras';
+import { useSplatScene } from './useSplatScene';
 
 defineOptions({ name: 'SplatViewer' });
 
@@ -115,7 +115,8 @@ const streaming = ref(false);
 // (null) until the sidecar was read, because what the sidecar says, what the device remembers
 // and the up the build estimated are told apart to choose between them (openingUpChoice)
 const upAxis = ref(/** @type {string | null} */ (VIEW_DEFAULTS.upAxis));
-// The up the build estimated when it is confident (the "Auto" choice of the Up axis select), else null
+// The up the "Auto" choice of the Up axis select follows (the one saved with the views, else the build's
+// estimate when it is confident), else null
 const autoUp = shallowRef(null);
 const pointScale = ref(VIEW_DEFAULTS.pointScale);
 // Ground-plane calibration (degrees), saved with the cameras: levels off-gravity reconstructions
@@ -125,12 +126,12 @@ const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 const navMode = usePreference(PREF.SPLAT_NAV_MODE, PREF_DEFAULTS[PREF.SPLAT_NAV_MODE]);
 const pressed = reactive(Object.fromEntries(MOVE_KEYS.map(k => [k, false])));
 const presentationMode = ref(null);
-const cams = useSplatCameras({
+const views = useSplatScene({
     dataset, entry, canWrite, notify, confirm: useConfirm(dialogs), getRig: () => rig,
-    orientation: { upAxis, tiltRoll, tiltPitch }
+    orientation: { upAxis, tiltRoll, tiltPitch, autoUp }
 });
-const { cameras, activeIndex: activeCameraIndex, dirty: camerasDirty } = cams;
-const { add: addCurrentCamera, update: updateCameraToCurrent, remove: deleteCamera, move: moveCamera, rename: renameCamera, save: saveCameras } = cams;
+const { cameras, activeIndex: activeCameraIndex, dirty: camerasDirty } = views;
+const { add: addCurrentCamera, update: updateCameraToCurrent, remove: deleteCamera, move: moveCamera, rename: renameCamera, save: saveCameras } = views;
 const activeCameraName = computed(() => {
     const i = activeCameraIndex.value;
     const c = i === null ? null : cameras.value[i];
@@ -166,7 +167,7 @@ function onUserInteract() {
 
 function applyOrientation() {
     // The turn that lays the chosen axis (or the estimated up) of the splat along world up
-    if (splatMesh) splatMesh.quaternion.set(...upChoiceQuaternion(upAxis.value, bounds));
+    if (splatMesh) splatMesh.quaternion.set(...upChoiceQuaternion(upAxis.value, autoUp.value));
 }
 
 /**
@@ -243,12 +244,12 @@ async function loadSplat() {
     tiltPitch.value = remembered.tiltPitch;
 
     // None of the three needs another
-    const [boundsData, , libraries] = await Promise.all([splatEntry.getGsplatBounds(), cams.load(), importLibraries()]);
+    const [boundsData, , libraries] = await Promise.all([splatEntry.getGsplatBounds(), views.load(), importLibraries()]);
     if (unmounted) return;
     bounds = boundsData;
-    autoUp.value = estimatedUp(bounds);
+    autoUp.value = resolvedAutoUp(bounds, views.savedUp.value);
     // The sidecar's up (the ref, if it had one), else the user's choice on this device, else the build's estimate
-    upAxis.value = openingUpChoice({ saved: upAxis.value ?? undefined, local: stored.upAxis, bounds });
+    upAxis.value = openingUpChoice({ saved: upAxis.value ?? undefined, savedUp: views.savedUp.value, local: stored.upAxis, bounds });
     THREE = libraries.THREE;
 
     // The tilt is known before the controls exist: they are built on the final up (and follow setTilt)

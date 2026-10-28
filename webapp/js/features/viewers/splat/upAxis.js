@@ -105,7 +105,27 @@ export function estimatedUp(bounds) {
 }
 
 /**
- * The choices of the Up axis select: "auto" first when the build estimated an up, then the axes.
+ * The up that "auto" follows: the one the views file saved when the choice was made (a unit
+ * vector of three finite numbers, normalised here), else the build's estimate. The saved vector wins
+ * so that the camera views saved with it stay right when a rebuild estimates another up.
+ * @param {any} bounds  the parsed bounds.json, or null
+ * @param {unknown} [savedUp]  the vector the views file holds for "auto", if any
+ * @returns {{ up: number[], source: string, label: string } | null}
+ */
+export function resolvedAutoUp(bounds, savedUp) {
+    const estimate = estimatedUp(bounds);
+    if (!Array.isArray(savedUp) || savedUp.length !== 3 || !savedUp.every(v => typeof v === 'number' && Number.isFinite(v))) return estimate;
+    const length = Math.hypot(savedUp[0], savedUp[1], savedUp[2]);
+    if (!(length > 1e-9)) return estimate;
+    return {
+        up: savedUp.map(v => v / length),
+        source: 'saved',
+        label: estimate ? estimate.label : 'Auto (saved with the views)'
+    };
+}
+
+/**
+ * The choices of the Up axis select: "auto" first when there is an up to follow, then the axes.
  * @param {{ label: string } | null} estimate
  */
 export const upChoices = estimate => (estimate ? [{ id: AUTO_UP, label: estimate.label }, ...UP_AXES] : [...UP_AXES]);
@@ -113,16 +133,18 @@ export const upChoices = estimate => (estimate ? [{ id: AUTO_UP, label: estimate
 /**
  * The choice the viewer opens with. Precedence: the orientation saved with the views, then what
  * the user chose on this device (a choice of the user beats an estimate), then the up the build
- * estimated, then the default. "auto" is only a choice while there is an estimate to follow (a
- * rebuild may have lost it), so without one it is skipped and the next source decides.
+ * estimated, then the default. "auto" is only a choice while there is an up to follow (a rebuild
+ * may have lost the estimate, unless the views saved the vector), so without one it is skipped
+ * and the next source decides.
  * @param {object} sources
  * @param {unknown} [sources.saved]   the up choice of the views file, if it has one
+ * @param {unknown} [sources.savedUp] the vector "auto" resolved to in the views file, if it has one
  * @param {unknown} [sources.local]   the up choice remembered on this device, if any
  * @param {any} [sources.bounds]      the parsed bounds.json, or null
  * @returns {UpChoice}
  */
-export function openingUpChoice({ saved, local, bounds } = {}) {
-    const estimate = estimatedUp(bounds);
+export function openingUpChoice({ saved, savedUp, local, bounds } = {}) {
+    const estimate = resolvedAutoUp(bounds, savedUp);
     const usable = /** @type {(c: unknown) => c is UpChoice} */ (c => isUpChoice(c) && (c !== AUTO_UP || !!estimate));
     return [saved, local].find(usable) ?? (estimate ? AUTO_UP : DEFAULT_UP_AXIS);
 }
@@ -148,12 +170,11 @@ export function quaternionToWorldUp([x, y, z]) {
 
 /**
  * The turn of the mesh for a choice: the table's for an axis (kept exact, saved views depend on it),
- * the estimate's for "auto".
+ * the up that "auto" follows for "auto" (no turn without one).
  * @param {string} choice
- * @param {any} bounds  the parsed bounds.json, or null
+ * @param {{ up: number[] } | null} autoUp  from resolvedAutoUp
  * @returns {number[]}
  */
-export function upChoiceQuaternion(choice, bounds) {
-    const estimate = choice === AUTO_UP ? estimatedUp(bounds) : null;
-    return estimate ? quaternionToWorldUp(estimate.up) : upAxisQuaternion(choice);
+export function upChoiceQuaternion(choice, autoUp) {
+    return choice === AUTO_UP && autoUp ? quaternionToWorldUp(autoUp.up) : upAxisQuaternion(choice);
 }
