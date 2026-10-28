@@ -14,7 +14,7 @@
  *   stage.start();                 // ...and stage.dispose() when the viewer goes away
  */
 import { watch } from 'vue';
-import { fitDistance } from '@/features/viewers/unified/sceneUtils';
+import { fitDistance, canvasNeedsResize } from '@/features/viewers/unified/sceneUtils';
 
 // Room around the unit sphere the model is scaled to (the mesh is not strictly inside it)
 const FIT_MARGIN = 1.25;
@@ -127,9 +127,7 @@ export function createModelStage({ THREE, ArcballControls, canvas, settings }) {
 
     function fitCanvas() {
         const el = renderer.domElement;
-        // The drawing buffer is the canvas size times the pixel ratio
-        const ratio = renderer.getPixelRatio();
-        if (el.width === Math.floor(el.clientWidth * ratio) && el.height === Math.floor(el.clientHeight * ratio)) return;
+        if (!canvasNeedsResize(el, renderer.getPixelRatio())) return;
         renderer.setSize(el.clientWidth, el.clientHeight, false);
         camera.aspect = el.clientWidth / el.clientHeight;
         camera.updateProjectionMatrix();

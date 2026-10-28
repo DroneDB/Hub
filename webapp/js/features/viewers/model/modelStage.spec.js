@@ -186,6 +186,17 @@ describe('render loop', () => {
         expect(stage.camera.position.z).toBeCloseTo(3 * tall / wide, 6);
     });
 
+    it('does not size the canvas again on every frame when the pixel ratio is not 1', () => {
+        vi.stubGlobal('devicePixelRatio', 2);
+        makeStage();
+        stage.start();
+        expect(stage.renderer.setSize).toHaveBeenCalledTimes(1);
+        expect(canvas.width).toBe(1600);
+        runFrame();
+        runFrame();
+        expect(stage.renderer.setSize).toHaveBeenCalledTimes(1);
+    });
+
     it('asks for one frame at a time, and starting twice does not double the loop', () => {
         makeStage();
         stage.start();

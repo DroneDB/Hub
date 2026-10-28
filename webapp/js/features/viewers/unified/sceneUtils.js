@@ -49,6 +49,20 @@ export function fitDistance(radius, fovDeg, aspect, margin = 1.1) {
     return margin * radius / Math.sin(Math.min(halfVertical, halfHorizontal));
 }
 
+/**
+ * Whether a canvas has to be resized to the size it has on the page. The drawing buffer is the
+ * page size times the pixel ratio, so that is what it is compared with (comparing it with the
+ * page size alone resizes the canvas on every frame on a screen with a ratio other than 1). A
+ * canvas with no size on the page (hidden) is left as it is.
+ * @param {{ width: number, height: number, clientWidth: number, clientHeight: number }} canvas
+ * @param {number} pixelRatio The ratio the renderer draws at (renderer.getPixelRatio())
+ */
+export function canvasNeedsResize(canvas, pixelRatio) {
+    if (!canvas.clientWidth || !canvas.clientHeight) return false;
+    return canvas.width !== Math.floor(canvas.clientWidth * pixelRatio)
+        || canvas.height !== Math.floor(canvas.clientHeight * pixelRatio);
+}
+
 /** Low to high elevation colours (blue, cyan, green, yellow, red). */
 export const ELEVATION_RAMP = [0x2c7bb6, 0x00a6ca, 0x00ccbc, 0x90eb9d, 0xffff8c, 0xf9d057, 0xf29e2e, 0xe76818, 0xd7191c];
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { geojsonBbox, isFiniteBox, measureFormatters, fitDistance } from './sceneUtils';
+import { geojsonBbox, isFiniteBox, measureFormatters, fitDistance, canvasNeedsResize } from './sceneUtils';
 
 describe('3D viewer helpers', () => {
     it('bounds a Feature or a bare geometry', () => {
@@ -34,5 +34,28 @@ describe('3D viewer helpers', () => {
         expect(1 / portrait).toBeCloseTo(Math.sin(Math.atan(Math.tan(Math.PI / 8) * 0.5)), 6);
         // Not measured yet: square, with the margin around
         expect(fitDistance(2, 45, 0, 1.5)).toBeCloseTo(3 / Math.sin(Math.PI / 8), 6);
+    });
+});
+
+describe('canvasNeedsResize', () => {
+    const canvas = (width, height, clientWidth, clientHeight) => ({ width, height, clientWidth, clientHeight });
+
+    it('compares the drawing buffer with the page size times the pixel ratio', () => {
+        // A buffer of twice the page size is the right one at a ratio of 2: no resize on every frame
+        expect(canvasNeedsResize(canvas(1600, 800, 800, 400), 2)).toBe(false);
+        expect(canvasNeedsResize(canvas(800, 400, 800, 400), 1)).toBe(false);
+        // A fractional page size rounds down, as the renderer's own buffer does
+        expect(canvasNeedsResize(canvas(1201, 600, 600.7, 300), 2)).toBe(false);
+    });
+
+    it('asks for a resize when the page size or the ratio changed', () => {
+        expect(canvasNeedsResize(canvas(1600, 800, 400, 800), 2)).toBe(true);
+        expect(canvasNeedsResize(canvas(800, 400, 800, 400), 2)).toBe(true);
+        expect(canvasNeedsResize(canvas(1600, 800, 800, 401), 2)).toBe(true);
+    });
+
+    it('leaves a canvas with no size on the page alone', () => {
+        expect(canvasNeedsResize(canvas(300, 150, 0, 0), 1)).toBe(false);
+        expect(canvasNeedsResize(canvas(300, 150, 800, 0), 1)).toBe(false);
     });
 });
