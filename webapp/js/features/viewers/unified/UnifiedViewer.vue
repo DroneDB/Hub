@@ -3,10 +3,7 @@
                  :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings">
         <template #loading>
             <LoadingSpinner :label="loadingText" />
-            <div v-if="progress !== null" class="progress-track">
-                <div class="progress-fill" :style="{ width: Math.round(progress * 100) + '%' }" />
-            </div>
-            <p v-if="progress !== null" class="progress-text">{{ Math.round(progress * 100) }}%</p>
+            <LoadProgress :progress="progress" />
         </template>
 
         <div ref="viewEl" class="giro3d-view" />
@@ -70,6 +67,7 @@
  * to this view.
  */
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import LoadProgress from '@/components/LoadProgress.vue';
 import { ref, reactive, toRefs, watch, onMounted, onBeforeUnmount } from 'vue';
 import Button from 'primevue/button';
 import ViewerShell from '@/components/ViewerShell.vue';
