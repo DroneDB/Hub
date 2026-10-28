@@ -155,3 +155,59 @@ describe('Dataset.buildArtifactUrl', () => {
         expect(ds.buildArtifactUrl('site.ply', 'gsplat.export')).toBe('/orgs/my_org/ds/my_ds/build-artifact?path=site.ply&role=gsplat.export');
     });
 });
+
+describe('Dataset meta writes', () => {
+    function datasetPosting() {
+        const registry = { remote: 'hub.example.com', secure: true, postFormData: vi.fn(async () => ({ ok: true })) };
+        return { ds: new Dataset(registry, 'my_org', 'my_ds'), post: registry.postFormData };
+    }
+    const fields = formData => Object.fromEntries(formData.entries());
+
+    it('metaAdd posts key, JSON data and path to meta/add', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.metaAdd('comparisons', { name: 'before/after', layers: ['a.tif', 'b.tif'] }, 'flights');
+        const [url, formData] = post.mock.calls[0];
+        expect(url).toBe('/orgs/my_org/ds/my_ds/meta/add');
+        expect(fields(formData)).toEqual({
+            key: 'comparisons',
+            data: '{"name":"before/after","layers":["a.tif","b.tif"]}',
+            path: 'flights'
+        });
+    });
+
+    it('metaAdd quotes a string like metaSet and defaults the path to empty', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.metaAdd('note', 'hello');
+        expect(fields(post.mock.calls[0][1])).toEqual({ key: 'note', data: '"hello"', path: '' });
+    });
+
+    it('metaSet sends objects as JSON too, and strings quoted, to meta/set', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.metaSet('license', 'cc0');
+        await ds.metaSet('obj', { a: 1 });
+        expect(post.mock.calls[0][0]).toBe('/orgs/my_org/ds/my_ds/meta/set');
+        expect(fields(post.mock.calls[0][1]).data).toBe('"cc0"');
+        expect(fields(post.mock.calls[1][1]).data).toBe('{"a":1}');
+    });
+
+    it('metaAdd refuses a missing key or value', async () => {
+        const { ds, post } = datasetPosting();
+        await expect(ds.metaAdd('', 1)).rejects.toThrow('Invalid key');
+        await expect(ds.metaAdd('k')).rejects.toThrow('Invalid data');
+        expect(post).not.toHaveBeenCalled();
+    });
+
+    it('metaRemove posts the id to meta/remove', async () => {
+        const { ds, post } = datasetPosting();
+        await ds.metaRemove('abc-123');
+        const [url, formData] = post.mock.calls[0];
+        expect(url).toBe('/orgs/my_org/ds/my_ds/meta/remove');
+        expect(fields(formData)).toEqual({ id: 'abc-123' });
+    });
+
+    it('metaRemove refuses an empty id', async () => {
+        const { ds, post } = datasetPosting();
+        await expect(ds.metaRemove('')).rejects.toThrow('Invalid id');
+        expect(post).not.toHaveBeenCalled();
+    });
+});

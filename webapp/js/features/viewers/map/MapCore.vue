@@ -14,9 +14,16 @@
                             @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" />
             <RasterLayerOpacityPanel v-else-if="!splitMode" v-model:layers="rasterLayerList"
                                      :active-plant-health-path="plantHealthVisible ? plantHealthFilePath : null"
+                                     :removable="!!comparison"
                                      @reorder="handleRasterLayerReorder"
-                                     @plant-health="handleLayerPlantHealth" />
-            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" @update:positions="onSplitPositionsChange" />
+                                     @plant-health="handleLayerPlantHealth"
+                                     @remove="path => $emit('removeLayer', path)"
+                                     @repick="path => $emit('repick', path)" />
+            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" :removable="!!comparison"
+                                @update:positions="onSplitPositionsChange"
+                                @move="(index, to) => handleRasterLayerReorder({ fromIndex: index, toIndex: to })"
+                                @remove="index => $emit('removeLayer', rasterLayerList[index].path)"
+                                @repick="index => $emit('repick', rasterLayerList[index].path)" />
             <PlantHealthPanel :visible="plantHealthVisible" :dataset="dataset" :file-path="plantHealthFilePath"
                               :initial-params="plantHealthInitialParams" @close="closePlantHealth"
                               @viz-params-changed="handleVizParamsChanged" />
@@ -68,6 +75,7 @@
                            @units-changed="handleUnitsChanged" @custom-basemap-config-changed="handleCustomBasemapConfigChanged" />
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
         <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :display-options="!standalone"
+                    :split-toggle="!standalone || !!comparison"
                     :analysis-entry="analysisFile" :raster-count="rasterLayerList.length"
                     :direction-indicators="showDirectionIndicators" :flight-path="showFlightPath"
                     :split-mode="splitMode" :can-compare="canCompare"
@@ -108,6 +116,7 @@ import { getVectorColor } from '@/libs/map/mapUtils';
 import { useListenerBag } from '@/composables/useEventListener';
 import { useTimerGroup } from '@/composables/useTimers';
 import { useMapFeatures } from '@/composables/useMapFeatures';
+import { useMapComparison } from '@/composables/useMapComparison';
 import { usePreference } from '@/composables/usePreference';
 
 import DialogHost from '@/components/DialogHost.vue';
@@ -164,12 +173,21 @@ export default {
         standalone: {
             type: Boolean,
             default: false
+        },
+        // A comparison (the compare view): its state is the parent's, the map shows it and
+        // emits what the user changes (update:comparison), plus removeLayer and repick (a path)
+        // for the parent to apply. Set before the map mounts; null on the other maps.
+        comparison: {
+            type: Object,
+            default: null
         }
     },
-    emits: ['scrollTo', 'openItem'],
-    setup(props) {
+    emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick'],
+    setup(props, { emit }) {
+        const features = useMapFeatures(props);
         return {
-            ...useMapFeatures(props),
+            ...features,
+            ...useMapComparison({ ...features, comparison: () => props.comparison, emit }),
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
             // Toolbar zones (createControlZones), set when the map is built
@@ -260,6 +278,7 @@ export default {
 
         loadMap: function () {
             this.loaded = true;
+            this.comparisonFitPending = !!this.comparison && !this.comparison.view;
             this.vectorLayers = [];
             this.fileLayers = new FileLayers();
             this.fileLayers.setFlightPathVisible(this.showFlightPath);
@@ -347,13 +366,29 @@ export default {
             const vectorFiles = this.fileLayers.build(this.files, { standalone: this.standalone, shotStyle: this.shotStyleKey() });
 
             // Zoom once every vector file's metadata is in (resolves at once without vectors)
-            Promise.all(vectorFiles.map(f => this.addVectorLayer(f))).then(() => this.zoomToFilesExtent());
-            this.syncRasterLayers();
+            Promise.all(vectorFiles.map(f => this.addVectorLayer(f))).then(() => {
+                if (this.fitsToFiles()) this.zoomToFilesExtent();
+            });
+            this.syncRasterLayers(this.fileLayers.rasterSlots);
+            // New layers get the plant-health styling remembered for their file
+            this.refreshRasterLayers();
             this.loadSplatFootprints();
             this.updateRastersOpacity();
-            this.loadSavedMeasurements();
-            this.restorePlantHealthFromHash(this.files);
+            // A comparison has no measurements of its own and its plant health is in its state
+            if (!this.comparison) {
+                this.loadSavedMeasurements();
+                this.restorePlantHealthFromHash(this.files);
+            }
             this.viewZoomCap.schedule();
+        },
+
+        // A comparison keeps its view: the map fits its files once, on the first load of a state
+        // without a view (the world view the map starts with is reported before that fit)
+        fitsToFiles: function () {
+            if (!this.comparison) return true;
+            const first = this.comparisonFitPending;
+            this.comparisonFitPending = false;
+            return first;
         },
 
         // The footprints of the georeferenced splats in view (the points of the others stay)
@@ -560,7 +595,7 @@ export default {
 
         handleKeyDown: function (e) {
             if (!this.shortcutsFor(e)) return;
-            if (Keyboard.isCtrlPressed()) {
+            if (Keyboard.isToggleSelectPressed()) {
                 this.selectSingle = true;
                 if (this.selectionControl) this.selectionControl.deactivate();
             }
@@ -575,7 +610,7 @@ export default {
                 this.measureControls.deselectCurrent();
                 if (this.selectionControl) this.selectionControl.deactivate();
             }
-            if (!Keyboard.isCtrlPressed() && this.shortcutsFor(e)) this.selectSingle = false;
+            if (!Keyboard.isToggleSelectPressed() && this.shortcutsFor(e)) this.selectSingle = false;
         },
 
         handleLayerPlantHealth: function (path) {

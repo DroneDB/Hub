@@ -22,18 +22,18 @@
             </template>
         </div>
     </Teleport>
-    <Teleport v-if="displayOptions" :to="zones.topCenter">
+    <Teleport v-if="displayOptions || splitToggle" :to="zones.topCenter">
         <div class="ol-map-display-buttons ol-unselectable ol-control">
-            <button title="Show direction and speed indicators" aria-label="Show direction and speed indicators"
+            <button v-if="displayOptions" title="Show direction and speed indicators" aria-label="Show direction and speed indicators"
                     :class="{ active: directionIndicators }" :aria-pressed="directionIndicators"
                     @click="emit('update:directionIndicators', !directionIndicators)">
                 <i class="fa-solid fa-location-arrow" />
             </button>
-            <button title="Show drone flight path" aria-label="Show drone flight path"
+            <button v-if="displayOptions" title="Show drone flight path" aria-label="Show drone flight path"
                     :class="{ active: flightPath }" :aria-pressed="flightPath" @click="emit('update:flightPath', !flightPath)">
                 <i class="fa-solid fa-signs-post" />
             </button>
-            <button :title="canCompare ? 'Compare georasters side by side' : 'Need at least 2 georasters to compare'"
+            <button v-if="splitToggle" :title="canCompare ? 'Compare georasters side by side' : 'Need at least 2 georasters to compare'"
                     aria-label="Compare georasters side by side" :disabled="!canCompare"
                     :class="{ active: splitMode }" :aria-pressed="splitMode" @click="emit('toggle-split')">
                 <i class="fa-solid fa-table-columns" />
@@ -47,7 +47,7 @@
  * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
  * - top right: Back (single-file map), Reset view, Fullscreen, Raster Analysis, Stockpile;
- * - top center: direction indicators, flight path, split compare.
+ * - top center: direction indicators and flight path (display options), split compare.
  */
 import { computed } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
@@ -56,8 +56,10 @@ const props = defineProps({
     /** Zones from createControlZones */
     zones: { type: Object, required: true },
     showBack: { type: Boolean, default: false },
-    /** Display options row (hidden on the single-file map) */
+    /** Direction indicators and flight path (hidden on the single-file map) */
     displayOptions: { type: Boolean, default: true },
+    /** The split compare button */
+    splitToggle: { type: Boolean, default: true },
     /** The entry the analysis tools open for; null hides them */
     analysisEntry: { type: Object, default: null },
     rasterCount: { type: Number, default: 0 },

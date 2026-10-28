@@ -8,6 +8,36 @@ import { unByKey } from 'ol/Observable';
 import HybridXYZ from '@/libs/map/olHybridXYZ';
 import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles, SOURCE_MIN_ZOOM } from '@/libs/map/rasterZoom';
 
+/** Visualisation parameters (plant health, raster analysis) that draw anything: null for the plain tiles. */
+const effectiveViz = vizParams => (vizParams && Object.keys(vizParams).length ? vizParams : null);
+
+/** Whether two sets of visualisation parameters draw the same tiles. */
+export function sameVizParams(a, b) {
+    const x = effectiveViz(a);
+    const y = effectiveViz(b);
+    if (!x || !y) return x === y;
+    const keys = Object.keys(x);
+    return keys.length === Object.keys(y).length && keys.every(k => x[k] === y[k]);
+}
+
+/**
+ * The tile source of a raster file: its tiles from `native` zoom down to the source minimum,
+ * styled by `vizParams` when given.
+ * @param {{ url: string, hash?: string, native: number, retina: boolean, vizParams?: object|null }} options
+ */
+export function createRasterSource({ url, hash, native, retina, vizParams = null }) {
+    return new HybridXYZ({
+        url,
+        hash,
+        tileSize: 256,
+        transition: 200,
+        minZoom: SOURCE_MIN_ZOOM,
+        retina,
+        maxZoom: sourceMaxZoom(native, retina),
+        vizParams: effectiveViz(vizParams) || undefined
+    });
+}
+
 /**
  * A tile layer for a file's tiles, clipped to `extent` (EPSG:3857), stamped with the
  * file and its native zoom (`rasterNativeZoom`, read by ViewZoomCap).
@@ -15,19 +45,10 @@ import { computeNativeZoom, sourceMaxZoom, viewMaxZoom, useRetinaTiles, SOURCE_M
  * @param {number[]} extent
  */
 export function createRasterTileLayer(file, extent) {
-    const retina = useRetinaTiles();
     const native = computeNativeZoom(file.entry);
     const layer = new TileLayer({
         extent,
-        source: new HybridXYZ({
-            url: file.path,
-            hash: file.entry.hash,
-            tileSize: 256,
-            transition: 200,
-            minZoom: SOURCE_MIN_ZOOM,
-            retina,
-            maxZoom: sourceMaxZoom(native, retina)
-        })
+        source: createRasterSource({ url: file.path, hash: file.entry.hash, native, retina: useRetinaTiles() })
     });
     layer.set('rasterNativeZoom', native);
     layer.file = file;

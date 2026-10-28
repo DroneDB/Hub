@@ -2,7 +2,13 @@
     <div v-if="layers && layers.length > 1" class="raster-opacity-panel map-bottom-panel">
         <div v-for="(layer, index) in layers" :key="layer.path" class="raster-opacity-row">
             <span class="raster-label" :title="layer.name">{{ truncate(layer.name) }}</span>
+            <span v-if="layer.placeholder" class="placeholder-text" :title="layer.placeholder.text">{{ layer.placeholder.text }}</span>
+            <button v-if="removable && layer.placeholder && layer.placeholder.kind === 'missing'" class="row-btn"
+                    title="Pick another raster" aria-label="Pick another raster" @click.stop="$emit('repick', layer.path)">
+                <i class="fa-solid fa-arrows-rotate" />
+            </button>
             <input
+                v-if="!layer.placeholder"
                 type="range"
                 min="0"
                 max="1"
@@ -12,19 +18,23 @@
                 :aria-label="'Opacity of ' + layer.name"
                 @input="onInput(layer, $event)"
             >
-            <span class="opacity-value">{{ Math.round(layer.opacity * 100) }}%</span>
+            <span v-if="!layer.placeholder" class="opacity-value">{{ Math.round(layer.opacity * 100) }}%</span>
             <button v-if="layer.plantHealthCapable" class="ph-btn"
                     :class="{ active: activePlantHealthPath === layer.path }"
                     title="Plant Health" aria-label="Plant Health"
                     @click.stop="$emit('plant-health', layer.path)">
                 <i class="fa-solid fa-leaf" />
             </button>
+            <button v-if="removable" class="row-btn" title="Remove from comparison" :aria-label="'Remove ' + layer.name + ' from comparison'"
+                    @click.stop="$emit('remove', layer.path)">
+                <i class="fa-solid fa-xmark" />
+            </button>
             <div class="order-buttons">
                 <button
                     class="order-btn"
                     :class="{ 'order-btn--hidden': index === 0 }"
                     :disabled="index === 0"
-                    title="Move layer up"
+                    title="Move layer up" aria-label="Move layer up"
                     @click="index > 0 && onReorder(index, index - 1)"
                 ><i class="fa-solid fa-chevron-up" /></button>
                 <button
@@ -49,9 +59,14 @@ export default {
         activePlantHealthPath: {
             type: String,
             default: null
+        },
+        // A comparison: each row can be removed (the panel shows with two layers or more)
+        removable: {
+            type: Boolean,
+            default: false
         }
     },
-    emits: ['update:layers', 'reorder', 'plant-health'],
+    emits: ['update:layers', 'reorder', 'plant-health', 'remove', 'repick'],
     methods: {
         truncate(name) {
             if (!name) return '';
@@ -104,6 +119,32 @@ export default {
     cursor: pointer;
 }
 
+.placeholder-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ddb-font-size-sm);
+    color: var(--ddb-warning);
+}
+
+.row-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.2rem;
+    line-height: 1;
+
+    &:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
 .order-buttons {
     display: flex;
     flex-direction: column;
@@ -150,12 +191,39 @@ export default {
 /* Fingers: the two arrows side by side, each a touch target; the missing one keeps its place so
    the sliders line up */
 @media (pointer: coarse) {
-    .order-buttons {
+    .placeholder-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--ddb-font-size-sm);
+    color: var(--ddb-warning);
+}
+
+.row-btn {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    padding: 0.1rem 0.25rem;
+    border-radius: 0.2rem;
+    line-height: 1;
+
+    &:hover {
+        color: white;
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
+.order-buttons {
         flex-direction: row;
         gap: 0;
     }
 
-    .order-btn {
+    .order-btn,
+    .row-btn {
         min-width: 2rem;
         min-height: 2rem;
         font-size: 0.75rem;

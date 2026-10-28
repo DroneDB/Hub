@@ -316,7 +316,7 @@ export default {
 
         handleSelection: function (evt, file) {
             Keyboard.updateState(evt);
-            this.select(file, { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isCtrlPressed() });
+            this.select(file, { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isToggleSelectPressed() });
             this.$emit('selectionChanged', file);
         },
 

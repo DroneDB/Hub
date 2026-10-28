@@ -41,6 +41,11 @@ const api = {
         return keyboardState.ctrlPressed;
     },
 
+    // Toggle-select modifier: Ctrl, or Cmd on macOS where Ctrl-click is a right click
+    isToggleSelectPressed: function () {
+        return keyboardState.ctrlPressed || keyboardState.metaPressed;
+    },
+
     isModifierPressed: function () {
         return keyboardState.shiftPressed || keyboardState.ctrlPressed || keyboardState.metaPressed;
     },

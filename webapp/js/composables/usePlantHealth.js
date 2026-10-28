@@ -8,8 +8,8 @@
  * - Component must import and register PlantHealthPanel component
  * - Component must call `this.refreshRasterLayers()` when vizParams change
  */
-import HybridXYZ from '@/libs/map/olHybridXYZ';
-import { sourceMaxZoom, FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
+import { createRasterSource, sameVizParams } from '@/libs/map/rasterLayers';
+import { FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
 import { createFeatureScope } from '@/composables/featureScope';
 
 const definition = {
@@ -71,59 +71,34 @@ const definition = {
             this.refreshRasterLayers();
         },
 
+        /**
+         * Gives each raster layer the tiles of its remembered viz params (the per-file cache).
+         * Only a layer whose params changed gets a new source: the others keep their loaded
+         * tiles (another layer's plant health, a closed panel, a rebuilt file list).
+         */
         refreshRasterLayers() {
             if (!this.rasterLayer) return;
 
             this.rasterLayer.getLayers().forEach(layer => {
                 const layerPath = this._getLayerPath(layer);
-                if (!layerPath) return;
-
                 const source = layer.getSource();
-                if (!source) return;
-
-                // Apply viz params from the per-file cache so layers stay
-                // styled across panel switches and panel close. The active
-                // panel's params are mirrored into the cache by its
-                // `handle*VizParamsChanged` hook, so reading the cache is
-                // sufficient.
-                const cached = this.vizParamsByPath && this.vizParamsByPath[layerPath];
-                const vizParams = cached && Object.keys(cached).length ? cached : {};
-
                 const url = this._getLayerUrl(layer);
-                if (!url) return;
+                if (!layerPath || !source || !url) return;
 
-                // Carry over the retina flag from the source we are replacing,
-                // and recompute its maxZoom from the native GSD zoom stamped on
-                // the layer by the map ('rasterNativeZoom'). OL's XYZ source never
-                // exposes '.maxZoom', so reading it back would always yield 22.
-                const prevRetina = typeof source.getTilePixelRatio === 'function'
-                    ? source.getTilePixelRatio(0) > 1
-                    : false;
+                const vizParams = this.vizParamsByPath && this.vizParamsByPath[layerPath];
+                if (sameVizParams(source.vizParams, vizParams)) return;
 
+                // The new source keeps the retina flag of the one it replaces and the native GSD
+                // zoom stamped on the layer ('rasterNativeZoom'): OL's XYZ source never exposes
+                // its maxZoom, so it cannot be read back
                 const native = layer.get('rasterNativeZoom');
-                const gridMax = typeof source.getTileGrid === 'function'
-                    ? source.getTileGrid()?.getMaxZoom?.()
-                    : undefined;
-                // Prefer the stamped native zoom; otherwise reconstruct it from the
-                // current tile grid (which already stores sourceMaxZoom), adding the
-                // retina level back to recover native before calling sourceMaxZoom
-                // again — this keeps the result idempotent when the stamp is missing.
-                const nativeForSource = typeof native === 'number' && isFinite(native)
-                    ? native
-                    : (typeof gridMax === 'number' && isFinite(gridMax)
-                        ? gridMax + (prevRetina ? 1 : 0)
-                        : FALLBACK_NATIVE_ZOOM);
-
-                const newSource = new HybridXYZ({
+                layer.setSource(createRasterSource({
                     url,
-                    tileSize: 256,
-                    transition: 200,
-                    minZoom: 14,
-                    retina: prevRetina,
-                    maxZoom: sourceMaxZoom(nativeForSource, prevRetina),
-                    vizParams: Object.keys(vizParams).length > 0 ? vizParams : undefined
-                });
-                layer.setSource(newSource);
+                    hash: layer.file && layer.file.entry ? layer.file.entry.hash : undefined,
+                    native: typeof native === 'number' && isFinite(native) ? native : FALLBACK_NATIVE_ZOOM,
+                    retina: typeof source.getTilePixelRatio === 'function' && source.getTilePixelRatio(0) > 1,
+                    vizParams
+                }));
             });
         },
 

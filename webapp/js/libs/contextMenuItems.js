@@ -14,6 +14,8 @@ import { useClipboardStore } from '@/stores/clipboard';
 import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
 import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
 import { taskToolOffered } from '@/libs/tasks/taskTools';
+import { openCompare } from '@/libs/compare/compareLinks';
+import { MAX_LAYERS } from '@/libs/compare/compareState';
 
 /**
  * Context object interface:
@@ -429,6 +431,34 @@ function experimentalMenuItems(ctx) {
     };
 }
 
+const isGeoraster = f => f.entry && f.entry.type === ddb.entry.type.GEORASTER;
+
+// One georaster: the compare view opens on it with the file picker, for the other rasters
+function compareToItem(ctx) {
+    return {
+        label: 'Compare to...',
+        icon: 'fa-solid fa-table-columns',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return !!ctx.dataset && sel.length === 1 && isGeoraster(sel[0]);
+        },
+        click: () => openCompare(ctx.dataset, { paths: [ctx.getSelectedEntries()[0].entry.path], pick: true })
+    };
+}
+
+// Several georasters: the compare view opens on them, side by side in the order they are listed
+function compareInMapItem(ctx) {
+    return {
+        label: 'Compare in Map',
+        icon: 'fa-solid fa-table-columns',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return !!ctx.dataset && sel.length >= 2 && sel.length <= MAX_LAYERS && sel.every(isGeoraster);
+        },
+        click: () => openCompare(ctx.dataset, { paths: ctx.getSelectedEntries().map(f => f.entry.path) })
+    };
+}
+
 /**
  * Build the standard viewer context menu items.
  * These are the Open/Open Map/Open Point Cloud/etc items shared across all views.
@@ -443,7 +473,9 @@ function buildViewerMenuItems(ctx) {
         openSplatItem(ctx),
         openMarkdownItem(ctx),
         openPdfItem(ctx),
-        plantHealthItem(ctx)
+        plantHealthItem(ctx),
+        compareToItem(ctx),
+        compareInMapItem(ctx)
     ];
 }
 

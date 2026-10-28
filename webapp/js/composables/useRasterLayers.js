@@ -3,44 +3,51 @@
  * rows of the opacity panel (top first, the reverse of the OpenLayers collection), the
  * global or per-layer opacity, reordering, and dimming of selected rasters.
  *
- *   const rasters = useRasterLayers({ group, vectorLayers, splitMode: () => ..., displayName });
+ *   const rasters = useRasterLayers({ group, vectorLayers, splitMode: () => ... });
+ *   rasters.syncRasterLayers(fileLayers.rasterSlots);
  */
 import { ref, watch, markRaw } from 'vue';
-import ddb from 'ddb';
 import { isPlantHealthCapable } from '@/libs/entryTypes';
+import { layerLabels } from '@/libs/map/layerLabels';
 
 /**
  * @param {object} ctx
  * @param {import('vue').Ref<any>} ctx.group          the rasters' LayerGroup
  * @param {import('vue').Ref<any[]>} ctx.vectorLayers  redrawn on restyle (their style reads the selection)
  * @param {() => boolean} ctx.splitMode               split compare shows every raster opaque
- * @param {(layer: any) => string} ctx.displayName
  */
-export function useRasterLayers({ group, vectorLayers, splitMode, displayName }) {
-    // [{ name, path, olLayer, opacity, plantHealthCapable }], top first
+export function useRasterLayers({ group, vectorLayers, splitMode }) {
+    // [{ name, path, olLayer, opacity, plantHealthCapable, placeholder }], top first; a placeholder
+    // row (olLayer null) keeps the place of a raster that cannot be drawn
     const rasterLayerList = ref([]);
     const rasterOpacity = ref(1.0);
     const hasRasters = ref(false);
 
-    /** Rebuilds the list from the layer group, keeping each layer's opacity. */
-    function syncRasterLayers() {
-        const list = [];
-        group.value.getLayers().forEach(olLayer => {
-            if (!olLayer.file) return;
-            const entryPath = olLayer.file.entry && olLayer.file.entry.path;
-            const name = displayName(olLayer) || (entryPath ? ddb.pathutils.basename(entryPath) : '');
-            const path = entryPath || name;
+    /**
+     * Rebuilds the list from the raster slots (file order, the last drawn on top), keeping
+     * each layer's opacity. Names are the file names, with enough of the folders to tell
+     * apart files of the same name.
+     * @param {{ file: any, olLayer: any }[]} slots
+     */
+    function syncRasterLayers(slots) {
+        const rows = slots.map(({ file, olLayer }) => ({
+            path: file.entry ? file.entry.path : file.placeholder.path,
+            file,
+            olLayer
+        }));
+        const labels = layerLabels(rows.map(r => r.path));
+        rasterLayerList.value = rows.map(({ path, file, olLayer }) => {
             const existing = rasterLayerList.value.find(r => r.path === path);
-            list.push({
-                name,
+            return {
+                name: labels.get(path) || path,
                 path,
                 // markRaw: a reactive proxy would break identity checks and slow OpenLayers
-                olLayer: markRaw(olLayer),
+                olLayer: olLayer ? markRaw(olLayer) : null,
                 opacity: existing ? existing.opacity : 1.0,
-                plantHealthCapable: isPlantHealthCapable(olLayer.file?.entry)
-            });
-        });
-        rasterLayerList.value = list.reverse();
+                plantHealthCapable: !!file.entry && isPlantHealthCapable(file.entry),
+                placeholder: file.placeholder || null
+            };
+        }).reverse();
     }
 
     function handleRasterLayerReorder({ fromIndex, toIndex }) {
@@ -51,7 +58,7 @@ export function useRasterLayers({ group, vectorLayers, splitMode, displayName })
         // The OL collection is the reverse of the list (OL draws the last on top)
         const olLayers = group.value.getLayers();
         olLayers.clear();
-        for (let i = updated.length - 1; i >= 0; i--) olLayers.push(updated[i].olLayer);
+        for (let i = updated.length - 1; i >= 0; i--) if (updated[i].olLayer) olLayers.push(updated[i].olLayer);
     }
 
     function updateRastersOpacity() {

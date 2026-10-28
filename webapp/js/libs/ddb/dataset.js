@@ -401,15 +401,32 @@ export default class Dataset {
         return this.registry.postFormData(`${this.baseApi}/rename`, formData);
     }
 
+    // The server parses the value as JSON, so strings are quoted and objects serialized
     async metaSet(key, data, path = "") {
+        return this.metaWrite('set', key, data, path);
+    }
+
+    // Appends an entry to a list key (a key may hold many); returns the new entry with its id
+    async metaAdd(key, data, path = "") {
+        return this.metaWrite('add', key, data, path);
+    }
+
+    async metaWrite(action, key, data, path) {
         if (!key) throw new Error(`Invalid key ${key}`);
         if (data === undefined) throw new Error(`Invalid data`);
-        if (typeof data === "string") data = JSON.stringify(data);
         const formData = new FormData();
         formData.append('key', key);
-        formData.append('data', data);
+        formData.append('data', JSON.stringify(data));
         formData.append('path', path);
-        return this.registry.postFormData(`${this.baseApi}/meta/set`, formData);
+        return this.registry.postFormData(`${this.baseApi}/meta/${action}`, formData);
+    }
+
+    // Removes one entry of a list key by the id metaAdd returned
+    async metaRemove(id) {
+        if (!id) throw new Error(`Invalid id ${id}`);
+        const formData = new FormData();
+        formData.append('id', id);
+        return this.registry.postFormData(`${this.baseApi}/meta/remove`, formData);
     }
 
     async metaUnset(key, path = "") {

@@ -233,7 +233,7 @@ export default {
             const file = thumb.file;
             this.selection.load(this.selectedFiles);
             this.selection.toggle(this.files.indexOf(file),
-                { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isCtrlPressed(), right: mouseBtn === Mouse.RIGHT });
+                { shift: Keyboard.isShiftPressed(), ctrl: Keyboard.isToggleSelectPressed(), right: mouseBtn === Mouse.RIGHT });
             this.applySelection();
             this.$emit('selectionChanged', file);
         },

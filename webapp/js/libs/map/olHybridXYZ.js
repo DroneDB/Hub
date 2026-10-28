@@ -53,6 +53,8 @@ class HybridXYZ extends XYZ {
         opt_options.url = "https://{z}/{x}/{y}";
         delete opt_options.vizParams;
         super(opt_options);
+        // What the tiles show, so a layer is re-sourced only when this changes
+        this.vizParams = vizParams;
 
         if (isDDB) {
             this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom, vizParams, retina, hash).bind(this);

@@ -52,7 +52,21 @@
                     <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
                     <Button v-if="isBuildableFile && !hasActiveBuild" severity="secondary"
                             icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
+                    <Button v-if="isGeoraster" severity="secondary" icon="fa-solid fa-table-columns" label="Compare to..."
+                            title="Compare this georaster with others of the dataset" @click="handleCompareTo" />
                 </div>
+            </div>
+
+            <!-- Saved comparisons that show this file -->
+            <div v-if="usedInComparisons.length" class="comparisons-section">
+                <h4>Used in comparisons</h4>
+                <ul>
+                    <li v-for="c in usedInComparisons" :key="c.uid">
+                        <a :href="comparisonUrl(c)" target="_blank" rel="noopener">
+                            <i class="fa-solid fa-table-columns" aria-hidden="true" /> {{ c.name }}
+                        </a>
+                    </li>
+                </ul>
             </div>
         </div>
     </div>
@@ -78,6 +92,8 @@ import Message from 'primevue/message';
 import { buildAllProperties, buildCopyableValues, buildRowNotes, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { compareUrl, openCompare } from '@/libs/compare/compareLinks';
+import { comparisonsUsing } from '@/libs/compare/comparisonStore';
 
 export default {
     components: { PropsTable, Button, Message },
@@ -92,6 +108,11 @@ export default {
         dataset: {
             type: Object,
             default: null
+        },
+        // The dataset's saved comparisons (libs/compare/comparisonStore savedComparisons)
+        comparisons: {
+            type: Array,
+            default: () => []
         }
     },
     emits: ['close', 'open', 'share', 'buildStarted', 'buildError'],
@@ -109,6 +130,12 @@ export default {
         }
     },
     computed: {
+        isGeoraster() {
+            return !!this.file && !!this.dataset && this.file.entry.type === ddb.entry.type.GEORASTER;
+        },
+        usedInComparisons() {
+            return this.isGeoraster ? comparisonsUsing(this.comparisons, this.file.entry.path) : [];
+        },
         isDirectory() {
             return this.file && isDirectory(this.file.entry);
         },
@@ -298,6 +325,12 @@ export default {
             this.$emit('open', this.file);
         },
 
+        handleCompareTo() {
+            openCompare(this.dataset, { paths: [this.file.entry.path], pick: true });
+        },
+        comparisonUrl(comparison) {
+            return compareUrl(this.dataset, { uid: comparison.uid });
+        },
         handleShare() {
             this.$emit('share', this.file);
         },
@@ -454,6 +487,26 @@ export default {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+
+.comparisons-section {
+    margin-bottom: 1rem;
+
+    h4 {
+        font-size: var(--ddb-font-size-base);
+        margin: 0 0 0.35rem;
+    }
+
+    ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    li {
+        padding: 0.15rem 0;
+        overflow-wrap: anywhere;
+    }
 }
 
 .detail-panel-empty {

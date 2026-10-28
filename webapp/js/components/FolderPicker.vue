@@ -119,6 +119,9 @@ const { pathutils, entry } = ddb;
  *   mode        - Selection mode: 'folder', 'file', or 'any' (default: 'folder').
  *   initialPath - Starting folder path within the dataset (default: '').
  *   title       - Dialog title (default: 'Select folder').
+ *   accept      - Optional (entry) => boolean; files it rejects cannot be selected. Folders are
+ *                 never filtered by it, so they stay navigable.
+ *   exclude     - Dataset-relative paths that cannot be selected (default: none).
  *
  * Emits:
  *   close - Emitted on confirm with { path, entry } or on cancel with null.
@@ -150,6 +153,14 @@ export default {
         title: {
             type: String,
             default: 'Select folder'
+        },
+        accept: {
+            type: Function,
+            default: null
+        },
+        exclude: {
+            type: Array,
+            default: () => []
         }
     },
 
@@ -191,6 +202,9 @@ export default {
         },
         createFolderMessage: function () {
             return `The folder <strong>${this.pendingCreatePath}</strong> does not exist. Do you want to create it?`;
+        },
+        excludedPaths: function () {
+            return new Set(this.exclude.map((p) => this.normalizePath(p)));
         },
         sortedFiles: function () {
             return sortFileRows(this.files, this.sortColumn, this.sortDirection);
@@ -257,7 +271,7 @@ export default {
 
             if (entry.isDirectory(file.entry)) {
                 this.navigateTo(file.entry.path);
-            } else if (this.mode === 'file' || this.mode === 'any') {
+            } else if (this.canSelect(file)) {
                 this.selectedFile = file;
                 file.selected = true;
                 this.selectedPath = this.normalizePath(file.entry.path);
@@ -265,23 +279,20 @@ export default {
             }
         },
 
-        // Verifies whether the given dataset-relative path exists (as the right
-        // kind of entry for the current mode). The dataset root always exists.
-        checkPathExists: async function (rawPath) {
-            const normalized = this.normalizePath(rawPath);
-            if (!normalized) return true;
-
+        // Looks up the entry at the given dataset-relative path (of the right kind
+        // for the current mode). Returns null when there is none.
+        findEntry: async function (normalized) {
             const parent = pathutils.getParentFolder(normalized) || '';
             const base = pathutils.basename(normalized);
 
             const entries = await this.dataset.list(parent || null);
-            return entries.some((e) => {
+            return entries.find((e) => {
                 if (pathutils.basename(e.path) !== base) return false;
                 const isDir = entry.isDirectory(e);
                 if (this.mode === 'file') return !isDir;
                 if (this.mode === 'folder') return isDir;
                 return true;
-            });
+            }) || null;
         },
 
         // Confirm handler: validates the typed/selected path exists; for folder
@@ -296,10 +307,20 @@ export default {
                 return;
             }
 
+            if (this.excludedPaths.has(normalized)) {
+                this.errorMessage = `"${normalized}" cannot be selected.`;
+                return;
+            }
+
             this.checkingPath = true;
             try {
-                const exists = await this.checkPathExists(normalized);
-                if (exists) {
+                // The dataset root always exists and has no entry to check.
+                const found = normalized ? await this.findEntry(normalized) : null;
+                if (!normalized || found) {
+                    if (found && !this.isEntryAllowed(found)) {
+                        this.errorMessage = `"${normalized}" cannot be selected.`;
+                        return;
+                    }
                     this.emitConfirm(normalized);
                     return;
                 }
@@ -338,8 +359,16 @@ export default {
             this.$emit('close', { path: this.normalizePath(path), entry: null });
         },
 
+        // Excluded paths and files rejected by accept are not selectable; folders
+        // skip accept so they can still be browsed into.
+        isEntryAllowed: function (e) {
+            if (this.excludedPaths.has(this.normalizePath(e.path))) return false;
+            return entry.isDirectory(e) || !this.accept || !!this.accept(e);
+        },
+
         canSelect: function (file) {
             if (!file) return false;
+            if (!this.isEntryAllowed(file.entry)) return false;
             if (this.mode === 'any') return true;
             if (this.mode === 'folder') return entry.isDirectory(file.entry);
             if (this.mode === 'file') return !entry.isDirectory(file.entry);

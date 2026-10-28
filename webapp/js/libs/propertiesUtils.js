@@ -6,6 +6,15 @@ import { getTypeDisplayName } from '@/libs/entryTypes';
 import { bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { formatGroundResolution } from '@/libs/groundResolution';
 import { fixedLengthParts, formatSpeed } from '@/libs/format';
+import { COMPARISONS_KEY } from '@/libs/compare/comparisonStore';
+
+// Meta keys that hold app data (saved map comparisons are raw JSON), not something to show users
+export const HIDDEN_META_KEYS = [COMPARISONS_KEY];
+
+/** The meta of an entry without the keys that are not for users to read. */
+export function visibleMeta(meta) {
+    return Object.fromEntries(Object.entries(meta ?? {}).filter(([key]) => !HIDDEN_META_KEYS.includes(key)));
+}
 
 /**
  * Extracts the best display name from a feature's properties, checking various property names
@@ -249,8 +258,9 @@ export function buildAllProperties(file, units = 'metric') {
     if (cadCrs) {
         props['coordinate system'] = cadCrs;
     }
-    if (entry.properties && entry.properties.meta) {
-        props['metadata'] = entry.properties.meta;
+    const meta = visibleMeta(entry.properties?.meta);
+    if (Object.keys(meta).length) {
+        props['metadata'] = meta;
     }
 
     // Extended properties (exclude meta and permissions)

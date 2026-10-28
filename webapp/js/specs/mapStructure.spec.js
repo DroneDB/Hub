@@ -17,11 +17,12 @@ describe('map family structure', () => {
         expect(fs.existsSync(path.resolve(__dirname, '../libs/map/controls/measureControl.js'))).toBe(true);
     });
 
-    it('shares one MapCore between the dataset map and the single map', () => {
+    it('shares one MapCore between the dataset map, the single map and the compare view', () => {
         expect(fs.existsSync(path.join(MAP, 'MapCore.vue'))).toBe(true);
         expect(lines('DatasetMap.vue')).toBeLessThanOrEqual(300);
         expect(lines('SingleMap.vue')).toBeLessThanOrEqual(200);
-        for (const f of ['DatasetMap.vue', 'SingleMap.vue']) {
+        expect(lines('CompareMap.vue')).toBeLessThanOrEqual(200);
+        for (const f of ['DatasetMap.vue', 'SingleMap.vue', 'CompareMap.vue']) {
             expect(fs.readFileSync(path.join(MAP, f), 'utf8')).not.toMatch(/\bmixins\s*:/);
         }
     });

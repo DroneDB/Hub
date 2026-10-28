@@ -36,6 +36,11 @@ export class FileLayers {
     constructor() {
         this.styles = createFileLayerStyles();
         this.rasters = new LayerGroup();
+        // Raster layers by file and content, reused by the next build so their tiles stay loaded
+        this.rasterCache = new Map();
+        // The raster files in file order: { file, olLayer }, olLayer null for a placeholder file
+        // (a layer the comparison view keeps but cannot draw: missing, or not built)
+        this.rasterSlots = [];
         this.footprints = new LayerGroup();
         // Georeferenced splats: a point, the footprint of the build once the map has read it
         this.splats = new SplatFootprints();
@@ -60,19 +65,27 @@ export class FileLayers {
 
     /**
      * Rebuilds the layers for the explorer items on show. Photos with a footprint are drawn
-     * as rasters on the single-file map (`standalone`), as camera markers elsewhere.
-     * @param {any[]} files
+     * as rasters on the single-file map (`standalone`), as camera markers elsewhere. A raster
+     * that was on show already keeps its layer: adding, removing or reordering files loads the
+     * tiles of the new files only.
+     * @param {any[]} files  items with `path` and `entry`; one with a `placeholder` and no entry
+     *                       holds a raster slot that draws nothing
      * @param {{ standalone?: boolean, shotStyle: string }} options
      * @returns {any[]} the vector files to load (measurement files excluded)
      */
     build(files, { standalone = false, shotStyle }) {
         [this.shotFeatures, this.extentFeatures, this.pathFeatures, this.flagFeatures].forEach(s => s.clear());
-        this.rasters.getLayers().clear();
 
         const shots = [];
         const stops = [];
         const vectorFiles = [];
+        const slots = [];
+        const rasterCache = new Map();
         for (const f of files) {
+            if (f.placeholder && !f.entry) {
+                slots.push({ file: f, olLayer: null });
+                continue;
+            }
             if (!f.entry) continue;
             const type = f.entry.type;
             const imageAsRaster = standalone && type === T.GEOIMAGE && f.entry.polygon_geom;
@@ -89,7 +102,14 @@ export class FileLayers {
                 }
             } else if (f.entry.polygon_geom && (type === T.GEORASTER || type === T.GEOIMAGE || type === T.POINTCLOUD)) {
                 const extent = mercatorExtent(f.entry.polygon_geom);
-                this.rasters.getLayers().push(createRasterTileLayer(f, extent));
+                const key = `${f.path}\n${f.entry.hash || ''}`;
+                // A file listed twice would put one layer twice in the group
+                if (rasterCache.has(key)) continue;
+                const olLayer = this.rasterCache.get(key) || createRasterTileLayer(f, extent);
+                // The same file listed again (the explorer re-lists): the layer follows its item
+                olLayer.file = f;
+                rasterCache.set(key, olLayer);
+                slots.push({ file: f, olLayer });
                 const extentFeat = new Feature(fromExtent(extent));
                 extentFeat.file = f;
                 this.extentFeatures.addFeature(extentFeat);
@@ -97,10 +117,23 @@ export class FileLayers {
                 vectorFiles.push(f);
             }
         }
+        this.setRasters(slots, rasterCache);
         if (shots.length) this.shotFeatures.addFeatures(shots);
         this.splats.setFiles(files);
         this.drawFlightPath(stops);
         return vectorFiles;
+    }
+
+    /** Puts the slots' layers in the raster group, in order, touching it only when they changed. */
+    setRasters(slots, rasterCache) {
+        this.rasterSlots = slots;
+        this.rasterCache = rasterCache;
+        const wanted = slots.map(s => s.olLayer).filter(Boolean);
+        const layers = this.rasters.getLayers();
+        const current = layers.getArray();
+        if (current.length === wanted.length && current.every((l, i) => l === wanted[i])) return;
+        layers.clear();
+        layers.extend(wanted);
     }
 
     /** The path through the timed shots, start/finish flags, and each shot's `computedSpeed`. */

@@ -15,7 +15,7 @@ import { get as getProjection } from 'ol/proj';
 import { getWidth } from 'ol/extent';
 import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
 import { EPSG } from '@/libs/constants';
-import { onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { getPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 
 /** Tile layer of a custom WMS/XYZ configuration. @param {any} config */
@@ -40,9 +40,15 @@ function customLayer(config) {
     return new TileLayer({ source: new TileWMS(options) });
 }
 
-/** @param {import('vue').ShallowRef<any>} map */
-export function useMapBasemap(map) {
-    const selectedBasemap = usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]);
+/**
+ * @param {import('vue').ShallowRef<any>} map
+ * @param {{ persist?: boolean }} [options]  persist: false keeps a change of basemap to this map (a
+ *        comparison carries its own basemap and must not change the user's preference)
+ */
+export function useMapBasemap(map, { persist = true } = {}) {
+    const selectedBasemap = persist
+        ? usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP])
+        : ref(getPref(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]));
     const customBasemapConfig = ref(getCustomBasemapConfig());
 
     /** Tile layer of the current selection. */

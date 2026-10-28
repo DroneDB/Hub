@@ -126,7 +126,7 @@ export default {
             if (mouseBtn === Mouse.RIGHT && this.selectedNodes.length > 1) return; // Prevent accidental deselection
 
             // Multiple selection
-            if (Keyboard.isCtrlPressed()) {
+            if (Keyboard.isToggleSelectPressed()) {
                 const id = this.selectedNodes.indexOf(node);
                 if (id !== -1) {
                     node.selected = false;

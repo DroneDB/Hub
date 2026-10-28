@@ -27,7 +27,7 @@ import { useMapSplitCompare } from '@/composables/useMapSplitCompare';
 import { useRasterLayers } from '@/composables/useRasterLayers';
 
 /**
- * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean }} props
+ * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, comparison?: any }} props
  */
 export function useMapFeatures(props) {
     const map = shallowRef(null);
@@ -74,16 +74,14 @@ export function useMapFeatures(props) {
         stockpile: { visible: () => stockpile.stockpilePanelVisible.value, open: stockpile.openStockpileVolume, close: stockpile.closeStockpileVolume }
     });
 
-    const rasters = useRasterLayers({
-        group: rasterLayer, vectorLayers, splitMode: () => split.splitMode.value,
-        displayName: layer => tooltip.getLayerDisplayName(layer)
-    });
+    const rasters = useRasterLayers({ group: rasterLayer, vectorLayers, splitMode: () => split.splitMode.value });
     const split = useMapSplitCompare({ map, rasterLayers: rasters.rasterLayerList, onChange: rasters.updateRastersOpacity });
 
     return {
         map, measureControls, rasterLayer, vectorLayers, currentUnitPref, dialogs,
         ...alerts,
-        ...useMapBasemap(map),
+        // A comparison's basemap is part of the comparison, not a preference
+        ...useMapBasemap(map, { persist: !props.comparison }),
         ...measurements, ...plantHealth, ...raster, ...stockpile, ...contours, ...tooltip, ...rasters, ...split,
         // Opening an analysis panel closes the others
         openPlantHealth: (...args) => panels.open('plantHealth', ...args),

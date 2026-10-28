@@ -20,6 +20,9 @@
         </div>
         <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
                   :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
+        <SavedComparisons v-if="comparisons.length && dataset && !loading && searchStaticPaths == null" :comparisons="comparisons"
+                          :dataset="dataset" :can-write="canWrite" @rename="c => $emit('renameComparison', c)"
+                          @delete="c => $emit('deleteComparison', c)" />
         <LoadingSpinner v-if="loading" />
         <div v-if="!loading && noResults" class="no-results">
             No files found
@@ -30,6 +33,7 @@
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
+import SavedComparisons from './SavedComparisons.vue';
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
@@ -52,7 +56,7 @@ const { pathutils } = ddb;
 export default {
     components: {
         LoadingSpinner,
-        TreeView, ContextMenu, InputText, InputIcon, IconField, Button
+        TreeView, SavedComparisons, ContextMenu, InputText, InputIcon, IconField, Button
     },
     // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
@@ -68,9 +72,14 @@ export default {
         dataset: {
             type: Object,
             default: null
+        },
+        // The dataset's saved comparisons, listed under the tree (not while searching)
+        comparisons: {
+            type: Array,
+            default: () => []
         }
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['renameComparison', 'deleteComparison', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
         return { requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },

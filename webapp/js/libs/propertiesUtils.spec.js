@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import ddb from 'ddb';
-import { formatCadCrs, tidyProperties, formatDimensions, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties } from './propertiesUtils';
+import { formatCadCrs, tidyProperties, formatDimensions, beautifyKey, isUrl, linkCrsCodes, pointCoordinatesText, buildCopyableValues, buildRowNotes, buildAllProperties, visibleMeta, HIDDEN_META_KEYS } from './propertiesUtils';
 
 const entry = (crs, units = 'm') => ({ properties: { vector: { crs, units } } });
 
@@ -220,5 +220,24 @@ describe('buildCopyableValues', () => {
     it('has only what the entry has', () => {
         expect(buildCopyableValues({ entry: { type: 1, path: 'dir' } })).toEqual({});
         expect(buildCopyableValues(null)).toEqual({});
+    });
+});
+
+describe('raw metadata rows', () => {
+    const file = meta => ({ entry: { type: ddb.entry.type.GENERIC, path: 'a.txt', properties: { meta } } });
+
+    it('hides the saved comparisons but keeps the other keys', () => {
+        const props = buildAllProperties(file({ name: { data: 'Site' }, comparisons: [{ id: '1', data: '{}' }] }));
+        expect(props.metadata).toEqual({ name: { data: 'Site' } });
+    });
+
+    it('leaves no metadata row when only hidden keys exist', () => {
+        expect(buildAllProperties(file({ comparisons: [] })).metadata).toBeUndefined();
+    });
+
+    it('visibleMeta drops every hidden key and tolerates no meta', () => {
+        expect(HIDDEN_META_KEYS).toContain('comparisons');
+        expect(visibleMeta({ license: 1, comparisons: 2 })).toEqual({ license: 1 });
+        expect(visibleMeta(undefined)).toEqual({});
     });
 });

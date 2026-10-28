@@ -28,7 +28,7 @@ describe('useMapSplitCompare', () => {
         split.toggleSplit();
         expect(split.splitMode.value).toBe(true);
         expect(split.splitPositions.value).toEqual([1 / 3, 2 / 3]);
-        expect(split.splitBands.value).toEqual(['r0', 'r1', 'r2']);
+        expect(split.splitBands.value.map(b => b.name)).toEqual(['r0', 'r1', 'r2']);
         expect(clipped()).toBe(3);
         split.toggleSplit();
         expect(clipped()).toBe(0);
@@ -49,5 +49,57 @@ describe('useMapSplitCompare', () => {
         split.enterSplitMode();
         scope.stop();
         expect(clipped()).toBe(0);
+    });
+
+    it('clips the layers of a rebuilt file list while the mode is on', async () => {
+        const { split, rasterLayers, layers } = setup(2);
+        split.enterSplitMode();
+        // The file list is rebuilt: one layer stays, a new one comes in
+        const added = { name: 'new', olLayer: new TileLayer() };
+        rasterLayers.value = [layers[0], added];
+        await nextTick();
+        expect(added.olLayer.hasListener('prerender')).toBe(true);
+        expect(layers[1].olLayer.hasListener('prerender')).toBe(false);
+    });
+
+    it('gives equal bands when a rebuilt list has another number of rasters', async () => {
+        const { split, rasterLayers, layers } = setup(2);
+        split.enterSplitMode();
+        split.onSplitPositionsChange([0.3]);
+        const third = { name: 'r2', olLayer: new TileLayer() };
+        rasterLayers.value = [...layers, third];
+        await nextTick();
+        expect(split.splitPositions.value).toEqual([1 / 3, 2 / 3]);
+        expect(third.olLayer.hasListener('prerender')).toBe(true);
+    });
+
+    it('keeps the band widths when the rasters are reordered', async () => {
+        const { split, rasterLayers, layers } = setup(2);
+        split.enterSplitMode();
+        split.onSplitPositionsChange([0.3]);
+        rasterLayers.value = [layers[1], layers[0]];
+        await nextTick();
+        expect(split.splitPositions.value).toEqual([0.3]);
+        expect(layers.every(l => l.olLayer.hasListener('prerender'))).toBe(true);
+    });
+
+    it('keeps an empty band for a placeholder row', () => {
+        const { split, rasterLayers, layers } = setup(2);
+        rasterLayers.value = [layers[0], { name: 'missing', olLayer: null, placeholder: { text: 'Missing' } }, layers[1]];
+        split.enterSplitMode();
+        expect(split.splitPositions.value).toEqual([1 / 3, 2 / 3]);
+        expect(split.splitBands.value[1].placeholder).toEqual({ text: 'Missing' });
+        expect(layers.every(l => l.olLayer.hasListener('prerender'))).toBe(true);
+    });
+
+    it('sets the mode and the dividers at once', () => {
+        const { split } = setup(3);
+        split.setSplit(true, [0.2, 0.9]);
+        expect(split.splitMode.value).toBe(true);
+        expect(split.splitPositions.value).toEqual([0.2, 0.9]);
+        split.setSplit(true, [0.4, 0.6]);
+        expect(split.splitPositions.value).toEqual([0.4, 0.6]);
+        split.setSplit(false, []);
+        expect(split.splitMode.value).toBe(false);
     });
 });

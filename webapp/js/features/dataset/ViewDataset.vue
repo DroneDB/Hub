@@ -25,7 +25,7 @@
                                 <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
                             </div>
                             <div v-if="detailFile && !isMobile" class="detail-side">
-                                <DetailPanel :file="detailFile" :dataset="dataset" v-on="detailEvents" />
+                                <DetailPanel :file="detailFile" :dataset="dataset" :comparisons="comparisons" v-on="detailEvents" />
                             </div>
                         </div>
                     </template>
@@ -33,7 +33,7 @@
                         <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :can-write="canWrite" />
                     </template>
                     <template v-if="isMobile" #properties>
-                        <DetailPanel :file="detailFile" :dataset="dataset" v-on="detailEvents" />
+                        <DetailPanel :file="detailFile" :dataset="dataset" :comparisons="comparisons" v-on="detailEvents" />
                     </template>
                 </TabSwitcher>
             </template>
@@ -84,6 +84,9 @@ import { useDatasetActions } from '@/composables/useDatasetActions';
 import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
 import { useOpenItem } from '@/composables/useOpenItem';
 import { useDatasetShortcuts } from '@/composables/useDatasetShortcuts';
+import { useComparisonActions } from '@/composables/useComparisonActions';
+import { useEventListener } from '@/composables/useEventListener';
+import { savedComparisons } from '@/libs/compare/comparisonStore';
 import Message from '@/components/HubMessage.vue';
 import Panel from '@/features/dataset/HubPanel.vue';
 import TabSwitcher from '@/features/dataset/TabSwitcher.vue';
@@ -135,6 +138,8 @@ const rootEntry = ref(null);
 const permissions = computed(() => permissionsOf(rootEntry.value));
 const canWrite = computed(() => permissions.value.canWrite);
 const canDelete = computed(() => permissions.value.canDelete);
+// Saved comparisons are in the root entry's meta
+const comparisons = computed(() => savedComparisons(rootEntry.value));
 
 const tabs = ref(null);
 const explorer = ref(null);
@@ -291,6 +296,20 @@ async function rootNodes() {
     }
 }
 
+// The root entry again (permissions, saved comparisons) without reloading the tree
+async function refreshRootEntry() {
+    try {
+        const entries = await dataset.info({ signal: requestSignal });
+        if (entries.length) rootEntry.value = entries[0];
+    } catch (e) {
+        if (!isAbort(e)) console.warn('Cannot refresh the dataset info:', e);
+    }
+}
+
+// Comparisons are saved in the compare view, another tab: the list catches up when this tab is back
+useEventListener(window, 'focus', refreshRootEntry);
+const comparisonActions = useComparisonActions({ dataset, dialogs, onChanged: refreshRootEntry });
+
 // ---- Bindings --------------------------------------------------------------------------
 
 /** Events of the file list, the tree and the detail panel; `items` is what they act on. */
@@ -325,12 +344,14 @@ const treeEvents = {
     selectionChanged: onTreeSelection,
     currentUriChanged: onCurrentUriChanged,
     selectAll: () => selectAll(true),
-    error: e => actions.showError(e, 'Error')
+    error: e => actions.showError(e, 'Error'),
+    renameComparison: comparisonActions.rename,
+    deleteComparison: comparisonActions.remove
 };
 const fileEvents = { ...commonEvents(() => listing.selected.value), selectionChanged: onSelectionChanged };
 const detailEvents = { close: closeDetail, open: file => onOpenItem(file), share: actions.share, buildStarted: handleBuildStarted, buildError: handleBuildError };
 
-const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset }));
+const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, comparisons: comparisons.value }));
 const tools = computed(() => explorerTools({
     canWrite: canWrite.value, files: listing.files.value, selected: listing.selected.value,
     viewMode: viewMode.value, expandedGrid: expandedGrid.value

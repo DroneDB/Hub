@@ -1,12 +1,15 @@
 /**
  * useDatasetShortcuts - the dataset page's keyboard and paste handling: Delete removes the selection, Ctrl/Cmd+C and +X copy and cut it, and an
  * OS paste uploads files, imports a URL, or pastes the Hub clipboard, in that order.
- * Keys typed in the tree go to the tree; nothing happens while typing or with a dialog open.
+ * Keys typed in the tree go to the tree; nothing happens while typing, with a dialog open, or
+ * in an element marked data-no-file-shortcuts.
  */
 import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 import { useEventListener } from '@/composables/useEventListener';
 
 const isTyping = t => t instanceof Element && (t.closest('input, textarea') || t.isContentEditable);
+// Keys typed in a list of things that are not files (the saved comparisons) are not file shortcuts
+const notForFiles = t => t instanceof Element && !!t.closest('[data-no-file-shortcuts]');
 
 /**
  * @param {object} ctx
@@ -19,7 +22,7 @@ const isTyping = t => t instanceof Element && (t.closest('input, textarea') || t
  */
 export function useDatasetShortcuts({ blocked, canWrite, selected, treeFor, actions, clipboard }) {
     useEventListener(document, 'keydown', e => {
-        if (isTyping(e.target) || blocked()) return;
+        if (isTyping(e.target) || notForFiles(e.target) || blocked()) return;
         // The tree acts on its own selection
         const tree = treeFor(e.target);
         if (tree) {
