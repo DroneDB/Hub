@@ -12,11 +12,10 @@ import { unByKey } from 'ol/Observable';
 import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import { toLonLat } from 'ol/proj';
-import { exportMeasurements, importMeasurements, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
+import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from '@/libs/map/olMeasurementConverter';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
 import { showPointPopup } from '@/libs/map/pointPopup';
-import { formatArea as formatAreaText, formatLength as formatLengthText } from '@/libs/format';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
@@ -642,10 +641,7 @@ class MeasureControls extends Control {
     importFromGeoJSON(geojson) {
         const map = this.getMap();
 
-        const formatArea = polygon => formatAreaText(getArea(polygon), this.unitPref);
-        const formatLength = line => formatLengthText(getLength(line), this.unitPref);
-
-        const result = importMeasurements(geojson, this.source, formatArea, formatLength, map, (feature, m) => {
+        const result = importMeasurements(geojson, this.source, this.unitPref, map, (feature, m) => {
             this.openPointAnnotationDialog(feature, m, true);
         });
 
@@ -913,12 +909,7 @@ class MeasureControls extends Control {
 
         if (!geometry || !measurementType) return;
 
-        let output;
-        if (geometry instanceof Polygon && measurementType === 'area') {
-            output = formatAreaText(getArea(geometry), this.unitPref);
-        } else if (geometry instanceof LineString && measurementType === 'length') {
-            output = formatLengthText(getLength(geometry), this.unitPref);
-        }
+        const output = measurementSizeText(geometry, measurementType, this.unitPref);
 
         if (output) {
             feature.set('tooltipText', output);
@@ -1181,14 +1172,6 @@ class MeasureControls extends Control {
             let listener;
             let sketch;
 
-            const formatArea = function (polygon) {
-                return formatAreaText(getArea(polygon), this.unitPref);
-            };
-
-            const formatLength = function (line) {
-                return formatLengthText(getLength(line), this.unitPref);
-            };
-
             this.pointerMoveHandler = function (evt) {
                 if (evt.dragging) {
                     return;
@@ -1261,10 +1244,10 @@ class MeasureControls extends Control {
                     const geom = evt.target;
                     let output;
                     if (geom instanceof Polygon) {
-                        output = formatArea.call(self, geom);
+                        output = measurementSizeText(geom, 'area', self.unitPref);
                         tooltipCoord = geom.getInteriorPoint().getCoordinates();
                     } else if (geom instanceof LineString) {
-                        output = formatLength.call(self, geom);
+                        output = measurementSizeText(geom, 'length', self.unitPref);
                         tooltipCoord = geom.getLastCoordinate();
                     }
                     self.measureTooltipElement.innerHTML = output;

@@ -128,13 +128,34 @@ function featureToGeoJSON(feature, unitPref = 'metric') {
 }
 
 /**
+ * The text of a measurement whose text is its size, from its geometry: an area or a length in the
+ * user's units. Null for every other measurement (a stockpile summary, a profile, a point), whose
+ * text is not derived from its size and is kept as it is.
+ * @param {ol.geom.Geometry} geometry
+ * @param {string} measurementType
+ * @param {string} unitPref - 'metric' or 'imperial'
+ * @returns {string|null}
+ */
+export function measurementSizeText(geometry, measurementType, unitPref) {
+    if (measurementType === 'area' && geometry instanceof Polygon) return areaParts(getArea(geometry), unitPref).text;
+    if (measurementType === 'length' && geometry instanceof LineString) return lengthParts(getLength(geometry), unitPref).text;
+    return null;
+}
+
+/** The size kind of an untyped geometry: 'area' for a polygon, 'length' for a line, else null */
+function sizeKind(geometry) {
+    if (geometry instanceof Polygon) return 'area';
+    if (geometry instanceof LineString) return 'length';
+    return null;
+}
+
+/**
  * Convert a GeoJSON Feature to an OpenLayers feature
  * @param {Object} geoJsonFeature - GeoJSON Feature
- * @param {Function} formatArea - Function to format area values
- * @param {Function} formatLength - Function to format length values
+ * @param {string} unitPref - Unit preference the sizes are shown in ('metric' or 'imperial')
  * @returns {ol.Feature} OpenLayers feature
  */
-function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
+function geoJSONToFeature(geoJsonFeature, unitPref) {
     const format = new GeoJSON();
     const feature = format.readFeature(geoJsonFeature, {
         dataProjection: EPSG.WGS84,
@@ -176,16 +197,12 @@ function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
     // Restore group assignment
     if (props.groupId) feature.set('groupId', props.groupId);
 
-    // Calculate and format the tooltip text
-    let tooltipText = props.tooltipText;
-
-    if (!tooltipText) {
-        if (geometry instanceof Polygon && formatArea) {
-            tooltipText = formatArea(geometry);
-        } else if (geometry instanceof LineString && formatLength) {
-            tooltipText = formatLength(geometry);
-        }
-    }
+    // An area or a length shows its size in today's units, not the text it was saved with (which
+    // may be in other units or an older format); other measurements keep their text. A feature
+    // saved without text gets its size, as its geometry gives it.
+    const tooltipText = measurementSizeText(geometry, props.measurementType, unitPref)
+        || props.tooltipText
+        || measurementSizeText(geometry, sizeKind(geometry), unitPref);
 
     feature.set('tooltipText', tooltipText);
 
@@ -273,12 +290,11 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
  * Import measurements from GeoJSON into the source
  * @param {Object} geojson - GeoJSON FeatureCollection
  * @param {ol.source.Vector} source - OpenLayers vector source
- * @param {Function} formatArea - Function to format area values
- * @param {Function} formatLength - Function to format length values
+ * @param {string} unitPref - Unit preference the sizes are shown in ('metric' or 'imperial')
  * @param {ol.Map} map - OpenLayers map instance
  * @returns {Array} Imported features
  */
-export function importMeasurements(geojson, source, formatArea, formatLength, map, onPointEdit) {
+export function importMeasurements(geojson, source, unitPref, map, onPointEdit) {
     if (!geojson || !geojson.features) {
         console.warn('Invalid GeoJSON data');
         return [];
@@ -288,7 +304,7 @@ export function importMeasurements(geojson, source, formatArea, formatLength, ma
 
     geojson.features.forEach(geoJsonFeature => {
         try {
-            const feature = geoJSONToFeature(geoJsonFeature, formatArea, formatLength);
+            const feature = geoJSONToFeature(geoJsonFeature, unitPref);
 
             // Add the feature to the source
             source.addFeature(feature);
