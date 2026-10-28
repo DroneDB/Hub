@@ -33,10 +33,26 @@
     margin-right: 0.35rem;
 }
 
-#splat .streaming-badge {
+#splat .top-left-stack {
     position: absolute;
     top: var(--ddb-spacing-md);
     left: var(--ddb-spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    pointer-events: none;
+}
+
+#splat .label-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    /* The labels are only to be read: the canvas below takes the pointer */
+    pointer-events: none;
+}
+
+#splat .streaming-badge {
     background: rgba(0, 0, 0, 0.55);
     color: var(--ddb-text-on-dark);
     padding: 0.25rem 0.6rem;

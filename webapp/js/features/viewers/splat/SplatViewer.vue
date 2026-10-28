@@ -7,6 +7,8 @@
         </template>
 
         <canvas ref="canvas" />
+        <!-- The labels of the measurements: HTML over the canvas, drawn by the stage -->
+        <div ref="labelLayer" class="label-layer" />
         <DialogHost :dialogs="dialogs" />
 
         <div class="top-right-stack">
@@ -15,9 +17,14 @@
             </div>
         </div>
 
-        <!-- Paged .rad: level-of-detail streaming -->
-        <div v-if="loaded && streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
-            <i class="fa-solid fa-tower-broadcast m-0" />
+        <div v-if="loaded" class="top-left-stack">
+            <!-- Paged .rad: level-of-detail streaming -->
+            <div v-if="streaming" class="streaming-badge" title="Level-of-detail streaming: only the detail in view is downloaded">
+                <i class="fa-solid fa-tower-broadcast m-0" />
+            </div>
+            <SplatMeasureToolbar :active-kind="measureKind" :count="measureCount" :metric="measureScale.metric"
+                                 :can-set-scale="canWrite && !georeferenced" @measure="startMeasure" @clear="clearMeasurements"
+                                 @finish="finishMeasure" @cancel="cancelMeasure" />
         </div>
 
         <div v-if="loaded" class="btn-stack">
@@ -79,6 +86,7 @@ import { useConfirm } from '@/composables/useConfirm';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import CameraManager from './CameraManager.vue';
 import SplatCameraRail from './SplatCameraRail.vue';
+import SplatMeasureToolbar from './SplatMeasureToolbar.vue';
 import SplatNavPad from './SplatNavPad.vue';
 import SplatSettings from './SplatSettings.vue';
 import { CameraRig, tiltUp } from './cameraRig';
@@ -91,6 +99,9 @@ import { viewSettingsStore, openingViewSettings, VIEW_DEFAULTS } from './viewSet
 import { EarthControls } from './earthControls';
 import { Presentation } from './presentation';
 import { createSplatStage, assertWebGL2 } from './splatStage';
+import { SplatMeasureTool } from './measureTool';
+import ScaleDialog from './ScaleDialog.vue';
+import { sceneScale, distanceBetween, metersPerUnitFrom } from './measureMath';
 import { useSplatScene } from './useSplatScene';
 
 defineOptions({ name: 'SplatViewer' });
@@ -103,6 +114,7 @@ const dialogs = useDialogs();
 const listeners = useListenerBag();
 
 const canvas = ref(null);
+const labelLayer = ref(null);
 const loaded = ref(false);
 // Fraction of the splat downloaded (null while the total is not known)
 const progress = ref(null);
@@ -132,6 +144,11 @@ const views = useSplatScene({
 });
 const { cameras, activeIndex: activeCameraIndex, dirty: camerasDirty } = views;
 const { add: addCurrentCamera, update: updateCameraToCurrent, remove: deleteCamera, move: moveCamera, rename: renameCamera, save: saveCameras } = views;
+// Measurements: the kind being drawn, how many are shown, and what their values are in
+const measureKind = ref(/** @type {string | null} */ (null));
+const measureCount = ref(0);
+const georeferenced = computed(() => entry.value?.properties?.georeferenced === true);
+const measureScale = computed(() => sceneScale({ georeferenced: georeferenced.value, metersPerUnit: views.scale.value?.metersPerUnit }));
 const activeCameraName = computed(() => {
     const i = activeCameraIndex.value;
     const c = i === null ? null : cameras.value[i];
@@ -148,6 +165,9 @@ let earth = null;
 let presentation = null;
 let pointSize = null;
 let bounds = null;
+let measureTool = null;
+// Drawing a measurement owns the pointer: the navigation controls stand by
+let navigationSuspended = false;
 let lastFrameTime = 0;
 let unmounted = false;
 // The user moved the camera: a late framing (bounds that arrive with the first chunks) must not take it back
@@ -166,9 +186,16 @@ function onUserInteract() {
 // ---- Scene ------------------------------------------------------------------------------
 
 function applyOrientation() {
+    if (!splatMesh) return;
     // The turn that lays the chosen axis (or the estimated up) of the splat along world up
-    if (splatMesh) splatMesh.quaternion.set(...upChoiceQuaternion(upAxis.value, autoUp.value));
+    splatMesh.quaternion.set(...upChoiceQuaternion(upAxis.value, autoUp.value));
+    // What is drawn over the splats turns with them; so does the up the measurements are made along
+    stage.overlay.quaternion.copy(splatMesh.quaternion);
+    if (measureTool) measureTool.refresh();
 }
+
+// The scene's up in the frame of the splat file (the world up, tilt included, turned back by the mesh)
+const fileUp = () => rig.sceneUp.clone().applyQuaternion(stage.overlay.quaternion.clone().invert()).toArray();
 
 /**
  * Frames the splat: the build-time bounds when known (the only source for a paged .rad at
@@ -212,12 +239,13 @@ function renderFrame(time) {
 
 // three.js, OrbitControls and Spark (WebGL + WASM) only load with the viewer
 async function importLibraries() {
-    const [three, orbit, spark] = await Promise.all([
+    const [three, orbit, labels, spark] = await Promise.all([
         import(/* webpackChunkName: "three" */ 'three'),
         import(/* webpackChunkName: "three" */ 'three/examples/jsm/controls/OrbitControls.js'),
+        import(/* webpackChunkName: "three" */ 'three/examples/jsm/renderers/CSS2DRenderer.js'),
         import(/* webpackChunkName: "spark" */ '@sparkjsdev/spark')
     ]);
-    return { THREE: three, OrbitControls: orbit.OrbitControls, Spark: spark };
+    return { THREE: three, OrbitControls: orbit.OrbitControls, CSS2DRenderer: labels.CSS2DRenderer, CSS2DObject: labels.CSS2DObject, Spark: spark };
 }
 
 async function loadSplat() {
@@ -254,7 +282,7 @@ async function loadSplat() {
 
     // The tilt is known before the controls exist: they are built on the final up (and follow setTilt)
     stage = createSplatStage({
-        ...libraries, canvas: canvas.value, streaming: streaming.value, up: tiltUp(THREE, tiltRoll.value, tiltPitch.value), onFrame: renderFrame,
+        ...libraries, canvas: canvas.value, labelLayer: labelLayer.value, streaming: streaming.value, up: tiltUp(THREE, tiltRoll.value, tiltPitch.value), onFrame: renderFrame,
         onContextLost: () => notify.warn('The browser took the graphics context away. The view comes back when it gives it back.', { summary: 'Graphics' }),
         onContextRestored: () => notify.info('The graphics context is back.', { summary: 'Graphics' })
     });
@@ -263,7 +291,7 @@ async function loadSplat() {
 
     rig = new CameraRig(THREE, camera, controls);
     rig.setTilt(tiltRoll.value, tiltPitch.value);
-    const hooks = mode => ({ enabled: () => navMode.value === mode && !dialogOpen.value, onInteract: onUserInteract });
+    const hooks = mode => ({ enabled: () => navMode.value === mode && !dialogOpen.value && !navigationSuspended, onInteract: onUserInteract });
     const el = canvas.value;
     fly = new FlyControls(rig, hooks('fly'));
     fly.attach(el, (t, type, fn, opts) => listeners.add(t, type, fn, opts));
@@ -284,7 +312,16 @@ async function loadSplat() {
     if (!mesh) return;
     splatMesh = mesh;
 
+    measureTool = new SplatMeasureTool({
+        THREE, CSS2DObject: libraries.CSS2DObject, stage, canvas: canvas.value, getUp: fileUp, getScale: () => measureScale.value,
+        listen: (target, type, fn) => listeners.add(target, type, fn),
+        setNavigationEnabled: enabled => { navigationSuspended = !enabled; stage.controls.enabled = enabled; },
+        onActive: kind => { measureKind.value = kind; },
+        onChange: list => views.setMeasurements(list),
+        onMiss: () => notify.info('No splat there: click on the scene.', { summary: 'Measure' })
+    }, count => { measureCount.value = count; });
     applyOrientation();
+    measureTool.show(views.measurements.value);
     // Nothing was in view while loading: a drag then did not choose a view
     userInteracted = false;
     frameRetry.start();
@@ -332,6 +369,8 @@ function setTilt(roll, pitch) {
     presentation.stop();
     rig.setTilt(roll, pitch);
     rig.applyYawPitch();
+    // The up the heights and areas are measured along moved
+    if (measureTool) measureTool.refresh();
 }
 
 // Earth mode: our pointer handlers pan / orbit / zoom; fly mode: OrbitControls pans and zooms
@@ -351,6 +390,45 @@ watch(navMode, mode => {
     if (mode !== 'fly' && mode !== 'earth') navMode.value = PREF_DEFAULTS[PREF.SPLAT_NAV_MODE];
     else applyNavMode();
 });
+
+// ---- Measurements -----------------------------------------------------------------------
+
+// A change of scale changes the values
+watch(measureScale, () => { if (measureTool) measureTool.refresh(); });
+
+// Drawing a shape again while it is drawn ends it
+function startMeasure(kind) {
+    if (!measureTool) return;
+    if (measureTool.activeKind === kind) {
+        measureTool.cancel();
+        return;
+    }
+    onUserInteract();
+    if (kind === 'scale') setScale();
+    else measureTool.measure(kind);
+}
+
+const finishMeasure = () => measureTool?.finish();
+const cancelMeasure = () => measureTool?.cancel();
+
+function clearMeasurements() {
+    if (measureTool) measureTool.clear();
+}
+
+// Two points on something of a known length give the metres per unit of the scene
+async function setScale() {
+    const picked = await measureTool.measure('scale');
+    if (!picked) return;
+    const [a, b] = picked.points;
+    const length = await dialogs.open(ScaleDialog, { unitsApart: distanceBetween(a, b) });
+    if (length === undefined) return;
+    const metersPerUnit = metersPerUnitFrom(a, b, length);
+    if (metersPerUnit === null) {
+        notify.warn('The two points are in the same place: pick the two ends of something you know the length of.', { summary: 'Scale' });
+        return;
+    }
+    views.setScale(metersPerUnit);
+}
 
 // ---- Keyboard and pad -------------------------------------------------------------------
 
@@ -446,9 +524,12 @@ onBeforeUnmount(() => {
     if (fly) fly.stop();
     if (presentation) presentation.dispose();
     if (earth) earth.dispose();
+    if (measureTool) measureTool.dispose();
     if (stage) stage.dispose();
-    stage = splatMesh = rig = fly = earth = presentation = pointSize = null;
+    stage = splatMesh = rig = fly = earth = presentation = pointSize = measureTool = null;
 });
 </script>
 
 <style scoped lang="scss" src="./Splat.scss"></style>
+<!-- The elements the scene draws itself (labels, dots) are not in this template: no scoping -->
+<style lang="scss" src="./SplatOverlays.scss"></style>
