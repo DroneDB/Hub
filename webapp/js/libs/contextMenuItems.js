@@ -11,6 +11,7 @@ import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { useClipboardStore } from '@/stores/clipboard';
+import { SPLAT_DOWNLOADS, splatDownloadsOf, runSplatDownload } from '@/features/viewers/splat/splatDownloads';
 
 /**
  * Context object interface:
@@ -541,10 +542,37 @@ function makeDownloadItem(label, icon, entryType, ctx) {
     };
 }
 
+/**
+ * The downloads of a Gaussian splat: one item per row of SPLAT_DOWNLOADS, shown when the selected
+ * splat has it (the original always, an artifact once it is built). Adding a download is adding a row there.
+ * @param {object} ctx - Context menu context object
+ */
+function splatDownloadItems(ctx) {
+    const selected = () => {
+        const sel = ctx.getSelectedEntries();
+        return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GAUSSIAN_SPLAT ? sel[0] : null;
+    };
+    const available = (file, row) => splatDownloadsOf(file.entry, { building: hasActiveBuild(ctx.dataset, file) }).find(d => d.id === row.id);
+    return SPLAT_DOWNLOADS.map(row => ({
+        label: row.label,
+        icon: row.icon,
+        isVisible: () => {
+            const file = selected();
+            return !!file && !!available(file, row);
+        },
+        click: () => {
+            const file = selected();
+            const download = file && available(file, row);
+            if (download) runSplatDownload(download, () => ctx.emit('downloadItems', [file]));
+        }
+    }));
+}
+
 function toolsItem(ctx) {
     const cogItem = makeDownloadItem('Download COG', 'fa-solid fa-file-image', ddb.entry.type.GEORASTER, ctx);
     const copcItem = makeDownloadItem('Download COPC', 'fa-solid fa-cube', ddb.entry.type.POINTCLOUD, ctx);
     const gpkgItem = makeDownloadItem('Download GPKG', 'fa-solid fa-map', ddb.entry.type.VECTOR, ctx);
+    const splatItems = splatDownloadItems(ctx);
 
     const mergeMultispectral = mergeMultispectralItem(ctx);
     const maskBorders = maskBordersItem(ctx);
@@ -572,11 +600,12 @@ function toolsItem(ctx) {
             transfer,
             {
                 type: 'separator',
-                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible()
+                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible() || splatItems.some(i => i.isVisible())
             },
             cogItem,
             copcItem,
-            gpkgItem
+            gpkgItem,
+            ...splatItems
         ]
     };
 }
@@ -658,6 +687,7 @@ export {
 
 
     setCoordinateSystemItem,
+    splatDownloadItems,
     deleteItem,
     deleteSeparator,
 
