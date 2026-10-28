@@ -9,8 +9,13 @@
  * are kept in the frame of the splat file (the overlay group of the stage is turned with the mesh),
  * and the values are worked out from them every time they are drawn, so they follow a change of the
  * scale or of the up. Navigation is suspended while a shape is drawn (a drag would also move the
- * camera): a click adds a point, Enter or a right click ends the shape, Escape cancels it. A
- * shape with a fixed number of points (a point, a height) ends by itself.
+ * camera): a click adds a point, a double click, Enter or a right click ends the shape, Escape
+ * cancels it. A shape with a fixed number of points (a point, a height) ends by itself.
+ *
+ * A double click is two clicks before its dblclick: the second one lands where the first did and
+ * would add the same point again (a segment of length 0 whose label covers the total), so a click
+ * on the screen spot of the point just added adds nothing. Navigation is suspended, so the same
+ * spot is the same point at any scale.
  *
  * The same drawing picks points that are not measurements: `measure('scale')` the two points of a
  * length the user knows, `measure('pin')` the place of a pin. The points are returned and nothing
@@ -23,6 +28,8 @@ import { newId } from './sceneData';
 // A press that moves more than this many pixels, or lasts longer than this, is a drag, not a click
 const CLICK_MOVE_PX = 6;
 const CLICK_MS = 600;
+// A click this close (in pixels) to the click that added the previous point picks that point again
+const SAME_POINT_PX = 5;
 
 /** What can be picked but is not a measurement: the two points of a known length, the place of a pin. Not kept. */
 const PICK_ONLY = { scale: { min: 2, max: 2 }, pin: { min: 1, max: 1 } };
@@ -56,7 +63,7 @@ export class SplatMeasureTool {
         this.measurements = [];
         /** @type {Map<number | string, { group: any, labels: any[] }>} */
         this.shapes = new Map();
-        /** @type {{ kind: string, points: number[][], resolve: (m: any) => void, draft: { group: any, labels: any[] } | null, down: { x: number, y: number, at: number } | null } | null} */
+        /** @type {{ kind: string, points: number[][], resolve: (m: any) => void, draft: { group: any, labels: any[] } | null, down: { x: number, y: number, at: number } | null, last: { x: number, y: number } | null } | null} */
         this.session = null;
         this.disposed = false;
         this.labels = sceneLabels(() => host.getScale(), () => host.getCoordinateWriter?.() ?? null);
@@ -65,6 +72,7 @@ export class SplatMeasureTool {
         listen(canvas, 'pointerdown', e => this.onPointerDown(e));
         listen(canvas, 'pointerup', e => this.onPointerUp(e));
         listen(canvas, 'contextmenu', e => this.onContextMenu(e));
+        listen(canvas, 'dblclick', e => this.onDoubleClick(e));
         listen(window, 'keydown', e => this.onKey(e));
     }
 
@@ -84,7 +92,7 @@ export class SplatMeasureTool {
         if (this.disposed || !Object.hasOwn(SPECS, kind)) return Promise.resolve(null);
         this.cancel();
         return new Promise(resolve => {
-            this.session = { kind, points: [], resolve, draft: null, down: null };
+            this.session = { kind, points: [], resolve, draft: null, down: null, last: null };
             this.host.setNavigationEnabled(false);
             this.host.onActive?.(kind);
         });
@@ -255,6 +263,8 @@ export class SplatMeasureTool {
         const { down } = s;
         s.down = null;
         if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_MOVE_PX || performance.now() - down.at > CLICK_MS) return;
+        const { last } = s;
+        if (last && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= SAME_POINT_PX) return;
         const rect = this.host.canvas.getBoundingClientRect();
         if (!rect.width || !rect.height) return;
         const ndc = { x: ((e.clientX - rect.left) / rect.width) * 2 - 1, y: -((e.clientY - rect.top) / rect.height) * 2 + 1 };
@@ -267,6 +277,7 @@ export class SplatMeasureTool {
         overlay.updateWorldMatrix(true, false);
         const local = overlay.worldToLocal(hit.point.clone());
         s.points.push([local.x, local.y, local.z]);
+        s.last = { x: e.clientX, y: e.clientY };
         this.drawDraft(s);
         if (s.points.length >= SPECS[s.kind].max) this.finish();
     }
@@ -278,6 +289,16 @@ export class SplatMeasureTool {
         e.preventDefault();
         if (s.points.length >= SPECS[s.kind].min) this.finish();
         else this.cancel();
+    }
+
+    /**
+     * A double click ends a shape that has enough points, as Enter does; one with too few goes on,
+     * since its clicks added at most one point. @param {MouseEvent} e
+     */
+    onDoubleClick(e) {
+        if (!this.session || e.button !== 0) return;
+        e.preventDefault();
+        this.finish();
     }
 
     /** @param {KeyboardEvent} e */

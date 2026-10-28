@@ -12,6 +12,7 @@ let counts;
 let hits;
 let scale;
 let up;
+let clicks;
 
 /** Mouse events on the canvas, 200 by 100 pixels at the origin of the page. */
 const fire = (type, init = {}) => canvas.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 0, ...init }));
@@ -39,6 +40,7 @@ beforeEach(() => {
     counts = [];
     scale = { metersPerUnit: 1, unit: 'm' };
     up = [0, 0, 1];
+    clicks = 0;
     host = {
         THREE, CSS2DObject, canvas,
         stage: { overlay, pickSplat: vi.fn(() => hits.shift() ?? null) },
@@ -54,8 +56,20 @@ beforeEach(() => {
 });
 
 const hit = (x, y, z) => ({ point: new THREE.Vector3(x, y, z), distance: 1 });
-/** Picks these points, one per click. */
-const pick = (...points) => points.forEach(p => { hits.push(hit(...p)); click(); });
+/** Picks these points, one per click, each click on a spot of its own as the user's would be. */
+const pick = (...points) => points.forEach(p => { hits.push(hit(...p)); click(10 + (clicks++ % 9) * 20, 50); });
+/**
+ * A double click on this spot that finds this point, as a browser sends it: two clicks (the second
+ * one a pixel off, as a hand does) and a dblclick. The splats under both clicks are the same point.
+ */
+function doubleClick(p, x = 150, y = 60) {
+    [x, x + 1].forEach(cx => {
+        hits.splice(0, hits.length, hit(...p));
+        click(cx, y);
+    });
+    hits.length = 0;
+    fire('dblclick', { clientX: x + 1, clientY: y });
+}
 
 describe('drawing a distance', () => {
     it('adds a point per click, labels every segment and the total, and ends with a right click', async () => {
@@ -107,6 +121,70 @@ describe('drawing a distance', () => {
         expect(dots()).toBe(0);
         tool.cancel();
         expect(await second).toBeNull();
+    });
+});
+
+describe('a double click', () => {
+    it('adds its point once and ends a distance, with no segment of length 0', async () => {
+        const drawing = tool.measure('distance');
+        pick([0, 0, 0]);
+        doubleClick([3, 4, 0]);
+        const measurement = await drawing;
+        expect(measurement).toMatchObject({ kind: 'distance', points: [[0, 0, 0], [3, 4, 0]] });
+        expect(tool.activeKind).toBeNull();
+        expect(labels()).toEqual(['5.0 m']);
+        expect(counts).toEqual([1]);
+    });
+
+    it('ends an area on its third point', async () => {
+        const drawing = tool.measure('area');
+        pick([0, 0, 0], [4, 0, 0]);
+        doubleClick([4, 3, 0]);
+        expect((await drawing).points).toEqual([[0, 0, 0], [4, 0, 0], [4, 3, 0]]);
+        expect(labels()).toEqual(['6 m²']);
+    });
+
+    it('leaves a shape with too few points being drawn, with the one point it added', () => {
+        tool.measure('distance');
+        doubleClick([1, 0, 0]);
+        expect(tool.activeKind).toBe('distance');
+        expect(dots()).toBe(1);
+        expect(host.stage.pickSplat).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not end a shape that is not being drawn', () => {
+        fire('dblclick');
+        expect(host.setNavigationEnabled).not.toHaveBeenCalled();
+    });
+
+    it('does not pick the first point of a known length twice', async () => {
+        const drawing = tool.measure('scale');
+        doubleClick([0, 0, 0]);
+        expect(tool.activeKind).toBe('scale');
+        pick([0, 0, 4]);
+        expect((await drawing).points).toEqual([[0, 0, 0], [0, 0, 4]]);
+    });
+});
+
+describe('a second click', () => {
+    it('adds a point when it is a few pixels further than the click before', async () => {
+        const drawing = tool.measure('distance');
+        hits.push(hit(0, 0, 0), hit(0, 0, 1));
+        click(100, 50);
+        click(108, 50);
+        fire('contextmenu');
+        expect((await drawing).points).toEqual([[0, 0, 0], [0, 0, 1]]);
+    });
+
+    it('adds a point on the spot of a click that found no splat', async () => {
+        const drawing = tool.measure('distance');
+        hits.push(hit(0, 0, 0), null, hit(0, 0, 1));
+        click(100, 50);
+        click(20, 50);
+        click(21, 50);
+        expect(host.onMiss).toHaveBeenCalledTimes(1);
+        fire('contextmenu');
+        expect((await drawing).points).toEqual([[0, 0, 0], [0, 0, 1]]);
     });
 });
 
