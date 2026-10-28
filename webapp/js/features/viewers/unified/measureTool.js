@@ -3,9 +3,7 @@
  * with Giro3D's DrawTool. Navigation is suspended while a shape is drawn (the DrawTool does
  * not do it, so a drag would also move the camera); right click ends a shape.
  */
-import { measureFormatters } from './sceneUtils';
-
-const COLOR = '#f2a51a';
+import { measureFormatters, MEASURE_COLOR as COLOR } from './sceneUtils';
 
 export class MeasureTool {
     /**

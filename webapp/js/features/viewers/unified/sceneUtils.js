@@ -66,21 +66,31 @@ export function canvasNeedsResize(canvas, pixelRatio) {
 /** Low to high elevation colours (blue, cyan, green, yellow, red). */
 export const ELEVATION_RAMP = [0x2c7bb6, 0x00a6ca, 0x00ccbc, 0x90eb9d, 0xffff8c, 0xf9d057, 0xf29e2e, 0xe76818, 0xd7191c];
 
+/** The colour of the shapes drawn by the measurement tools of the 3D viewers. */
+export const MEASURE_COLOR = '#f2a51a';
+
 /**
  * Measurement labels. `scale` corrects Web Mercator lengths to ground lengths (cos latitude;
- * 1 in metric CRSs) and is read at call time.
+ * 1 in metric CRSs) and is read at call time. `unit` names what the lengths are in: metres, or
+ * (a scene with no known scale) anything else, which is written as it is and never turned into
+ * kilometres. It is read at call time too.
  * @param {() => number} scale
+ * @param {() => string} [unit]
  */
-export function measureFormatters(scale) {
+export function measureFormatters(scale, unit = () => 'm') {
     return {
         /** @param {{ length: number }} m */
         length: ({ length }) => {
             const v = length * scale();
+            const u = unit();
+            if (u !== 'm') return `${v.toFixed(2)} ${u}`;
             return v >= 1000 ? `${(v / 1000).toFixed(2)} km` : `${v.toFixed(1)} m`;
         },
         /** @param {{ area: number }} m */
         area: ({ area }) => {
             const v = area * scale() * scale();
+            const u = unit();
+            if (u !== 'm') return `${v.toFixed(2)} ${u}²`;
             return v >= 1e6 ? `${(v / 1e6).toFixed(2)} km²` : `${v.toFixed(0)} m²`;
         }
     };
