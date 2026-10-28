@@ -27,5 +27,7 @@ export const isBadRequest = e => hasStatus(e, 400);
 export const isUnauthorized = e => hasStatus(e, 401);
 /** @param {unknown} e */
 export const isForbidden = e => hasStatus(e, 403);
+/** The thing asked for is not there (a status of 0, a network failure or a timeout, says nothing about it). @param {unknown} e */
+export const isNotFound = e => hasStatus(e, 404);
 
 export { ApiError };

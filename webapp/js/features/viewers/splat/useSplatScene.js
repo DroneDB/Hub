@@ -28,9 +28,7 @@ import { ref, shallowRef } from 'vue';
 import { camerasPathFor, parseCamerasFile, serializeCamerasFile, viewFromRig, cameraFromRig } from './cameraPresets';
 import { editableList } from './editableList';
 import { newId } from './sceneData';
-
-/** The request was answered with 404 (an ApiError's status; 0 is a network failure or a timeout). @param {unknown} e */
-const isNotFound = e => !!e && typeof e === 'object' && /** @type {any} */ (e).status === 404;
+import { isNotFound } from '@/libs/ddb/apiError';
 
 /**
  * @param {object} options
