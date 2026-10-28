@@ -155,16 +155,44 @@ describe('what is read, and when', () => {
         expect(reads).toEqual(['a.spz']);
     });
 
-    it('is kept for the build when the files on show are set again, so the new points get their footprint without a request', async () => {
-        const { dataset, reads } = datasetWith({ 'a.spz': { min: [0], max: [1], wgs84Footprint: FOOTPRINT } });
+    it('is read again for a new file list, so a splat built again under the same bounds URL gets the footprint of its new build', async () => {
+        // An older build without a footprint, then the same file built again (same hash, same URL) with one
+        const bounds = { 'a.spz': { min: [0], max: [1] } };
+        const { dataset, reads } = datasetWith(bounds);
         splats.setFiles([splat('a.spz')]);
         await splats.loadInView(WORLD, dataset);
 
+        bounds['a.spz'] = { min: [0], max: [1], wgs84Footprint: FOOTPRINT };
         const again = splat('a.spz');
         splats.setFiles([again]);
         expect(geometryType(splats, again)).toBe('Point');
         await splats.loadInView(WORLD, dataset);
         expect(geometryType(splats, again)).toBe('Polygon');
+        expect(reads).toEqual(['a.spz', 'a.spz']);
+    });
+
+    it.each([
+        ['bounds that could not be read (a server error or a dropped connection)', null],
+        ['a read that throws', new Error('network')]
+    ])('is asked again on the next move after %s, and then applied', async (_name, failure) => {
+        const bounds = { 'a.spz': failure };
+        const { dataset, reads } = datasetWith(bounds);
+        const file = splat('a.spz');
+        splats.setFiles([file]);
+        await splats.loadInView(WORLD, dataset);
+        expect(geometryType(splats, file)).toBe('Point');
+
+        bounds['a.spz'] = { min: [0], max: [1], wgs84Footprint: FOOTPRINT };
+        await splats.loadInView(WORLD, dataset);
+        expect(geometryType(splats, file)).toBe('Polygon');
+        expect(reads).toEqual(['a.spz', 'a.spz']);
+    });
+
+    it('is not asked again, within a file list, for bounds that were read and have no footprint', async () => {
+        const { dataset, reads } = datasetWith({ 'a.spz': { min: [0], max: [1] } });
+        splats.setFiles([splat('a.spz')]);
+        await splats.loadInView(WORLD, dataset);
+        await splats.loadInView(WORLD, dataset);
         expect(reads).toEqual(['a.spz']);
     });
 

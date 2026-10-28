@@ -7,8 +7,12 @@
  * drawn: it has no place.
  *
  * The footprint is read lazily: only for the splats in view, and once per build (the URL of the
- * bounds artifact names the build), including a build that has none, so a pan does not ask
- * again. A splat whose build is not finished lists no bounds artifact and nothing is requested.
+ * bounds artifact names the build) and file list, including a build whose bounds have none, so a
+ * pan does not ask again. A read that fails (a server error, a dropped connection) is not kept:
+ * the point stays and the next move of the map asks again. A new file list reads again, because
+ * a splat built again keeps the URL of its bounds (the hash of the file) and an older build may
+ * have had no footprint. A splat whose build is not finished lists no bounds artifact and nothing
+ * is requested.
  *
  *   const splats = new SplatFootprints();
  *   splats.setFiles(files);                      // when the files on show change
@@ -89,18 +93,23 @@ export class SplatFootprints {
         });
         /** The feature of each splat on show. @type {Map<any, Feature>} */
         this.features = new Map();
-        /** What a build's bounds gave, by the URL of the bounds artifact. @type {Map<string, Promise<any>>} */
+        /**
+         * What a build's bounds gave, by the URL of the bounds artifact: `{ footprint }` (null when
+         * the bounds have none), or null while the bounds could not be read (not kept).
+         * @type {Map<string, Promise<{ footprint: any } | null>>}
+         */
         this.footprints = new Map();
     }
 
     /**
-     * Shows these files: a point for each georeferenced splat among them (the footprints already
-     * read are kept and are applied by the next loadInView).
+     * Shows these files: a point for each georeferenced splat among them. The footprints read for
+     * the files before are forgotten, so a splat built again since gets the bounds of its new build.
      * @param {any[]} files
      */
     setFiles(files) {
         this.source.clear();
         this.features.clear();
+        this.footprints.clear();
         const features = [];
         for (const file of files) {
             if (!isGeoreferencedSplat(file)) continue;
@@ -137,15 +146,18 @@ export class SplatFootprints {
 
         let read = this.footprints.get(url);
         if (!read) {
-            // An unreadable file is no footprint: the point stays (getGsplatBounds does not throw, but nothing relies on it)
-            read = Promise.resolve(entry.getGsplatBounds()).then(footprintOf, () => null);
+            // getGsplatBounds gives null for bounds it could not read (and does not throw, but nothing relies on it)
+            read = Promise.resolve(entry.getGsplatBounds())
+                .then(bounds => (bounds ? { footprint: footprintOf(bounds) } : null), () => null);
             this.footprints.set(url, read);
         }
-        const footprint = await read;
+        const result = await read;
+        // A failed read may be a passing one: forgotten, so the next look asks again
+        if (!result && this.footprints.get(url) === read) this.footprints.delete(url);
         // The files on show changed while it was read
-        if (this.features.get(file) !== feature) return;
+        if (this.features.get(file) !== feature || !result) return;
         feature.set('footprintOf', url);
-        if (footprint) feature.setGeometry(toMercator(footprint));
+        if (result.footprint) feature.setGeometry(toMercator(result.footprint));
     }
 
     /** The extent of everything drawn (EPSG:3857), empty when nothing is. */
