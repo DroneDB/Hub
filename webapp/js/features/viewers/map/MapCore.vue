@@ -309,6 +309,7 @@ export default {
                 this.map.on('pointermove', e => this.onPointerMove(e)),
                 this.map.on('click', e => this.onMapClick(e)),
                 this.map.on('dblclick', e => this.onMapDoubleClick(e)),
+                this.map.on('moveend', () => this.loadSplatFootprints()),
                 this.map.on('contextmenu', e => {
                     this.selectAt(e.pixel);
                     e.stopPropagation();
@@ -348,10 +349,18 @@ export default {
             // Zoom once every vector file's metadata is in (resolves at once without vectors)
             Promise.all(vectorFiles.map(f => this.addVectorLayer(f))).then(() => this.zoomToFilesExtent());
             this.syncRasterLayers();
+            this.loadSplatFootprints();
             this.updateRastersOpacity();
             this.loadSavedMeasurements();
             this.restorePlantHealthFromHash(this.files);
             this.viewZoomCap.schedule();
+        },
+
+        // The footprints of the georeferenced splats in view (the points of the others stay)
+        loadSplatFootprints: function () {
+            if (!this.map || !this.fileLayers) return;
+            const extent = this.map.getView().calculateExtent(this.map.getSize());
+            this.fileLayers.splats.loadInView(extent, this.dataset).catch(error => console.error('Error loading splat footprints:', error));
         },
 
         addVectorLayer: async function (file) {
@@ -382,11 +391,13 @@ export default {
             }
             const vectorHit = featureAt(this.map, e.pixel, l => this.vectorLayers.includes(l));
             const shotHit = vectorHit ? null : featureAt(this.map, e.pixel, l => l === this.fileLayers.shotLayer);
-            this.map.getTargetElement().style.cursor = vectorHit || shotHit ? 'pointer' : 'inherit';
+            const splatHit = vectorHit || shotHit ? null : featureAt(this.map, e.pixel, l => l === this.fileLayers.splats.layer);
+            this.map.getTargetElement().style.cursor = vectorHit || shotHit || splatHit ? 'pointer' : 'inherit';
 
             const shots = shotHit && shotHit.feature.get('features');
             if (vectorHit) this.showFeatureTooltip(vectorHit.feature, e.pixel, vectorHit.layer);
             else if (shots && shots.length) this.showTextTooltip(this.shotsLabel(shots), e.pixel);
+            else if (splatHit) this.showTextTooltip(ddb.pathutils.basename(splatHit.feature.file.entry.path), e.pixel);
             else this.hideFeatureTooltip();
         },
 
@@ -447,6 +458,15 @@ export default {
             if (this.isSelecting()) return;
             const hit = featureAt(this.map, e.pixel, l => l.getVisible() && l === this.fileLayers.shotLayer);
             const file = hit && hit.feature.get('features')[0].file;
+            // A splat opens in its viewer
+            const splat = hit ? null : featureAt(this.map, e.pixel, l => l === this.fileLayers.splats.layer);
+            if (splat) {
+                this.$refs.filePopup.close();
+                this.$emit('openItem', splat.feature.file);
+                e.stopPropagation();
+                e.preventDefault();
+                return;
+            }
             if (file && file.entry.type === ddb.entry.type.GEOVIDEO) {
                 this.$refs.filePopup.close();
                 this.$emit('openItem', file);

@@ -1,7 +1,7 @@
 /**
  * The dataset map's file layers: georasters, the footprint of a
- * clicked photo, invisible raster extents (so rasters can be clicked), the flight path,
- * the shot / panorama markers and the start and finish flags. Vector files are separate
+ * clicked photo, the georeferenced Gaussian splats, invisible raster extents (so rasters can be
+ * clicked), the flight path, the shot / panorama markers and the start and finish flags. Vector files are separate
  * layers (createVectorFileLayer) because they load asynchronously.
  *
  *   const fl = new FileLayers();
@@ -23,6 +23,7 @@ import { EPSG } from '@/libs/constants';
 import { createFileLayerStyles } from '@/libs/map/fileLayerStyles';
 import { orderFlightPath } from '@/libs/map/flightPath';
 import { createRasterTileLayer } from '@/libs/map/rasterLayers';
+import { SplatFootprints } from '@/libs/map/splatFootprints';
 import { isMeasurementFile } from '@/libs/map/measurementStorage';
 import { createMvtVectorStyles, createMvtStyleFunction, createMvtVectorLayer, fetchMvtMetadata } from '@/composables/useMvtLayer';
 
@@ -36,6 +37,8 @@ export class FileLayers {
         this.styles = createFileLayerStyles();
         this.rasters = new LayerGroup();
         this.footprints = new LayerGroup();
+        // Georeferenced splats: a point, the footprint of the build once the map has read it
+        this.splats = new SplatFootprints();
         this.extentFeatures = new VectorSource();
         this.extentLayer = new VectorLayer({ source: this.extentFeatures, style: this.styles.invisible });
         this.shotFeatures = new VectorSource();
@@ -51,7 +54,7 @@ export class FileLayers {
 
     /** The layers in map order, bottom first. */
     get layers() {
-        return [this.rasters, this.footprints, this.extentLayer,
+        return [this.rasters, this.footprints, this.splats.layer, this.extentLayer,
             new LayerGroup({ layers: [this.pathLayer, this.shotLayer, this.flagLayer] })];
     }
 
@@ -95,6 +98,7 @@ export class FileLayers {
             }
         }
         if (shots.length) this.shotFeatures.addFeatures(shots);
+        this.splats.setFiles(files);
         this.drawFlightPath(stops);
         return vectorFiles;
     }
@@ -145,10 +149,11 @@ export class FileLayers {
         this.footprints.getLayers().clear();
     }
 
-    /** Extent of the shots and rasters (EPSG:3857), empty when there are none. */
+    /** Extent of the shots, rasters and splats (EPSG:3857), empty when there are none. */
     extent() {
         const ext = createEmptyExtent();
         if (this.shotFeatures.getFeatures().length) extendExtent(ext, this.shotFeatures.getExtent());
+        if (this.splats.features.size) extendExtent(ext, this.splats.extent());
         this.rasters.getLayers().forEach(layer => extendExtent(ext, layer.getExtent()));
         return ext;
     }
