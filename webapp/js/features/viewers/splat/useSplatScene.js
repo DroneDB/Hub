@@ -29,6 +29,9 @@ import { camerasPathFor, parseCamerasFile, serializeCamerasFile, viewFromRig, ca
 import { editableList } from './editableList';
 import { newId } from './sceneData';
 
+/** The request was answered with 404 (an ApiError's status; 0 is a network failure or a timeout). @param {unknown} e */
+const isNotFound = e => !!e && typeof e === 'object' && /** @type {any} */ (e).status === 404;
+
 /**
  * @param {object} options
  * @param {{ value: any }} options.dataset            the dataset (a ref)
@@ -62,14 +65,27 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
         return (/** @type {any[]} */ ...args) => (canWrite.value ? change(...args) : undefined);
     }
 
-    /** Reads the sidecar (absent for most datasets) and applies the orientation it holds. */
+    /** The sidecar may exist but was not read: it is reported, and saving asks before replacing it. */
+    function markUnreadable(/** @type {unknown} */ e) {
+        cameras.value = [];
+        unreadable.value = true;
+        notify.warn(`The saved views of this splat (camera views, pins and measurements) could not be read (${e instanceof Error ? e.message : e}). `
+            + 'Saving will replace the file.', { summary: 'Saved views', life: 'long' });
+    }
+
+    /**
+     * Reads the sidecar (absent for most datasets) and applies the orientation it holds. Only a
+     * 404 means there is none: a server error, a timeout or a dropped connection says nothing
+     * about the file, which may hold views that a save without asking would overwrite.
+     */
     async function load() {
         path = camerasPathFor(entry.value.path);
         let text;
         try {
             text = await dataset.value.getFileContents(path);
-        } catch {
-            cameras.value = [];
+        } catch (e) {
+            if (isNotFound(e)) cameras.value = [];
+            else markUnreadable(e);
             return;
         }
         try {
@@ -83,10 +99,7 @@ export function useSplatScene({ dataset, entry, canWrite, notify, confirm, getRi
             if (parsed.orientation.tiltPitch !== undefined) orientation.tiltPitch.value = parsed.orientation.tiltPitch;
             savedUp.value = parsed.orientation.upAxis === 'auto' ? (parsed.orientation.up ?? null) : null;
         } catch (e) {
-            cameras.value = [];
-            unreadable.value = true;
-            notify.warn(`The saved views of this splat (camera views, pins and measurements) could not be read (${e instanceof Error ? e.message : e}). `
-                + 'Saving will replace the file.', { summary: 'Saved views', life: 'long' });
+            markUnreadable(e);
         }
     }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { useSplatScene } from './useSplatScene';
 import { parseCamerasFile } from './cameraPresets';
+import { ApiError } from '@/libs/ddb/apiError';
 
 const rig = {
     camera: { position: { x: 1, y: 2, z: 3 }, quaternion: { x: 0, y: 0, z: 0, w: 1 }, fov: 60 },
@@ -61,13 +62,28 @@ describe('loading the sidecar', () => {
         expect(orientation.upAxis.value).toBeNull();
     });
 
-    it('treats a missing sidecar as none, with no warning', async () => {
-        dataset.getFileContents.mockRejectedValue(new Error('Not found'));
+    it('treats a missing sidecar (404) as none, with no warning', async () => {
+        dataset.getFileContents.mockRejectedValue(new ApiError('Not found', 404));
         const cams = make();
         await cams.load();
         expect(cams.cameras.value).toEqual([]);
         expect(cams.unreadable.value).toBe(false);
         expect(notify.warn).not.toHaveBeenCalled();
+        expect(orientation.upAxis.value).toBe('-y');
+    });
+
+    it.each([
+        ['a server error', new ApiError('Server Error', 500)],
+        ['a timeout', new ApiError('Request timed out after 30s', 0)],
+        ['a dropped connection', new TypeError('Failed to fetch')]
+    ])('does not take %s for a missing sidecar: it warns that the file could not be read', async (_, error) => {
+        dataset.getFileContents.mockRejectedValue(error);
+        const cams = make();
+        await cams.load();
+        expect(cams.cameras.value).toEqual([]);
+        expect(cams.unreadable.value).toBe(true);
+        expect(notify.warn).toHaveBeenCalledTimes(1);
+        expect(notify.warn.mock.calls[0][0]).toMatch(/could not be read/);
         expect(orientation.upAxis.value).toBe('-y');
     });
 
@@ -140,6 +156,30 @@ describe('saving', () => {
         expect(await cams.save()).toBe(false);
         expect(dataset.writeObj).not.toHaveBeenCalled();
         expect(notify.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes without asking when there was no sidecar (404)', async () => {
+        dataset.getFileContents.mockRejectedValue(new ApiError('Not found', 404));
+        const cams = make();
+        await cams.load();
+        cams.add();
+        expect(await cams.save()).toBe(true);
+        expect(confirm).not.toHaveBeenCalled();
+        expect(dataset.writeObj).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        ['a server error', new ApiError('Server Error', 500)],
+        ['a network failure', new ApiError('Network error', 0)]
+    ])('does not overwrite a sidecar it failed to read through %s unless the user confirms', async (_, error) => {
+        dataset.getFileContents.mockRejectedValue(error);
+        const cams = make();
+        await cams.load();
+        cams.add();
+        confirm.mockResolvedValue(false);
+        expect(await cams.save()).toBe(false);
+        expect(confirm).toHaveBeenCalledTimes(1);
+        expect(dataset.writeObj).not.toHaveBeenCalled();
     });
 
     describe('over a sidecar that could not be read', () => {
