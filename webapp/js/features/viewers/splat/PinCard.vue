@@ -12,6 +12,9 @@
         <img v-if="imageUrl" class="pin-image" :src="imageUrl" :alt="pin.title">
         <!-- eslint-disable-next-line vue/no-v-html -- Markdown rendered and sanitised by libs/markdown.js -->
         <div v-if="html" class="pin-text" v-html="html" />
+        <small v-if="coordinates" class="pin-coordinates" title="Where the pin is">
+            <i class="fa-solid fa-location-crosshairs" /> {{ coordinates }}
+        </small>
         <a v-if="pin.link" class="pin-link" :href="pin.link" target="_blank" rel="noopener noreferrer">
             <i class="fa-solid fa-arrow-up-right-from-square" /> {{ pin.link }}
         </a>
@@ -22,7 +25,8 @@
 /**
  * PinCard - what a pin says: its title, the image from the dataset, the text (Markdown, rendered
  * and sanitised by the Markdown renderer of the Hub; an image in the text is not loaded, the
- * pin has its own) and its link, which opens in another tab.
+ * pin has its own), where it is on the Earth for a georeferenced splat, and its link, which opens
+ * in another tab.
  */
 import { computed } from 'vue';
 import { renderMarkdown } from '@/libs/markdown';
@@ -32,7 +36,9 @@ const props = defineProps({
     pin: { type: Object, required: true },
     /** The address of the pin's image, if it has one */
     imageUrl: { type: String, default: '' },
-    canWrite: { type: Boolean, default: false }
+    canWrite: { type: Boolean, default: false },
+    /** Where the pin is on the Earth (a georeferenced splat), already written; empty when it is not shown */
+    coordinates: { type: String, default: '' }
 });
 const emit = defineEmits(['close', 'edit']);
 const html = computed(() => renderMarkdown(props.pin.text, { allowImages: false }));
@@ -101,6 +107,14 @@ h3 {
 .pin-text :deep(a),
 .pin-link {
     color: var(--ddb-primary-200, #9cc4ff);
+}
+
+.pin-coordinates {
+    display: block;
+    margin-top: 0.4rem;
+    opacity: 0.85;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
 }
 
 .pin-link {

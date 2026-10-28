@@ -121,6 +121,20 @@ describe('labels', () => {
     it('give the coordinates of a georeferenced point in metres', () => {
         expect(labelsFor({ georeferenced: true }).coordinates([10, 20, 30])).toBe('10.00, 20.00, 30.00 m');
     });
+
+    it('write the coordinates of a point on the Earth when there is a writer for them, and follow it when it changes', () => {
+        let writer = p => `at ${p.join('/')}`;
+        const labels = sceneLabels(() => sceneScale({ georeferenced: true }), () => writer);
+        expect(labels.coordinates([1, 2, 3])).toBe('at 1/2/3');
+        expect(shapeLabels('point', [[4, 5, 6]], [0, 0, 1], labels)[0].text).toBe('at 4/5/6');
+        writer = null;
+        expect(labels.coordinates([1, 2, 3])).toBe('1.00, 2.00, 3.00 m');
+    });
+
+    it('leave the lengths alone when the coordinates are written on the Earth', () => {
+        const labels = sceneLabels(() => sceneScale({ georeferenced: true }), () => () => 'somewhere');
+        expect(labels.length(5)).toBe('5.0 m');
+    });
 });
 
 describe('the labels of a shape', () => {

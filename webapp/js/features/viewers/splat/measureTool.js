@@ -36,6 +36,7 @@ const SPECS = { ...MEASURE_KINDS, ...PICK_ONLY };
  * @property {HTMLCanvasElement} canvas
  * @property {() => number[]} getUp               the scene's up in the frame of the file
  * @property {() => { metersPerUnit: number, unit: string }} getScale
+ * @property {() => ((p: number[]) => string) | null} [getCoordinateWriter]   writes a point as coordinates on the Earth, null when the scene has none
  * @property {(target: any, type: string, listener: (e: any) => void) => void} listen   adds a listener for the life of the viewer
  * @property {(enabled: boolean) => void} setNavigationEnabled
  * @property {(kind: string | null) => void} [onActive]   the kind being drawn or picked changed (null: none)
@@ -58,7 +59,7 @@ export class SplatMeasureTool {
         /** @type {{ kind: string, points: number[][], resolve: (m: any) => void, draft: { group: any, labels: any[] } | null, down: { x: number, y: number, at: number } | null } | null} */
         this.session = null;
         this.disposed = false;
-        this.labels = sceneLabels(() => host.getScale());
+        this.labels = sceneLabels(() => host.getScale(), () => host.getCoordinateWriter?.() ?? null);
 
         const { canvas, listen } = host;
         listen(canvas, 'pointerdown', e => this.onPointerDown(e));

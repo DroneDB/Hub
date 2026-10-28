@@ -12,6 +12,10 @@
                     aria-label="Set the scale" :aria-pressed="activeKind === 'scale'" @click="emit('measure', 'scale')">
                 <i class="fa-solid fa-arrows-left-right-to-line" />
             </button>
+            <button v-if="coordinateMode" class="coordinate-mode" :title="`Coordinates are shown in ${coordinateMode}: click to change`"
+                    :aria-label="`Coordinates are shown in ${coordinateMode}: click to change`" @click="emit('toggle-coordinates')">
+                {{ coordinateMode }}
+            </button>
         </div>
         <div v-if="activeKind" class="measure-hint">
             <span>{{ hint }}</span>
@@ -27,7 +31,8 @@
 <script setup>
 /**
  * The splat viewer's measurement toolbar (top-left): point, distance, height and area, clearing
- * them, and (for a user who can save it, on a scene with no scale) setting the scale. While a
+ * them, and (for a user who can save it, on a scene with no scale) setting the scale. A georeferenced
+ * scene also has a button for the coordinates of a point: in its CRS or in WGS84. While a
  * shape is drawn it says how to end it, with buttons for a screen that has no right click or Enter.
  */
 import { computed } from 'vue';
@@ -40,9 +45,11 @@ const props = defineProps({
     /** The values are in metres (a georeferenced scene, or one with a scale) */
     metric: { type: Boolean, default: false },
     /** The scale can be set: the user can save it and the scene has none */
-    canSetScale: { type: Boolean, default: false }
+    canSetScale: { type: Boolean, default: false },
+    /** What the coordinates of a point are shown in ("EPSG:32632", "WGS84"), empty when the scene has no choice to offer */
+    coordinateMode: { type: String, default: '' }
 });
-const emit = defineEmits(['measure', 'clear', 'finish', 'cancel']);
+const emit = defineEmits(['measure', 'clear', 'finish', 'cancel', 'toggle-coordinates']);
 
 const TOOLS = [
     { kind: 'point', title: 'Measure a point', icon: 'fa-solid fa-location-dot' },
@@ -90,6 +97,13 @@ const hint = computed(() => HINTS[props.activeKind] ?? '');
 
 .toolbar-buttons button {
     @include toolbar-button;
+}
+
+.toolbar-buttons .coordinate-mode {
+    width: auto;
+    padding: 0 0.5rem;
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+    white-space: nowrap;
 }
 
 .measure-hint {

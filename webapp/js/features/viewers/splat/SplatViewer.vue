@@ -15,7 +15,7 @@
             <div v-if="loaded && activeCameraName" class="camera-hud" title="Current camera view">
                 <i class="fa-solid fa-camera" /> {{ activeCameraName }}
             </div>
-            <PinCard v-if="loaded && shownPin" :pin="shownPin" :image-url="shownPinImage" :can-write="canWrite"
+            <PinCard v-if="loaded && shownPin" :pin="shownPin" :image-url="shownPinImage" :coordinates="shownPinCoordinates" :can-write="canWrite"
                      @close="activePin = null" @edit="showPins = true" />
         </div>
 
@@ -25,7 +25,7 @@
                 <i class="fa-solid fa-tower-broadcast m-0" />
             </div>
             <SplatMeasureToolbar :active-kind="measureKind" :count="measureCount" :metric="measureScale.metric"
-                                 :can-set-scale="canWrite && !georeferenced" @measure="startMeasure" @clear="clearMeasurements"
+                                 :can-set-scale="canWrite && !georeferenced" :coordinate-mode="coordToggle" @toggle-coordinates="toggleCoordinates" @measure="startMeasure" @clear="clearMeasurements"
                                  @finish="finishMeasure" @cancel="cancelMeasure" />
         </div>
 
@@ -127,6 +127,7 @@ import { createPinLayer } from './pinLayer';
 import { tourStops } from './sceneData';
 import ScaleDialog from './ScaleDialog.vue';
 import { sceneScale, distanceBetween, metersPerUnitFrom } from './measureMath';
+import { COORD_MODE, createGeorefFrame, availableModes, coordinateFormatter, modeLabel, nextMode } from './georefCoords';
 import { useSplatScene } from './useSplatScene';
 
 defineOptions({ name: 'SplatViewer' });
@@ -184,11 +185,20 @@ const measureCount = ref(0);
 // What the info popover shows besides the entry: the bounds the build wrote (shallow: only replaced)
 const boundsInfo = shallowRef(null);
 const georeferenced = computed(() => entry.value?.properties?.georeferenced === true);
+// Where the points are on the Earth, for a splat with a georeference: shown in its CRS or in WGS84
+const geoFrame = computed(() => createGeorefFrame(entry.value?.properties));
+const coordMode = ref(COORD_MODE.CRS);
+const coordWriter = computed(() => (geoFrame.value ? coordinateFormatter(geoFrame.value, coordMode.value) : null));
+const coordToggle = computed(() => {
+    const frame = geoFrame.value;
+    return frame && availableModes(frame).length > 1 ? modeLabel(frame, coordMode.value) : '';
+});
 const measureScale = computed(() => sceneScale({ georeferenced: georeferenced.value, metersPerUnit: views.scale.value?.metersPerUnit }));
 // The pins: the one on show (clicked, picked in the panel, or visited by the tour) opens its card
 const { annotations, activePin } = views;
 const { removePin, movePin, renamePin, editPin, updatePinView } = views;
 const shownPin = computed(() => (activePin.value === null ? null : annotations.value[activePin.value] ?? null));
+const shownPinCoordinates = computed(() => (shownPin.value && coordWriter.value ? coordWriter.value(shownPin.value.position) : ''));
 const shownPinImage = computed(() => (shownPin.value?.image ? dataset.value.thumbUrl(shownPin.value.image, 800) : ''));
 const infoSource = computed(() => ({
     entry: entry.value, bounds: boundsInfo.value, scale: measureScale.value, streaming: streaming.value,
@@ -375,7 +385,7 @@ async function loadSplat() {
     splatMesh = mesh;
 
     measureTool = new SplatMeasureTool({
-        THREE, CSS2DObject: libraries.CSS2DObject, stage, canvas: canvas.value, getUp: fileUp, getScale: () => measureScale.value,
+        THREE, CSS2DObject: libraries.CSS2DObject, stage, canvas: canvas.value, getUp: fileUp, getScale: () => measureScale.value, getCoordinateWriter: () => coordWriter.value,
         listen: (target, type, fn) => listeners.add(target, type, fn),
         setNavigationEnabled: enabled => { navigationSuspended = !enabled; stage.controls.enabled = enabled; },
         // Spark keeps its extra set of splats for picking only while something is being picked
@@ -474,8 +484,12 @@ async function startDownload(download) {
 
 // ---- Measurements -----------------------------------------------------------------------
 
-// A change of scale changes the values
-watch(measureScale, () => { if (measureTool) measureTool.refresh(); });
+// A change of scale, or of how coordinates are written, changes the labels
+watch([measureScale, coordWriter], () => { if (measureTool) measureTool.refresh(); });
+
+function toggleCoordinates() {
+    if (geoFrame.value) coordMode.value = nextMode(geoFrame.value, coordMode.value);
+}
 
 // Drawing a shape again while it is drawn ends it
 function startMeasure(kind) {

@@ -248,6 +248,23 @@ describe('the scale and the places of pins', () => {
         tool.refresh();
         expect(labels()).toEqual(['1.0 m']);
     });
+
+    it('writes a point as coordinates on the Earth when the host has a writer, and draws it again when the host changes it', async () => {
+        let writer = p => `${p[0]} east`;
+        host.getCoordinateWriter = () => writer;
+        const drawing = tool.measure('point');
+        pick([7, 0, 0]);
+        await drawing;
+        expect(labels()).toEqual(['7 east']);
+
+        writer = p => `${p[0]} E`;
+        tool.refresh();
+        expect(labels()).toEqual(['7 E']);
+
+        writer = null;
+        tool.refresh();
+        expect(labels()).toEqual(['7.00, 0.00, 0.00 m']);
+    });
 });
 
 describe('the shapes that are shown', () => {

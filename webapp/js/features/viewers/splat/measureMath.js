@@ -110,14 +110,18 @@ export function sceneScale({ georeferenced = false, metersPerUnit = null }) {
  * The labels of the scene: the sceneUtils formatters (metres, kilometres) with the scale and the
  * unit of the scene, plus the coordinates of a point and the height.
  * @param {() => { metersPerUnit: number, unit: string }} scale  read when a label is made, so a change of scale shows
+ * @param {() => ((p: Vec3) => string) | null} [georeferenced]  the writer of a point's coordinates on the Earth
+ *   (georefCoords), read when a label is made; null (a scene with no georeference) leaves the position in the frame of the file
  */
-export function sceneLabels(scale) {
+export function sceneLabels(scale, georeferenced = () => null) {
     const formatters = measureFormatters(() => scale().metersPerUnit, () => scale().unit);
     return {
         length: (/** @type {number} */ length) => formatters.length({ length }),
         area: (/** @type {number} */ area) => formatters.area({ area }),
         /** The position in the frame of the file (the same scale as the lengths, from its origin). @param {Vec3} p */
         coordinates: p => {
+            const onEarth = georeferenced();
+            if (onEarth) return onEarth(p);
             const { metersPerUnit, unit } = scale();
             return `${p.map(v => (v * metersPerUnit).toFixed(2)).join(', ')} ${unit}`;
         }
