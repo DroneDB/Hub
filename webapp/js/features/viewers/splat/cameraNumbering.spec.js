@@ -22,7 +22,7 @@ describe('camera numbers', () => {
             props: { cameras, canWrite: true, dirty: false, activeIndex: null },
             global: { stubs: { Window: { template: '<div><slot /></div>' }, Button: true } }
         });
-        const rows = manager.findAll('.camera-row');
+        const rows = manager.findAll('.saved-row');
         expect(rows.map(r => r.find('.idx').text())).toEqual(['1', '2', '3']);
         expect(rows[0].find('.idx').attributes('title')).toBe('Press 1 to jump here');
         expect(rows[0].find('input').attributes('aria-label')).toBe('Name of view 1');
@@ -36,7 +36,7 @@ describe('camera numbers', () => {
             props: { cameras: ten, canWrite: false, dirty: false, activeIndex: null },
             global: { stubs: { Window: { template: '<div><slot /></div>' }, Button: true } }
         });
-        const idx = manager.findAll('.camera-row')[9].find('.idx');
+        const idx = manager.findAll('.saved-row')[9].find('.idx');
         expect(idx.text()).toBe('10');
         expect(idx.attributes('title')).toBeUndefined();
     });
