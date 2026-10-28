@@ -1,3 +1,20 @@
+import { fitDistance } from '@/features/viewers/unified/sceneUtils';
+
+// How much of the view the scene fills when framed: well under 1 (the sphere of the scene is
+// larger than the view), so the camera starts inside the model, which reads as immersive
+const FRAME_MARGIN = 0.4;
+
+/**
+ * Scene up from the calibration angles (degrees): pitch about world X, roll about world Z.
+ * @param {any} THREE
+ */
+export function tiltUp(THREE, rollDeg, pitchDeg) {
+    const up = new THREE.Vector3(0, 1, 0);
+    up.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(pitchDeg));
+    up.applyAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(rollDeg));
+    return up.normalize();
+}
+
 /**
  * The splat viewer's camera rig: the three.js camera, the
  * OrbitControls target it looks at, the scene "up" (tilted by the ground-plane
@@ -32,14 +49,28 @@ export class CameraRig {
         this._fwd = new THREE.Vector3();
     }
 
-    /** Scene up from the calibration angles (degrees): pitch about world X, roll about world Z. */
+    /**
+     * Scene up from the calibration angles (degrees). OrbitControls bakes the camera's up into a
+     * rotation once, in its constructor (the same pitfall createNavControls documents), so the
+     * controls are rebuilt on the new up here; orbit, pan and zoom then follow the tilt.
+     */
     setTilt(rollDeg, pitchDeg) {
-        const { THREE } = this;
-        const up = new THREE.Vector3(0, 1, 0);
-        up.applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(pitchDeg));
-        up.applyAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(rollDeg));
-        this.sceneUp.copy(up.normalize());
+        this.sceneUp.copy(tiltUp(this.THREE, rollDeg, pitchDeg));
         this.camera.up.copy(this.sceneUp);
+        this.rebuildControlsUp();
+    }
+
+    /** Makes OrbitControls use camera.up as it is now (a no-op for controls that keep no such rotation). */
+    rebuildControlsUp() {
+        const { controls, camera, _yAxis } = this;
+        if (!controls._quat || !controls._quatInverse) return;
+        controls._quat.setFromUnitVectors(camera.up, _yAxis);
+        controls._quatInverse.copy(controls._quat).invert();
+    }
+
+    /** One step of OrbitControls (pan, zoom, auto-rotate) for the frame's duration in seconds, so the orbit speed does not depend on the frame rate. */
+    updateControls(dt) {
+        this.controls.update(dt);
     }
 
     /** yaw/pitch (and the look target) from the camera orientation, about the scene up. */
@@ -71,7 +102,8 @@ export class CameraRig {
         const center = box.getCenter(new THREE.Vector3()).applyQuaternion(q);
         this.boundsDiagonal = Math.max(size.length(), 1e-3);
         const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
-        const dist = (radius / Math.sin((camera.fov * Math.PI) / 360)) * 0.4;
+        // The vertical field of view limits a landscape view, the horizontal one a portrait view
+        const dist = fitDistance(radius, camera.fov, camera.aspect, FRAME_MARGIN);
         // A small near plane lets splats render when the camera flies in among them
         camera.near = Math.max(this.boundsDiagonal / 5000, 0.001);
         camera.far = dist + this.boundsDiagonal * 10;
@@ -80,24 +112,15 @@ export class CameraRig {
         camera.up.copy(this.sceneUp);
         camera.lookAt(center);
         controls.target.copy(center);
-        controls.update();
+        this.updateControls();
         this.lookDist = Math.max(dist, 0.01);
         this.syncYawPitch();
     }
 
-    /** Position, target and field of view. */
-    capturePose() {
-        return { position: this.camera.position.clone(), target: this.controls.target.clone(), fov: this.camera.fov };
-    }
-
-    /** Moves to `from` lerped toward `to` by e (0..1). */
-    applyPose(from, to = from, e = 1) {
-        this.camera.position.copy(from.position).lerp(to.position, e);
-        const fov = from.fov + (to.fov - from.fov) * e;
-        if (Math.abs(this.camera.fov - fov) > 1e-3) {
-            this.camera.fov = fov;
-            this.camera.updateProjectionMatrix();
-        }
-        this.controls.target.copy(from.target).lerp(to.target, e);
+    /** Field of view in degrees (the projection follows). */
+    setFov(fov) {
+        if (Math.abs(this.camera.fov - fov) <= 1e-3) return;
+        this.camera.fov = fov;
+        this.camera.updateProjectionMatrix();
     }
 }
