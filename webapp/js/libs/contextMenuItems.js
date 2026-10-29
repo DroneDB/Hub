@@ -12,6 +12,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { useClipboardStore } from '@/stores/clipboard';
 import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
+import { BUILD_DOWNLOADS, offersBuildDownload } from '@/libs/build/buildDownloads';
 import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
 import { taskToolOffered } from '@/libs/tasks/taskTools';
 import { openCompare } from '@/libs/compare/compareLinks';
@@ -553,27 +554,26 @@ function setCoordinateSystemItem(ctx) {
 }
 
 /**
- * Factory: create a context menu item for downloading a build artifact.
- * @param {string} label - Menu item label (e.g. "Download COG")
- * @param {string} icon - Font Awesome icon class
- * @param {number} entryType - ddb.entry.type constant (GEORASTER, POINTCLOUD, VECTOR)
+ * The downloads of built files: one item per row of BUILD_DOWNLOADS, shown when the selected file's
+ * complete build offers that artifact as a download (the artifacts say it, not the file type).
+ * Adding a download is adding a row there.
  * @param {object} ctx - Context menu context object
  */
-function makeDownloadItem(label, icon, entryType, ctx) {
-    return {
-        label,
-        icon,
+function buildDownloadItems(ctx) {
+    return BUILD_DOWNLOADS.map(row => ({
+        label: row.label,
+        icon: row.icon,
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return sel.length === 1
-                && sel[0].entry.type === entryType
+                && offersBuildDownload(sel[0].entry, row)
                 && isBuildComplete(ctx.dataset, sel[0]);
         },
         click: () => {
             const sel = ctx.getSelectedEntries();
-            if (sel.length === 1) ctx.emit('downloadBuildArtifact', sel[0]);
+            if (sel.length === 1) ctx.emit('downloadBuildArtifact', sel[0], row.role);
         }
-    };
+    }));
 }
 
 /**
@@ -625,9 +625,7 @@ function splatTrainingExportItem(ctx) {
 }
 
 function toolsItem(ctx) {
-    const cogItem = makeDownloadItem('Download COG', 'fa-solid fa-file-image', ddb.entry.type.GEORASTER, ctx);
-    const copcItem = makeDownloadItem('Download COPC', 'fa-solid fa-cube', ddb.entry.type.POINTCLOUD, ctx);
-    const gpkgItem = makeDownloadItem('Download GPKG', 'fa-solid fa-map', ddb.entry.type.VECTOR, ctx);
+    const buildDownloads = buildDownloadItems(ctx);
     const splatItems = splatDownloadItems(ctx);
     const trainingExport = splatTrainingExportItem(ctx);
 
@@ -657,12 +655,10 @@ function toolsItem(ctx) {
             transfer,
             {
                 type: 'separator',
-                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible() || splatItems.some(i => i.isVisible()) ||
+                isVisible: () => buildDownloads.some(i => i.isVisible()) || splatItems.some(i => i.isVisible()) ||
                     trainingExport.isVisible()
             },
-            cogItem,
-            copcItem,
-            gpkgItem,
+            ...buildDownloads,
             ...splatItems,
             trainingExport
         ]

@@ -58,12 +58,14 @@ export async function downloadFromDataset({ dataset, paths, files, signedIn, thr
 }
 
 /**
- * A built file's artifact (e.g. a COG), opened in a new tab after a download-slot check.
+ * A built file's artifact (a COG, the 3D Tiles of a model as a ZIP...), named by the server after
+ * the file, opened in a new tab after a download-slot check.
  * @param {import('./ddb/dataset').default} dataset
  * @param {string} path
+ * @param {string} [role]  the artifact (BUILD_DOWNLOADS); the entry's first download without it
  */
-export async function downloadBuildArtifact(dataset, path) {
-    const url = dataset.buildArtifactUrl(path);
+export async function downloadBuildArtifact(dataset, path, role) {
+    const url = dataset.buildArtifactUrl(path, role);
     await dataset.checkDownloadSlot(url);
     window.open(url, '_blank');
 }

@@ -224,14 +224,14 @@ async function downloadItems(files) {
     }
 }
 
-// Build output: re-checks that the build exists (the entry's artifacts), then downloads it
-async function downloadArtifact(file) {
+// Build output: re-checks that the build exists (the entry's artifacts), then downloads its artifact of `role`
+async function downloadArtifact(file, role) {
     if (!file || !file.entry) return;
     if (!await isFileBuilt(dataset, file)) {
         notify.warn('This file has not been built yet. Run Build first.', { summary: 'Not available' });
         return;
     }
-    await downloadBuildArtifact(dataset, file.entry.path).catch(notifyDownloadError);
+    await downloadBuildArtifact(dataset, file.entry.path, role).catch(notifyDownloadError);
 }
 
 // A download of a splat other than the original: its artifact, or the .spz made for other tools

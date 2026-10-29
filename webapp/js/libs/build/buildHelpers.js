@@ -65,7 +65,7 @@ async function buildFile(dataset, file) {
 
 /**
  * Whether a file has a complete build (artifacts listed, no build status) and none is running:
- * what the "Download COG/COPC/..." menu items need. A job that succeeded does not say it.
+ * what the downloads of built files (BUILD_DOWNLOADS) need. A job that succeeded does not say it.
  */
 function isBuildComplete(dataset, file) {
     if (!dataset) return false;

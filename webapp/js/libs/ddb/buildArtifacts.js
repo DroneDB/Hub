@@ -7,15 +7,16 @@
  * Build artifacts by role: what an artifact is for, never where it lives.
  *
  * libddb owns the build layout and Registry puts the artifacts that
- * exist on the entry DTO: `artifacts: [{role, url, mediaType}]`, from the same listing that gives
+ * exist on the entry DTO: `artifacts: [{role, url, mediaType, downloadName?}]`, from the same listing that gives
  * the entry. The Hub asks by role and uses the URL it is given: it holds no build path and does
  * not probe for files. The ArtifactRole values are the shared vocabulary (a role Registry sends
  * and the Hub does not know is ignored, a role the Hub asks for and the entry lacks is absent).
  */
 
 /**
- * One artifact of an entry's build, as Registry lists it.
- * @typedef {{ role: string, url: string, mediaType?: string }} BuildArtifact
+ * One artifact of an entry's build, as Registry lists it. `downloadName` is set when the artifact is
+ * offered as a download (the build-artifact endpoint, by role).
+ * @typedef {{ role: string, url: string, mediaType?: string, downloadName?: string }} BuildArtifact
  */
 
 /** @enum {string} */
