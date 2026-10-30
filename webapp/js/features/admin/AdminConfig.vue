@@ -180,6 +180,7 @@ import Textarea from 'primevue/textarea';
 import Tag from 'primevue/tag';
 import { copyText } from '@/composables/useCopyText';
 import { isForbidden } from '@/libs/ddb/apiError';
+import { settingPath, setSettingAt } from '@/libs/appSettingsJson';
 
 /**
  * Admin Configuration Editor - inspect all Registry config fields grouped by
@@ -314,12 +315,13 @@ export default {
 
         // ---- JSON generation ----
 
+        // The settings in the shape of appsettings.json: AppSettings, and ConnectionStrings and
+        // Serilog next to it (see libs/appSettingsJson.js)
         generateAppSettingsJson() {
             const obj = {};
 
             for (let sIdx = 0; sIdx < this.sections.length; sIdx++) {
                 const section = this.sections[sIdx];
-                const sectionKey = section.name;
 
                 for (let fIdx = 0; fIdx < section.fields.length; fIdx++) {
                     const field = section.fields[fIdx];
@@ -379,17 +381,7 @@ export default {
                         if (!field.sensitive && field.defaultValue === rawValue) continue;
                     }
 
-                    // Build nested structure for sub-objects
-                    const dotIndex = field.key.indexOf('.');
-                    if (dotIndex > 0) {
-                        const parentKey = field.key.substring(0, dotIndex);
-                        const childKey = field.key.substring(dotIndex + 1);
-                        if (!obj[parentKey]) obj[parentKey] = {};
-                        obj[parentKey][childKey] = value;
-                    } else {
-                        obj[sectionKey] = obj[sectionKey] || {};
-                        obj[sectionKey][field.key] = value;
-                    }
+                    setSettingAt(obj, settingPath(section.name, field.key), value);
                 }
             }
 
@@ -397,9 +389,7 @@ export default {
         },
 
         copyToClipboard() {
-            const json = this.generateAppSettingsJson();
-            const fullJson = JSON.stringify({ AppSettings: JSON.parse(json) }, null, 2);
-            copyText(fullJson).then(() => {
+            copyText(this.generateAppSettingsJson()).then(() => {
                 this.$notify.success('AppSettings JSON copied to clipboard.', { summary: 'Copied' });
             }).catch(() => {
                 this.$notify.error('Failed to copy to clipboard.', { life: 'short' });

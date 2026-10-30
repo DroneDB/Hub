@@ -87,14 +87,14 @@ describe('AdminConfig', () => {
         expect(info.textContent).not.toContain('Default');
     });
 
-    it('leaves informational values out of the AppSettings JSON', async () => {
+    it('leaves informational values out of the AppSettings JSON, and writes the keys where Registry reads them', async () => {
         await show();
         [...document.querySelectorAll('button')].find(b => b.textContent.includes('Copy AppSettings JSON')).click();
         await flushPromises();
 
         expect(h.copyText).toHaveBeenCalledTimes(1);
-        const { AppSettings } = JSON.parse(h.copyText.mock.calls[0][0]);
-        expect(AppSettings.UpdateCheck).toEqual({ UpdateCheckEmail: 'all' });
+        // UpdateCheckEmail is a direct key of AppSettings: the section only groups it on the page
+        expect(JSON.parse(h.copyText.mock.calls[0][0])).toEqual({ AppSettings: { UpdateCheckEmail: 'all' } });
     });
 
     it('names each section header by its title, described by its Custom/Default tag', async () => {
