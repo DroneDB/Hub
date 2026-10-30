@@ -8,7 +8,7 @@
  * - Component must import and register PlantHealthPanel component
  * - Component must call `this.refreshRasterLayers()` when vizParams change
  */
-import { createRasterSource, sameVizParams } from '@/libs/map/rasterLayers';
+import { createRasterSource, sameVizParams, rasterLayerPath } from '@/libs/map/rasterLayers';
 import { FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
 import { createFeatureScope } from '@/composables/featureScope';
 
@@ -146,14 +146,8 @@ const definition = {
             }
         },
 
-        /**
-         * Get the file path from a raster tile layer.
-         * Override in consuming component if layer structure differs.
-         */
         _getLayerPath(layer) {
-            if (layer.file && layer.file.entry) return layer.file.entry.path;
-            if (layer.entryPath) return layer.entryPath;
-            return null;
+            return rasterLayerPath(layer);
         },
 
         /**

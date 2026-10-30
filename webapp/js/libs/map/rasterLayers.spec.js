@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Group as LayerGroup, Tile as TileLayer } from 'ol/layer';
-import { ViewZoomCap } from './rasterLayers';
+import { ViewZoomCap, rasterLayerPath } from './rasterLayers';
 import { OL_DEFAULT_MAX_ZOOM, SOURCE_MIN_ZOOM } from './rasterZoom';
 
 function fakeMap({ busy = false } = {}) {
@@ -68,5 +68,15 @@ describe('ViewZoomCap', () => {
         group.getLayers().push(raster(18));
         await flush();
         expect(view.setMaxZoom).not.toHaveBeenCalled();
+    });
+});
+
+describe('rasterLayerPath', () => {
+    it('is the dataset path of the file a raster tile layer shows, null for another layer', () => {
+        const layer = new TileLayer();
+        layer.file = { path: 'ddb://h/o/d/odm_dem/dsm.tif', entry: { path: 'odm_dem/dsm.tif' } };
+        expect(rasterLayerPath(layer)).toBe('odm_dem/dsm.tif');
+        expect(rasterLayerPath(new TileLayer())).toBeNull();
+        expect(rasterLayerPath(null)).toBeNull();
     });
 });

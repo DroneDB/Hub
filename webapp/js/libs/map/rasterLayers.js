@@ -56,6 +56,17 @@ export function createRasterTileLayer(file, extent) {
 }
 
 /**
+ * The dataset path of the file a raster tile layer shows (stamped by createRasterTileLayer);
+ * null for another layer.
+ * @param {any} layer
+ * @returns {string|null}
+ */
+export function rasterLayerPath(layer) {
+    if (layer && layer.file && layer.file.entry) return layer.file.entry.path;
+    return null;
+}
+
+/**
  * Keeps the View maxZoom capped to the deepest native raster zoom in the watched layer
  * groups (plus a small magnification allowance). Updates are coalesced into one microtask
  * (a clear + reload burst pops then re-pushes every layer) and deferred while the View is

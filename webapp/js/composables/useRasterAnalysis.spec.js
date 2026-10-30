@@ -19,7 +19,8 @@ const PATH = 'odm_dem/dsm.tif';
 function setup({ areaStats = vi.fn(async () => ({ min: 1, max: 2, pixelCount: 4 })) } = {}) {
     const map = new Map({ view: new View({ center: [0, 0], zoom: 1 }) });
     const layer = new TileLayer({ extent: [0, 0, 1000, 500] });
-    layer.entryPath = PATH;
+    // As createRasterTileLayer stamps it
+    layer.file = { path: `ddb://h/o/d/${PATH}`, entry: { path: PATH } };
     map.addLayer(layer);
     const dataset = {
         getRasterValueInfo: vi.fn(async () => ({ width: 100, height: 50, unit: 'm' })),

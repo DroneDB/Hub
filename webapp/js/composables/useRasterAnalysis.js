@@ -12,6 +12,7 @@ import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
 import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/rasterPixels';
+import { rasterLayerPath } from '@/libs/map/rasterLayers';
 
 // The server answers an area without any value with an error of its own
 const AREA_NO_DATA_MESSAGE = 'No statistics for this area: it may hold only pixels without data.';
@@ -768,7 +769,7 @@ const definition = {
                     layer.getLayers().forEach(visit);
                     return;
                 }
-                if (layer.entryPath === this.rasterFilePath) found = layer;
+                if (rasterLayerPath(layer) === this.rasterFilePath) found = layer;
             };
             this.map.getLayers().forEach(visit);
             return found;

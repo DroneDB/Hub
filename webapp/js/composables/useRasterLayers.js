@@ -9,6 +9,7 @@
 import { ref, watch, markRaw } from 'vue';
 import { isPlantHealthCapable } from '@/libs/entryTypes';
 import { layerLabels } from '@/libs/map/layerLabels';
+import { rasterLayerPath } from '@/libs/map/rasterLayers';
 
 /**
  * @param {object} ctx
@@ -74,7 +75,7 @@ export function useRasterLayers({ group, vectorLayers, splitMode }) {
             let opacity = rasterOpacity.value;
             if (perLayer) {
                 // By path: the list holds proxied rows, identity is unreliable
-                const path = layer.file && layer.file.entry ? layer.file.entry.path : null;
+                const path = rasterLayerPath(layer);
                 const row = rasterLayerList.value.find(r => r.path === path);
                 opacity = row ? row.opacity : 1.0;
             }
