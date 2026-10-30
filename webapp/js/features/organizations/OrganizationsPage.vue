@@ -97,8 +97,7 @@
                                 <Tag v-if="org.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                     {{ org.owner }}
                                 </Tag>
-                                <Tag v-if="org.isPublic" rounded severity="success" icon="fa-solid fa-globe">Public</Tag>
-                                <Tag v-else rounded severity="warn" icon="fa-solid fa-lock">Private</Tag>
+                                <VisibilityTag rounded :visibility="org.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
                             </div>
                             <div class="org-card-actions d-flex gap-1 ms-3">
                                 <Button v-if="memberManagementEnabled && !readyOnly && org.permissions?.canManageMembers"
@@ -140,6 +139,7 @@
 
 <script>
 import EmptyState from '@/components/EmptyState.vue';
+import VisibilityTag from '@/components/VisibilityTag.vue';
 import SortSelect from '@/components/SortSelect.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import { DatasetLocationsMap } from '@/features/datasets/locationsMap';
@@ -168,6 +168,7 @@ import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Paginator from 'primevue/paginator';
 import { isUnauthorized } from '@/libs/ddb/apiError';
+import { Visibility } from 'ddb';
 
 // Typing in the search box asks the server once the user pauses
 const SEARCH_DELAY_MS = 300;
@@ -196,6 +197,7 @@ export default {
         Button,
         Card,
         Tag,
+        VisibilityTag,
         Skeleton,
         ToggleSwitch,
         InputText,
@@ -207,7 +209,7 @@ export default {
     setup() {
         const dialogs = useDialogs();
         // The locations are many small objects the map reads whole: not made reactive
-        return { dialogs, deleteEntity: useEntityDelete(dialogs), ORG_SORT_OPTIONS, formatDateTime, formatTimeAgo, locationGroups: shallowRef([]) };
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), ORG_SORT_OPTIONS, Visibility, formatDateTime, formatTimeAgo, locationGroups: shallowRef([]) };
     },
     data: function () {
         const settings = getOrgPageSettings();

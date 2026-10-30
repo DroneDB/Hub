@@ -49,9 +49,7 @@
                                         <Tag v-if="orgInfo?.owner" rounded severity="secondary" icon="fa-solid fa-user">
                                             {{ orgInfo.owner }}
                                         </Tag>
-                                        <Tag rounded :severity="orgInfo?.isPublic ? 'success' : 'warn'" :icon="orgInfo?.isPublic ? 'fa-solid fa-globe' : 'fa-solid fa-lock'">
-                                            {{ orgInfo?.isPublic ? 'Public' : 'Private' }}
-                                        </Tag>
+                                        <VisibilityTag rounded :visibility="orgInfo?.isPublic ? Visibility.PUBLIC : Visibility.PRIVATE" />
                                         <Tag rounded severity="info" icon="fa-solid fa-database">
                                             {{ totalDatasets }}
                                         </Tag>
@@ -103,7 +101,7 @@
                     <template #body="slotProps">
                         <span class="ds-name">{{ slotProps.data.name || slotProps.data.slug }}</span>
                         <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none ms-1"
-                           role="img" :aria-label="getVisibilityText(slotProps.data.visibility)" />
+                           role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
                     </template>
                 </Column>
@@ -138,9 +136,7 @@
                 <Column field="visibility" header="Visibility" :sortable="true"
                         v-bind="columnFrom(COLUMNS_FROM.visibility)" :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
                     <template #body="slotProps">
-                        <Tag v-if="slotProps.data.visibility === Visibility.PUBLIC" severity="success" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
-                        <Tag v-else-if="slotProps.data.visibility === Visibility.UNLISTED" severity="info" icon="fa-solid fa-unlock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
-                        <Tag v-else severity="warn" icon="fa-solid fa-lock">{{ getVisibilityText(slotProps.data.visibility) }}</Tag>
+                        <VisibilityTag :visibility="slotProps.data.visibility" />
                     </template>
                 </Column>
                 <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7.5rem;">
@@ -202,6 +198,7 @@
 
 <script>
 import EmptyState from '@/components/EmptyState.vue';
+import VisibilityTag from '@/components/VisibilityTag.vue';
 import Message from '@/components/HubMessage.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import { DatasetLocationsMap } from './locationsMap';
@@ -237,6 +234,7 @@ import { datasetListQuery } from '@/libs/datasetList';
 const SEARCH_DELAY_MS = 300;
 import { Features } from '@/libs/features';
 import { Visibility } from 'ddb';
+import { visibilityLabel } from '@/libs/visibility';
 import { formatDateTime } from '@/libs/format';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
@@ -270,6 +268,7 @@ export default {
         InputIcon,
         Paginator,
         Tag,
+        VisibilityTag,
         
         ProgressSpinner,
         Skeleton,
@@ -494,18 +493,13 @@ export default {
         },
         bytesToSize,
         datasetName,
+        visibilityLabel,
 
         formatDateTime,
 
         formatCreationDateRel(timestamp) {
             if (!timestamp) return '';
             return formatTimeAgo(timestamp);
-        },
-
-        getVisibilityText(visibility) {
-            if (visibility === Visibility.PUBLIC) return 'Public';
-            if (visibility === Visibility.UNLISTED) return 'Unlisted';
-            return 'Private';
         },
 
         onSort(event) {
