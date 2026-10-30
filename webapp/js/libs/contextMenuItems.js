@@ -20,6 +20,9 @@ import { MAX_LAYERS } from '@/libs/compare/compareState';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 
 /**
+ * An item's `accelerator` names the key that does the same on the dataset page
+ * (useDatasetShortcuts, and the folder tree): only Ctrl/Cmd+C, +X, +V and Delete are bound.
+ *
  * Context object interface:
  * {
  *   getSelectedEntries: () => [{ entry, path, ... }]  - returns array of selected file objects
@@ -197,7 +200,6 @@ function renameItem(ctx) {
         label: 'Rename',
         icon: 'fa-solid fa-pencil',
         isVisible: () => ctx.canWrite && ctx.getSelectedEntries().length === 1,
-        accelerator: 'CmdOrCtrl+M',
         click: () => ctx.emit('moveSelectedItems')
     };
 }
@@ -207,7 +209,6 @@ function propertiesItem(ctx) {
         label: 'Properties',
         icon: 'fa-solid fa-circle-info',
         isVisible: () => ctx.getSelectedEntries().length > 0,
-        accelerator: 'CmdOrCtrl+P',
         click: () => ctx.emit('openProperties')
     };
 }
@@ -291,7 +292,6 @@ function transferItem(ctx) {
             const sel = ctx.getSelectedEntries();
             return !sel.some(f => hasActiveBuild(ctx.dataset, f));
         },
-        accelerator: 'CmdOrCtrl+T',
         click: () => ctx.emit('transferSelectedItems')
     };
 }
@@ -384,7 +384,7 @@ function deleteItem(ctx) {
     return {
         label: 'Delete',
         icon: 'fa-solid fa-trash',
-        accelerator: 'CmdOrCtrl+D',
+        accelerator: 'Delete',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return ctx.canWrite && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
@@ -397,7 +397,6 @@ function selectAllNoneItem(ctx) {
     return {
         label: 'Select All/None',
         icon: 'fa-solid fa-list',
-        accelerator: 'CmdOrCtrl+A',
         click: () => {
             if (ctx.onSelectAllNone) ctx.onSelectAllNone();
         }
@@ -409,7 +408,6 @@ function createFolderItem(ctx) {
         label: 'Create Folder',
         icon: 'fa-solid fa-folder',
         isVisible: () => ctx.canWrite,
-        accelerator: 'CmdOrCtrl+N',
         click: () => ctx.emit('createFolder')
     };
 }

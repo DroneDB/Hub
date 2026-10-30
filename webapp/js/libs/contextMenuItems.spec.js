@@ -59,3 +59,13 @@ describe('the context menu of a dataset the user can write', () => {
         expect(visible(byLabel('Cut'))).toBe(true);
     });
 });
+
+describe('the shortcuts the menu names', () => {
+    beforeEach(() => setActivePinia(createPinia()));
+
+    it('are only the keys the dataset page binds: Ctrl/Cmd+C, +X, +V and Delete', () => {
+        const { all } = menu(true);
+        const named = Object.fromEntries(all.filter(i => i.accelerator).map(i => [i.label, i.accelerator]));
+        expect(named).toEqual({ Copy: 'CmdOrCtrl+C', Cut: 'CmdOrCtrl+X', Paste: 'CmdOrCtrl+V', Delete: 'Delete' });
+    });
+});
