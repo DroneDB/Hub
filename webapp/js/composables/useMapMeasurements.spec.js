@@ -117,6 +117,35 @@ describe('useMapMeasurements', () => {
         expect(flashes).toEqual([]);
     });
 
+    describe('next to a point cloud (the file the 3D viewer saves to)', () => {
+        const fromViewer = { type: 'Feature', geometry: { type: 'LineString', coordinates: [[10, 45, 100], [10.001, 45, 101]] },
+            properties: { name: 'v1', measurementType: 'distance', localCoordinates: [[0, 0, 0], [1, 0, 1]] } };
+        beforeEach(() => {
+            stored = { 'a/cloud_measurements.geojson': JSON.stringify({ type: 'FeatureCollection', features: [lengthFeature('m1'), fromViewer] }) };
+            files.value = [{ entry: { path: 'a/cloud.laz', type: T.POINTCLOUD } }];
+        });
+        const inFile = () => JSON.parse(stored['a/cloud_measurements.geojson']).features.map(f => f.properties.name);
+
+        it('shows only the map\'s measurements and saves without touching the 3D viewer\'s', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['m1']);
+            controls.importFromGeoJSON(JSON.parse(fileOf('m2')));
+            await m.saveMeasurements();
+            expect(inFile()).toEqual(['m1', 'm2', 'v1']);
+        });
+
+        it('Delete saved keeps the file for the 3D viewer and tells the file list it changed', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            await m.deleteSavedMeasurements();
+            expect(inFile()).toEqual(['v1']);
+            expect(events).toEqual({ written: ['a/cloud_measurements.geojson'], removed: [] });
+            expect(m.hasSavedMeasurements.value).toBe(false);
+            expect(onMap()).toEqual([]);
+        });
+    });
+
     it('a new target drops unsaved measurements with a notice', async () => {
         const m = start();
         await m.loadSavedMeasurements();

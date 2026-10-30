@@ -28,13 +28,13 @@
             </div>
 
             <div v-if="loaded && (hasMeasurements || hasSavedMeasurements)" class="measurements-toolbar">
-                <button v-if="hasMeasurements && canWrite" :disabled="savingMeasurements" class="btn-measurement"
+                <button v-if="(hasMeasurements || hasSavedMeasurements) && canWrite" :disabled="savingMeasurements" class="btn-measurement"
                         title="Save measurements" @click="saveMeasurements">
                     <i class="fa-solid fa-floppy-disk" />
                     Save Measurements
                 </button>
                 <button v-if="hasSavedMeasurements && canDelete" class="btn-measurement btn-measurement--danger"
-                        title="Delete saved measurements file" @click="requestDelete">
+                        title="Delete the saved measurements" @click="requestDelete">
                     <i class="fa-solid fa-trash" />
                     Delete Saved
                 </button>
@@ -43,15 +43,7 @@
             <div id="potree_sidebar_container" ref="sidebar" />
             <div id="potree_render_area" ref="container" />
         </div>
-        <ConfirmDialog v-if="deleteDialogOpen"
-                       title="Delete Saved Measurements"
-                       message="Are you sure you want to delete all saved measurements?"
-                       confirm-text="Delete"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
-                       warning-title="Warning"
-                       warning-message="This action cannot be undone."
-                       @close="onDeleteDialogClose" />
+        <DeleteSavedMeasurementsDialog v-if="deleteDialogOpen" @close="onDeleteDialogClose" />
     </ViewerShell>
 </template>
 
@@ -62,7 +54,7 @@
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DeleteSavedMeasurementsDialog from '@/components/measurements/DeleteSavedMeasurementsDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useDialogs } from '@/composables/useDialogs';

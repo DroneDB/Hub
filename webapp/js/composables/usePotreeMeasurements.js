@@ -2,6 +2,10 @@
  * usePotreeMeasurements - the measurements of the point-cloud viewer: count, saved file (load / save / delete), editing through the properties
  * dialogs on double click, the delete tool, and undo / redo of deletions (Ctrl+Z / Ctrl+Y).
  *
+ * Like the 2D map, the viewer is a working copy of its measurements in the file: Save makes the file match the
+ * viewer (also with nothing left to save), and Delete saved removes them from the file and the viewer. The map's
+ * measurements in the same file are not shown and stay as they are; the file goes when nothing is left in it.
+ *
  *   const m = usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs });
  *   m.attach(viewer, session, coordinateSystem);   // once the viewer exists
  *   await m.load();
@@ -9,7 +13,7 @@
 import { ref, computed } from 'vue';
 import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPropertiesDialog.vue';
 import AnnotationPropertiesDialog from '@/features/viewers/pointcloud/AnnotationPropertiesDialog.vue';
-import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage } from '@/libs/map/measurementStorage';
 import { exportMeasurements, importMeasurements } from '@/libs/map/potreeMeasurementConverter';
 import { createUndoStack } from '@/libs/undoStack';
 import { applyMeasureStyle, measureAsFeature, assignMeasureProperties } from '@/libs/potree/measureStyle';
@@ -19,7 +23,6 @@ import { PotreeDeleteTool } from '@/libs/potree/deleteTool';
 import { flash } from '@/composables/useMapAlerts';
 import { useTimerGroup } from '@/composables/useTimers';
 
-const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 const isTyping = t => t instanceof Element && (t.closest('input, textarea, select') || t.isContentEditable);
 
 /**
@@ -50,14 +53,22 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     let dialog = null;
 
     const labelCtx = () => ({ viewer, session });
-    const storageFor = () => storage || (storage = new MeasurementStorage(dataset.value, entry.value));
+    const storageFor = () => storage || (storage = new MeasurementStorage(dataset.value, entry.value, MeasurementOwner.POINT_CLOUD));
 
+    // What Save writes: the measures and the annotations (profiles and volumes are not saved)
     function countMeasurements() {
         const scene = viewer.scene;
         let annotations = 0;
         scene.annotations.traverse(a => { if (a && a.position) annotations++; });
-        measurementCount.value = (scene.measurements || []).length + (scene.profiles || []).length +
-            (scene.volumes || []).length + annotations;
+        measurementCount.value = (scene.measurements || []).length + annotations;
+    }
+
+    // Takes what Save writes out of the viewer
+    function clearMeasurements() {
+        const scene = viewer.scene;
+        [...(scene.measurements || [])].forEach(measure => scene.removeMeasurement(measure));
+        scene.annotations.removeAllChildren();
+        countMeasurements();
     }
 
     function openDialog(component, props) {
@@ -142,7 +153,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         coordinateSystem = crs;
         const scene = viewer.scene;
 
-        ['measurement_added', 'measurement_removed', 'profile_added', 'profile_removed', 'volume_added', 'volume_removed']
+        ['measurement_added', 'measurement_removed']
             .forEach(type => session.track(scene, type, countMeasurements));
         session.track(scene.annotations, 'annotation_added', e => {
             countMeasurements();
@@ -180,8 +191,8 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     async function load() {
         try {
             const geojson = await storageFor().load();
-            const count = geojson && geojson.features ? geojson.features.length : 0;
-            if (!count) return;
+            if (!geojson) return;
+            const count = geojson.features.length;
             const imported = importMeasurements(geojson, viewer, coordinateSystem) || [];
             // Potree builds the measure geometry asynchronously
             later(() => imported.forEach(item => {
@@ -196,7 +207,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
                 }
             }), 500);
             hasSavedMeasurements.value = true;
-            flash(`${plural(count, 'measurement')} loaded`);
+            flash(`${count} measurement${count > 1 ? 's' : ''} loaded`);
         } catch (e) {
             console.error('Error loading measurements:', e);
             error.value = `Could not load measurements: ${e.message}`;
@@ -214,15 +225,13 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         }
         error.value = '';
         const geojson = exportMeasurements(viewer, entry.value.path, coordinateSystem);
-        if (!geojson.features || !geojson.features.length) {
+        if (!(geojson.features || []).length && !hasSavedMeasurements.value) {
             error.value = 'No measurements to save';
             return;
         }
         savingMeasurements.value = true;
         try {
-            await storageFor().save(geojson, { ownedTypes: MeasurementStorage.POTREE_OWNED_TYPES });
-            hasSavedMeasurements.value = true;
-            flash(`${plural(geojson.features.length, 'measurement')} saved successfully`);
+            afterFileChange(await storageFor().save(geojson));
         } catch (e) {
             console.error('Error saving measurements:', e);
             error.value = `Failed to save measurements: ${e.message}`;
@@ -231,13 +240,19 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         }
     }
 
+    // The file holds what the viewer shows now
+    function afterFileChange(result) {
+        hasSavedMeasurements.value = result.count > 0;
+        flash(saveResultMessage(result));
+    }
+
     async function onDeleteDialogClose(result) {
         deleteDialogOpen.value = false;
         if (result !== 'confirm') return;
         try {
-            await storageFor().delete();
-            hasSavedMeasurements.value = false;
-            flash('Saved measurements deleted successfully');
+            const result = await storageFor().deleteSaved();
+            clearMeasurements();
+            afterFileChange(result);
         } catch (e) {
             console.error('Error deleting measurements:', e);
             error.value = `Failed to delete measurements: ${e.message}`;

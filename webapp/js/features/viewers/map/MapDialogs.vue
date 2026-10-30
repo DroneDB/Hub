@@ -10,22 +10,18 @@
                        cancel-text="Cancel"
                        confirm-button-class="danger"
                        @close="$emit('clearMeasurementsClose', $event)" />
-        <ConfirmDialog v-if="deleteSavedMeasurementsDialogOpen"
-                       title="Delete Saved Measurements"
-                       message="Are you sure you want to delete saved measurements?"
-                       confirm-text="Delete"
-                       cancel-text="Cancel"
-                       confirm-button-class="danger"
-                       @close="$emit('deleteSavedMeasurementsClose', $event)" />
+        <DeleteSavedMeasurementsDialog v-if="deleteSavedMeasurementsDialogOpen"
+                                       @close="$emit('deleteSavedMeasurementsClose', $event)" />
     </div>
 </template>
 
 <script>
 import Alert from '@/components/HubAlert.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import DeleteSavedMeasurementsDialog from '@/components/measurements/DeleteSavedMeasurementsDialog.vue';
 
 export default {
-    components: { Alert, ConfirmDialog },
+    components: { Alert, ConfirmDialog, DeleteSavedMeasurementsDialog },
     props: {
         alertDialogOpen: { type: Boolean, default: false },
         alertTitle: { type: String, default: '' },

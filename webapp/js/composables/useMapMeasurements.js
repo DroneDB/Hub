@@ -3,17 +3,18 @@
  * show, else the folder's measurements.geojson), load, save, export, delete, clear,
  * the measurement list, groups and the units change.
  *
- * The map is a working copy of that file: Save makes the file match the map (nothing on
- * the map removes the file). The file is read once per target; when the target changes
- * (another folder), the map shows the new file and unsaved measurements are dropped
- * with a notice.
+ * The map is a working copy of its measurements in that file: Save makes the file match the
+ * map, and Delete saved removes them from it. The 3D viewer's measurements in the same file
+ * (next to a point cloud) are not shown and stay as they are; the file goes when nothing is
+ * left in it. The file is read once per target; when the target changes (another folder),
+ * the map shows the new file and unsaved measurements are dropped with a notice.
  *
  * Externals: measureControls, files, dataset, canWrite, canDelete, currentUnitPref,
  * showAlert, showFlash, onFileWritten(path), onFileRemoved(path).
  */
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
-import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import { MeasurementStorage, MeasurementOwner, saveResultMessage } from '@/libs/map/measurementStorage';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
@@ -107,7 +108,7 @@ const definition = {
         async loadSavedMeasurements() {
             if (!this.dataset || !this.measureControls) return;
             const entry = this._measurementTargetEntry();
-            const storage = new MeasurementStorage(this.dataset, entry);
+            const storage = new MeasurementStorage(this.dataset, entry, MeasurementOwner.MAP);
             const previous = this._loadedMeasurementPath;
             if (storage.measurementPath === previous) return;
             this._loadedMeasurementPath = storage.measurementPath;
@@ -126,12 +127,11 @@ const definition = {
             const geojson = await storage.load();
             // Another target took over while the file was read
             if (this._loadedMeasurementPath !== storage.measurementPath) return;
-            const saved = !!(geojson && geojson.features && geojson.features.length);
-            if (saved) {
+            if (geojson) {
                 const result = this.measureControls.importFromGeoJSON(geojson);
                 if (result && result.groups) this.restoreGroupsFromMetadata(result.groups);
             }
-            this._setSaved(saved);
+            this._setSaved(!!geojson);
             this.measureControls.markSaved();
         },
 
@@ -183,8 +183,8 @@ const definition = {
         },
 
         /**
-         * Makes the file match the map: writes the measurements, or removes the file when
-         * nothing is left on the map. The file list hears of either.
+         * Makes the file match the map: writes the measurements, or removes them (and the file
+         * when nothing is left in it). The file list hears of either.
          */
         async saveMeasurements() {
             if (!this.canWrite) {
@@ -205,25 +205,22 @@ const definition = {
             }
 
             try {
-                const result = await this.measurementStorage.save(geojson);
-                this._setSaved(!result.deleted);
-                this.measureControls.markSaved();
-
-                // The persisted file now mirrors the in-memory state, so any
-                // previously "logically deleted" IDs are no longer relevant.
-                this.deletedMeasurementIds.clear();
-
-                if (result.deleted) {
-                    this.onFileRemoved(result.path);
-                    this.showFlash(`Removed "${result.fileName}": no measurements left`, 'positive');
-                } else {
-                    this.onFileWritten(result.path);
-                    this.showFlash(`Saved ${count} measurement(s) to "${result.fileName}"`, 'positive');
-                }
+                this._afterFileChange(await this.measurementStorage.save(geojson));
             } catch (e) {
                 console.error('Error saving measurements:', e);
                 this.showAlert('Error', `Failed to save measurements: ${e.message}`);
             }
+        },
+
+        // The file holds what the map shows now: the saved state, the file list and a message follow
+        _afterFileChange(result) {
+            this._setSaved(result.count > 0);
+            this.measureControls.markSaved();
+            // The file mirrors the map, so the "logically deleted" IDs are no longer relevant
+            this.deletedMeasurementIds.clear();
+            if (result.deleted) this.onFileRemoved(result.path);
+            else this.onFileWritten(result.path);
+            this.showFlash(saveResultMessage(result), 'positive');
         },
 
         /**
@@ -251,20 +248,15 @@ const definition = {
         },
 
         /**
-         * Delete saved measurements
+         * Removes the map's measurements from the file and from the map
          */
         async deleteSavedMeasurements() {
             if (!this.measurementStorage) return;
 
             try {
-                await this.measurementStorage.delete();
-                this.deletedMeasurementIds.clear();
+                const result = await this.measurementStorage.deleteSaved();
                 this.measureControls.clearAllMeasurements();
-                this._setSaved(false);
-                this.measureControls.markSaved();
-                this.onFileRemoved(this.measurementStorage.measurementPath);
-
-                this.showFlash('Saved measurements deleted', 'positive');
+                this._afterFileChange(result);
             } catch (e) {
                 console.error('Error deleting measurements:', e);
                 this.showAlert('Error', `Failed to delete measurements: ${e.message}`);
