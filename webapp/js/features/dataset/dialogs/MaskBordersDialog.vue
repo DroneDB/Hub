@@ -4,7 +4,7 @@
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="mb-3">
                 <div>
-                    Makes the black or white border pixels of the GeoTIFF transparent, producing a clean
+                    Makes the black border pixels of the GeoTIFF transparent, producing a clean
                     orthomosaic without empty areas around the survey footprint. <br>The masked result is
                     added to the dataset as a <em>new</em> COG file with the <i>_masked</i> suffix, the original file is never modified.<br>
                     See the <a :href="docsLink" target="_blank" rel="noopener">Mask Borders documentation</a> for details.
