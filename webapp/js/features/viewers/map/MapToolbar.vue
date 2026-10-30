@@ -33,8 +33,8 @@
                     :class="{ active: flightPath }" :aria-pressed="flightPath" @click="emit('update:flightPath', !flightPath)">
                 <i class="fa-solid fa-signs-post" />
             </button>
-            <button v-if="showCompare" title="Compare georasters side by side" aria-label="Compare georasters side by side"
-                    :class="{ active: splitMode }" :aria-pressed="splitMode" @click="emit('toggle-split')">
+            <button v-if="showCompare" :title="compareLabel" :aria-label="compareLabel"
+                    :class="{ active: splitMode }" :aria-pressed="splitMode" @click="emit(canCompare ? 'toggle-split' : 'compare-to')">
                 <i class="fa-solid fa-table-columns" />
             </button>
         </div>
@@ -46,7 +46,8 @@
  * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
  * - top right: Back (single-file map), Reset view, Fullscreen, Raster Analysis, Stockpile;
- * - top center: direction indicators and flight path (display options), split compare.
+ * - top center: direction indicators and flight path (display options), compare: with two
+ *   georasters or more it splits the map between them, with one it asks for another to compare to.
  */
 import { computed } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
@@ -57,7 +58,7 @@ const props = defineProps({
     showBack: { type: Boolean, default: false },
     /** Direction indicators and flight path (hidden on the single-file map) */
     displayOptions: { type: Boolean, default: true },
-    /** The split compare button, shown only while canCompare (two georasters or more) */
+    /** The compare button, shown while the map has a georaster */
     splitToggle: { type: Boolean, default: true },
     /** The entry the analysis tools open for; null hides them */
     analysisEntry: { type: Object, default: null },
@@ -65,15 +66,17 @@ const props = defineProps({
     directionIndicators: { type: Boolean, default: false },
     flightPath: { type: Boolean, default: false },
     splitMode: { type: Boolean, default: false },
+    /** Two georasters or more: the button splits the map between them */
     canCompare: { type: Boolean, default: false }
 });
-const emit = defineEmits(['back', 'reset', 'fullscreen', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split']);
+const emit = defineEmits(['back', 'reset', 'fullscreen', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
 
 const canFullscreen = supportsFullScreen();
 // Raster Analysis and Stockpile Volume work on exactly one georaster
 const multiRaster = computed(() => props.rasterCount > 1);
-// Nothing to compare: no button rather than a disabled one
-const showCompare = computed(() => props.splitToggle && props.canCompare);
+// No georaster: nothing to compare, no button
+const showCompare = computed(() => props.splitToggle && props.rasterCount > 0);
+const compareLabel = computed(() => (props.canCompare ? 'Compare georasters side by side' : 'Compare to another georaster'));
 const analysisTitle = name => multiRaster.value
     ? `${name} - Requires a single georaster layer. Remove other layers or open the file individually.`
     : name;

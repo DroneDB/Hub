@@ -8,7 +8,7 @@
                             @repick="pick" @remove="remove" />
             <div class="compare-map-area">
                 <MapCore :files="files" :dataset="dataset" :comparison="state" :can-write="false" :can-delete="false" standalone
-                         @update:comparison="onMapUpdate" @remove-layer="remove" @repick="pick" @vue:mounted="pickOnFirstShow" />
+                         @update:comparison="onMapUpdate" @remove-layer="remove" @repick="pick" @add-layer="pick()" @vue:mounted="pickOnFirstShow" />
             </div>
         </div>
         <div v-else-if="!loading" class="compare-failed">

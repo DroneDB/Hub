@@ -330,6 +330,30 @@ test('compare view: georasters side by side, saved and listed under the tree', a
     await page.waitForSelector('.saved-comparisons >> text=Smoke comparison', { timeout: 20000 });
 });
 
+test('dataset Map tab: with one georaster, Compare opens the compare view with the picker', async () => {
+    const dem = path.basename(FILES.dem);
+    await api('POST', `/orgs/${USER}/ds/${DS}/obj`, form({ path: `single/${dem}`, file: new Blob([fs.readFileSync(FILES.dem)]) }));
+    await page.goto(`${URL_}/r/${USER}/${DS}`);
+    await page.click('text=Files');
+    await page.dblclick('#explorer >> text=single');
+    await page.waitForSelector(`#explorer >> text=${dem}`, { timeout: 20000 });
+    await page.click('text=Map');
+    const compare = page.locator('button[aria-label="Compare to another georaster"]');
+    await compare.waitFor({ timeout: 60000 });
+    const [tab] = await Promise.all([page.context().waitForEvent('page'), compare.click()]);
+    await tab.waitForLoadState();
+    assert.match(tab.url(), /\/compare\?p=[^&]+&pick=1$/);
+    await tab.waitForSelector('.p-dialog >> text=Add raster to compare', { timeout: 30000 });
+    // In the compare view, with its one raster, the same button asks for another
+    await tab.keyboard.press('Escape');
+    await tab.waitForSelector('.p-dialog', { state: 'detached', timeout: 10000 });
+    await tab.click('button[aria-label="Compare to another georaster"]');
+    await tab.waitForSelector('.p-dialog >> text=Add raster to compare', { timeout: 10000 });
+    await tab.close();
+    await page.goto(`${URL_}/r/${USER}/${DS}`);
+    await appReady();
+});
+
 test('dataset Map tab: clicking a photo opens its popup', async () => {
     const name = path.basename(FILES.photo);
     // sub/ holds only the photo: the map fits it at the centre

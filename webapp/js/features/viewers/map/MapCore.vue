@@ -81,7 +81,7 @@
                     @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen"
                     @analysis="kind => toggleAnalysisPanel(kind, analysisFile)"
                     @update:direction-indicators="setDirectionIndicators" @update:flight-path="setFlightPath"
-                    @toggle-split="toggleSplit" />
+                    @toggle-split="toggleSplit" @compare-to="compareTo" />
     </div>
 </template>
 
@@ -117,6 +117,7 @@ import { useTimerGroup } from '@/composables/useTimers';
 import { useMapFeatures } from '@/composables/useMapFeatures';
 import { useMapComparison } from '@/composables/useMapComparison';
 import { usePreference } from '@/composables/usePreference';
+import { openCompare } from '@/libs/compare/compareLinks';
 
 import DialogHost from '@/components/DialogHost.vue';
 import MapToolbar from './MapToolbar.vue';
@@ -173,14 +174,15 @@ export default {
             default: false
         },
         // A comparison (the compare view): its state is the parent's, the map shows it and
-        // emits what the user changes (update:comparison), plus removeLayer and repick (a path)
+        // emits what the user changes (update:comparison), plus removeLayer, repick (a path)
+        // and addLayer (the compare button with one georaster)
         // for the parent to apply. Set before the map mounts; null on the other maps.
         comparison: {
             type: Object,
             default: null
         }
     },
-    emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick'],
+    emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick', 'addLayer'],
     setup(props, { emit }) {
         const features = useMapFeatures(props);
         return {
@@ -580,6 +582,13 @@ export default {
 
         goBack: function () {
             this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
+        },
+
+        // The compare button with one georaster: the compare view adds another from its
+        // picker; the dataset map opens the compare view with this one and the picker
+        compareTo: function () {
+            if (this.comparison) this.$emit('addLayer');
+            else if (this.dataset && this.rasterLayerList.length) openCompare(this.dataset, { paths: [this.rasterLayerList[0].path], pick: true });
         },
 
         toggleFullscreen: function () {
