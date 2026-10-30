@@ -176,15 +176,19 @@ export default {
         // A comparison (the compare view): its state is the parent's, the map shows it and
         // emits what the user changes (update:comparison), plus removeLayer, repick (a path)
         // and addLayer (the compare button with one georaster)
-        // for the parent to apply. Set before the map mounts; null on the other maps.
+        // for the parent to apply. Every map emits fileWritten / fileRemoved (a path) when it
+        // saves or removes a file of the dataset (the measurements). Set before the map mounts; null on the other maps.
         comparison: {
             type: Object,
             default: null
         }
     },
-    emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick', 'addLayer'],
+    emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick', 'addLayer', 'fileWritten', 'fileRemoved'],
     setup(props, { emit }) {
-        const features = useMapFeatures(props);
+        const features = useMapFeatures(props, {
+            onFileWritten: path => emit('fileWritten', path),
+            onFileRemoved: path => emit('fileRemoved', path)
+        });
         return {
             ...features,
             ...useMapComparison({ ...features, comparison: () => props.comparison, emit }),

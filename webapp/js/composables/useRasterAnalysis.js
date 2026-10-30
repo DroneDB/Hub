@@ -304,13 +304,7 @@ const definition = {
                 // by default; revealed on hover by the measure control's hover handler.
                 this._createProfileStaticTooltip(feature);
 
-                if (typeof this.measureControls.updateButtonsVisibility === 'function') {
-                    this.measureControls.updateButtonsVisibility(
-                        typeof this.measureControls.hasMeasurements === 'function'
-                            ? this.measureControls.hasMeasurements()
-                            : true,
-                        false);
-                }
+                this.measureControls.refreshButtons();
 
                 // Synchronously suspend the Draw interaction so the upcoming
                 // pointer events can NOT start a new feature, and flip the UI

@@ -1,6 +1,7 @@
 <template>
     <MapCore ref="core" :files="files" :dataset="dataset" :can-write="canWrite" :can-delete="canDelete" :defer-load="lazyload"
-             @scroll-to="file => emit('scrollTo', file)" @open-item="(file, view) => emit('openItem', file, view)" />
+             @scroll-to="file => emit('scrollTo', file)" @open-item="(file, view) => emit('openItem', file, view)"
+             @file-written="path => emit('fileWritten', path)" @file-removed="path => emit('fileRemoved', path)" />
 </template>
 
 <script setup>
@@ -21,7 +22,8 @@ defineProps({
     canWrite: { type: Boolean, default: true },
     canDelete: { type: Boolean, default: true }
 });
-const emit = defineEmits(['scrollTo', 'openItem']);
+// fileWritten / fileRemoved: a path of the dataset the map saved or removed (the measurements)
+const emit = defineEmits(['scrollTo', 'openItem', 'fileWritten', 'fileRemoved']);
 
 const core = ref(null);
 const registerTabChild = inject('registerTabChild', null);

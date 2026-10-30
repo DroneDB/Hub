@@ -192,6 +192,11 @@ class MeasureControls extends Control {
 
         // Geometry modifications, undone with Ctrl+Z while editing
         this.undoStack = createUndoStack({ limit: 50 });
+
+        // Whether the measurements file exists (set by the owner after a load, save or delete)
+        this.hasSaved = false;
+        // The measurements as last loaded or saved, to tell unsaved changes (isDirty): none yet
+        this._savedSnapshot = '[]';
     }
 
     /**
@@ -213,7 +218,7 @@ class MeasureControls extends Control {
                 const unit = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
                 if (unit !== this.unitPref) this.showUnit(unit);
             });
-            this.updateButtonsVisibility(this.hasMeasurements(), false);
+            this.refreshButtons();
             // Detail dialog: outside edit mode, double-clicking on a measurement
             // opens the properties dialog with a Delete button. We only act on
             // hits against our own vector layer; misses fall through so the
@@ -432,21 +437,45 @@ class MeasureControls extends Control {
         this.onDeleteSaved();
     }
 
+    /** Records whether the measurements file exists and updates the buttons. */
+    setSavedState(hasSaved) {
+        this.hasSaved = !!hasSaved;
+        this.refreshButtons();
+    }
+
     /**
-     * Show or hide the management buttons
+     * Shows the management buttons that apply. Save makes the file match the map, so it
+     * stays while a saved file exists even with nothing on the map (that save removes it).
      */
-    updateButtonsVisibility(hasMeasurements, hasSavedMeasurements) {
-        // Only show Save button if user has write permission
-        const canShowSave = this.canWrite;
-        // Only show Delete button if user has delete permission
-        const canShowDelete = this.canDelete;
-        const displaySave = (hasMeasurements && canShowSave) ? 'block' : 'none';
-        this.toolbar2.style.display = hasMeasurements ? 'block' : 'none';
-        this.btnList.style.display = hasMeasurements ? 'block' : 'none';
-        this.btnSave.style.display = displaySave;
-        this.btnClear.style.display = hasMeasurements ? 'block' : 'none';
-        this.btnExport.style.display = hasMeasurements ? 'block' : 'none';
-        this.btnDelete.style.display = (hasSavedMeasurements && canShowDelete) ? 'block' : 'none';
+    refreshButtons() {
+        const hasMeasurements = this.hasMeasurements();
+        const show = on => (on ? 'block' : 'none');
+        this.toolbar2.style.display = show(hasMeasurements || this.hasSaved);
+        this.btnList.style.display = show(hasMeasurements);
+        this.btnSave.style.display = show((hasMeasurements || this.hasSaved) && this.canWrite);
+        this.btnClear.style.display = show(hasMeasurements);
+        this.btnExport.style.display = show(hasMeasurements);
+        this.btnDelete.style.display = show(this.hasSaved && this.canDelete);
+    }
+
+    /** The measurements as they would be saved, without the times that an export may fill in. */
+    _snapshot() {
+        const { features } = this.exportToGeoJSON('');
+        return JSON.stringify(features.map(f => {
+            const properties = { ...f.properties };
+            delete properties.createdAt;
+            return { ...f, properties };
+        }));
+    }
+
+    /** Takes the measurements on the map as the saved ones (after a load or a save). */
+    markSaved() {
+        this._savedSnapshot = this._snapshot();
+    }
+
+    /** Whether the map has changes that are not in the file. */
+    isDirty() {
+        return this._snapshot() !== this._savedSnapshot;
     }
 
     handleListOpen() {
@@ -537,7 +566,7 @@ class MeasureControls extends Control {
             tooltipElement.parentNode.removeChild(tooltipElement);
         }
         this.source.removeFeature(feature);
-        this.updateButtonsVisibility(this.hasMeasurements(), false);
+        this.refreshButtons();
     }
 
     /**
@@ -625,7 +654,7 @@ class MeasureControls extends Control {
         this.source.clear();
 
         // Update button visibility
-        this.updateButtonsVisibility(false, false);
+        this.refreshButtons();
     }
 
     /**
@@ -646,7 +675,7 @@ class MeasureControls extends Control {
         });
 
         // Update button visibility after import
-        this.updateButtonsVisibility(this.hasMeasurements(), true);
+        this.refreshButtons();
 
         return result;
     }
@@ -992,14 +1021,14 @@ class MeasureControls extends Control {
                 } else {
                     // First time: create the popup
                     this.createPointPopupElement(feature, map);
-                    this.updateButtonsVisibility(this.hasMeasurements(), false);
+                    this.refreshButtons();
                 }
             },
             onDiscard: () => {
                 if (!isEdit) {
                     // New point: remove it
                     this.source.removeFeature(feature);
-                    this.updateButtonsVisibility(this.hasMeasurements(), false);
+                    this.refreshButtons();
                 }
             },
             onClose: () => {
@@ -1318,7 +1347,7 @@ class MeasureControls extends Control {
                         try { self.source.removeFeature(feat); } catch { /* noop */ }
 
                         // Update button visibility after erase
-                        self.updateButtonsVisibility(self.hasMeasurements(), false);
+                        self.refreshButtons();
                     }, 100);
                 } else {
                     // Validate measurement: discard degenerate geometries (0m lines, 0m² areas)
@@ -1361,10 +1390,7 @@ class MeasureControls extends Control {
 
                     // Update button visibility after a short delay to allow OpenLayers to add the feature to the source
                     // lifetime: defer
-                    setTimeout(() => {
-                        const hasMeasurements = self.hasMeasurements();
-                        self.updateButtonsVisibility(hasMeasurements, false);
-                    }, 10);
+                    setTimeout(() => self.refreshButtons(), 10);
                 }
 
                 sketch = null;

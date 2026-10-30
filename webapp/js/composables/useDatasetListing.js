@@ -47,10 +47,16 @@ export function useDatasetListing(dataset) {
         if (paths.length) emitter.emit('deleteEntries', paths);
     }
 
-    /** An entry created on the server (merge, align output): shown when it is in the folder. */
+    /**
+     * An entry created or rewritten on the server (merge, align output, the map's measurements):
+     * shown when it is in the folder; an item already on show is replaced (its size and date
+     * follow) and stays selected.
+     */
     async function addEntry(path) {
         const entry = await dataset.listOne(path);
-        if (inView(entry.path) && !files.value.some(f => f.entry.path === entry.path)) added([itemFor(dataset, entry)]);
+        if (!inView(entry.path)) return;
+        const shown = files.value.find(f => f.entry.path === entry.path);
+        added([itemFor(dataset, entry, shown ? { selected: shown.selected } : {})]);
     }
 
     /**

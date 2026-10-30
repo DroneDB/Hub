@@ -9,6 +9,9 @@ export function isMeasurementFile(path) {
     return path.endsWith('_measurements.geojson') || pathutils.basename(path) === 'measurements.geojson';
 }
 
+/** A missing file, as the dataset API reports it. */
+const isNotFound = e => !!(e && (e.status === 404 || /not found/i.test(String(e.message || ''))));
+
 export class MeasurementStorage {
     /**
      * @param {Dataset} dataset - ddb dataset
@@ -35,12 +38,12 @@ export class MeasurementStorage {
     }
 
     /**
-     * Default set of measurement types considered "owned" by the map measure control (2D map
-     * viewer). When saving, features with these `measurementType` values are
-     * replaced by the incoming GeoJSON; all others are preserved verbatim
-     * (e.g. stockpiles or 3D viewer measurements).
+     * Measurement types the 2D map owns: every type it writes from its measurement layer
+     * (stockpiles, contours and raster profiles included, or each save would write them twice). When saving,
+     * features of these types are replaced by the incoming GeoJSON; the others (the 3D
+     * viewer's) are kept as they are.
      */
-    static OL_MEASURE_OWNED_TYPES = Object.freeze(['point', 'length', 'area']);
+    static OL_MEASURE_OWNED_TYPES = Object.freeze(['point', 'length', 'area', 'stockpile', 'contour', 'profile']);
 
     /**
      * Set of measurement types considered "owned" by the Potree (3D point
@@ -61,7 +64,8 @@ export class MeasurementStorage {
      * @param {Object} [options]
      * @param {Iterable<string>} [options.ownedTypes] - measurementType values
      *   the caller fully owns and intends to overwrite.
-     * @returns {Promise<{path: string, fileName: string}>} Storage path info.
+     * @returns {Promise<{path: string, fileName: string, deleted: boolean}>} Storage path info;
+     *   `deleted` when nothing was left to keep, so the file was removed instead of written.
      */
     async save(geojsonData, options = {}) {
         try {
@@ -81,9 +85,16 @@ export class MeasurementStorage {
                 }
             } catch (e) {
                 // 404 / missing / unreadable: nothing to preserve.
-                if (!(e && (e.status === 404 || /not found/i.test(String(e.message || ''))))) {
+                if (!isNotFound(e)) {
                     console.warn('Existing measurements file unreadable; will overwrite:', e);
                 }
+            }
+
+            const features = [...(geojsonData.features || []), ...foreign];
+            if (!features.length) {
+                await this._deleteIfPresent();
+                console.log(`Measurements file removed (nothing left): ${this.measurementPath}`);
+                return { path: this.measurementPath, fileName: this._fileName(), deleted: true };
             }
 
             const merged = {
@@ -92,7 +103,7 @@ export class MeasurementStorage {
                     ...(geojsonData.metadata || {}),
                     modifiedAt: new Date().toISOString()
                 },
-                features: [...(geojsonData.features || []), ...foreign]
+                features
             };
 
             const content = JSON.stringify(merged, null, 2);
@@ -101,10 +112,19 @@ export class MeasurementStorage {
             await this.dataset.writeObj(this.measurementPath, blob);
 
             console.log(`Measurements saved to: ${this.measurementPath} (${merged.features.length} feature(s), ${foreign.length} preserved)`);
-            return { path: this.measurementPath, fileName: this._fileName() };
+            return { path: this.measurementPath, fileName: this._fileName(), deleted: false };
         } catch (error) {
             console.error('Failed to save measurements:', error);
             throw new Error(`Failed to save measurements: ${error.message}`, { cause: error });
+        }
+    }
+
+    /** Deletes the file; a file that is already gone is not an error. */
+    async _deleteIfPresent() {
+        try {
+            await this.dataset.deleteObj(this.measurementPath);
+        } catch (e) {
+            if (!isNotFound(e)) throw e;
         }
     }
 

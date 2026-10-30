@@ -28,8 +28,10 @@ import { useRasterLayers } from '@/composables/useRasterLayers';
 
 /**
  * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, comparison?: any }} props
+ * @param {{ onFileWritten?: (path: string) => void, onFileRemoved?: (path: string) => void }} [fileEvents]
+ *   told when the map writes or removes a file of the dataset (the measurements)
  */
-export function useMapFeatures(props) {
+export function useMapFeatures(props, fileEvents = {}) {
     const map = shallowRef(null);
     const measureControls = shallowRef(null);
     const rasterLayer = shallowRef(null);
@@ -47,7 +49,9 @@ export function useMapFeatures(props) {
 
     const measurements = useMapMeasurements({
         canWrite: () => props.canWrite, canDelete: () => props.canDelete, measureControls, currentUnitPref,
-        files: () => props.files, dataset, showAlert, showFlash
+        files: () => props.files, dataset, showAlert, showFlash,
+        onFileWritten: () => fileEvents.onFileWritten || (() => {}),
+        onFileRemoved: () => fileEvents.onFileRemoved || (() => {})
     });
     const plantHealth = usePlantHealth({ dataset, rasterLayer, entry: () => null });
     const raster = useRasterAnalysis({
@@ -58,13 +62,13 @@ export function useMapFeatures(props) {
     });
     const stockpile = useStockpileVolume({
         dataset, map, measureControls, currentUnitPref,
-        deletedMeasurementIds: measurements.deletedMeasurementIds, hasSavedMeasurements: measurements.hasSavedMeasurements,
+        deletedMeasurementIds: measurements.deletedMeasurementIds,
         rasterFilePath: raster.rasterFilePath,
         getMapCenterLatLon: () => getMapCenterLatLon
     });
     const contours = useContourLines({
         dataset, measureControls, rasterFilePath: raster.rasterFilePath,
-        hasSavedMeasurements: measurements.hasSavedMeasurements, showAlert, showFlash
+        showAlert, showFlash
     });
     const tooltip = useMapTooltip({ map, vectorLayers, dialogs: () => dialogs });
 

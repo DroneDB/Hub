@@ -16,7 +16,8 @@
                     <template #map>
                         <Map v-if="openedTabs.map" ref="mapViewer" lazyload :files="listing.files.value" :dataset="dataset"
                              :can-write="canWrite" :can-delete="canDelete" @scroll-to="file => explorer && explorer.scrollTo && explorer.scrollTo(file)"
-                             @open-item="openItem" @vue:mounted="onMapMounted" />
+                             @open-item="openItem" @vue:mounted="onMapMounted"
+                             @file-written="onMapFileWritten" @file-removed="path => listing.removed([path])" />
                     </template>
                     <template #explorer>
                         <div class="detail-layout">
@@ -172,6 +173,11 @@ function onMapMounted() {
         if (tabs.value && tabs.value.activeTab === 'map') map.onTabActivated();
         pendingMapActions.splice(0).forEach(action => action(map));
     });
+}
+
+// A file the map saved (the measurements) joins the list and the tree, or replaces its old entry
+function onMapFileWritten(path) {
+    listing.addEntry(path).catch(e => console.warn(`Could not show ${path} in the file list:`, e));
 }
 
 function onTabChange(key) {

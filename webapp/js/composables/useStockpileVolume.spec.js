@@ -30,7 +30,8 @@ function start() {
                 feature.setProperties(f.properties);
                 source.addFeature(feature);
             }
-        }
+        },
+        refreshButtons() {}
     };
     const dataset = {
         calculateStockpileVolume: async () => ({ ...VOLUME }),
@@ -46,7 +47,6 @@ function start() {
         measureControls: shallowRef(measureControls),
         currentUnitPref: ref('metric'),
         deletedMeasurementIds: ref([]),
-        hasSavedMeasurements: ref(false),
         rasterFilePath: ref(''),
         getMapCenterLatLon: () => () => null
     }));

@@ -87,3 +87,23 @@ describe('build refresh', () => {
         expect(handlers.buildStateChanged).toHaveLength(0);
     });
 });
+
+describe('addEntry', () => {
+    it('shows a new file of the folder and tells the tree', async () => {
+        const emitter = (await import('@/libs/eventBus')).default;
+        emitter.emit.mockClear();
+        const { listing } = setup({ path: 'measurements.geojson', type: 2, size: 10 });
+        await listing.addEntry('measurements.geojson');
+        expect(listing.files.value.map(f => f.entry.path)).toEqual(['measurements.geojson', 'ortho.tif']);
+        expect(emitter.emit).toHaveBeenCalledWith('addItems', [expect.objectContaining({ label: 'measurements.geojson' })]);
+    });
+
+    it('replaces the item of a rewritten file, which stays selected', async () => {
+        const { listing } = setup({ ...entry, size: 99 });
+        listing.files.value[0].selected = true;
+        await listing.addEntry('ortho.tif');
+        expect(listing.files.value).toHaveLength(1);
+        expect(listing.files.value[0].entry.size).toBe(99);
+        expect(listing.files.value[0].selected).toBe(true);
+    });
+});

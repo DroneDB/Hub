@@ -742,11 +742,7 @@ const definition = {
                 // Drop our temporary draw overlay - the polygon now lives in
                 // the regular measurements layer.
                 this._clearStockpileOverlay();
-                if (typeof this.measureControls.updateButtonsVisibility === 'function') {
-                    this.measureControls.updateButtonsVisibility(
-                        this.measureControls.hasMeasurements(),
-                        !!this.hasSavedMeasurements);
-                }
+                this.measureControls.refreshButtons();
             } catch (e) {
                 console.warn('Could not adopt stockpile into measurement layer:', e);
             }
