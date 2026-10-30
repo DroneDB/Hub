@@ -3,8 +3,8 @@
  * Comma-separated values (RFC 4180): fields with a comma, a quote, a line break or a space at
  * either end are quoted, a quote inside one is doubled, and rows end with CRLF.
  *
- * Text that a spreadsheet would run as a formula (it starts with =, +, -, @, a tab or a carriage
- * return) gets a leading apostrophe, so a name typed by one user cannot run in the spreadsheet
+ * Text that a spreadsheet would run as a formula (it starts with an equals sign, a plus, a minus,
+ * an at sign, a tab or a carriage return) gets a leading apostrophe, so a name typed by one user cannot run in the spreadsheet
  * of another. Numbers are written as they are, with a dot for the decimals, so -12.5 stays a number.
  */
 
