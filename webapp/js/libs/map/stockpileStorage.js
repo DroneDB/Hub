@@ -12,6 +12,7 @@
 import { pathutils } from 'ddb';
 import { newId as makeId } from '@/libs/ids';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { ANALYSIS_FILL } from '@/libs/map/analysisStyles';
 
 const SUFFIX = '_measurements.geojson';
 // Application id stamped on every file we own. Legacy values are still readable.
@@ -87,7 +88,7 @@ export function buildStockpileFeature(polygon, properties = {}) {
             measurementType: 'stockpile',
             stroke: properties.stroke || ANALYSIS_COLOR,
             'stroke-width': properties['stroke-width'] || 2,
-            fill: properties.fill || 'rgba(255, 152, 0, 0.20)',
+            fill: properties.fill || ANALYSIS_FILL,
             'fill-opacity': properties['fill-opacity'] != null ? properties['fill-opacity'] : 0.2,
             createdAt: properties.createdAt || now,
             savedAt: now

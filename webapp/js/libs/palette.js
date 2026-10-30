@@ -24,14 +24,28 @@ export const PRIMARY = Object.freeze({
 });
 
 /**
+ * The yellow of the map analysis overlays (the raster area, the profile line, the stockpiles) and
+ * of the stockpile panel's accent and the panels' warnings: the Hub has no orange, its warnings
+ * are yellow. css/_analysis-panel.scss keeps a copy that a spec holds equal to it.
+ */
+export const ANALYSIS_YELLOW = '#ffd54f';
+
+/**
+ * A #rrggbb colour as a canvas colour string with an alpha (#0070e0: rgba(0, 112, 224, alpha)).
+ * @param {string} hex
+ * @param {number} alpha  0 to 1
+ * @returns {string}
+ */
+export const hexRgba = (hex, alpha) => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+/**
  * A shade of the brand blue as a canvas colour string with an alpha
  * (shade 500: rgba(0, 112, 224, alpha)).
  * @param {number} alpha  0 to 1
  * @param {PrimaryShade} [shade]
  * @returns {string}
  */
-export const primaryRgba = (alpha, shade = 500) => {
-    const hex = PRIMARY[shade];
-    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
+export const primaryRgba = (alpha, shade = 500) => hexRgba(PRIMARY[shade], alpha);

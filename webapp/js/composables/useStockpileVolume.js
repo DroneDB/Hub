@@ -18,7 +18,6 @@ import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
 import { Feature } from 'ol';
 import { Polygon } from 'ol/geom';
-import { Fill, Stroke, Style } from 'ol/style';
 import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import { buildStockpileFeature, loadStockpile, STOCKPILE_PROPERTIES } from '@/libs/map/stockpileStorage';
@@ -37,18 +36,12 @@ import { normalizeCurrency } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
-import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { ANALYSIS_FILL, analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
 
-const STOCKPILE_FILL = 'rgba(255, 152, 0, 0.20)';
-const STOCKPILE_STROKE = ANALYSIS_COLOR;
-
 function stockpileStyle() {
-    return new Style({
-        fill: new Fill({ color: STOCKPILE_FILL }),
-        stroke: new Stroke({ color: STOCKPILE_STROKE, width: 2 })
-    });
+    return analysisStyles({ width: 2, fill: ANALYSIS_FILL });
 }
 
 // Convert known technical/native error messages into something a user can act on.

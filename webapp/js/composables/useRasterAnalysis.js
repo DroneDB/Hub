@@ -9,6 +9,8 @@ import { transform } from 'ol/proj';
 import { unByKey } from 'ol/Observable';
 import { getLength as olGetLength } from 'ol/sphere';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { PRIMARY } from '@/libs/palette';
+import { analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
 import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/rasterPixels';
@@ -276,9 +278,10 @@ const definition = {
         },
 
         _rasterAreaStyle(sketch) {
-            return new Style({
-                stroke: new Stroke({ color: ANALYSIS_COLOR, width: 2, lineDash: sketch ? [8, 6] : undefined }),
-                fill: new Fill({ color: 'rgba(255, 255, 255, 0.12)' }),
+            return analysisStyles({
+                width: 2,
+                lineDash: sketch ? [8, 6] : undefined,
+                fill: 'rgba(255, 255, 255, 0.12)',
                 image: new CircleStyle({ radius: 4, fill: new Fill({ color: ANALYSIS_COLOR }) })
             });
         },
@@ -407,17 +410,14 @@ const definition = {
             this.rasterProfileError = null;
             this._removeRasterProfileHoverMarker();
 
-            // The dashed orange style is applied only to the in-progress
+            // The dashed style is applied only to the in-progress
             // sketch by OL design: once `drawend` fires, the persisted
             // feature is rendered by the measurement layer's style function
             // (which respects the `stroke` / `stroke-width` properties we
             // set below and inherits hover highlight automatically).
-            const sketchStyle = new Style({
-                stroke: new Stroke({
-                    color: ANALYSIS_COLOR,
-                    width: 3,
-                    lineDash: [8, 6]
-                }),
+            const sketchStyle = analysisStyles({
+                width: 3,
+                lineDash: [8, 6],
                 image: new CircleStyle({
                     radius: 4,
                     fill: new Fill({ color: ANALYSIS_COLOR }),
@@ -514,7 +514,8 @@ const definition = {
                 style: new Style({
                     image: new CircleStyle({
                         radius: 6,
-                        fill: new Fill({ color: '#ff5722' }),
+                        // The brand blue stands out on the yellow line
+                        fill: new Fill({ color: PRIMARY[500] }),
                         stroke: new Stroke({ color: '#ffffff', width: 2 })
                     })
                 })

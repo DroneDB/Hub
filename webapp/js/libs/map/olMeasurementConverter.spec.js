@@ -6,6 +6,8 @@
 import { describe, it, expect } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
 import { importMeasurements, measurementSizeText } from './olMeasurementConverter';
+import { ANALYSIS_COLOR } from './mapUtils';
+import { ANALYSIS_FILL } from './analysisStyles';
 
 // About 11 m x 11 m near the equator: a roof-sized area, well below 1 acre
 const ROOF = [[[9, 0], [9.0001, 0], [9.0001, 0.0001], [9, 0.0001], [9, 0]]];
@@ -53,5 +55,24 @@ describe('measurementSizeText', () => {
         const pile = importOne(featureOf('Polygon', ROOF, { measurementType: 'stockpile', tooltipText: 'x' }));
         expect(measurementSizeText(pile.getGeometry(), 'stockpile', 'metric')).toBeNull();
         expect(measurementSizeText(pile.getGeometry(), 'length', 'metric')).toBeNull();
+    });
+});
+
+describe('importMeasurements colours of the analysis overlays', () => {
+    it('gives a stockpile or a profile saved in the earlier orange the yellow of today', () => {
+        const pile = importOne(featureOf('Polygon', ROOF, {
+            measurementType: 'stockpile', stroke: '#ff9800', fill: 'rgba(255, 152, 0, 0.20)'
+        }));
+        expect(pile.get('stroke')).toBe(ANALYSIS_COLOR);
+        expect(pile.get('fill')).toBe(ANALYSIS_FILL);
+        const profile = importOne(featureOf('LineString', LINE, { measurementType: 'profile', stroke: '#FF9800' }));
+        expect(profile.get('stroke')).toBe(ANALYSIS_COLOR);
+    });
+
+    it('keeps a colour the user chose, and the orange of a measurement that is not an analysis', () => {
+        const pile = importOne(featureOf('Polygon', ROOF, { measurementType: 'stockpile', stroke: '#00cc66' }));
+        expect(pile.get('stroke')).toBe('#00cc66');
+        const length = importOne(featureOf('LineString', LINE, { measurementType: 'length', stroke: '#ff9800' }));
+        expect(length.get('stroke')).toBe('#ff9800');
     });
 });

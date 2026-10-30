@@ -1,7 +1,7 @@
 /**
  * Shared utility functions for Map.vue and SingleMap.vue
  */
-import { PRIMARY } from '@/libs/palette';
+import { PRIMARY, ANALYSIS_YELLOW } from '@/libs/palette';
 
 /**
  * How a map fits its view to an extent (View.fit options): room around it, a short animation, and
@@ -12,8 +12,8 @@ export const FIT_OPTIONS = Object.freeze({ padding: [40, 40, 40, 40], duration: 
 /** Default colour of measurements and point annotations (map and point cloud). */
 export const MEASURE_COLOR = '#ffcc33';
 
-/** Colour of analysis overlays (raster analysis, stockpiles, profile lines). */
-export const ANALYSIS_COLOR = '#ff9800';
+/** Colour of analysis overlays (raster analysis, stockpiles, profile lines): the Hub's yellow. */
+export const ANALYSIS_COLOR = ANALYSIS_YELLOW;
 
 /** Default colour of a new measurement group. */
 export const GROUP_COLOR = PRIMARY[500];

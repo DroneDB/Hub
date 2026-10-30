@@ -13,6 +13,7 @@ import { copyText } from '@/composables/useCopyText';
 import { areaParts, lengthParts } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
 import { STOCKPILE_PROPERTIES } from './stockpileStorage';
+import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -188,11 +189,13 @@ function geoJSONToFeature(geoJsonFeature, unitPref) {
         }
     }
 
-    // Restore GeoJSON styling properties
-    if (props.stroke) feature.set('stroke', props.stroke);
+    // Restore GeoJSON styling properties; a stockpile or a profile saved in the orange of the
+    // earlier analysis overlays takes today's yellow
+    const colour = ANALYSIS_MEASUREMENT_TYPES.includes(props.measurementType) ? currentAnalysisColour : c => c;
+    if (props.stroke) feature.set('stroke', colour(props.stroke));
     if (props['stroke-width']) feature.set('stroke-width', props['stroke-width']);
     if (props['stroke-opacity']) feature.set('stroke-opacity', props['stroke-opacity']);
-    if (props.fill) feature.set('fill', props.fill);
+    if (props.fill) feature.set('fill', colour(props.fill));
     if (props['fill-opacity']) feature.set('fill-opacity', props['fill-opacity']);
     // Restore group assignment
     if (props.groupId) feature.set('groupId', props.groupId);

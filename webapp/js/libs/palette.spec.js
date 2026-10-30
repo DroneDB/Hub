@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { PRIMARY, primaryRgba } from './palette';
+import { PRIMARY, primaryRgba, ANALYSIS_YELLOW, hexRgba } from './palette';
 
 const WEBAPP = path.resolve(__dirname, '../..');
 const variables = fs.readFileSync(path.join(WEBAPP, 'css/_variables.scss'), 'utf8');
@@ -44,6 +44,20 @@ describe('the brand blue', () => {
     it('gives canvas colours with an alpha', () => {
         expect(primaryRgba(0.25)).toBe('rgba(0, 112, 224, 0.25)');
         expect(primaryRgba(0.5, 700)).toBe('rgba(0, 74, 149, 0.5)');
+    });
+});
+
+describe('the analysis yellow', () => {
+    const panels = fs.readFileSync(path.join(WEBAPP, 'css/_analysis-panel.scss'), 'utf8');
+
+    it('is held equal by the stockpile panel accent and the panel warning', () => {
+        const stockpile = panels.match(/\.analysis-panel--stockpile\s*\{([^}]*)\}/)[1];
+        expect(stockpile).toMatch(new RegExp(`--panel-accent:\\s*${ANALYSIS_YELLOW};`, 'i'));
+        expect(panels).toMatch(new RegExp(`--panel-warn:\\s*${ANALYSIS_YELLOW};`, 'i'));
+    });
+
+    it('gives canvas colours with an alpha', () => {
+        expect(hexRgba(ANALYSIS_YELLOW, 0.2)).toBe('rgba(255, 213, 79, 0.2)');
     });
 });
 

@@ -105,4 +105,10 @@ describe('no orange', () => {
     ])('has no %s', (_label, pattern) => {
         expect(sourcesMatching(pattern)).toEqual([]);
     });
+
+    it('draws no map overlay in the orange of the earlier analysis overlays', () => {
+        // analysisStyles.js names it once, to give the overlays saved in it today's yellow
+        expect(sourcesMatching(/#ff(9800|5722)\b/i).filter(file => !file.startsWith('css/')))
+            .toEqual(['js/libs/map/analysisStyles.js']);
+    });
 });

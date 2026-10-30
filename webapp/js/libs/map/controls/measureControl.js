@@ -8,6 +8,7 @@ import Translate from 'ol/interaction/Translate';
 import DoubleClickZoom from 'ol/interaction/DoubleClickZoom';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
+import { ANALYSIS_MEASUREMENT_TYPES, haloStyle } from '@/libs/map/analysisStyles';
 import { Vector as VectorLayer } from 'ol/layer';
 import { unByKey } from 'ol/Observable';
 import { getArea, getLength } from 'ol/sphere';
@@ -549,7 +550,7 @@ class MeasureControls extends Control {
     /**
      * Create a style for a feature based on its properties (GeoJSON styling conventions)
      * @param {ol.Feature} feature - The feature to style
-     * @returns {ol.style.Style} The style for the feature
+     * @returns {Style|Style[]} The style for the feature (an analysis overlay: its halo and its style)
      */
     createFeatureStyle(feature) {
         // Default colors
@@ -589,7 +590,7 @@ class MeasureControls extends Control {
         const strokeRgba = hexToRgba(strokeColor, strokeOpacity);
         const fillRgba = hexToRgba(fillColor, effectiveFillOpacity);
 
-        return new Style({
+        const style = new Style({
             fill: new Fill({
                 color: fillRgba,
             }),
@@ -605,6 +606,10 @@ class MeasureControls extends Control {
                 stroke: hovered ? new Stroke({ color: '#ffffff', width: 2 }) : null,
             }),
         });
+        // A stockpile or a profile is an analysis overlay: a dark halo under its line
+        return ANALYSIS_MEASUREMENT_TYPES.includes(feature.get('measurementType'))
+            ? [haloStyle(effectiveStrokeWidth), style]
+            : style;
     }
 
     /**
