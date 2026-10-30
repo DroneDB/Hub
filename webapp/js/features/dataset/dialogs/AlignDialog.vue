@@ -9,7 +9,7 @@
                     <strong>Similarity</strong> mode corrects translation, rotation and uniform scale; <br>
                     <strong>Translation</strong> mode corrects position only and is faster for small offsets.<br>
                     The aligned result is added to the dataset as a <em>new</em> GeoTIFF file with the <i>_aligned</i> suffix, the original source is never modified.<br>
-                    See the <a href="https://docs.dronedb.app/docs/features/raster-alignment" target="_blank" rel="noopener">Raster Alignment documentation</a> for details.
+                    See the <a :href="docsLink" target="_blank" rel="noopener">Raster Alignment documentation</a> for details.
                 </div>
             </PrimeMessage>
 
@@ -110,6 +110,7 @@ import InputText from 'primevue/inputtext';
 import Select    from 'primevue/select';
 import PrimeMessage from 'primevue/message';
 import { useHeavyTask } from '@/composables/useHeavyTask';
+import { DOCS } from '@/libs/docsLinks';
 
 export default {
     name: 'AlignDialog',
@@ -124,7 +125,7 @@ export default {
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask };
+        return { runHeavyTask, docsLink: DOCS.alignRaster };
     },
     data() {
         const stem = (this.sourceEntry?.entry?.path ?? 'output').replace(/\.tiff?$/i, '');

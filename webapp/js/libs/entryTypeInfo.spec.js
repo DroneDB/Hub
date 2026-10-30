@@ -47,11 +47,11 @@ describe('EntryTypeInfoDialog', () => {
         expect(wrapper.find('h2').text()).toBe('Type: GeoRaster');
         expect(wrapper.text()).toContain(getEntryTypeInfo(T.GEORASTER).summary);
         expect(wrapper.text()).toContain('An orthophoto (odm_orthophoto.tif)');
-        expect(wrapper.find('a').attributes('href')).toBe('https://docs.dronedb.app/docs/features/georaster-processing');
+        expect(wrapper.find('a').attributes('href')).toBe('https://docs.dronedb.app/docs/reference/formats#rasters');
     });
 
     it('has no documentation link for a type without one, and closes on OK', async () => {
-        const wrapper = mountDialog(T.IMAGE);
+        const wrapper = mountDialog(T.DRONEDB);
         expect(wrapper.find('a').exists()).toBe(false);
         await wrapper.find('button').trigger('click');
         expect(wrapper.emitted('close')).toHaveLength(1);

@@ -46,8 +46,7 @@ import Card from 'primevue/card';
 import Message from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { runUploadProbe } from '@/libs/upload/uploadProbe';
-
-const DOCS_URL = 'https://docs.dronedb.app/docs/registry/admin/troubleshooting#tuning-the-reverse-proxy-for-large-uploads';
+import { DOCS } from '@/libs/docsLinks';
 
 /**
  * UploadDiagnostics - the upload self-test: throughput, protocol and round trip
@@ -57,7 +56,7 @@ export default {
     name: 'UploadDiagnostics',
     components: { Button, Card, Message },
     data() {
-        return { running: false, result: null, error: '', docsUrl: DOCS_URL };
+        return { running: false, result: null, error: '', docsUrl: DOCS.largeUploads };
     },
     methods: {
         format(mbps) {

@@ -19,7 +19,7 @@ const CONFIG = {
     sections: [{
         name: 'UpdateCheck',
         title: 'Update check',
-        description: 'Update check: disabled (AppSettings:UpdateCheckCron). Docs: https://docs.dronedb.app/docs/registry/admin/update-check',
+        description: 'Update check: disabled (AppSettings:UpdateCheckCron). Docs: https://docs.dronedb.app/docs/self-hosting/update-check',
         isActive: false,
         fields: [
             field('UpdateCheckEmail', 'enum', 'all', 'security'),

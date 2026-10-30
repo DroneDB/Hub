@@ -7,8 +7,7 @@
                     Makes the black or white border pixels of the GeoTIFF transparent, producing a clean
                     orthomosaic without empty areas around the survey footprint. <br>The masked result is
                     added to the dataset as a <em>new</em> COG file with the <i>_masked</i> suffix, the original file is never modified.<br>
-                    See the <a href="https://docs.dronedb.app/docs/features/georaster-processing#border-masking"
-                               target="_blank" rel="noopener">Border Masking documentation</a> for details.
+                    See the <a :href="docsLink" target="_blank" rel="noopener">Mask Borders documentation</a> for details.
                 </div>
             </PrimeMessage>
 
@@ -32,12 +31,13 @@ import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
+import { DOCS } from '@/libs/docsLinks';
 
 /**
  * MaskBordersDialog - Confirmation dialog shown before starting the Mask Borders
  * operation on a single GeoTIFF.
  *
- * Explains what the operation does, links to the Border Masking documentation,
+ * Explains what the operation does, links to the Mask Borders documentation,
  * and emits 'close' with 'confirm' or 'cancel'. The actual check/existence
  * and job start are handled by the parent after confirmation.
  *
@@ -53,7 +53,8 @@ export default {
     },
     emits: ['close'],
 
-    methods: {
+    setup() {
+        return { docsLink: DOCS.maskBorders };
     }
 };
 </script>
