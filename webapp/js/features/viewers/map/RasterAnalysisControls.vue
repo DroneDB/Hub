@@ -60,26 +60,37 @@
                 <input id="raster-analysis-controls-rescale" v-model="rescale" class="panel-input" placeholder="e.g. 0,50 (auto if empty)" @change="onRescaleChange">
             </div>
 
-            <!-- Spot Info -->
-            <div v-if="spotInfo" class="section">
+            <!-- Spot Info: the last value read with Inspect -->
+            <div v-if="spotInfo" class="section" data-testid="raster-spot-value">
                 <span class="section-label">{{ isThermal ? 'Spot Temperature' : 'Spot Value' }}</span>
                 <div class="spot-info">
                     <span class="spot-temp" :class="{ thermal: isThermal }">{{ formatValue(spotInfo.value) }}</span>
-                    <span class="spot-coords">({{ spotInfo.x }}, {{ spotInfo.y }})</span>
+                    <span class="spot-coords">{{ spotPlace }}</span>
                 </div>
             </div>
 
-            <!-- Area Stats -->
-            <div v-if="areaStats" class="section">
-                <span class="section-label">Area Statistics</span>
-                <div class="stats-grid">
-                    <span>Min: {{ formatValue(areaStats.min) }}</span>
-                    <span>Max: {{ formatValue(areaStats.max) }}</span>
-                    <span>Mean: {{ formatValue(areaStats.mean) }}</span>
-                    <span>StdDev: {{ formatNum(areaStats.stddev) }}</span>
-                    <span>Median: {{ formatValue(areaStats.median) }}</span>
-                    <span>Pixels: {{ areaStats.pixelCount }}</span>
+            <!-- Area Stats: the values in the rectangle drawn with Area -->
+            <div v-if="areaStats || areaStatsLoading || areaStatsError" class="section" data-testid="raster-area-stats">
+                <span class="section-label">
+                    Area Statistics
+                    <button v-if="areaStats || areaStatsError" type="button" class="info-icon-btn"
+                            title="Clear the statistics and remove the rectangle from the map"
+                            aria-label="Clear the statistics and remove the rectangle from the map"
+                            data-testid="raster-area-stats-clear"
+                            @click="$emit('clearAreaStats')">
+                        <i class="fas fa-eraser" />
+                    </button>
+                </span>
+                <LoadingSpinner v-if="areaStatsLoading" inline label="Computing statistics..." />
+                <div v-else-if="areaStatsError" class="profile-error">
+                    <i class="fas fa-exclamation-triangle" /> {{ areaStatsError }}
                 </div>
+                <dl v-else class="stats-grid area-stats">
+                    <div v-for="row in areaStatsRows" :key="row.label">
+                        <dt>{{ row.label }}:</dt>
+                        <dd>{{ row.value }}</dd>
+                    </div>
+                </dl>
             </div>
 
             <!-- Profile (elevation / value along a polyline) -->
@@ -123,6 +134,17 @@
                         @click="toggleInspect">
                     <i :class="inspectActive ? 'fas fa-eye-slash' : 'fas fa-magnifying-glass'" />
                     <span class="action-label">Inspect</span>
+                </button>
+                <button class="panel-btn action-btn"
+                        :class="{ 'is-active': drawingArea }"
+                        :disabled="areaStatsLoading"
+                        :title="drawingArea
+                            ? 'Stop drawing the rectangle (Esc)'
+                            : 'Draw a rectangle on the map to get the statistics of the values inside it'"
+                        data-testid="raster-area-stats-btn"
+                        @click="$emit('toggleAreaStats')">
+                    <i :class="drawingArea ? 'fas fa-stop' : 'far fa-square'" />
+                    <span class="action-label">{{ drawingArea ? 'Stop' : 'Area' }}</span>
                 </button>
                 <button v-if="!isThermal && !loadError" class="panel-btn action-btn"
                         title="Generate contour lines from this elevation raster"
@@ -175,6 +197,10 @@ import { bytesToSize } from '@/libs/utils';
 import RasterProfileChart from './RasterProfileChart.vue';
 import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
+import { noDataPixelCount } from '@/libs/map/rasterPixels';
+import { formatNumber } from '@/libs/format';
+
+const formatCount = n => (typeof n === 'number' ? n.toLocaleString() : '-');
 
 export default {
     components: { ColormapDropdown, RasterProfileChart, LoadingSpinner },
@@ -185,6 +211,10 @@ export default {
         initialParams: { type: Object, default: null },
         spotInfo: { type: Object, default: null },
         areaStats: { type: Object, default: null },
+        areaStatsLoading: { type: Boolean, default: false },
+        areaStatsError: { type: String, default: null },
+        // True while the host has an active OL Draw interaction for the statistics rectangle.
+        drawingArea: { type: Boolean, default: false },
         profile: { type: Object, default: null },
         profileLoading: { type: Boolean, default: false },
         profileError: { type: String, default: null },
@@ -196,7 +226,7 @@ export default {
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
             'profileHover', 'cancelDrawProfile', 'toggleInspectValue',
-            'openContourDialog'],
+            'openContourDialog', 'toggleAreaStats', 'clearAreaStats'],
 
     setup() {
         return { applyLater: useTimerGroup() };
@@ -227,6 +257,32 @@ export default {
         },
         availableColormaps() {
             return colormapList(this.isThermal ? THERMAL_COLORMAPS : GENERIC_COLORMAPS);
+        },
+        // Where the spot value was read: longitude and latitude when the raster is georeferenced
+        spotPlace() {
+            const s = this.spotInfo;
+            if (!s) return '';
+            if (s.hasGeo && typeof s.geoX === 'number' && typeof s.geoY === 'number') {
+                return `${formatNumber(s.geoY, 6)}, ${formatNumber(s.geoX, 6)}`;
+            }
+            return `pixel ${s.x}, ${s.y}`;
+        },
+        // Min, max, mean, median and standard deviation in the raster's unit, then the pixels
+        // counted and those without data
+        areaStatsRows() {
+            const s = this.areaStats;
+            if (!s) return [];
+            const rows = [
+                { label: 'Min', value: this.formatValue(s.min) },
+                { label: 'Max', value: this.formatValue(s.max) },
+                { label: 'Mean', value: this.formatValue(s.mean) },
+                { label: 'Median', value: this.formatValue(s.median) },
+                { label: 'Std dev', value: this.formatSpread(s.stddev) },
+                { label: 'Pixels', value: formatCount(s.pixelCount) }
+            ];
+            const noData = noDataPixelCount(s);
+            if (noData) rows.push({ label: 'No data', value: formatCount(noData) });
+            return rows;
         },
         displayUnit() {
             if (this.isThermal) {
@@ -408,9 +464,13 @@ export default {
             return `${val.toFixed(2)}${unit}`;
         },
 
-        formatNum(val) {
-            if (val === undefined || val === null) return '-';
-            return typeof val === 'number' ? val.toFixed(3) : val;
+        // A spread of values (a standard deviation): in the raster's unit, without the offset
+        // that turns Celsius into Kelvin
+        formatSpread(val) {
+            if (typeof val !== 'number') return '-';
+            if (this.isThermal) return `${val.toFixed(1)}${this.displayUnit}`;
+            const unit = this.unitLabel ? ` ${this.unitLabel}` : '';
+            return `${val.toFixed(2)}${unit}`;
         }
     }
 };
@@ -455,6 +515,23 @@ export default {
 
 .spot-temp.thermal {
     color: var(--panel-thermal);
+}
+
+.area-stats {
+    margin: 0;
+}
+
+.area-stats div {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.area-stats dt {
+    font-weight: normal;
+}
+
+.area-stats dd {
+    margin: 0;
 }
 
 .spot-coords {

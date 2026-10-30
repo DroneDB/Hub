@@ -1,4 +1,4 @@
-import Draw from 'ol/interaction/Draw';
+import Draw, { createBox } from 'ol/interaction/Draw';
 import Overlay from 'ol/Overlay';
 import { Vector as VectorLayer } from 'ol/layer';
 import { Vector as VectorSource } from 'ol/source';
@@ -11,6 +11,10 @@ import { getLength as olGetLength } from 'ol/sphere';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
+import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/rasterPixels';
+
+// The server answers an area without any value with an error of its own
+const AREA_NO_DATA_MESSAGE = 'No statistics for this area: it may hold only pixels without data.';
 
 /**
  * Feature scope for Raster Analysis panel (thermal + DEM + generic value rasters).
@@ -31,6 +35,10 @@ const definition = {
             rasterInitialParams: null,
             rasterSpotInfo: null,
             rasterAreaStats: null,
+            rasterAreaStatsLoading: false,
+            rasterAreaStatsError: null,
+            // True while an OL Draw interaction for the statistics rectangle is active.
+            rasterAreaDrawing: false,
             rasterProfile: null,
             rasterProfileLoading: false,
             rasterProfileError: null,
@@ -56,7 +64,15 @@ const definition = {
             _currentProfileFeature: null,
             _rasterProfileSourceRemoveKey: null,
             _rasterProfileKeyHandler: null,
-            _rasterProfileToolLockHeld: false,
+            // True while this feature keeps the measurement toolbar disabled (profile or
+            // rectangle drawing), so it is enabled again exactly once.
+            _rasterToolLockHeld: false,
+            // The statistics rectangle: its Draw interaction, its Esc handler and the layer
+            // that shows it until it is cleared or drawn again.
+            _rasterAreaDraw: null,
+            _rasterAreaKeyHandler: null,
+            _rasterAreaLayer: null,
+            _rasterAreaSource: null,
             _rasterInspectMoveKey: null,
             _rasterInspectKeyHandler: null,
             _rasterInspectTooltipEl: null,
@@ -76,6 +92,12 @@ const definition = {
         openRasterAnalysis(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path) return;
+            if (path !== this.rasterFilePath) {
+                // The rectangle, its statistics and the spot value were of the other raster
+                this._stopRasterAreaDrawing();
+                this.handleClearAreaStats();
+                this.rasterSpotInfo = null;
+            }
             this.rasterFilePath = path;
             this.rasterPanelVisible = true;
             // Restore previously-applied viz params for this file so the
@@ -97,7 +119,8 @@ const definition = {
             this.rasterFilePath = null;
             this.rasterInitialParams = null;
             this.rasterSpotInfo = null;
-            this.rasterAreaStats = null;
+            this.handleClearAreaStats();
+            this._removeRasterAreaLayer();
             this.rasterProfile = null;
             this.rasterProfileLoading = false;
             this.rasterProfileError = null;
@@ -129,21 +152,186 @@ const definition = {
             this.refreshRasterLayers();
         },
 
+        /**
+         * The value of the raster at a pixel; the panel shows it as the spot value.
+         * Errors reach the caller.
+         * @returns {Promise<any>} the server's answer
+         */
         async queryRasterPoint(x, y) {
-            if (!this.rasterFilePath || !this.dataset) return;
+            if (!this.rasterFilePath || !this.dataset) return null;
+            const result = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y);
+            this.rasterSpotInfo = result;
+            return result;
+        },
+
+        /**
+         * The statistics of the raster values in a window of pixels, corners included.
+         * An answer that comes after the panel moved to another raster is dropped.
+         */
+        async queryRasterArea(x0, y0, x1, y1) {
+            const path = this.rasterFilePath;
+            if (!path || !this.dataset) return;
+            this.rasterAreaStatsLoading = true;
+            this.rasterAreaStatsError = null;
+            this.rasterAreaStats = null;
             try {
-                this.rasterSpotInfo = await this.dataset.getRasterPointValue(this.rasterFilePath, x, y);
+                const stats = await this.dataset.getRasterAreaStats(path, x0, y0, x1, y1);
+                if (path === this.rasterFilePath) this.rasterAreaStats = stats;
             } catch (e) {
-                console.error('Failed to query raster point:', e);
+                if (path !== this.rasterFilePath) return;
+                console.warn('[RasterAnalysis] area statistics failed:', e);
+                const clientError = e && typeof e.status === 'number' && e.status >= 400 && e.status < 500;
+                this.rasterAreaStatsError = clientError && e.message ? e.message : AREA_NO_DATA_MESSAGE;
+            } finally {
+                if (path === this.rasterFilePath) this.rasterAreaStatsLoading = false;
             }
         },
 
-        async queryRasterArea(x0, y0, x1, y1) {
-            if (!this.rasterFilePath || !this.dataset) return;
-            try {
-                this.rasterAreaStats = await this.dataset.getRasterAreaStats(this.rasterFilePath, x0, y0, x1, y1);
-            } catch (e) {
-                console.error('Failed to query raster area:', e);
+        /**
+         * The raster's map extent and pixel size, to turn map coordinates into pixels;
+         * null while the raster's layer or its size is not known.
+         * @returns {Promise<{ extent: number[], width: number, height: number }|null>}
+         */
+        async _rasterPixelGrid() {
+            const tileLayer = this._findRasterTileLayer();
+            const extent = tileLayer && tileLayer.getExtent ? tileLayer.getExtent() : null;
+            if (!extent) return null;
+            const dims = await this._ensureRasterDimsCache();
+            if (!dims) return null;
+            return { extent, width: dims.width, height: dims.height };
+        },
+
+        // ----- Area statistics (a rectangle drawn on the map) -----
+
+        /**
+         * Starts drawing the statistics rectangle, or stops a drawing in progress. A new
+         * rectangle replaces the previous one and its statistics.
+         */
+        toggleRasterAreaDrawing() {
+            if (this.rasterAreaDrawing) {
+                this._stopRasterAreaDrawing();
+                return;
+            }
+            if (!this.map || !this.rasterFilePath) return;
+            // One map tool at a time
+            if (this.rasterInspectActive) this._stopRasterInspect();
+            if (this.rasterProfileDrawing) this.cancelRasterProfileDrawing();
+            this.handleClearAreaStats();
+
+            this._ensureRasterAreaLayer();
+            const draw = new Draw({
+                source: this._rasterAreaSource,
+                type: 'Circle',
+                geometryFunction: createBox(),
+                style: this._rasterAreaStyle(true)
+            });
+            this._rasterAreaDraw = draw;
+            this.rasterAreaDrawing = true;
+            this.map.addInteraction(draw);
+            this._holdMeasureToolLock();
+
+            this._rasterAreaKeyHandler = (e) => {
+                if (e.key === 'Escape' || e.keyCode === 27) this._stopRasterAreaDrawing();
+            };
+            window.addEventListener('keydown', this._rasterAreaKeyHandler);
+
+            draw.on('drawend', (evt) => {
+                const geom = evt.feature.getGeometry();
+                // Ends the drawing on this click; the interaction leaves once OpenLayers has
+                // finished with the event (a microtask runs after its pointer handler returns)
+                try { draw.setActive(false); } catch { /* noop */ }
+                this.rasterAreaDrawing = false;
+                queueMicrotask(() => this._stopRasterAreaDrawing());
+                this._onRasterAreaDrawn(geom ? geom.getExtent() : null);
+            });
+        },
+
+        /**
+         * Asks the statistics of the pixels under a rectangle drawn on the map.
+         * @param {number[]|null} box  [minX, minY, maxX, maxY] in map coordinates
+         */
+        async _onRasterAreaDrawn(box) {
+            if (!box) return;
+            this.rasterAreaStatsError = null;
+            const grid = await this._rasterPixelGrid();
+            if (!grid) {
+                this.rasterAreaStatsError = 'The raster is not on the map yet.';
+                return;
+            }
+            const pixels = rasterPixelWindow(grid.extent, grid.width, grid.height, box);
+            if (!pixels) {
+                this.rasterAreaStatsError = 'The rectangle is outside the raster.';
+                return;
+            }
+            await this.queryRasterArea(pixels.x0, pixels.y0, pixels.x1, pixels.y1);
+        },
+
+        /** Removes the rectangle and its statistics. */
+        handleClearAreaStats() {
+            if (this._rasterAreaSource) this._rasterAreaSource.clear();
+            this.rasterAreaStats = null;
+            this.rasterAreaStatsError = null;
+            this.rasterAreaStatsLoading = false;
+        },
+
+        _rasterAreaStyle(sketch) {
+            return new Style({
+                stroke: new Stroke({ color: ANALYSIS_COLOR, width: 2, lineDash: sketch ? [8, 6] : undefined }),
+                fill: new Fill({ color: 'rgba(255, 255, 255, 0.12)' }),
+                image: new CircleStyle({ radius: 4, fill: new Fill({ color: ANALYSIS_COLOR }) })
+            });
+        },
+
+        _ensureRasterAreaLayer() {
+            if (this._rasterAreaLayer || !this.map) return;
+            this._rasterAreaSource = new VectorSource();
+            this._rasterAreaLayer = new VectorLayer({
+                source: this._rasterAreaSource,
+                style: this._rasterAreaStyle(false),
+                zIndex: 2100
+            });
+            this.map.addLayer(this._rasterAreaLayer);
+        },
+
+        _removeRasterAreaLayer() {
+            this._stopRasterAreaDrawing();
+            if (this._rasterAreaLayer && this.map) {
+                try { this.map.removeLayer(this._rasterAreaLayer); } catch { /* noop */ }
+            }
+            this._rasterAreaLayer = null;
+            this._rasterAreaSource = null;
+        },
+
+        _stopRasterAreaDrawing() {
+            if (this._rasterAreaDraw && this.map) {
+                try { this._rasterAreaDraw.setActive(false); } catch { /* noop */ }
+                try { this._rasterAreaDraw.abortDrawing(); } catch { /* noop */ }
+                try { this.map.removeInteraction(this._rasterAreaDraw); } catch { /* noop */ }
+            }
+            this._rasterAreaDraw = null;
+            this.rasterAreaDrawing = false;
+            if (this._rasterAreaKeyHandler) {
+                window.removeEventListener('keydown', this._rasterAreaKeyHandler);
+                this._rasterAreaKeyHandler = null;
+            }
+            this._releaseMeasureToolLock();
+        },
+
+        // The measurement toolbar is disabled while this feature draws on the map, so another
+        // measurement cannot start on top; held at most once
+        _holdMeasureToolLock() {
+            if (this._rasterToolLockHeld) return;
+            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                this.measureControls.setToolsDisabled(true);
+                this._rasterToolLockHeld = true;
+            }
+        },
+
+        _releaseMeasureToolLock() {
+            if (!this._rasterToolLockHeld) return;
+            this._rasterToolLockHeld = false;
+            if (this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
+                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
             }
         },
 
@@ -205,8 +393,9 @@ const definition = {
                 this.cancelRasterProfileDrawing();
                 return;
             }
-            // Profile drawing is mutually exclusive with the inspect tool.
+            // One map tool at a time
             if (this.rasterInspectActive) this._stopRasterInspect();
+            if (this.rasterAreaDrawing) this._stopRasterAreaDrawing();
 
             // Replace any previously-drawn profile so the panel always
             // reflects exactly one active profile/chart pair. Past profiles
@@ -244,15 +433,7 @@ const definition = {
             this.rasterProfileDrawing = true;
             this.map.addInteraction(draw);
 
-            // Suspend the measurement toolbar while the user is drawing the
-            // profile line so they can't start a different measurement on top.
-            // Tracked by a flag so _stopRasterProfileDrawing() releases at
-            // most one lock no matter how many times it gets called.
-            if (!this._rasterProfileToolLockHeld
-                && typeof this.measureControls.setToolsDisabled === 'function') {
-                this.measureControls.setToolsDisabled(true);
-                this._rasterProfileToolLockHeld = true;
-            }
+            this._holdMeasureToolLock();
 
             const onKey = (e) => {
                 if (e.key === 'Escape' || e.keyCode === 27) {
@@ -354,11 +535,7 @@ const definition = {
                 window.removeEventListener('keydown', this._rasterProfileKeyHandler);
                 this._rasterProfileKeyHandler = null;
             }
-            if (this._rasterProfileToolLockHeld
-                && this.measureControls && typeof this.measureControls.setToolsDisabled === 'function') {
-                try { this.measureControls.setToolsDisabled(false); } catch { /* noop */ }
-                this._rasterProfileToolLockHeld = false;
-            }
+            this._releaseMeasureToolLock();
         },
 
         /**
@@ -503,8 +680,9 @@ const definition = {
 
         _startRasterInspect() {
             if (!this.map || !this.rasterFilePath || !this.dataset) return;
-            // Mutually exclusive with profile drawing.
+            // One map tool at a time
             if (this.rasterProfileDrawing) this.cancelRasterProfileDrawing();
+            if (this.rasterAreaDrawing) this._stopRasterAreaDrawing();
             this.rasterInspectActive = true;
             this.rasterInspectValue = null;
 
@@ -620,37 +798,19 @@ const definition = {
         async _fetchInspectValueAtMapCoord(mapCoord) {
             if (!this.rasterFilePath || !this.dataset) return;
             try {
-                const tileLayer = this._findRasterTileLayer();
-                const extent = tileLayer && tileLayer.getExtent ? tileLayer.getExtent() : null;
-                if (!extent) {
+                const grid = await this._rasterPixelGrid();
+                if (!grid || !isInsideExtent(grid.extent, mapCoord)) {
                     if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
                     return;
                 }
-                const dims = await this._ensureRasterDimsCache();
-                if (!dims) {
-                    if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
-                    return;
-                }
-                const [mx, my] = mapCoord;
-                const [x0, y0, x1, y1] = extent;
-                if (mx < x0 || mx > x1 || my < y0 || my > y1) {
-                    if (this._rasterInspectTooltipEl) this._rasterInspectTooltipEl.style.display = 'none';
-                    return;
-                }
-                // Pixel index: linear in extent. Y axis inverted (image origin
-                // is top-left, map origin is bottom-left).
-                const px = Math.max(0, Math.min(dims.width - 1,
-                    Math.floor((mx - x0) / (x1 - x0) * dims.width)));
-                const py = Math.max(0, Math.min(dims.height - 1,
-                    Math.floor((y1 - my) / (y1 - y0) * dims.height)));
-
-                const result = await this.dataset.getRasterPointValue(
-                    this.rasterFilePath, px, py);
+                const [px, py] = rasterPixelAt(grid.extent, grid.width, grid.height, mapCoord);
+                const result = await this.queryRasterPoint(px, py);
                 if (!this.rasterInspectActive || !this._rasterInspectTooltipEl) return;
                 if (!result || result.value == null || !isFinite(result.value)) {
                     this._rasterInspectTooltipEl.style.display = 'none';
                     return;
                 }
+                const dims = this._rasterDimsCache || {};
                 const info = {
                     value: result.value,
                     unit: result.unit || dims.unit || '',
