@@ -8,14 +8,18 @@ import { formatTimeAgo, formatDateTime, formatDuration } from '@/libs/format';
 /** @typedef {{ id: string, title?: string, resultExtension?: string, producesArtifact?: boolean, hidden?: boolean, disabled?: boolean }} TaskTool */
 /** @typedef {{ value: string, terminal: boolean }} TaskState */
 
-/** PrimeVue Tag severity of a state. @param {string} state */
+/**
+ * PrimeVue Tag severity of a task or build state. Work that runs or waits its turn is the brand
+ * blue (the icon tells which), not a warning. @param {string} state
+ */
 export function tagSeverity(state) {
     switch (state) {
         case 'Succeeded': return 'success';
         case 'Failed': return 'danger';
-        case 'Processing': return 'warn';
+        case 'Processing':
         case 'Enqueued':
         case 'Scheduled':
+        case 'Awaiting':
         case 'Reused': return 'info';
         default: return 'secondary';
     }

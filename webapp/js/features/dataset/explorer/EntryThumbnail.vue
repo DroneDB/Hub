@@ -510,16 +510,16 @@ export default {
     background-color: var(--ddb-danger);
 }
 
-.build-badge.processing {
-    background-color: var(--ddb-warning);
-}
-
+/* Work that runs or waits its turn is the brand blue; a build that waits for files the user
+   must add is the warning yellow, with dark text */
+.build-badge.processing,
 .build-badge.queued {
-    background-color: var(--ddb-warning);
+    background-color: var(--ddb-primary);
 }
 
 .build-badge.pending {
-    background-color: var(--ddb-build-pending);
+    background-color: var(--ddb-warning);
+    color: var(--ddb-text);
 }
 
 .build-badge i.icon {

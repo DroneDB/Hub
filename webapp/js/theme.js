@@ -13,7 +13,7 @@ const solid = c => ({
     background: `{${c}.700}`, hoverBackground: `{${c}.800}`, activeBackground: `{${c}.900}`,
     borderColor: `{${c}.700}`, hoverBorderColor: `{${c}.800}`, activeBorderColor: `{${c}.900}`
 });
-const SEVERITIES = { success: 'green', warn: 'orange', help: 'purple', danger: 'red' };
+const SEVERITIES = { success: 'green', help: 'purple', danger: 'red' };
 const each = make => Object.fromEntries(Object.entries(SEVERITIES).map(([s, c]) => [s, make(c)]));
 
 // "info" is not a second blue: it is the brand blue, so a button, a tag and a message about
@@ -28,6 +28,19 @@ const infoOutlined = {
     hoverBackground: '{primary.50}', activeBackground: '{primary.100}', borderColor: '{primary.200}', color: '{primary.color}'
 };
 const infoText = { hoverBackground: '{primary.50}', activeBackground: '{primary.100}', color: '{primary.color}' };
+
+// "warn" is yellow, as Lara's warning messages and toasts already are: its orange, darkened for
+// white text, read as a second red next to danger. Yellow takes dark text (yellow.950 on
+// yellow.400 is 9.5:1, on yellow.600 5.0:1; yellow.800 on white 6.9:1).
+const warnSolid = {
+    background: '{yellow.400}', hoverBackground: '{yellow.500}', activeBackground: '{yellow.600}',
+    borderColor: '{yellow.400}', hoverBorderColor: '{yellow.500}', activeBorderColor: '{yellow.600}',
+    color: '{yellow.950}', hoverColor: '{yellow.950}', activeColor: '{yellow.950}',
+    focusRing: { color: 'transparent', shadow: '0 0 0 0.2rem {yellow.200}' }
+};
+const warnOutlined = { hoverBackground: '{yellow.50}', activeBackground: '{yellow.100}', borderColor: '{yellow.300}', color: '{yellow.800}' };
+const warnText = { hoverBackground: '{yellow.50}', activeBackground: '{yellow.100}', color: '{yellow.800}' };
+const warnTag = { background: '{yellow.400}', color: '{yellow.950}' };
 
 // Messages, toasts and inline messages: primary tints with primary.700 text (7.7:1 on the tint;
 // primary.500 would give 4.2:1)
@@ -47,17 +60,17 @@ const DdbPreset = definePreset(Lara, {
         button: {
             colorScheme: {
                 light: {
-                    root: { ...each(solid), info: infoSolid },
-                    outlined: { info: infoOutlined },
-                    text: { info: infoText }
+                    root: { ...each(solid), info: infoSolid, warn: warnSolid },
+                    outlined: { info: infoOutlined, warn: warnOutlined },
+                    text: { info: infoText, warn: warnText }
                 }
             }
         },
         tag: {
-            colorScheme: { light: { ...each(c => ({ background: `{${c}.700}` })), info: { background: '{primary.color}' } } }
+            colorScheme: { light: { ...each(c => ({ background: `{${c}.700}` })), info: { background: '{primary.color}' }, warn: warnTag } }
         },
         badge: {
-            colorScheme: { light: { info: { background: '{primary.color}' } } }
+            colorScheme: { light: { info: { background: '{primary.color}' }, warn: warnTag } }
         },
         message: {
             colorScheme: {

@@ -542,12 +542,12 @@ export default {
     display: flex;
     gap: 0.5rem;
     padding: 0.5rem 0.6rem;
-    background: var(--p-orange-50);
-    border-left: 3px solid var(--p-orange-400);
+    background: var(--ddb-warning-bg);
+    border-left: 3px solid var(--ddb-warning);
     border-radius: 0.375rem;
     margin-top: 0.5rem;
     font-size: 0.8rem;
-    color: var(--p-orange-800);
+    color: var(--ddb-warning-text);
 }
 
 .alignment-warning i {
@@ -560,7 +560,7 @@ export default {
 }
 
 .alignment-warning a {
-    color: var(--p-orange-700);
+    color: var(--ddb-warning-text);
     text-decoration: underline;
 }
 

@@ -97,7 +97,7 @@
                                 :loading="slotProps.data.taskId === downloadingTaskId"
                                 :disabled="slotProps.data.taskId === downloadingTaskId"
                                 @click="$emit('download-result', slotProps.data)" />
-                        <Button v-if="isActive(slotProps.data.state)" size="small" severity="warn"
+                        <Button v-if="isActive(slotProps.data.state)" size="small" severity="secondary"
                                 icon="fa-solid fa-stop" title="Cancel" aria-label="Cancel" @click="$emit('cancel', slotProps.data)" />
                         <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
                                 icon="fa-solid fa-rotate-right" title="Retry" aria-label="Retry" @click="$emit('retry', slotProps.data)" />

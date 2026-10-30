@@ -24,7 +24,7 @@
                     <template #header>
                         <span class="section-header">
                             {{ section.title }}
-                            <Tag v-if="isSectionActive(sIdx)" value="Custom" severity="warning" size="small" class="ms-2" />
+                            <Tag v-if="isSectionActive(sIdx)" value="Custom" severity="info" size="small" class="ms-2" />
                             <Tag v-else value="Default" severity="secondary" size="small" class="ms-2" />
                         </span>
                     </template>
@@ -39,13 +39,13 @@
                                     <div class="field-tags">
                                         <Tag v-if="isInfoField(field)" value="Read-only" severity="secondary" size="small" />
                                         <Tag v-else-if="field.sensitive && isFieldModified(sIdx, fIdx)"
-                                             value="Modified" severity="warning" size="small" />
+                                             value="Modified" severity="info" size="small" />
                                         <Tag v-else-if="field.sensitive && field.isSet"
                                              value="Set (masked)" severity="info" size="small" />
                                         <Tag v-else-if="field.sensitive && !field.isSet"
                                              value="Not set" severity="secondary" size="small" />
                                         <Tag v-else-if="isFieldModified(sIdx, fIdx)"
-                                             value="Modified" severity="warning" size="small" />
+                                             value="Modified" severity="info" size="small" />
                                         <Tag v-else value="Default" severity="success" size="small" />
                                     </div>
                                 </div>

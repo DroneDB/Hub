@@ -15,7 +15,7 @@
             <h3 v-if="templates.length <= 1" class="template-title">
                 {{ template.title }}
                 <Tag v-if="template.isDefault" value="Default" severity="secondary" size="small" />
-                <Tag v-else value="Custom" severity="warning" size="small" />
+                <Tag v-else value="Custom" severity="info" size="small" />
             </h3>
 
             <div class="card-field">

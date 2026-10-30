@@ -29,11 +29,11 @@ function getBuildBadge(dataset, file) {
     // build exists is on the entry: "ready" (built) is the default and never gets a badge.
     switch (shownBuildStatus(BuildManager.getBuildState(dataset, file.entry.path), file.entry)) {
         case 'failed':
-            return 'fa-solid fa-circle-xmark red';
+            return 'fa-solid fa-circle-xmark build-failed';
         case 'pending':
-            return 'fa-solid fa-triangle-exclamation orange';
+            return 'fa-solid fa-triangle-exclamation build-pending';
         case 'queued':
-            return 'fa-solid fa-clock amber';
+            return 'fa-solid fa-clock build-queued';
         default:
             return null;
     }

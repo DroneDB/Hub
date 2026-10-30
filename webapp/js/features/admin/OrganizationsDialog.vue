@@ -48,7 +48,7 @@
                     <tr v-for="org in userOrganizations" :key="org.slug">
                         <td>
                             {{ org.name || org.slug }}
-                            <Tag v-if="org.isOwner" severity="warn" value="Owner" class="ms-1" />
+                            <Tag v-if="org.isOwner" severity="secondary" value="Owner" class="ms-1" />
                         </td>
                         <td>
                             <Select v-if="!org.isOwner"

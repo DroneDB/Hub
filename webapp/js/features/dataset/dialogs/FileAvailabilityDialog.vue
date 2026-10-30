@@ -26,7 +26,7 @@
                                 <tr>
                                     <td><strong>Status:</strong></td>
                                     <td>
-                                        <Tag :value="buildState.currentState" :severity="getTagSeverity(buildState.currentState)" />
+                                        <Tag :value="buildState.currentState" :severity="tagSeverity(buildState.currentState)" />
                                     </td>
                                 </tr>
                                 <tr v-if="buildState.createdAt">
@@ -54,7 +54,7 @@
                 <Button v-if="hasAction('start-build')"
                         :disabled="processing" icon="fa-solid fa-play"
                         label="Start Processing" @click="handleStartBuild" />
-                <Button v-if="hasAction('retry-build')" severity="warn"
+                <Button v-if="hasAction('retry-build')"
                         :disabled="processing" icon="fa-solid fa-rotate-right"
                         label="Retry Processing" @click="handleRetryBuild" />
                 <Button v-if="hasAction('wait')" label="Wait" @click="handleClose" />
@@ -74,6 +74,7 @@ import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Tag from 'primevue/tag';
 import { formatDateTime } from '@/libs/format';
+import { tagSeverity } from '@/libs/tasks/taskFormat';
 
 export default {
     components: {
@@ -228,7 +229,7 @@ export default {
         getMessageSeverity() {
             switch (this.status) {
                 case 'building':
-                    return 'warn';
+                    return 'info';
                 case 'failed':
                     return 'error';
                 case 'blocked':
@@ -242,22 +243,7 @@ export default {
             }
         },
 
-        getTagSeverity(state) {
-            switch (state) {
-                case 'Succeeded':
-                    return 'success';
-                case 'Failed':
-                    return 'danger';
-                case 'Processing':
-                    return 'warn';
-                case 'Enqueued':
-                case 'Scheduled':
-                case 'Awaiting':
-                    return 'info';
-                default:
-                    return 'secondary';
-            }
-        },
+        tagSeverity,
 
         formatDate(value) {
             return formatDateTime(value, { placeholder: '-', seconds: true });

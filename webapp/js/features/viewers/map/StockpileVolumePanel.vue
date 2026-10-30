@@ -392,8 +392,8 @@ export default {
     gap: 0.4rem;
     font-size: 0.75rem;
     color: var(--panel-warn-text);
-    background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    background: rgba(var(--panel-warn-rgb), 0.1);
+    border: 1px solid rgba(var(--panel-warn-rgb), 0.3);
     border-radius: 4px;
     padding: 0.4rem 0.5rem;
     line-height: 1.3;
@@ -436,8 +436,8 @@ export default {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    background: rgba(255, 152, 0, 0.18);
-    border: 1px solid rgba(255, 152, 0, 0.45);
+    background: rgba(var(--panel-warn-rgb), 0.18);
+    border: 1px solid rgba(var(--panel-warn-rgb), 0.45);
     color: var(--panel-warn-light);
     border-radius: 4px;
     padding: 0.4rem 0.5rem;

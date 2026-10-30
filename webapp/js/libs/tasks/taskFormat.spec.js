@@ -12,6 +12,12 @@ describe('taskFormat', () => {
         expect(f.isActiveTaskState('Reused', states)).toBe(true);
     });
 
+    it('running and waiting work is the brand blue, not a warning', () => {
+        for (const state of ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Reused']) expect(f.tagSeverity(state)).toBe('info');
+        expect(f.tagSeverity('Succeeded')).toBe('success');
+        expect(f.tagSeverity('Deleted')).toBe('secondary');
+    });
+
     it('measures running and concluded tasks', () => {
         expect(f.runningTime({ startedAt: '2026-10-20T10:00:00Z' }, Date.parse('2026-10-20T10:01:05Z'))).toBe('1m 5s');
         expect(f.taskDuration({ createdAt: '2026-10-20T10:00:00Z', finishedAt: '2026-10-20T11:00:01Z' })).toBe('1h 0m 1s');

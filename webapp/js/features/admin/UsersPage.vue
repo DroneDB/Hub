@@ -88,7 +88,7 @@
                             <Button size="small" :loading="slotProps.data.editing"
                                     :disabled="slotProps.data.editing || slotProps.data.deleting" title="Edit User" aria-label="Edit User"
                                     icon="fa-solid fa-pen-to-square" @click.stop="editUser(slotProps.data)" />
-                            <Button severity="warn" size="small" :disabled="slotProps.data.editing || slotProps.data.deleting"
+                            <Button severity="secondary" size="small" :disabled="slotProps.data.editing || slotProps.data.deleting"
                                     title="Change Password" aria-label="Change Password" icon="fa-solid fa-key"
                                     @click.stop="changePassword(slotProps.data)" />
                             <Button severity="danger" size="small" :loading="slotProps.data.deleting"

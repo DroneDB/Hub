@@ -469,8 +469,8 @@ export default {
 }
 
 .no-calibration-info {
-    background: rgba(255, 152, 0, 0.15);
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    background: rgba(var(--panel-warn-rgb), 0.15);
+    border: 1px solid rgba(var(--panel-warn-rgb), 0.3);
     border-radius: 0.25rem;
     padding: 0.3rem 0.5rem;
     font-size: 0.75rem;

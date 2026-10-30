@@ -112,7 +112,7 @@
                             @click="handleCancel" />
 
                     <template v-if="done">
-                        <Button v-if="counts.error > 0" severity="warn" icon="fa-solid fa-rotate-right"
+                        <Button v-if="counts.error > 0" icon="fa-solid fa-rotate-right"
                                 :label="'Retry Failed (' + counts.error + ')'" @click="retryAllFailed" />
                         <Button severity="secondary" icon="fa-solid fa-check" label="Close" @click="finishUpload" />
                     </template>

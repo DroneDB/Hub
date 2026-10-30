@@ -15,7 +15,7 @@
                     @click="goToOrganization">
                 <i class="fa-solid fa-sitemap" />
             </Button>
-            <Button v-if="updateAvailable" class="update-available-btn" severity="warning" size="small" text
+            <Button v-if="updateAvailable" class="update-available-btn" size="small" text
                     :title="updateTitle" :aria-label="updateLabel" @click="updateNotesOpen = true">
                 <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
             </Button>

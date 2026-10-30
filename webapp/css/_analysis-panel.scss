@@ -13,13 +13,16 @@
     --panel-field-bg: rgba(255, 255, 255, 0.1);
     --panel-field-border: rgba(255, 255, 255, 0.2);
     --panel-option-bg: #2a2a2a;
-    --panel-active: #ff9800;
-    --panel-active-rgb: 255, 152, 0;
+    // The tool the map is in: the panel's accent
+    --panel-active: var(--panel-accent);
+    --panel-active-rgb: var(--panel-accent-rgb);
     --panel-info: var(--ddb-primary-200);
     --panel-error-text: #ff8a80;
-    --panel-warn: #ffb74d;
-    --panel-warn-text: #ffcc80;
-    --panel-warn-light: #ffe0b2;
+    // Warnings are yellow, as in the rest of the Hub
+    --panel-warn: #ffd54f;
+    --panel-warn-rgb: 255, 213, 79;
+    --panel-warn-text: #ffe082;
+    --panel-warn-light: #fff3c4;
     // Thermal rasters: values and the profile line
     --panel-thermal: #ff9800;
     --panel-thermal-strong: #ff7043;
@@ -27,6 +30,7 @@
     // Primary button: the accent unless a panel picks a stronger one
     --panel-primary: var(--panel-accent);
     --panel-primary-hover: var(--panel-accent);
+    --panel-primary-text: #fff;
 
     position: absolute;
     top: 0.5rem;
@@ -235,7 +239,7 @@
 
     .panel-btn--primary {
         background: var(--panel-primary);
-        color: #fff;
+        color: var(--panel-primary-text);
 
         &:hover:not(:disabled) {
             background: var(--panel-primary-hover);
@@ -269,10 +273,11 @@
 }
 
 .analysis-panel--stockpile {
-    --panel-accent: #ffb74d;
-    --panel-accent-rgb: 255, 183, 77;
-    --panel-primary: #ff9800;
-    --panel-primary-hover: #f57c00;
+    --panel-accent: #ffd54f; // 10.7:1 on the panel
+    --panel-accent-rgb: 255, 213, 79;
+    --panel-primary: #ffc107; // dark text on the button: 10.7:1
+    --panel-primary-hover: #ffb300;
+    --panel-primary-text: #1a1a1a;
 }
 
 // Bottom sheet on phones
