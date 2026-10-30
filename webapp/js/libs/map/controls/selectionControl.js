@@ -3,6 +3,7 @@ import Draw, { createBox } from 'ol/interaction/Draw';
 import { Circle as CircleStyle, Fill, Stroke, Style } from 'ol/style';
 import { Vector as VectorSource } from 'ol/source';
 import { Vector as VectorLayer } from 'ol/layer';
+import { controlButton, controlGroup } from './controlButton';
 
 /**
  * Unified selection control that groups rectangle and polygon selection
@@ -19,25 +20,14 @@ class SelectionControl extends Control {
     constructor(opt_options) {
         const options = opt_options || {};
 
-        // Rectangle selection button
-        const btnRectangle = document.createElement('button');
-        btnRectangle.title = 'Rectangle Selection - Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.';
-        btnRectangle.innerHTML = '<img src="' + '/images/rectangle-selection.svg' + '" alt=""/>';
-
-        // Polygon selection button
-        const btnPolygon = document.createElement('button');
-        btnPolygon.title = 'Polygon Selection - Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.';
-        btnPolygon.innerHTML = '<img src="' + '/images/polygon-selection.svg' + '" alt=""/>';
-
-        // Clear selection button (hidden by default, shown when there's an active selection)
-        const btnClear = document.createElement('button');
-        btnClear.title = 'Clear Selection - Deselect all selected features.';
-        btnClear.innerHTML = '<img src="' + '/images/clear-selection.svg' + '" alt=""/>';
+        const btnRectangle = controlButton('Rectangle Selection', 'Click to activate, then click and drag on the map to draw a rectangle. All features inside will be selected. Press ESC or click this button again to cancel.', '/images/rectangle-selection.svg');
+        const btnPolygon = controlButton('Polygon Selection', 'Click to activate, then click on the map to draw a polygon. Close the polygon by clicking the first point. Right-click to cancel the current drawing. Press ESC or click this button again to deactivate.', '/images/polygon-selection.svg');
+        // Hidden by default, shown when there's an active selection
+        const btnClear = controlButton('Clear Selection', 'Deselect all selected features.', '/images/clear-selection.svg');
         btnClear.style.display = 'none';
 
         // Single container for all buttons
-        const element = document.createElement('div');
-        element.className = 'ol-selection ol-unselectable ol-control';
+        const element = controlGroup('Selection Tools', 'ol-selection ol-unselectable');
         element.appendChild(btnRectangle);
         element.appendChild(btnPolygon);
         element.appendChild(btnClear);

@@ -20,12 +20,14 @@
             <EmailTemplatesCard />
 
             <Accordion :active-index="activeIndex" class="config-accordion">
-                <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx">
+                <!-- The header is named by the section title alone (the Custom/Default tag describes it) -->
+                <AccordionTab v-for="(section, sIdx) in sections" :key="sIdx"
+                              :pt="{ header: { 'aria-label': section.title, 'aria-describedby': `config-section-state-${sIdx}` } }">
                     <template #header>
                         <span class="section-header">
                             {{ section.title }}
-                            <Tag v-if="isSectionActive(sIdx)" value="Custom" severity="info" size="small" class="ms-2" />
-                            <Tag v-else value="Default" severity="secondary" size="small" class="ms-2" />
+                            <Tag v-if="isSectionActive(sIdx)" :id="`config-section-state-${sIdx}`" value="Custom" severity="info" size="small" class="ms-2" />
+                            <Tag v-else :id="`config-section-state-${sIdx}`" value="Default" severity="secondary" size="small" class="ms-2" />
                         </span>
                     </template>
                     <div :class="['config-section-content', isSectionActive(sIdx) ? '' : 'config-section-inactive']">

@@ -96,4 +96,11 @@ describe('AdminConfig', () => {
         const { AppSettings } = JSON.parse(h.copyText.mock.calls[0][0]);
         expect(AppSettings.UpdateCheck).toEqual({ UpdateCheckEmail: 'all' });
     });
+
+    it('names each section header by its title, described by its Custom/Default tag', async () => {
+        await show();
+        const header = document.querySelector('button[aria-label="Update check"]');
+        expect(header).not.toBeNull();
+        expect(document.getElementById(header.getAttribute('aria-describedby')).textContent).toBe('Default');
+    });
 });

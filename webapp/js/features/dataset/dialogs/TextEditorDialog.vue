@@ -193,6 +193,8 @@ export default {
 
             const languageMode = getLanguageMode(this.entry.path);
             const extensions = [
+                // The editing area is a contenteditable div: its name for assistive technology
+                EditorView.contentAttributes.of({ 'aria-label': 'File contents' }),
                 lineNumbers(),
                 highlightActiveLine(),
                 highlightActiveLineGutter(),

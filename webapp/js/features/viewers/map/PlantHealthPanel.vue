@@ -88,7 +88,7 @@
             </div>
 
             <!-- Histogram -->
-            <div v-if="histogramData" class="section" style="margin-bottom: 1rem">
+            <div v-if="histogramData" class="section" style="margin-bottom: 1rem" role="group" aria-label="Histogram">
                 <span class="section-label">Histogram</span>
                 <HistogramChart
                     :data="histogramData"

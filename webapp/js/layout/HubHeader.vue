@@ -12,23 +12,23 @@
         <div class="right">
 
             <Button v-if="showBackToOrg" severity="secondary" size="small" text title="Back to organization"
-                    @click="goToOrganization">
+                    aria-label="Back to organization" @click="goToOrganization">
                 <i class="fa-solid fa-sitemap" />
             </Button>
             <Button v-if="updateAvailable" class="update-available-btn" size="small" text
                     :title="updateTitle" :aria-label="updateLabel" @click="updateNotesOpen = true">
                 <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
             </Button>
-            <Button v-if="showDownload && onFilesTab" severity="secondary" size="small" text :title="downloadTitle"
+            <Button v-if="showDownload && onFilesTab" severity="secondary" size="small" text :title="downloadTitle" aria-label="Download"
                     :disabled="isDownloading || downloadBlocked || activeBulkDownload" @click="handleDownload">
                 <i class="fa-solid fa-download" />
                 <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
-            <Button v-if="showShare && onFilesTab && selectedFiles.length === 1" severity="secondary" size="small" text :title="shareTitle"
+            <Button v-if="showShare && onFilesTab && selectedFiles.length === 1" severity="secondary" size="small" text :title="shareTitle" aria-label="Share"
                     @click="handleShare">
                 <i class="fa-solid fa-share-nodes" />
             </Button>
-            <Button v-if="showSettings" severity="secondary" size="small" text title="Settings" @click="handleSettings">
+            <Button v-if="showSettings" severity="secondary" size="small" text title="Settings" aria-label="Settings" @click="handleSettings">
                 <i class="fa-solid fa-wrench" />
             </Button>
 
@@ -171,6 +171,8 @@ export default {
         // The popup menu is rendered in <body>: styled through pass-through, not global CSS
         userMenuPt: function () {
             return {
+                // An item's ariaLabel replaces the label as its accessible name
+                item: ({ context }) => (context.item?.ariaLabel ? { 'aria-label': context.item.ariaLabel } : {}),
                 itemIcon: { style: { width: '1.25rem', display: 'inline-flex', justifyContent: 'center' } },
                 itemLabel: ({ context }) => (context.item?.class === 'user-menu-header' ? { style: { fontWeight: 'bold' } } : {})
             };
@@ -310,12 +312,17 @@ export default {
 
             if (this.storageInfo) {
                 items.push({ separator: true });
+                // The row shows a bare number: its name says what the number is
+                const storage = (label, ariaLabel, command = () => {}) => ({ label, ariaLabel, icon: 'fa-regular fa-hard-drive', command });
                 if (this.storageInfo.total != null && this.storageInfo.used > 0) {
-                    items.push({ label: this.percent(this.storageInfo.usedPercentage, 2), icon: 'fa-regular fa-hard-drive', command: () => { this.storageInfoDialogOpen = true; } });
+                    const used = this.percent(this.storageInfo.usedPercentage, 2);
+                    items.push(storage(used, `Storage: ${used} used`, () => { this.storageInfoDialogOpen = true; }));
                 } else if (this.storageInfo.total != null && !this.storageInfo.used) {
-                    items.push({ label: this.bytes(this.storageInfo.total), icon: 'fa-regular fa-hard-drive', command: () => {} });
+                    const total = this.bytes(this.storageInfo.total);
+                    items.push(storage(total, `Storage: ${total} total, none used`));
                 } else if (this.storageInfo.total == null) {
-                    items.push({ label: this.bytes(this.storageInfo.used), icon: 'fa-regular fa-hard-drive', command: () => {} });
+                    const used = this.bytes(this.storageInfo.used);
+                    items.push(storage(used, `Storage: ${used} used`));
                 }
             }
 

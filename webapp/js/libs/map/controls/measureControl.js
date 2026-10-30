@@ -1,4 +1,5 @@
 import { createUndoStack } from '@/libs/undoStack';
+import { controlButton, controlGroup } from './controlButton';
 import { Control } from 'ol/control';
 import Overlay from 'ol/Overlay';
 import Draw from 'ol/interaction/Draw';
@@ -35,55 +36,25 @@ class MeasureControls extends Control {
 
         const unitPref = getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
 
-        const btnPoint = document.createElement('button');
-        btnPoint.title = 'Point Annotation - Click on the map to place an annotation.';
-        btnPoint.innerHTML = '<img src="' + '/images/measure-point.svg' + '" alt=""/>';
-        const btnLength = document.createElement('button');
-        btnLength.title = 'Measure Length - Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.';
-        btnLength.innerHTML = '<img src="' + '/images/measure-length.svg' + '" alt=""/>';
-        const btnArea = document.createElement('button');
-        btnArea.title = 'Measure Area - Click on the map to draw a polygon. Double-click to finish and calculate the area. Press ESC to cancel.';
-        btnArea.innerHTML = '<img src="' + '/images/measure-area.svg' + '" alt=""/>';
-        const btnErase = document.createElement('button');
-        btnErase.title = 'Erase Measurement - Click on a measurement to delete it.';
-        btnErase.innerHTML = '<img src="' + '/images/measure-erase.svg' + '" alt=""/>';
-        const btnEdit = document.createElement('button');
-        btnEdit.title = 'Edit/Move Measurements - Click and drag measurement points to reposition them.';
-        btnEdit.innerHTML = '<img src="' + '/images/edit.svg' + '" alt=""/>';
-        const btnStop = document.createElement('button');
-        btnStop.title = 'Stop Measuring - Cancel the current measurement. Shortcut: ESC';
-        btnStop.innerHTML = '<img src="' + '/images/measure-stop.svg' + '" alt=""/>';
+        const btnPoint = controlButton('Point Annotation', 'Click on the map to place an annotation.', '/images/measure-point.svg');
+        const btnLength = controlButton('Measure Length', 'Click on the map to place points along a line. Double-click to finish. Press ESC to cancel.', '/images/measure-length.svg');
+        const btnArea = controlButton('Measure Area', 'Click on the map to draw a polygon. Double-click to finish and calculate the area. Press ESC to cancel.', '/images/measure-area.svg');
+        const btnErase = controlButton('Erase Measurement', 'Click on a measurement to delete it.', '/images/measure-erase.svg');
+        const btnEdit = controlButton('Edit/Move Measurements', 'Click and drag measurement points to reposition them.', '/images/edit.svg');
+        const btnStop = controlButton('Stop Measuring', 'Cancel the current measurement. Shortcut: ESC', '/images/measure-stop.svg');
         btnStop.style.display = 'none'; // Hidden by default, shown when a tool is active
 
-        // Save/Load/Clear buttons
-        const btnSave = document.createElement('button');
-        btnSave.title = 'Save Measurements - Save all current measurements to the dataset.';
-        btnSave.innerHTML = '<img src="' + '/images/save.svg' + '" alt=""/>';
-        btnSave.style.display = 'none';
-
-        const btnClear = document.createElement('button');
-        btnClear.title = 'Clear All Measurements - Remove all measurements from the map.';
-        btnClear.innerHTML = '<img src="' + '/images/eraser.svg' + '" alt=""/>';
-        btnClear.style.display = 'none';
-
-        const btnExport = document.createElement('button');
-        btnExport.title = 'Export Measurements - Download measurements as a GeoJSON file.';
-        btnExport.innerHTML = '<img src="' + '/images/download.svg' + '" alt=""/>';
-        btnExport.style.display = 'none';
-
-        const btnDelete = document.createElement('button');
-        btnDelete.title = 'Delete Saved Measurements - Permanently delete saved measurements from the dataset.';
-        btnDelete.innerHTML = '<img src="' + '/images/trash.svg' + '" alt=""/>';
-        btnDelete.style.display = 'none';
-
-        const btnList = document.createElement('button');
-        btnList.title = 'Measurement List - View and manage all measurements.';
-        btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem"></i>';
-        btnList.style.display = 'none';
+        // Save/Load/Clear buttons (hidden until there is something to manage)
+        const btnSave = controlButton('Save Measurements', 'Save all current measurements to the dataset.', '/images/save.svg');
+        const btnClear = controlButton('Clear All Measurements', 'Remove all measurements from the map.', '/images/eraser.svg');
+        const btnExport = controlButton('Export Measurements', 'Download measurements as a GeoJSON file.', '/images/download.svg');
+        const btnDelete = controlButton('Delete Saved Measurements', 'Permanently delete saved measurements from the dataset.', '/images/trash.svg');
+        const btnList = controlButton('Measurement List', 'View and manage all measurements.');
+        btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
+        [btnSave, btnClear, btnExport, btnDelete, btnList].forEach(btn => { btn.style.display = 'none'; });
 
         // First toolbar: drawing tools (always visible)
-        const toolbar1 = document.createElement('div');
-        toolbar1.className = 'ol-control';
+        const toolbar1 = controlGroup('Measure Tools');
         toolbar1.appendChild(btnPoint);
         toolbar1.appendChild(btnLength);
         toolbar1.appendChild(btnArea);
@@ -92,8 +63,7 @@ class MeasureControls extends Control {
         toolbar1.appendChild(btnStop);
 
         // Second toolbar: save/manage tools (hidden until there are measurements)
-        const toolbar2 = document.createElement('div');
-        toolbar2.className = 'ol-control';
+        const toolbar2 = controlGroup('Manage Measurements');
         toolbar2.style.display = 'none';
         toolbar2.appendChild(btnList);
         toolbar2.appendChild(btnSave);

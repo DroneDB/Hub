@@ -65,6 +65,7 @@ import { isMobile } from '@/libs/responsive';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { PotreeSession, pointBudgetFor } from '@/libs/potree/potreeSession';
 import { POTREE_RESOURCES, versioned, fixPotreePaths } from '@/libs/potree/potreeResources';
+import { labelPotreeControls } from '@/libs/potree/potreeControls';
 import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 
 defineOptions({ name: 'PotreeViewer' });
@@ -163,6 +164,7 @@ async function loadViewer() {
     viewer.loadGUI(() => {
         viewer.setLanguage('en');
         $('#menu_tools').next().show();
+        labelPotreeControls(container.value, session);
         m.onGuiLoaded($);
     });
 

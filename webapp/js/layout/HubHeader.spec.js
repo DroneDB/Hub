@@ -307,3 +307,30 @@ describe('HubHeader: a link to the Preferences window', () => {
         expect(replace).not.toHaveBeenCalled();
     });
 });
+
+describe('HubHeader accessible names', () => {
+    it('names the icon-only buttons of a dataset', async () => {
+        await render();
+        const { useDatasetSessionStore } = await import('@/stores/datasetSession');
+        useDatasetSessionStore(wrapper.vm.$pinia).activeTab = 'explorer';
+        await flushPromises();
+        expect(wrapper.find('[aria-label="Settings"]').exists()).toBe(true);
+        expect(wrapper.find('[aria-label="Download"]').attributes('title')).toBe('Download');
+    });
+
+    it('says what the number of the storage row is', async () => {
+        await render();
+        const storageRow = () => wrapper.vm.userMenuItems.find(i => i.icon === 'fa-regular fa-hard-drive');
+        const nameOf = item => wrapper.vm.userMenuPt.item({ context: { item } })['aria-label'];
+
+        wrapper.vm.storageInfo = { total: 10737418240, used: 1073741824, usedPercentage: 0.1, free: 9663676416 };
+        expect(nameOf(storageRow())).toBe(`Storage: ${storageRow().label} used`);
+        expect(storageRow().label).toMatch(/%/);
+
+        wrapper.vm.storageInfo = { total: 10737418240, used: 0 };
+        expect(nameOf(storageRow())).toBe(`Storage: ${storageRow().label} total, none used`);
+
+        // The other rows keep their label as their name
+        expect(wrapper.vm.userMenuPt.item({ context: { item: { label: 'Logout' } } })).toEqual({});
+    });
+});

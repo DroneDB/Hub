@@ -1,5 +1,5 @@
 <template>
-    <div v-if="file" class="detail-panel">
+    <div v-if="file" class="detail-panel" role="region" aria-label="File details">
         <div class="detail-header">
             <h3 class="ui header">
                 <i class="icon" :class="file.icon" />
