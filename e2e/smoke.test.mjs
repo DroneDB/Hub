@@ -305,7 +305,7 @@ test('dataset page: Plant Health from the context menu opens the Map tab with th
 test('dataset Map tab: split compare and the display toggles', async () => {
     // Root holds the orthophoto, the DEM and the point cloud: three georasters
     const compare = 'button[aria-label="Compare georasters side by side"]';
-    await page.waitForSelector(`${compare}:not([disabled])`, { timeout: 15000 });
+    await page.waitForSelector(compare, { timeout: 15000 });
     await page.click(compare);
     await page.waitForSelector('.split-overlay', { timeout: 10000 });
     await page.click(compare);
@@ -341,6 +341,8 @@ test('dataset Map tab: clicking a photo opens its popup', async () => {
     const box = await page.locator('.ol-viewport').boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForSelector(`.image-popup >> text=${name}`, { timeout: 10000 });
+    // No georaster here: no compare button
+    assert.equal(await page.locator('button[aria-label="Compare georasters side by side"]').count(), 0);
     // Dragging the header moves the popup by the same distance
     const header = page.locator('.image-popup-header');
     await page.waitForSelector('.image-popup-img', { state: 'visible', timeout: 10000 });

@@ -22,7 +22,7 @@
             </template>
         </div>
     </Teleport>
-    <Teleport v-if="displayOptions || splitToggle" :to="zones.topCenter">
+    <Teleport v-if="displayOptions || showCompare" :to="zones.topCenter">
         <div class="ol-map-display-buttons ol-unselectable ol-control">
             <button v-if="displayOptions" title="Show direction and speed indicators" aria-label="Show direction and speed indicators"
                     :class="{ active: directionIndicators }" :aria-pressed="directionIndicators"
@@ -33,8 +33,7 @@
                     :class="{ active: flightPath }" :aria-pressed="flightPath" @click="emit('update:flightPath', !flightPath)">
                 <i class="fa-solid fa-signs-post" />
             </button>
-            <button v-if="splitToggle" :title="canCompare ? 'Compare georasters side by side' : 'Need at least 2 georasters to compare'"
-                    aria-label="Compare georasters side by side" :disabled="!canCompare"
+            <button v-if="showCompare" title="Compare georasters side by side" aria-label="Compare georasters side by side"
                     :class="{ active: splitMode }" :aria-pressed="splitMode" @click="emit('toggle-split')">
                 <i class="fa-solid fa-table-columns" />
             </button>
@@ -58,7 +57,7 @@ const props = defineProps({
     showBack: { type: Boolean, default: false },
     /** Direction indicators and flight path (hidden on the single-file map) */
     displayOptions: { type: Boolean, default: true },
-    /** The split compare button */
+    /** The split compare button, shown only while canCompare (two georasters or more) */
     splitToggle: { type: Boolean, default: true },
     /** The entry the analysis tools open for; null hides them */
     analysisEntry: { type: Object, default: null },
@@ -73,6 +72,8 @@ const emit = defineEmits(['back', 'reset', 'fullscreen', 'analysis', 'update:dir
 const canFullscreen = supportsFullScreen();
 // Raster Analysis and Stockpile Volume work on exactly one georaster
 const multiRaster = computed(() => props.rasterCount > 1);
+// Nothing to compare: no button rather than a disabled one
+const showCompare = computed(() => props.splitToggle && props.canCompare);
 const analysisTitle = name => multiRaster.value
     ? `${name} - Requires a single georaster layer. Remove other layers or open the file individually.`
     : name;
