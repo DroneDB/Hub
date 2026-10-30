@@ -1,3 +1,5 @@
+import { withColorDepth } from './pointCloudColors';
+
 /**
  * The libraries of the 3D viewer: three.js, Giro3D and the
  * OpenLayers sources, loaded only when the viewer opens (one "giro3d" chunk).
@@ -50,7 +52,8 @@ export async function loadGiro3dLibs() {
         TiledImageSource: TiledImageSource.default,
         VectorTileSource: VectorTileSource.default,
         PointCloud: PointCloud.default,
-        COPCSource: COPCSource.default,
+        // Colours of the depth the cloud stores (8-bit ones are not turned black)
+        COPCSource: withColorDepth(COPCSource.default, THREE.Uint8BufferAttribute),
         Tiles3D: Tiles3D.default,
         DrawTool: DrawTool.default,
         XYZ: XYZ.default,
