@@ -17,6 +17,7 @@ import Point from 'ol/geom/Point';
 import LineString from 'ol/geom/LineString';
 import Polygon, { fromExtent } from 'ol/geom/Polygon';
 import { coordAll } from '@turf/meta';
+import { pointLonLat } from '@/libs/ddb/pointGeom';
 import bbox from '@turf/bbox';
 import ddb from 'ddb';
 import { EPSG } from '@/libs/constants';
@@ -90,7 +91,8 @@ export class FileLayers {
             const type = f.entry.type;
             const imageAsRaster = standalone && type === T.GEOIMAGE && f.entry.polygon_geom;
             if ((type === T.GEOIMAGE && !imageAsRaster) || type === T.GEOVIDEO || type === T.GEOPANORAMA) {
-                const lonLat = coordAll(f.entry.point_geom)[0];
+                const lonLat = pointLonLat(f.entry.point_geom);
+                if (!lonLat) continue;
                 const feat = new Feature(new Point(lonLat));
                 feat.getGeometry().transform(EPSG.WGS84, EPSG.WEB_MERCATOR);
                 feat.style = type === T.GEOPANORAMA ? 'pano' : shotStyle;

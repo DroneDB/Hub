@@ -27,7 +27,7 @@
  *   lightbox.value.open(node, files)   // a photo: every photo of `files`; a video: just it
  */
 import { ref, shallowRef, markRaw, computed, nextTick } from 'vue';
-import { coordAll } from '@turf/meta';
+import { pointLonLat } from '@/libs/ddb/pointGeom';
 import ddb from 'ddb';
 import { lazyComponent } from '@/libs/lazyComponent';
 
@@ -58,13 +58,11 @@ const current = computed(() => {
     if (!item) return null;
     let coords = null;
     let altitude = null;
-    try {
-        const c = item.entry.point_geom && coordAll(item.entry.point_geom)[0];
-        if (c && c.length >= 2) {
-            coords = `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`;
-            if (c.length >= 3 && c[2] !== 0) altitude = c[2].toFixed(1);
-        }
-    } catch { /* no position */ }
+    const c = pointLonLat(item.entry.point_geom);
+    if (c) {
+        coords = `${c[1].toFixed(6)}, ${c[0].toFixed(6)}`;
+        if (c.length >= 3 && c[2] !== 0) altitude = c[2].toFixed(1);
+    }
     return { name: ddb.pathutils.basename(item.path), coords, altitude };
 });
 

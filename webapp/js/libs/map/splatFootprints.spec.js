@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { transformExtent } from 'ol/proj';
+import { transformExtent, toLonLat } from 'ol/proj';
 import { SplatFootprints, footprintOf, isGeoreferencedSplat } from './splatFootprints';
 import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 import ddb from 'ddb';
@@ -12,10 +12,18 @@ const FOOTPRINT = {
     coordinates: [[[11.0, 43.0], [11.002, 43.0], [11.002, 43.001], [11.0, 43.001], [11.0, 43.0]]]
 };
 
+// The point_geom as Registry sends it: a GeoJSON Feature of the Point, with the CRS of the index
+const pointGeom = coordinates => ({
+    type: 'Feature',
+    crs: { type: 'name', properties: { name: 'EPSG:4326' } },
+    geometry: { type: 'Point', coordinates },
+    properties: {}
+});
+
 const splat = (name, extra = {}) => ({
     entry: {
         path: name, hash: `hash-${name}`, type: SPLAT,
-        point_geom: { type: 'Point', coordinates: [11.001, 43.0005, 100] },
+        point_geom: pointGeom([11.001, 43.0005, 100]),
         properties: { georeferenced: true, georef: { kind: 'enu', origin: [43.0005, 11.001, 100] } },
         ...extra
     }
@@ -46,13 +54,24 @@ beforeEach(() => { splats = new SplatFootprints(); });
 describe('which files are drawn', () => {
     it('is a splat with a georeference and a point', () => {
         expect(isGeoreferencedSplat(splat('a.spz'))).toBe(true);
+        // A bare Point geometry is read too
+        expect(isGeoreferencedSplat(splat('a.spz', { point_geom: { type: 'Point', coordinates: [11, 43] } }))).toBe(true);
+    });
+
+    it('draws the point Registry sends where it is', () => {
+        const a = splat('a.spz');
+        splats.setFiles([a]);
+        const [x, y] = splats.features.get(a).getGeometry().getCoordinates();
+        expect(toLonLat([x, y])[0]).toBeCloseTo(11.001, 6);
+        expect(toLonLat([x, y])[1]).toBeCloseTo(43.0005, 6);
     });
 
     it.each([
         ['a splat that is not georeferenced', splat('a.spz', { properties: { georeferenced: false } })],
         ['a splat with no properties', splat('a.spz', { properties: undefined })],
         ['a splat with no point', splat('a.spz', { point_geom: null })],
-        ['a splat with a point out of range', splat('a.spz', { point_geom: { type: 'Point', coordinates: [11, 143] } })],
+        ['a splat whose Feature has no geometry', splat('a.spz', { point_geom: { type: 'Feature', geometry: null } })],
+        ['a splat with a point out of range', splat('a.spz', { point_geom: pointGeom([11, 143]) })],
         ['another type of file', splat('a.jpg', { type: ddb.entry.type.GEOIMAGE })]
     ])('is not %s', (_name, file) => {
         expect(isGeoreferencedSplat(file)).toBe(false);
@@ -61,7 +80,7 @@ describe('which files are drawn', () => {
     it('puts only the georeferenced splats on the map, as points', () => {
         const a = splat('a.spz');
         const plain = splat('b.spz', { properties: { georeferenced: false } });
-        splats.setFiles([a, plain, { entry: { path: 'c.jpg', type: ddb.entry.type.GEOIMAGE, point_geom: { type: 'Point', coordinates: [1, 2] } } }]);
+        splats.setFiles([a, plain, { entry: { path: 'c.jpg', type: ddb.entry.type.GEOIMAGE, point_geom: pointGeom([1, 2]) } }]);
         expect([...splats.features.keys()]).toEqual([a]);
         expect(splats.source.getFeatures()).toHaveLength(1);
         expect(geometryType(splats, a)).toBe('Point');
@@ -137,7 +156,7 @@ describe('the footprint of a built splat', () => {
 describe('what is read, and when', () => {
     it('is the bounds of the splats in view only', async () => {
         const near = splat('near.spz');
-        const far = splat('far.spz', { point_geom: { type: 'Point', coordinates: [-70, -30] } });
+        const far = splat('far.spz', { point_geom: pointGeom([-70, -30]) });
         splats.setFiles([near, far]);
         const { dataset, reads } = datasetWith({ 'near.spz': { min: [0], max: [1], wgs84Footprint: FOOTPRINT }, 'far.spz': { min: [0], max: [1] } });
         await splats.loadInView(transformExtent([10.9, 42.9, 11.1, 43.1], 'EPSG:4326', 'EPSG:3857'), dataset);

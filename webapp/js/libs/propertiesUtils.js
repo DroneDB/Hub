@@ -7,6 +7,7 @@ import { bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { formatGroundResolution } from '@/libs/groundResolution';
 import { fixedLengthParts, formatSpeed } from '@/libs/format';
 import { COMPARISONS_KEY } from '@/libs/compare/comparisonStore';
+import { pointLonLat } from '@/libs/ddb/pointGeom';
 
 // Meta keys that hold app data (saved map comparisons are raw JSON), not something to show users
 export const HIDDEN_META_KEYS = [COMPARISONS_KEY];
@@ -101,12 +102,6 @@ export function formatModifiedTimeAgo(mtime) {
     return mtime ? formatTimeAgo(mtime * 1000) : '';
 }
 
-// The [x, y, z?] of a point_geom (GeoJSON order: longitude, latitude), or null
-function pointCoordinates(pointGeom) {
-    const coords = pointGeom && pointGeom.geometry && pointGeom.geometry.coordinates;
-    return Array.isArray(coords) && coords.length >= 2 ? coords : null;
-}
-
 const hasAltitude = coords => typeof coords[2] === 'number';
 
 /**
@@ -117,7 +112,7 @@ const hasAltitude = coords => typeof coords[2] === 'number';
  * @returns {string|null}
  */
 export function pointCoordinatesText(pointGeom) {
-    const coords = pointCoordinates(pointGeom);
+    const coords = pointLonLat(pointGeom);
     if (!coords) return null;
     const parts = [coords[1], coords[0]];
     if (hasAltitude(coords)) parts.push(coords[2].toFixed(2));
@@ -132,7 +127,7 @@ export function pointCoordinatesText(pointGeom) {
  * @returns {string|null}
  */
 function formatCoordinates(pointGeom, units) {
-    const coords = pointCoordinates(pointGeom);
+    const coords = pointLonLat(pointGeom);
     if (!coords) return null;
     const crsName = pointGeom.crs && pointGeom.crs.properties && pointGeom.crs.properties.name;
     let text = (crsName ? crsName + ' ' : '') + coords[0] + ', ' + coords[1];
@@ -179,7 +174,7 @@ export function buildCopyableValues(file) {
     if (entry.hash) values.size = { text: entry.hash, label: 'hash' };
     const coordinates = pointCoordinatesText(entry.point_geom);
     if (coordinates) {
-        const altitude = hasAltitude(entry.point_geom.geometry.coordinates) ? ', altitude' : '';
+        const altitude = hasAltitude(pointLonLat(entry.point_geom)) ? ', altitude' : '';
         values.coordinates = { text: coordinates, label: `latitude, longitude${altitude}` };
     }
     return values;

@@ -53,7 +53,7 @@
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import { reactive, ref, nextTick, onBeforeUnmount } from 'vue';
 import Overlay from 'ol/Overlay';
-import { coordAll } from '@turf/meta';
+import { pointLonLat } from '@/libs/ddb/pointGeom';
 import ddb from 'ddb';
 import { thumbs } from 'ddb';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
@@ -90,8 +90,8 @@ function clearRetry() {
 
 /** "lat, lon" of a point entry, or '' */
 function entryCoords(entry) {
-    const coords = entry.point_geom && coordAll(entry.point_geom)[0];
-    return coords && coords.length >= 2 ? `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}` : '';
+    const coords = pointLonLat(entry.point_geom);
+    return coords ? `${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}` : '';
 }
 
 /**

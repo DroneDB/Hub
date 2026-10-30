@@ -29,6 +29,7 @@ import { ArtifactRole } from '@/libs/ddb/buildArtifacts';
 import { EPSG } from '@/libs/constants';
 import { FILE_COLORS } from '@/libs/map/fileLayerStyles';
 import { primaryRgba } from '@/libs/palette';
+import { pointLonLat } from '@/libs/ddb/pointGeom';
 
 const geoJson = new GeoJSON();
 
@@ -40,14 +41,26 @@ const isLonLat = v => Array.isArray(v) && v.length >= 2 && Number.isFinite(v[0])
     && Math.abs(v[0]) <= 180 && Math.abs(v[1]) <= 90;
 
 /**
+ * The longitude and latitude of a georeferenced Gaussian splat: the point the indexer wrote (the
+ * Feature Registry sends, or a bare Point), or null when the file is not one or has no place on
+ * the Earth.
+ * @param {any} file  an explorer item
+ * @returns {[number, number] | null}
+ */
+function splatLonLat(file) {
+    const entry = file?.entry;
+    if (entry?.type !== ddb.entry.type.GAUSSIAN_SPLAT || entry.properties?.georeferenced !== true) return null;
+    const lonLat = pointLonLat(entry.point_geom);
+    return lonLat && isLonLat(lonLat) ? [lonLat[0], lonLat[1]] : null;
+}
+
+/**
  * Whether a file of the map is a Gaussian splat with a place on the Earth: georeferenced and with
  * the point the indexer wrote.
  * @param {any} file  an explorer item
  */
 export function isGeoreferencedSplat(file) {
-    const entry = file?.entry;
-    return entry?.type === ddb.entry.type.GAUSSIAN_SPLAT && entry.properties?.georeferenced === true
-        && entry.point_geom?.type === 'Point' && isLonLat(entry.point_geom.coordinates);
+    return splatLonLat(file) !== null;
 }
 
 /**
@@ -112,8 +125,9 @@ export class SplatFootprints {
         this.footprints.clear();
         const features = [];
         for (const file of files) {
-            if (!isGeoreferencedSplat(file)) continue;
-            const feature = new Feature(toMercator(file.entry.point_geom));
+            const lonLat = splatLonLat(file);
+            if (!lonLat) continue;
+            const feature = new Feature(toMercator({ type: 'Point', coordinates: lonLat }));
             /** @type {any} */ (feature).file = file;
             this.features.set(file, feature);
             features.push(feature);
