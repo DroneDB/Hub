@@ -529,16 +529,9 @@ export default {
             useDatasetSessionStore().requestSettings();
         },
 
+        // The button is shown for one selected file or folder only
         handleShare: function () {
-            if (this.selectedFiles.length === 1) {
-                this.shareFile = this.selectedFiles[0];
-            } else {
-                this.shareFile = {
-                    path: `${window.location.protocol}//${window.location.host}/r/${this.params.org}/${this.params.ds}`,
-                    entry: null,
-                    scope: 'dataset'
-                };
-            }
+            this.shareFile = this.selectedFiles[0];
         },
 
         handleCloseShareEmbed: function () {

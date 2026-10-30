@@ -45,10 +45,7 @@
 
                 <!-- Link / Embed / TMS (legacy single-entry modes) -->
                 <div v-else-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" class="mt-3">
-                    <div v-if="needsAuth">
-                        <Button icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
-                                @click="handleSetUnlisted" />
-                    </div>
+                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="confirmUnlistedOpen = true" />
                     <template v-else>
                         <PrimeMessage v-if="!legacyUrl" severity="info" :closable="false">
                             <strong>Not supported</strong> - This file does not support this type of sharing.
@@ -67,10 +64,7 @@
 
                 <!-- OGC modes (WMS/WMTS/WFS/WCS/OGC API) -->
                 <div v-else-if="currentOgcService" class="mt-3">
-                    <div v-if="needsAuth">
-                        <Button icon="fa-solid fa-unlock" label="Allow access to anyone with the link"
-                                @click="handleSetUnlisted" />
-                    </div>
+                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="confirmUnlistedOpen = true" />
                     <template v-else>
                         <PrimeMessage v-if="!ogcDescriptor || !ogcDescriptor.supported" severity="info"
                                       :closable="false">
@@ -94,6 +88,13 @@
 
         <OgcUsageHints v-if="hintsOpen && hintsService" :service="hintsService"
                        :url="primaryHintUrl" @close="hintsOpen = false" />
+
+        <ConfirmDialog v-if="confirmUnlistedOpen"
+                       title="Make the dataset Unlisted"
+                       :message="unlistedMessage"
+                       confirm-text="Make Unlisted"
+                       cancel-text="Cancel"
+                       @close="handleUnlistedConfirm" />
     </Window>
 </template>
 
@@ -109,8 +110,11 @@ import ddb from 'ddb';
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
 import { b64encode } from '@/libs/base64';
+import { escapeHtml } from '@/libs/sanitize';
 import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
+import MakeUnlistedPrompt from './MakeUnlistedPrompt.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import UrlRow from './ShareUrlRow.vue';
 import { useCopyText } from '@/composables/useCopyText';
 
@@ -123,12 +127,10 @@ const LEGACY_MODES = [
 
 export default {
     components: { LoadingSpinner,
-        Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow
+        Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow, MakeUnlistedPrompt, ConfirmDialog
     },
     props: {
-        // Legacy: a file-like object { path, entry }. For dataset-level sharing pass
-        // { path: <ddb dataset URI>, entry: null, scope: 'dataset' }.
-        // For folder-level sharing, pass the directory entry as usual - scope is auto-detected.
+        // The file or folder to share, { path, entry }: a folder shares its OGC services
         file: { type: Object, required: true }
     },
     emits: ['close'],
@@ -145,7 +147,8 @@ export default {
             shareMode: null,
             entry: null,
             dataset: null,
-            hintsOpen: false
+            hintsOpen: false,
+            confirmUnlistedOpen: false
         };
     },
     computed: {
@@ -153,15 +156,15 @@ export default {
             return this.copied ? 'fa-solid fa-check' : 'fa-regular fa-copy';
         },
         scope() {
-            if (this.file && this.file.scope) return this.file.scope;
-            if (!this.file || !this.file.entry) return 'dataset';
-            if (ddb.entry.isDirectory(this.file.entry)) return 'folder';
-            return 'entry';
+            return ddb.entry.isDirectory(this.file.entry) ? 'folder' : 'entry';
         },
         windowTitle() {
-            if (this.scope === 'dataset') return 'Share Dataset';
-            if (this.scope === 'folder')  return 'Share Folder';
-            return 'Share / Embed';
+            return this.scope === 'folder' ? 'Share Folder' : 'Share / Embed';
+        },
+        unlistedMessage() {
+            return `This changes the visibility of the whole dataset <strong>${escapeHtml(this.ds)}</strong> from Private to Unlisted: ` +
+                'anyone with a link can then open every file and folder in it, not only this one. ' +
+                'An Unlisted dataset stays out of the public dataset lists. You can make it Private again in the dataset settings.';
         },
         baseUrl() {
             return `${window.location.protocol}//${window.location.host}`;
@@ -288,6 +291,10 @@ export default {
         },
         copyToClipboard(value) {
             if (value) this.copy(value);
+        },
+        handleUnlistedConfirm(action) {
+            this.confirmUnlistedOpen = false;
+            if (action === 'confirm') this.handleSetUnlisted();
         },
         async handleSetUnlisted() {
             try {
