@@ -62,7 +62,7 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
     gap: 0.3rem;
     max-height: 82%;
     overflow-y: auto;
-    padding: 0.35rem 0.3rem;
+    padding: 0.35rem var(--splat-rail-padding);
     background: rgba(0, 0, 0, 0.35);
     border-radius: 0 var(--ddb-radius-sm) var(--ddb-radius-sm) 0;
     user-select: none;
@@ -76,7 +76,7 @@ const emit = defineEmits(['goto', 'toggle-orbit', 'toggle-tour', 'add', 'save'])
 
 .rail-btn {
     @include overlay-button(
-        $size: 2.1rem,
+        $size: var(--splat-rail-button),
         $radius: var(--ddb-radius-sm),
         $background: rgba(0, 0, 0, 0.5),
         $hover-background: rgba(0, 0, 0, 0.75),

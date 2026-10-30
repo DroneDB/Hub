@@ -51,10 +51,12 @@ const rows = computed(() => splatInfoRows({ ...props.info, lod: lod.value }));
 <style scoped>
 .info-panel {
     position: absolute;
-    left: var(--ddb-spacing-md);
+    /* Beside the camera rail on the left edge, not over it (desktop and phone) */
+    left: calc(var(--splat-rail-width) + var(--ddb-spacing-sm));
     bottom: calc(var(--ddb-spacing-md) + 2.25rem + 0.5rem);
     z-index: 100;
-    width: min(24rem, 90vw);
+    width: min(24rem, calc(100% - var(--splat-rail-width) - var(--ddb-spacing-sm) - var(--ddb-spacing-md)));
+    box-sizing: border-box;
     max-height: 60vh;
     overflow-y: auto;
     padding: 0.6rem 0.75rem;

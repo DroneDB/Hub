@@ -1,6 +1,13 @@
 // Splat viewer overlays: badges and the bottom-left buttons.
 @use '../../../../css/overlay-button' as *;
 
+// The camera rail on the left edge (SplatCameraRail): its size, which the panels beside it keep clear of
+#splat {
+    --splat-rail-button: 2.1rem;
+    --splat-rail-padding: 0.3rem;
+    --splat-rail-width: calc(var(--splat-rail-button) + 2 * var(--splat-rail-padding));
+}
+
 #splat canvas {
     display: flex;
     width: 100%;
