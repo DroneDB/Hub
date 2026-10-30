@@ -10,6 +10,7 @@
  * update removes the others.
  */
 import { validateState, workingState, isSafeLayerPath } from './compareState';
+import { compareText } from '@/libs/compareText';
 
 export const COMPARISONS_KEY = 'comparisons';
 export const MAX_NAME_LENGTH = 100;
@@ -73,7 +74,7 @@ export function savedComparisons(rootEntry) {
     }
     return [...latest.values()]
         .map(item => ({ id: item.id, uid: item.data.uid, name: item.data.name.trim(), data: item.data, newerVersion: item.newerVersion }))
-        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+        .sort((a, b) => compareText(a.name, b.name));
 }
 
 /**

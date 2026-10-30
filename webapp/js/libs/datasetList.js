@@ -9,7 +9,7 @@
  */
 
 // Sort fields of GET /orgs/{org}/ds (DatasetListQuery on the server)
-const DATASET_SORT_FIELDS = ['name', 'creationDate', 'entries', 'size', 'visibility'];
+export const DATASET_SORT_FIELDS = ['name', 'creationDate', 'lastModified', 'entries', 'size', 'visibility'];
 
 /**
  * @param {object} view what the page shows

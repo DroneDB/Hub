@@ -22,11 +22,13 @@ export const FILE_COLORS = {
 };
 
 /**
+ * The marker of a point or of a cluster of points: a dot with the count of features drawn above 1
+ * (the camera shots of the dataset map, the datasets of the overview map).
  * @param {string} fill
  * @param {string} stroke
  * @param {number} size  features in the cluster (a count is drawn above 1)
  */
-function shotStyle(fill, stroke, size) {
+export function clusterStyle(fill, stroke, size) {
     const text = size > 1
         ? new Text({ text: size.toString(), font: 'bold 1rem sans-serif', fill: new Fill({ color: FILE_COLORS.halo }) })
         : undefined;
@@ -88,8 +90,8 @@ export function createFileLayerStyles() {
 
     Object.assign(styles, {
         shot: feats => anySelected(feats)
-            ? memo(`_shot-selected-${feats.length}`, () => shotStyle(FILE_COLORS.shotSelected, FILE_COLORS.halo, feats.length))
-            : memo(`_shot-${feats.length}`, () => shotStyle(FILE_COLORS.shot, FILE_COLORS.halo, feats.length)),
+            ? memo(`_shot-selected-${feats.length}`, () => clusterStyle(FILE_COLORS.shotSelected, FILE_COLORS.halo, feats.length))
+            : memo(`_shot-${feats.length}`, () => clusterStyle(FILE_COLORS.shot, FILE_COLORS.halo, feats.length)),
         direction: arrow,
         pano: feats => anySelected(feats) ? styles.panoSelected : styles.panoDeselected,
 

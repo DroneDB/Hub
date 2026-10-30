@@ -111,7 +111,7 @@ import { createControlZones, moveToZone } from '@/libs/map/controlZones';
 import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fileLayers';
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
 import { ViewZoomCap } from '@/libs/map/rasterLayers';
-import { getVectorColor } from '@/libs/map/mapUtils';
+import { getVectorColor, FIT_OPTIONS } from '@/libs/map/mapUtils';
 
 import { useListenerBag } from '@/composables/useEventListener';
 import { useTimerGroup } from '@/composables/useTimers';
@@ -137,7 +137,6 @@ import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 
 // Pointer over one of these: no feature tooltip
 const MAP_CONTROLS = '.ol-map-display-buttons, .ol-map-buttons, .ol-measure-control, .ol-selection, .ol-zoom, .ol-settings';
-const FIT_OPTIONS = { padding: [40, 40, 40, 40], duration: 500, minResolution: 0.5, maxZoom: 22 };
 
 export default {
     name: 'MapCore',

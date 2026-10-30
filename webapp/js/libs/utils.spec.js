@@ -9,7 +9,8 @@ import {
     queryParams,
     inIframe,
     clone,
-    bytesToSize
+    bytesToSize,
+    parseTimestamp
 } from './utils';
 
 describe('setTitle', () => {
@@ -139,5 +140,15 @@ describe('bytesToSize', () => {
     it('respects decimals parameter', () => {
         expect(bytesToSize(1536000, 0)).toBe('1 MB');
         expect(bytesToSize(1536000, 3)).toBe('1.465 MB');
+    });
+});
+
+describe('parseTimestamp', () => {
+    it('reads an ISO date as milliseconds', () => {
+        expect(parseTimestamp('2026-03-04T05:06:07Z')).toBe(Date.UTC(2026, 2, 4, 5, 6, 7));
+    });
+
+    it('is null for a missing or invalid date, never 1970 or NaN', () => {
+        for (const value of [null, undefined, '', 'yesterday', 0, 12345, {}]) expect(parseTimestamp(value)).toBeNull();
     });
 });

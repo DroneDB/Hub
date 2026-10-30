@@ -142,6 +142,47 @@ describe('PreferencesDialog', () => {
         });
     });
 
+    describe('Organization sort', () => {
+        const column = () => document.getElementById('pref-orgs-sort-column');
+        const direction = () => document.getElementById('pref-orgs-sort-direction');
+        const open = async () => {
+            await render();
+            await tabs()[3].trigger('click');
+            await flushPromises();
+        };
+        beforeEach(() => setPref(PREF.ORG_PAGE, null));
+
+        it('is a sort field and an order in the Lists tab, by name ascending by default', async () => {
+            await open();
+            expect(column().closest('.p-select').textContent).toContain('Name');
+            expect(direction().closest('.p-select').textContent).toContain('Ascending');
+            column().closest('.p-select').click();
+            await flushPromises();
+            expect(Array.from(document.body.querySelectorAll('[role="option"]')).map(o => o.textContent.trim()))
+                .toEqual(['Name', 'Creation date', 'Last modified', 'Number of datasets']);
+        });
+
+        it('shows what is stored, and the default for a value the list does not know', async () => {
+            setPref(PREF.ORG_PAGE, { sortColumn: 'lastModified', sortDirection: 'desc' });
+            await open();
+            expect(column().closest('.p-select').textContent).toContain('Last modified');
+            expect(direction().closest('.p-select').textContent).toContain('Descending');
+            wrapper.unmount();
+            setPref(PREF.ORG_PAGE, { sortColumn: 'size', sortDirection: 'sideways' });
+            await open();
+            expect(column().closest('.p-select').textContent).toContain('Name');
+            expect(direction().closest('.p-select').textContent).toContain('Ascending');
+        });
+
+        it('follows a change that comes from the account', async () => {
+            await open();
+            applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'datasetCount', sortDirection: 'desc' });
+            await flushPromises();
+            expect(column().closest('.p-select').textContent).toContain('Number of datasets');
+            expect(direction().closest('.p-select').textContent).toContain('Descending');
+        });
+    });
+
     describe('Currency', () => {
         const currency = () => document.getElementById('pref-currency');
         beforeEach(() => setPref(PREF.CURRENCY, null));

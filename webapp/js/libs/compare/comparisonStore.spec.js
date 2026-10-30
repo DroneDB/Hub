@@ -41,6 +41,12 @@ describe('savedComparisons', () => {
         expect(savedComparisons(null)).toEqual([]);
     });
 
+    it('sorts names the way people read them: accents, case and numbers', () => {
+        const names = ['Site 10', 'site 2', 'Évora', 'Zurich', 'evora b'];
+        const root = { properties: { meta: { comparisons: names.map((name, i) => ({ id: `m${i}`, mtime: 1, data: saved(`c_${i}`, name) })) } } };
+        expect(savedComparisons(root).map(c => c.name)).toEqual(['Évora', 'evora b', 'site 2', 'Site 10', 'Zurich']);
+    });
+
     it('lists an item of a later version by its name', () => {
         const root = { properties: { meta: { comparisons: [{ id: 'm1', mtime: 1, data: { v: 2, uid: 'c_n', name: 'Next' } }] } } };
         expect(savedComparisons(root)).toMatchObject([{ uid: 'c_n', name: 'Next', newerVersion: true }]);

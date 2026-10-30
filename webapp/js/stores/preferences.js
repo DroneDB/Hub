@@ -40,7 +40,7 @@ const TO_ACCOUNT = {
     // The WMS layer list is large and fetched again when the map settings need it
     [PREF.CUSTOM_BASEMAP]: config => Object.fromEntries(Object.entries(config).filter(([field]) => field !== 'wmsLayers')),
     // The position of the page (currentPage, scrollTop) is not a preference
-    [PREF.ORG_PAGE]: ({ itemsPerPage, ownedOnly }) => ({ itemsPerPage, ownedOnly })
+    [PREF.ORG_PAGE]: ({ itemsPerPage, ownedOnly, sortColumn, sortDirection, view }) => ({ itemsPerPage, ownedOnly, sortColumn, sortDirection, view })
 };
 
 /** @param {string} key @returns {boolean} */

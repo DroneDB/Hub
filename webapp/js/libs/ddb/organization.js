@@ -44,6 +44,19 @@ export default class Organization {
         return { items, total: Number.isFinite(total) ? total : items.length };
     }
 
+    /**
+     * Where each dataset of the organization is: the bounding box (minLon, minLat, maxLon, maxLat,
+     * WGS84) of its content, or null when it has no location. The server answers for the datasets
+     * the user may see.
+     * @param {object} [opts]
+     * @param {AbortSignal} [opts.signal]
+     * @returns {Promise<Array<{slug: string, name: string|null, bbox: number[]|null}>>}
+     */
+    async datasetLocations(opts = {}) {
+        const locations = await this.registry.getRequest(`/orgs/${this.org}/locations`, { cache: false, signal: opts.signal });
+        return Array.isArray(locations) ? locations : [];
+    }
+
     datasetsUrl(opts) {
         const params = new URLSearchParams();
         if (opts?.includeThumbnailCheck) params.set('includeThumbnailCheck', 'true');

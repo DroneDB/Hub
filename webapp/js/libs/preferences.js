@@ -10,6 +10,7 @@
  * `onPrefChange` tells subscribers when a stored value changes, whoever changed it, so open
  * views follow the Preferences page, other tabs and the account.
  */
+import { DEFAULT_LIST_VIEW } from '@/libs/listViews';
 
 /** Keys, so a preference shared by several views has one spelling. */
 export const PREF = Object.freeze({
@@ -191,9 +192,9 @@ export const PREF_DEFAULTS = frozen({
     [PREF.FILE_VIEW_MODE]: 'grid',
     [PREF.TABLE_EXPANDED_GRID]: true,
     [PREF.SORT_DESCENDING]: false,
-    [PREF.DATASET_TABLE]: frozen({ sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), itemsPerPage: 10 }),
+    [PREF.DATASET_TABLE]: frozen({ sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), itemsPerPage: 10, view: DEFAULT_LIST_VIEW }),
     [PREF.OPEN_AFTER_CREATE]: false,
-    [PREF.ORG_PAGE]: frozen({ itemsPerPage: 10, ownedOnly: true }),
+    [PREF.ORG_PAGE]: frozen({ itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: /** @type {'asc'|'desc'} */ ('asc'), view: DEFAULT_LIST_VIEW }),
     [PREF.SPLAT_NAV_MODE]: 'fly',
     [PREF.SPLAT_QUALITY]: 'auto',
     [PREF.MODEL_LIGHTING]: frozen({ ambientIntensity: 0.4, directionalIntensity: 0.7, shininess: 25 }),

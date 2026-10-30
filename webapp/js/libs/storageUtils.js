@@ -3,12 +3,28 @@
  * libs/preferences.js.
  */
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { ORG_SORT_FIELDS, SORT_DIRECTIONS } from '@/libs/organizationList';
+import { LIST_VIEWS } from '@/libs/listViews';
 
 /** @param {unknown} value @returns {Record<string, any>|null} */
 const asObject = value => (value && typeof value === 'object' && !Array.isArray(value) ? value : null);
 
 /** A stored field stands for its default when it has the default's type and, unless a boolean, is not empty. */
 const usable = (value, fallback) => typeof value === typeof fallback && (typeof value === 'boolean' || !!value);
+
+/**
+ * The values a field of a settings object accepts when it has a fixed set (settings key -> field
+ * -> values). A stored value outside the set (a hand-edited store, an account written by a newer
+ * Hub) stands for the default.
+ * @type {Record<string, Record<string, readonly string[]>>}
+ */
+const FIELD_CHOICES = {
+    [PREF.DATASET_TABLE]: { view: LIST_VIEWS },
+    [PREF.ORG_PAGE]: { sortColumn: ORG_SORT_FIELDS, sortDirection: SORT_DIRECTIONS, view: LIST_VIEWS }
+};
+
+/** @param {string} key @param {string} name @param {unknown} value */
+const allowed = (key, name, value) => !FIELD_CHOICES[key]?.[name] || FIELD_CHOICES[key][name].includes(/** @type {string} */ (value));
 
 /**
  * The settings object stored under `key` (a PREF key whose default is an object): every field of
@@ -19,7 +35,18 @@ const usable = (value, fallback) => typeof value === typeof fallback && (typeof 
 function readSettings(key) {
     const stored = asObject(getPref(key, null)) ?? {};
     return Object.fromEntries(Object.entries(PREF_DEFAULTS[key]).map(([name, fallback]) =>
-        [name, usable(stored[name], fallback) ? stored[name] : fallback]));
+        [name, usable(stored[name], fallback) && allowed(key, name, stored[name]) ? stored[name] : fallback]));
+}
+
+/**
+ * `value` when the organisation list accepts it for the field (sortColumn, sortDirection, view),
+ * else the default of the field.
+ * @param {'sortColumn'|'sortDirection'|'view'} field
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function orgPageChoice(field, value) {
+    return allowed(PREF.ORG_PAGE, field, value) ? /** @type {string} */ (value) : PREF_DEFAULTS[PREF.ORG_PAGE][field];
 }
 
 /**
@@ -46,18 +73,28 @@ function followSettings(key, apply) {
 }
 
 /**
- * @returns {{sortColumn: string, sortDirection: 'asc'|'desc', itemsPerPage: number}} the stored
- * settings of the dataset table over the defaults
+ * @typedef {object} DatasetTableSettings
+ * @property {string} sortColumn
+ * @property {'asc'|'desc'} sortDirection
+ * @property {number} itemsPerPage
+ * @property {'list'|'map'} view
  */
+
+/** @returns {DatasetTableSettings} the stored settings of the dataset table over the defaults */
 export function getDatasetTablePreferences() {
-    return readSettings(PREF.DATASET_TABLE);
+    return /** @type {DatasetTableSettings} */ (readSettings(PREF.DATASET_TABLE));
 }
 
-export function saveDatasetTablePreferences(sortColumn, sortDirection, itemsPerPage) {
-    saveSettings(PREF.DATASET_TABLE, { sortColumn, sortDirection, itemsPerPage });
+/**
+ * Stores the settings that changed over the stored ones, so a page that changes one of them
+ * (the sort) keeps the others (the view).
+ * @param {Partial<DatasetTableSettings>} changes
+ */
+export function saveDatasetTablePreferences(changes) {
+    saveSettings(PREF.DATASET_TABLE, { ...readSettings(PREF.DATASET_TABLE), ...changes });
 }
 
-/** @param {(settings: {sortColumn: string, sortDirection: 'asc'|'desc', itemsPerPage: number}) => void} apply @returns {() => void} unsubscribe */
+/** @param {(settings: DatasetTableSettings) => void} apply @returns {() => void} unsubscribe */
 export const followDatasetTablePreferences = apply => followSettings(PREF.DATASET_TABLE, apply);
 
 /** @returns {boolean} open a dataset right after creating it */
@@ -71,18 +108,32 @@ export function saveOpenAfterCreatePreference(value) {
 }
 
 /**
+ * @typedef {object} OrgPageSettings
+ * @property {number} itemsPerPage
+ * @property {boolean} ownedOnly
+ * @property {string} sortColumn one of ORG_SORT_FIELDS
+ * @property {'asc'|'desc'} sortDirection
+ * @property {'list'|'map'} view
+ */
+
+/**
  * The organisation page's list settings, which follow the account (its position is stored apart).
- * @returns {{itemsPerPage: number, ownedOnly: boolean}}
+ * @returns {OrgPageSettings}
  */
 export function getOrgPageSettings() {
-    return readSettings(PREF.ORG_PAGE);
+    return /** @type {OrgPageSettings} */ (readSettings(PREF.ORG_PAGE));
 }
 
-export function saveOrgPageSettings(itemsPerPage, ownedOnly) {
-    saveSettings(PREF.ORG_PAGE, { itemsPerPage, ownedOnly });
+/**
+ * Stores the settings that changed over the stored ones, so a page that changes one of them
+ * (the sort) keeps the others (the view another page set).
+ * @param {Partial<OrgPageSettings>} changes
+ */
+export function saveOrgPageSettings(changes) {
+    saveSettings(PREF.ORG_PAGE, { ...readSettings(PREF.ORG_PAGE), ...changes });
 }
 
-/** @param {(settings: {itemsPerPage: number, ownedOnly: boolean}) => void} apply @returns {() => void} unsubscribe */
+/** @param {(settings: OrgPageSettings) => void} apply @returns {() => void} unsubscribe */
 export const followOrgPageSettings = apply => followSettings(PREF.ORG_PAGE, apply);
 
 /**

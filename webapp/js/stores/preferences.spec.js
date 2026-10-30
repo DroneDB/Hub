@@ -117,8 +117,8 @@ describe('preferences store: load', () => {
     });
 
     it('applies object values of the account as they are', async () => {
-        await start({ orgs: { list: { itemsPerPage: 50, ownedOnly: false } }, units: { measurement: 'imperial' } });
-        expect(getPref(PREF.ORG_PAGE, null)).toEqual({ itemsPerPage: 50, ownedOnly: false });
+        await start({ orgs: { list: { itemsPerPage: 50, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc', view: 'map' } }, units: { measurement: 'imperial' } });
+        expect(getPref(PREF.ORG_PAGE, null)).toEqual({ itemsPerPage: 50, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc', view: 'map' });
         expect(h.reg.patchRequest).not.toHaveBeenCalled();
     });
 
@@ -361,11 +361,25 @@ describe('preferences store: sending changes', () => {
         expect(JSON.stringify(bodies())).not.toContain('wmsLayers');
     });
 
-    it('sends the organisations list as {itemsPerPage, ownedOnly} only', async () => {
+    it('sends the organisations list settings, the sort and the view included, and nothing else', async () => {
         await start();
-        setPref(PREF.ORG_PAGE, { itemsPerPage: 25, ownedOnly: false, currentPage: 4, scrollTop: 99 });
+        setPref(PREF.ORG_PAGE, { itemsPerPage: 25, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc', view: 'map', currentPage: 4, scrollTop: 99 });
         await tick(600);
-        expect(bodies()[0]).toEqual({ orgs: { list: { itemsPerPage: 25, ownedOnly: false } } });
+        expect(bodies()[0]).toEqual({
+            orgs: { list: { itemsPerPage: 25, ownedOnly: false, sortColumn: 'lastModified', sortDirection: 'desc', view: 'map' } }
+        });
+    });
+
+    it('sends the dataset table settings whole, the view included', async () => {
+        await start();
+        setPref(PREF.DATASET_TABLE, { sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
+        await tick(600);
+        expect(bodies()[0].datasets.table).toEqual({ sortColumn: 'size', sortDirection: 'desc', itemsPerPage: 25, view: 'map' });
+    });
+
+    it('applies the dataset table view of the account', async () => {
+        await start({ datasets: { table: { sortColumn: 'name', sortDirection: 'asc', itemsPerPage: 10, view: 'map' } } });
+        expect(getPref(PREF.DATASET_TABLE, null)).toEqual({ sortColumn: 'name', sortDirection: 'asc', itemsPerPage: 10, view: 'map' });
     });
 
     it('a failed PATCH keeps the section dirty, and the next change sends it with its own, warning once', async () => {

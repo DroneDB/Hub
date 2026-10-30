@@ -16,6 +16,9 @@
                     <Column header="Creation Date" v-bind="columnFrom(COLUMNS_FROM.creationDate)">
                         <template #body><Skeleton width="6rem" /></template>
                     </Column>
+                    <Column header="Modified" v-bind="columnFrom(COLUMNS_FROM.lastModified)">
+                        <template #body><Skeleton width="6rem" /></template>
+                    </Column>
                     <Column header="Files" v-bind="columnFrom(COLUMNS_FROM.entries)">
                         <template #body><Skeleton width="2rem" /></template>
                     </Column>
@@ -64,11 +67,12 @@
                     <!-- Right: actions -->
                     <div class="org-actions">
                         <div class="d-flex flex-wrap align-items-center gap-2">
+                            <ViewSelect v-model="view" label="Show the datasets as" />
                             <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
                             <Button v-if="canCreateDataset" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" @click.stop="openImportDialog()" />
                             <Button v-if="canCreateDataset" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" @click.stop="handleNew()" />
                         </div>
-                        <IconField class="mt-2">
+                        <IconField v-if="view === 'list'" class="mt-2">
                             <InputIcon class="fa-solid fa-magnifying-glass" />
                             <InputText v-model="searchQuery" small placeholder="Search datasets" aria-label="Search datasets" fluid />
                         </IconField>
@@ -76,8 +80,10 @@
                 </div>
             </div>
 
+            <!-- Where the datasets are -->
+            <DatasetLocationsMap v-if="view === 'map'" :groups="locationGroups" :loading="locationsLoading" />
             <!-- Datasets Table -->
-            <DataTable :value="datasets" :paginator="false" striped-rows
+            <DataTable v-else :value="datasets" :paginator="false" striped-rows
                        row-hover class="ds-table" scrollable scroll-height="flex"
                        :sort-field="sortColumn" :sort-order="sortOrderPrimevue"
                        :pt="{ bodyRow: { style: 'cursor: pointer' } }" @row-click="onRowClick" @row-contextmenu="onRowContextMenu"
@@ -107,6 +113,16 @@
                         <div class="file-date">
                             <div>{{ formatDateTime(slotProps.data.creationDate) }}</div>
                             <small class="relative-time">{{ formatCreationDateRel(slotProps.data.creationDate) }}</small>
+                        </div>
+                    </template>
+                </Column>
+                <Column field="lastModified" header="Modified" :sortable="true"
+                        v-bind="columnFrom(COLUMNS_FROM.lastModified)"
+                        :pt="{ bodyCell: { style: 'text-align: right' }, columnHeaderContent: { style: 'display: flex; justify-content: flex-end' } }">
+                    <template #body="slotProps">
+                        <div v-if="slotProps.data.lastModified != null" class="file-date">
+                            <div>{{ formatDateTime(slotProps.data.lastModified) }}</div>
+                            <small class="relative-time">{{ formatCreationDateRel(slotProps.data.lastModified) }}</small>
                         </div>
                     </template>
                 </Column>
@@ -148,7 +164,7 @@
             <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" />
 
             <!-- Pagination -->
-            <div v-if="totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
+            <div v-if="view === 'list' && totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
                 <span>
                     Showing {{ datasets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0 }} to
                     {{ Math.min(currentPage * itemsPerPage, totalDatasets) }} of {{ totalDatasets }} datasets
@@ -186,9 +202,12 @@
 <script>
 import EmptyState from '@/components/EmptyState.vue';
 import Message from '@/components/HubMessage.vue';
-import { setTitle, bytesToSize, formatTimeAgo } from '@/libs/utils';
+import ViewSelect from '@/components/ViewSelect.vue';
+import { DatasetLocationsMap } from './locationsMap';
+import { setTitle, bytesToSize, formatTimeAgo, parseTimestamp } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences } from '@/libs/storageUtils';
+import { shallowRef } from 'vue';
 import DialogHost from '@/components/DialogHost.vue';
 import { useDialogs } from '@/composables/useDialogs';
 import { useEntityDelete } from '@/composables/useEntityDelete';
@@ -222,14 +241,17 @@ import { columnFrom } from '@/libs/responsiveColumns';
 
 // The width each secondary column appears from, shared by the table and its loading skeleton.
 // Every column with the actions takes about 790 px, more than a 768 px screen holds: the creation
-// date, the widest, waits for 992 px so the actions stay on screen.
-const COLUMNS_FROM = Object.freeze({ creationDate: 'lg', entries: 'md', size: 'sm', visibility: 'sm' });
+// date, the widest, waits for 992 px so the actions stay on screen, and the date of the last
+// change, as wide, for 1200 px.
+const COLUMNS_FROM = Object.freeze({ creationDate: 'lg', lastModified: 'xl', entries: 'md', size: 'sm', visibility: 'sm' });
 
 export default {
     name: 'DatasetsPage',
     components: {
         EmptyState,
         Message,
+        ViewSelect,
+        DatasetLocationsMap,
         DialogHost,
         MessageDialog,
         DatasetDialog,
@@ -252,7 +274,8 @@ export default {
     },
     setup() {
         const dialogs = useDialogs();
-        return { dialogs, deleteEntity: useEntityDelete(dialogs), columnFrom, COLUMNS_FROM };
+        // The locations are many small objects the map reads whole: not made reactive
+        return { dialogs, deleteEntity: useEntityDelete(dialogs), columnFrom, COLUMNS_FROM, locationGroups: shallowRef([]) };
     },
     data: function () {
         // Load preferences from Local Storage
@@ -294,6 +317,9 @@ export default {
             sortColumn: prefs.sortColumn,
             sortDirection: prefs.sortDirection,
 
+            // The table or the map of where the datasets are
+            view: prefs.view,
+            locationsLoading: false,
             // Pagination - use saved preferences or defaults
             currentPage: 1,
             itemsPerPage: prefs.itemsPerPage,
@@ -406,6 +432,16 @@ export default {
         sortDirection: function () {
             this.currentPage = 1;
             this.savePreferences();
+        },
+        view: function (view) {
+            this.savePreferences();
+            if (view === 'map') {
+                this.loadLocations();
+            } else {
+                // Leaving the map ends a request it is still waiting for; the map asks again when shown
+                this._locationsRequest?.abort();
+                this.locationsLoading = false;
+            }
         }
     },
     created() {
@@ -415,6 +451,7 @@ export default {
             this.sortColumn = prefs.sortColumn;
             this.sortDirection = prefs.sortDirection;
             this.itemsPerPage = prefs.itemsPerPage;
+            this.view = prefs.view;
         });
     },
     mounted: async function () {
@@ -424,6 +461,7 @@ export default {
             this.orgName = orgInfo.name !== "" ? orgInfo.name : this.$route.params.org;
             this.orgInfo = orgInfo;
             setTitle(this.orgName);
+            if (this.view === 'map') this.loadLocations();
 
             await this.loadPage();
         } catch (e) {
@@ -441,12 +479,15 @@ export default {
         this._stopFollowingPreferences?.();
         clearTimeout(this._searchTimer);
         this._listRequest?.abort();
+        this._locationsRequest?.abort();
     }, methods: {
         /**
          * Save table preferences to Local Storage
          */
         savePreferences: function () {
-            saveDatasetTablePreferences(this.sortColumn, this.sortDirection, this.itemsPerPage);
+            saveDatasetTablePreferences({
+                sortColumn: this.sortColumn, sortDirection: this.sortDirection, itemsPerPage: this.itemsPerPage, view: this.view
+            });
         },
         bytesToSize,
         datasetName,
@@ -486,7 +527,7 @@ export default {
                 warning: 'All the files will be deleted too.',
                 remove: () => this.org.Dataset(ds.slug).delete(),
                 // The next dataset moves into the page
-                done: () => this.reloadPage()
+                done: () => this.reloadDatasets()
             });
         },
 
@@ -536,6 +577,7 @@ export default {
             this.datasets.unshift({
                 slug: payload.slug,
                 creationDate: Date.now(),
+                lastModified: Date.now(),
                 visibility: payload.visibility,
                 entries: 0,
                 size: 0,
@@ -566,7 +608,7 @@ export default {
             if (action === 'done') {
                 const index = this.datasets.findIndex(ds => ds.isTemporary && ds.slug === slug);
                 if (payload.success) {
-                    this.reloadPage();
+                    this.reloadDatasets();
                     this.$notify.success(`Dataset "${slug}" imported successfully`, { summary: 'Import complete', life: 'normal' });
                 } else {
                     if (index !== -1) {
@@ -600,6 +642,7 @@ export default {
                     this.datasets.unshift({
                         slug: newds.slug,
                         creationDate: Date.now(),
+                        lastModified: Date.now(),
                         visibility: newds.visibility,
                         entries: 0,
                         size: 0,
@@ -617,7 +660,7 @@ export default {
                     let ret = await this.org.createDataset(newds.slug, newds.name, newds.visibility, newds.tagline);
                     if (ret) {
                         // The server places the new dataset in the sort order
-                        await this.reloadPage();
+                        await this.reloadDatasets();
 
                         this.$notify.success('Dataset created successfully', { summary: 'Dataset Created' });
 
@@ -652,12 +695,14 @@ export default {
 
                 let dsitem = this.datasets.find(o => o.slug == ds.slug);
                 dsitem['editing'] = true;
+                let renamed = false;
 
                 try {
                     // Use renameDataset function to update name and slug
                     let ret = await renameDataset(this.$route.params.org, ds.slug, newds.name);
 
                     if (ret) {
+                        renamed = true;
                         // Also update visibility if needed
                         let dsobj = this.org.Dataset(ret.slug);
                         let update = await dsobj.update(newds.name, newds.visibility);
@@ -684,6 +729,8 @@ export default {
                     console.error(e);
                     this.$notify.error('Failed to update dataset: ' + e.message);
                 }
+                // The pins know the dataset by its slug and name, which the rename changed
+                if (renamed) this.invalidateLocations();
 
                 dsitem['editing'] = false;
             }
@@ -742,10 +789,31 @@ export default {
             }
         },
 
+        // Where the datasets are, asked once for the visit to the organization (a dataset added,
+        // removed or renamed asks again); a request in flight is ended when the map is left
+        async loadLocations() {
+            if (!this.org || this._locationsLoaded) return;
+            this._locationsRequest?.abort();
+            const request = new AbortController();
+            this._locationsRequest = request;
+            this.locationsLoading = true;
+            try {
+                const datasets = await this.org.datasetLocations({ signal: request.signal });
+                if (request.signal.aborted) return;
+                this.locationGroups = [{ org: this.$route.params.org, orgName: this.orgName, datasets }];
+                this._locationsLoaded = true;
+            } catch (e) {
+                if (request.signal.aborted || e.name === 'AbortError') return;
+                this.error = e.message;
+            }
+            this.locationsLoading = false;
+        },
+
         toRow(ds) {
             return {
                 slug: ds.slug,
                 creationDate: Date.parse(ds.creationDate),
+                lastModified: parseTimestamp(ds.lastModified),
                 visibility: ds.properties?.meta?.visibility?.data !== undefined ? ds.properties?.meta?.visibility?.data : Visibility.PRIVATE,
                 entries: ds.properties.entries,
                 size: ds.size,
@@ -770,7 +838,18 @@ export default {
             }
         },
 
-        // A dataset was added or removed: the page and the total change
+        // A dataset was added or removed: the page, the total and the locations change
+        reloadDatasets() {
+            this.invalidateLocations();
+            return this.reloadPage();
+        },
+
+        // The locations loaded are out of date: the map asks again, now if it is shown
+        invalidateLocations() {
+            this._locationsLoaded = false;
+            if (this.view === 'map') this.loadLocations();
+        },
+
         async reloadPage() {
             try {
                 await this.loadPage();

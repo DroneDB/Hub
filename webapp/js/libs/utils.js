@@ -83,6 +83,16 @@ export function formatTimeAgo(ms) {
     if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
     return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
 }
+/**
+ * The millisecond timestamp of a date the server sent (an ISO string).
+ * @param {unknown} value
+ * @returns {number|null} null when there is no date or it is not one (a date that is unknown, not 1970)
+ */
+export function parseTimestamp(value) {
+    if (typeof value !== 'string' || !value) return null;
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? null : ms;
+}
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {
     const fse = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || null;

@@ -3,6 +3,12 @@
  */
 import { PRIMARY } from '@/libs/palette';
 
+/**
+ * How a map fits its view to an extent (View.fit options): room around it, a short animation, and
+ * no closer than half a metre per pixel.
+ */
+export const FIT_OPTIONS = Object.freeze({ padding: [40, 40, 40, 40], duration: 500, minResolution: 0.5, maxZoom: 22 });
+
 /** Default colour of measurements and point annotations (map and point cloud). */
 export const MEASURE_COLOR = '#ffcc33';
 

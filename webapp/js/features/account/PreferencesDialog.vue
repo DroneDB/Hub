@@ -112,7 +112,9 @@ import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { currencyChoices, normalizeCurrency } from '@/libs/format';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
+import { ORG_SORT_OPTIONS } from '@/libs/organizationList';
 import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
+import { orgPageChoice } from '@/libs/storageUtils';
 import { QUALITY_CHOICES } from '@/features/viewers/splat/qualityPresets';
 import { useAuthStore } from '@/stores/auth';
 import { usePreferencesStore } from '@/stores/preferences';
@@ -156,6 +158,17 @@ const splatQuality = computed({
     get: () => prefChoice(PREF.SPLAT_QUALITY, storedQuality.value),
     set: value => { storedQuality.value = value; }
 });
+
+// A stored sort that is not one the list knows shows as the default, which is what the list uses
+const orgSortColumn = computed({
+    get: () => orgPageChoice('sortColumn', orgPage.sortColumn),
+    set: value => { orgPage.sortColumn = value; }
+});
+const orgSortDirection = computed({
+    get: () => orgPageChoice('sortDirection', orgPage.sortDirection),
+    set: value => { orgPage.sortDirection = value; }
+});
+const SORT_DIRECTION_OPTIONS = [{ value: 'asc', label: 'Ascending' }, { value: 'desc', label: 'Descending' }];
 
 const basemapOptions = Object.entries(Basemaps).map(([value, { label }]) => ({ value, label }));
 
@@ -254,6 +267,8 @@ const TABS = [
                 title: 'Organizations',
                 controls: [
                     select('orgs-per-page', 'Organizations per page', toRef(orgPage, 'itemsPerPage'), PAGE_SIZES),
+                    select('orgs-sort-column', 'Sort organizations by', orgSortColumn, ORG_SORT_OPTIONS),
+                    select('orgs-sort-direction', 'Organizations order', orgSortDirection, SORT_DIRECTION_OPTIONS),
                     toggle('orgs-owned-only', 'Show only the organizations I own', toRef(orgPage, 'ownedOnly'))
                 ]
             }

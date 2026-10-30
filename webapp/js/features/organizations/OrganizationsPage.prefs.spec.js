@@ -87,12 +87,92 @@ describe('OrganizationsPage preferences', () => {
         expect(localOrgSettingsWrites()).toHaveLength(0);
     });
 
-    it('a change of the user is one local write of {itemsPerPage, ownedOnly}', async () => {
+    it('starts from the stored sort', async () => {
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ sortColumn: 'lastModified', sortDirection: 'desc' }));
+        await render();
+        expect(wrapper.vm.sortColumn).toBe('lastModified');
+        expect(wrapper.vm.sortDirection).toBe('desc');
+    });
+
+    it('starts from the default sort when the stored one is not a sort of the list', async () => {
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ sortColumn: 'entries', sortDirection: 'up' }));
+        await render();
+        expect(wrapper.vm.sortColumn).toBe('name');
+        expect(wrapper.vm.sortDirection).toBe('asc');
+    });
+
+    it('an external change of the sort updates the page and writes nothing back', async () => {
+        await render();
+        events.length = 0;
+        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'datasetCount', sortDirection: 'desc' });
+        await flushPromises();
+        expect(wrapper.vm.sortColumn).toBe('datasetCount');
+        expect(wrapper.vm.sortDirection).toBe('desc');
+        expect(localOrgSettingsWrites()).toHaveLength(0);
+    });
+
+    it('a change of the user is one local write of the settings', async () => {
         await render();
         events.length = 0;
         wrapper.vm.itemsPerPage = 25;
         await flushPromises();
-        expect(localOrgSettingsWrites()).toEqual([{ key: PREF.ORG_PAGE, value: { itemsPerPage: 25, ownedOnly: true }, origin: 'local' }]);
+        expect(localOrgSettingsWrites()).toEqual([{
+            key: PREF.ORG_PAGE,
+            value: { itemsPerPage: 25, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' },
+            origin: 'local'
+        }]);
+    });
+
+    it('choosing a sort stores it and goes back to the first page', async () => {
+        await render();
+        wrapper.vm.currentPage = 3;
+        events.length = 0;
+        wrapper.vm.sortColumn = 'creationDate';
+        wrapper.vm.sortDirection = 'desc';
+        await flushPromises();
+        expect(wrapper.vm.currentPage).toBe(1);
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toMatchObject({ sortColumn: 'creationDate', sortDirection: 'desc' });
+        expect(localOrgSettingsWrites().length).toBeGreaterThan(0);
+    });
+
+    it('choosing a sort keeps the view that is stored', async () => {
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ view: 'map' }));
+        await render();
+        wrapper.vm.sortDirection = 'desc';
+        await flushPromises();
+        expect(JSON.parse(localStorage.getItem(PREF.ORG_PAGE))).toMatchObject({ sortDirection: 'desc', view: 'map' });
+    });
+
+    it('starts from the stored view, and the default when it is not a view', async () => {
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ view: 'map' }));
+        await render();
+        expect(wrapper.vm.view).toBe('map');
+        wrapper.unmount();
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ view: 'globe' }));
+        await render();
+        expect(wrapper.vm.view).toBe('list');
+    });
+
+    it('choosing a view is one local write that keeps the other settings', async () => {
+        localStorage.setItem(PREF.ORG_PAGE, JSON.stringify({ itemsPerPage: 25, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc' }));
+        await render();
+        events.length = 0;
+        wrapper.vm.view = 'map';
+        await flushPromises();
+        expect(localOrgSettingsWrites()).toEqual([{
+            key: PREF.ORG_PAGE,
+            value: { itemsPerPage: 25, ownedOnly: false, sortColumn: 'creationDate', sortDirection: 'desc', view: 'map' },
+            origin: 'local'
+        }]);
+    });
+
+    it('an external change of the view updates the page and writes nothing back', async () => {
+        await render();
+        events.length = 0;
+        applyAccountValue(PREF.ORG_PAGE, { itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'map' });
+        await flushPromises();
+        expect(wrapper.vm.view).toBe('map');
+        expect(localOrgSettingsWrites()).toHaveLength(0);
     });
 
     it('stops following when unmounted', async () => {

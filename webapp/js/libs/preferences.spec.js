@@ -188,6 +188,11 @@ describe('catalog', () => {
         for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key]);
     });
 
+    it('the organisation list defaults to name ascending, as a list', () => {
+        expect(PREF_DEFAULTS[PREF.ORG_PAGE]).toEqual({ itemsPerPage: 10, ownedOnly: true, sortColumn: 'name', sortDirection: 'asc', view: 'list' });
+        expect(ACCOUNT_SECTIONS[PREF.ORG_PAGE]).toEqual(['orgs', 'list']);
+    });
+
     it('every ACCOUNT_OWNED key follows the account', () => {
         for (const key of ACCOUNT_OWNED) expect(ACCOUNT_SECTIONS).toHaveProperty(key);
     });
