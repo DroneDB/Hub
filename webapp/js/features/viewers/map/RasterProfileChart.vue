@@ -68,7 +68,10 @@
 </template>
 
 <script>
-import { downloadText } from '@/libs/download';
+import { downloadCsv, toCsv } from '@/libs/csv';
+import { formatLength } from '@/libs/format';
+import { usePreference } from '@/composables/usePreference';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 /**
  * Elevation / value profile chart.
@@ -79,6 +82,7 @@ import { downloadText } from '@/libs/download';
  *   map can render a matching marker on the polyline.
  * - Null samples (nodata) are rendered as translucent vertical bands so users
  *   immediately see gaps instead of a misleading flat line.
+ * - Distances are in the user's units, as the map's measurements; values in the raster's unit.
  */
 export default {
     name: 'RasterProfileChart',
@@ -88,6 +92,9 @@ export default {
         isThermal: { type: Boolean, default: false }
     },
     emits: ['activeSample'],
+    setup() {
+        return { measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]) };
+    },
     data() {
         return {
             // The drawing's width: the panel's, once measured (a phone's bottom sheet and the
@@ -213,8 +220,7 @@ export default {
         },
         formatLength(m) {
             if (m === null || m === undefined) return '';
-            if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
-            return `${m.toFixed(1)} m`;
+            return formatLength(m, this.measureUnit);
         },
         onHover(evt) {
             const svg = evt.currentTarget;
@@ -258,12 +264,9 @@ export default {
         },
         exportCsv() {
             if (!this.hasSamples) return;
-            const header = 'index,distance_m,value,unit,lon,lat\n';
             const unit = this.profile.unit || this.unit || '';
-            const escape = (v) => (v === null || v === undefined) ? '' : String(v);
-            const rows = this.samples.map((s, i) =>
-                `${i},${escape(s.distance)},${escape(s.value)},${unit},${escape(s.lon)},${escape(s.lat)}`);
-            downloadText(header + rows.join('\n') + '\n', 'raster-profile.csv', 'text/csv;charset=utf-8');
+            const rows = this.samples.map((s, i) => [i, s.distance, s.value, unit, s.lon, s.lat]);
+            downloadCsv(toCsv(['index', 'distance_m', 'value', 'unit', 'lon', 'lat'], rows), 'raster-profile.csv');
         }
     }
 };

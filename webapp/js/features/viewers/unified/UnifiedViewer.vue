@@ -74,6 +74,7 @@ import ViewerShell from '@/components/ViewerShell.vue';
 import RangeSetting from '@/components/RangeSetting.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { useViewerSettings } from '@/composables/useViewerSettings';
+import { usePreference } from '@/composables/usePreference';
 import { useNotify } from '@/composables/useNotify';
 import keyboard from '@/libs/keyboard';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
@@ -110,6 +111,9 @@ let scene = null;
 let measureTool = null;
 
 watch(settings, () => { if (scene) scene.updateLighting(); }, { deep: true });
+// The labels of the measurements follow the units preference (changed in another view or tab)
+const measureUnit = usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
+watch(measureUnit, () => { if (measureTool) measureTool.relabel(); });
 
 const measure = kind => measureTool && measureTool.measure(kind);
 const clearMeasurements = () => measureTool && measureTool.clear();

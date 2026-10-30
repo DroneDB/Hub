@@ -3,6 +3,8 @@
  * Small pure helpers of the 3D viewer.
  */
 import { PRIMARY, primaryRgba } from '@/libs/palette';
+import { areaParts, lengthParts } from '@/libs/format';
+import { getPref, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 /**
  * [minLon, minLat, maxLon, maxLat] of a GeoJSON Feature or geometry (DroneDB footprints are
@@ -70,55 +72,85 @@ export const ELEVATION_RAMP = [0x2c7bb6, 0x00a6ca, 0x00ccbc, 0x90eb9d, 0xffff8c,
 export const MEASURE_COLOR = '#f2a51a';
 
 /**
- * The metric units of the measurement labels, largest first: a value is written in the first
- * unit it reaches (`min`, in metres or square metres), with the unit's decimals. Below a metre a
- * length is in centimetres (millimetres below one) and below a square metre an area in square
- * centimetres (square millimetres below one), so the short lengths of a small scene, such as a
- * splat given a scale, do not read "0.0 m" or "0 m²".
- * @typedef {{ min: number, size: number, unit: string, digits: number }} MetricUnit
+ * The units of the measurement labels below the scales of the map (libs/format.js), largest
+ * first: a value is written in the first unit it reaches (`min`, in metres or square metres),
+ * with the unit's decimals. A metric length is in kilometres from 1 km, metres from 1 m, then
+ * centimetres and millimetres; an area below a square metre is in square centimetres (square
+ * millimetres below one), below a square foot in square inches. So the short lengths of a small
+ * scene, such as a splat given a scale, do not read "0.0 m" or "0 m²".
+ * @typedef {{ min: number, size: number, unit: string, digits: number }} SmallUnit
  */
-/** @type {MetricUnit[]} */
-const LENGTH_UNITS = [
+/** @type {SmallUnit[]} */
+const METRIC_LENGTHS = [
     { min: 1000, size: 1000, unit: 'km', digits: 2 },
     { min: 1, size: 1, unit: 'm', digits: 1 },
     { min: 0.01, size: 0.01, unit: 'cm', digits: 1 },
     { min: 0, size: 0.001, unit: 'mm', digits: 1 }
 ];
-/** @type {MetricUnit[]} */
-const AREA_UNITS = [
-    { min: 1e6, size: 1e6, unit: 'km²', digits: 2 },
-    { min: 1, size: 1, unit: 'm²', digits: 0 },
+const M_PER_FOOT = 0.3048;
+const M_PER_INCH = 0.0254;
+/** @type {SmallUnit[]} */
+const SMALL_METRIC_AREAS = [
     { min: 1e-4, size: 1e-4, unit: 'cm²', digits: 0 },
     { min: 0, size: 1e-6, unit: 'mm²', digits: 0 }
 ];
+/** @type {SmallUnit[]} */
+const SMALL_IMPERIAL_AREAS = [{ min: 0, size: M_PER_INCH * M_PER_INCH, unit: 'in²', digits: 1 }];
 
-/** A metric value in the first of these units it reaches. @param {number} v @param {MetricUnit[]} units */
-function formatMetric(v, units) {
+/** A value in the first of these units it reaches. @param {number} v @param {SmallUnit[]} units */
+function formatIn(v, units) {
     const { size, unit, digits } = units.find(u => Math.abs(v) >= u.min) ?? units[units.length - 1];
     return `${(v / size).toFixed(digits)} ${unit}`;
+}
+
+/** The units the user reads measurements in ('metric' or 'imperial'), at call time */
+const preferredUnits = () => getPref(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]);
+
+/**
+ * A length in metres in the user's units: metric as METRIC_LENGTHS, imperial in feet as the map
+ * writes them, in inches below a foot.
+ * @param {number} meters @param {string} units
+ */
+function groundLength(meters, units) {
+    if (units === 'metric') return formatIn(meters, METRIC_LENGTHS);
+    return Math.abs(meters) >= M_PER_FOOT ? lengthParts(meters, units).text : `${(meters / M_PER_INCH).toFixed(1)} in`;
+}
+
+/**
+ * An area in square metres in the user's units, on the area scale of the map (m², ha, km²; ft²,
+ * acres) from 1 m² or 1 ft², below that in SMALL_METRIC_AREAS or SMALL_IMPERIAL_AREAS.
+ * @param {number} squareMeters @param {string} units
+ */
+function groundArea(squareMeters, units) {
+    const metric = units === 'metric';
+    const smallest = metric ? 1 : M_PER_FOOT * M_PER_FOOT;
+    if (Math.abs(squareMeters) >= smallest) return areaParts(squareMeters, units).text;
+    return formatIn(squareMeters, metric ? SMALL_METRIC_AREAS : SMALL_IMPERIAL_AREAS);
 }
 
 /**
  * Measurement labels. `scale` corrects Web Mercator lengths to ground lengths (cos latitude;
  * 1 in metric CRSs) and is read at call time. `unit` names what the lengths are in: metres, or
  * (a scene with no known scale) anything else, which is written as it is and never turned into
- * another unit. It is read at call time too.
+ * another unit. Lengths in metres are written in `units` ('metric' or 'imperial'; the user's
+ * preference by default). Both are read at call time too.
  * @param {() => number} scale
  * @param {() => string} [unit]
+ * @param {() => string} [units]
  */
-export function measureFormatters(scale, unit = () => 'm') {
+export function measureFormatters(scale, unit = () => 'm', units = preferredUnits) {
     return {
         /** @param {{ length: number }} m */
         length: ({ length }) => {
             const v = length * scale();
             const u = unit();
-            return u === 'm' ? formatMetric(v, LENGTH_UNITS) : `${v.toFixed(2)} ${u}`;
+            return u === 'm' ? groundLength(v, units()) : `${v.toFixed(2)} ${u}`;
         },
         /** @param {{ area: number }} m */
         area: ({ area }) => {
             const v = area * scale() * scale();
             const u = unit();
-            return u === 'm' ? formatMetric(v, AREA_UNITS) : `${v.toFixed(2)} ${u}²`;
+            return u === 'm' ? groundArea(v, units()) : `${v.toFixed(2)} ${u}²`;
         }
     };
 }

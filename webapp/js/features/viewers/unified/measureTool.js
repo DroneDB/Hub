@@ -1,6 +1,6 @@
 /**
  * Point / distance / area measurement in the 3D viewer,
- * with Giro3D's DrawTool. Navigation is suspended while a shape is drawn (the DrawTool does
+ * with Giro3D's DrawTool. The labels are in the user's units (measureFormatters). Navigation is suspended while a shape is drawn (the DrawTool does
  * not do it, so a drag would also move the camera); right click ends a shape.
  */
 import { measureFormatters, MEASURE_COLOR as COLOR } from './sceneUtils';
@@ -51,6 +51,14 @@ export class MeasureTool {
             this.onCount(this.shapes.length);
             scene.instance.notifyChange();
         }
+    }
+
+    /** Writes the labels of the shapes again: the formatters read the units at call time. */
+    relabel() {
+        const instance = this.scene.instance;
+        if (!instance) return;
+        this.shapes.forEach(s => s.rebuildLabels());
+        instance.notifyChange();
     }
 
     clear() {
