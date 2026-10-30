@@ -1,5 +1,5 @@
 <template>
-    <Window id="transferDialog" title="Transfer to Dataset" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Transfer" confirm-icon="fa-solid fa-right-left" :confirm-disabled="!canTransfer" :busy="isTransferring" @confirm="transfer" @close="close('close')">
+    <Window id="transferDialog" :title="mode.title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode.confirmLabel" :confirm-icon="mode.confirmIcon" :confirm-disabled="!canTransfer" :busy="isTransferring" @confirm="transfer" @close="close('close')">
         <div class="transfer-dialog">
             <form :class="{ error: hasError }" @submit.prevent>
 
@@ -11,6 +11,7 @@
                 <!-- Source Info -->
                 <PrimeMessage severity="info" :closable="false">
                     <strong>Source:</strong> {{ sourceInfo }}
+                    <div class="mt-1" data-transfer-note>{{ mode.note }}</div>
                 </PrimeMessage>
 
                 <!-- Destination Organization -->
@@ -64,6 +65,7 @@ import Checkbox from 'primevue/checkbox';
 import ProgressBar from 'primevue/progressbar';
 import reg from '@/libs/api/sharedRegistry';
 import { useTimerGroup } from '@/composables/useTimers';
+import { transferModeOf } from '@/libs/dataset/transferMode';
 
 
 export default {
@@ -83,6 +85,11 @@ export default {
         sourceDs: {
             type: String,
             required: true
+        },
+        // true copies the files (the user can only read the source), false moves them
+        keepSource: {
+            type: Boolean,
+            default: false
         }
     },
     emits: ['close'],
@@ -107,6 +114,10 @@ export default {
     },
 
     computed: {
+        mode: function () {
+            return transferModeOf(this.keepSource);
+        },
+
         sourceInfo: function () {
             if (this.files.length === 1) {
                 return `${this.sourceOrg}/${this.sourceDs}/${this.files[0].entry.path}`;
@@ -197,30 +208,31 @@ export default {
                     const file = this.files[i];
                     const sourcePath = file.entry.path;
 
-                    this.statusMessage = `Transferring ${sourcePath}...`;
+                    this.statusMessage = `${this.mode.working} ${sourcePath}...`;
 
                     await sourceDataset.transferObj(
                         sourcePath,
                         this.destOrg,
                         this.destDs,
                         this.destPath,
-                        this.overwrite
+                        this.overwrite,
+                        this.mode.keepSource
                     );
 
                     this.transferredCount++;
                     this.progress = Math.round((this.transferredCount / this.files.length) * 100);
                 }
 
-                this.statusMessage = "Transfer completed successfully!";
+                this.statusMessage = this.mode.summary;
 
                 // Close dialog after a short delay
                 this.later(() => this.$emit('close', 'transferred', this.files), 1500);
 
             } catch (e) {
-                console.error("Transfer error:", e);
-                this.errorMessage = "Transfer failed: " + e.message;
+                console.error(`${this.mode.failed}:`, e);
+                this.errorMessage = `${this.mode.failed}: ${e.message}`;
                 this.isTransferring = false;
-                this.statusMessage = "Transfer failed";
+                this.statusMessage = this.mode.failed;
             }
         },
 

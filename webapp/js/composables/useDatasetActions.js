@@ -17,6 +17,7 @@ import { isBuildableType } from '@/libs/entryTypeCapabilities';
 import emitter from '@/libs/eventBus';
 import { itemFor } from '@/libs/dataset/explorerItems';
 import { confirmDelete, CONFIRM_RESCAN, CONFIRM_REBUILD } from '@/libs/dataset/confirmations';
+import { transferModeFor } from '@/libs/dataset/transferMode';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
 import Alert from '@/components/HubAlert.vue';
@@ -228,14 +229,16 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
         }
     }
 
+    /** To another dataset: a move for a writer, a copy for a user who can only read this dataset. */
     function transfer(files) {
         if (!files.length) return;
+        const mode = transferModeFor(canWrite.value);
         dialogs.open(TransferDialog, {
-            files, sourceOrg: dataset.org, sourceDs: dataset.ds,
-            onClose: (id, moved) => {
-                if (id !== 'transferred' || !moved || !moved.length) return;
-                listing.removed(moved.map(f => f.entry.path));
-                notify.success(`${plural(moved.length, 'item')} transferred successfully`, { summary: 'Transfer Complete' });
+            files, sourceOrg: dataset.org, sourceDs: dataset.ds, keepSource: mode.keepSource,
+            onClose: (id, sent) => {
+                if (id !== 'transferred' || !sent || !sent.length) return;
+                if (!mode.keepSource) listing.removed(sent.map(f => f.entry.path));
+                notify.success(`${plural(sent.length, 'item')} ${mode.done} successfully`, { summary: mode.summary });
             }
         });
     }

@@ -17,6 +17,7 @@ import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers
 import { taskToolOffered } from '@/libs/tasks/taskTools';
 import { openCompare } from '@/libs/compare/compareLinks';
 import { MAX_LAYERS } from '@/libs/compare/compareState';
+import { transferModeFor } from '@/libs/dataset/transferMode';
 
 /**
  * Context object interface:
@@ -277,10 +278,11 @@ function buildItem(ctx) {
     };
 }
 
+// A move to another dataset for a writer, a copy for a user who can only read this one
 function transferItem(ctx) {
     return {
-        label: 'Transfer',
-        icon: 'fa-solid fa-right-left',
+        get label() { return transferModeFor(ctx.canWrite).menuLabel; },
+        get icon() { return transferModeFor(ctx.canWrite).confirmIcon; },
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return reg.isLoggedIn() && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
