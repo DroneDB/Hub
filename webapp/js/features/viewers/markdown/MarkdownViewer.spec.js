@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
-const source = vi.hoisted(() => ({ text: '', canWrite: false, writeObj: null }));
+const source = vi.hoisted(() => ({ text: '', path: 'readme.md', canWrite: false, writeObj: null }));
 vi.mock('@/composables/useViewerEntry', async () => {
     const { ref, shallowRef } = await import('vue');
     return {
         useViewerEntry: () => ({
-            entry: shallowRef({ path: 'readme.md' }),
-            dataset: shallowRef({ getFileContents: () => Promise.resolve(source.text), writeObj: source.writeObj }),
+            entry: shallowRef({ path: source.path }),
+            dataset: shallowRef({
+                getFileContents: () => Promise.resolve(source.text), writeObj: source.writeObj,
+                downloadUrl: (path, { inline } = {}) => `/orgs/o/ds/d/download/${path}${inline ? '?inline=1' : ''}`
+            }),
             canWrite: ref(source.canWrite),
             loading: ref(true),
             error: ref(''),
@@ -20,6 +23,7 @@ vi.mock('@/composables/useViewerEntry', async () => {
 const { default: MarkdownViewer } = await import('./MarkdownViewer.vue');
 
 beforeEach(() => {
+    source.path = 'readme.md';
     source.canWrite = false;
     source.writeObj = vi.fn(() => Promise.resolve());
 });
@@ -68,8 +72,23 @@ describe('MarkdownViewer', () => {
         expect(content.find('script').exists()).toBe(false);
     });
 
-    it('keeps images, which belong to the dataset owner', async () => {
+    it('loads an image of the dataset from the folder of the file, not from the address of the viewer', async () => {
         const content = await render('![chart](chart.png)');
-        expect(content.find('img').attributes('src')).toBe('chart.png');
+        expect(content.find('img').attributes('src')).toBe('/orgs/o/ds/d/download/chart.png?inline=1');
+    });
+
+    it('resolves the images and links of a file in a folder from that folder', async () => {
+        source.path = 'odm/report/README.md';
+        const content = await render('![a](../images/a.jpg) [report](report.pdf#page=2) [site](https://example.com)');
+        expect(content.find('img').attributes('src')).toBe('/orgs/o/ds/d/download/odm/images/a.jpg?inline=1');
+        const links = content.findAll('a').map(a => a.attributes('href'));
+        expect(links).toEqual(['/orgs/o/ds/d/download/odm/report/report.pdf?inline=1#page=2', 'https://example.com']);
+    });
+
+    it('does not load a file from outside the dataset', async () => {
+        const content = await render('![secret](../../other/x.png) [up](../x.md)');
+        expect(content.find('img').exists()).toBe(false);
+        expect(content.text()).toContain('secret');
+        expect(content.find('a').attributes('href')).toBeUndefined();
     });
 });

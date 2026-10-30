@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarkdown } from './markdown';
+import { renderMarkdown, datasetFileUrls } from './markdown';
+import pathutils from '@/libs/ddb/pathutils';
 
 describe('renderMarkdown', () => {
     it('renders Markdown to HTML', () => {
@@ -63,5 +64,56 @@ describe('renderMarkdown', () => {
         const html = renderMarkdown('[docs](https://example.com) [here](/admin/users)');
         expect(html).toContain('<a href="https://example.com">docs</a>');
         expect(html).toContain('<a href="/admin/users">here</a>');
+    });
+});
+
+describe('the files a Markdown file of a dataset names', () => {
+    const dataset = { downloadUrl: (path, { inline } = {}) => `/dl/${path.split('/').map(encodeURIComponent).join('/')}${inline ? '?inline=1' : ''}` };
+
+    it('are next to the file, in its folder, or below it', () => {
+        const resolve = datasetFileUrls(dataset, 'odm/README.md');
+        expect(resolve('langley.png')).toBe('/dl/odm/langley.png?inline=1');
+        expect(resolve('./images/a.jpg')).toBe('/dl/odm/images/a.jpg?inline=1');
+        expect(resolve('../top.png')).toBe('/dl/top.png?inline=1');
+        expect(datasetFileUrls(dataset, 'README.md')('langley.png')).toBe('/dl/langley.png?inline=1');
+    });
+
+    it('keep the place in the file and lose the query of the address', () => {
+        const resolve = datasetFileUrls(dataset, 'README.md');
+        expect(resolve('report.pdf?x=1#page=3')).toBe('/dl/report.pdf?inline=1#page=3');
+    });
+
+    it('are named by their plain path, whatever markdown-it encodes', () => {
+        const html = renderMarkdown('![a](<my photo.png>) ![b](caf%C3%A9.png)', { resolveUrl: datasetFileUrls(dataset, 'README.md') });
+        expect(html).toContain('src="/dl/my%20photo.png?inline=1"');
+        expect(html).toContain('src="/dl/caf%C3%A9.png?inline=1"');
+    });
+
+    it('never leave the dataset', () => {
+        const resolve = datasetFileUrls(dataset, 'odm/README.md');
+        expect(resolve('../../etc/passwd')).toBeNull();
+        expect(resolve('a/../../..')).toBeNull();
+        expect(resolve('%E0%A4%A')).toBeNull();
+    });
+
+    it('leave web, site and page addresses as they are', () => {
+        const resolve = datasetFileUrls(dataset, 'odm/README.md');
+        for (const url of ['https://example.com/a.png', '//cdn.test/a.png', '/r/org/ds', '#section', 'mailto:a@b.test']) {
+            expect(resolve(url)).toBe(url);
+        }
+    });
+
+    it('still refuses a javascript: link and the HTML of the source', () => {
+        const html = renderMarkdown('[x](javascript:alert(1)) <img src=x onerror=alert(1)>', { resolveUrl: datasetFileUrls(dataset, 'README.md') });
+        expect(html).not.toMatch(/href="javascript:|<img/);
+    });
+});
+
+describe('a relative path in a dataset', () => {
+    it('resolves . and .. from a folder, and is null outside the dataset or at its root', () => {
+        expect(pathutils.resolveRelative('', 'a/./b/../c')).toBe('a/c');
+        expect(pathutils.resolveRelative('x/y', '../z')).toBe('x/z');
+        expect(pathutils.resolveRelative('x', '../..')).toBeNull();
+        expect(pathutils.resolveRelative('x', '..')).toBeNull();
     });
 });

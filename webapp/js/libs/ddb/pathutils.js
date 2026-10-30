@@ -35,6 +35,20 @@ const pathutils = {
         }).join("/");
     },
 
+    // The dataset path a relative path names from `folder` ("" for the root): "." and ".." are
+    // resolved, and null is returned for a path that leaves the dataset or names its root
+    resolveRelative: function (folder, relative) {
+        const parts = folder ? folder.split("/").filter(Boolean) : [];
+        for (const segment of relative.split("/")) {
+            if (segment === "" || segment === ".") continue;
+            if (segment === "..") {
+                if (!parts.length) return null;
+                parts.pop();
+            } else parts.push(segment);
+        }
+        return parts.length ? parts.join("/") : null;
+    },
+
     getParentFolder: function (path) {
         if (typeof path === 'undefined' || path == null)
             throw "Path is required";

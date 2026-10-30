@@ -18,14 +18,15 @@
 <script setup>
 /**
  * MarkdownViewer - renders a markdown file; users who can write edit it in place
- * (on ViewerShell and useViewerEntry; the edit button shows to writers only).
+ * (on ViewerShell and useViewerEntry; the edit button shows to writers only). A relative image
+ * or link (`![](langley.png)`) is a file of the dataset next to the Markdown file.
  */
 import { ref, computed, nextTick, onMounted } from 'vue';
 import Button from 'primevue/button';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
-import { renderMarkdown } from '@/libs/markdown';
+import { renderMarkdown, datasetFileUrls } from '@/libs/markdown';
 
 defineOptions({ name: 'MarkdownViewer' });
 
@@ -36,7 +37,8 @@ const { entry, dataset, canWrite, loading, error, entryLoaded } = useViewerEntry
 const rawContent = ref('');
 const editing = ref(false);
 const editor = ref(null);
-const content = computed(() => renderMarkdown(rawContent.value));
+// Images and links of the file name files of the dataset from the file's folder
+const content = computed(() => renderMarkdown(rawContent.value, { resolveUrl: datasetFileUrls(dataset.value, entry.value.path) }));
 
 onMounted(async () => {
     if (!await entryLoaded) return;
