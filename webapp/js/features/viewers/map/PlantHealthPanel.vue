@@ -97,6 +97,7 @@
                     :colormap="selectedFormula ? selectedColormap : null"
                     :height="100"
                     @update:range="onHistogramRangeChange" />
+                <p v-if="histogramNote" class="histogram-note" data-testid="plant-health-histogram-note">{{ histogramNote }}</p>
             </div>
 
             <!-- Statistics -->
@@ -169,6 +170,7 @@ import { downloadBlob } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { copyText } from '@/composables/useCopyText';
 import { formatNumber } from '@/libs/format';
+import { shownHistogram, percentileRange } from '@/libs/map/histogramRange';
 import { useTimerGroup } from '@/composables/useTimers';
 
 /**
@@ -239,10 +241,34 @@ export default {
             if (stats['1']) return stats['1'];
             return stats;
         },
-        histogramData() {
+        // The [min, max] the selected formula can give (NDVI: -1 to 1), null when it has none
+        formulaRange() {
+            const f = this.availableFormulas.find(x => x.id === this.selectedFormula);
+            return f && Array.isArray(f.range) ? f.range : null;
+        },
+        // The histogram without the outliers that would crush it into a bar or two
+        shownHistogram() {
             const s = this.firstBandStats;
-            if (s && s.histogram) return s.histogram;
-            return null;
+            return s && s.histogram ? shownHistogram(s.histogram, s, this.formulaRange) : null;
+        },
+        histogramData() {
+            return this.shownHistogram ? this.shownHistogram.histogram : null;
+        },
+        histogramNote() {
+            const shown = this.shownHistogram;
+            if (!shown || !shown.trimmed) return '';
+            const [lo, hi] = shown.domain.map(v => this.formatNum(v));
+            const s = this.firstBandStats;
+            // The server bins from min to max: with far outliers its bins are too wide to draw
+            const outliers = `Outliers: the values go from ${this.formatNum(s.min)} to ${this.formatNum(s.max)}`;
+            return shown.bars
+                ? `${outliers}. The histogram shows ${lo} to ${hi}.`
+                : `${outliers}, so the histogram cannot be drawn between ${lo} and ${hi}. Drag the handles to set the range.`;
+        },
+        // The 2%-98% range, inside the formula's range; min / max without percentiles
+        percentileStretch() {
+            const s = this.firstBandStats;
+            return percentileRange(s, this.formulaRange) || [s ? (s.min || 0) : 0, s ? (s.max || 1) : 1];
         },
         stretchRange() {
             const s = this.firstBandStats;
@@ -250,11 +276,8 @@ export default {
             if (!s) return fallback;
 
             switch (this.selectedStretch) {
-                case 'percentile': {
-                    const lo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : fallback[0];
-                    const hi = (s.percentiles && s.percentiles.p98 !== undefined) ? s.percentiles.p98 : fallback[1];
-                    return [lo, hi];
-                }
+                case 'percentile':
+                    return this.percentileStretch;
                 case 'minmax':
                 case 'none':
                     return fallback;
@@ -273,9 +296,7 @@ export default {
                     break;
             }
             // Default: percentile if available, else min/max
-            const pLo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : fallback[0];
-            const pHi = (s.percentiles && s.percentiles.p98 !== undefined) ? s.percentiles.p98 : fallback[1];
-            return [pLo, pHi];
+            return this.percentileStretch;
         },
         histogramMin() {
             return this.stretchRange[0];
@@ -423,8 +444,7 @@ export default {
             if (!s) return;
 
             if (this.selectedStretch === 'percentile') {
-                const lo = (s.percentiles && s.percentiles.p2 !== undefined) ? s.percentiles.p2 : s.min;
-                const hi = (s.percentiles && s.percentiles.p98 !== undefined) ? s.percentiles.p98 : s.max;
+                const [lo, hi] = percentileRange(s, this.formulaRange) || [s.min, s.max];
                 this.rescale = `${Number(lo).toFixed(3)},${Number(hi).toFixed(3)}`;
             } else if (this.selectedStretch === 'minmax') {
                 this.rescale = `${Number(s.min).toFixed(3)},${Number(s.max).toFixed(3)}`;
@@ -506,6 +526,13 @@ export default {
 <style scoped>
 /* Shared look and palette: css/_analysis-panel.scss */
 
+
+.histogram-note {
+    margin: 1.1rem 0 0;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--panel-text-soft);
+}
 
 .single-band-info {
     display: flex;

@@ -70,11 +70,12 @@ export default {
         dataRange() {
             return this.dataMax - this.dataMin || 1;
         },
+        // A value outside the histogram (a range typed by hand) puts its handle on the edge
         minHandlePos() {
-            return ((this.currentMin - this.dataMin) / this.dataRange) * 100;
+            return this.positionOf(this.currentMin);
         },
         maxHandlePos() {
-            return ((this.currentMax - this.dataMin) / this.dataRange) * 100;
+            return this.positionOf(this.currentMax);
         },
         handles() {
             return [
@@ -142,6 +143,10 @@ export default {
     },
 
     methods: {
+        positionOf(value) {
+            return Math.max(0, Math.min(100, ((value - this.dataMin) / this.dataRange) * 100));
+        },
+
         getBarColor(position) {
             return colorAt(this.colormap, position);
         },
