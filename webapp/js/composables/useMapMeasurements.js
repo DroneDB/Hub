@@ -155,8 +155,8 @@ const definition = {
             if (result !== 'confirm') return;
             this.measureControls.applyUnitsChange(this.changeUnitsTargetUnit);
             this.currentUnitPref = this.changeUnitsTargetUnit;
-            // Save the measurements in the new units
-            await this.saveMeasurements();
+            // Save the measurements in the new units; a user who cannot write only sees them in the new units
+            if (this.canWrite) await this.saveMeasurements();
         },
 
         openCreateGroupDialog() {

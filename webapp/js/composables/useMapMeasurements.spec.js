@@ -8,6 +8,7 @@ import { ref, shallowRef } from 'vue';
 import ddb from 'ddb';
 import MeasureControls from '@/libs/map/controls/measureControl';
 import * as csv from '@/libs/csv';
+import { PREF, removePref } from '@/libs/preferences';
 import { useMapMeasurements } from './useMapMeasurements';
 
 const T = ddb.entry.type;
@@ -25,19 +26,21 @@ let controls;
 let events;
 let flashes;
 let alerts;
+let unitPref;
 
 function start({ canWrite = true } = {}) {
     controls = new MeasureControls({});
     events = { written: [], removed: [] };
     flashes = [];
     alerts = [];
+    unitPref = ref('metric');
     return useMapMeasurements({
         measureControls: shallowRef(controls),
         files: () => files.value,
         dataset: () => dataset,
         canWrite: () => canWrite,
         canDelete: () => true,
-        currentUnitPref: ref('metric'),
+        currentUnitPref: unitPref,
         showAlert: () => title => alerts.push(title),
         showFlash: () => (message, color) => flashes.push({ message, color }),
         onFileWritten: () => path => events.written.push(path),
@@ -48,6 +51,8 @@ function start({ canWrite = true } = {}) {
 const onMap = () => controls.source.getFeatures().map(f => f.get('name')).sort();
 
 beforeEach(() => {
+    // A change of units is stored as the user's preference: each test starts from the default
+    removePref(PREF.MEASURE_UNIT);
     stored = { 'a/ortho_measurements.geojson': fileOf('m1', 'm2') };
     dataset = {
         getFileContents: vi.fn(async path => {
@@ -189,5 +194,32 @@ describe('useMapMeasurements', () => {
         } finally {
             saved.mockRestore();
         }
+    });
+
+    describe('a change of units with measurements on the map', () => {
+        const label = () => controls.source.getFeatures().map(f => f.get('tooltipText'));
+
+        it('saves them in the new units for a user who can write', async () => {
+            const m = start();
+            await m.loadSavedMeasurements();
+            m.handleUnitsChanged('imperial');
+            expect(m.changeUnitsDialogOpen.value).toBe(true);
+            await m.handleChangeUnitsDialogClose('confirm');
+            expect(label().every(t => t.endsWith(' ft'))).toBe(true);
+            const saved = JSON.parse(stored['a/ortho_measurements.geojson']);
+            expect(saved.features.map(f => f.properties.unit)).toEqual(['ft', 'ft']);
+            expect(alerts).toEqual([]);
+        });
+
+        it('only shows them in the new units for a user who cannot write: no save, no permission alert', async () => {
+            const m = start({ canWrite: false });
+            await m.loadSavedMeasurements();
+            m.handleUnitsChanged('imperial');
+            await m.handleChangeUnitsDialogClose('confirm');
+            expect(label().every(t => t.endsWith(' ft'))).toBe(true);
+            expect(unitPref.value).toBe('imperial');
+            expect(dataset.writeObj).not.toHaveBeenCalled();
+            expect(alerts).toEqual([]);
+        });
     });
 });
