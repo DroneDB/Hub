@@ -8,12 +8,16 @@
 /**
  * PanoramaViewer - a 360° photo in Photo Sphere Viewer, posed from the entry's XMP
  * properties (on ViewerShell and useViewerEntry; the viewer is destroyed on leave).
+ * The viewer starts while the loading row is still above it and Photo Sphere Viewer only
+ * follows the window's size: it is resized with its container, so it fills the room the
+ * loading row leaves.
  */
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import ddb from 'ddb';
 import ViewerShell from '@/components/ViewerShell.vue';
 import { useViewerEntry } from '@/composables/useViewerEntry';
 import { loadResources } from '@/libs/lazy';
+import { useResizeObserver } from '@/composables/useEventListener';
 
 defineOptions({ name: 'PanoramaViewer' });
 
@@ -25,6 +29,7 @@ let viewer = null;
 let left = false;
 
 onMounted(async () => {
+    useResizeObserver(container.value, () => viewer?.autoSize());
     if (!await entryLoaded) return;
     loading.value = true;
     try {

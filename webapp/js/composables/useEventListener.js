@@ -35,3 +35,17 @@ export function useEventListener(target, type, handler, options) {
 export function useListenerBag() {
     return scopedBag();
 }
+
+/**
+ * A ResizeObserver on `element`, disconnected with the current component / effect scope:
+ * for a canvas library that only follows the window's size, while its container also changes
+ * with the page around it.
+ *   onMounted(() => useResizeObserver(container.value, () => viewer?.autoSize()));
+ */
+export function useResizeObserver(element, callback) {
+    if (!element || typeof ResizeObserver === 'undefined') return null;
+    const observer = new ResizeObserver(callback);
+    observer.observe(element);
+    if (getCurrentScope()) onScopeDispose(() => observer.disconnect());
+    return observer;
+}
