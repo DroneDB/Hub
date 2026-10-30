@@ -49,6 +49,7 @@
  * offset, so the popup still follows the point when the map pans or zooms.
  *
  *   <MapFilePopup ref="popup" :map="map" @open-item="..." />   then popup.show(file, coordinate)
+ * and popup.closeUnlessIn(files) when the map shows other files.
  */
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import { reactive, ref, nextTick, onBeforeUnmount } from 'vue';
@@ -146,6 +147,18 @@ function close() {
     if (overlay) overlay.setPosition(undefined);
 }
 
+/**
+ * Closes the popup unless its file is one of `files`: the map now shows other files (another
+ * folder), and the popup of a photo it no longer shows stays over the map otherwise.
+ * @param {{ path: string }[]} files
+ * @returns {boolean} whether it closed
+ */
+function closeUnlessIn(files) {
+    if (!popup.file || files.some(f => f.path === popup.file.path)) return false;
+    close();
+    return true;
+}
+
 function play() {
     const file = popup.file;
     close();
@@ -214,7 +227,7 @@ onBeforeUnmount(() => {
     overlay = null;
 });
 
-defineExpose({ show, close });
+defineExpose({ show, close, closeUnlessIn });
 </script>
 
 <style scoped>

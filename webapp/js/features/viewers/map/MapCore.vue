@@ -368,6 +368,8 @@ export default {
 
         reloadFileLayers: function () {
             if (!this.loaded) return;
+            // Another folder: the popup and the footprint of a photo of the previous one go
+            if (this.$refs.filePopup && this.$refs.filePopup.closeUnlessIn(this.files)) this.fileLayers.clearFootprints();
             this.vectorLayers.forEach(layer => this.map.removeLayer(layer));
             this.vectorLayers = [];
             const vectorFiles = this.fileLayers.build(this.files, { standalone: this.standalone, shotStyle: this.shotStyleKey() });
