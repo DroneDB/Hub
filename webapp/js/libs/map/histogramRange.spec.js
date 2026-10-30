@@ -44,6 +44,21 @@ describe('shownHistogram', () => {
         expect(shown.histogram.counts.every(c => c === 50)).toBe(true);
     });
 
+    it('keeps a histogram the server binned over the range shown, and says values are left out', () => {
+        // The server bins [p2 - spread, 1] and counts the values outside: min -191.7, max 278.5
+        const h = { ...histogram(0.37 - 0.58, 1, 255, () => 10), below: 120, above: 80 };
+        const stats = { min: -191.73, max: 278.52, percentiles: { p2: 0.37, p98: 0.95 } };
+        const shown = shownHistogram(h, stats, [-1, 1]);
+        expect(shown.bars).toBe(true);
+        expect(shown.trimmed).toBe(true);
+        expect(shown.histogram.counts).toHaveLength(255);
+        expect(shown.domain).toEqual([h.edges[0], h.edges[255]]);
+        // Without below and above (a server that does not count them), min and max say it
+        const { below, above, ...plain } = h;
+        expect(below + above).toBe(200);
+        expect(shownHistogram(plain, stats, [-1, 1]).trimmed).toBe(true);
+    });
+
     it('uses the percentiles alone for a formula without a range', () => {
         const h = histogram(-1000, 1000, 2000, () => 1);
         const shown = shownHistogram(h, { percentiles: { p2: 0, p98: 10 } }, null);

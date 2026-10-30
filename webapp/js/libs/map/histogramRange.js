@@ -1,19 +1,21 @@
 // @ts-check
 /**
- * The range of an index histogram that is worth showing. The server bins the values of a formula
- * between their min and max, so a few outliers (an NDVI of -191 where the ground has no signal)
- * put almost every value in one or two bars and the range handles on top of each other. The
- * range shown keeps the values the index can have (its formula's range) and those near the
- * bulk of the data (within one 2%-98% spread of the 2nd and 98th percentiles).
+ * The range of an index histogram that is worth showing. A few outliers (an NDVI of -191 where
+ * the ground has no signal) put almost every value in one or two bars and the range handles on
+ * top of each other. The range shown keeps the values the index can have (its formula's range)
+ * and those near the bulk of the data (within one 2%-98% spread of the 2nd and 98th
+ * percentiles). The server bins that range itself and counts the values outside its edges
+ * (`below`, `above`); a server that bins from min to max is trimmed here to the same range.
  */
 
 /**
- * @typedef {{ counts: number[], edges: number[] }} Histogram  `edges` has one more item than `counts`
+ * @typedef {{ counts: number[], edges: number[], below?: number, above?: number }} Histogram
+ *   `edges` has one more item than `counts`; `below` and `above` count the values outside the edges
  * @typedef {{ min?: number, max?: number, percentiles?: { p2?: number, p98?: number } }} BandStats
  * @typedef {{ histogram: Histogram, domain: [number, number], bars: boolean, trimmed: boolean }} ShownHistogram
  *   `domain` is the range the handles move in; `bars` is false when the histogram has too few
  *   bins inside it to show a shape (then `histogram` has no counts and its edges are the domain);
- *   `trimmed` is true when values outside the domain were left out
+ *   `trimmed` is true when values outside the domain are not in the histogram shown
  */
 
 /** Fewer bins than this inside the range shown draw no shape: no bars are drawn */
@@ -54,6 +56,9 @@ export function shownHistogram(histogram, stats, validRange) {
     }
     const first = edges[0];
     const last = edges[edges.length - 1];
+    // Values the server left outside its bins: it binned the range shown already
+    const outside = (histogram.below > 0) || (histogram.above > 0) ||
+        (isNum(stats?.min) && stats.min < first) || (isNum(stats?.max) && stats.max > last);
     let lo = first;
     let hi = last;
     if (validRange && isNum(validRange[0]) && isNum(validRange[1])) {
@@ -66,7 +71,7 @@ export function shownHistogram(histogram, stats, validRange) {
         lo = Math.max(lo, p[0] - spread);
         hi = Math.min(hi, p[1] + spread);
     }
-    if (!(hi > lo) || (lo <= first && hi >= last)) return { ...full, domain: [first, last] };
+    if (!(hi > lo) || (lo <= first && hi >= last)) return { ...full, domain: [first, last], trimmed: outside };
 
     // The bins that overlap the range, whole
     let from = 0;

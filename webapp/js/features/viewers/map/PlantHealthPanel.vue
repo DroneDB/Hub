@@ -259,7 +259,7 @@ export default {
             if (!shown || !shown.trimmed) return '';
             const [lo, hi] = shown.domain.map(v => this.formatNum(v));
             const s = this.firstBandStats;
-            // The server bins from min to max: with far outliers its bins are too wide to draw
+            // Values outside the histogram shown: say where they go
             const outliers = `Outliers: the values go from ${this.formatNum(s.min)} to ${this.formatNum(s.max)}`;
             return shown.bars
                 ? `${outliers}. The histogram shows ${lo} to ${hi}.`
