@@ -4,7 +4,7 @@ import {
     TRAINING_DEFAULTS, TRAINING_LIMITS, isTrainingExportFolder, trainingExportPath, defaultTrainingFileName,
     validateTrainingOptions, trainingWarnings, odmProjectEvidence, looksLikeOdmProject
 } from './trainingExport';
-import { splatTrainingExportItem, buildStandardContextMenu } from '@/libs/contextMenuItems';
+import { splatTrainingExportItem, buildStandardContextMenu, buildActionMenuItems } from '@/libs/contextMenuItems';
 import { taskToolOffered } from '@/libs/tasks/taskTools';
 
 vi.mock('@/libs/tasks/taskTools', () => ({ taskToolOffered: vi.fn(() => true) }));
@@ -12,6 +12,8 @@ vi.mock('@/libs/tasks/taskTools', () => ({ taskToolOffered: vi.fn(() => true) })
 const T = ddb.entry.type;
 const folder = path => ({ path, type: T.DIRECTORY });
 const file = path => ({ path, type: T.GENERIC });
+// The root of the folder tree as the server lists it: the dataset, named by its address
+const treeRoot = { path: 'ddb+unsafe://localhost:5180/odm/langley', type: T.DRONEDB };
 
 describe('the options of the training-data export', () => {
     const valid = { maxImageSize: TRAINING_DEFAULTS.maxImageSize, maxPoints: TRAINING_DEFAULTS.maxPoints, fileName: 'project-training-data.zip' };
@@ -72,6 +74,12 @@ describe('the folder of the export', () => {
     it('is submitted as its path, or as nothing for the root', () => {
         expect(trainingExportPath(folder('odm/project'))).toBe('odm/project');
         expect(trainingExportPath({ path: '', type: T.DRONEDB })).toBeNull();
+        expect(trainingExportPath(treeRoot)).toBeNull();
+    });
+
+    it('is the root of the folder tree, which the server names by the address of the dataset', () => {
+        expect(isTrainingExportFolder(treeRoot)).toBe(true);
+        expect(isTrainingExportFolder({ path: 'ddb://hub.dronedb.app/org/ds', type: T.DRONEDB })).toBe(true);
     });
 
     it('gives the file the name of the folder, as the server does', () => {
@@ -173,6 +181,11 @@ describe('the context menu item', () => {
         const selected = { entry: folder('p') };
         item(context([selected], emit)).click();
         expect(emit).toHaveBeenCalledWith('exportSplatTrainingData', selected);
+    });
+
+    it('is under Tools of the root of the folder tree', () => {
+        const tools = buildActionMenuItems(context([{ entry: treeRoot }])).find(i => i.label === 'Tools');
+        expect(tools.items.filter(i => i.type !== 'separator' && i.isVisible()).map(i => i.label)).toEqual(['Export splat training data']);
     });
 
     it('is part of the standard menu, under Tools', () => {

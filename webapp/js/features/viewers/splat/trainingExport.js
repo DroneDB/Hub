@@ -18,14 +18,13 @@ export const TRAINING_LIMITS = Object.freeze({ maxImageSize: 16384, maxPoints: 1
 
 /**
  * Whether a folder entry is one the export is offered for: any folder of the dataset or the dataset
- * itself (the root, the entry of type DroneDB without a path).
+ * itself (the root: the entry of type DroneDB, with no path or the dataset's ddb:// address).
  * @param {{ type?: number, path?: string } | null | undefined} entry
  * @returns {boolean}
  */
 export function isTrainingExportFolder(entry) {
     if (!entry) return false;
-    if (entry.type === ddb.entry.type.DIRECTORY) return true;
-    return entry.type === ddb.entry.type.DRONEDB && !entry.path;
+    return entry.type === ddb.entry.type.DIRECTORY || ddb.entry.isDatasetRoot(entry);
 }
 
 /**
@@ -34,7 +33,7 @@ export function isTrainingExportFolder(entry) {
  * @returns {string | null}
  */
 export function trainingExportPath(entry) {
-    return entry && entry.path ? entry.path : null;
+    return entry && entry.path && !ddb.entry.isDatasetRoot(entry) ? entry.path : null;
 }
 
 /** The file name the export is saved with unless the user chooses another. @param {string | null} path */

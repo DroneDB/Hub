@@ -190,6 +190,13 @@ const entry = {
         if (!entry) return false;
         return entry.type === this.type.DIRECTORY ||
             entry.type === this.type.DRONEDB;
+    },
+
+    // The dataset itself: the DroneDB entry the server lists as the root of the tree (its path is
+    // the dataset's ddb:// address) or the one a drop on the root names (no path)
+    isDatasetRoot: function (entry) {
+        if (!entry || entry.type !== this.type.DRONEDB) return false;
+        return !entry.path || /^ddb(\+unsafe)?:\/\//i.test(entry.path);
     }
 };
 
