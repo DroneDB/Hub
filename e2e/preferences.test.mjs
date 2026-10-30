@@ -69,8 +69,10 @@ async function openPreferences(page) {
     await page.waitForSelector('#preferencesDialog #pref-measurement-units', { timeout: 15000 });
 }
 
-const savedToAccount = page => page.waitForResponse(
-    r => r.url().endsWith('/users/preferences') && r.request().method() === 'PATCH' && r.ok(), { timeout: 15000 });
+// `sent`, when given, is text the saved request carries
+const savedToAccount = (page, sent = '') => page.waitForResponse(
+    r => r.url().endsWith('/users/preferences') && r.request().method() === 'PATCH' && r.ok()
+        && (r.request().postData() ?? '').includes(sent), { timeout: 15000 });
 
 async function chooseUnits(page, label) {
     await page.click('#pref-measurement-units');
@@ -160,4 +162,97 @@ test('4. a change in one tab updates the open map in another tab without a reloa
     assert.notEqual(await flight.getAttribute('aria-pressed'), before);
     // The map was not reloaded
     assert.ok(await tabB.locator('.ol-viewport canvas').count());
+});
+
+// A custom tile server for the basemap scenarios: every tile is one transparent pixel
+const TILE_HOST = 'https://tiles.e2e.test';
+const TILE_URL = `${TILE_HOST}/{z}/{x}/{y}.png`;
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+const serveTiles = context => context.route(`${TILE_HOST}/**`,
+    route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: PIXEL }));
+// A tile of the map, not the one tile the editor loads to check the source
+const isMapTile = request => request.url().startsWith(TILE_HOST) && !request.url().endsWith('/0/0/0.png');
+const SAVES_CUSTOM = '"basemap":"custom"';
+
+async function openDatasetMap(page) {
+    await page.goto(`${URL_}/r/${USER}/${DS}`);
+    await page.waitForSelector(`#explorer >> text=${path.basename(RASTER)}`, { timeout: 20000 });
+    await page.click('text=Map');
+    await page.waitForSelector('.ol-viewport canvas', { timeout: 30000 });
+}
+
+test('5. Custom in the Map tab sets up the custom basemap; the open map draws it; Clear goes back to the default', async () => {
+    await resetAccount();
+    const { context, page: tabA } = await newPage();
+    await serveTiles(context);
+    await login(tabA);
+
+    const tabB = await context.newPage();
+    await openDatasetMap(tabB);
+
+    await tabA.bringToFront();
+    await openPreferences(tabA);
+    assert.equal(await tabA.locator('#preferencesDialog .p-dialog-title').textContent(), 'User preferences');
+    await tabA.click('[role="tab"]:has-text("Map")');
+    await tabA.click('#pref-basemap');
+    await tabA.click('li[role="option"]:has-text("Custom")');
+    await tabA.waitForSelector('#pref-custom-basemap-url');
+    // Custom waits for a source: the account and the map keep the basemap they had
+    assert.notEqual((await accountPreferences()).map?.basemap, 'custom');
+
+    await tabA.fill('#pref-custom-basemap-url', TILE_URL);
+    const saved = savedToAccount(tabA, SAVES_CUSTOM);
+    const drawn = tabB.waitForRequest(isMapTile, { timeout: 15000 });
+    await tabA.click('#preferencesDialog button:has-text("Apply")');
+    await saved;
+    const map = (await accountPreferences()).map;
+    assert.equal(map.basemap, 'custom');
+    assert.equal(map.customBasemap.url, TILE_URL);
+    // The map open in the other tab draws the custom tiles
+    await drawn;
+
+    const cleared = savedToAccount(tabA);
+    await tabA.click('#preferencesDialog button:has-text("Clear")');
+    await cleared;
+    await tabA.waitForSelector('#pref-custom-basemap-url', { state: 'detached' });
+    assert.match(await tabA.locator('#pref-basemap').textContent(), /Satellite/);
+});
+
+test('6. the map settings of a map set up the same custom basemap', async () => {
+    await resetAccount();
+    const { context, page } = await newPage();
+    await serveTiles(context);
+    await login(page);
+    await openDatasetMap(page);
+    await page.click('.ol-settings button');
+    await page.click('#map-settings-dialog-basemap');
+    await page.click('li[role="option"]:has-text("Custom")');
+    await page.fill('#map-settings-dialog-custom-url', TILE_URL);
+    const saved = savedToAccount(page, SAVES_CUSTOM);
+    const drawn = page.waitForRequest(isMapTile, { timeout: 15000 });
+    await page.click('#map-settings button:has-text("Apply")');
+    await saved;
+    await drawn;
+    const map = (await accountPreferences()).map;
+    assert.equal(map.basemap, 'custom');
+    assert.equal(map.customBasemap.url, TILE_URL);
+});
+
+test('7. the dataset names of the datasets map follow the account', async () => {
+    await resetAccount();
+    await api('PATCH', '/users/preferences', { datasets: { table: { sortColumn: 'name', sortDirection: 'asc', itemsPerPage: 10, view: 'map' } } }, true);
+    const { page } = await newPage();
+    await login(page);
+    await openPreferences(page);
+    await page.click('[role="tab"]:has-text("Map")');
+    const saved = savedToAccount(page);
+    await page.click('label[for="pref-dataset-names"]');
+    await saved;
+    assert.equal((await accountPreferences()).map?.showDatasetNames, true);
+    await page.click('#preferencesDialog button:has-text("Close")');
+
+    await page.goto(`${URL_}/r/${USER}`);
+    const names = page.locator('button[aria-label="Show the names of the datasets"]');
+    await names.waitFor({ timeout: 30000 });
+    assert.equal(await names.getAttribute('aria-pressed'), 'true');
 });

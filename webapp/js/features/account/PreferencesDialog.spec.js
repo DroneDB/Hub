@@ -48,11 +48,11 @@ afterEach(() => {
 });
 
 describe('PreferencesDialog', () => {
-    it('is a modal window titled Preferences with one tab per area and the sync status', async () => {
+    it('is a modal window titled User preferences with one tab per area and the sync status', async () => {
         await render();
         expect(document.body.querySelector('#preferencesDialog')).not.toBeNull();
         expect(document.body.querySelector('.p-dialog-mask')).not.toBeNull();
-        expect(dom().find('.p-dialog-title').text()).toBe('Preferences');
+        expect(dom().find('.p-dialog-title').text()).toBe('User preferences');
         expect(tabs().map(t => t.text())).toEqual(['Units', 'Map', 'Files', 'Lists', 'Viewers', 'Stockpiles', 'Notifications']);
         expect(dom().find('.sync-status').text()).toContain('Saved to your account');
         h.store.status = 'error';
@@ -84,25 +84,75 @@ describe('PreferencesDialog', () => {
         expect(getPref(PREF.MEASURE_UNIT, '')).toBe('imperial');
     });
 
-    it('shows the stored custom basemap as text and clears it', async () => {
-        setPref(PREF.CUSTOM_BASEMAP, { sourceType: 'xyz', url: 'https://tiles.example.com/{z}/{x}/{y}.png', attribution: '<b>x</b>' });
-        await render();
-        await tabs()[1].trigger('click');
-        await flushPromises();
-        expect(document.body.textContent).toContain('https://tiles.example.com/{z}/{x}/{y}.png');
-        expect(document.body.innerHTML).not.toContain('<b>x</b>');
-        await buttonWith('Clear').trigger('click');
-        expect(getPref(PREF.CUSTOM_BASEMAP, null)).toBeNull();
-        expect(document.body.textContent).toContain('No custom basemap is set');
-    });
+    describe('Map tab', () => {
+        const urlInput = () => document.getElementById('pref-custom-basemap-url');
+        const open = async () => {
+            await render();
+            await tabs()[1].trigger('click');
+            await flushPromises();
+        };
+        // The basemap select, as a user's choice
+        async function chooseBasemap(value) {
+            wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'pref-basemap').vm.$emit('update:modelValue', value);
+            await flushPromises();
+        }
 
-    it('an invalid stored custom basemap is not shown (javascript: URL)', async () => {
-        setPref(PREF.CUSTOM_BASEMAP, { sourceType: 'xyz', url: 'javascript:alert(1)' });
-        await render();
-        await tabs()[1].trigger('click');
-        await flushPromises();
-        expect(document.body.textContent).not.toContain('javascript:');
-        expect(document.body.textContent).toContain('No custom basemap is set');
+        beforeEach(() => {
+            setPref(PREF.BASEMAP, null);
+            setPref(PREF.LOCATIONS_MAP_NAMES, null);
+            vi.spyOn(globalThis, 'Image').mockImplementation(function () {
+                const img = {};
+                Object.defineProperty(img, 'src', { set(v) { if (v) queueMicrotask(() => img.onload?.()); } });
+                return img;
+            });
+        });
+        afterEach(() => vi.restoreAllMocks());
+
+        it('has no custom basemap editor while another basemap is chosen', async () => {
+            await open();
+            expect(urlInput()).toBeNull();
+        });
+
+        it('Custom opens the editor without storing Custom; Apply stores the source and Custom', async () => {
+            await open();
+            await chooseBasemap('custom');
+            expect(getPref(PREF.BASEMAP, 'satellite')).toBe('satellite');
+            expect(urlInput()).not.toBeNull();
+            await new DOMWrapper(urlInput()).setValue('https://tiles.example.com/{z}/{x}/{y}.png');
+            await buttonWith('Apply').trigger('click');
+            await flushPromises();
+            expect(getPref(PREF.CUSTOM_BASEMAP, null)).toMatchObject({ sourceType: 'xyz', url: 'https://tiles.example.com/{z}/{x}/{y}.png' });
+            expect(getPref(PREF.BASEMAP, '')).toBe('custom');
+        });
+
+        it('shows the stored custom source in the editor and Clear returns to the default basemap', async () => {
+            setPref(PREF.BASEMAP, 'custom');
+            setPref(PREF.CUSTOM_BASEMAP, { sourceType: 'xyz', url: 'https://tiles.example.com/{z}/{x}/{y}.png' });
+            await open();
+            expect(urlInput().value).toBe('https://tiles.example.com/{z}/{x}/{y}.png');
+            await buttonWith('Clear').trigger('click');
+            await flushPromises();
+            expect(getPref(PREF.CUSTOM_BASEMAP, null)).toBeNull();
+            expect(getPref(PREF.BASEMAP, '')).toBe('satellite');
+            expect(urlInput()).toBeNull();
+        });
+
+        it('an invalid stored custom source (javascript: URL) is not shown', async () => {
+            setPref(PREF.BASEMAP, 'custom');
+            setPref(PREF.CUSTOM_BASEMAP, { sourceType: 'xyz', url: 'javascript:alert(1)' });
+            await open();
+            expect(urlInput().value).toBe('');
+            expect(document.body.textContent).not.toContain('javascript:');
+        });
+
+        it('the dataset names of the datasets map are a toggle of the account', async () => {
+            await open();
+            const toggle = document.getElementById('pref-dataset-names');
+            expect(toggle.checked).toBe(false);
+            toggle.click();
+            await flushPromises();
+            expect(getPref(PREF.LOCATIONS_MAP_NAMES, false)).toBe(true);
+        });
     });
 
     describe('Gaussian splat quality', () => {

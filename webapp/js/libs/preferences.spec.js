@@ -184,6 +184,11 @@ describe('catalog', () => {
         expect(PREF_CHOICES[PREF.SPLAT_QUALITY]).toEqual(['auto', 'low', 'medium', 'high']);
     });
 
+    it('the dataset names of the locations map are an account preference in the map section, off by default', () => {
+        expect(ACCOUNT_SECTIONS[PREF.LOCATIONS_MAP_NAMES]).toEqual(['map', 'showDatasetNames']);
+        expect(PREF_DEFAULTS[PREF.LOCATIONS_MAP_NAMES]).toBe(false);
+    });
+
     it('every preference with choices has its default among them', () => {
         for (const [key, choices] of Object.entries(PREF_CHOICES)) expect(choices).toContain(PREF_DEFAULTS[key]);
     });

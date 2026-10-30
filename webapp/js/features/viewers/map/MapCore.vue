@@ -70,9 +70,8 @@
                                 @close="measurementGroupDialogOpen = false"
                                 @save="handleGroupDialogSave" />
         <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selected-basemap="selectedBasemap"
-                           :unit-pref="currentUnitPref" :custom-basemap-config="customBasemapConfig"
-                           @close="mapSettingsDialogOpen = false" @basemap-changed="handleBasemapChanged"
-                           @units-changed="handleUnitsChanged" @custom-basemap-config-changed="handleCustomBasemapConfigChanged" />
+                           :unit-pref="currentUnitPref" @close="mapSettingsDialogOpen = false"
+                           @basemap-changed="handleBasemapChanged" @units-changed="handleUnitsChanged" />
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
         <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :display-options="!standalone"
                     :split-toggle="!standalone || !!comparison"

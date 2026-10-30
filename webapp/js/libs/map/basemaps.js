@@ -90,4 +90,74 @@ function saveCustomBasemapConfig(config) {
     setPref(PREF.CUSTOM_BASEMAP, config);
 }
 
-export { Basemaps, getAttributionFromUrl, isAbsoluteHttpUrl, getCustomBasemapConfig, saveCustomBasemapConfig };
+/**
+ * The configuration stored for what the editor holds: the URL trimmed, the attribution taken from
+ * it, the TIME of the chosen WMS layer, and the WMS fields reset for an XYZ source.
+ * @param {{ sourceType: 'wms'|'xyz', url: string, layerName?: string, tileSize?: number, wmsLayers?: any[] }} form
+ */
+function buildCustomBasemapConfig({ sourceType, url, layerName = '', tileSize, wmsLayers = [] }) {
+    const trimmed = url.trim();
+    const wms = sourceType === 'wms';
+    return {
+        sourceType,
+        url: trimmed,
+        layerName: wms ? layerName : '',
+        tileSize: wms && CUSTOM_TILE_SIZES.includes(tileSize) ? tileSize : CUSTOM_TILE_SIZES[0],
+        defaultTime: wms ? wmsLayers.find(l => l.name === layerName)?.defaultTime || '' : '',
+        attribution: getAttributionFromUrl(trimmed),
+        wmsLayers: wms ? wmsLayers : []
+    };
+}
+
+/**
+ * The URL of one tile of a custom source, loaded to check the source before it is saved: the
+ * first XYZ tile, or a WMS GetMap of one quarter of the world at the tile size.
+ * @param {{ sourceType: 'wms'|'xyz', url: string, layerName: string, tileSize?: number, defaultTime?: string }} config
+ */
+function customBasemapTestUrl(config) {
+    if (config.sourceType !== 'wms') {
+        return config.url.replace('{z}', '0').replace('{x}', '0').replace('{y}', '0');
+    }
+    const separator = config.url.includes('?') ? '&' : '?';
+    const size = config.tileSize || CUSTOM_TILE_SIZES[0];
+    let url = config.url + separator
+        + 'SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1'
+        + '&LAYERS=' + encodeURIComponent(config.layerName)
+        + '&STYLES='
+        + '&SRS=EPSG:3857&BBOX=0,0,20037508,20037508'
+        + '&WIDTH=' + size + '&HEIGHT=' + size + '&FORMAT=image/png&TILED=true';
+    if (config.defaultTime) url += '&TIME=' + encodeURIComponent(config.defaultTime);
+    return url;
+}
+
+/**
+ * Loads an image; rejects when it fails or takes longer than the timeout.
+ * @param {string} url @param {number} [timeoutMs]
+ * @returns {Promise<void>}
+ */
+function loadTestTile(url, timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const timeout = setTimeout(() => {
+            img.onload = null;
+            img.onerror = null;
+            img.src = '';
+            reject(new Error('Connection timed out'));
+        }, timeoutMs);
+        img.onload = () => {
+            clearTimeout(timeout);
+            resolve();
+        };
+        img.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Failed to load tile'));
+        };
+        img.crossOrigin = 'anonymous';
+        img.src = url;
+    });
+}
+
+export {
+    Basemaps, CUSTOM_TILE_SIZES, getAttributionFromUrl, isAbsoluteHttpUrl, getCustomBasemapConfig, saveCustomBasemapConfig,
+    buildCustomBasemapConfig, customBasemapTestUrl, loadTestTile
+};

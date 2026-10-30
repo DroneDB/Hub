@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { getAttributionFromUrl, isAbsoluteHttpUrl, getCustomBasemapConfig, saveCustomBasemapConfig, Basemaps } from './basemaps';
+import { getAttributionFromUrl, isAbsoluteHttpUrl, getCustomBasemapConfig, saveCustomBasemapConfig, Basemaps, buildCustomBasemapConfig, customBasemapTestUrl } from './basemaps';
 import { PREF, setPref, getPref } from '@/libs/preferences';
 
 beforeEach(() => localStorage.clear());
@@ -120,4 +120,47 @@ describe('isAbsoluteHttpUrl', () => {
         undefined,
         null
     ])('rejects %s', url => expect(isAbsoluteHttpUrl(url)).toBe(false));
+});
+
+describe('buildCustomBasemapConfig', () => {
+    const layers = [{ name: 'a', title: 'A', defaultTime: '' }, { name: 'ortho', title: 'Ortho', defaultTime: '2026-03-12' }];
+
+    it('an XYZ source: the URL trimmed, the attribution from it, the WMS fields reset', () => {
+        expect(buildCustomBasemapConfig({ sourceType: 'xyz', url: '  https://t.example.com/{z}/{x}/{y}.png ', layerName: 'ortho', tileSize: 512, wmsLayers: layers }))
+            .toEqual({
+                sourceType: 'xyz', url: 'https://t.example.com/{z}/{x}/{y}.png', layerName: '', tileSize: 256,
+                defaultTime: '', attribution: '&copy; t.example.com', wmsLayers: []
+            });
+    });
+
+    it('a WMS source keeps its layer, tile size and layers, and takes the TIME of the chosen layer', () => {
+        const config = buildCustomBasemapConfig({ sourceType: 'wms', url: 'https://maps.example.org/wms', layerName: 'ortho', tileSize: 512, wmsLayers: layers });
+        expect(config).toMatchObject({ layerName: 'ortho', tileSize: 512, defaultTime: '2026-03-12', wmsLayers: layers });
+    });
+
+    it('a tile size the map does not draw is the default', () => {
+        expect(buildCustomBasemapConfig({ ...WMS, tileSize: 300 }).tileSize).toBe(256);
+    });
+
+    it('is what getCustomBasemapConfig reads back once saved', () => {
+        const config = buildCustomBasemapConfig({ sourceType: 'wms', url: 'https://maps.example.org/wms', layerName: 'ortho', tileSize: 512, wmsLayers: layers });
+        saveCustomBasemapConfig(config);
+        expect(getCustomBasemapConfig()).toEqual(config);
+    });
+});
+
+describe('customBasemapTestUrl', () => {
+    it('is the first tile of an XYZ source', () => {
+        expect(customBasemapTestUrl({ ...XYZ })).toBe('https://tiles.example.com/0/0/0.png');
+    });
+
+    it('is a GetMap of a WMS source at its tile size, with its TIME', () => {
+        const url = customBasemapTestUrl({ ...WMS, tileSize: 512, defaultTime: '2026-03-12T00:00:00Z' });
+        expect(url).toBe('https://maps.example.org/wms?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=ortho&STYLES='
+            + '&SRS=EPSG:3857&BBOX=0,0,20037508,20037508&WIDTH=512&HEIGHT=512&FORMAT=image/png&TILED=true&TIME=2026-03-12T00%3A00%3A00Z');
+    });
+
+    it('adds to the query string a WMS URL already has', () => {
+        expect(customBasemapTestUrl({ ...WMS, url: 'https://maps.example.org/wms?map=x' })).toMatch(/^https:\/\/maps\.example\.org\/wms\?map=x&SERVICE=WMS&/);
+    });
 });

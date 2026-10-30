@@ -62,7 +62,7 @@
  * arrives. While the user has not moved the map it keeps every pin in view. Pointing at a pin (or
  * opening it) draws the box of its dataset; a cluster zooms in; a pin opens a popup with the
  * dataset and a button to open it. Two buttons over the map bring back the view of every pin and
- * show the names of the datasets under their pins (remembered on the device); names that would
+ * show the names of the datasets under their pins (a preference of the account); names that would
  * overlap are left out until the map is zoomed in. With more than one organization the pins take a colour each,
  * explained by a legend: the colour of an organization is given by its place among `organizations`
  * sorted, so it is the same on every load whatever order the groups arrive in.
@@ -85,7 +85,7 @@ import { buildLocations, bboxExtent, organizationColours } from '@/libs/map/data
 import { createLocationStyles } from '@/libs/map/locationStyles';
 import { FIT_OPTIONS } from '@/libs/map/mapUtils';
 import { usePreference } from '@/composables/usePreference';
-import { PREF } from '@/libs/preferences';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
 defineOptions({ name: 'DatasetLocationsMap' });
 
@@ -121,7 +121,7 @@ const legend = computed(() => built.value.legend);
 const multiOrg = computed(() => legend.value.length > 1);
 const empty = computed(() => !props.loading && built.value.features.length === 0);
 
-const showNames = usePreference(PREF.LOCATIONS_MAP_NAMES, false);
+const showNames = usePreference(PREF.LOCATIONS_MAP_NAMES, PREF_DEFAULTS[PREF.LOCATIONS_MAP_NAMES]);
 
 const styles = createLocationStyles({ coloured: () => multiOrg.value });
 const pinSource = new VectorSource();

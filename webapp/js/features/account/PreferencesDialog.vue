@@ -1,5 +1,5 @@
 <template>
-    <Window id="preferencesDialog" title="Preferences" modal fixed-size size-class="dialog-lg" @close="$emit('close')">
+    <Window id="preferencesDialog" title="User preferences" modal fixed-size size-class="dialog-lg" @close="$emit('close')">
         <Tabs ref="tabsRef" v-model:value="activeTab" class="pref-tabs">
             <TabList>
                 <Tab v-for="tab in visibleTabs" :key="tab.value" :value="tab.value">
@@ -32,29 +32,9 @@
                         <component :is="group.component" v-if="group.component" />
                     </section>
 
-                    <section v-if="tab.value === 'map'" class="pref-group">
+                    <section v-if="tab.value === 'map' && editingCustom" class="pref-group">
                         <h3>Custom basemap</h3>
-                        <dl v-if="customBasemap" class="custom-basemap">
-                            <div>
-                                <dt>Source type</dt>
-                                <dd>{{ customBasemap.sourceType.toUpperCase() }}</dd>
-                            </div>
-                            <div>
-                                <dt>URL</dt>
-                                <dd class="custom-basemap-url">{{ customBasemap.url }}</dd>
-                            </div>
-                            <div v-if="customBasemap.attribution">
-                                <dt>Attribution</dt>
-                                <dd>{{ plainText(customBasemap.attribution) }}</dd>
-                            </div>
-                        </dl>
-                        <p v-else class="pref-hint">No custom basemap is set.</p>
-                        <p class="pref-hint">
-                            To edit the custom basemap, open the map settings of any map: they test the
-                            tiles before saving.
-                        </p>
-                        <Button v-if="storedCustomBasemap" severity="secondary" size="small" icon="fa-solid fa-xmark"
-                                label="Clear" @click="storedCustomBasemap = null" />
+                        <CustomBasemapEditor id-prefix="pref-custom-basemap" @applied="onCustomApplied" @cleared="onCustomCleared" />
                     </section>
 
                     <div class="pref-actions">
@@ -104,6 +84,8 @@ import DialogHost from '@/components/DialogHost.vue';
 import Window from '@/components/HubWindow.vue';
 import RangeSetting from '@/components/RangeSetting.vue';
 import StockpileMaterialsEditor from './StockpileMaterialsEditor.vue';
+import CustomBasemapEditor from '@/features/viewers/map/CustomBasemapEditor.vue';
+import { useBasemapChoice } from '@/composables/useBasemapChoice';
 import { useConfirm } from '@/composables/useConfirm';
 import { useDialogs } from '@/composables/useDialogs';
 import { usePreference } from '@/composables/usePreference';
@@ -111,7 +93,7 @@ import { useViewerSettings } from '@/composables/useViewerSettings';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { currencyChoices, normalizeCurrency } from '@/libs/format';
-import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
+import { Basemaps } from '@/libs/map/basemaps';
 import { ORG_SORT_OPTIONS } from '@/libs/organizationList';
 import { PREF, PREF_DEFAULTS, prefChoice } from '@/libs/preferences';
 import { orgPageChoice } from '@/libs/storageUtils';
@@ -147,8 +129,8 @@ const PAGE_SIZES = optionsOf([5, 10, 25, 50, 100]);
  *   hint: a line shown under the row; filter: a search box above a long list of options
  */
 const select = (id, label, model, options, extra) => ({ id, label, kind: 'select', model, options, ...extra });
-/** @param {string} id @param {string} label @param {import('vue').Ref} model */
-const toggle = (id, label, model) => ({ id, label, kind: 'switch', model });
+/** @param {string} id @param {string} label @param {import('vue').Ref} model @param {{ hint?: import('vue').Ref<string|null> }} [extra] */
+const toggle = (id, label, model, extra) => ({ id, label, kind: 'switch', model, ...extra });
 /** @param {string} id @param {string} label @param {import('vue').Ref} model @param {number} max @param {Record<string, any>} [extra] */
 const range = (id, label, model, max, extra) => ({ id, label, kind: 'range', model, min: 0, max, ...extra });
 
@@ -171,6 +153,10 @@ const orgSortDirection = computed({
 const SORT_DIRECTION_OPTIONS = [{ value: 'asc', label: 'Ascending' }, { value: 'desc', label: 'Descending' }];
 
 const basemapOptions = Object.entries(Basemaps).map(([value, { label }]) => ({ value, label }));
+// "Custom" opens the editor of the custom source, and is stored once a source is saved
+const {
+    choice: basemapChoice, editingCustom, onApplied: onCustomApplied, onCleared: onCustomCleared
+} = useBasemapChoice(usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]));
 
 // A stored value that is not a currency code shows as the default, which is what the views use
 const storedCurrency = usePreference(PREF.CURRENCY, PREF_DEFAULTS[PREF.CURRENCY]);
@@ -236,9 +222,11 @@ const TABS = [
         value: 'map', label: 'Map', icon: 'fa-solid fa-map', sections: ['map'],
         groups: [{
             controls: [
-                select('basemap', 'Default basemap', usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]), basemapOptions),
+                select('basemap', 'Default basemap', basemapChoice, basemapOptions),
                 toggle('flight-path', 'Show flight path', usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH])),
-                toggle('direction-indicators', 'Show direction indicators', usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]))
+                toggle('direction-indicators', 'Show direction indicators', usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS])),
+                toggle('dataset-names', 'Show dataset names on the datasets map', usePreference(PREF.LOCATIONS_MAP_NAMES, PREF_DEFAULTS[PREF.LOCATIONS_MAP_NAMES]),
+                    { hint: ref('The Map view of the Organizations and Datasets pages.') })
             ]
         }]
     },
@@ -343,13 +331,6 @@ const tabsRef = ref(null);
 watch([activeTab, tabsRef], () => nextTick(() => tabsRef.value?.$el?.querySelector('[role="tab"][aria-selected="true"]')
     ?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })), { flush: 'post' });
 
-// The custom basemap: shown as the map reads it (an invalid one is ignored there too), cleared here
-const storedCustomBasemap = usePreference(PREF.CUSTOM_BASEMAP, PREF_DEFAULTS[PREF.CUSTOM_BASEMAP]);
-const customBasemap = computed(() => (storedCustomBasemap.value ? getCustomBasemapConfig() : null));
-
-/** The attribution is HTML for the map; the dialog shows its text. @param {string} html */
-const plainText = html => html.replace(/&copy;/g, '©');
-
 const STATUS = {
     idle: { icon: 'fa-solid fa-circle-check', text: 'Saved to your account' },
     loading: { icon: 'fa-solid fa-spinner fa-spin', text: 'Saving...' },
@@ -424,25 +405,6 @@ async function resetAll() {
     margin: 0 0 0.75rem 0;
     font-size: var(--ddb-font-size-sm);
     color: var(--ddb-text-secondary);
-}
-
-.custom-basemap {
-    margin: 0 0 0.75rem 0;
-}
-
-.custom-basemap dt {
-    font-weight: bold;
-    font-size: var(--ddb-font-size-sm);
-    color: var(--ddb-text-secondary);
-}
-
-.custom-basemap dd {
-    margin: 0 0 0.5rem 0;
-    color: var(--ddb-text);
-}
-
-.custom-basemap-url {
-    overflow-wrap: anywhere;
 }
 
 .pref-actions {

@@ -1,7 +1,8 @@
 // @ts-check
 /**
  * Basemap of the map viewer.
- * Owns the selection, the custom WMS/XYZ configuration and their persistence.
+ * Owns the selection and draws it; the custom WMS/XYZ source is saved by CustomBasemapEditor and
+ * followed here through its preference.
  *
  *   const basemap = useMapBasemap(map);    // map: ShallowRef<ol/Map|null>
  *   new Map({ layers: [basemap.createBasemapLayer(), ...] })
@@ -13,7 +14,7 @@ import TileWMS from 'ol/source/TileWMS';
 import TileGrid from 'ol/tilegrid/TileGrid';
 import { get as getProjection } from 'ol/proj';
 import { getWidth } from 'ol/extent';
-import { Basemaps, getCustomBasemapConfig, saveCustomBasemapConfig } from '@/libs/map/basemaps';
+import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { EPSG } from '@/libs/constants';
 import { getPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
@@ -88,11 +89,5 @@ export function useMapBasemap(map, { persist = true } = {}) {
         if (selectedBasemap.value === 'custom') updateBasemap();
     }));
 
-    /** Settings dialog: a new custom configuration. @param {any} config */
-    function handleCustomBasemapConfigChanged(config) {
-        // The preference listener above takes the stored configuration and applies it
-        saveCustomBasemapConfig(config);
-    }
-
-    return { selectedBasemap, basemaps: Basemaps, customBasemapConfig, createBasemapLayer, updateBasemap, handleBasemapChanged, handleCustomBasemapConfigChanged };
+    return { selectedBasemap, basemaps: Basemaps, createBasemapLayer, updateBasemap, handleBasemapChanged };
 }
