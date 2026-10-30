@@ -49,7 +49,7 @@
                     <div class="settings-control">
                         <template v-if="readme == null">
                             <Button severity="secondary" icon="fa-solid fa-plus" label="Add Readme" @click="addDocument('README.md')" />
-                            <small class="field-hint">Creates README.md, shown on the dataset page.</small>
+                            <small class="field-hint">Creates README.md at the root of the dataset, a file to describe it.</small>
                         </template>
                         <span v-else class="settings-value">{{ readme }}</span>
                     </div>
