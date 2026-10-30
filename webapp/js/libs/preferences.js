@@ -23,6 +23,7 @@ export const PREF = Object.freeze({
     FILE_VIEW_MODE: 'fileViewMode',
     TABLE_EXPANDED_GRID: 'tableExpandedGrid',
     SORT_DESCENDING: 'sortDescending',
+    LOCATIONS_MAP_NAMES: 'locationsMapNames', // true: the map of dataset locations shows the names of its pins; device only
     SPLAT_NAV_MODE: 'ddb.splat.navMode',
     SPLAT_QUALITY: 'ddb.splat.quality', // 'auto' | 'low' | 'medium' | 'high': how much detail the splat viewer draws
     SPLAT_VIEW_SETTINGS: 'ddb.splat.viewSettings', // [[remote URI, { upAxis, tiltRoll, tiltPitch, pointScale }], ...] of the splats opened, oldest first; device only (a list that grows with use)

@@ -1,7 +1,8 @@
 /**
- * The overview map shows a pin per dataset with a location, lists the others beside it, opens a
- * popup for a pin, zooms into a cluster and cleans up with the page. OpenLayers' map is replaced
- * by a stand-in that records what the component asks of it (the pins, layers and styles are real).
+ * The overview map shows a pin per dataset with a location and none for the others, opens a
+ * popup for a pin, resets its view, shows the names of the datasets on demand, zooms into a
+ * cluster and cleans up with the page. OpenLayers' map is replaced by a stand-in that records
+ * what the component asks of it (the pins, layers and styles are real).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
@@ -63,6 +64,7 @@ let wrapper;
 let observed;
 beforeEach(() => {
     router.push.mockClear();
+    localStorage.clear();
     globalThis.ResizeObserver = class {
         constructor(callback) { this.callback = callback; observed = this; this.disconnect = vi.fn(); }
         observe() {}
@@ -96,7 +98,7 @@ describe('DatasetLocationsMap pins', () => {
     it('creates the map with the basemap as layer 0 and a pin for each dataset with a location', async () => {
         render({ groups: [group('acme', [ds('a', [10, 40, 12, 42], 'A'), ds('b', null, 'B'), ds('c', [0, 0, 0, 0], 'C')])] });
         await flushPromises();
-        expect(map().options.layers).toHaveLength(3);
+        expect(map().options.layers).toHaveLength(4);
         expect(map().options.layers[0].getSource).toBeTypeOf('function'); // the basemap tiles
         expect(slugs()).toEqual(['a']);
         expect(map().options.target).toBe(wrapper.find('.dlm-map').element);
@@ -150,39 +152,11 @@ describe('DatasetLocationsMap pins', () => {
 });
 
 describe('DatasetLocationsMap without a location', () => {
-    const groups = [group('acme', [ds('a', [1, 1, 2, 2], 'A'), ds('none', null, 'No place'), ds('zero', [0, 0, 0, 0], null)], 'Acme')];
-
-    it('lists the datasets without a location, each a link to the dataset', async () => {
-        render({ groups });
+    it('pins only the datasets that have one and lists none of the others', async () => {
+        render({ groups: [group('acme', [ds('a', [1, 1, 2, 2], 'A'), ds('none', null, 'No place')], 'Acme')] });
         await flushPromises();
-        expect(wrapper.find('.dlm-without-toggle').text()).toBe('2 datasets without a location');
-        const links = wrapper.findAll('.dlm-without-list a');
-        expect(links.map(a => a.text())).toEqual(['No place', 'zero']);
-        expect(JSON.parse(links[0].attributes('data-to'))).toEqual({ name: 'ViewDataset', params: { org: 'acme', ds: 'none' } });
-    });
-
-    it('collapses the list', async () => {
-        render({ groups });
-        await flushPromises();
-        const toggle = wrapper.find('.dlm-without-toggle');
-        const list = wrapper.find('.dlm-without-list');
-        expect(toggle.attributes('aria-expanded')).toBe('true');
-        expect(list.element.style.display).toBe('');
-        await toggle.trigger('click');
-        expect(toggle.attributes('aria-expanded')).toBe('false');
-        expect(list.element.style.display).toBe('none');
-    });
-
-    it('has no list when every dataset has a location', async () => {
-        render({ groups: [group('a', [ds('a1', [1, 1, 2, 2])])] });
-        await flushPromises();
-        expect(wrapper.find('.dlm-without').exists()).toBe(false);
-    });
-
-    it('names the organization of each dataset when the datasets are of several, though only one has pins', async () => {
-        render({ groups: [group('a', [ds('x', null)], 'Org A'), group('b', [ds('y', [1, 1, 2, 2]), ds('z', null)], 'Org B')] });
-        await flushPromises();
-        expect(wrapper.findAll('.dlm-without-org').map(e => e.text())).toEqual(['Org A', 'Org B']);
+        expect(pinSource().getFeatures().map(f => f.get('slug'))).toEqual(['a']);
+        expect(wrapper.text()).not.toContain('No place');
     });
 });
 
@@ -239,6 +213,51 @@ describe('DatasetLocationsMap states', () => {
         expect(Object.keys(first)).toHaveLength(3);
         expect(second).toEqual(first);
         expect(new Set(Object.values(first)).size).toBe(3);
+    });
+});
+
+describe('DatasetLocationsMap buttons', () => {
+    const groups = [group('a', [ds('a1', [10, 40, 12, 42], 'One')]), group('b', [ds('b1', [20, 30, 21, 31], 'Two')])];
+    const labelLayer = () => map().options.layers[3];
+    const namesButton = () => wrapper.find('button[aria-label="Show the names of the datasets"]');
+
+    it('brings back the view of every pin, closes the popup and follows the pins again', async () => {
+        render({ groups });
+        await flushPromises();
+        pointAt('a1');
+        map().dispatchEvent({ type: 'click', pixel: [1, 1] });
+        await flushPromises();
+        await wrapper.find('.dlm-map').trigger('pointerdown');
+        map().view.fit.mockClear();
+
+        await wrapper.find('button[aria-label="Reset view"]').trigger('click');
+        expect(map().view.fit).toHaveBeenCalledWith(pinSource().getExtent(), FIT_OPTIONS);
+        expect(wrapper.find('.dlm-popup-name').exists()).toBe(false);
+
+        map().view.fit.mockClear();
+        await wrapper.setProps({ groups: [...groups, group('c', [ds('c1', [60, 60, 61, 61])])] });
+        expect(map().view.fit).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the names of the datasets on demand, decluttered, and remembers the choice', async () => {
+        render({ groups });
+        await flushPromises();
+        expect(labelLayer().getVisible()).toBe(false);
+        expect(labelLayer().getDeclutter()).toBeTruthy();
+        expect(labelLayer().getSource()).toBe(map().options.layers[1].getSource());
+        expect(namesButton().attributes('aria-pressed')).toBe('false');
+
+        await namesButton().trigger('click');
+        expect(labelLayer().getVisible()).toBe(true);
+        expect(namesButton().attributes('aria-pressed')).toBe('true');
+        expect(namesButton().classes()).toContain('active');
+        wrapper.unmount();
+
+        render({ groups });
+        await flushPromises();
+        expect(labelLayer().getVisible()).toBe(true);
+        await namesButton().trigger('click');
+        expect(labelLayer().getVisible()).toBe(false);
     });
 });
 

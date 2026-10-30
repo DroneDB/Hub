@@ -1,38 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { transformExtent } from 'ol/proj';
-import { buildLocations, bboxExtent, isUsableBbox, organizationColours } from './datasetLocations';
+import { buildLocations, bboxExtent, organizationColours } from './datasetLocations';
 
 const group = (org, datasets, orgName) => ({ org, orgName, datasets });
 const dataset = (slug, bbox, name) => ({ slug, name, bbox });
-
-describe('isUsableBbox', () => {
-    it('accepts a box inside the WGS84 range, a point included', () => {
-        expect(isUsableBbox([10, 20, 11, 21])).toBe(true);
-        expect(isUsableBbox([10, 20, 10, 20])).toBe(true);
-        expect(isUsableBbox([-180, -90, 180, 90])).toBe(true);
-    });
-
-    it.each([
-        ['null', null],
-        ['undefined', undefined],
-        ['a string', '1,2,3,4'],
-        ['too short', [1, 2, 3]],
-        ['too long', [1, 2, 3, 4, 5, 6]],
-        ['all zero', [0, 0, 0, 0]],
-        ['not finite', [1, 2, NaN, 4]],
-        ['infinite', [1, 2, 3, Infinity]],
-        ['numbers as text', ['1', '2', '3', '4']],
-        ['a minimum above the maximum', [12, 20, 11, 21]],
-        ['longitude out of range', [10, 20, 181, 21]],
-        ['latitude out of range', [10, 20, 11, 91]]
-    ])('refuses %s', (_, bbox) => {
-        expect(isUsableBbox(bbox)).toBe(false);
-    });
-
-    it('accepts a box that has a zero in it', () => {
-        expect(isUsableBbox([0, 0, 1, 1])).toBe(true);
-    });
-});
 
 describe('bboxExtent', () => {
     it('is the box in Web Mercator', () => {
@@ -48,8 +19,7 @@ describe('bboxExtent', () => {
 
 describe('buildLocations', () => {
     it('pins each dataset at the centre of its box, with what the map shows of it', () => {
-        const { features, without } = buildLocations([group('acme', [dataset('roof', [10, 40, 12, 42], 'Roof')], 'Acme Inc')]);
-        expect(without).toEqual([]);
+        const { features } = buildLocations([group('acme', [dataset('roof', [10, 40, 12, 42], 'Roof')], 'Acme Inc')]);
         expect(features).toHaveLength(1);
         const [pin] = features;
         const [minX, minY, maxX, maxY] = bboxExtent([10, 40, 12, 42]);
@@ -60,14 +30,13 @@ describe('buildLocations', () => {
     });
 
     it('names a dataset by its slug and an organization by its slug when they have no name', () => {
-        const { features, without } = buildLocations([group('acme', [dataset('a', [1, 1, 2, 2], null), dataset('b', null, '')])]);
+        const { features } = buildLocations([group('acme', [dataset('a', [1, 1, 2, 2], null)])]);
         expect(features[0].get('name')).toBe('a');
         expect(features[0].get('orgName')).toBe('acme');
-        expect(without).toEqual([{ org: 'acme', orgName: 'acme', slug: 'b', name: 'b' }]);
     });
 
-    it('lists apart the datasets with no usable box', () => {
-        const { features, without } = buildLocations([group('acme', [
+    it('leaves out the datasets with no usable box', () => {
+        const { features } = buildLocations([group('acme', [
             dataset('ok', [1, 1, 2, 2], 'Ok'),
             dataset('none', null, 'None'),
             dataset('short', [1, 2, 3], 'Short'),
@@ -75,7 +44,6 @@ describe('buildLocations', () => {
             dataset('zero', [0, 0, 0, 0], 'Zero')
         ])]);
         expect(features.map(f => f.get('slug'))).toEqual(['ok']);
-        expect(without.map(d => d.slug)).toEqual(['none', 'short', 'nan', 'zero']);
     });
 
     it('gives each organization its own colour, the same for all of its pins', () => {
@@ -130,7 +98,7 @@ describe('buildLocations', () => {
     it('leaves an organization without a pin out of the legend, and builds nothing from nothing', () => {
         const { legend } = buildLocations([group('a', [dataset('x', null)]), group('b', [])]);
         expect(legend).toEqual([]);
-        expect(buildLocations([])).toEqual({ features: [], without: [], legend: [] });
+        expect(buildLocations([])).toEqual({ features: [], legend: [] });
     });
 });
 

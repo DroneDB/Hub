@@ -28,6 +28,7 @@
                         <InputIcon class="fa-solid fa-magnifying-glass" />
                         <InputText v-model="searchQuery" small placeholder="Search organizations" aria-label="Search organizations" />
                     </IconField>
+                    <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" show-organization />
                     <ViewSelect v-model="view" label="Show the organizations as" />
                     <SortSelect v-if="view === 'list'" v-model:column="sortColumn" v-model:direction="sortDirection" :options="ORG_SORT_OPTIONS"
                                 label="Sort organizations by" />
@@ -142,6 +143,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import SortSelect from '@/components/SortSelect.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import { DatasetLocationsMap } from '@/features/datasets/locationsMap';
+import UnlocatedDatasetsButton from '@/features/datasets/UnlocatedDatasetsButton.vue';
 import { createLocationFanOut } from '@/libs/locationFanOut';
 import { shallowRef } from 'vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -186,6 +188,7 @@ export default {
         SortSelect,
         ViewSelect,
         DatasetLocationsMap,
+        UnlocatedDatasetsButton,
         DialogHost,
         MessageDialog,
         OrganizationDialog,

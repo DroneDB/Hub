@@ -3,6 +3,16 @@
         <div class="dlm-map-wrap">
             <div ref="mapEl" class="dlm-map" />
 
+            <div class="ol-map-buttons ol-unselectable ol-control dlm-tools">
+                <button type="button" title="Reset view" aria-label="Reset view" @click="resetView">
+                    <i class="fa-solid fa-house" aria-hidden="true" />
+                </button>
+                <button type="button" title="Show the names of the datasets" aria-label="Show the names of the datasets"
+                        :class="{ active: showNames }" :aria-pressed="showNames" @click="showNames = !showNames">
+                    <i class="fa-solid fa-tags" aria-hidden="true" />
+                </button>
+            </div>
+
             <div v-if="loading" class="dlm-status" role="status">
                 <i class="fa-solid fa-spinner fa-spin" aria-hidden="true" /> Loading locations&hellip;
             </div>
@@ -38,20 +48,6 @@
                 </template>
             </div>
         </div>
-
-        <aside v-if="without.length" class="dlm-without">
-            <button type="button" class="dlm-without-toggle" :aria-expanded="withoutOpen" aria-controls="dlm-without-list"
-                    @click="withoutOpen = !withoutOpen">
-                <i :class="withoutOpen ? 'fa-solid fa-chevron-down' : 'fa-solid fa-chevron-right'" aria-hidden="true" />
-                {{ without.length }} {{ without.length === 1 ? 'dataset' : 'datasets' }} without a location
-            </button>
-            <ul v-show="withoutOpen" id="dlm-without-list" class="dlm-without-list">
-                <li v-for="dataset in without" :key="dataset.org + '/' + dataset.slug">
-                    <router-link :to="{ name: 'ViewDataset', params: { org: dataset.org, ds: dataset.slug } }">{{ dataset.name }}</router-link>
-                    <small v-if="severalOrgsListed" class="dlm-without-org">{{ dataset.orgName }}</small>
-                </li>
-            </ul>
-        </aside>
     </div>
 </template>
 
@@ -59,13 +55,15 @@
 /**
  * DatasetLocationsMap - a map of where datasets are: one pin per dataset at the centre of its
  * bounding box, grouped into counted clusters when they crowd. The datasets that have no
- * location are listed beside the map (below it on a narrow screen).
+ * location are not on it: the page lists them (UnlocatedDatasetsButton).
  *
  * The pins are the `groups` it is given, `{ org, orgName, datasets: [{ slug, name, bbox }] }` per
  * organization, and follow them as groups are added, so the page can show an answer as it
  * arrives. While the user has not moved the map it keeps every pin in view. Pointing at a pin (or
  * opening it) draws the box of its dataset; a cluster zooms in; a pin opens a popup with the
- * dataset and a button to open it. With more than one organization the pins take a colour each,
+ * dataset and a button to open it. Two buttons over the map bring back the view of every pin and
+ * show the names of the datasets under their pins (remembered on the device); names that would
+ * overlap are left out until the map is zoomed in. With more than one organization the pins take a colour each,
  * explained by a legend: the colour of an organization is given by its place among `organizations`
  * sorted, so it is the same on every load whatever order the groups arrive in.
  */
@@ -86,7 +84,8 @@ import { useListenerBag } from '@/composables/useEventListener';
 import { buildLocations, bboxExtent, organizationColours } from '@/libs/map/datasetLocations';
 import { createLocationStyles } from '@/libs/map/locationStyles';
 import { FIT_OPTIONS } from '@/libs/map/mapUtils';
-import { isMobile } from '@/libs/responsive';
+import { usePreference } from '@/composables/usePreference';
+import { PREF } from '@/libs/preferences';
 
 defineOptions({ name: 'DatasetLocationsMap' });
 
@@ -118,21 +117,19 @@ const { createBasemapLayer } = useMapBasemap(map);
 // Organization -> colour, from the organizations the page knows rather than the groups so far
 const colours = computed(() => organizationColours(props.organizations ?? props.groups.map(group => group.org)));
 const built = computed(() => buildLocations(props.groups, colours.value));
-const without = computed(() => built.value.without);
 const legend = computed(() => built.value.legend);
 const multiOrg = computed(() => legend.value.length > 1);
-// The list beside the map names organizations when it mixes datasets of several
-const severalOrgsListed = computed(() =>
-    new Set([...legend.value.map(entry => entry.org), ...without.value.map(dataset => dataset.org)]).size > 1);
 const empty = computed(() => !props.loading && built.value.features.length === 0);
-const withoutOpen = ref(!isMobile());
+
+const showNames = usePreference(PREF.LOCATIONS_MAP_NAMES, false);
 
 const styles = createLocationStyles({ coloured: () => multiOrg.value });
 const pinSource = new VectorSource();
-const pinLayer = new VectorLayer({
-    source: new Cluster({ distance: CLUSTER_DISTANCE, source: pinSource }),
-    style: styles.pin
-});
+const clusters = new Cluster({ distance: CLUSTER_DISTANCE, source: pinSource });
+const pinLayer = new VectorLayer({ source: clusters, style: styles.pin });
+// The names, over the boxes; a name that would cover another is left out
+const labelLayer = new VectorLayer({ source: clusters, style: styles.label, declutter: true, visible: showNames.value });
+watch(showNames, visible => labelLayer.setVisible(visible));
 const boxSource = new VectorSource();
 const boxLayer = new VectorLayer({ source: boxSource, style: styles.box });
 
@@ -189,9 +186,9 @@ watch(() => props.loading, loading => {
     if (!loading && followPins) fitToPins(true);
 });
 
-/** The cluster (one or more pins) drawn at `pixel`. */
+/** The cluster (one or more pins) drawn at `pixel`, at its pin or its name. */
 const clusterAt = pixel => map.value.forEachFeatureAtPixel(pixel, feature => feature,
-    { layerFilter: layer => layer === pinLayer, hitTolerance: 4 });
+    { layerFilter: layer => layer === pinLayer || layer === labelLayer, hitTolerance: 4 });
 
 function onPointerMove(event) {
     if (event.dragging) return;
@@ -241,6 +238,13 @@ function openDataset(pin) {
     router.push({ name: 'ViewDataset', params: { org: pin.org, ds: pin.slug } });
 }
 
+/** Back to the view of every pin, which follows the pins again as more arrive. */
+function resetView() {
+    closePopup();
+    followPins = true;
+    fitToPins(true);
+}
+
 /** The user moves the map: it stops following the pins. */
 function stopFollowing() {
     followPins = false;
@@ -250,7 +254,7 @@ onMounted(() => {
     map.value = new Map({
         target: mapEl.value,
         // The basemap must be layer 0 (useMapBasemap replaces it)
-        layers: [createBasemapLayer(), pinLayer, boxLayer],
+        layers: [createBasemapLayer(), pinLayer, boxLayer, labelLayer],
         view: new View({ center: [0, 0], zoom: 2 })
     });
     overlay = new Overlay({
@@ -267,7 +271,7 @@ onMounted(() => {
     listeners.add(popupEl.value, 'keydown', event => { if (event.key === 'Escape') closePopup(); });
     for (const type of ['pointerdown', 'wheel']) listeners.add(mapEl.value, type, stopFollowing, { passive: true });
 
-    // The container changes size with the window and the list beside the map
+    // The container changes size with the window
     resizeObserver = new ResizeObserver(() => {
         map.value?.updateSize();
         if (followPins) fitToPins(false);
@@ -294,9 +298,6 @@ onBeforeUnmount(() => {
     flex: 1;
     min-height: 0;
     display: flex;
-    flex-direction: column;
-    gap: var(--ddb-spacing-sm);
-    overflow-y: auto;
 }
 
 .dlm-map-wrap {
@@ -312,6 +313,11 @@ onBeforeUnmount(() => {
 .dlm-map {
     position: absolute;
     inset: 0;
+}
+
+.dlm-tools {
+    top: var(--ddb-spacing-sm);
+    right: var(--ddb-spacing-sm);
 }
 
 .dlm-status {
@@ -439,60 +445,5 @@ onBeforeUnmount(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.dlm-without {
-    flex-shrink: 0;
-    min-width: 0;
-}
-
-.dlm-without-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--ddb-spacing-xs);
-    width: 100%;
-    padding: var(--ddb-spacing-xs) 0;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-weight: bold;
-    text-align: left;
-    cursor: pointer;
-}
-
-.dlm-without-list {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    max-height: 12rem;
-    overflow-y: auto;
-}
-
-.dlm-without-list li {
-    display: flex;
-    flex-direction: column;
-    padding: var(--ddb-spacing-xs) 0;
-}
-
-.dlm-without-org {
-    color: var(--ddb-text-secondary);
-}
-
-/* Beside the map on a wide screen */
-@media screen and (min-width: 768px) {
-    .dlm {
-        flex-direction: row;
-        overflow-y: hidden;
-    }
-
-    .dlm-without {
-        width: 16rem;
-        overflow-y: auto;
-    }
-
-    .dlm-without-list {
-        max-height: none;
-    }
 }
 </style>

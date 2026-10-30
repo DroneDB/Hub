@@ -3,9 +3,8 @@
  * datasetLocations - the pins of the overview map: where each dataset is, built from the
  * locations the server gives per organization.
  *
- * A dataset has a location when the server gives it a bounding box (minLon, minLat, maxLon,
- * maxLat in WGS84) that is a real place; the others are listed apart as "without a location".
- * A dataset is pinned at the centre of its box and keeps the box, which the map draws on demand.
+ * A dataset with a location (datasetPlaces) is pinned at the centre of its box and keeps the
+ * box, which the map draws on demand.
  */
 import Feature from 'ol/Feature';
 import Point from 'ol/geom/Point';
@@ -13,40 +12,9 @@ import { transformExtent } from 'ol/proj';
 import { getCenter } from 'ol/extent';
 import { EPSG } from '@/libs/constants';
 import { getVectorColor } from '@/libs/map/mapUtils';
+import { datasetName, groupName, isUsableBbox } from '@/libs/map/datasetPlaces';
 
-/**
- * @typedef {object} LocatedDataset
- * @property {string} slug
- * @property {string|null} [name]
- * @property {number[]|null} [bbox]
- *
- * @typedef {object} LocationGroup  the datasets of one organization, as the server lists them
- * @property {string} org  slug of the organization
- * @property {string} [orgName]
- * @property {LocatedDataset[]} datasets
- *
- * @typedef {object} UnlocatedDataset
- * @property {string} org
- * @property {string} orgName
- * @property {string} slug
- * @property {string} name
- */
-
-/**
- * Whether `bbox` is a place on the earth: four finite numbers inside the WGS84 range, the
- * minimum not above the maximum (a box across the antimeridian is not given that way), and not
- * all zero (what a dataset with no location reports).
- * @param {unknown} bbox
- * @returns {bbox is number[]}
- */
-export function isUsableBbox(bbox) {
-    if (!Array.isArray(bbox) || bbox.length !== 4) return false;
-    if (!bbox.every(v => typeof v === 'number' && Number.isFinite(v))) return false;
-    const [minLon, minLat, maxLon, maxLat] = bbox;
-    if (bbox.every(v => v === 0)) return false;
-    if (minLon > maxLon || minLat > maxLat) return false;
-    return Math.abs(minLon) <= 180 && Math.abs(maxLon) <= 180 && Math.abs(minLat) <= 90 && Math.abs(maxLat) <= 90;
-}
+/** @typedef {import('./datasetPlaces').LocationGroup} LocationGroup */
 
 /**
  * A WGS84 box in Web Mercator (the map's projection). The poles have no Web Mercator: the
@@ -76,7 +44,7 @@ export function organizationColours(slugs) {
 }
 
 /**
- * The pins and the datasets without a location of the groups, each organization in its colour
+ * The pins of the groups and the legend of their organizations, each organization in its colour
  * of `colours` (organizationColours). By default the colours are those of the groups' own
  * organizations; a page that shows a changing subset of the organizations it knows passes the
  * colours of all of them, so a colour does not depend on the subset. An organization missing from
@@ -85,28 +53,22 @@ export function organizationColours(slugs) {
  * @param {Record<string, string>} [colours]
  * @returns {{
  *   features: Feature<Point>[],
- *   without: UnlocatedDataset[],
  *   legend: Array<{org: string, orgName: string, colour: string}>
  * }}
  */
 export function buildLocations(groups, colours = organizationColours(groups.map(group => group.org))) {
     /** @type {Feature<Point>[]} */
     const features = [];
-    /** @type {UnlocatedDataset[]} */
-    const without = [];
     /** @type {Array<{org: string, orgName: string, colour: string}>} */
     const legend = [];
 
     for (const group of groups) {
-        const orgName = group.orgName || group.org;
+        const orgName = groupName(group);
         const colour = colours[group.org] ?? getVectorColor(group.org, Number.POSITIVE_INFINITY, {});
         let pinned = 0;
         for (const dataset of group.datasets ?? []) {
-            const name = dataset.name || dataset.slug;
-            if (!isUsableBbox(dataset.bbox)) {
-                without.push({ org: group.org, orgName, slug: dataset.slug, name });
-                continue;
-            }
+            if (!isUsableBbox(dataset.bbox)) continue;
+            const name = datasetName(dataset);
             const feature = new Feature(new Point(getCenter(bboxExtent(dataset.bbox))));
             feature.setId(`${group.org}/${dataset.slug}`);
             feature.setProperties({ org: group.org, orgName, slug: dataset.slug, name, bbox: dataset.bbox, colour });
@@ -115,5 +77,5 @@ export function buildLocations(groups, colours = organizationColours(groups.map(
         }
         if (pinned > 0) legend.push({ org: group.org, orgName, colour });
     }
-    return { features, without, legend };
+    return { features, legend };
 }

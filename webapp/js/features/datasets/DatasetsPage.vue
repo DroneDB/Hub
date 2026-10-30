@@ -67,6 +67,7 @@
                     <!-- Right: actions -->
                     <div class="org-actions">
                         <div class="d-flex flex-wrap align-items-center gap-2">
+                            <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" />
                             <ViewSelect v-model="view" label="Show the datasets as" />
                             <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
                             <Button v-if="canCreateDataset" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" @click.stop="openImportDialog()" />
@@ -204,6 +205,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import Message from '@/components/HubMessage.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
 import { DatasetLocationsMap } from './locationsMap';
+import UnlocatedDatasetsButton from './UnlocatedDatasetsButton.vue';
 import { setTitle, bytesToSize, formatTimeAgo, parseTimestamp } from '@/libs/utils';
 import { renameDataset, datasetName } from '@/libs/api/registryUtils';
 import { getDatasetTablePreferences, saveDatasetTablePreferences, followDatasetTablePreferences } from '@/libs/storageUtils';
@@ -252,6 +254,7 @@ export default {
         Message,
         ViewSelect,
         DatasetLocationsMap,
+        UnlocatedDatasetsButton,
         DialogHost,
         MessageDialog,
         DatasetDialog,
