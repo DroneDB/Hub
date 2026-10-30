@@ -21,10 +21,11 @@
                     <!-- Add member section -->
                     <div v-if="canManageMembers" class="mb-3">
                         <h3>Add Member</h3>
-                        <div class="d-flex gap-3 flex-wrap align-items-end">
+                        <div class="d-flex gap-3 flex-wrap align-items-start">
                             <div style="flex: 7 1 12rem;">
-                                <label id="organization-members-dialog-user-label" for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User</label>
-                                <Select v-model="newMember.userName" input-id="organization-members-dialog-user" aria-labelledby="organization-members-dialog-user-label" :options="availableUsers" option-label="displayName" option-value="userName" filter placeholder="Search user..." class="w-100" />
+                                <label for="organization-members-dialog-user" class="d-block mb-1 fw-semibold">User name</label>
+                                <InputText id="organization-members-dialog-user" v-model.trim="newMember.userName" class="w-100" autocomplete="off" spellcheck="false" placeholder="Exact user name" aria-describedby="organization-members-dialog-user-hint" @keyup.enter="addMember" />
+                                <small id="organization-members-dialog-user-hint" class="d-block mt-1 text-muted">Type the exact user name; it is checked when you add the member.</small>
                             </div>
                             <div style="flex: 5 1 9rem;">
                                 <label id="organization-members-dialog-permissions-label" for="organization-members-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
@@ -32,7 +33,7 @@
                             </div>
                             <div style="flex: 0 0 auto;">
                                 <span class="d-block mb-1" aria-hidden="true">&nbsp;</span>
-                                <Button :disabled="!newMember.userName || addingMember" icon="fa-solid fa-plus" label="Add" @click="addMember" />
+                                <Button :disabled="!canAdd" icon="fa-solid fa-plus" label="Add" @click="addMember" />
                             </div>
                         </div>
                     </div>
@@ -106,6 +107,7 @@
 import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Select from 'primevue/select';
+import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
@@ -114,7 +116,7 @@ import { formatDate } from '@/libs/format';
 import { showFrom } from '@/libs/responsiveColumns';
 
 export default {
-    components: { Window, ConfirmDialog, Select, Button, PrimeMessage },
+    components: { Window, ConfirmDialog, Select, InputText, Button, PrimeMessage },
 
     props: {
         orgSlug: { type: String, required: true },
@@ -131,7 +133,6 @@ export default {
             error: null,
             featureEnabled: false,
             members: [],
-            allUsers: [],
             addingMember: false,
             removingMember: null,
             newMember: {
@@ -150,11 +151,8 @@ export default {
     },
 
     computed: {
-        availableUsers() {
-            const memberUserNames = this.members.map(m => m.userName);
-            return this.allUsers
-                .filter(u => !memberUserNames.includes(u.userName))
-                .map(u => ({ ...u, displayName: `${u.userName} (${u.email})` }));
+        canAdd() {
+            return !!this.newMember.userName.trim() && !this.addingMember;
         }
     },
 
@@ -176,13 +174,7 @@ export default {
                     return;
                 }
 
-                // Load members
                 this.members = await reg.orgs.getOrganizationMembers(this.orgSlug);
-
-                // Load all users if can manage (for adding new members)
-                if (this.canManageMembers) {
-                    this.allUsers = await reg.admin.users();
-                }
 
             } catch (e) {
                 this.error = e.message || 'Failed to load members';
@@ -192,14 +184,17 @@ export default {
             }
         },
 
+        // The user list is not exposed to organization owners: the name is typed and the
+        // server says when there is no such user (or it is already a member)
         async addMember() {
-            if (!this.newMember.userName) return;
+            if (!this.canAdd) return;
 
             this.addingMember = true;
+            this.error = null;
             try {
                 await reg.orgs.addOrganizationMember(
                     this.orgSlug,
-                    this.newMember.userName,
+                    this.newMember.userName.trim(),
                     this.newMember.permissions
                 );
 
