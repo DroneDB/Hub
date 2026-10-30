@@ -2,7 +2,7 @@
  * The management buttons follow the map and the saved file: Save makes the file match the
  * map, so it stays while a saved file exists, and Delete saved stays until the file is gone.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import OlMap from 'ol/Map';
 import Feature from 'ol/Feature';
 import LineString from 'ol/geom/LineString';
@@ -42,6 +42,20 @@ describe('MeasureControls buttons', () => {
         expect(control.toolbar2.style.display).toBe('block');
         expect(shown(control.btnList)).toBe(false);
         expect(shown(control.btnExport)).toBe(false);
+        expect(shown(control.btnExportCsv)).toBe(false);
+    });
+
+    it('offers the GeoJSON and the CSV export with measurements on the map, each with its own name', () => {
+        const onExportCsv = vi.fn();
+        const withCsv = new MeasureControls({ onExportCsv });
+        withCsv.source.addFeature(line());
+        withCsv.refreshButtons();
+        expect(shown(withCsv.btnExport)).toBe(true);
+        expect(shown(withCsv.btnExportCsv)).toBe(true);
+        expect(withCsv.btnExport.getAttribute('aria-label')).toBe('Export Measurements as GeoJSON');
+        expect(withCsv.btnExportCsv.getAttribute('aria-label')).toBe('Export Measurements as CSV');
+        withCsv.btnExportCsv.click();
+        expect(onExportCsv).toHaveBeenCalledTimes(1);
     });
 
     it('keeps Save and Delete saved after Clear all', () => {

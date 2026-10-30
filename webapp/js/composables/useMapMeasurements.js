@@ -1,6 +1,6 @@
 /**
  * The map's measurements: where they are saved (the first georaster / point cloud on
- * show, else the folder's measurements.geojson), load, save, export, delete, clear,
+ * show, else the folder's measurements.geojson), load, save, export (GeoJSON, CSV), delete, clear,
  * the measurement list, groups and the units change.
  *
  * The map is a working copy of its measurements in that file: Save makes the file match the
@@ -18,6 +18,8 @@ import { MeasurementStorage, MeasurementOwner, saveResultMessage } from '@/libs/
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
+import { measurementsToCsv } from '@/libs/map/measurementCsv';
+import { downloadCsv } from '@/libs/csv';
 
 const definition = {
     data() {
@@ -65,6 +67,7 @@ const definition = {
                 onSave: () => { this.saveMeasurements(); },
                 onClearAll: () => { this.onClearAllMeasurements(); },
                 onExport: () => { this.exportMeasurementsToFile(); },
+                onExportCsv: () => { this.exportMeasurementsToCsv(); },
                 onDeleteSaved: () => { this.deleteSavedMeasurements(); },
                 onRequestClearConfirm: () => { this.clearMeasurementsDialogOpen = true; },
                 onRequestDeleteConfirm: () => { this.deleteSavedMeasurementsDialogOpen = true; },
@@ -223,28 +226,32 @@ const definition = {
             this.showFlash(saveResultMessage(result), 'positive');
         },
 
-        /**
-         * Export measurements to file
-         */
-        exportMeasurementsToFile() {
+        // The measurements to export, as GeoJSON; null (with a warning when there are none) otherwise
+        _exportableMeasurements() {
             const activeEntry = this.activeMeasurementEntry;
-            if (!this.measureControls || !activeEntry) return;
-
-            if (!this.measureControls.hasMeasurements()) {
+            if (!this.measureControls || !activeEntry) return null;
+            const geojson = this.measureControls.hasMeasurements()
+                ? this.measureControls.exportToGeoJSON(activeEntry.path, this.measurementGroups)
+                : null;
+            if (!geojson || !geojson.features || geojson.features.length === 0) {
                 this.showAlert('Warning', 'No measurements to export');
-                return;
+                return null;
             }
+            return geojson;
+        },
 
-            const geojson = this.measureControls.exportToGeoJSON(activeEntry.path);
+        /** Downloads the measurements as a GeoJSON file */
+        exportMeasurementsToFile() {
+            const geojson = this._exportableMeasurements();
+            if (geojson && this.measurementStorage) this.measurementStorage.exportToFile(geojson);
+        },
 
-            if (!geojson.features || geojson.features.length === 0) {
-                this.showAlert('Warning', 'No measurements to export');
-                return;
-            }
-
-            if (this.measurementStorage) {
-                this.measurementStorage.exportToFile(geojson);
-            }
+        /** Downloads the measurements as a CSV table, with the values in the units the map shows */
+        exportMeasurementsToCsv() {
+            const geojson = this._exportableMeasurements();
+            if (!geojson) return;
+            downloadCsv(measurementsToCsv(geojson, this.measurementGroups, this.measureControls.unitPref),
+                `measurements_${Date.now()}.csv`);
         },
 
         /**

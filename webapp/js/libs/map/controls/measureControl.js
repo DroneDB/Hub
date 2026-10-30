@@ -47,11 +47,13 @@ class MeasureControls extends Control {
         // Save/Load/Clear buttons (hidden until there is something to manage)
         const btnSave = controlButton('Save Measurements', 'Save all current measurements to the dataset.', '/images/save.svg');
         const btnClear = controlButton('Clear All Measurements', 'Remove all measurements from the map.', '/images/eraser.svg');
-        const btnExport = controlButton('Export Measurements', 'Download measurements as a GeoJSON file.', '/images/download.svg');
+        const btnExport = controlButton('Export Measurements as GeoJSON', 'Download measurements as a GeoJSON file.', '/images/download.svg');
+        const btnExportCsv = controlButton('Export Measurements as CSV', 'Download measurements as a CSV table, in the units shown.');
+        btnExportCsv.innerHTML = '<i class="fa-solid fa-file-csv" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
         const btnDelete = controlButton('Delete Saved Measurements', 'Permanently delete saved measurements from the dataset.', '/images/trash.svg');
         const btnList = controlButton('Measurement List', 'View and manage all measurements.');
         btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
-        [btnSave, btnClear, btnExport, btnDelete, btnList].forEach(btn => { btn.style.display = 'none'; });
+        [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList].forEach(btn => { btn.style.display = 'none'; });
 
         // First toolbar: drawing tools (always visible)
         const toolbar1 = controlGroup('Measure Tools');
@@ -69,6 +71,7 @@ class MeasureControls extends Control {
         toolbar2.appendChild(btnSave);
         toolbar2.appendChild(btnClear);
         toolbar2.appendChild(btnExport);
+        toolbar2.appendChild(btnExportCsv);
         toolbar2.appendChild(btnDelete);
 
         const element = document.createElement('div');
@@ -91,6 +94,7 @@ class MeasureControls extends Control {
         btnSave.addEventListener('click', this.handleSave.bind(this), false);
         btnClear.addEventListener('click', this.handleClearAll.bind(this), false);
         btnExport.addEventListener('click', this.handleExport.bind(this), false);
+        btnExportCsv.addEventListener('click', () => this.onExportCsv(), false);
         btnDelete.addEventListener('click', this.handleDeleteSaved.bind(this), false);
         btnList.addEventListener('click', this.handleListOpen.bind(this), false);
 
@@ -102,6 +106,7 @@ class MeasureControls extends Control {
         this.onSave = options.onSave || (() => { });
         this.onClearAll = options.onClearAll || (() => { });
         this.onExport = options.onExport || (() => { });
+        this.onExportCsv = options.onExportCsv || (() => { });
         this.onDeleteSaved = options.onDeleteSaved || (() => { });
         this.onRequestClearConfirm = options.onRequestClearConfirm || (() => { });
         this.onRequestDeleteConfirm = options.onRequestDeleteConfirm || (() => { });
@@ -133,6 +138,7 @@ class MeasureControls extends Control {
         this.btnSave = btnSave;
         this.btnClear = btnClear;
         this.btnExport = btnExport;
+        this.btnExportCsv = btnExportCsv;
         this.btnDelete = btnDelete;
         this.btnList = btnList;
         this.btnPoint = btnPoint;
@@ -425,6 +431,7 @@ class MeasureControls extends Control {
         this.btnSave.style.display = show((hasMeasurements || this.hasSaved) && this.canWrite);
         this.btnClear.style.display = show(hasMeasurements);
         this.btnExport.style.display = show(hasMeasurements);
+        this.btnExportCsv.style.display = show(hasMeasurements);
         this.btnDelete.style.display = show(this.hasSaved && this.canDelete);
     }
 

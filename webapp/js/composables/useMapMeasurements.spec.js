@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref, shallowRef } from 'vue';
 import ddb from 'ddb';
 import MeasureControls from '@/libs/map/controls/measureControl';
+import * as csv from '@/libs/csv';
 import { useMapMeasurements } from './useMapMeasurements';
 
 const T = ddb.entry.type;
@@ -23,19 +24,21 @@ let files;
 let controls;
 let events;
 let flashes;
+let alerts;
 
-function start() {
+function start({ canWrite = true } = {}) {
     controls = new MeasureControls({});
     events = { written: [], removed: [] };
     flashes = [];
+    alerts = [];
     return useMapMeasurements({
         measureControls: shallowRef(controls),
         files: () => files.value,
         dataset: () => dataset,
-        canWrite: () => true,
+        canWrite: () => canWrite,
         canDelete: () => true,
         currentUnitPref: ref('metric'),
-        showAlert: () => vi.fn(),
+        showAlert: () => title => alerts.push(title),
         showFlash: () => (message, color) => flashes.push({ message, color }),
         onFileWritten: () => path => events.written.push(path),
         onFileRemoved: () => path => events.removed.push(path)
@@ -154,5 +157,37 @@ describe('useMapMeasurements', () => {
         await m.loadSavedMeasurements();
         expect(onMap()).toEqual([]);
         expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
+    });
+
+    it('exports the measurements as CSV with their group names, in the units shown', async () => {
+        const saved = vi.spyOn(csv, 'downloadCsv').mockImplementation(() => {});
+        try {
+            const m = start();
+            await m.loadSavedMeasurements();
+            m.createGroup({ name: 'Site A' });
+            controls.setMeasurementGroupId(controls.source.getFeatures()[0], m.measurementGroups.value[0].id);
+            m.exportMeasurementsToCsv();
+            const [text, filename] = saved.mock.calls[0];
+            const rows = text.trim().split('\r\n');
+            expect(filename).toMatch(/^measurements_\d+\.csv$/);
+            expect(rows).toHaveLength(3);
+            expect(rows.slice(1).map(r => r.split(',').slice(0, 3).join(','))).toEqual(['Site A,m1,length', ',m2,length']);
+        } finally {
+            saved.mockRestore();
+        }
+    });
+
+    it('a CSV export with nothing on the map warns instead of saving an empty file', async () => {
+        const saved = vi.spyOn(csv, 'downloadCsv').mockImplementation(() => {});
+        try {
+            delete stored['a/ortho_measurements.geojson'];
+            const m = start();
+            await m.loadSavedMeasurements();
+            m.exportMeasurementsToCsv();
+            expect(saved).not.toHaveBeenCalled();
+            expect(alerts).toEqual(['Warning']);
+        } finally {
+            saved.mockRestore();
+        }
     });
 });
