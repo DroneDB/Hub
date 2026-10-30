@@ -1,9 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { decorativeIcons } from './scripts/lib/decorativeIcons.cjs';
 
 export default defineConfig({
-    plugins: [vue()],
+    // The templates are compiled as webpack compiles them (the icons hidden from screen readers)
+    plugins: [vue({ template: { compilerOptions: { nodeTransforms: [decorativeIcons] } } })],
     resolve: {
         // Match webpack: components are imported without the .vue extension.
         extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.vue'],

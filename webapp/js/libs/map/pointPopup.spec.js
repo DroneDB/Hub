@@ -19,6 +19,14 @@ describe('showPointPopup', () => {
         expect(feature.get('measureTooltip')).toBe(popupOverlay);
     });
 
+    it('hides its icons from screen readers', () => {
+        const feature = new Feature({ name: 'Gate' });
+        const { popupEl } = showPointPopup({ addOverlay() {} }, feature, { lat: 1, lon: 2, coords: [0, 0], actions: true });
+        const icons = [...popupEl.querySelectorAll('i')];
+        expect(icons.length).toBeGreaterThan(0);
+        for (const i of icons) expect(i.getAttribute('aria-hidden')).toBe('true');
+    });
+
     it('adds the edit, copy and delete buttons for an imported point', () => {
         const feature = new Feature({ name: 'Gate' });
         const { popupEl } = showPointPopup({ addOverlay() {} }, feature, { lat: 1, lon: 2, coords: [0, 0], actions: true });

@@ -116,7 +116,12 @@ export const primeVueOptions = {
     pt: {
         // Password puts popup attributes on its input although the Hub never shows the
         // strength popup (feedback off): a password field is not a combobox (axe aria-allowed-attr)
-        password: { pcInputText: { root: { 'aria-expanded': null, 'aria-haspopup': null } } }
+        password: { pcInputText: { root: { 'aria-expanded': null, 'aria-haspopup': null } } },
+        // The icon font's glyph is not part of the name of a button or a menu item (" Save"):
+        // its label or aria-label is
+        button: { icon: { 'aria-hidden': 'true' } },
+        menu: { itemIcon: { 'aria-hidden': 'true' } },
+        contextmenu: { itemIcon: { 'aria-hidden': 'true' } }
     },
     theme: {
         preset: DdbPreset,

@@ -1,4 +1,5 @@
 const { VueLoaderPlugin } = require('vue-loader');
+const { decorativeIcons } = require('./scripts/lib/decorativeIcons.cjs');
 const CopyPlugin = require('copy-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
@@ -55,7 +56,9 @@ module.exports = {
             {
                 test: /\.vue$/,
                 exclude: /(node_modules|bower_components)/,
-                loader: 'vue-loader'
+                loader: 'vue-loader',
+                // The icons of the templates are hidden from screen readers (see decorativeIcons)
+                options: { compilerOptions: { nodeTransforms: [decorativeIcons] } }
             },
             {
                 test: /\.js$/,

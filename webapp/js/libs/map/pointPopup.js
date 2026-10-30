@@ -28,7 +28,7 @@ export function pointPopupHtml({ lat, lon, name, accent, description, actions = 
     const color = escapeHtml(accent || DEFAULT_ACCENT);
     const headerHtml = name
         ? `<div class="ol-point-popup-header" style="border-left-color:${color}">
-                <i class="fa-solid fa-location-dot" style="color:${color}"></i>
+                <i class="fa-solid fa-location-dot" style="color:${color}" aria-hidden="true"></i>
                 <span class="ol-point-popup-title">${escapeHtml(name)}</span>
            </div>`
         : '';
@@ -37,9 +37,9 @@ export function pointPopupHtml({ lat, lon, name, accent, description, actions = 
         : '';
     const actionsHtml = actions
         ? `<div class="ol-point-popup-actions">
-                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation" aria-label="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil"></i></button>
-                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates" aria-label="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy"></i></button>
-                <button class="image-popup-btn ol-point-popup-delete" title="Delete point" aria-label="Delete point"><i style="margin: 0" class="fa-solid fa-trash"></i></button>
+                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation" aria-label="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil" aria-hidden="true"></i></button>
+                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates" aria-label="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy" aria-hidden="true"></i></button>
+                <button class="image-popup-btn ol-point-popup-delete" title="Delete point" aria-label="Delete point"><i style="margin: 0" class="fa-solid fa-trash" aria-hidden="true"></i></button>
             </div>`
         : '';
     return `
@@ -47,10 +47,10 @@ export function pointPopupHtml({ lat, lon, name, accent, description, actions = 
         <div class="ol-point-popup-body">
             <div class="ol-point-popup-coords">
                 <span class="ol-point-popup-dms" title="Degrees Minutes Seconds">
-                    <i class="fa-solid fa-compass ol-point-popup-coord-icon"></i>${dmsLat} / ${dmsLon}
+                    <i class="fa-solid fa-compass ol-point-popup-coord-icon" aria-hidden="true"></i>${dmsLat} / ${dmsLon}
                 </span>
                 <span class="ol-point-popup-dd" title="Decimal Degrees">
-                    <i class="fa-solid fa-hashtag ol-point-popup-coord-icon"></i>${ddLat} / ${ddLon}
+                    <i class="fa-solid fa-hashtag ol-point-popup-coord-icon" aria-hidden="true"></i>${ddLat} / ${ddLon}
                 </span>
                 ${descHtml}
             </div>

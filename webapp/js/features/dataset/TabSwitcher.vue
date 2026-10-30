@@ -6,8 +6,10 @@
                     <Tab v-for="t in dynTabs" :key="t.key" :value="t.key"
                          :pt="{ root: { id: tabId(t.key), 'aria-controls': panelId(t.key) } }"
                          :aria-keyshortcuts="t.canClose ? 'Delete' : undefined"
+                         :aria-label="t.hideLabel ? t.label : undefined"
                          @keydown.delete="t.canClose && removeTab(t.key)">
-                        <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label" /><span v-if="!t.hideLabel" class="tab-label">{{
+                        <!-- The icon's title is a tooltip; the name is the label (or the aria-label without one) -->
+                        <i class="icon" :class="{ padded: !!t.hideLabel, [t.icon]: true }" :title="t.label" aria-hidden="true" /><span v-if="!t.hideLabel" class="tab-label">{{
                             t.label }}</span>
                         <span v-if="!!t.canClose" class="close-btn" aria-hidden="true" title="Close (Delete)" @click.stop="removeTab(t.key)"><i
                             class="fa-solid fa-xmark" /></span>

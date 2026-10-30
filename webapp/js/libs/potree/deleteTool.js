@@ -65,7 +65,7 @@ export class PotreeDeleteTool {
     addToolbarButton($) {
         const toolbar = $('#tools');
         if (!toolbar.length) return;
-        this.icon = $('<div style="width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="fa-solid fa-trash" style="font-size: x-large; margin: 0"></i></div>');
+        this.icon = $('<div style="width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center;" class="button-icon" title="Delete measurement (click to remove)"><i class="fa-solid fa-trash" style="font-size: x-large; margin: 0" aria-hidden="true"></i></div>');
         this.icon.click(() => this.toggle());
         toolbar.append(this.icon);
     }

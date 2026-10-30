@@ -57,7 +57,7 @@ export default [
         languageOptions: { globals: { ...globals.node, ...globals.browser } }
     },
     {
-        files: ['*.js', '*.mjs', 'scripts/**/*.{js,mjs}', 'eslint-rules/**/*.mjs'],
+        files: ['*.js', '*.mjs', 'scripts/**/*.{js,mjs,cjs}', 'eslint-rules/**/*.mjs'],
         languageOptions: { globals: globals.node }
     },
     {
