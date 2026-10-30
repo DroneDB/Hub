@@ -154,11 +154,8 @@ export default {
                 this.destPathError = 'Path cannot contain empty folder names.';
                 return false;
             }
-            // Reserved DroneDB database folder (server rejects any ".ddb" prefix).
-            if (raw.startsWith('.ddb')) {
-                this.destPathError = 'This is a reserved path.';
-                return false;
-            }
+            // A reserved folder (".ddb" in any of the spellings a file system opens as it) is refused
+            // by the server with the rule of libddb when the extraction is submitted
             return true;
         },
 
