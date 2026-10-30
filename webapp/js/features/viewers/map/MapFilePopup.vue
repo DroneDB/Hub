@@ -1,6 +1,6 @@
 <template>
-    <div v-show="popup.kind" ref="element" class="image-popup">
-        <div class="image-popup-header">
+    <div v-show="popup.kind" ref="element" class="image-popup" :class="{ dragging }">
+        <div class="image-popup-header" title="Drag to move" @pointerdown="startDrag">
             <span class="image-popup-title">{{ popup.name }}</span>
             <div class="image-popup-actions">
                 <a v-if="popup.kind === 'image'" :href="popup.openUrl" target="_blank" class="image-popup-btn"
@@ -21,7 +21,7 @@
         <div v-if="popup.kind === 'image'" class="image-popup-body">
             <LoadingSpinner v-if="popup.loading" class="image-popup-loading" />
             <img v-show="!popup.loading && popup.thumbnail" :src="popup.thumbnail" :alt="popup.name"
-                 class="image-popup-img" @load="popup.loading = false" @error="onThumbnailError">
+                 class="image-popup-img" @load="onThumbnailLoad" @error="onThumbnailError">
         </div>
         <div v-else class="image-popup-body image-popup-video-info">
             <i class="fa-solid fa-film video-popup-icon" />
@@ -45,6 +45,8 @@
  * The popup over a clicked photo or video on the dataset map:
  * name, thumbnail or video details, open/download/play, and the coordinates with a copy
  * button. One popup at a time, on one OpenLayers overlay owned by this component.
+ * Dragging the header moves the popup away from its point: the drag changes the overlay's
+ * offset, so the popup still follows the point when the map pans or zooms.
  *
  *   <MapFilePopup ref="popup" :map="map" @open-item="..." />   then popup.show(file, coordinate)
  */
@@ -75,6 +77,11 @@ const empty = () => ({
 const popup = reactive(empty());
 let overlay = null;
 let retryTimer = null;
+
+// Where the popup sits from its point before it is dragged, in pixels
+const DEFAULT_OFFSET = [150, -150];
+const dragging = ref(false);
+const PAN = { animation: { duration: 250 } };
 
 function clearRetry() {
     if (retryTimer) retryTimer.clear();
@@ -119,13 +126,16 @@ function show(file, coordinate) {
         if (!overlay && props.map) {
             overlay = new Overlay({
                 element: element.value,
-                autoPan: { animation: { duration: 250 } },
-                offset: [150, -150],
+                autoPan: PAN,
+                offset: DEFAULT_OFFSET,
                 positioning: 'bottom-left'
             });
             props.map.addOverlay(overlay);
         }
-        if (overlay) overlay.setPosition(coordinate);
+        if (overlay) {
+            overlay.setOffset(DEFAULT_OFFSET);
+            overlay.setPosition(coordinate);
+        }
     });
 }
 
@@ -140,6 +150,45 @@ function play() {
     const file = popup.file;
     close();
     if (file) emit('openItem', file);
+}
+
+/** A pointer position kept inside the map, so the header cannot be dragged out of reach */
+function clampToMap(x, y) {
+    const box = props.map.getViewport().getBoundingClientRect();
+    return [Math.min(Math.max(x, box.left), box.right), Math.min(Math.max(y, box.top), box.bottom)];
+}
+
+// Header drag: the buttons in it keep their clicks
+function startDrag(event) {
+    if (!overlay || event.button !== 0 || event.target.closest('a, button')) return;
+    event.preventDefault();
+    const header = event.currentTarget;
+    const [startX, startY] = clampToMap(event.clientX, event.clientY);
+    const [offsetX, offsetY] = overlay.getOffset();
+    dragging.value = true;
+
+    const move = e => {
+        const [x, y] = clampToMap(e.clientX, e.clientY);
+        overlay.setOffset([offsetX + x - startX, offsetY + y - startY]);
+    };
+    const stop = e => {
+        dragging.value = false;
+        if (header.hasPointerCapture(e.pointerId)) header.releasePointerCapture(e.pointerId);
+        header.removeEventListener('pointermove', move);
+        header.removeEventListener('pointerup', stop);
+        header.removeEventListener('pointercancel', stop);
+    };
+    header.setPointerCapture(event.pointerId);
+    header.addEventListener('pointermove', move);
+    header.addEventListener('pointerup', stop);
+    header.addEventListener('pointercancel', stop);
+}
+
+// The thumbnail grows the popup upwards after the map panned it into view: pan again, so
+// its header does not end under whatever covers the top of the map
+function onThumbnailLoad() {
+    popup.loading = false;
+    nextTick(() => { if (overlay && overlay.getPosition()) overlay.panIntoView(PAN); });
 }
 
 // Thumbnail failed: bounded retry with the shared policy, then name and download only
@@ -187,6 +236,13 @@ defineExpose({ show, close });
     padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     background: var(--ddb-bg-subtle);
     border-bottom: var(--ddb-border-width) solid var(--ddb-border-separator);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+}
+
+.image-popup.dragging .image-popup-header {
+    cursor: grabbing;
 }
 
 .image-popup-title {

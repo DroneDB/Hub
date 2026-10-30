@@ -341,8 +341,21 @@ test('dataset Map tab: clicking a photo opens its popup', async () => {
     const box = await page.locator('.ol-viewport').boundingBox();
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await page.waitForSelector(`.image-popup >> text=${name}`, { timeout: 10000 });
-    // The thumbnail grows the popup after the map panned it into view: it can end under the tabs
-    await page.locator('.image-popup button[aria-label="Close"]').dispatchEvent('click');
+    // Dragging the header moves the popup by the same distance
+    const header = page.locator('.image-popup-header');
+    await page.waitForSelector('.image-popup-img', { state: 'visible', timeout: 10000 });
+    await page.waitForTimeout(500); // the pan that brings the grown popup into view
+    const before = await page.locator('.image-popup').boundingBox();
+    const grip = await header.boundingBox();
+    assert.ok(grip.y >= box.y, `the header (top ${grip.y}) is inside the map (top ${box.y}), not under the tabs`);
+    await page.mouse.move(grip.x + 20, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x - 40, grip.y + grip.height / 2 + 30, { steps: 5 });
+    await page.mouse.up();
+    const after = await page.locator('.image-popup').boundingBox();
+    assert.ok(Math.abs(after.x - before.x + 60) <= 1 && Math.abs(after.y - before.y - 30) <= 1,
+        `popup moved from ${before.x},${before.y} to ${after.x},${after.y}`);
+    await page.locator('.image-popup button[aria-label="Close"]').click();
     await page.waitForSelector('.image-popup', { state: 'hidden', timeout: 10000 });
 });
 
@@ -361,13 +374,22 @@ test('point cloud viewer renders a canvas', async () => {
     await page.waitForSelector('canvas', { timeout: 60000 });
 });
 
+// Units are an account preference: each choice is saved before the page is left, or the
+// reload reads the old one, and feet would stay for the measurements of the next run
+async function chooseUnits(value) {
+    const saved = page.waitForResponse(r => r.url().endsWith('/users/preferences') && r.request().method() === 'PATCH'
+        && r.ok() && (r.request().postData() ?? '').includes(value), { timeout: 15000 });
+    await page.selectOption('#potree-unit-select', value);
+    await saved;
+}
+
 test('point cloud viewer keeps the chosen units', async () => {
     await page.waitForSelector('#potree-unit-select', { timeout: 60000 });
-    await page.selectOption('#potree-unit-select', 'imperial');
+    await chooseUnits('imperial');
     await page.reload();
     await page.waitForSelector('#potree-unit-select', { timeout: 60000 });
     assert.equal(await page.inputValue('#potree-unit-select'), 'imperial');
-    await page.selectOption('#potree-unit-select', 'metric');
+    await chooseUnits('metric');
 });
 
 test('markdown viewer renders and offers editing to a writer', async () => {
