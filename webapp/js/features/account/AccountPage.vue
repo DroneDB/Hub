@@ -147,45 +147,21 @@ export default {
 
         async loadUserInfo() {
             this.loading = true;
+            this.username = reg.getUsername() || '';
+            this.isAdmin = reg.isAdmin();
+
+            const isLocalAuth = reg.features.get(Features.USER_MANAGEMENT);
+            this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
+
+            // The routes of the signed-in user, which answer every user; the ones that take a user name are
+            // for administrators and refuse everyone else
             try {
-                // Get username and admin status from registry
-                this.username = reg.getUsername() || '';
-                this.isAdmin = reg.isAdmin();
-
-                // Check if account management is available
-                const isLocalAuth = reg.features.get(Features.USER_MANAGEMENT);
-                this.accountManagement = isLocalAuth && !HubOptions.disableAccountManagement;
-
-                // Get user organizations
-                try {
-                    const orgs = await reg.admin.getUserOrganizations(this.username);
-                    this.organizationsCount = orgs ? orgs.length : 0;
-                } catch (e) {
-                    console.warn('Could not load organizations:', e.message);
-                    this.organizationsCount = 0;
-                }
-
-                // Get storage info
-                try {
-                    const storageInfo = await reg.admin.getUserStorageInfo(this.username);
-                    this.storageUsed = storageInfo.used || 0;
-                    this.storageTotal = storageInfo.total || null;
-                } catch (e) {
-                    console.warn('Could not load storage info:', e.message);
-                }
-
-                // Try to get email from detailed user info if admin
-                if (this.isAdmin) {
-                    try {
-                        const users = await reg.admin.usersDetailed();
-                        const currentUser = users.find(u => u.userName === this.username);
-                        if (currentUser) {
-                            this.email = currentUser.email || '';
-                        }
-                    } catch (e) {
-                        console.warn('Could not load user details:', e.message);
-                    }
-                }
+                const [profile, storage] = await Promise.all([reg.currentUser(), reg.storageInfo()]);
+                this.username = profile.userName || this.username;
+                this.email = profile.email || '';
+                this.organizationsCount = profile.organizations?.length ?? 0;
+                this.storageUsed = storage.used || 0;
+                this.storageTotal = storage.total || null;
             } catch (e) {
                 this.error = e.message;
             }

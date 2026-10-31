@@ -102,6 +102,26 @@ describe('e-mail templates and notification status', () => {
     });
 });
 
+describe('the account of the signed-in user', () => {
+    it('is read from the routes of the signed-in user, which answer every user, not from the routes that take a user name', async () => {
+        const { default: Registry } = await import('@/libs/ddb/registry');
+        const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => new Response(
+            JSON.stringify(new URL(url).pathname === '/users/storage'
+                ? { used: 5, total: 10 }
+                : { userName: 'docsdemo', email: 'docsdemo@example.com', roles: [], organizations: ['quarry'] }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }));
+        const reg = new Registry('http://hub.test');
+        vi.spyOn(reg, 'ensureLoggedIn').mockReturnValue(true);
+
+        expect(await reg.currentUser()).toEqual({ userName: 'docsdemo', email: 'docsdemo@example.com', roles: [], organizations: ['quarry'] });
+        expect(await reg.storageInfo()).toMatchObject({ used: 5, total: 10 });
+        expect(fetchMock.mock.calls.map(([url, init]) => [init.method, new URL(url).pathname])).toEqual([
+            ['GET', '/users/me'],
+            ['GET', '/users/storage']
+        ]);
+    });
+});
+
 describe('upload diagnostics requests', () => {
     /** A response whose body reports when it is read to its end */
     function trackedResponse(status, text) {

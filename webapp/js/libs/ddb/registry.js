@@ -105,6 +105,14 @@ export default class Registry {
     }
 
     /**
+     * The signed-in user as they see themselves, administrator or not: { userName, email, roles, organizations },
+     * organizations the slugs of the ones they own or belong to.
+     */
+    currentUser() {
+        return this.getRequest('/users/me', { cache: false });
+    }
+
+    /**
      * Whether the signed-in user can be sent e-mail: { canReceiveEmail, reason }, reason
      * 'emailDisabled' (the server sends none), 'noAddress' (the account has no address) or null.
      */
