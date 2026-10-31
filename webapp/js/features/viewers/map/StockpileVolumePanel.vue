@@ -18,11 +18,9 @@
                         <i class="fas fa-info-circle" />
                     </button>
                 </label>
-                <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select" data-testid="stockpile-base-method">
-                    <option value="lowest_perimeter">Lowest perimeter</option>
-                    <option value="average_perimeter">Average perimeter</option>
-                    <option value="best_fit">Best-fit plane</option>
-                    <option value="flat">Flat (elevation = 0)</option>
+                <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select"
+                        :disabled="loading" data-testid="stockpile-base-method">
+                    <option v-for="m in baseMethods" :key="m.id" :value="m.id">{{ m.name }}</option>
                 </select>
             </div>
 
@@ -187,6 +185,7 @@
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, formatMoney } from '@/libs/format';
 import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
+import { BASE_METHOD, BASE_METHODS } from '@/libs/stockpileBase';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { useAuthStore } from '@/stores/auth';
 
@@ -211,7 +210,8 @@ export default {
         loading: { type: Boolean, default: false },
         error: { type: String, default: null },
         result: { type: Object, default: null },
-        baseMethod: { type: String, default: 'lowest_perimeter' },
+        // The base of the pile shown; a pick is emitted (update:baseMethod) and the pile measured again
+        baseMethod: { type: String, default: BASE_METHOD.LOWEST_PERIMETER },
         sensitivity: { type: Number, default: 0.5 },
         radius: { type: Number, default: 50 },
         material: { type: String, default: null },
@@ -238,7 +238,7 @@ export default {
         return { auth: useAuthStore() };
     },
     data() {
-        return { customSlug: CUSTOM_MATERIAL_SLUG, showBaseMethodsInfo: false };
+        return { customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false };
     },
     computed: {
         localBaseMethod: {
@@ -307,8 +307,8 @@ export default {
             if (!this.result) return true;
             const fill = Number(this.result.fillVolume);
             const m = this.baseMethod;
-            if (m === 'lowest_perimeter') return false;
-            if (m === 'flat' && (!isFinite(fill) || fill === 0)) return false;
+            if (m === BASE_METHOD.LOWEST_PERIMETER) return false;
+            if (m === BASE_METHOD.FLAT && (!isFinite(fill) || fill === 0)) return false;
             return true;
         },
         baseMethodTooltip() {
@@ -318,7 +318,9 @@ export default {
                 '- Lowest perimeter: base = the lowest elevation along the polygon boundary. Best for isolated piles on uneven ground; Fill is always 0.',
                 '- Average perimeter: base = the mean elevation along the boundary. A balanced choice when the surrounding terrain is roughly level.',
                 '- Best-fit plane: fits a tilted plane through the perimeter elevations. Useful when the ground around the pile slopes.',
-                '- Flat (elevation = 0): base is the absolute reference 0 m. Use only when your DSM is already a height-above-ground (DTM-subtracted) raster.'
+                '- Flat (elevation = 0): base is the absolute reference 0 m. Use only when your DSM is already a height-above-ground (DTM-subtracted) raster.',
+                '',
+                'Until you pick one, a pile found with Click map is measured from the Best-fit plane (the ground around it) and a drawn polygon from the Lowest perimeter.'
             ].join('\n');
         }
     },

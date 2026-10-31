@@ -95,6 +95,18 @@ describe('StockpileVolumePanel', () => {
         expect(wrapper.emitted('update:customCostPerTon').at(-1)[0]).toBeCloseTo(11.0231, 4);
     });
 
+    it('shows the base of the pile, gives back the one the user picks, and none while it measures', async () => {
+        render({ baseMethod: 'best_fit', result: RESULT });
+        const select = wrapper.find('[data-testid="stockpile-base-method"]');
+        expect(select.element.value).toBe('best_fit');
+        expect(select.findAll('option').map(o => o.text())).toEqual(
+            ['Lowest perimeter', 'Average perimeter', 'Best-fit plane', 'Flat (elevation = 0)']);
+        await select.setValue('lowest_perimeter');
+        expect(wrapper.emitted('update:baseMethod')).toEqual([['lowest_perimeter']]);
+        await wrapper.setProps({ loading: true });
+        expect(select.attributes('disabled')).toBeDefined();
+    });
+
     describe('Edit materials…', () => {
         it('opens the Preferences on the stockpile materials, keeping the page query', async () => {
             render({}, { query: { t: 'map' } });

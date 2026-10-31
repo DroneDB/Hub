@@ -4,6 +4,7 @@
 import { Entry } from './entry';
 import { ApiError } from './apiError';
 import { failureMessageOf, isJsonType } from './http/httpClient';
+import { BASE_METHOD } from '../stockpileBase';
 
 // The image format of map tiles is the extension of their URL, and the server sends exactly that format. WebP is the
 // default: smaller than PNG for the same tile (what a map pulls by the hundred). PNG is the universal one, for URLs
@@ -160,7 +161,7 @@ export default class Dataset {
         return this.registry.postRequest(`${this.baseApi}/raster-profile`, body);
     }
 
-    async calculateStockpileVolume(path, polygonGeoJson, { baseMethod = 'lowest_perimeter', flatElevation = 0 } = {}) {
+    async calculateStockpileVolume(path, polygonGeoJson, { baseMethod = BASE_METHOD.LOWEST_PERIMETER, flatElevation = 0 } = {}) {
         const body = {
             path,
             polygon: typeof polygonGeoJson === 'string'

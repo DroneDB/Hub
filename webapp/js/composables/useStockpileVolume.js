@@ -12,6 +12,11 @@
  * (PREF.CURRENCY): the weight and the cost follow a change of the material, of the values typed
  * for a custom one, of the user's materials or currency, and the pile on the map is updated
  * with them.
+ *
+ * The base the volume is measured from is the one the user picks in the panel; until they pick
+ * one, a pile found by a click is measured on the best-fit plane and a drawn polygon on the
+ * lowest perimeter (libs/stockpileBase). The panel shows the base of the pile, and picking
+ * another one measures the pile again. The base is saved with the pile.
  */
 import Draw from 'ol/interaction/Draw';
 import { Vector as VectorLayer } from 'ol/layer';
@@ -38,6 +43,7 @@ import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
 import { ANALYSIS_FILL, analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
+import { BASE_METHOD, PILE_OUTLINE, baseMethodFor, isBaseMethod } from '@/libs/stockpileBase';
 import { createFeatureScope } from '@/composables/featureScope';
 
 function stockpileStyle() {
@@ -80,7 +86,10 @@ const definition = {
     data() {
         return {
             stockpilePanelVisible: false,
-            stockpileBaseMethod: 'lowest_perimeter',
+            // The base of the pile shown (or of the next one); see chooseStockpileBaseMethod
+            stockpileBaseMethod: BASE_METHOD.LOWEST_PERIMETER,
+            // The base the user picked in the panel, null until they pick one
+            _chosenStockpileBaseMethod: null,
             stockpileSensitivity: 0.5,
             stockpileRadius: 50,
             stockpileMaterial: null,
@@ -194,9 +203,13 @@ const definition = {
                         confidence: p.confidence,
                         weightEstimate: p.weightEstimate,
                         costEstimate: p.costEstimate,
+                        basePlaneMethod: p.basePlaneMethod,
                         _restored: true
                     };
                 }
+                // The panel shows the base the pile was measured from (piles saved before the
+                // base was saved with them leave the panel's as it is)
+                if (isBaseMethod(p.basePlaneMethod)) this.stockpileBaseMethod = p.basePlaneMethod;
                 this._restoreStockpileMaterial(p);
                 if (p.title) this.stockpileTitle = p.title;
                 // `description` is the canonical key; `notes` is read for
@@ -370,14 +383,8 @@ const definition = {
                 });
                 this.stockpileDetectedPolygon = detection.polygon;
 
-                const volume = await this.dataset.calculateStockpileVolume(
-                    this.rasterFilePath,
-                    detection.polygon,
-                    {
-                        baseMethod: this.stockpileBaseMethod,
-                        flatElevation: 0
-                    }
-                );
+                this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DETECTED, this._chosenStockpileBaseMethod);
+                const volume = await this._measureStockpile(detection.polygon);
                 this.stockpileResult = this._withStockpileEstimate({
                     ...volume,
                     confidence: detection.confidence,
@@ -413,14 +420,8 @@ const definition = {
             this.stockpileTitle = '';
             this.stockpileDescription = '';
             try {
-                const volume = await this.dataset.calculateStockpileVolume(
-                    this.rasterFilePath,
-                    polygonGeoJson,
-                    {
-                        baseMethod: this.stockpileBaseMethod,
-                        flatElevation: 0
-                    }
-                );
+                this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DRAWN, this._chosenStockpileBaseMethod);
+                const volume = await this._measureStockpile(polygonGeoJson);
                 this.stockpileResult = this._withStockpileEstimate(volume);
                 this.stockpileDetectedPolygon = polygonGeoJson;
                 this._adoptDraftStockpile(polygonGeoJson);
@@ -431,6 +432,59 @@ const definition = {
                 this.stockpileResult = null;
             } finally {
                 this.stockpileLoading = false;
+            }
+        },
+
+        /**
+         * The volume of `polygon` above the base of the panel (stockpileBaseMethod), with the
+         * base it was measured from.
+         * @param {object} polygon  GeoJSON polygon, WGS84
+         */
+        async _measureStockpile(polygon) {
+            const baseMethod = this.stockpileBaseMethod;
+            const volume = await this.dataset.calculateStockpileVolume(this.rasterFilePath, polygon,
+                { baseMethod, flatElevation: 0 });
+            return { ...volume, basePlaneMethod: volume.basePlaneMethod ?? baseMethod };
+        },
+
+        /**
+         * The user picks the base in the panel: it is the base of every pile from now on, the
+         * detected ones included, and the pile just measured is measured again from it (a
+         * restored pile keeps the volumes it was saved with).
+         * @param {string} method
+         */
+        async chooseStockpileBaseMethod(method) {
+            if (!isBaseMethod(method)) return;
+            this._chosenStockpileBaseMethod = method;
+            if (method === this.stockpileBaseMethod) return;
+            this.stockpileBaseMethod = method;
+            await this._remeasureDraftStockpile();
+        },
+
+        /** Measure the pile just measured again, from the base of the panel. */
+        async _remeasureDraftStockpile() {
+            const id = this._draftStockpileFeatureId;
+            const previous = this.stockpileResult;
+            const polygon = this.stockpileDetectedPolygon;
+            if (!id || !previous || previous._restored || !polygon || this.stockpileLoading) return;
+            this.stockpileLoading = true;
+            this.stockpileError = null;
+            try {
+                const volume = await this._measureStockpile(polygon);
+                // Cleared, or another pile measured, meanwhile
+                if (this._draftStockpileFeatureId !== id) return;
+                const { confidence, estimatedFromDetection } = previous;
+                this.stockpileResult = this._withStockpileEstimate({ ...volume, confidence, estimatedFromDetection });
+                this._patchDraftStockpileProps();
+            } catch (e) {
+                console.error('Stockpile calculation failed:', e);
+                if (this._draftStockpileFeatureId !== id) return;
+                // The panel keeps the volumes of the pile, so it shows the base they are from
+                if (isBaseMethod(previous.basePlaneMethod)) this.stockpileBaseMethod = previous.basePlaneMethod;
+                this.stockpileError = friendlyStockpileError(e && e.message,
+                    'Cannot calculate the volume of this pile from the selected base.');
+            } finally {
+                if (this._draftStockpileFeatureId === id) this.stockpileLoading = false;
             }
         },
 
@@ -685,6 +739,7 @@ const definition = {
                 if (typeof r.area3d === 'number') props.area3d = r.area3d;
                 if (typeof r.baseElevation === 'number') props.baseElevation = r.baseElevation;
                 if (typeof r.confidence === 'number') props.confidence = r.confidence;
+                if (isBaseMethod(r.basePlaneMethod)) props.basePlaneMethod = r.basePlaneMethod;
                 if (r.weightEstimate) props.weightEstimate = r.weightEstimate;
                 if (r.costEstimate) props.costEstimate = r.costEstimate;
             }

@@ -41,12 +41,13 @@
             <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
                                   :raster-min="contourRasterMin" :raster-max="contourRasterMax" :initial-options="contourLastOptions"
                                   @generate="generateContourLines" @cancel="closeContourDialog" />
-            <StockpileVolumePanel v-model:base-method="stockpileBaseMethod" v-model:sensitivity="stockpileSensitivity"
+            <StockpileVolumePanel v-model:sensitivity="stockpileSensitivity"
                                   v-model:radius="stockpileRadius" v-model:material="stockpileMaterial"
                                   v-model:custom-density="stockpileCustomDensity" v-model:custom-cost-per-ton="stockpileCustomCostPerTon"
                                   v-model:title="stockpileTitle" v-model:description="stockpileDescription"
-                                  :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
+                                  :base-method="stockpileBaseMethod" :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
                                   :result="stockpileResult" :materials="stockpileMaterials" :currency="stockpileCurrency" :mode="stockpileMode" :unit-pref="currentUnitPref"
+                                  @update:base-method="chooseStockpileBaseMethod"
                                   @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
                                   @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
                                   @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson" />

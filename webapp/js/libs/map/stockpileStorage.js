@@ -20,14 +20,15 @@ const APP_ID = 'DroneDB Registry';
 const LEGACY_APP_IDS = new Set([APP_ID, 'Registry-Stockpile', 'Registry-Orthophoto']);
 
 /**
- * The properties of a stockpile feature beyond those of every measurement: what was measured and
- * what it was weighed and priced with (the material's name, density, price per tonne and
- * currency), so a saved pile reads the same for a user whose materials differ.
+ * The properties of a stockpile feature beyond those of every measurement: what was measured, the
+ * base the volumes are from (libddb's basePlaneMethod), and what it was weighed and priced with
+ * (the material's name, density, price per tonne and currency), so a saved pile reads the same
+ * for a user whose materials differ.
  */
 export const STOCKPILE_PROPERTIES = Object.freeze([
     'id', 'title', 'material', 'materialName', 'materialDensity', 'costPerTon', 'currency',
     'netVolume', 'cutVolume', 'fillVolume',
-    'area2d', 'area3d', 'baseElevation', 'confidence',
+    'area2d', 'area3d', 'baseElevation', 'basePlaneMethod', 'confidence',
     'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
 ]);
 

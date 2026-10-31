@@ -2,6 +2,9 @@
  * The weight and the cost of a pile follow the material: a change of material, of the user's
  * materials or of a custom value weighs the pile again, both in the panel and on the pile the
  * toolbar saves. A restored pile keeps what it was weighed and priced with.
+ *
+ * The base of the volume: a pile found by a click is measured from the best-fit plane and a drawn
+ * polygon from the lowest perimeter, until the user picks a base; a pick measures the pile again.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { effectScope, nextTick, ref, shallowRef } from 'vue';
@@ -18,6 +21,9 @@ let scope;
 let pile;
 let source;
 let savedFile;
+// The base of every volume asked for, and the volume of each base (a pile on a slope)
+let measuredBases;
+let netVolumeOf;
 
 function start() {
     source = new VectorSource();
@@ -34,7 +40,12 @@ function start() {
         refreshButtons() {}
     };
     const dataset = {
-        calculateStockpileVolume: async () => ({ ...VOLUME }),
+        calculateStockpileVolume: async (path, polygon, { baseMethod }) => {
+            measuredBases.push(baseMethod);
+            const net = netVolumeOf[baseMethod] ?? VOLUME.netVolume;
+            return { ...VOLUME, cutVolume: net, netVolume: net, basePlaneMethod: baseMethod };
+        },
+        detectStockpile: async () => ({ polygon: POLYGON, confidence: 0.8, estimatedVolume: 8.7, basePlaneMethod: 'auto' }),
         getFileContents: async () => {
             if (!savedFile) throw Object.assign(new Error('not found'), { status: 404 });
             return JSON.stringify(savedFile);
@@ -75,6 +86,8 @@ beforeEach(() => {
     setPref(PREF.STOCKPILE_MATERIALS, null);
     setPref(PREF.CURRENCY, null);
     savedFile = null;
+    measuredBases = [];
+    netVolumeOf = {};
     start();
 });
 afterEach(() => {
@@ -210,5 +223,87 @@ describe('a restored pile', () => {
         await flushPromises();
         expect(pile.stockpileMaterials.value.some(m => m.saved)).toBe(false);
         expect(pile.stockpileMaterial.value).toBeNull();
+    });
+});
+
+describe('the base of a pile', () => {
+    async function open() {
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+    }
+    async function detect() {
+        await pile.autoDetectAndCalculate(9.0005, 45.0005);
+        await flushPromises();
+    }
+
+    it('found by a click is the best-fit plane, shown in the panel and saved with the pile', async () => {
+        await open();
+        await detect();
+        expect(measuredBases).toEqual(['best_fit']);
+        expect(pile.stockpileBaseMethod.value).toBe('best_fit');
+        expect(pile.stockpileResult.value).toMatchObject({ basePlaneMethod: 'best_fit', confidence: 0.8, estimatedFromDetection: 8.7 });
+        expect(draft().get('basePlaneMethod')).toBe('best_fit');
+    });
+
+    it('of a drawn polygon is the lowest perimeter, also after a detected pile', async () => {
+        await open();
+        await detect();
+        await pile.calculateStockpileVolume(POLYGON);
+        await flushPromises();
+        expect(measuredBases).toEqual(['best_fit', 'lowest_perimeter']);
+        expect(pile.stockpileBaseMethod.value).toBe('lowest_perimeter');
+        const piles = source.getFeatures().filter(f => f.get('measurementType') === 'stockpile');
+        expect(piles.map(f => f.get('basePlaneMethod'))).toEqual(['best_fit', 'lowest_perimeter']);
+    });
+
+    it('picked by the user is the base of the piles found by a click, and of the drawn ones', async () => {
+        await open();
+        await pile.chooseStockpileBaseMethod('average_perimeter');
+        await detect();
+        await pile.calculateStockpileVolume(POLYGON);
+        await flushPromises();
+        expect(measuredBases).toEqual(['average_perimeter', 'average_perimeter']);
+    });
+
+    it('picked as the lowest perimeter is kept for a detected pile', async () => {
+        await open();
+        await pile.calculateStockpileVolume(POLYGON);
+        await pile.chooseStockpileBaseMethod('best_fit');
+        await pile.chooseStockpileBaseMethod('lowest_perimeter');
+        await detect();
+        expect(measuredBases.at(-1)).toBe('lowest_perimeter');
+        expect(pile.stockpileBaseMethod.value).toBe('lowest_perimeter');
+    });
+
+    it('picked after the detection measures the pile again, in the panel and on the pile', async () => {
+        netVolumeOf = { best_fit: 6.8, lowest_perimeter: 35.5 };
+        await open();
+        pile.stockpileMaterial.value = 'sand';
+        await detect();
+        expect(pile.stockpileResult.value.netVolume).toBe(6.8);
+        const id = draft().get('id');
+        await pile.chooseStockpileBaseMethod('lowest_perimeter');
+        await flushPromises();
+        expect(pile.stockpileResult.value).toMatchObject({ netVolume: 35.5, basePlaneMethod: 'lowest_perimeter', confidence: 0.8 });
+        // The same pile, weighed again from its new volume
+        expect(source.getFeatures().filter(f => f.get('measurementType') === 'stockpile')).toHaveLength(1);
+        expect(draft().getProperties()).toMatchObject({ id, netVolume: 35.5, basePlaneMethod: 'lowest_perimeter' });
+        expect(draft().get('weightEstimate').tons).toBeCloseTo(35.5 * 1.6, 9);
+    });
+
+    it('picked after the pile was cleared measures nothing', async () => {
+        await open();
+        await detect();
+        pile.clearStockpileOverlay();
+        await pile.chooseStockpileBaseMethod('flat');
+        expect(measuredBases).toEqual(['best_fit']);
+        expect(pile.stockpileResult.value).toBeNull();
+    });
+
+    it('of a restored pile is the one it was saved with', async () => {
+        savedFile = savedPile({ basePlaneMethod: 'average_perimeter' });
+        await open();
+        expect(pile.stockpileBaseMethod.value).toBe('average_perimeter');
+        expect(measuredBases).toEqual([]);
     });
 });

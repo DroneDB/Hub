@@ -8,6 +8,14 @@
                 cut and fill volumes inside the polygon. Pick the option that
                 best matches the terrain around your pile.
             </p>
+            <p class="info-intro" data-testid="stockpile-base-default">
+                Until you pick one, a pile found with <b>Click map</b> is measured
+                from the <b>Best-fit plane</b>: the detector finds the pile as what
+                rises above the ground around it, so a pile on a slope is measured
+                above the slope. A polygon you draw is measured from the
+                <b>Lowest perimeter</b>. Picking a base measures the current pile
+                again and is used for the next piles.
+            </p>
 
             <div v-for="m in methods" :key="m.id" class="method-card">
                 <h4><i :class="m.icon" /> {{ m.name }}</h4>
@@ -34,6 +42,7 @@
 
 <script>
 import Window from '@/components/HubWindow.vue';
+import { BASE_METHOD, baseMethodName } from '@/libs/stockpileBase';
 
 export default {
     name: 'StockpileBaseMethodsDialog',
@@ -46,32 +55,32 @@ export default {
         return {
             methods: [
                 {
-                    id: 'lowest_perimeter',
-                    name: 'Lowest perimeter',
+                    id: BASE_METHOD.LOWEST_PERIMETER,
+                    name: baseMethodName(BASE_METHOD.LOWEST_PERIMETER),
                     icon: 'fa-solid fa-arrow-down',
                     what: 'The base elevation is the lowest point along the polygon boundary. The whole pile sits above this floor.',
                     when: 'Isolated piles on uneven ground where the boundary touches the actual ground level at least at one point.',
                     output: 'Cut volume only. Fill volume is always 0 because no pixel is below the floor.'
                 },
                 {
-                    id: 'average_perimeter',
-                    name: 'Average perimeter',
+                    id: BASE_METHOD.AVERAGE_PERIMETER,
+                    name: baseMethodName(BASE_METHOD.AVERAGE_PERIMETER),
                     icon: 'fa-solid fa-equals',
                     what: 'The base is the mean elevation of the polygon boundary, treated as a flat horizontal plane.',
                     when: 'Surrounding terrain is roughly level. A balanced choice that tolerates small dips and bumps along the boundary.',
                     output: 'Both cut (above the plane) and fill (below the plane) volumes.'
                 },
                 {
-                    id: 'best_fit',
-                    name: 'Best-fit plane',
+                    id: BASE_METHOD.BEST_FIT,
+                    name: baseMethodName(BASE_METHOD.BEST_FIT),
                     icon: 'fa-solid fa-ruler-combined',
                     what: 'Fits a tilted plane through the perimeter elevations using least squares.',
                     when: 'The ground around the pile slopes consistently in one direction.',
                     output: 'Both cut and fill volumes against the tilted plane.'
                 },
                 {
-                    id: 'flat',
-                    name: 'Flat (elevation = 0)',
+                    id: BASE_METHOD.FLAT,
+                    name: baseMethodName(BASE_METHOD.FLAT),
                     icon: 'fa-solid fa-water',
                     what: 'Uses the absolute reference 0 m as the base plane.',
                     when: 'The raster is already a height-above-ground product (e.g. DSM minus DTM). Do not use on a regular DSM.',

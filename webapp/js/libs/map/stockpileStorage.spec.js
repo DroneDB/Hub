@@ -27,6 +27,6 @@ describe('a stockpile in the measurements file', () => {
 
     it('every stockpile property is listed once', () => {
         expect(new Set(STOCKPILE_PROPERTIES).size).toBe(STOCKPILE_PROPERTIES.length);
-        for (const key of ['materialName', 'costPerTon', 'currency']) expect(STOCKPILE_PROPERTIES).toContain(key);
+        for (const key of ['materialName', 'costPerTon', 'currency', 'basePlaneMethod']) expect(STOCKPILE_PROPERTIES).toContain(key);
     });
 });
