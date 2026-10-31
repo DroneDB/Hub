@@ -1,34 +1,28 @@
 <template>
-    <Window v-bind:title="title" id="organizationDialog" @onClose="close('close')" modal maxWidth="70%" fixedSize>
+    <Window id="organizationDialog" :title="title" modal max-width="70%" fixed-size cancel-label="Close" :confirm-label="mode == 'new' ? 'Create' : 'Save'" :confirm-disabled="!isValid()" @confirm="close(mode == 'new' ? 'create' : 'save')" @close="close('close')">
         <div class="org-dialog">
-            <form v-on:submit.prevent>
+            <form @submit.prevent>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Name</label>
-                    <InputText ref="name"
-                        @keyup.enter="isValid() && close(mode == 'new' ? 'create' : 'save')" v-model="org.name"
-                        placeholder="Name" class="w-100" />
+                    <label for="organization-dialog-name" class="d-block mb-1 fw-semibold">Name</label>
+                    <InputText id="organization-dialog-name" ref="name"
+                               v-model="org.name" placeholder="Name"
+                               class="w-100" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Description</label>
-                    <Textarea v-model="org.description" placeholder="Description" rows="3" autoResize class="w-100" />
+                    <label for="organization-dialog-description" class="d-block mb-1 fw-semibold">Description</label>
+                    <Textarea id="organization-dialog-description" v-model="org.description" placeholder="Description" rows="3" auto-resize class="w-100" />
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-2">
-                    <Checkbox v-model="org.isPublic" :binary="true" inputId="orgPublic" />
+                    <Checkbox v-model="org.isPublic" :binary="true" input-id="orgPublic" />
                     <label for="orgPublic" class="mb-0" style="cursor: pointer;">Public</label>
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close('close')" severity="secondary" label="Close" />
-                <Button v-if="mode == 'new'" @click="close('create')" severity="primary" :disabled="!isValid()" label="Create" />
-                <Button v-else @click="close('save')" severity="primary" :disabled="!isValid()" label="Save" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 import Checkbox from 'primevue/checkbox';
 import InputText from 'primevue/inputtext';
 import Textarea from 'primevue/textarea';
@@ -38,11 +32,14 @@ var re = /^[a-z0-9\-_]+$/;
 
 export default {
     components: {
-        Window, Button, Checkbox, InputText, Textarea
+        Window, Checkbox, InputText, Textarea
     },
 
-    props: ["mode", "model"],
-    emits: ['onClose'],
+    props: {
+        mode: { type: String, required: true },
+        model: { type: Object, default: null }
+    },
+    emits: ['close'],
 
     data: function () {
         return {
@@ -73,24 +70,12 @@ export default {
 
     },
     methods: {
-        filterKeys(e) {
-
-            // Allow backspace, canc, left arrow, right arrow and tab
-            if (e.keyCode == 8 || e.keyCode == 46 || e.keyCode == 37 || e.keyCode == 39 || e.keyCode == 9) {
-                return;
-            }
-
-            // Allow only lowercase letters and numbers
-            if (!re.test(e.key)) {
-                e.preventDefault();
-            }
-        },
         close: function (buttonId) {
             if (buttonId === 'close') {
-                this.$emit('onClose', 'close');
+                this.$emit('close', 'close');
                 return;
             }
-            this.$emit('onClose', buttonId, {
+            this.$emit('close', buttonId, {
                 name: this.org.name,
                 description: typeof this.org.description === "string" ? this.org.description : "",
                 isPublic: this.org.isPublic,
@@ -108,6 +93,6 @@ export default {
 
 <style scoped>
 .org-dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
 }
 </style>

@@ -17,7 +17,9 @@ import {
     createTurntableRotate,
     applySceneMetrics,
     createDoubleClickRecenter,
-    createCameraTweener
+    createCameraTweener,
+    easeInOutCubic,
+    groundPlaneHit
 } from './navControls';
 
 afterEach(() => {
@@ -265,7 +267,7 @@ describe('turntable rotation (real OrbitControls)', () => {
     });
 
     it('never flips at the poles: a huge vertical drag stops short and drags stay responsive', () => {
-        const { camera, controls, center, azimuth, elevation, drag } = fixture();
+        const { camera, azimuth, elevation, drag } = fixture();
         const startUp = camera.up.clone();
 
         // 2 viewport heights in one drag: the equivalent accumulated rotation carried the real
@@ -323,7 +325,7 @@ describe('turntable rotation (real OrbitControls)', () => {
     });
 
     it('stop responding once the control is disposed', () => {
-        const { el, camera, controls, azimuth, drag } = fixture();
+        const { el, controls, azimuth } = fixture();
         controls.dispose();
         const az = azimuth();
         // Replaying the whole gesture on the disposed control must be inert: the listeners are
@@ -550,5 +552,71 @@ describe('createCameraTweener', () => {
         expect(onDone).not.toHaveBeenCalled();
         // the cancelled frame no longer runs
         expect(() => { if (frames[1]) frames[1](start + 400); }).not.toThrow();
+    });
+
+    it('tells onStep the eased progress, so a caller can move more than the position and target', () => {
+        const { frames, camera, controls } = makeTweenerHarness();
+        const tweener = createCameraTweener();
+        const onStep = vi.fn();
+
+        const start = 1000;
+        vi.spyOn(performance, 'now').mockReturnValue(start);
+        tweener.tweenTo(camera, controls, new THREE.Vector3(0, 0, 100), new THREE.Vector3(), 400, undefined, onStep);
+        frames[0](start + 100);
+        expect(onStep).toHaveBeenLastCalledWith(easeInOutCubic(0.25));
+        frames[1](start + 500);
+        expect(onStep).toHaveBeenLastCalledWith(1);
+        vi.restoreAllMocks();
+    });
+});
+
+// ---- easing ----
+
+describe('easeInOutCubic', () => {
+    it('starts at 0, ends at 1 and passes the middle at one half', () => {
+        expect(easeInOutCubic(0)).toBe(0);
+        expect(easeInOutCubic(1)).toBe(1);
+        expect(easeInOutCubic(0.5)).toBe(0.5);
+    });
+
+    it('eases in slowly and out slowly, never going backwards', () => {
+        expect(easeInOutCubic(0.25)).toBeCloseTo(0.0625);
+        expect(easeInOutCubic(0.75)).toBeCloseTo(0.9375);
+        let last = 0;
+        for (let t = 0; t <= 1; t += 0.05) {
+            const e = easeInOutCubic(t);
+            expect(e).toBeGreaterThanOrEqual(last);
+            last = e;
+        }
+    });
+});
+
+// ---- ground plane under a pointer ----
+
+describe('groundPlaneHit', () => {
+    function fixture(up) {
+        const domElement = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
+        const camera = new THREE.PerspectiveCamera(90, 1, 0.1, 2000);
+        camera.up.copy(up);
+        camera.position.set(-5, 0, 10);
+        camera.updateMatrixWorld();
+        return { domElement, camera, controls: { target: new THREE.Vector3(0, 0, 4) } };
+    }
+
+    it('meets the plane through the pivot perpendicular to camera.up', () => {
+        const { domElement, camera, controls } = fixture(new THREE.Vector3(0, 0, 1));
+        const hit = groundPlaneHit(THREE, { domElement }, camera, controls, { clientX: 800, clientY: 600 });
+        expect(hit.distanceTo(new THREE.Vector3(1, -6, 4))).toBeLessThan(1e-9);
+    });
+
+    it('is null for a pointer whose ray points away from the plane, and for an element with no size', () => {
+        const { domElement, camera, controls } = fixture(new THREE.Vector3(0, 0, 1));
+        // Looking up from above the plane: the ray through the top of the view never reaches it
+        camera.position.set(0, 0, 10);
+        camera.lookAt(0, 10, 12);
+        camera.updateMatrixWorld();
+        expect(groundPlaneHit(THREE, { domElement }, camera, controls, { clientX: 400, clientY: 0 })).toBeNull();
+        const hidden = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }) };
+        expect(groundPlaneHit(THREE, { domElement: hidden }, camera, controls, { clientX: 1, clientY: 1 })).toBeNull();
     });
 });

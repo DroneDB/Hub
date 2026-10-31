@@ -12,10 +12,11 @@ import {
 
 /**
  * rasterZoom.spec - zoom math contract owned by rasterZoom.js and consumed
- * by Map.vue, SingleMap.vue and usePlantHealth.js (ImproveCOG plan).
+ * by MapCore, SingleMap.vue and usePlantHealth.js.
  *
- * Expectations are derived from the spec in DroneDB-Roadmap WORKING/ImproveCOG/PLAN.md,
- * not from existing implementation behaviour, so production regressions fail loudly.
+ * Expectations are derived from the zoom contract (native zoom of a raster from its
+ * footprint and size, source and view zoom limits), not from existing implementation
+ * behaviour, so production regressions fail loudly.
  */
 
 function makePolygonFromMeters3857(width3857, height3857, latCenter = 46.0) {
@@ -171,8 +172,8 @@ describe('sourceMaxZoom', () => {
 
     it('clamps a very coarse native (8) up to SOURCE_MIN_ZOOM in both retina modes', () => {
         // Source-side coarse-raster floor contract: the view-side floor for coarse
-        // rasters lives in Map.vue _applyViewCapNow (not a pure helper, so it is
-        // covered only by manual/live test steps — see ImproveCOG plan).
+        // rasters lives in the map component (not a pure helper, so it is covered
+        // only by manual/live test steps).
         expect(sourceMaxZoom(8, false)).toBe(SOURCE_MIN_ZOOM);
         expect(sourceMaxZoom(8, false)).toBe(14);
         expect(sourceMaxZoom(8, true)).toBe(SOURCE_MIN_ZOOM);

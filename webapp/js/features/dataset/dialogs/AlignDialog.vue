@@ -1,29 +1,29 @@
 <template>
-    <Window title="Align GeoTIFF to Reference" id="align-georaster" @onClose="close" modal width="600px" height="auto" fixedPosition>
+    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @close="$emit('close', 'close')">
         <div class="align-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="align-info">
                 <div>
                     Aligns the source GeoTIFF to the selected reference by template matching, correcting
-                    georeferencing offsets (GPS drift, rotation, scale drift) between two surveys.<br />
-                    <strong>Similarity</strong> mode corrects translation, rotation and uniform scale; <br />
-                    <strong>Translation</strong> mode corrects position only and is faster for small offsets.<br />
-                    The aligned result is added to the dataset as a <em>new</em> GeoTIFF file with the <i>_aligned</i> suffix, the original source is never modified.<br />
-                    See the <a href="https://docs.dronedb.app/docs/features/raster-alignment" target="_blank" rel="noopener">Raster Alignment documentation</a> for details.
+                    georeferencing offsets (GPS drift, rotation, scale drift) between two surveys.<br>
+                    <strong>Similarity</strong> mode corrects translation, rotation and uniform scale; <br>
+                    <strong>Translation</strong> mode corrects position only and is faster for small offsets.<br>
+                    The aligned result is added to the dataset as a <em>new</em> GeoTIFF file with the <i>_aligned</i> suffix, the original source is never modified.<br>
+                    See the <a :href="docsLink" target="_blank" rel="noopener">Raster Alignment documentation</a> for details.
                 </div>
             </PrimeMessage>
 
             <!-- Source (read-only) -->
             <div class="section">
-                <label class="section-label">Source file</label>
-                <InputText :modelValue="sourceEntry.entry.path" readonly fluid class="w-100" />
+                <label for="align-dialog-source-file" class="section-label">Source file</label>
+                <InputText id="align-dialog-source-file" :model-value="sourceEntry.entry.path" readonly fluid class="w-100" />
             </div>
 
             <!-- Reference picker -->
             <div class="section">
-                <label class="section-label">Reference GeoTIFF</label>
-                <Select v-model="selectedReference" :options="referenceOptions" optionLabel="label" optionValue="value"
-                    placeholder="Select reference..." class="w-100" fluid @change="onReferenceChange" />
+                <label id="align-dialog-reference-geotiff-label" for="align-dialog-reference-geotiff" class="section-label">Reference GeoTIFF</label>
+                <Select v-model="selectedReference" input-id="align-dialog-reference-geotiff" aria-labelledby="align-dialog-reference-geotiff-label" :options="referenceOptions" option-label="label" option-value="value"
+                        placeholder="Select reference..." class="w-100" fluid @change="onReferenceChange" />
                 <small v-if="referenceOptions.length === 0" class="hint-error">
                     No other GeoTIFF in this dataset to use as reference.
                 </small>
@@ -31,21 +31,21 @@
 
             <!-- Mode -->
             <div class="section">
-                <label class="section-label">Alignment mode</label>
-                <Select v-model="mode" :options="modeOptions" optionLabel="label" optionValue="value" class="w-100" fluid />
+                <label id="align-dialog-alignment-mode-label" for="align-dialog-alignment-mode" class="section-label">Alignment mode</label>
+                <Select v-model="mode" input-id="align-dialog-alignment-mode" aria-labelledby="align-dialog-alignment-mode-label" :options="modeOptions" option-label="label" option-value="value" class="w-100" fluid />
             </div>
 
             <!-- Output name -->
             <div class="section">
-                <label class="section-label">Output file name</label>
-                <InputText v-model="outputName" fluid class="w-100" :invalid="!isOutputValid"
-                    @input="validateOutputName" placeholder="aligned.tif" />
+                <label for="align-dialog-output-file-name" class="section-label">Output file name</label>
+                <InputText id="align-dialog-output-file-name" v-model="outputName" fluid class="w-100" :invalid="!isOutputValid"
+                           placeholder="aligned.tif" @input="validateOutputName" />
                 <small v-if="outputNameError" class="hint-error">{{ outputNameError }}</small>
             </div>
 
             <!-- Validation result -->
             <div v-if="validating" class="status-info">
-                <i class="fa-solid fa-spinner fa-spin"></i> Validating...
+                <LoadingSpinner inline label="Validating..." />
             </div>
             <div v-else-if="validationResult">
                 <div v-if="!validationResult.ok" class="result-msg error">
@@ -62,7 +62,7 @@
 
             <!-- Align task progress -->
             <div v-if="alignTaskId" class="task-row" :class="alignTaskState">
-                <i :class="taskIcon(alignTaskState)"></i>
+                <i :class="taskIcon(alignTaskState)" />
                 <span class="task-label">Align</span>
                 <span class="task-phase">{{ alignPhase || alignTaskState }}</span>
                 <span v-if="alignPct !== null" class="task-pct">{{ alignPct }}%</span>
@@ -70,7 +70,7 @@
 
             <!-- Build task progress -->
             <div v-if="buildTaskId" class="task-row" :class="buildTaskState">
-                <i :class="taskIcon(buildTaskState)"></i>
+                <i :class="taskIcon(buildTaskState)" />
                 <span class="task-label">Build</span>
                 <span class="task-phase">{{ buildPhase || buildTaskState }}</span>
                 <span v-if="buildPct !== null" class="task-pct">{{ buildPct }}%</span>
@@ -92,36 +92,41 @@
             <!-- Actions -->
             <div class="actions">
                 <Button label="Validate" icon="fa-solid fa-check" severity="secondary"
-                    :disabled="!selectedReference || validating || running" @click="validate" />
+                        :disabled="!selectedReference || validating || running" @click="validate" />
                 <Button label="Align" icon="fa-solid fa-crosshairs" severity="primary"
-                    :disabled="!canAlign" @click="startAlign" />
-                <Button label="Close" severity="secondary" :disabled="running" @click="close" />
+                        :disabled="!canAlign" @click="startAlign" />
+                <Button label="Close" severity="secondary" :disabled="running" @click="$emit('close', 'close')" />
             </div>
         </div>
     </Window>
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ddb from 'ddb';
-import Window    from '@/components/Window.vue';
+import Window    from '@/components/HubWindow.vue';
 import Button    from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Select    from 'primevue/select';
 import PrimeMessage from 'primevue/message';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
+import { DOCS } from '@/libs/docsLinks';
 
 export default {
     name: 'AlignDialog',
-    components: { Window, Button, InputText, Select, PrimeMessage },
-    mixins: [useHeavyTask],
+    components: { Window, Button, InputText, Select, PrimeMessage, LoadingSpinner },
 
     props: {
         sourceEntry: { type: Object, required: true },
         dataset:     { type: Object, required: true },
         allEntries:  { type: Array,  required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        const { runHeavyTask } = useHeavyTask();
+        return { runHeavyTask, docsLink: DOCS.alignRaster };
+    },
     data() {
         const stem = (this.sourceEntry?.entry?.path ?? 'output').replace(/\.tiff?$/i, '');
         return {
@@ -229,7 +234,7 @@ export default {
                     const line = logTail[i].replace(/^\[\d{2}:\d{2}:\d{2}\] /, '').trim();
                     const j = JSON.parse(line);
                     if (typeof j.success === 'boolean') return j;
-                } catch (e) { /* not JSON, skip */ }
+                } catch { /* not JSON, skip */ }
             }
             return null;
         },
@@ -301,20 +306,17 @@ export default {
 
             // Notify parent to refresh file browser
             if (this.alignTaskState === 'Succeeded') {
-                this.$emit('onClose', 'aligned', { outputPath });
+                this.$emit('close', 'aligned', { outputPath });
             }
         },
 
-        close() {
-            this.$emit('onClose', 'close');
-        }
     }
 };
 </script>
 
 <style scoped>
 .align-dialog {
-    min-width: 380px;
+    min-width: min(380px, var(--window-content-width, 100%));
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -326,7 +328,7 @@ export default {
 }
 
 .align-info :deep(a) {
-    color: var(--p-blue-600);
+    color: var(--ddb-link-on-tint);
 }
 
 .section {
@@ -377,7 +379,7 @@ export default {
 }
 .task-row.Succeeded { background: var(--p-green-50); }
 .task-row.Failed    { background: var(--p-red-50);   }
-.task-row.Processing{ background: var(--p-blue-50);  }
+.task-row.Processing{ background: var(--ddb-primary-50); }
 
 .task-label { font-weight: 600; min-width: 45px; }
 .task-phase { flex: 1; color: var(--p-text-muted-color); }

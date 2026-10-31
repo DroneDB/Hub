@@ -1,73 +1,45 @@
 <template>
-    <Window title="Point Annotation" id="point-annotation" @onClose="discard" modal fixedSize sizeClass="dialog-sm">
+    <Window id="point-annotation" title="Point Annotation" modal fixed-size size-class="dialog-sm" cancel-label="Discard" confirm-label="Save" @confirm="save" @close="discard">
         <div class="point-annotation-form">
             <div class="mb-3">
-                <label class="d-block mb-1 fw-semibold">Color</label>
-                <div class="color-palette">
-                    <div
-                        v-for="color in colorPalette"
-                        :key="color"
-                        class="color-swatch"
-                        :class="{ selected: formData.color === color }"
-                        :style="{ backgroundColor: color }"
-                        @click="formData.color = color"
-                    ></div>
-                    <input
-                        type="color"
-                        v-model="formData.color"
-                        class="color-picker-custom"
-                        title="Custom color"
-                    />
-                </div>
+                <label class="d-block mb-1 fw-semibold" for="pa-color">Color</label>
+                <ColorSwatchPicker v-model="formData.color" input-id="pa-color" />
             </div>
 
             <div class="mb-3">
                 <label class="d-block mb-1 fw-semibold" for="pa-description">Description</label>
-                <Textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3" autoResize class="w-100" />
+                <Textarea id="pa-description" v-model="formData.description" placeholder="Enter a description..." rows="3" auto-resize class="w-100" />
             </div>
 
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="discard" severity="secondary" label="Discard" />
-                <Button @click="save" severity="primary" label="Save" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
+import ColorSwatchPicker from '@/components/ColorSwatchPicker.vue';
 import Textarea from 'primevue/textarea';
+import { MEASURE_COLOR } from '@/libs/map/mapUtils';
 
 export default {
     components: {
         Window,
-        Button,
-        Textarea
+        Textarea,
+        ColorSwatchPicker
     },
     props: {
         initialColor: {
             type: String,
-            default: '#ffcc33'
+            default: MEASURE_COLOR
         },
         initialDescription: {
             type: String,
             default: ''
         }
     },
-    emits: ['onClose'],
+    emits: ['close', 'save', 'discard'],
     data() {
         return {
-            colorPalette: [
-                '#ffcc33', // Default yellow
-                '#ff0000', // Red
-                '#00ff00', // Green
-                '#0000ff', // Blue
-                '#ff6600', // Orange
-                '#9900ff', // Purple
-                '#00cccc', // Cyan
-                '#333333'  // Dark gray
-            ],
             formData: {
                 color: this.initialColor,
                 description: this.initialDescription
@@ -76,12 +48,12 @@ export default {
     },
     methods: {
         save() {
-            this.$emit('onSave', { ...this.formData });
-            this.$emit('onClose');
+            this.$emit('save', { ...this.formData });
+            this.$emit('close');
         },
         discard() {
-            this.$emit('onDiscard');
-            this.$emit('onClose');
+            this.$emit('discard');
+            this.$emit('close');
         }
     }
 };
@@ -90,41 +62,6 @@ export default {
 <style scoped>
 .point-annotation-form {
     padding: 1rem;
-    min-width: 18.75rem;
-}
-
-.color-palette {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    align-items: center;
-}
-
-.color-swatch {
-    width: 1.75rem;
-    height: 1.75rem;
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    border: var(--ddb-border-width) solid transparent;
-    transition: border-color 0.2s, transform 0.1s;
-}
-
-.color-swatch:hover {
-    transform: scale(1.1);
-}
-
-.color-swatch.selected {
-    border-color: #000;
-    box-shadow: 0 0 0 0.25rem #fff, 0 0 0 0.5rem #000;
-}
-
-.color-picker-custom {
-    width: 1.75rem;
-    height: 1.75rem;
-    padding: 0;
-    border: var(--ddb-border-width) solid var(--ddb-border);
-    border-radius: var(--ddb-radius-sm);
-    cursor: pointer;
-    background: linear-gradient(135deg, #ff0000, #00ff00, #0000ff);
+    min-width: min(18.75rem, var(--window-content-width, 100%));
 }
 </style>

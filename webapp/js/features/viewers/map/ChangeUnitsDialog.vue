@@ -1,5 +1,5 @@
 <template>
-    <Window title="Change Units" id="changeUnitsDialog" @onClose="close('cancel')" modal sizeClass="dialog-sm" fixedSize>
+    <Window id="changeUnitsDialog" title="Change Units" modal size-class="dialog-sm" fixed-size confirm-label="Convert" @close="$emit('close', 'cancel')" @confirm="$emit('close', 'confirm')">
         <div class="change-units-content">
             <p>
                 Convert <strong>{{ measurementsCount }}</strong> measurement{{ measurementsCount !== 1 ? 's' : '' }}
@@ -10,21 +10,15 @@
             </p>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('cancel')" severity="secondary" label="Cancel" />
-            <Button @click="close('confirm')" severity="primary" label="Convert" />
-        </div>
     </Window>
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 
 export default {
     components: {
-        Window, Button
+        Window
     },
 
     props: {
@@ -38,7 +32,11 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
+
+    data: function () {
+        return {};
+    },
 
     computed: {
         targetUnitLabel() {
@@ -46,27 +44,9 @@ export default {
         }
     },
 
-    data: function () {
-        return {};
-    },
 
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
 
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Enter') this.close('confirm');
-            if (e.key === 'Escape') this.close('cancel');
-        }
     }
 }
 </script>

@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["webapp/js/*"],
+            "ddb": ["webapp/js/libs/ddb"]
+        },
+        "allowJs": true,
+        "checkJs": false,
+        "strict": false,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "types": ["vitest/globals"]
+    },
+    "include": ["webapp/js/**/*.js", "webapp/js/**/*.vue"],
+    "exclude": ["node_modules", "build", "webapp/public"],
+    "vueCompilerOptions": {
+        "checkUnknownProps": false
+    }
+}

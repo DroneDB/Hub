@@ -4,24 +4,26 @@
         <div id="search-box">
             <IconField style="flex: 1; min-width: 0;">
                 <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" @keyup.enter="search()" placeholder="Search files" style="width: 100%;" />
+                <InputText v-model="filterRaw" placeholder="Search files" aria-label="Search files" style="width: 100%;" @keyup.enter="search(filterRaw)" />
             </IconField>
-            <div v-if="filterRaw != null && filterRaw.length > 0" id="cancel" v-on:click="clearSearch()">
-                <i class="fa-solid fa-xmark"></i>
-            </div>
+            <Button v-if="filterRaw != null && filterRaw.length > 0" icon="fa-solid fa-xmark"
+                    title="Clear search" aria-label="Clear search" severity="secondary" text size="small"
+                    @click="clearSearch()" />
             <Button
                 :icon="sortDescending ? 'fa-solid fa-arrow-down-z-a' : 'fa-solid fa-arrow-down-a-z'"
                 :title="sortDescending ? 'Sort Z→A (click to sort A→Z)' : 'Sort A→Z (click to sort Z→A)'"
+                :aria-label="sortDescending ? 'Sorted Z to A, sort A to Z' : 'Sorted A to Z, sort Z to A'"
                 severity="secondary" text size="small"
-                @click="toggleSortDirection"
                 style="flex-shrink: 0;"
+                @click="toggleSortDirection"
             />
         </div>
-        <TreeView v-show="!noResults" :nodes="nodes" @selectionChanged="handleSelectionChanged" @opened="handleOpen"
-            :getChildren="getChildren" :canWrite="canWrite" ref="treeView" />
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
+                  :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
+        <SavedComparisons v-if="comparisons.length && dataset && !loading && searchStaticPaths == null" :comparisons="comparisons"
+                          :dataset="dataset" :can-write="canWrite" @rename="c => $emit('renameComparison', c)"
+                          @delete="c => $emit('deleteComparison', c)" />
+        <LoadingSpinner v-if="loading" />
         <div v-if="!loading && noResults" class="no-results">
             No files found
         </div>
@@ -29,14 +31,14 @@
 </template>
 
 <script>
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
-import TreeNode from './TreeNode.vue';
-import ContextMenu from '@/components/ContextMenu';
+import SavedComparisons from './SavedComparisons.vue';
+import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import Button from 'primevue/button';
-import env from '@/dynamic/env';
 import ddb from 'ddb';
 import icons from '@/libs/icons';
 import { clone, debounce } from '@/libs/utils';
@@ -44,14 +46,21 @@ import { buildViewerMenuItems, buildActionMenuItems, deleteItem, deleteSeparator
 import { sortEntriesDirectoriesFirst } from '@/libs/entryTypes';
 import emitter from '@/libs/eventBus';
 import { isPathRemoved, liveSelectionEntries } from './treeSelection';
+import { useRequestScope, isAbort } from '@/composables/useRequestScope';
+import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { usePreference } from '@/composables/usePreference';
+import { isUnauthorized } from '@/libs/ddb/apiError';
 
 const { pathutils } = ddb;
 
+const isBlank = (text) => text == null || text.length === 0;
+
 export default {
     components: {
-        TreeView, ContextMenu, InputText, InputIcon, IconField, Button
+        LoadingSpinner,
+        TreeView, SavedComparisons, ContextMenu, InputText, InputIcon, IconField, Button
     },
-    emits: ['openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard'],
+    // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
     props: {
         rootNodes: {
@@ -65,7 +74,16 @@ export default {
         dataset: {
             type: Object,
             default: null
+        },
+        // The dataset's saved comparisons, listed under the tree (not while searching)
+        comparisons: {
+            type: Array,
+            default: () => []
         }
+    },
+    emits: ['renameComparison', 'deleteComparison', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    setup() {
+        return { requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },
     data: function () {
         // Adapter: expose the tree selection to the shared context menu factory
@@ -80,22 +98,6 @@ export default {
         };
 
         let contextMenu = [];
-
-        if (env.isElectron()) {
-            contextMenu = contextMenu.concat([{
-                label: "Open Item Location",
-                icon: 'fa-regular fa-folder-open',
-                isVisible: () => {
-                    return this.lastSelectedNode !== null;
-                },
-                click: () => {
-                    if (this.lastSelectedNode !== null) shell.showItemInFolder(this.lastSelectedNode.node.path);
-                }
-            }, {
-                type: 'separator'
-            }
-            ]);
-        }
 
         contextMenu = contextMenu.concat([
         {
@@ -125,22 +127,22 @@ export default {
             loading: true,
             lastSelectedNode: null,
             contextMenu,
+            // What is in the search box, and the query last searched (null: no search)
             filterRaw: null,
             filter: null,
             searchStaticPaths: null,
             noResults: false,
-            sortDescending: localStorage.getItem('sortDescending') === 'true',
         };
     },
     watch: {
+        // Search as the user types; Enter may have searched this text already
         filterRaw: debounce(function (newVal) {
-            this.filter = newVal;
-            if ((newVal == null || newVal.length === 0) && this.searchStaticPaths == null) return;
-            this.search();
+            if (isBlank(newVal) ? this.searchStaticPaths == null : newVal === this.filter) return;
+            this.search(newVal);
         }, 500),
         sortDescending: function () {
             if (this.searchStaticPaths != null) {
-                this.search();
+                this.search(this.filter);
             } else {
                 this.refreshNodes();
             }
@@ -213,9 +215,12 @@ export default {
             }
         },
 
+        reportLoadError: function (e) {
+            this.$emit('error', isUnauthorized(e) ? "You are not allowed to perform this action" : e, "Load entries");
+        },
+
         toggleSortDirection: function () {
             this.sortDescending = !this.sortDescending;
-            localStorage.setItem('sortDescending', this.sortDescending);
             // Watcher handles the refresh
         },
 
@@ -227,40 +232,26 @@ export default {
             await this.refreshNodes();
         },
 
-        search: async function () {
+        // Searches the tree for query (a blank one clears the search)
+        search: async function (query) {
 
-            if (this.filter == null || this.filter.length == 0) {
+            if (isBlank(query)) {
                 await this.clearSearch();
                 return;
             };
 
+            this.filter = query;
+
             try {
 
                 var rootPath = this.nodes[0].path;
-
-                var query = this.filter;
 
                 if (!query.includes('*') && !query.includes('*'))
                     query = "*" + query + "*";
 
                 const entries = await ddb.searchEntries(rootPath, query);
 
-                var res = sortEntriesDirectoriesFirst(
-                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path),
-                    this.sortDescending
-                )
-                    .map(entry => {
-                        const base = pathutils.basename(entry.path);
-                        return {
-                            icon: icons.getForType(entry.type, entry.path),
-                            label: base,
-                            path: pathutils.join(rootPath, entry.path),
-                            selected: false,
-                            entry,
-                            isExpandable: ddb.entry.isDirectory(entry)
-                        }
-                    });
+                const res = this.nodesOf(entries, entry => pathutils.join(rootPath, entry.path));
 
                 this.searchStaticPaths = {};
                 this.searchStaticPaths[rootPath] = res;
@@ -272,15 +263,27 @@ export default {
             } catch (e) {
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
 
                 this.nodes = [];
 
             }
+        },
+
+        // Tree nodes of listed entries: folders first, hidden entries left out
+        nodesOf: function (entries, pathOf) {
+            return sortEntriesDirectoriesFirst(
+                entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
+                e => pathutils.basename(e.path),
+                this.sortDescending
+            ).map(entry => ({
+                icon: icons.getForType(entry.type, entry.path),
+                label: pathutils.basename(entry.path),
+                path: pathOf(entry),
+                selected: false,
+                entry,
+                isExpandable: ddb.entry.isDirectory(entry)
+            }));
         },
 
         getChildren: async function (path) {
@@ -295,35 +298,17 @@ export default {
                     withHash: false,
                     recursive: true,
                     maxRecursionDepth: 1,
-                    stopOnError: false
+                    stopOnError: false,
+                    signal: this.requestSignal
                 });
 
-                var res = sortEntriesDirectoriesFirst(
-                    entries.filter(entry => pathutils.basename(entry.path)[0] != "."),
-                    e => pathutils.basename(e.path),
-                    this.sortDescending
-                )
-                    .map(entry => {
-                        const base = pathutils.basename(entry.path);
-
-                        return {
-                            icon: icons.getForType(entry.type, entry.path),
-                            label: base,
-                            path: pathutils.join(path, base),
-                            selected: false,
-                            entry,
-                            isExpandable: ddb.entry.isDirectory(entry)
-                        }
-                    });
-                return res;
+                return this.nodesOf(entries, entry => pathutils.join(path, pathutils.basename(entry.path)));
             } catch (e) {
+                // The browser is gone: nobody waits for this listing
+                if (isAbort(e)) return [];
                 console.error("Exception", clone(e));
 
-                if (e.message == "Unauthorized") {
-                    this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                } else {
-                    this.$emit('error', e, "Load entries");
-                }
+                this.reportLoadError(e);
                 return [];
             }
 
@@ -341,7 +326,8 @@ export default {
 
                 try {
                     const entry = n.entry || (await ddb.fetchEntries(n.path, {
-                        withHash: false
+                        withHash: false,
+                        signal: this.requestSignal
                     }))[0];
 
                     this.nodes.push({
@@ -354,11 +340,7 @@ export default {
                         entry
                     });
                 } catch (e) {
-                    if (e.message == "Unauthorized") {
-                        this.$emit('error', "You are not allowed to perform this action", "Load entries");
-                    } else {
-                        this.$emit('error', e, "Load entries");
-                    }
+                    this.reportLoadError(e);
                 }
             }
 
@@ -487,40 +469,11 @@ export default {
     gap: 0.25rem;
     width: 100%;
 
-    .box {
-        width: 100%;
-        position: relative;
-    }
-
     input {
         width: 100%;
         text-align: left;
     }
 
-    #cancel {
-        cursor: pointer;
-        visibility: hidden;
-        position: absolute;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        padding-right: 0.5rem;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-
-        .icon {
-            margin: 0;
-        }
-    }
-
-    #src {
-        margin-left: 0.5rem;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        margin-top: -0.25rem;
-    }
 
     .no-results {
         text-align: center;

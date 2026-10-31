@@ -36,7 +36,7 @@ const DEFAULT_BYTES_PER_PIXEL = 4;
  * @param {string|null|undefined} dataType
  * @returns {number}
  */
-export function bytesPerPixel(dataType) {
+function bytesPerPixel(dataType) {
     return BYTES_PER_PIXEL[dataType] ?? DEFAULT_BYTES_PER_PIXEL;
 }
 
@@ -50,7 +50,7 @@ export function bytesPerPixel(dataType) {
  * @param {Object} info - Raster info object ({width, height, bandCount, dataType}).
  * @returns {number} Estimated output size in bytes, or 0 when input is invalid.
  */
-export function estimateExportSize(info) {
+function estimateExportSize(info) {
     if (!info) return 0;
     const width = Number(info.width) || 0;
     const height = Number(info.height) || 0;
@@ -72,9 +72,3 @@ export function isExportTooLarge(info, maxBytes) {
     const estimated = estimateExportSize(info);
     return estimated > 0 && estimated > maxBytes;
 }
-
-/**
- * Human-readable byte size formatter.
- * Re-exports bytesToSize from utils.js as the single source of truth.
- */
-export { bytesToSize as formatBytes } from './utils';

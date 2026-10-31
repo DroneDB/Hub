@@ -1,30 +1,25 @@
 <template>
-    <Window title="Create folder" id="newFolder" @onClose="onWindowClose" modal maxWidth="70%" fixedSize>
+    <Window id="newFolder" title="Create folder" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Create folder" :confirm-disabled="!newFolderPath" :busy="busy" @confirm="createFolder" @close="onWindowClose">
 
-        <InputText class="newFolderInput" ref="newFolderInput" v-on:keyup.enter="createFolder" v-on:keyup.esc="close('close')"
-            v-model="newFolderPath" :invalid="!newFolderPath" :disabled="busy" placeholder="Folder name" />
+        <InputText ref="newFolderInput" v-model="newFolderPath" class="newFolderInput" aria-label="Folder name" :invalid="!newFolderPath"
+                   :disabled="busy" placeholder="Folder name" />
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close('close')" :disabled="busy" severity="secondary" label="Close" />
-            <Button @click="createFolder" :disabled="!newFolderPath || busy" :loading="busy" severity="primary" label="Create folder" />
-        </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 import InputText from 'primevue/inputtext';
 
 export default {
     components: {
-        Window, Button, InputText
+        Window, InputText
     },
 
     props: {
         busy: { type: Boolean, default: false }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {
@@ -39,12 +34,12 @@ export default {
         },
         close: function (buttonId) {
             if (this.busy && buttonId !== 'createFolder') return;
-            this.$emit('onClose', buttonId);
+            this.$emit('close', buttonId);
         },
         createFolder: function () {
             if (this.busy) return;
             if (this.newFolderPath) {
-                this.$emit('onClose', "createFolder", this.newFolderPath);
+                this.$emit('close', "createFolder", this.newFolderPath);
             }
         }
     }

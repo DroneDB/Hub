@@ -14,10 +14,6 @@ export function getCookie(key) {
     return cobj[key];
 }
 
-export function clearCookie(key) {
-    document.cookie = `${key}=;-1;path=/`;
-}
-
 export function queryParams(location) {
     let params = {};
     let paramsRaw = (location.search.replace("?", "").match(/([^&=]+)=?([^&]*)/g) || []);
@@ -33,7 +29,7 @@ export function queryParams(location) {
 export function inIframe() {
     try {
         return window.self !== window.top;
-    } catch (e) {
+    } catch {
         return true;
     }
 }
@@ -88,14 +84,14 @@ export function formatTimeAgo(ms) {
     return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
 }
 /**
- * ProgressBar mode for task progress values.
- * A task that reports no progress (null/undefined), 0 or a negative percent
- * renders as an animated indeterminate bar until a real percent arrives.
- * @param {number|null|undefined} percent Task progress percent (0-100, nullable)
- * @returns {'indeterminate'|'determinate'} ProgressBar mode
+ * The millisecond timestamp of a date the server sent (an ISO string).
+ * @param {unknown} value
+ * @returns {number|null} null when there is no date or it is not one (a date that is unknown, not 1970)
  */
-export function taskProgressMode(percent) {
-    return (percent == null || percent <= 0) ? 'indeterminate' : 'determinate';
+export function parseTimestamp(value) {
+    if (typeof value !== 'string' || !value) return null;
+    const ms = Date.parse(value);
+    return Number.isNaN(ms) ? null : ms;
 }
 /* Is currently in full screen or not */
 export function isFullScreenCurrently() {
@@ -122,7 +118,7 @@ export function requestFullScreen(element) {
     if (requestMethod) { // Native full screen.
         requestMethod.call(element);
     } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
-        var wscript = new ActiveXObject("WScript.Shell");
+        var wscript = new window.ActiveXObject("WScript.Shell");
         if (wscript !== null) {
             wscript.SendKeys("{F11}");
         }

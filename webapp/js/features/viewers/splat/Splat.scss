@@ -1,0 +1,95 @@
+// Splat viewer overlays: badges and the bottom-left buttons.
+@use '../../../../css/overlay-button' as *;
+
+// The camera rail on the left edge (SplatCameraRail): its size, which the panels beside it keep clear of
+#splat {
+    --splat-rail-button: 2.1rem;
+    --splat-rail-padding: 0.3rem;
+    --splat-rail-width: calc(var(--splat-rail-button) + 2 * var(--splat-rail-padding));
+}
+
+#splat canvas {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    /* Let our pointer handlers own touch gestures (earth pan/orbit/pinch) on touch devices. */
+    touch-action: none;
+}
+
+#splat .top-right-stack {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    pointer-events: none;
+}
+
+#splat .camera-hud {
+    background: color-mix(in srgb, var(--ddb-primary-800) 70%, transparent);
+    color: var(--ddb-text-on-dark);
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--ddb-border-radius, 4px);
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+    white-space: nowrap;
+}
+
+#splat .camera-hud i {
+    margin-right: 0.35rem;
+}
+
+#splat .top-left-stack {
+    position: absolute;
+    top: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    pointer-events: none;
+}
+
+#splat .label-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    /* The labels are only to be read: the canvas below takes the pointer */
+    pointer-events: none;
+}
+
+/* A pin in the way of a click would take it from the shape being drawn under it */
+#splat .label-layer.drawing .splat-pin {
+    pointer-events: none;
+}
+
+#splat .streaming-badge {
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--ddb-text-on-dark);
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--ddb-border-radius, 4px);
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+}
+
+#splat .streaming-badge i {
+    margin-right: 0.35rem;
+}
+
+#splat .btn-stack {
+    position: absolute;
+    bottom: var(--ddb-spacing-md);
+    left: var(--ddb-spacing-md);
+    display: flex;
+    gap: 0.4rem;
+}
+
+#splat .btn-overlay {
+    @include overlay-button(
+        $size: 2.25rem,
+        $radius: 50%,
+        $background: rgba(0, 0, 0, 0.55),
+        $hover-background: rgba(0, 0, 0, 0.75),
+        $active-background: rgba(var(--ddb-primary-rgb), 0.85)
+    );
+}

@@ -4,8 +4,12 @@
  * - background store refreshes (applyFilters(false)) keep the current page
  * - a shrinking list clamps onto the last valid page
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { setActivePinia, createPinia } from 'pinia';
 import TaskHistory from './TaskHistory.vue';
+
+// applyFilters reports the bulk-download state to the dataset session store
+beforeEach(() => setActivePinia(createPinia()));
 
 const { applyFilters, onFilterChange } = TaskHistory.methods;
 
@@ -18,7 +22,7 @@ function fakeVm(tasks, { page = 0, selectedState = '', selectedTool = '' } = {})
         selectedTool,
         currentPageFirst: page,
         pageSize: 20,
-        // Present on the real component (useTaskFormatting mixin); unused unless
+        // Present on the real component (useTaskFormatting); unused unless
         // a task has toolId 'bulk-download', which these fixtures avoid.
         isActive: () => false,
     };

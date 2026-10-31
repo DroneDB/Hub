@@ -1,9 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
+import { decorativeIcons } from './scripts/lib/decorativeIcons.cjs';
 
 export default defineConfig({
-    plugins: [vue()],
+    // The templates are compiled as webpack compiles them (the icons hidden from screen readers)
+    plugins: [vue({ template: { compilerOptions: { nodeTransforms: [decorativeIcons] } } })],
     resolve: {
         // Match webpack: components are imported without the .vue extension.
         extensions: ['.mjs', '.js', '.mts', '.ts', '.jsx', '.tsx', '.json', '.vue'],
@@ -18,14 +20,13 @@ export default defineConfig({
         include: ['webapp/js/**/*.spec.js', 'webapp/js/**/*.test.js'],
         setupFiles: ['./test-setup.js'],
         coverage: {
-            provider: 'istanbul',
-            reporter: ['text', 'json', 'html'],
-            include: ['webapp/js/libs/**/*.js', 'webapp/js/composables/**/*.js'],
-            exclude: [
-                'webapp/js/vendor/**',
-                'webapp/js/libs/ddb/**',
-                'webapp/js/libs/map/potree/**'
-            ]
+            provider: 'v8',
+            reporter: ['text-summary', 'json-summary', 'html'],
+            reportsDirectory: 'coverage',
+            include: ['webapp/js/libs/**/*.js', 'webapp/js/composables/**/*.js', 'webapp/js/stores/**/*.js'],
+            exclude: ['webapp/js/**/*.spec.js', 'webapp/js/libs/map/potree/**'],
+            // Ratchet: the coverage reached so far; raise it as coverage grows
+            thresholds: { lines: 32, statements: 32, functions: 32, branches: 77 }
         }
     }
 });

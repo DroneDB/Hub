@@ -1,0 +1,83 @@
+<template>
+    <Teleport :to="zones.topRight">
+        <div class="ol-map-buttons ol-unselectable ol-control" style="order: -1">
+            <button v-if="showBack" title="Back to Dataset" aria-label="Back to Dataset" @click="emit('back')">
+                <i class="fa-solid fa-arrow-left" />
+            </button>
+            <button title="Reset View (H)" aria-label="Reset View" @click="emit('reset')">
+                <i class="fa-solid fa-house" />
+            </button>
+            <button v-if="canFullscreen" title="Fullscreen (F11)" aria-label="Fullscreen" @click="emit('fullscreen')">
+                <i class="fa-solid fa-expand" />
+            </button>
+            <template v-if="analysisEntry">
+                <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis" :disabled="multiRaster"
+                        data-testid="raster-analysis-toolbar-btn" @click="emit('analysis', 'rasterAnalysis')">
+                    <i class="fa-solid fa-chart-area" />
+                </button>
+                <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume" :disabled="multiRaster"
+                        data-testid="stockpile-toolbar-btn" @click="emit('analysis', 'stockpile')">
+                    <i class="fa-solid fa-layer-group" />
+                </button>
+            </template>
+        </div>
+    </Teleport>
+    <Teleport v-if="displayOptions || showCompare" :to="zones.topCenter">
+        <div class="ol-map-display-buttons ol-unselectable ol-control">
+            <button v-if="displayOptions" title="Show direction and speed indicators" aria-label="Show direction and speed indicators"
+                    :class="{ active: directionIndicators }" :aria-pressed="directionIndicators"
+                    @click="emit('update:directionIndicators', !directionIndicators)">
+                <i class="fa-solid fa-location-arrow" />
+            </button>
+            <button v-if="displayOptions" title="Show drone flight path" aria-label="Show drone flight path"
+                    :class="{ active: flightPath }" :aria-pressed="flightPath" @click="emit('update:flightPath', !flightPath)">
+                <i class="fa-solid fa-signs-post" />
+            </button>
+            <button v-if="showCompare" :title="compareLabel" :aria-label="compareLabel"
+                    :class="{ active: splitMode }" :aria-pressed="splitMode" @click="emit(canCompare ? 'toggle-split' : 'compare-to')">
+                <i class="fa-solid fa-table-columns" />
+            </button>
+        </div>
+    </Teleport>
+</template>
+
+<script setup>
+/**
+ * The dataset map's own buttons,
+ * teleported into the map's toolbar zones (libs/map/controlZones):
+ * - top right: Back (single-file map), Reset view, Fullscreen, Raster Analysis, Stockpile;
+ * - top center: direction indicators and flight path (display options), compare: with two
+ *   georasters or more it splits the map between them, with one it asks for another to compare to.
+ */
+import { computed } from 'vue';
+import { supportsFullScreen } from '@/libs/utils';
+
+const props = defineProps({
+    /** Zones from createControlZones */
+    zones: { type: Object, required: true },
+    showBack: { type: Boolean, default: false },
+    /** Direction indicators and flight path (hidden on the single-file map) */
+    displayOptions: { type: Boolean, default: true },
+    /** The compare button, shown while the map has a georaster */
+    splitToggle: { type: Boolean, default: true },
+    /** The entry the analysis tools open for; null hides them */
+    analysisEntry: { type: Object, default: null },
+    rasterCount: { type: Number, default: 0 },
+    directionIndicators: { type: Boolean, default: false },
+    flightPath: { type: Boolean, default: false },
+    splitMode: { type: Boolean, default: false },
+    /** Two georasters or more: the button splits the map between them */
+    canCompare: { type: Boolean, default: false }
+});
+const emit = defineEmits(['back', 'reset', 'fullscreen', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
+
+const canFullscreen = supportsFullScreen();
+// Raster Analysis and Stockpile Volume work on exactly one georaster
+const multiRaster = computed(() => props.rasterCount > 1);
+// No georaster: nothing to compare, no button
+const showCompare = computed(() => props.splitToggle && props.rasterCount > 0);
+const compareLabel = computed(() => (props.canCompare ? 'Compare georasters side by side' : 'Compare to another georaster'));
+const analysisTitle = name => multiRaster.value
+    ? `${name} - Requires a single georaster layer. Remove other layers or open the file individually.`
+    : name;
+</script>

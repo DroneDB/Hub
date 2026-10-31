@@ -1,23 +1,21 @@
 /**
  * Build Manager - delegates to taskMonitor for unified polling.
  *
- * Public API preserved for backward compatibility with existing consumers:
- * DetailPanel, Thumbnail, buildHelpers, fileAvailabilityChecker,
- * contextMenuItems, FileAvailabilityDialog, useFileOperations, useDialogManager.
+ * It holds the Hangfire jobs of the builds of a dataset: how far a build is and why it failed.
+ * Whether a build's output exists is not a job state: that is the artifacts the entry lists
+ * (libs/build/entryBuild.js).
+ *
+ * Used by DetailPanel, EntryThumbnail, buildHelpers, fileAvailabilityChecker,
+ * contextMenuItems, FileAvailabilityDialog, useDatasetActions and useDatasetListing.
  */
 
+import { shallowReactive } from 'vue';
 import taskMonitor from '@/libs/tasks/taskMonitor';
-import ddb from 'ddb';
+import { datasetKey, isActiveState, isWaitingBackgroundTask, latestTaskByPath } from '@/libs/tasks/taskStates';
+import { isBuilt } from '@/libs/build/entryBuild';
+import { isBuildableType } from '@/libs/entryTypeCapabilities';
 
-const BUILDABLE_TYPES = [
-    ddb.entry.type.POINTCLOUD,
-    ddb.entry.type.GEORASTER,
-    ddb.entry.type.MODEL,
-    ddb.entry.type.VECTOR,
-    ddb.entry.type.GAUSSIAN_SPLAT
-];
-
-// Build states according to Hangfire / JobIndex states
+// Build job states according to Hangfire / JobIndex states (progress and failures, not availability)
 const BUILD_STATES = {
     AWAITING: 'Awaiting',
     CREATED: 'Created',
@@ -29,20 +27,16 @@ const BUILD_STATES = {
     SUCCEEDED: 'Succeeded'
 };
 
-const ACTIVE_STATES = [
-    BUILD_STATES.AWAITING,
-    BUILD_STATES.CREATED,
-    BUILD_STATES.ENQUEUED,
-    BUILD_STATES.PROCESSING,
-    BUILD_STATES.SCHEDULED
-];
 
 class BuildManager {
     constructor() {
-        this._buildByPath = new Map(); // datasetKey -> Map<filePath, TaskSummaryDto>
+        // datasetKey -> Map<filePath, TaskSummaryDto>: the newest build task of each file. Reactive,
+        // and each change replaces a dataset's map, so a view that reads a build state renders again
+        this._buildByPath = shallowReactive(new Map());
         this.eventListeners = {};
         this.datasets = new Map();
         this._acquired = new Set(); // datasetKeys holding a taskMonitor reference
+        this._listed = new Set(); // datasetKeys whose build states come from a fetched task list
     }
 
     /* ---- event system ---- */
@@ -63,16 +57,10 @@ class BuildManager {
         });
     }
 
-    /* ---- dataset key (mirrors old getDatasetKey) ---- */
+    /* ---- dataset key (libs/tasks/taskStates) ---- */
 
     getDatasetKey(dataset) {
-        return dataset.baseApi || `${dataset.org}/${dataset.ds}`;
-    }
-
-    /* ---- buildable type helpers ---- */
-
-    isBuildableType(entryType) {
-        return BUILDABLE_TYPES.includes(entryType);
+        return datasetKey(dataset);
     }
 
     /* ---- dataset registration & initialisation ---- */
@@ -80,15 +68,13 @@ class BuildManager {
     registerDataset(dataset) {
         const key = this.getDatasetKey(dataset);
         this.datasets.set(key, dataset);
-        // Subscribe once; check against all registered datasets, not just the first one
-        if (!this._boundOnStateChange) {
-            this._boundOnStateChange = (data) => {
-                if (data.dataset && this.datasets.has(this.getDatasetKey(data.dataset))) {
-                    this._sync(data.dataset);
-                    this.emit('buildStateChanged', data);
-                }
+        // Subscribe once; check against all registered datasets, not just the first one. Any change
+        // of the task list counts: a state change, a new task, a task deleted
+        if (!this._boundOnTasksUpdated) {
+            this._boundOnTasksUpdated = ({ dataset: changed }) => {
+                if (changed && this.datasets.has(this.getDatasetKey(changed))) this._sync(changed);
             };
-            taskMonitor.on('buildStateChanged', this._boundOnStateChange);
+            taskMonitor.on('tasksUpdated', this._boundOnTasksUpdated);
         }
         // Start the unified poller for this dataset (once per dataset, released on unregister)
         if (!this._acquired.has(key)) {
@@ -104,33 +90,51 @@ class BuildManager {
         if (this._acquired.delete(key)) taskMonitor.release(dataset);
         this.datasets.delete(key);
         this._buildByPath.delete(key);
+        this._listed.delete(key);
     }
 
-    /** Sync _buildByPath from taskMonitor store (filtered on toolId='build'). */
+    /**
+     * Sync _buildByPath from the taskMonitor store: the newest build task of each file, and emit
+     * 'buildStateChanged' for each file whose shown build changed (another task, another state, or
+     * none). The first fetched list of a dataset only loads: nothing changed for the page yet.
+     * Before that fetch the list is empty, so comparing against it would report every past
+     * build as if it had just ended.
+     */
     _sync(dataset) {
         const key = this.getDatasetKey(dataset);
-        const prev = this._buildByPath.get(key) || new Map();
-        const updated = new Map();
+        const prev = this._buildByPath.get(key);
+        const updated = latestTaskByPath(taskMonitor.getTasks(dataset).filter(t => t.toolId === 'build'));
 
-        for (const task of taskMonitor.getTasks(dataset)) {
-            if (task.toolId === 'build' && task.path) {
-                updated.set(task.path, task);
-            }
+        // A background rebuild that waits for its turn is no build of the file (the entry is usable); it is the
+        // newest task, so an older failed one does not show in its place
+        for (const [path, task] of updated) if (isWaitingBackgroundTask(task)) updated.delete(path);
+
+        // A build just started (startBuild) stays shown until the list has its task: a task of the
+        // file that was not listed when it started, or one that is still running (a build already
+        // in progress that the server reused)
+        for (const [path, held] of prev ?? []) {
+            if (!held.knownTaskIds) continue;
+            const listed = updated.get(path);
+            if (!listed || (held.knownTaskIds.has(listed.taskId) && !isActiveState(listed.state))) updated.set(path, held);
         }
         this._buildByPath.set(key, updated);
+        if (!taskMonitor.isLoaded(dataset)) return;
+        if (!this._listed.has(key)) {
+            this._listed.add(key);
+            return;
+        }
 
-        // Emit state changes
-        for (const [path, task] of updated) {
-            const prevEntry = prev.get(path);
-            if (prevEntry && prevEntry.state !== task.state) {
-                this.emit('buildStateChanged', {
-                    dataset,
-                    filePath: path,
-                    previousState: prevEntry.state,
-                    newState: task.state,
-                    buildInfo: { path, currentState: task.state },
-                });
-            }
+        for (const path of new Set([...prev.keys(), ...updated.keys()])) {
+            const before = prev.get(path);
+            const after = updated.get(path);
+            if (before?.taskId === after?.taskId && before?.state === after?.state) continue;
+            this.emit('buildStateChanged', {
+                dataset,
+                filePath: path,
+                previousState: before?.state ?? null,
+                newState: after?.state ?? null,
+                buildInfo: after ? { path, currentState: after.state } : null,
+            });
         }
     }
 
@@ -140,10 +144,10 @@ class BuildManager {
         const key = this.getDatasetKey(dataset);
         const cache = this._buildByPath.get(key);
         if (!cache || !cache.has(filePath)) return false;
-        return ACTIVE_STATES.includes(cache.get(filePath).state);
+        return isActiveState(cache.get(filePath).state);
     }
 
-    /** Get build info for a file. Returns { path, currentState } to match old BuildJobDto. */
+    /** Get build info for a file. Returns { path, currentState }. */
     getBuildState(dataset, filePath) {
         const key = this.getDatasetKey(dataset);
         const cache = this._buildByPath.get(key);
@@ -157,7 +161,7 @@ class BuildManager {
     async startBuild(dataset, filePath, force = false) {
         try {
             const entry = await dataset.listOne(filePath);
-            if (!this.isBuildableType(entry.type)) {
+            if (!isBuildableType(entry.type)) {
                 throw new Error(`File type ${entry.type} is not buildable`);
             }
             if (this.hasActiveBuild(dataset, filePath) && !force) {
@@ -165,11 +169,14 @@ class BuildManager {
             }
             await dataset.build(filePath, force);
 
-            // Update cache with temporary "Enqueued" state
+            // Shown as enqueued until the list has the new task (see _sync); a new map, so the
+            // views that read the old one render again
             const key = this.getDatasetKey(dataset);
-            const cache = this._buildByPath.get(key) || new Map();
-            cache.set(filePath, { path: filePath, state: BUILD_STATES.ENQUEUED });
-            this._buildByPath.set(key, cache);
+            const knownTaskIds = new Set(taskMonitor.getTasks(dataset)
+                .filter(t => t.toolId === 'build' && t.path === filePath).map(t => t.taskId));
+            const next = new Map(this._buildByPath.get(key) ?? []);
+            next.set(filePath, { path: filePath, state: BUILD_STATES.ENQUEUED, knownTaskIds });
+            this._buildByPath.set(key, next);
 
             // Trigger immediate refresh so the new build task shows up
             taskMonitor.forceRefresh(dataset);
@@ -181,7 +188,7 @@ class BuildManager {
         }
     }
 
-    /* ---- load builds (backward compat, delegates to taskMonitor) ---- */
+    /* ---- load builds (delegates to taskMonitor) ---- */
 
     async loadBuilds(dataset) {
         const key = this.getDatasetKey(dataset);
@@ -189,17 +196,17 @@ class BuildManager {
         await taskMonitor.forceRefresh(dataset);
         this._sync(dataset);
         return taskMonitor.getTasks(dataset)
-            .filter(t => t.toolId === 'build')
+            .filter(t => t.toolId === 'build' && !isWaitingBackgroundTask(t))
             .map(t => ({ path: t.path, currentState: t.state }));
     }
 
-    // Legacy API that consumers may still call — a task was just started, so refresh now
+    // A task was just started: refresh now
     startPolling(dataset)  { taskMonitor.forceRefresh(dataset); }
 
     /* ---- file-added callbacks ---- */
 
     async startPollingForNewFiles(dataset, fileEntries = []) {
-        const buildableFiles = fileEntries.filter(e => e && this.isBuildableType(e.type));
+        const buildableFiles = fileEntries.filter(e => e && isBuildableType(e.type));
         if (buildableFiles.length > 0) {
             taskMonitor.onFilesAdded(dataset);
             this.emit('newBuildableFilesDetected', {
@@ -209,12 +216,9 @@ class BuildManager {
         }
     }
 
+    /** Whether any of the entries (as just listed) is buildable and has no complete build. */
     hasNewBuildableFiles(dataset, fileEntries = []) {
-        return fileEntries.some(entry => {
-            if (!entry || !this.isBuildableType(entry.type)) return false;
-            const bs = this.getBuildState(dataset, entry.path);
-            return !bs || bs.currentState !== BUILD_STATES.SUCCEEDED;
-        });
+        return fileEntries.some(entry => entry && isBuildableType(entry.type) && !isBuilt(entry));
     }
 
     async onFilesAdded(dataset, fileEntries) {
@@ -224,57 +228,16 @@ class BuildManager {
         }
     }
 
-    monitorDatasetForBuilds(dataset) {
-        this.registerDataset(dataset);
-        this.loadBuilds(dataset).catch(e => console.error('Error monitoring dataset for builds:', e));
-    }
-
-    /* ---- readiness helpers ---- */
-
-    async isFileReadyForViewing(dataset, entry, _viewType) {
-        if (!this.isBuildableType(entry.type)) return true;
-        const bs = this.getBuildState(dataset, entry.path);
-        if (bs) return bs.currentState === BUILD_STATES.SUCCEEDED;
-        // Fallback: check taskMonitor store directly
-        const builds = taskMonitor.getTasks(dataset).filter(t => t.toolId === 'build');
-        const cur = builds.find(b => b.path === entry.path);
-        if (cur) return cur.state === BUILD_STATES.SUCCEEDED;
-        return false;
-    }
-
-    async waitForBuildCompletion(dataset, filePath, maxWaitMs = 300000) {
-        const startTime = Date.now();
-        return new Promise((resolve, reject) => {
-            const tick = async () => {
-                try {
-                    if (Date.now() - startTime > maxWaitMs) {
-                        reject(new Error('Timeout waiting for build completion'));
-                        return;
-                    }
-                    this._sync(dataset);
-                    const bs = this.getBuildState(dataset, filePath);
-                    if (!bs) { setTimeout(tick, 3000); return; }
-                    if (bs.currentState === BUILD_STATES.SUCCEEDED) { resolve(bs); return; }
-                    if (bs.currentState === BUILD_STATES.FAILED) {
-                        reject(new Error(`Build failed for ${filePath}`));
-                        return;
-                    }
-                    setTimeout(tick, 3000);
-                } catch (e) { reject(e); }
-            };
-            tick();
-        });
-    }
-
     /* ---- cleanup ---- */
 
     cleanup() {
         for (const ds of Array.from(this.datasets.values())) this.unregisterDataset(ds);
-        taskMonitor.off('buildStateChanged', this._boundOnStateChange);
-        this._boundOnStateChange = null;
+        taskMonitor.off('tasksUpdated', this._boundOnTasksUpdated);
+        this._boundOnTasksUpdated = null;
         this._buildByPath.clear();
         this.datasets.clear();
         this._acquired.clear();
+        this._listed.clear();
         this.eventListeners = {};
     }
 }

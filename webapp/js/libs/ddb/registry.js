@@ -12,106 +12,73 @@
  * - null and undefined values in objects are preserved correctly in JSON
  */
 
-const Organization = require('./organization');
-const { DEFAULT_REGISTRY } = require('./constants');
-const { applyHubBranding } = require('../hubBranding');
+import Organization from './organization';
+import RequestCache from './requestCache';
+import { DEFAULT_REGISTRY } from './constants';
+import { createHttpClient } from './http/httpClient';
+import SysApi from './sysApi';
+import ShareApi from './shareApi';
+import AuthSession from './authSession';
+import FeaturesService from './featuresService';
+import AdminApi from './adminApi';
+import OrganizationsApi from './organizationsApi';
 
-let refreshTimers = {};
+const registries = new Map();
 
-const throwError = (msg, status, extraData = {}) => {
-    const e = new Error(msg);
-    e.status = status;
-    Object.assign(e, extraData);
-    throw e;
-};
-
-// Credit https://stackoverflow.com/a/38552302
-function parseJwt(token) {
-    if (!token) return {};
-    try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return {};
-        const base64Url = parts[1];
-        if (!base64Url) return {};
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-        return JSON.parse(jsonPayload);
-    } catch (e) {
-        return null;
-    }
-}
-
-// Check localStorage availability
-const hasLocalStorage = (() => {
-    try {
-        const test = '__localStorage_test__';
-        localStorage.setItem(test, test);
-        localStorage.removeItem(test);
-        return true;
-    } catch (e) {
-        return false;
-    }
-})();
-
-// In-memory fallback storage when localStorage is not available
-const memoryStorage = {};
-
-const storage = {
-    getItem: (key) => hasLocalStorage ? localStorage.getItem(key) : (memoryStorage[key] || null),
-    setItem: (key, value) => hasLocalStorage ? localStorage.setItem(key, value) : (memoryStorage[key] = value),
-    removeItem: (key) => hasLocalStorage ? localStorage.removeItem(key) : delete memoryStorage[key]
-};
-
-module.exports = class Registry {
+export default class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
         this.eventListeners = {};
-        this._refreshingToken = false;
-        this._features = {};
+        // Shared by every client of this origin
+        this.requestCache = RequestCache.forOrigin(url);
+        // Transport: auth header, timeout, parsing, ApiError
+        this.http = createHttpClient({ baseUrl: url, getToken: () => this.getAuthToken() });
+        this.sys = new SysApi(this);
+        this.share = new ShareApi(this);
+        this.session = new AuthSession(this);
+        this.features = new FeaturesService(this);
+        this.admin = new AdminApi(this);
+        this.orgs = new OrganizationsApi(this);
+    }
+
+    /**
+     * The shared client of a Registry URL (one per origin), so helpers do not build a new
+     * client, with its own feature list and token refresh, on every call.
+     * @param {string} url
+     * @returns {Registry}
+     */
+    static forUrl(url) {
+        if (!registries.has(url)) registries.set(url, new Registry(url));
+        return registries.get(url);
+    }
+
+    // ---- session (authSession.js) ----
+
+    login(username, password, xAuthToken = null) { return this.session.login(username, password, xAuthToken); }
+    logout() { return this.session.logout(); }
+    changePwd(oldPassword, newPassword) { return this.session.changePwd(oldPassword, newPassword); }
+    refreshToken() { return this.session.refreshToken(); }
+    setAutoRefreshToken(seconds) { return this.session.setAutoRefreshToken(seconds); }
+    setCredentials(username, token, expires) { return this.session.setCredentials(username, token, expires); }
+    clearCredentials() { return this.session.clearCredentials(); }
+    getAuthToken() { return this.session.getAuthToken(); }
+    getAuthTokenExpiration() { return this.session.getAuthTokenExpiration(); }
+    getUsername() { return this.session.getUsername(); }
+    isAdmin() { return this.session.isAdmin(); }
+    isLoggedIn() { return this.session.isLoggedIn(); }
+    ensureLoggedIn() { return this.session.ensureLoggedIn(); }
+
+    /** Drops the cached GET answers (all, or the endpoints starting with `prefix`). */
+    invalidateCache(prefix = '') {
+        this.requestCache.invalidate(prefix);
     }
 
     get remote() {
         return this.url.replace(/^https?:\/\//, "");
     }
 
-    get tagUrl() {
-        // Drop the https prefix if it's secure (it's the default)
-        return this.secure ? this.remote : this.url;
-    }
-
     get secure() {
         return this.url.startsWith("https://");
-    }
-
-    // Login
-    async login(username, password, xAuthToken = null) {
-        const formData = new FormData();
-        if (username) formData.append('username', username);
-        if (password) formData.append('password', password);
-        if (xAuthToken) formData.append('token', xAuthToken);
-
-        try {
-            const res = await this.postFormData('/users/authenticate', formData);
-
-            if (res && res.token) {
-                this.setCredentials(res.username, res.token, res.expires);
-                this.setAutoRefreshToken();
-                this.emit("login", res.username);
-
-                return res;
-            } else {
-                throw new Error(res?.error || "Cannot login: Invalid response");
-            }
-        } catch (e) {
-            if (e.status) {
-                // Re-throw API errors
-                throw e;
-            } else {
-                throw new Error(`Cannot login: ${e.message}`);
-            }
-        }
     }
 
     async storageInfo() {
@@ -137,352 +104,25 @@ module.exports = class Registry {
         }
     }
 
-    async users() {
-        return await this.getRequest(`/users`);
-    }
-
-    async userRoles() {
-        return await this.getRequest(`/users/roles`);
-    }
-
-    async addUser(username, password, roles = [], email = '') {
-        return await this.postRequest('/users', {
-            userName: username,
-            email: email,
-            password,
-            roles: roles
-        });
+    /**
+     * The signed-in user as they see themselves, administrator or not: { userName, email, roles, organizations },
+     * organizations the slugs of the ones they own or belong to.
+     */
+    currentUser() {
+        return this.getRequest('/users/me', { cache: false });
     }
 
     /**
-     * Deletes a user and optionally transfers their data to a successor.
-     * @param {string} username - The username of the user to delete.
-     * @param {string|null} successor - The username of the successor to transfer data to. If null, all data is deleted.
-     * @param {string} conflictResolution - How to handle conflicts: 'HaltOnConflict' (0), 'Overwrite' (1), or 'Rename' (2). Default is 'Rename'.
-     * @returns {Promise<Object>} Result object with deletion details.
+     * Whether the signed-in user can be sent e-mail: { canReceiveEmail, reason }, reason
+     * 'emailDisabled' (the server sends none), 'noAddress' (the account has no address) or null.
      */
-    async deleteUser(username, successor = null, conflictResolution = 'Rename') {
-        let url = `/users/${encodeURIComponent(username)}`;
-        const params = new URLSearchParams();
-
-        if (successor) {
-            params.append('successor', successor);
-        }
-        if (conflictResolution) {
-            params.append('conflictResolution', conflictResolution);
-        }
-
-        const queryString = params.toString();
-        if (queryString) {
-            url += `?${queryString}`;
-        }
-
-        return await this.deleteRequest(url);
-    }
-
-    async changePwd(oldPassword, newPassword) {
-        const formData = new FormData();
-        formData.append('oldPassword', oldPassword);
-        formData.append('newPassword', newPassword);
-        const res = await this.postFormData('/users/changePwd', formData);
-        if (res.token) {
-            this.setCredentials(this.getUsername(), res.token, res.expires);
-        } else {
-            throwError(res.error || `Cannot change password: ${JSON.stringify(res)}`, res.status);
-        }
-    }
-
-    async refreshToken() {
-        if (!this.ensureLoggedIn()) {
-            throw new Error("logged out");
-        }
-
-        // If a refresh is already in-flight, return the same promise
-        if (this._refreshPromise) {
-            return this._refreshPromise;
-        }
-
-        this._refreshPromise = this._doRefreshToken();
-
-        try {
-            return await this._refreshPromise;
-        } finally {
-            this._refreshPromise = null;
-        }
-    }
-
-    async _doRefreshToken() {
-        try {
-            const res = await this.postRequest('/users/authenticate/refresh');
-
-            if (res.token) {
-                this.setCredentials(this._getUsernameFromStorage(), res.token, res.expires);
-            } else {
-                throwError(res.error || "Cannot refresh token: Invalid response", res.status || 400);
-            }
-        } catch (error) {
-            if (error.status === 401) {
-                // Token is no longer valid, clear credentials
-                this.clearCredentials();
-                throw new Error("logged out");
-            }
-            throw error;
-        }
-    }
-
-    setAutoRefreshToken(seconds = 3600) {
-        if (refreshTimers[this.url]) {
-            clearTimeout(refreshTimers[this.url]);
-            delete refreshTimers[this.url];
-        }
-
-        refreshTimers[this.url] = setTimeout(async () => {
-            try {
-                await this.refreshToken();
-                this.setAutoRefreshToken(seconds);
-            } catch (e) {
-                console.error(e);
-
-                // Try again later, unless we're logged out
-                if (e.message !== "logged out") {
-                    this.setAutoRefreshToken(seconds);
-                }
-            }
-        }, seconds * 1000);
-    }
-
-    logout() {
-        // Clear the auto-refresh timer
-        if (refreshTimers[this.url]) {
-            clearTimeout(refreshTimers[this.url]);
-            delete refreshTimers[this.url];
-        }
-        // Clear cached features
-        this._features = {};
-        this.clearCredentials();
-        this.emit("logout");
-    }
-
-    setCredentials(username, token, expires) {
-        storage.setItem(`${this.url}_username`, username);
-        storage.setItem(`${this.url}_jwt_token`, token);
-        storage.setItem(`${this.url}_jwt_token_expires`, expires);
-
-        // Set cookie if the URL matches the current window
-        if (typeof window !== "undefined") {
-            if (window.location.origin === this.url) {
-                const expiresDate = new Date(expires * 1000).toUTCString();
-                const isSecure = window.location.protocol === 'https:';
-                document.cookie = `jwtToken=${token};expires=${expiresDate};path=/;SameSite=Strict${isSecure ? ';Secure' : ''}`;
-            }
-        }
-    }
-
-    getAuthToken() {
-        const expiration = this.getAuthTokenExpiration();
-        if (expiration && expiration > new Date()) {
-            return storage.getItem(`${this.url}_jwt_token`);
-        }
-        return null;
-    }
-
-    /**
-     * Get username from storage without triggering side effects.
-     * Used internally to avoid circular calls with isLoggedIn().
-     */
-    _getUsernameFromStorage() {
-        return storage.getItem(`${this.url}_username`);
-    }
-
-    getUsername() {
-        if (this.ensureLoggedIn()) {
-            return this._getUsernameFromStorage();
-        }
-        return null;
-    }
-
-    isAdmin() {
-        if (this.ensureLoggedIn()) {
-            const token = this.getAuthToken();
-            if (!token)
-                return false;
-
-            const decoded = parseJwt(token);
-            if (!decoded)
-                return false;
-
-            return decoded.admin === true;
-        }
-        return false;
-    }
-
-    getAuthTokenExpiration() {
-        const expires = storage.getItem(`${this.url}_jwt_token_expires`);
-        if (expires) {
-            return new Date(expires * 1000);
-        }
-        return null;
-    }
-
-    async createOrganization(slugOrData, name, description, isPublic) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        const formData = new FormData();
-
-        // Support both old signature (slug, name, desc, isPublic) and new signature (object)
-        if (typeof slugOrData === 'object') {
-            // New signature: createOrganization({slug, name, description, isPublic})
-            if (slugOrData.slug) formData.append('slug', slugOrData.slug);
-            if (slugOrData.name) formData.append('name', slugOrData.name);
-            if (slugOrData.description) formData.append('description', slugOrData.description);
-            if (slugOrData.isPublic !== undefined) formData.append('isPublic', slugOrData.isPublic);
-        } else {
-            // Old signature: createOrganization(slug, name, description, isPublic)
-            if (slugOrData) formData.append('slug', slugOrData);
-            if (name) formData.append('name', name);
-            if (description) formData.append('description', description);
-            if (isPublic !== undefined) formData.append('isPublic', isPublic);
-        }
-
-        return await this.postFormData('/orgs', formData);
-    }
-
-    async updateOrganization(slug, name, description, isPublic) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        const formData = new FormData();
-        formData.append('slug', slug);
-        if (name !== undefined) formData.append('name', name);
-        if (description !== undefined) formData.append('description', description);
-        if (isPublic !== undefined) formData.append('isPublic', isPublic);
-        return await this.putFormData(`/orgs/${slug}`, formData);
-    }
-
-    async getOrganizations(ownedOnly = false) {
-        const res = await this.getRequest(`/orgs${ownedOnly ? '?ownedOnly=true' : ''}`);
-        return res.map(org => new Organization(this, org));
-    }
-
-    async deleteOrganization(orgSlug) {
-
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.deleteRequest(`/orgs/${orgSlug}`);
+    notificationStatus() {
+        return this.getRequest('/users/notifications/status', { cache: false });
     }
 
     // ==================== Features ====================
 
-    /**
-     * Loads all platform feature flags from the server.
-     * Should be called once at app startup after authentication.
-     * @returns {Promise<Object>} The features object
-     */
-    async loadFeatures() {
-        try {
-            this._features = await this.getRequest('/sys/features');
-        } catch (e) {
-            console.error('Failed to load features:', e);
-            this._features = {};
-        }
-
-        // Apply Hub branding (window.HubOptions, document title, favicon links).
-        // The features endpoint is anonymous, so this works pre-login too.
-        try {
-            applyHubBranding(this._features ? this._features.hubOptions : null);
-        } catch (e) {
-            console.error('Failed to apply Hub branding:', e);
-        }
-
-        return this._features;
-    }
-
-    /**
-     * Gets the value of a specific feature flag.
-     * Features must be loaded first via loadFeatures().
-     * @param {string} name - The feature name (e.g. 'OrganizationMemberManagement')
-     * @returns {boolean} Whether the feature is enabled (defaults to false if not loaded)
-     */
-    getFeature(name) {
-        if (!this._features) return false;
-        return this._features[name] === true;
-    }
-
-    /**
-     * Gets the raw value of a feature (supports non-boolean features).
-     * Features must be loaded first via loadFeatures().
-     * @param {string} name - The feature name
-     * @returns {*} The feature value, or null if not loaded/not present
-     */
-    getFeatureValue(name) {
-        if (!this._features) return null;
-        return this._features[name] ?? null;
-    }
-
     // ==================== Organization Member Management ==
-
-    /**
-     * Gets all members of an organization
-     * @param {string} orgSlug - The organization slug
-     * @returns {Promise<Array>} List of organization members
-     */
-    async getOrganizationMembers(orgSlug) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.getRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`);
-    }
-
-    /**
-     * Adds a member to an organization
-     * @param {string} orgSlug - The organization slug
-     * @param {string} userName - The username to add
-     * @param {number} permissions - Permission level (0=ReadOnly, 1=ReadWrite, 2=ReadWriteDelete, 3=Admin)
-     * @returns {Promise<void>}
-     */
-    async addOrganizationMember(orgSlug, userName, permissions = 1) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.postRequest(`/orgs/${encodeURIComponent(orgSlug)}/members`, {
-            userName: userName,
-            permissions: permissions
-        });
-    }
-
-    /**
-     * Updates a member's permission level
-     * @param {string} orgSlug - The organization slug
-     * @param {string} userName - The username to update
-     * @param {number} permissions - New permission level (0-3)
-     * @returns {Promise<void>}
-     */
-    async updateMemberPermissions(orgSlug, userName, permissions) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.putRequest(
-            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userName)}`,
-            { permissions: permissions }
-        );
-    }
-
-    /**
-     * Removes a member from an organization
-     * @param {string} orgSlug - The organization slug
-     * @param {string} userName - The username to remove
-     * @returns {Promise<void>}
-     */
-    async removeOrganizationMember(orgSlug, userName) {
-        if (!this.ensureLoggedIn())
-            throw new Error("not logged in");
-
-        return await this.deleteRequest(
-            `/orgs/${encodeURIComponent(orgSlug)}/members/${encodeURIComponent(userName)}`
-        );
-    }
 
     /**
      * Permission level constants for organization members
@@ -511,38 +151,28 @@ module.exports = class Registry {
         }
     }
 
-    clearCredentials() {
-        storage.removeItem(`${this.url}_jwt_token`);
-        storage.removeItem(`${this.url}_jwt_token_expires`);
-        storage.removeItem(`${this.url}_username`);
-
-        // Clear cookie if needed
-        if (typeof window !== "undefined") {
-            if (window.location.origin === this.url) {
-                document.cookie = `jwtToken=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-            }
-        }
-    }
-
     /**
-     * Pure check: returns true if the user has a valid, non-expired token.
-     * No side effects.
+     * One request to the Registry.
+     *
+     * makeRequest(endpoint, options) with options { method, body, contentType, responseType,
+     * signal, headers, cache, readOnly, invalidate, onHeaders }; the positional form makeRequest(endpoint, method, body,
+     * contentType, responseType) still works.
+     *
+     * GETs go through the request cache (single flight, short read cache, conditional
+     * requests); with a `signal`, only the reused descriptors do. `cache: false` skips it. Any other method drops the cached answers
+     * (all, or the endpoints starting with `invalidate` when a write changes only those).
+     * `signal` aborts the request (AbortError); requests time out after 5 minutes.
+     * `onHeaders(headers)` receives the response headers (requests that skip the cache only).
+     * @param {string} endpoint
+     * @param {string | Record<string, any>} [methodOrOptions]
+     * @param {any} [body] @param {string|null} [contentType] @param {string|null} [responseType]
      */
-    isLoggedIn() {
-        return this.getAuthToken() !== null && this.getAuthTokenExpiration() > new Date();
-    }
+    async makeRequest(endpoint, methodOrOptions = "GET", body = null, contentType = null, responseType = null) {
+        const options = typeof methodOrOptions === 'object' && methodOrOptions !== null
+            ? methodOrOptions
+            : { method: methodOrOptions, body, contentType, responseType };
+        const method = (options.method || "GET").toUpperCase();
 
-    /**
-     * Check login status and clear stale credentials if expired.
-     * Use this when you want to enforce logout on expiration.
-     */
-    ensureLoggedIn() {
-        const loggedIn = this.isLoggedIn();
-        if (!loggedIn) this.clearCredentials();
-        return loggedIn;
-    }
-
-    async makeRequest(endpoint, method = "GET", body = null, contentType = null, responseType = null) {
         // Input validation
         if (typeof endpoint !== 'string' || !endpoint) {
             throw new Error('Invalid endpoint: must be a non-empty string');
@@ -551,274 +181,58 @@ module.exports = class Registry {
             throw new Error("Invalid endpoint: must start with '/'");
         }
         // Validate endpoint for dangerous patterns
-        if (/\.\.[\/\\]/.test(endpoint) || /[\x00-\x1f]/.test(endpoint)) {
+        if (/\.\.[/\\]/.test(endpoint) || [...endpoint].some(c => c.charCodeAt(0) < 0x20)) {
             throw new Error('Invalid endpoint: contains dangerous characters or patterns');
         }
 
-        try {
-            const headers = {};
-            const authToken = this.getAuthToken();
-
-            if (authToken) headers.Authorization = `Bearer ${authToken}`;
-
-            const options = {
-                method: method.toUpperCase(),
-                headers
-            };
-
-            // Handle request body
-            if (body !== null && body !== undefined) {
-                if (contentType) {
-                    // Explicit content type override
-                    headers['Content-Type'] = contentType;
-                    if (contentType === 'application/json') {
-                        options.body = JSON.stringify(body);
-                    } else {
-                        options.body = body;
-                    }
-                } else if (body instanceof FormData) {
-                    // Use FormData as-is (don't set Content-Type, let browser handle it)
-                    options.body = body;
-                } else if (typeof body === 'string') {
-                    // Send as plain text
-                    headers['Content-Type'] = 'text/plain';
-                    options.body = body;
-                } else if (typeof body === 'object') {
-                    // Default: send objects as JSON (modern approach)
-                    headers['Content-Type'] = 'application/json';
-                    options.body = JSON.stringify(body);
-                } else {
-                    // For other types, send as-is
-                    options.body = body;
-                }
-            }
-
-            let response;
-            try {
-                // Add timeout to fetch requests (5 minutes default)
-                const controller = new AbortController();
-                const timeoutMs = 300000;
-                const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-                try {
-                    response = await fetch(`${this.url}${endpoint}`, { ...options, signal: controller.signal });
-                } finally {
-                    clearTimeout(timeoutId);
-                }
-            } catch (fetchError) {
-                // Only network errors (connection refused, DNS failure, etc.) reach here
-                // fetch() throws TypeError for network failures in standard implementations
-                if (fetchError.name === 'AbortError')
-                    throwError(`Request timed out after ${timeoutMs / 1000}s`, 0, { originalError: fetchError });
-
-                throwError(`Network error: ${fetchError.message}`, 0, { originalError: fetchError });
-            }
-
-            // Response handling errors are not caught here - they propagate as-is
-            return await this._handleResponse(response, method, responseType);
-
-        } catch (error) {
-            // Re-throw errors that already have a status (our custom API errors)
-            if (error.status !== undefined) {
-                throw error;
-            }
-            // Wrap unexpected errors
-            throwError(`Request failed: ${error.message}`, 0, { originalError: error });
+        if (method !== "GET") {
+            // A write changes what the cached reads saw; a read sent as POST (`readOnly`) does not
+            if (!options.readOnly) this.requestCache.invalidate(options.invalidate ?? '');
+            return this._send(endpoint, method, options);
         }
+
+        if (options.cache === false || options.responseType || options.onHeaders)
+            return this._send(endpoint, method, options);
+
+        const load = ({ etag }) => this._send(endpoint, method, { ...options, signal: undefined, etag, withMeta: true });
+        // A caller that can abort: the descriptors that are reused anyway are shared (the caller
+        // stops waiting when it aborts); anything else gets its own request, which the abort
+        // cancels, so aborting it cannot abort another caller
+        if (options.signal) {
+            return this.requestCache.keeps(endpoint)
+                ? this.requestCache.getAbortable(endpoint, load, options.signal)
+                : this._send(endpoint, method, options);
+        }
+        return this.requestCache.get(endpoint, load);
     }
 
-    async _handleResponse(response, method, responseType = null) {
-        const status = response.status;
+    // Sends one request; with `withMeta` resolves { value, etag, notModified } (request cache)
+    _send(endpoint, method, options) {
+        return this.http.send(endpoint, { ...options, method });
+    }
 
-        // Handle successful responses first
-        if (status >= 200 && status < 300) {
-            // No content responses
-            if (status === 204) return true;
-
-            // HEAD requests
-            if (method.toUpperCase() === "HEAD") return true;
-
-            // Try to parse response based on content type
-            return await this._parseResponseBody(response, status, responseType);
-        }
-
-        // Handle specific error status codes
-        switch (status) {
-            case 400:
-                await this._throwResponseError(response, "Bad Request", status);
-                break;
-            case 401:
-                await this._throwResponseError(response, "Unauthorized", status);
-                break;
-            case 403:
-                await this._throwResponseError(response, "Forbidden", status);
-                break;
-            case 404:
-                throwError("Not found", 404);
-                break;
-            case 422:
-                await this._throwResponseError(response, "Unprocessable Entity", status);
-                break;
-            case 429:
-                await this._throwResponseError(response, "Too Many Requests", status);
-                break;
-            case 500:
-                await this._throwResponseError(response, "Internal Server Error", status);
-                break;
-            case 502:
-                await this._throwResponseError(response, "Bad Gateway", status);
-                break;
-            case 503:
-                await this._throwResponseError(response, "Service Unavailable", status);
-                break;
-            default:
-                // Handle other 4xx and 5xx errors
-                if (status >= 400 && status < 500) {
-                    await this._throwResponseError(response, "Client Error", status);
-                } else if (status >= 500) {
-                    await this._throwResponseError(response, "Server Error", status);
-                } else {
-                    await this._throwResponseError(response, "Unexpected Response", status);
-                }
-                break;
-        }
+    /** Request headers carrying the session token (for URLs fetched outside this client). */
+    authHeaders(extra = {}) {
+        return this.http.authHeaders(extra);
     }
 
     /**
-     * Extracts error message from a JSON response body.
-     * Checks common error fields: 'error', 'message'.
-     * @param {Object} json - The parsed JSON response
-     * @returns {string|null} The error message if found, null otherwise
+     * An authenticated fetch() that returns the raw Response, for blobs, streams and
+     * callers that treat HTTP statuses as results.
+     * @param {string} endpoint  path starting with '/', or an absolute URL of this registry
+     * @param {RequestInit} [init]
+     * @returns {Promise<Response>}
      */
-    _extractErrorMessage(json) {
-        if (!json || typeof json !== 'object') {
-            return null;
-        }
-        return json.error || json.message || null;
+    fetchRaw(endpoint, init) {
+        return this.http.fetchRaw(endpoint, init);
     }
 
     /**
-     * Parses the response body based on content type.
-     * Note: This method also checks for error fields in successful HTTP responses (2xx)
-     * because some APIs return 200 OK with an error in the body.
-     * @param {Response} response - The fetch response object
-     * @param {number} status - HTTP status code
-     * @param {string|null} responseType - Force response type: 'text' to always return text, null for auto-detection
+     * @param {string} endpoint
+     * @param {object} [options] { signal, headers, cache } (see makeRequest)
      */
-    async _parseResponseBody(response, status, responseType = null) {
-        const contentType = response.headers.get("Content-Type");
-
-        try {
-            // Force text response if explicitly requested (useful for downloading file contents)
-            if (responseType === 'text') {
-                return await response.text();
-            }
-
-            // Handle JSON responses
-            if (contentType && contentType.toLowerCase().includes("application/json")) {
-                const json = await response.json();
-
-                // Check for error field in successful JSON responses
-                // Some APIs return HTTP 200 but include an error in the response body
-                const errorMessage = this._extractErrorMessage(json);
-                if (errorMessage) {
-                    throwError(errorMessage, status, json);
-                }
-
-                return json;
-            }
-
-            // Handle text responses
-            if (contentType && contentType.toLowerCase().includes("text/")) {
-                return await response.text();
-            }
-
-            // Handle responses with no content type or other content types
-            if (!contentType || contentType.trim() === '') {
-                // Try to read as text for empty content type
-                const text = await response.text();
-
-                // If empty response, return true for successful status
-                if (!text || text.trim() === '') {
-                    return true;
-                }
-
-                // Try to parse as JSON if it looks like JSON
-                if (text.trim().startsWith('{') || text.trim().startsWith('[')) {
-                    try {
-                        const json = JSON.parse(text);
-                        // Check for error field (same as explicit JSON content-type handling)
-                        const errorMessage = this._extractErrorMessage(json);
-                        if (errorMessage) {
-                            throwError(errorMessage, status, json);
-                        }
-                        return json;
-                    } catch (e) {
-                        // If JSON parsing fails, return as text
-                        return text;
-                    }
-                }
-
-                return text;
-            }
-
-            // Handle binary content types (images, etc.)
-            if (contentType && (contentType.toLowerCase().includes("image/") || contentType.toLowerCase().includes("application/octet-stream"))) {
-                return await response.blob();
-            }
-
-            // Handle explicit blob response type
-            if (responseType === 'blob') {
-                return await response.blob();
-            }
-
-            // For other content types, try to read as text
-            return await response.text();
-
-        } catch (error) {
-            // Handle parsing errors
-            if (error.status) {
-                // Re-throw our custom errors
-                throw error;
-            } else {
-                throwError(`Failed to parse response: ${error.message}`, status, { originalError: error });
-            }
-        }
-    }
-
-    /**
-     * Throws an error based on the response body content.
-     * Used for non-2xx HTTP responses to extract meaningful error messages.
-     * Unlike _parseResponseBody(), this always throws - it's meant for error responses.
-     */
-    async _throwResponseError(response, defaultMessage, status) {
-        const contentType = response.headers.get("Content-Type");
-
-        try {
-            if (contentType && contentType.toLowerCase().includes("application/json")) {
-                const json = await response.json();
-                const errorMessage = this._extractErrorMessage(json) || defaultMessage;
-                throwError(errorMessage, status, json);
-            } else if (contentType && contentType.toLowerCase().includes("text/")) {
-                const text = await response.text();
-                throwError(text || defaultMessage, status);
-            } else {
-                // For other content types or no content type, try text
-                const text = await response.text();
-                throwError(text || defaultMessage, status);
-            }
-        } catch (error) {
-            if (error.status) {
-                // Re-throw our custom errors
-                throw error;
-            } else {
-                // If parsing fails, throw with default message
-                throwError(defaultMessage, status);
-            }
-        }
-    }
-
-    async getRequest(endpoint) {
-        return this.makeRequest(endpoint, "GET");
+    async getRequest(endpoint, options = {}) {
+        return this.makeRequest(endpoint, { ...options, method: "GET" });
     }
 
     /**
@@ -839,35 +253,30 @@ module.exports = class Registry {
         return this.makeRequest(endpoint, "PUT", body);
     }
 
+    /**
+     * @param {string} endpoint
+     * @param {object} [body]
+     * @param {{ invalidate?: string }} [options] invalidate: prefix of the cached GETs this write changes (default: all)
+     */
+    async patchRequest(endpoint, body = {}, { invalidate } = {}) {
+        return this.makeRequest(endpoint, { method: "PATCH", body, invalidate });
+    }
+
     async deleteRequest(endpoint, body = {}) {
         return this.makeRequest(endpoint, "DELETE", body);
     }
 
-    async headRequest(endpoint) {
-        return this.makeRequest(endpoint, "HEAD");
-    }
-
-    async patchRequest(endpoint, body = {}) {
-        return this.makeRequest(endpoint, "PATCH", body);
-    }
-
     // Methods for explicit FormData usage (for file uploads or when needed)
-    async postFormData(endpoint, formData) {
+    async postFormData(endpoint, formData, options = {}) {
         if (!(formData instanceof FormData))
             throw new Error('Expected FormData instance');
-        return this.makeRequest(endpoint, "POST", formData);
+        return this.makeRequest(endpoint, { ...options, method: "POST", body: formData });
     }
 
     async putFormData(endpoint, formData) {
         if (!(formData instanceof FormData))
             throw new Error('Expected FormData instance');
         return this.makeRequest(endpoint, "PUT", formData);
-    }
-
-    async patchFormData(endpoint, formData) {
-        if (!(formData instanceof FormData))
-            throw new Error('Expected FormData instance');
-        return this.makeRequest(endpoint, "PATCH", formData);
     }
 
     async deleteFormData(endpoint, formData) {
@@ -878,6 +287,15 @@ module.exports = class Registry {
 
     Organization(name) {
         return new Organization(this, name);
+    }
+
+    /**
+     * Called with the error when a request (other than sign-in or token refresh) is
+     * rejected with 401. The app decides what to do (end the session, go to Login).
+     * @param {(error: Error) => void} handler
+     */
+    onUnauthorized(handler) {
+        this.http.onUnauthorized(handler);
     }
 
     addEventListener(event, cb) {
@@ -903,103 +321,5 @@ module.exports = class Registry {
     // ========== Extended User Management Methods ==========
 
 
-
-    // Get detailed user information
-    async usersDetailed() {
-        return await this.getRequest('/users/detailed');
-    }
-
-    /**
-     * Lists all tasks across all users and datasets (admin only).
-     * @param {Object} [filter]
-     * @param {string} [filter.toolId]
-     * @param {string} [filter.state]
-     * @param {string} [filter.userId]
-     * @param {number} [filter.skip]
-     * @param {number} [filter.take]
-     * @returns {Promise<Object>} { items, total, skip, take }
-     */
-    async adminTasks({ toolId, state, userId, skip = 0, take = 50 } = {}) {
-        const q = new URLSearchParams();
-        if (toolId) q.append('toolId', toolId);
-        if (state) q.append('state', state);
-        if (userId) q.append('userId', userId);
-        q.append('skip', String(skip));
-        q.append('take', String(take));
-        return this.getRequest(`/sys/tasks?${q}`);
-    }
-
-    /**
-     * Deletes a concluded task from the global admin task list (admin only).
-     * @param {string} id Task id
-     * @returns {Promise<Object>} { deleted }
-     */
-    async adminDeleteTask(id) {
-        if (!id) throw new Error('Invalid task id');
-        return this.postRequest(`/sys/tasks/${encodeURIComponent(id)}/delete`, {});
-    }
-
-    // User update method (email and roles)
-    async updateUser(userName, email, roles) {
-        return await this.putRequest(`/users/${encodeURIComponent(userName)}`, {
-            email: email,
-            roles: roles
-        });
-    }
-
-    // Role management
-    async createRole(roleName) {
-        return await this.postRequest('/users/roles', {roleName: roleName});
-    }
-
-    async deleteRole(roleName) {
-        return await this.deleteRequest(`/users/roles/${encodeURIComponent(roleName)}`);
-    }
-
-    async updateUserRoles(userName, roles) {
-        const result = await this.putRequest(`/users/${encodeURIComponent(userName)}`, {
-            email: null, // Will be handled by the updateUser method instead
-            roles: roles
-        });
-        // PUT /users/{userName} returns 200 OK with empty body on success
-        return result || {}; // Return empty object if result is null/undefined
-    }
-
-    // User organization management
-    async getUserOrganizations(userName) {
-        return await this.getRequest(`/users/${encodeURIComponent(userName)}/orgs`);
-    }
-
-    async addUserToOrganization(userName, orgSlug, permissions) {
-        return await this.postRequest(`/users/${encodeURIComponent(userName)}/orgs`, {
-            orgSlug,
-            permissions
-        });
-    }
-
-    async removeUserFromOrganization(userName, orgSlug) {
-        return await this.deleteRequest(`/users/${encodeURIComponent(userName)}/orgs/${encodeURIComponent(orgSlug)}`);
-    }
-
-    async updateUserOrganizationPermissions(userName, orgSlug, permissions) {
-        return await this.putRequest(`/users/${encodeURIComponent(userName)}/orgs/${encodeURIComponent(orgSlug)}`, {
-            permissions
-        });
-    }
-
-    // User storage info
-    async getUserStorageInfo(userName) {
-        return await this.getRequest(`/users/${encodeURIComponent(userName)}/storage`);
-    }
-
-    // Change user password (admin function)
-    async changeUserPassword(userName, currentPassword, newPassword) {
-        const result = await this.putRequest(`/users/${encodeURIComponent(userName)}/changepwd`, {
-            currentPassword,
-            newPassword
-        });
-        // PUT /users/{userName}/changepwd returns 200 OK with empty body on success
-        return result || {}; // Return empty object if result is null/undefined
-    }
 
 }

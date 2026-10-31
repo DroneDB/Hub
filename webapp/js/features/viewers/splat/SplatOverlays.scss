@@ -1,0 +1,58 @@
+// What the splat scene draws with HTML elements it creates itself (CSS2D labels): the
+// measurement labels and their dots, and the pins. They are not in a template, so these rules are not
+// scoped (and CSS2DRenderer owns their transform, so none is set here).
+
+#splat .splat-measure-label {
+    /* Above the point (CSS2DRenderer owns the transform of the element) */
+    margin-top: -1.1rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--ddb-border-radius, 4px);
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    font-size: var(--ddb-font-size-sm, 0.8rem);
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+}
+
+#splat .splat-measure-label.total {
+    background: rgba(242, 165, 26, 0.9);
+    color: #000;
+}
+
+#splat .splat-vertex {
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 50%;
+    background: #f2a51a;
+    border: 1px solid #000;
+    pointer-events: none;
+}
+
+#splat .splat-pin {
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    background: var(--ddb-primary, #1a73e8);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+#splat .splat-pin.active {
+    background: #f2a51a;
+    color: #000;
+}
+
+#splat .splat-pin:hover,
+#splat .splat-pin:focus-visible {
+    filter: brightness(1.15);
+}

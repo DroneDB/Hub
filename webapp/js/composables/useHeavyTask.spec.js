@@ -5,7 +5,8 @@
  * - tracking the same task twice reuses the in-flight poll
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import useHeavyTask from './useHeavyTask';
+import { effectScope } from 'vue';
+import { useHeavyTask } from './useHeavyTask';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 
 let dsSeq = 0;
@@ -21,17 +22,11 @@ function makeDataset(over = {}) {
     };
 }
 
-// The mixin is options-only, and this repo has no @vue/test-utils, so drive it
-// through a plain context object the way Vue would bind `this`.
+// The owning component is an effect scope: stopping it is the unmount
 function makeHost() {
-    const ctx = { $toast: { add: vi.fn() } };
-    Object.assign(ctx, useHeavyTask.data());
-    useHeavyTask.created.call(ctx);
-    for (const [name, fn] of Object.entries(useHeavyTask.methods)) {
-        if (typeof fn === 'function') ctx[name] = fn.bind(ctx);
-    }
-    ctx.$unmount = () => useHeavyTask.beforeUnmount.call(ctx);
-    return ctx;
+    const scope = effectScope();
+    const api = scope.run(() => useHeavyTask());
+    return { ...api, $unmount: () => scope.stop() };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -55,7 +50,7 @@ describe('unmount during an in-flight tick', () => {
         await vi.advanceTimersByTimeAsync(10000);
 
         expect(dataset.getTaskLog).toHaveBeenCalledTimes(1);
-        expect(Object.keys(host._heavyTaskTimers)).toHaveLength(0);
+        expect(vi.getTimerCount()).toBe(0);
     });
 
     it('releases the taskMonitor reference so no snapshot is left behind', async () => {
@@ -68,7 +63,7 @@ describe('unmount during an in-flight tick', () => {
         host.$unmount();
 
         expect(taskMonitor.getTasks(dataset)).toHaveLength(0);
-        expect(host._heavyTaskDatasets).toEqual({});
+        expect(vi.getTimerCount()).toBe(0);
     });
 
     it('never acquires when tracking starts after unmount', async () => {

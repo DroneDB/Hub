@@ -1,25 +1,22 @@
 <template>
     <div class="text-editor-wrapper">
-        <Window :title="windowTitle" id="textEditorDialog" @onClose="close" :autofocus="false" modal width="80%" height="80%">
+        <Window id="textEditorDialog" :title="windowTitle" :focus-on-show="false" modal width="80%" height="80%" @close="close">
             <div class="text-editor-dialog">
-                <Message bindTo="error" />
+                <Message v-model="error" />
 
-                <div v-if="loading" class="loading-container">
-                    <i class="fa-solid fa-circle-notch fa-spin" />
-                    <span>Loading file...</span>
-                </div>
+                <LoadingSpinner v-if="loading" label="Loading file..." />
 
                 <PrimeMessage v-else-if="fileTooLarge" severity="warn" :closable="false" icon="fa-solid fa-triangle-exclamation">
                     <p>File is too large to edit ({{ formattedSize }})</p>
                     <p class="text-muted">Maximum size: {{ formattedMaxSize }}</p>
-                    <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                        <Button @click="close" severity="secondary" label="Close" />
-                        <Button @click="downloadFile" severity="primary" icon="fa-solid fa-download" label="Download Instead" />
+                    <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
+                        <Button severity="secondary" label="Close" @click="close" />
+                        <Button severity="primary" icon="fa-solid fa-download" label="Download Instead" @click="downloadFile" />
                     </div>
                 </PrimeMessage>
 
                 <template v-else>
-                    <div class="editor-container" ref="editorContainer"></div>
+                    <div ref="editorContainer" class="editor-container" />
 
                     <PrimeMessage v-if="!readonly && isModified" severity="info" :closable="false" icon="fa-solid fa-circle-info">
                         You have unsaved changes
@@ -27,15 +24,15 @@
 
                     <div class="footer-actions">
                         <div class="footer-left">
-                            <Button v-if="!readonly && canFormatFile" @click="formatDocument" :disabled="saving"
-                                severity="secondary" title="Format document (Shift+Alt+F)"
-                                icon="fa-solid fa-code" label="Format" />
+                            <Button v-if="!readonly && canFormatFile" :disabled="saving" severity="secondary"
+                                    title="Format document (Shift+Alt+F)" icon="fa-solid fa-code"
+                                    label="Format" @click="formatDocument" />
                         </div>
                         <div class="footer-right">
-                            <Button v-if="!readonly && isModified" @click="save" :disabled="saving"
-                                severity="info"
-                                icon="fa-solid fa-floppy-disk" :label="saving ? 'Saving...' : 'Save'" />
-                            <Button @click="close" severity="secondary" label="Close" />
+                            <Button v-if="!readonly && isModified" :disabled="saving"
+                                    icon="fa-solid fa-floppy-disk"
+                                    :label="saving ? 'Saving...' : 'Save'" @click="save" />
+                            <Button severity="secondary" label="Close" @click="close" />
                         </div>
                     </div>
                 </template>
@@ -45,23 +42,24 @@
             v-if="showConfirmClose"
             title="Unsaved Changes"
             message="You have unsaved changes. Are you sure you want to close?"
-            confirmText="Discard and Close"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            secondaryText="Save and Close"
-            secondaryButtonClass="success"
-            @onClose="handleConfirmClose"
+            confirm-text="Discard and Close"
+            cancel-text="Cancel"
+            confirm-button-class="danger"
+            secondary-text="Save and Close"
+            secondary-button-class="success"
+            @close="handleConfirmClose"
         />
     </div>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
+import Message from '@/components/HubMessage.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
-import Keyboard from '@/libs/keyboard';
+import { useListenerBag } from '@/composables/useEventListener';
 import { getLanguageMode, MAX_TEXT_FILE_SIZE, canFormat, formatContent } from '@/libs/textFileUtils';
 import { bytesToSize } from '@/libs/utils';
 
@@ -76,6 +74,7 @@ import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@cod
 
 export default {
     components: {
+        LoadingSpinner,
         Window,
         Message,
         ConfirmDialog,
@@ -97,8 +96,11 @@ export default {
             default: false
         }
     },
-    emits: ['onClose'],
+    emits: ['close', 'saved'],
 
+    setup() {
+        return { listeners: useListenerBag() };
+    },
     data() {
         return {
             loading: true,
@@ -142,12 +144,12 @@ export default {
     },
 
     async mounted() {
-        Keyboard.onKeyDown(this.handleKeyDown);
+        // Ctrl/Cmd+S saves, Shift+Alt+F formats (Escape is the Window's)
+        this.listeners.add(document, 'keydown', this.handleKeyDown);
         await this.loadFile();
     },
 
     beforeUnmount() {
-        Keyboard.offKeyDown(this.handleKeyDown);
         if (this.editor) {
             this.editor.destroy();
             this.editor = null;
@@ -191,6 +193,8 @@ export default {
 
             const languageMode = getLanguageMode(this.entry.path);
             const extensions = [
+                // The editing area is a contenteditable div: its name for assistive technology
+                EditorView.contentAttributes.of({ 'aria-label': 'File contents' }),
                 lineNumbers(),
                 highlightActiveLine(),
                 highlightActiveLineGutter(),
@@ -280,7 +284,7 @@ export default {
                 this.showConfirmClose = true;
                 return;
             }
-            this.$emit('onClose');
+            this.$emit('close');
         },
 
         async handleConfirmClose(buttonId) {
@@ -289,10 +293,10 @@ export default {
                 // Save and close
                 await this.save();
                 if (!this.error) {
-                    this.$emit('onClose');
+                    this.$emit('close');
                 }
             } else if (buttonId === 'confirm') {
-                this.$emit('onClose');
+                this.$emit('close');
             }
         },
 
@@ -307,11 +311,6 @@ export default {
             if (e.shiftKey && e.altKey && e.key === 'F') {
                 e.preventDefault();
                 this.formatDocument();
-            }
-
-            // Escape to close
-            if (e.key === 'Escape') {
-                this.close();
             }
         },
 
@@ -345,20 +344,6 @@ export default {
     flex-direction: column;
     height: 100%;
     min-height: 25rem;
-}
-
-.loading-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 12.5rem;
-    color: var(--ddb-text-secondary);
-}
-
-.loading-container i {
-    font-size: 2rem;
-    margin-bottom: var(--ddb-spacing-sm);
 }
 
 .footer-actions {

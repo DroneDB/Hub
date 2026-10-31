@@ -5,8 +5,15 @@
 import { getArea, getLength } from 'ol/sphere';
 import { LineString, Polygon, Point } from 'ol/geom';
 import Feature from 'ol/Feature';
+import Overlay from 'ol/Overlay';
 import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
+import { pointCoordinates, showPointPopup } from './pointPopup';
+import { copyText } from '@/composables/useCopyText';
+import { areaParts, lengthParts } from '@/libs/format';
+import { EPSG } from '@/libs/constants';
+import { STOCKPILE_PROPERTIES } from './stockpileStorage';
+import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
 
 /**
  * Convert an OpenLayers feature to a GeoJSON Feature
@@ -14,7 +21,7 @@ import { toLonLat } from 'ol/proj';
  * @param {string} unitPref - Unit preference ('metric' or 'imperial')
  * @returns {Object} GeoJSON Feature
  */
-export function featureToGeoJSON(feature, unitPref = 'metric') {
+function featureToGeoJSON(feature, unitPref = 'metric') {
     const geometry = feature.getGeometry();
     const geometryType = geometry.getType();
 
@@ -30,11 +37,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
         'stroke', 'stroke-width', 'stroke-opacity',
         'fill', 'fill-opacity',
         'groupId',
-        // Stockpile metadata
-        'id', 'title', 'material', 'materialDensity',
-        'netVolume', 'cutVolume', 'fillVolume',
-        'area2d', 'area3d', 'baseElevation', 'confidence',
-        'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
+        ...STOCKPILE_PROPERTIES
     ];
     safeProperties.forEach(prop => {
         const value = feature.get(prop);
@@ -46,8 +49,8 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
     // Convert to GeoJSON using OpenLayers built-in formatter
     const format = new GeoJSON();
     const geoJsonFeature = JSON.parse(format.writeFeature(clonedFeature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
+        dataProjection: EPSG.WGS84,
+        featureProjection: EPSG.WEB_MERCATOR
     }));
 
     // Determine measurement type and calculate values
@@ -107,13 +110,7 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
 
     // Stockpile features: persist all metadata fields without overwriting calculated values.
     if (measurementType === 'stockpile') {
-        const stockpileFields = [
-            'id', 'title', 'material', 'materialDensity',
-            'netVolume', 'cutVolume', 'fillVolume',
-            'area2d', 'area3d', 'baseElevation', 'confidence',
-            'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
-        ];
-        stockpileFields.forEach(k => {
+        STOCKPILE_PROPERTIES.forEach(k => {
             const v = feature.get(k);
             if (v !== undefined && v !== null) properties[k] = v;
         });
@@ -132,17 +129,38 @@ export function featureToGeoJSON(feature, unitPref = 'metric') {
 }
 
 /**
+ * The text of a measurement whose text is its size, from its geometry: an area or a length in the
+ * user's units. Null for every other measurement (a stockpile summary, a profile, a point), whose
+ * text is not derived from its size and is kept as it is.
+ * @param {ol.geom.Geometry} geometry
+ * @param {string} measurementType
+ * @param {string} unitPref - 'metric' or 'imperial'
+ * @returns {string|null}
+ */
+export function measurementSizeText(geometry, measurementType, unitPref) {
+    if (measurementType === 'area' && geometry instanceof Polygon) return areaParts(getArea(geometry), unitPref).text;
+    if (measurementType === 'length' && geometry instanceof LineString) return lengthParts(getLength(geometry), unitPref).text;
+    return null;
+}
+
+/** The size kind of an untyped geometry: 'area' for a polygon, 'length' for a line, else null */
+function sizeKind(geometry) {
+    if (geometry instanceof Polygon) return 'area';
+    if (geometry instanceof LineString) return 'length';
+    return null;
+}
+
+/**
  * Convert a GeoJSON Feature to an OpenLayers feature
  * @param {Object} geoJsonFeature - GeoJSON Feature
- * @param {Function} formatArea - Function to format area values
- * @param {Function} formatLength - Function to format length values
+ * @param {string} unitPref - Unit preference the sizes are shown in ('metric' or 'imperial')
  * @returns {ol.Feature} OpenLayers feature
  */
-export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
+function geoJSONToFeature(geoJsonFeature, unitPref) {
     const format = new GeoJSON();
     const feature = format.readFeature(geoJsonFeature, {
-        dataProjection: 'EPSG:4326',
-        featureProjection: 'EPSG:3857'
+        dataProjection: EPSG.WGS84,
+        featureProjection: EPSG.WEB_MERCATOR
     });
 
     const props = geoJsonFeature.properties;
@@ -159,13 +177,7 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
 
     // Restore stockpile-specific metadata so the panel can re-hydrate.
     if (props.measurementType === 'stockpile') {
-        const stockpileFields = [
-            'id', 'title', 'material', 'materialDensity',
-            'netVolume', 'cutVolume', 'fillVolume',
-            'area2d', 'area3d', 'baseElevation', 'confidence',
-            'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
-        ];
-        stockpileFields.forEach(k => {
+        STOCKPILE_PROPERTIES.forEach(k => {
             if (props[k] !== undefined && props[k] !== null) feature.set(k, props[k]);
         });
         // Backwards compatibility: stockpiles persisted before the
@@ -177,25 +189,23 @@ export function geoJSONToFeature(geoJsonFeature, formatArea, formatLength) {
         }
     }
 
-    // Restore GeoJSON styling properties
-    if (props.stroke) feature.set('stroke', props.stroke);
+    // Restore GeoJSON styling properties; a stockpile or a profile saved in the orange of the
+    // earlier analysis overlays takes today's yellow
+    const colour = ANALYSIS_MEASUREMENT_TYPES.includes(props.measurementType) ? currentAnalysisColour : c => c;
+    if (props.stroke) feature.set('stroke', colour(props.stroke));
     if (props['stroke-width']) feature.set('stroke-width', props['stroke-width']);
     if (props['stroke-opacity']) feature.set('stroke-opacity', props['stroke-opacity']);
-    if (props.fill) feature.set('fill', props.fill);
+    if (props.fill) feature.set('fill', colour(props.fill));
     if (props['fill-opacity']) feature.set('fill-opacity', props['fill-opacity']);
     // Restore group assignment
     if (props.groupId) feature.set('groupId', props.groupId);
 
-    // Calculate and format the tooltip text
-    let tooltipText = props.tooltipText;
-
-    if (!tooltipText) {
-        if (geometry instanceof Polygon && formatArea) {
-            tooltipText = formatArea(geometry);
-        } else if (geometry instanceof LineString && formatLength) {
-            tooltipText = formatLength(geometry);
-        }
-    }
+    // An area or a length shows its size in today's units, not the text it was saved with (which
+    // may be in other units or an older format); other measurements keep their text. A feature
+    // saved without text gets its size, as its geometry gives it.
+    const tooltipText = measurementSizeText(geometry, props.measurementType, unitPref)
+        || props.tooltipText
+        || measurementSizeText(geometry, sizeKind(geometry), unitPref);
 
     feature.set('tooltipText', tooltipText);
 
@@ -245,7 +255,7 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
         crs: {
             type: 'name',
             properties: {
-                name: 'EPSG:4326' // Output is always in WGS84
+                name: EPSG.WGS84 // Output is always in WGS84
             }
         },
         metadata: {
@@ -283,12 +293,11 @@ export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', 
  * Import measurements from GeoJSON into the source
  * @param {Object} geojson - GeoJSON FeatureCollection
  * @param {ol.source.Vector} source - OpenLayers vector source
- * @param {Function} formatArea - Function to format area values
- * @param {Function} formatLength - Function to format length values
+ * @param {string} unitPref - Unit preference the sizes are shown in ('metric' or 'imperial')
  * @param {ol.Map} map - OpenLayers map instance
  * @returns {Array} Imported features
  */
-export function importMeasurements(geojson, source, formatArea, formatLength, map, onPointEdit) {
+export function importMeasurements(geojson, source, unitPref, map, onPointEdit) {
     if (!geojson || !geojson.features) {
         console.warn('Invalid GeoJSON data');
         return [];
@@ -298,7 +307,7 @@ export function importMeasurements(geojson, source, formatArea, formatLength, ma
 
     geojson.features.forEach(geoJsonFeature => {
         try {
-            const feature = geoJSONToFeature(geoJsonFeature, formatArea, formatLength);
+            const feature = geoJSONToFeature(geoJsonFeature, unitPref);
 
             // Add the feature to the source
             source.addFeature(feature);
@@ -362,7 +371,6 @@ function createStaticTooltip(feature, text, map) {
     }
 
     if (position) {
-        const Overlay = require('ol/Overlay').default;
         const measureTooltip = new Overlay({
             element: measureTooltipElement,
             offset: [0, -7],
@@ -396,88 +404,28 @@ function createPointPopup(feature, map, source, onEdit) {
 
     if (lat === undefined || lon === undefined) return;
 
-    const ddToDms = (coordinate, posSymbol, negSymbol) => {
-        const dd = Math.abs(coordinate);
-        const d = Math.floor(dd);
-        const m = Math.floor((dd - d) * 60);
-        const s = Math.round((dd - d - m / 60) * 3600 * 100) / 100;
-        const dir = coordinate >= 0 ? posSymbol : negSymbol;
-        return d + '\u00B0' + (m < 10 ? '0' : '') + m + "'" + (s < 10 ? '0' : '') + s.toFixed(2) + '" ' + dir;
-    };
-
-    const dmsLat = ddToDms(lat, 'N', 'S');
-    const dmsLon = ddToDms(lon, 'E', 'W');
-    const ddLat = lat.toFixed(6);
-    const ddLon = lon.toFixed(6);
-    const description = feature.get('description') || '';
-
-    const escapeHtml = (s) => String(s)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    const accent = feature.get('stroke') || '#3b82f6';
-    const name = feature.get('name');
-    const headerHtml = name
-        ? `<div class="ol-point-popup-header" style="border-left-color:${escapeHtml(accent)}">
-                <i class="fa-solid fa-location-dot" style="color:${escapeHtml(accent)}"></i>
-                <span class="ol-point-popup-title">${escapeHtml(name)}</span>
-           </div>`
-        : '';
-    const descHtml = description
-        ? `<div class="ol-point-popup-description">${escapeHtml(description)}</div>`
-        : '';
-
-    const popupEl = document.createElement('div');
-    popupEl.className = 'ol-point-popup';
-    popupEl.innerHTML = `
-        ${headerHtml}
-        <div class="ol-point-popup-body">
-            <div class="ol-point-popup-coords">
-                <span class="ol-point-popup-dms" title="Degrees Minutes Seconds">
-                    <i class="fa-solid fa-compass ol-point-popup-coord-icon"></i>${dmsLat} / ${dmsLon}
-                </span>
-                <span class="ol-point-popup-dd" title="Decimal Degrees">
-                    <i class="fa-solid fa-hashtag ol-point-popup-coord-icon"></i>${ddLat} / ${ddLon}
-                </span>
-                ${descHtml}
-            </div>
-            <div class="ol-point-popup-actions">
-                <button class="image-popup-btn ol-point-popup-edit" title="Edit annotation"><i style="margin: 0" class="fa-solid fa-pencil"></i></button>
-                <button class="image-popup-btn ol-point-popup-copy" title="Copy coordinates"><i style="margin: 0" class="fa-regular fa-copy"></i></button>
-                <button class="image-popup-btn ol-point-popup-delete" title="Delete point"><i style="margin: 0" class="fa-solid fa-trash"></i></button>
-            </div>
-        </div>
-    `;
-
-    const Overlay = require('ol/Overlay').default;
-    const popupOverlay = new Overlay({
-        element: popupEl,
-        offset: [0, -12],
-        positioning: 'bottom-center',
-        stopEvent: true,
-        insertFirst: false,
-    });
-    popupOverlay.setPosition(coords);
-    map.addOverlay(popupOverlay);
-
-    feature.set('measureTooltipElement', popupEl);
-    feature.set('measureTooltip', popupOverlay);
+    const { ddLat, ddLon } = pointCoordinates(lat, lon);
+    const { popupEl, popupOverlay } = showPointPopup(map, feature, { lat, lon, coords, actions: true });
 
     // Edit handler
+    // lifetime: element (buttons of the popup created here)
     popupEl.querySelector('.ol-point-popup-edit').addEventListener('click', (e) => {
         e.preventDefault();
         if (onEdit) onEdit(feature, map);
     });
 
+    // lifetime: element (buttons of the popup created here)
     popupEl.querySelector('.ol-point-popup-copy').addEventListener('click', (e) => {
         e.preventDefault();
         const text = `${ddLat}, ${ddLon}`;
-        navigator.clipboard.writeText(text).then(() => {
+        copyText(text).then(() => {
             const icon = popupEl.querySelector('.ol-point-popup-copy i');
             if (icon) { icon.className = 'fa-solid fa-check'; }
             setTimeout(() => { if (icon) { icon.className = 'fa-regular fa-copy'; } }, 1500);
         });
     });
 
+    // lifetime: element (buttons of the popup created here)
     popupEl.querySelector('.ol-point-popup-delete').addEventListener('click', (e) => {
         e.preventDefault();
         map.removeOverlay(popupOverlay);
@@ -497,32 +445,8 @@ function createPointPopup(feature, map, source, onEdit) {
  * @returns {Object} Calculated values
  */
 function calculateAreaValues(area, unitPref) {
-    let value, unit, displayValue;
-
-    if (unitPref === 'metric') {
-        if (area > 10000) {
-            value = area / 1000000;
-            unit = 'km²';
-            displayValue = Math.round(value * 100) / 100 + ' km²';
-        } else {
-            value = area;
-            unit = 'm²';
-            displayValue = Math.round(value * 100) / 100 + ' m²';
-        }
-    } else {
-        // Imperial: convert to acres
-        const f = 0.00024710538146717; // m² to acres
-        value = area * f;
-        unit = 'acres';
-        displayValue = Math.round(value * 100) / 100 + ' acres';
-    }
-
-    return {
-        area: Math.round(area * 100) / 100, // Always store raw m² value
-        areaValue: Math.round(value * 100) / 100,
-        unit: unit,
-        displayValue: displayValue
-    };
+    const { value, unit, text } = areaParts(area, unitPref);
+    return { area: Math.round(area * 100) / 100, areaValue: value, unit, displayValue: text };
 }
 
 /**
@@ -532,30 +456,6 @@ function calculateAreaValues(area, unitPref) {
  * @returns {Object} Calculated values
  */
 function calculateLengthValues(length, unitPref) {
-    let value, unit, displayValue;
-
-    if (unitPref === 'metric') {
-        if (length > 100) {
-            value = length / 1000;
-            unit = 'km';
-            displayValue = Math.round(value * 100) / 100 + ' km';
-        } else {
-            value = length;
-            unit = 'm';
-            displayValue = Math.round(value * 100) / 100 + ' m';
-        }
-    } else {
-        // Imperial: convert to feet
-        const f = 3.28084; // meters to feet
-        value = length * f;
-        unit = 'ft';
-        displayValue = Math.round(value * 100) / 100 + ' ft';
-    }
-
-    return {
-        length: Math.round(length * 100) / 100, // Always store raw meters value
-        lengthValue: Math.round(value * 100) / 100,
-        unit: unit,
-        displayValue: displayValue
-    };
+    const { value, unit, text } = lengthParts(length, unitPref);
+    return { length: Math.round(length * 100) / 100, lengthValue: value, unit, displayValue: text };
 }

@@ -1,6 +1,6 @@
 /**
- * Mixin for Plant Health (multispectral visualization) functionality.
- * Shared between Map.vue and SingleMap.vue.
+ * Feature scope for Plant Health (multispectral visualization) functionality.
+ * Shared by the dataset map and the single-file map (MapCore).
  *
  * Requirements:
  * - Component must have `this.dataset` (Dataset instance)
@@ -8,19 +8,16 @@
  * - Component must import and register PlantHealthPanel component
  * - Component must call `this.refreshRasterLayers()` when vizParams change
  */
-import HybridXYZ from '@/libs/map/olHybridXYZ';
-import { sourceMaxZoom, FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
+import { createRasterSource, sameVizParams, rasterLayerPath } from '@/libs/map/rasterLayers';
+import { FALLBACK_NATIVE_ZOOM } from '@/libs/map/rasterZoom';
+import { createFeatureScope } from '@/composables/featureScope';
 
-export default {
+const definition = {
     data() {
         return {
             plantHealthVisible: false,
             plantHealthFilePath: null,
             plantHealthInitialParams: null,
-            // Latest viz params emitted by the currently-open analysis panel.
-            // Kept for backwards compatibility with consumers that still read
-            // it directly; the canonical store is `vizParamsByPath` below.
-            currentVizParams: {},
             // Per-file viz-params cache. Each Plant Health / Raster Analysis
             // panel writes its current params here when the user changes the
             // colormap, formula, or rescale, and reads them back on reopen so
@@ -35,9 +32,6 @@ export default {
         openPlantHealth(file, options) {
             const path = typeof file === 'string' ? file : (file && file.entry ? file.entry.path : null);
             if (!path) return;
-            // Mutually-exclusive analysis panels.
-            if (typeof this.closeRasterAnalysis === 'function') this.closeRasterAnalysis();
-            if (typeof this.closeStockpileVolume === 'function') this.closeStockpileVolume();
             this.plantHealthFilePath = path;
             this.plantHealthVisible = true;
             // Restore previously-applied viz params for this file so the
@@ -51,9 +45,6 @@ export default {
             } else {
                 this.plantHealthInitialParams = null;
             }
-            if (cached && Object.keys(cached).length) {
-                this.currentVizParams = { ...cached };
-            }
         },
 
         closePlantHealth() {
@@ -62,15 +53,11 @@ export default {
             this.plantHealthInitialParams = null;
             // Note: `vizParamsByPath` is intentionally preserved so the next
             // panel that opens (or the next refreshRasterLayers tick) can
-            // restore the styling. `currentVizParams` is reset only because
-            // it represents the "active panel emitting" state, which no
-            // longer applies once the panel is closed.
-            this.currentVizParams = {};
+            // restore the styling.
             this.refreshRasterLayers();
         },
 
         handleVizParamsChanged(params) {
-            this.currentVizParams = params;
             const path = this.plantHealthFilePath;
             if (path) {
                 if (params && Object.keys(params).length) {
@@ -84,59 +71,34 @@ export default {
             this.refreshRasterLayers();
         },
 
+        /**
+         * Gives each raster layer the tiles of its remembered viz params (the per-file cache).
+         * Only a layer whose params changed gets a new source: the others keep their loaded
+         * tiles (another layer's plant health, a closed panel, a rebuilt file list).
+         */
         refreshRasterLayers() {
             if (!this.rasterLayer) return;
 
             this.rasterLayer.getLayers().forEach(layer => {
                 const layerPath = this._getLayerPath(layer);
-                if (!layerPath) return;
-
                 const source = layer.getSource();
-                if (!source) return;
-
-                // Apply viz params from the per-file cache so layers stay
-                // styled across panel switches and panel close. The active
-                // panel's `currentVizParams` is mirrored into the cache by
-                // its `handle*VizParamsChanged` hook, so reading the cache
-                // is sufficient.
-                const cached = this.vizParamsByPath && this.vizParamsByPath[layerPath];
-                const vizParams = cached && Object.keys(cached).length ? cached : {};
-
                 const url = this._getLayerUrl(layer);
-                if (!url) return;
+                if (!layerPath || !source || !url) return;
 
-                // Carry over the retina flag from the source we are replacing,
-                // and recompute its maxZoom from the native GSD zoom stamped on
-                // the layer by Map.vue ('rasterNativeZoom'). OL's XYZ source never
-                // exposes '.maxZoom', so reading it back would always yield 22.
-                const prevRetina = typeof source.getTilePixelRatio === 'function'
-                    ? source.getTilePixelRatio(0) > 1
-                    : false;
+                const vizParams = this.vizParamsByPath && this.vizParamsByPath[layerPath];
+                if (sameVizParams(source.vizParams, vizParams)) return;
 
+                // The new source keeps the retina flag of the one it replaces and the native GSD
+                // zoom stamped on the layer ('rasterNativeZoom'): OL's XYZ source never exposes
+                // its maxZoom, so it cannot be read back
                 const native = layer.get('rasterNativeZoom');
-                const gridMax = typeof source.getTileGrid === 'function'
-                    ? source.getTileGrid()?.getMaxZoom?.()
-                    : undefined;
-                // Prefer the stamped native zoom; otherwise reconstruct it from the
-                // current tile grid (which already stores sourceMaxZoom), adding the
-                // retina level back to recover native before calling sourceMaxZoom
-                // again — this keeps the result idempotent when the stamp is missing.
-                const nativeForSource = typeof native === 'number' && isFinite(native)
-                    ? native
-                    : (typeof gridMax === 'number' && isFinite(gridMax)
-                        ? gridMax + (prevRetina ? 1 : 0)
-                        : FALLBACK_NATIVE_ZOOM);
-
-                const newSource = new HybridXYZ({
+                layer.setSource(createRasterSource({
                     url,
-                    tileSize: 256,
-                    transition: 200,
-                    minZoom: 14,
-                    retina: prevRetina,
-                    maxZoom: sourceMaxZoom(nativeForSource, prevRetina),
-                    vizParams: Object.keys(vizParams).length > 0 ? vizParams : undefined
-                });
-                layer.setSource(newSource);
+                    hash: layer.file && layer.file.entry ? layer.file.entry.hash : undefined,
+                    native: typeof native === 'number' && isFinite(native) ? native : FALLBACK_NATIVE_ZOOM,
+                    retina: typeof source.getTilePixelRatio === 'function' && source.getTilePixelRatio(0) > 1,
+                    vizParams
+                }));
             });
         },
 
@@ -154,7 +116,7 @@ export default {
                 const path = params.get('path');
                 if (!path) return;
 
-                // Check if file exists in list (Map.vue) or matches entry (SingleMap.vue)
+                // Check if file exists in list (dataset map) or matches entry (single-file map)
                 if (files) {
                     const file = files.find(f => f.entry && f.entry.path === path);
                     if (!file) return;
@@ -176,7 +138,6 @@ export default {
 
                 if (Object.keys(vizParams).length > 0) {
                     this.plantHealthInitialParams = vizParams;
-                    this.currentVizParams = vizParams;
                 }
 
                 this.openPlantHealth(path);
@@ -185,14 +146,8 @@ export default {
             }
         },
 
-        /**
-         * Get the file path from a raster tile layer.
-         * Override in consuming component if layer structure differs.
-         */
         _getLayerPath(layer) {
-            if (layer.file && layer.file.entry) return layer.file.entry.path;
-            if (layer.entryPath) return layer.entryPath;
-            return null;
+            return rasterLayerPath(layer);
         },
 
         /**
@@ -206,3 +161,12 @@ export default {
         }
     }
 };
+
+/**
+ * The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function usePlantHealth(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

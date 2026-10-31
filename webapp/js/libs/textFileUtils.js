@@ -3,7 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import ddb from 'ddb';
-import { bytesToSize } from './utils';
 const { pathutils } = ddb;
 
 // Extensions that should open as text by default
@@ -19,14 +18,14 @@ const TEXT_EXTENSIONS = [
 
 // Binary extensions that should never be opened as text
 const BINARY_EXTENSIONS = [
-    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff',
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'webp', 'tif', 'tiff', 'jp2', 'j2k',
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp',
     'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz',
     'exe', 'dll', 'so', 'dylib', 'bin',
     'mp3', 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'wav', 'ogg', 'flac',
     'las', 'laz', 'ply', 'obj', 'fbx', 'glb', 'gltf', 'dae', 'stl', '3ds',
     'shp', 'dbf', 'shx', 'gpkg', 'mbtiles', 'sqlite', 'db',
-    'ddb', 'nxs', 'nxz'
+    'ddb', 'nxs', 'nxz', 'bm3d'
 ];
 
 // Maximum file size for text editing (5MB)
@@ -36,10 +35,7 @@ const MAX_TEXT_FILE_SIZE = 5 * 1024 * 1024;
  * Get file extension from path
  */
 function getExtension(path) {
-    const base = pathutils.basename(path);
-    const lastDot = base.lastIndexOf('.');
-    if (lastDot === -1 || lastDot === 0) return '';
-    return base.substring(lastDot + 1).toLowerCase();
+    return pathutils.extname(path).slice(1);
 }
 
 /**
@@ -104,6 +100,8 @@ function getLanguageMode(path) {
         case 'markdown':
             return 'markdown';
         case 'xml':
+        case 'gpx':
+        case 'kml':
         case 'html':
         case 'htm':
         case 'svg':
@@ -130,12 +128,13 @@ function canFormat(path) {
 function formatContent(content, mode) {
     try {
         switch (mode) {
-            case 'json':
+            case 'json': {
                 const parsed = JSON.parse(content);
                 return {
                     success: true,
                     content: JSON.stringify(parsed, null, 2)
                 };
+            }
             default:
                 return {
                     success: false,
@@ -153,12 +152,7 @@ function formatContent(content, mode) {
 }
 
 export {
-    TEXT_EXTENSIONS,
-    BINARY_EXTENSIONS,
     MAX_TEXT_FILE_SIZE,
-    getExtension,
-    isDefaultTextFile,
-    isBinaryFile,
     isPdfFile,
     canOpenAsText,
     shouldOpenAsText,

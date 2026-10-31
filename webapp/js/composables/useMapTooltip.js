@@ -1,6 +1,6 @@
 /**
- * Mixin for tooltip overlay on vector features.
- * Shared between Map.vue and SingleMap.vue.
+ * Feature scope for the tooltip overlay on vector features.
+ * Shared by the dataset map and the single-file map (MapCore).
  *
  * The consuming component should define a method `getLayerDisplayName(layer)`
  * that returns the fallback label for a layer (e.g. layer.file.name or layer.entry.name).
@@ -8,12 +8,10 @@
 import Overlay from 'ol/Overlay';
 import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
-import { createApp } from 'vue';
-import PrimeVue from 'primevue/config';
-import Lara from '@primevue/themes/lara';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
+import { createFeatureScope } from '@/composables/featureScope';
 
-export default {
+const definition = {
     data() {
         return {
             tooltipElement: null,
@@ -102,29 +100,7 @@ export default {
                 }
             }
 
-            const container = document.createElement('div');
-            document.body.appendChild(container);
-
-            const cleanup = () => {
-                try {
-                    dialogApp.unmount();
-                } catch (e) { /* already unmounted */ }
-                if (container.parentNode) {
-                    document.body.removeChild(container);
-                }
-            };
-
-            const dialogApp = createApp(FeatureInfoDialog, {
-                title,
-                properties,
-                onOnClose: cleanup
-            });
-            dialogApp.config.errorHandler = (err) => {
-                console.error('FeatureInfoDialog error:', err);
-                cleanup();
-            };
-            dialogApp.use(PrimeVue, { theme: { preset: Lara } });
-            dialogApp.mount(container);
+            this.dialogs.open(FeatureInfoDialog, { title, properties });
         },
 
         /**
@@ -139,3 +115,12 @@ export default {
         }
     }
 };
+
+/**
+ * The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useMapTooltip(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

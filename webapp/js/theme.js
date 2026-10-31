@@ -1,0 +1,132 @@
+// @ts-check
+/** The Hub's PrimeVue theme: Lara with the DroneDB blue. */
+import Lara from '@primevue/themes/lara';
+import { definePreset } from '@primevue/themes';
+import { PRIMARY } from '@/libs/palette';
+
+// The tint of a selected row that has focus or is pressed: a quarter of shade 100 in shade 50
+// (css/_variables.scss writes the same recipe for --ddb-selected-active-bg)
+const SELECTED_ACTIVE = `color-mix(in srgb, ${PRIMARY[100]} 25%, ${PRIMARY[50]})`;
+
+// Lara's solid severities (500 shades) put white text below 4.5:1; the 700 shades pass
+const solid = c => ({
+    background: `{${c}.700}`, hoverBackground: `{${c}.800}`, activeBackground: `{${c}.900}`,
+    borderColor: `{${c}.700}`, hoverBorderColor: `{${c}.800}`, activeBorderColor: `{${c}.900}`
+});
+const SEVERITIES = { success: 'green', help: 'purple', danger: 'red' };
+const each = make => Object.fromEntries(Object.entries(SEVERITIES).map(([s, c]) => [s, make(c)]));
+
+// "info" is not a second blue: it is the brand blue, so a button, a tag and a message about
+// the same thing never come out as different blues. The solid shades are the primary ones
+// (white on primary.500 is 4.78:1).
+const infoSolid = {
+    background: '{primary.color}', hoverBackground: '{primary.hover.color}', activeBackground: '{primary.active.color}',
+    borderColor: '{primary.color}', hoverBorderColor: '{primary.hover.color}', activeBorderColor: '{primary.active.color}',
+    focusRing: { shadow: '0 0 0 0.2rem {primary.200}' }
+};
+const infoOutlined = {
+    hoverBackground: '{primary.50}', activeBackground: '{primary.100}', borderColor: '{primary.200}', color: '{primary.color}'
+};
+const infoText = { hoverBackground: '{primary.50}', activeBackground: '{primary.100}', color: '{primary.color}' };
+
+// "warn" is yellow, as Lara's warning messages and toasts already are: its orange, darkened for
+// white text, read as a second red next to danger. Yellow takes dark text (yellow.950 on
+// yellow.400 is 9.5:1, on yellow.600 5.0:1; yellow.800 on white 6.9:1).
+const warnSolid = {
+    background: '{yellow.400}', hoverBackground: '{yellow.500}', activeBackground: '{yellow.600}',
+    borderColor: '{yellow.400}', hoverBorderColor: '{yellow.500}', activeBorderColor: '{yellow.600}',
+    color: '{yellow.950}', hoverColor: '{yellow.950}', activeColor: '{yellow.950}',
+    focusRing: { color: 'transparent', shadow: '0 0 0 0.2rem {yellow.200}' }
+};
+const warnOutlined = { hoverBackground: '{yellow.50}', activeBackground: '{yellow.100}', borderColor: '{yellow.300}', color: '{yellow.800}' };
+const warnText = { hoverBackground: '{yellow.50}', activeBackground: '{yellow.100}', color: '{yellow.800}' };
+const warnTag = { background: '{yellow.400}', color: '{yellow.950}' };
+
+// Messages, toasts and inline messages: primary tints with primary.700 text (7.7:1 on the tint;
+// primary.500 would give 4.2:1)
+const infoMessage = {
+    background: 'color-mix(in srgb, {primary.50}, transparent 5%)',
+    color: '{primary.700}',
+    closeButton: { hoverBackground: '{primary.100}', focusRing: { shadow: '0 0 0 0.2rem {primary.200}' } }
+};
+
+const DdbPreset = definePreset(Lara, {
+    components: {
+        dataview: {
+            root: {
+                borderWidth: '0'
+            }
+        },
+        button: {
+            colorScheme: {
+                light: {
+                    root: { ...each(solid), info: infoSolid, warn: warnSolid },
+                    outlined: { info: infoOutlined, warn: warnOutlined },
+                    text: { info: infoText, warn: warnText }
+                }
+            }
+        },
+        tag: {
+            colorScheme: { light: { ...each(c => ({ background: `{${c}.700}` })), info: { background: '{primary.color}' }, warn: warnTag } }
+        },
+        badge: {
+            colorScheme: { light: { info: { background: '{primary.color}' }, warn: warnTag } }
+        },
+        message: {
+            colorScheme: {
+                light: {
+                    info: {
+                        ...infoMessage,
+                        outlined: { color: '{primary.700}', borderColor: '{primary.700}' },
+                        simple: { color: '{primary.700}' }
+                    }
+                }
+            }
+        },
+        inlinemessage: {
+            colorScheme: { light: { info: { ...infoMessage, borderColor: infoMessage.background } } }
+        },
+        toast: {
+            colorScheme: { light: { info: { ...infoMessage, borderColor: '{primary.500}' } } }
+        }
+    },
+    semantic: {
+        primary: PRIMARY,
+        colorScheme: {
+            light: {
+                primary: {
+                    color: PRIMARY[500],
+                    contrastColor: '#ffffff',
+                    hoverColor: PRIMARY[600],
+                    activeColor: PRIMARY[700]
+                },
+                highlight: {
+                    background: PRIMARY[50],
+                    focusBackground: SELECTED_ACTIVE,
+                    color: PRIMARY[600],
+                    focusColor: PRIMARY[700]
+                }
+            }
+        }
+    }
+});
+
+/** PrimeVue options for every Vue app the Hub creates. */
+export const primeVueOptions = {
+    pt: {
+        // Password puts popup attributes on its input although the Hub never shows the
+        // strength popup (feedback off): a password field is not a combobox (axe aria-allowed-attr)
+        password: { pcInputText: { root: { 'aria-expanded': null, 'aria-haspopup': null } } },
+        // The icon font's glyph is not part of the name of a button or a menu item (" Save"):
+        // its label or aria-label is
+        button: { icon: { 'aria-hidden': 'true' } },
+        menu: { itemIcon: { 'aria-hidden': 'true' } },
+        contextmenu: { itemIcon: { 'aria-hidden': 'true' } }
+    },
+    theme: {
+        preset: DdbPreset,
+        options: {
+            darkModeSelector: false
+        }
+    }
+};

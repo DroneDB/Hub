@@ -1,14 +1,14 @@
 <template>
-    <Window :title="title" id="paste-results" @onClose="close" modal sizeClass="dialog-lg" fixedSize>
+    <Window id="paste-results" :title="title" modal size-class="dialog-lg" fixed-size close-button cancel-label="Close" @close="$emit('close')" @confirm="$emit('close')">
         <div class="paste-results-content">
             <div v-if="succeeded.length > 0" class="result-section success-section">
                 <h4>
-                    <i class="fa-solid fa-circle-check green"></i>
+                    <i class="fa-solid fa-circle-check green" />
                     Successfully {{ mode === 'cut' ? 'moved' : 'copied' }} ({{ succeeded.length }})
                 </h4>
                 <ul class="file-list">
                     <li v-for="s in succeeded" :key="s.source + '|' + s.dest" class="file-item success">
-                        <i class="fa-solid fa-check green"></i>
+                        <i class="fa-solid fa-check green" />
                         <span class="file-path">{{ s.source }} → {{ s.dest }}</span>
                     </li>
                 </ul>
@@ -16,12 +16,12 @@
 
             <div v-if="skipped.length > 0" class="result-section">
                 <h4>
-                    <i class="fa-solid fa-forward"></i>
+                    <i class="fa-solid fa-forward" />
                     Skipped ({{ skipped.length }})
                 </h4>
                 <ul class="file-list">
                     <li v-for="path in skipped" :key="path" class="file-item">
-                        <i class="fa-solid fa-forward"></i>
+                        <i class="fa-solid fa-forward" />
                         <span class="file-path">{{ path }}</span>
                     </li>
                 </ul>
@@ -29,12 +29,12 @@
 
             <div v-if="failedCount > 0" class="result-section error-section">
                 <h4>
-                    <i class="fa-solid fa-circle-exclamation red"></i>
+                    <i class="fa-solid fa-circle-exclamation red" />
                     Failed ({{ failedCount }})
                 </h4>
                 <ul class="file-list">
                     <li v-for="(error, path) in failed" :key="path" class="file-item error">
-                        <i class="fa-solid fa-xmark red"></i>
+                        <i class="fa-solid fa-xmark red" />
                         <span class="file-path">{{ path }}</span>
                         <span class="error-message">{{ error }}</span>
                     </li>
@@ -42,41 +42,26 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button @click="close" severity="secondary" label="Close" />
-        </div>
     </Window>
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 
 export default {
-    components: { Window, Button },
+    components: { Window },
     props: {
         mode: { type: String, default: 'copy' },
         succeeded: { type: Array, default: () => [] },
         failed: { type: Object, default: () => ({}) },
         skipped: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     computed: {
         failedCount() { return Object.keys(this.failed).length; },
         title() {
             return this.mode === 'cut' ? 'Move Results' : 'Copy Results';
-        }
-    },
-
-    mounted() { Keyboard.onKeyDown(this.handleKeyDown); },
-    beforeUnmount() { Keyboard.offKeyDown(this.handleKeyDown); },
-
-    methods: {
-        close() { this.$emit('onClose'); },
-        handleKeyDown(e) {
-            if (e.key === 'Enter' || e.key === 'Escape') this.close();
         }
     }
 };
@@ -133,6 +118,6 @@ export default {
     padding-left: 1.25rem;
 }
 
-.green { color: #22c55e; }
-.red { color: #ef4444; }
+.green { color: var(--ddb-success); }
+.red { color: var(--ddb-danger); }
 </style>

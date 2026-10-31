@@ -1,42 +1,42 @@
 <template>
-    <Window :title="windowTitle" id="share-embed" modal fixedSize @onClose="$emit('onClose')">
+    <Window id="share-embed" :title="windowTitle" modal fixed-size @close="$emit('close')">
         <div class="content">
-            <Message bindTo="error" noDismiss />
-            <i v-if="loading" class="fa-solid fa-circle-notch fa-spin" />
+            <Message v-model="error" no-dismiss />
+            <LoadingSpinner v-if="loading" />
             <template v-else>
                 <div class="share-type">
                     <label for="share-mode" class="me-2 fw-semibold">Share: </label>
                     <Select id="share-mode" v-model="shareMode" :options="shareModeGroups"
-                        optionLabel="label" optionValue="value"
-                        optionGroupLabel="label" optionGroupChildren="items"
-                        style="min-width: 9rem;" />
-                    <Button v-if="hintsService" @click="hintsOpen = true" severity="secondary" text
-                        icon="fa-solid fa-circle-question" title="How to use this service" class="ms-1" />
+                            option-label="label" option-value="value"
+                            option-group-label="label" option-group-children="items"
+                            style="min-width: 9rem;" />
+                    <Button v-if="hintsService" severity="secondary" text icon="fa-solid fa-circle-question"
+                            title="How to use this service" aria-label="How to use this service" class="ms-1" @click="hintsOpen = true" />
                 </div>
 
                 <!-- QGIS (legacy single-entry mode) -->
                 <div v-if="shareMode === 'qgis'" class="mt-3">
                     <template v-if="qgisUrl">
-                        <div class="ui icon positive message" v-if="!error">
-                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <div v-if="!error" class="ui icon positive message">
+                            <i class="fa-solid fa-cloud-arrow-up" />
                             <div class="content">
                                 <div class="header">From QGIS</div>
                                 <div v-if="typeIs('POINTCLOUD')">
-                                    Layer <i class="fa-solid fa-arrow-right"></i> Add Point Cloud Layer <i
-                                        class="fa-solid fa-arrow-right"></i> Source Type Protocol: HTTP(s) <i
-                                        class="fa-solid fa-arrow-right"></i> copy/paste the URL below.
+                                    Layer <i class="fa-solid fa-arrow-right" /> Add Point Cloud Layer <i
+                                        class="fa-solid fa-arrow-right" /> Source Type Protocol: HTTP(s) <i
+                                        class="fa-solid fa-arrow-right" /> copy/paste the URL below.
                                 </div>
                                 <div v-if="typeIs('GEORASTER')">
-                                    Layer <i class="fa-solid fa-arrow-right"></i> Add Raster Layer <i
-                                        class="fa-solid fa-arrow-right"></i> Source Type Protocol: HTTP(s) <i
-                                        class="fa-solid fa-arrow-right"></i> copy/paste the URL below.
+                                    Layer <i class="fa-solid fa-arrow-right" /> Add Raster Layer <i
+                                        class="fa-solid fa-arrow-right" /> Source Type Protocol: HTTP(s) <i
+                                        class="fa-solid fa-arrow-right" /> copy/paste the URL below.
                                 </div>
-                                <div class="auth-note" v-if="needsAuth">
-                                    <i class="fa-solid fa-lock"></i> For Authentication choose Basic and use your username and password.
+                                <div v-if="needsAuth" class="auth-note">
+                                    <i class="fa-solid fa-lock" /> For Authentication choose Basic and use your username and password.
                                 </div>
                             </div>
                         </div>
-                        <UrlRow :value="qgisUrl" @copy="copyToClipboard(qgisUrl)" :copyIcon="copyIcon" />
+                        <UrlRow :value="qgisUrl" label="QGIS URL" :copy-icon="copyIcon" @copy="copyToClipboard(qgisUrl)" />
                     </template>
                     <PrimeMessage v-else severity="info" :closable="false">
                         <strong>Not supported</strong> - This file cannot be streamed directly into QGIS (download it instead).
@@ -45,42 +45,36 @@
 
                 <!-- Link / Embed / TMS (legacy single-entry modes) -->
                 <div v-else-if="shareMode === 'link' || shareMode === 'tms' || shareMode === 'embed'" class="mt-3">
-                    <div v-if="needsAuth">
-                        <Button severity="info" @click="handleSetUnlisted" icon="fa-solid fa-unlock"
-                            label="Allow access to anyone with the link" />
-                    </div>
+                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="confirmUnlistedOpen = true" />
                     <template v-else>
                         <PrimeMessage v-if="!legacyUrl" severity="info" :closable="false">
                             <strong>Not supported</strong> - This file does not support this type of sharing.
                         </PrimeMessage>
                         <template v-else>
                             <div v-if="shareMode === 'embed'" class="share-embed-row">
-                                <Textarea readonly :modelValue="legacyUrl"
-                                    @click="copyToClipboard(legacyUrl)" class="share-textarea" />
-                                <Button @click="copyToClipboard(legacyUrl)" title="Copy to clipboard"
-                                    :icon="copyIcon" text />
+                                <Textarea readonly :model-value="legacyUrl" aria-label="Embed code"
+                                          class="share-textarea" @click="copyToClipboard(legacyUrl)" />
+                                <Button title="Copy to clipboard" aria-label="Copy to clipboard" :icon="copyIcon"
+                                        text @click="copyToClipboard(legacyUrl)" />
                             </div>
-                            <UrlRow v-else :value="legacyUrl" @copy="copyToClipboard(legacyUrl)" :copyIcon="copyIcon" />
+                            <UrlRow v-else :value="legacyUrl" label="Share link" :copy-icon="copyIcon" @copy="copyToClipboard(legacyUrl)" />
                         </template>
                     </template>
                 </div>
 
                 <!-- OGC modes (WMS/WMTS/WFS/WCS/OGC API) -->
                 <div v-else-if="currentOgcService" class="mt-3">
-                    <div v-if="needsAuth">
-                        <Button severity="info" @click="handleSetUnlisted" icon="fa-solid fa-unlock"
-                            label="Allow access to anyone with the link" />
-                    </div>
+                    <MakeUnlistedPrompt v-if="needsAuth" @make-unlisted="confirmUnlistedOpen = true" />
                     <template v-else>
                         <PrimeMessage v-if="!ogcDescriptor || !ogcDescriptor.supported" severity="info"
-                            :closable="false">
+                                      :closable="false">
                             <strong>Not supported</strong>
                             <template v-if="ogcDescriptor && ogcDescriptor.reason"> - {{ ogcDescriptor.reason }}</template>
                         </PrimeMessage>
                         <template v-else>
                             <div v-for="row in ogcRows" :key="row.label">
                                 <div class="ogc-row-label">{{ row.label }}</div>
-                                <UrlRow :value="row.url" @copy="copyToClipboard(row.url)" :copyIcon="copyIcon" />
+                                <UrlRow :value="row.url" :label="row.label" :copy-icon="copyIcon" @copy="copyToClipboard(row.url)" />
                             </div>
                         </template>
                     </template>
@@ -88,43 +82,41 @@
             </template>
 
             <div class="d-flex justify-content-end mt-3">
-                <Button @click="$emit('onClose')" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
             </div>
         </div>
 
         <OgcUsageHints v-if="hintsOpen && hintsService" :service="hintsService"
-            :url="primaryHintUrl" @onClose="hintsOpen = false" />
+                       :url="primaryHintUrl" @close="hintsOpen = false" />
+
+        <ConfirmDialog v-if="confirmUnlistedOpen"
+                       title="Make the dataset Unlisted"
+                       :message="unlistedMessage"
+                       confirm-text="Make Unlisted"
+                       cancel-text="Cancel"
+                       @close="handleUnlistedConfirm" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window';
-import Message from '@/components/Message';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow';
+import Message from '@/components/HubMessage';
 import Button from 'primevue/button';
 import Select from 'primevue/select';
-import InputText from 'primevue/inputtext';
 import PrimeMessage from 'primevue/message';
 import Textarea from 'primevue/textarea';
-import copy from 'clipboard-copy';
 import ddb from 'ddb';
 
-import { OpenItemDefaults } from '@/libs/openItemDefaults';
+import { defaultViewFor } from '@/libs/openItemDefaults';
 import { b64encode } from '@/libs/base64';
-import { buildOgcShareUrls, OGC_SHARE_MODES } from '@/libs/ogcShareUrls';
+import { escapeHtml } from '@/libs/sanitize';
+import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
-
-// Inline URL+copy row component (kept private to ShareEmbed - DRY for legacy & OGC rows).
-const UrlRow = {
-    components: { InputText, Button },
-    props: ['value', 'copyIcon'],
-    emits: ['copy'],
-    template: `
-        <div class="share-url-row">
-            <InputText :modelValue="value" readonly @click="$emit('copy')" title="Copy to clipboard" style="flex: 1;" />
-            <Button @click="$emit('copy')" title="Copy to clipboard" :icon="copyIcon" text />
-        </div>
-    `
-};
+import MakeUnlistedPrompt from './MakeUnlistedPrompt.vue';
+import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import UrlRow from './ShareUrlRow.vue';
+import { useCopyText } from '@/composables/useCopyText';
 
 const LEGACY_MODES = [
     { value: 'link',  label: 'Link' },
@@ -134,19 +126,20 @@ const LEGACY_MODES = [
 ];
 
 export default {
-    components: {
-        Window, Message, Button, Select, InputText, PrimeMessage, Textarea, OgcUsageHints, UrlRow
+    components: { LoadingSpinner,
+        Window, Message, Button, Select, PrimeMessage, Textarea, OgcUsageHints, UrlRow, MakeUnlistedPrompt, ConfirmDialog
     },
     props: {
-        // Legacy: a file-like object { path, entry }. For dataset-level sharing pass
-        // { path: <ddb dataset URI>, entry: null, scope: 'dataset' }.
-        // For folder-level sharing, pass the directory entry as usual - scope is auto-detected.
+        // The file or folder to share, { path, entry }: a folder shares its OGC services
         file: { type: Object, required: true }
     },
-    emits: ['onClose'],
+    emits: ['close'],
+    setup() {
+        const { copy, copied } = useCopyText();
+        return { copy, copied };
+    },
     data() {
         return {
-            copyIcon: "fa-regular fa-copy",
             loading: true,
             error: "",
             needsAuth: false,
@@ -154,20 +147,24 @@ export default {
             shareMode: null,
             entry: null,
             dataset: null,
-            hintsOpen: false
+            hintsOpen: false,
+            confirmUnlistedOpen: false
         };
     },
     computed: {
+        copyIcon() {
+            return this.copied ? 'fa-solid fa-check' : 'fa-regular fa-copy';
+        },
         scope() {
-            if (this.file && this.file.scope) return this.file.scope;
-            if (!this.file || !this.file.entry) return 'dataset';
-            if (ddb.entry.isDirectory(this.file.entry)) return 'folder';
-            return 'entry';
+            return ddb.entry.isDirectory(this.file.entry) ? 'folder' : 'entry';
         },
         windowTitle() {
-            if (this.scope === 'dataset') return 'Share Dataset';
-            if (this.scope === 'folder')  return 'Share Folder';
-            return 'Share / Embed';
+            return this.scope === 'folder' ? 'Share Folder' : 'Share / Embed';
+        },
+        unlistedMessage() {
+            return `This changes the visibility of the whole dataset <strong>${escapeHtml(this.ds)}</strong> from Private to Unlisted: ` +
+                'anyone with a link can then open every file and folder in it, not only this one. ' +
+                'An Unlisted dataset stays out of the public dataset lists. You can make it Private again in the dataset settings.';
         },
         baseUrl() {
             return `${window.location.protocol}//${window.location.host}`;
@@ -237,7 +234,7 @@ export default {
             if (this.scope !== 'entry' || !this.entry) return '';
             const baseUrl = this.baseUrl;
             if (this.shareMode === 'link' || this.shareMode === 'embed') {
-                const view = OpenItemDefaults[this.entry.type];
+                const view = defaultViewFor(this.entry);
                 if (view) {
                     let url = `${baseUrl}/r/${this.org}/${this.ds}/view/${b64encode(this.entry.path)}/${view}`;
                     if (this.shareMode === 'embed') {
@@ -254,7 +251,8 @@ export default {
             if (this.shareMode === 'tms') {
                 if ([ddb.entry.type.GEORASTER, ddb.entry.type.POINTCLOUD, ddb.entry.type.GEOIMAGE]
                     .indexOf(this.entry.type) !== -1) {
-                    return baseUrl + this.dataset.tileUrl(this.entry.path, "{z}", "{x}", "{y}");
+                    // Handed to other software (QGIS, Leaflet, ...): PNG, which every client reads
+                    return baseUrl + this.dataset.tileUrl(this.entry.path, "{z}", "{x}", "{y}", { format: "png" });
                 }
             }
             return '';
@@ -273,9 +271,9 @@ export default {
             if (this.scope === 'entry' && this.file.entry) {
                 const entry = dataset.Entry(this.file.entry);
                 this.entry = entry;
-                if (entry.type === ddb.entry.type.POINTCLOUD)     this.buildUrl = await entry.getCopc();
-                else if (entry.type === ddb.entry.type.GEORASTER) this.buildUrl = await entry.getCog();
-                else if (entry.type === ddb.entry.type.VECTOR)    this.buildUrl = await entry.getVector();
+                // A missing artifact (not built yet) only disables the QGIS mode
+                const role = streamableArtifactRole(entry.type);
+                if (role) this.buildUrl = entry.findArtifact(role);
             }
 
             this.shareMode = this.pickDefaultMode();
@@ -292,14 +290,11 @@ export default {
             return null;
         },
         copyToClipboard(value) {
-            if (!value) return;
-            copy(value);
-            this.copyIcon = "fa-solid fa-check";
-            if (this._copyTimeout) clearTimeout(this._copyTimeout);
-            this._copyTimeout = setTimeout(() => {
-                this.copyIcon = "fa-regular fa-copy";
-                this._copyTimeout = null;
-            }, 2000);
+            if (value) this.copy(value);
+        },
+        handleUnlistedConfirm(action) {
+            this.confirmUnlistedOpen = false;
+            if (action === 'confirm') this.handleSetUnlisted();
         },
         async handleSetUnlisted() {
             try {
@@ -321,7 +316,7 @@ export default {
 <style scoped>
 .share-type { margin-bottom: 0.75rem; display: flex; align-items: center; }
 label { font-weight: bold; }
-.content { min-width: 26.25rem; }
+.content { min-width: min(26.25rem, var(--window-content-width, 100%)); }
 .auth-note { margin-top: 0.5rem; }
 .share-url-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }
 .share-embed-row { display: flex; align-items: center; gap: 0.25rem; margin-top: 0.5rem; }

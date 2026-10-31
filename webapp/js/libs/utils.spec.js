@@ -2,16 +2,15 @@
  * Unit tests for libs/utils.js
  * Run with: npx vitest run --reporter=verbose
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
     setTitle,
     getCookie,
-    clearCookie,
     queryParams,
     inIframe,
     clone,
     bytesToSize,
-    taskProgressMode
+    parseTimestamp
 } from './utils';
 
 describe('setTitle', () => {
@@ -47,15 +46,6 @@ describe('getCookie', () => {
 
     it('returns undefined for missing key', () => {
         expect(getCookie('nonexistent')).toBeUndefined();
-    });
-});
-
-describe('clearCookie', () => {
-    it('sets cookie with past expiration', () => {
-        window.document.cookie = '';
-        clearCookie('testKey');
-        // The cookie string is appended; check that testKey was written
-        expect(window.document.cookie).toContain('testKey');
     });
 });
 
@@ -153,23 +143,12 @@ describe('bytesToSize', () => {
     });
 });
 
-describe('taskProgressMode', () => {
-    it('returns indeterminate for null or undefined progress', () => {
-        expect(taskProgressMode(null)).toBe('indeterminate');
-        expect(taskProgressMode(undefined)).toBe('indeterminate');
+describe('parseTimestamp', () => {
+    it('reads an ISO date as milliseconds', () => {
+        expect(parseTimestamp('2026-03-04T05:06:07Z')).toBe(Date.UTC(2026, 2, 4, 5, 6, 7));
     });
 
-    it('returns indeterminate for zero progress', () => {
-        expect(taskProgressMode(0)).toBe('indeterminate');
-    });
-
-    it('returns indeterminate for negative progress', () => {
-        expect(taskProgressMode(-5)).toBe('indeterminate');
-    });
-
-    it('returns determinate for any positive progress', () => {
-        expect(taskProgressMode(1)).toBe('determinate');
-        expect(taskProgressMode(42)).toBe('determinate');
-        expect(taskProgressMode(100)).toBe('determinate');
+    it('is null for a missing or invalid date, never 1970 or NaN', () => {
+        for (const value of [null, undefined, '', 'yesterday', 0, 12345, {}]) expect(parseTimestamp(value)).toBeNull();
     });
 });

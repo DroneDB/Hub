@@ -1,0 +1,52 @@
+// @ts-check
+/**
+ * Task states and the dataset key used to group tasks. The task monitor, the
+ * build manager and the heavy-task helpers read these, so "is this task still running"
+ * has one answer. Mirrors the server's TaskStateCatalog.
+ */
+
+/** States a task is still in progress in (TaskStateCatalog.Active). */
+export const ACTIVE_STATES = Object.freeze(['Awaiting', 'Created', 'Indexing', 'Enqueued', 'Processing', 'Scheduled', 'Reused']);
+
+/** States a task ends in. */
+export const TERMINAL_STATES = Object.freeze(['Succeeded', 'Failed', 'Deleted']);
+
+/** @param {string} state */
+export const isActiveState = state => ACTIVE_STATES.includes(state);
+
+/** @param {string} state */
+export const isTerminalState = state => TERMINAL_STATES.includes(state);
+
+/**
+ * Whether a task is the background rebuild of an entry made with an older layout (the server marks it
+ * `background`) that has not started: a queue of one worker serves them, so it can wait for days, and the entry
+ * it will rebuild is usable meanwhile. Nothing is in progress for the file until it processes.
+ * @param {{ background?: boolean, state?: string } | null | undefined} task
+ */
+export const isWaitingBackgroundTask = task =>
+    task?.background === true && isActiveState(task.state) && task.state !== 'Processing';
+
+/**
+ * Stable identity of a dataset for task stores and event matching.
+ * @param {{ baseApi?: string, org?: string, ds?: string }} dataset
+ */
+export function datasetKey(dataset) {
+    return dataset.baseApi || `${dataset.org}/${dataset.ds}`;
+}
+
+/**
+ * The newest task of each path, by creation time, whatever order the list is in: a file whose
+ * build ran more than once is shown by its latest build, not by an older one that failed.
+ * @template {{ path?: string | null, createdAt?: string }} T
+ * @param {Iterable<T>} tasks
+ * @returns {Map<string, T>}
+ */
+export function latestTaskByPath(tasks) {
+    const latest = new Map();
+    for (const task of tasks) {
+        if (!task.path) continue;
+        const held = latest.get(task.path);
+        if (!held || Date.parse(task.createdAt ?? '') > Date.parse(held.createdAt ?? '')) latest.set(task.path, task);
+    }
+    return latest;
+}

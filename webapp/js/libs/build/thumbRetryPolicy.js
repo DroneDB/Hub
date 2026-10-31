@@ -1,7 +1,7 @@
 /**
  * thumbRetryPolicy - bounded retry policy for failed thumbnail loads.
  *
- * Single source of truth shared by Thumbnail.vue, TableView.vue and the Map
+ * Single source of truth shared by EntryThumbnail.vue, TableView.vue and the map
  * image popup so every thumbnail surface caps retries the same way: an
  * unbounded retry loop turns a server-side outage into a self-sustaining
  * request storm.

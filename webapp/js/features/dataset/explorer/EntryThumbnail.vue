@@ -1,0 +1,535 @@
+<template>
+    <div class="thumbnail" :class="{ selected: file.selected }" :title="getTitleText"
+         role="option" tabindex="0" :aria-selected="!!file.selected"
+         :style="tileStyle" @click="onClick" @contextmenu="onRightClick" @dblclick="onDblClick"
+         @keydown.enter.self.prevent="onDblClick" @keydown.space.self.prevent="onClick">
+        <div class="container" :class="{ bordered: thumbnail !== null }" :style="sizeStyle">
+            <!-- Show thumbnail image if we have a thumbnail URL and not loading -->
+            <img v-if="thumbnail && !loading && !buildLoading"
+                 :src="thumbnail" alt="" style="max-width: 100%; max-height: 100%;" @load="handleImageLoad"
+                 @error="handleImageError">
+
+            <!-- Show icon if we have an icon and not loading (only as fallback when no thumbnail) -->
+            <i v-else-if="icon && !loading && !buildLoading" class="icon icon-file" :class="icon" :style="iconStyle" />
+
+            <!-- Build loading spinner (highest priority) -->
+            <i v-if="buildLoading" class="fa-solid fa-circle-notch fa-spin loading" />
+
+            <!-- Regular loading spinner (when loading thumbnails) -->
+            <i v-else-if="loading" class="fa-solid fa-circle-notch fa-spin loading" />
+
+            <!-- Fallback spinner (when no thumbnail, no icon, and not loading) -->
+            <i v-else-if="!thumbnail && !icon" class="fa-solid fa-circle-notch fa-spin loading" />
+
+            <!-- Build Status Badges: only for non-default states (queued/pending/failed) -->
+            <div v-if="!buildLoading && !loading && shouldShowBuildBadge" class="build-badge" :class="buildBadgeClass">
+                <i class="icon" :class="buildBadgeIcon" />
+            </div>
+        </div>
+        <span class="thumbnail-label">{{ label }}</span>
+    </div>
+</template>
+
+<script>
+import { thumbs } from 'ddb';
+import Mouse from '@/libs/mouse';
+import Keyboard from '@/libs/keyboard';
+import BuildManager from '@/libs/build/buildManager';
+import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
+import taskMonitor from '@/libs/tasks/taskMonitor';
+import { isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
+import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
+import { shownBuildStatus, isBuildStopped } from '@/libs/build/entryBuild';
+import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
+import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
+import { tileCssVars } from './tileGeometry';
+
+export default {
+    name: 'EntryThumbnail',
+    components: {
+    },
+    // Provided by the Explorer: load when visible, a few at a time
+    inject: { thumbnailLoader: { default: null } },
+    props: {
+        file: {
+            type: Object,
+            required: true
+        },
+        size: {
+            type: Number,
+            required: false,
+            default: 128
+        },
+        lazyLoad: {
+            type: Boolean,
+            default: false
+        },
+        dataset: {
+            type: Object,
+            default: null
+        }
+    },
+    emits: ['clicked', 'open'],
+    data: function () {
+        const label = this.file.label;
+
+        return {
+            label,
+            thumbnail: null,
+            icon: null,
+            error: null,
+            buildState: null,
+            buildLoading: false,
+            iconStyle: {
+                fontSize: (parseInt(this.size / 3) / 16) + 'rem'
+            },
+            sizeStyle: {
+                width: (this.size / 16) + 'rem',
+                height: (this.size / 16) + 'rem'
+            },
+            loading: false,
+            // Bounded retry state (see libs/build/thumbRetryPolicy)
+            retryNumber: 0,
+            loadTimeout: null
+        }
+    },
+    computed: {
+        // The spacing and the name height come from the tile geometry the virtual grid sizes its rows by
+        tileStyle() {
+            return { ...tileCssVars(), maxWidth: (this.size / 16) + 'rem' };
+        },
+        // Effective badge status: the job gives failure (a running build shows the spinner), the
+        // entry says whether the build exists. "ready" (built) is the default and never produces
+        // a badge - only queued/pending/failed do.
+        effectiveBuildStatus() {
+            return shownBuildStatus(this.buildState, this.file.entry);
+        },
+        getTitleText() {
+            if (this.error) return this.error;
+            // The job's state, unless the entry says more (a job that succeeded can leave a build on hold)
+            if (this.buildState && this.effectiveBuildStatus !== 'pending' && this.effectiveBuildStatus !== 'queued') {
+                return `${this.file.path}\nBuild Status: ${this.buildState.currentState}`;
+            }
+            if (this.effectiveBuildStatus === 'pending') {
+                return `${this.file.path}\n${describeEntryPendingBuild(this.file.entry).text}`;
+            }
+            if (this.effectiveBuildStatus === 'queued') {
+                return `${this.file.path}\nQueued for processing`;
+            }
+            return this.file.path;
+        },
+        shouldShowBuildBadge() {
+            return !!this.effectiveBuildStatus;
+        },
+        buildBadgeClass() {
+            switch (this.effectiveBuildStatus) {
+                case 'failed':
+                    return 'error';
+                case 'pending':
+                    return 'pending';
+                case 'queued':
+                    return 'queued';
+                default:
+                    return '';
+            }
+        },
+        buildBadgeIcon() {
+            switch (this.effectiveBuildStatus) {
+                case 'failed':
+                    return 'fa-solid fa-xmark';
+                case 'pending':
+                    return 'fa-solid fa-triangle-exclamation';
+                case 'queued':
+                    return 'fa-solid fa-clock';
+                default:
+                    return '';
+            }
+        }
+    },
+    mounted: async function () {
+        if (!this.lazyLoad) await this.loadThumbnail();
+        else if (this.thumbnailLoader) {
+            this.thumbnailLoader.visibility.observe(this.$el, visible => {
+                if (visible) this.loadThumbnail();
+                // Scrolled away before its turn: it asks again when it comes back
+                else if (this.imageTicket?.state === 'waiting') this.cancelImageRequest();
+            });
+        }
+
+        // Setup build listeners if dataset is available
+        if (this.dataset) {
+            this.setupBuildListeners();
+        }
+    },
+    beforeUnmount() {
+        this.cleanupBuildListeners();
+        this.thumbnailLoader?.visibility.unobserve(this.$el);
+        this.cancelImageRequest();
+        if (this.loadTimeout) clearTimeout(this.loadTimeout);
+    },
+    methods: {
+        // Shows `url` once the loader grants a slot (at once without a loader)
+        showImage: function (url) {
+            this.cancelImageRequest();
+            if (!this.thumbnailLoader) {
+                this.thumbnail = url;
+                this.loading = false;
+                return;
+            }
+            this.imageTicket = this.thumbnailLoader.queue.enqueue(() => {
+                this.thumbnail = url;
+                this.loading = false;
+            });
+        },
+        cancelImageRequest: function () {
+            if (!this.imageTicket) return;
+            const waiting = this.imageTicket.state === 'waiting';
+            this.imageTicket.cancel();
+            this.imageTicket = null;
+            // Never shown: the next visibility asks again
+            if (waiting) this.loading = false;
+        },
+        // The image request ended (loaded or failed): its slot goes to the next tile
+        releaseImageSlot: function () {
+            this.imageTicket?.release();
+            this.imageTicket = null;
+        },
+        handleImageError: function () {
+            this.releaseImageSlot();
+            // Bounded retry: MAX_RETRIES retries with backoff (thumbRetryPolicy),
+            // so a server-side failure costs <= 4 requests per tile instead of an
+            // unbounded 5s retry loop that amplifies outages. A build that failed or
+            // is on hold makes no thumbnail while the tile waits: the fallback shows
+            // at once (a build that starts or succeeds later reloads the tile).
+            if (this.thumbnail && this.thumbnail.startsWith("/orgs") && shouldRetry(this.retryNumber)
+                && !isBuildStopped(this.buildState, this.file.entry)) {
+                if (this.loadTimeout) {
+                    clearTimeout(this.loadTimeout);
+                    this.loadTimeout = null;
+                }
+                const nextRetry = this.retryNumber + 1;
+                this.loadTimeout = setTimeout(() => {
+                    // Cache-buster: stripRetryParam + fresh &retry=N busts the
+                    // browser cache of the failed response (server ignores it).
+                    this.thumbnail = `${stripRetryParam(this.thumbnail)}&retry=${nextRetry}`;
+                    this.retryNumber = nextRetry;
+                }, retryDelayMs(this.retryNumber));
+                return;
+            }
+
+            // Retries exhausted (or non-API URL): terminal fallback.
+            if (this.loadTimeout) {
+                clearTimeout(this.loadTimeout);
+                this.loadTimeout = null;
+            }
+            if (this.dataset && isBuildableType(this.file.entry.type)) {
+                // Buildable entry: show the file icon and let the
+                // queued/pending/failed badge explain the state (same rule as
+                // the loadThumbnail catch branch).
+                this.thumbnail = null;
+                this.icon = this.file.icon;
+                this.loading = false;
+                this.buildLoading = false;
+            } else {
+                this.showError(new Error("Cannot load thumbnail (retries exceeded)"));
+            }
+        },
+        handleImageLoad: function () {
+            this.releaseImageSlot();
+            // Confirmed load: recharge the retry budget ONLY. Deliberately does
+            // NOT rewrite the bound URL — reassigning thumbnail would re-render
+            // the <img>, refetch the stripped URL and re-arm the budget against
+            // a possibly-still-broken server.
+            this.retryNumber = 0;
+        },
+        showError: function (e) {
+            console.warn(e);
+            this.error = e.message;
+            this.icon = "fa-solid fa-triangle-exclamation";
+            this.loading = false;
+        },
+        loadThumbnail: async function (force = false) {
+            if (force) {
+                // Forced reload (e.g. build Succeeded): a file that exhausted its
+                // retry budget while unbuilt gets a fresh budget now.
+                this.retryNumber = 0;
+                if (this.loadTimeout) {
+                    clearTimeout(this.loadTimeout);
+                    this.loadTimeout = null;
+                }
+            }
+
+            // Use single loading flag to prevent multiple calls
+            if (this.loading) {
+                return; // Already loading
+            }
+            if (!force && this.thumbnail && !this.error) {
+                return; // Already loaded (unless forced)
+            }
+            if (!force && this.error) {
+                return; // Skip if error (unless forced)
+            }
+
+            // For buildable files, check if there's an active build or if it needs building
+            if (this.dataset && isBuildableType(this.file.entry.type)) {
+                try {
+                    // Check BuildManager cache first (more reliable)
+                    const buildState = BuildManager.getBuildState(this.dataset, this.file.entry.path);
+
+                    if (buildState) {
+                        const activeStates = ['Processing', 'Enqueued', 'Scheduled', 'Awaiting', 'Created'];
+
+                        if (activeStates.includes(buildState.currentState)) {
+                            this.buildLoading = true;
+                            this.buildState = buildState;
+                            this.icon = this.file.icon;
+                            return;
+                        }
+
+                        // If build failed or succeeded, continue with thumbnail load
+                        this.buildState = buildState;
+                    } else {
+                        // No build state found in buildManager cache — check taskMonitor store
+                        const tasks = taskMonitor.getTasks(this.dataset);
+                        const buildTasks = tasks.filter(t => t.toolId === 'build');
+                        const activeBuild = buildTasks.find(build =>
+                            build.path === this.file.entry.path &&
+                            !isWaitingBackgroundTask(build) &&
+                            (build.state === 'Processing' ||
+                             build.state === 'Enqueued' ||
+                             build.state === 'Scheduled' ||
+                             build.state === 'Awaiting' ||
+                             build.state === 'Created')
+                        );
+
+                        if (activeBuild) {
+                            this.buildLoading = true;
+                            this.buildState = { path: activeBuild.path, currentState: activeBuild.state };
+                            this.icon = this.file.icon;
+                            return;
+                        }
+
+                        const hasSuccessfulBuild = buildTasks.find(build =>
+                            build.path === this.file.entry.path &&
+                            build.state === 'Succeeded'
+                        );
+
+                        if (!hasSuccessfulBuild) {
+                            this.icon = this.file.icon;
+                        }
+                    }
+                } catch {
+                    // If build check fails, continue with thumbnail load
+                }
+            }
+
+            this.loading = true;
+
+            try {
+                if (hasThumbnail(this.file.entry.type)) {
+                    // The tile's size times the pixel ratio, not a fixed 256 px
+                    const url = await thumbs.fetch(this.file.path, thumbnailRequestSize(this.size), this.file.entry.hash);
+                    this.buildLoading = false; // Clear build loading when thumbnail succeeds
+                    this.showImage(url);
+                } else {
+                    this.icon = this.file.icon;
+                    this.loading = false;
+                    this.buildLoading = false; // Clear build loading when using icon
+                }
+            } catch (e) {
+                this.loading = false; // Reset loading state on error
+
+                // For buildable files without a build yet, show the icon and let the
+                // queued/pending badge explain the state instead of a perpetual spinner.
+                if (this.dataset && isBuildableType(this.file.entry.type) && !this.buildState) {
+                    this.icon = this.file.icon;
+                } else {
+                    this.buildLoading = false;
+                    this.showError(e);
+                }
+            }
+        },
+        onClick: function (e) {
+            Keyboard.updateState(e);
+            this.$emit('clicked', this, Mouse.LEFT);
+        },
+        onRightClick: function (e) {
+            Keyboard.updateState(e);
+            this.$emit('clicked', this, Mouse.RIGHT);
+        },
+        onDblClick: function () {
+            this.$emit("open", this);
+        },
+
+        // Build management methods
+
+        setupBuildListeners() {
+            if (!this.dataset) return;
+
+            // Listen to build events (only for UI feedback)
+            BuildManager.on('buildStateChanged', this.onBuildStateChanged);
+            BuildManager.on('buildStarted', this.onBuildStarted);
+        },
+
+        cleanupBuildListeners() {
+            BuildManager.off('buildStateChanged', this.onBuildStateChanged);
+            BuildManager.off('buildStarted', this.onBuildStarted);
+        },
+
+        onBuildStateChanged(data) {
+            if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                this.buildState = data.buildInfo;
+                this.buildLoading = false;
+
+                // If build succeeded, refresh the thumbnail
+                if (data.newState === 'Succeeded') {
+                    // Clear existing state and reload
+                    this.thumbnail = null;
+                    this.error = null;
+                    this.icon = null;
+                    this.loading = false;
+                    this.loadThumbnail(true);
+                }
+            }
+        },
+
+        onBuildStarted(data) {
+            if (data.dataset === this.dataset && data.filePath === this.file.entry.path) {
+                this.buildLoading = true;
+                this.loading = false;
+                this.error = null;
+                this.thumbnail = null;
+                this.icon = this.file.icon;
+            }
+        },
+
+
+    }
+}
+</script>
+
+<style scoped>
+.thumbnail {
+    width: 100%;
+    margin: var(--tile-spacing);
+    padding-top: var(--tile-spacing);
+    padding-bottom: var(--tile-spacing);
+    text-align: center;
+    border-radius: var(--ddb-radius-sm);
+    transition: 0.25s background-color ease;
+}
+
+/* A name wraps at its words (inside one only when it is longer than the tile) and stops after two lines.
+   It always takes two lines, in em so that they follow the font size: the tile height is fixed. */
+.thumbnail .thumbnail-label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: var(--tile-label-lines);
+    line-clamp: var(--tile-label-lines);
+    line-height: var(--tile-label-line-height);
+    height: calc(var(--tile-label-lines) * var(--tile-label-line-height) * 1em);
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+
+.thumbnail:hover {
+    background: var(--ddb-bg-hover);
+    cursor: pointer;
+}
+
+.thumbnail:active {
+    background: var(--ddb-border);
+}
+
+.thumbnail:focus-visible {
+    outline: 2px solid var(--ddb-primary);
+    outline-offset: -2px;
+}
+
+.thumbnail.selected {
+    background: var(--ddb-border);
+}
+
+.thumbnail .container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    position: relative;
+    pointer-events: none;
+    margin-bottom: var(--tile-spacing);
+}
+
+/* .thumbnail .container.bordered - drop shadow removed */
+
+.thumbnail .container img {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.thumbnail .container img.hide {
+    visibility: hidden;
+}
+
+.thumbnail .container i.icon-file {
+    display: inline-block;
+}
+
+.thumbnail .icon.badge {
+    font-size: var(--ddb-font-size-sm);
+}
+
+.thumbnail i.icon {
+    margin: 0;
+}
+
+.thumbnail i.loading {
+    position: absolute;
+    top: 63%;
+    left: 50%;
+    margin-left: -0.5rem;
+}
+
+/* Build Status Badges */
+.build-badge {
+    position: absolute;
+    top: var(--ddb-spacing-xs);
+    right: var(--ddb-spacing-xs);
+    width: 1.25rem;
+    height: 1.25rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--ddb-font-size-sm);
+    color: white;
+    z-index: 10;
+}
+
+.build-badge.success {
+    background-color: var(--ddb-success);
+}
+
+.build-badge.error {
+    background-color: var(--ddb-danger);
+}
+
+/* Work that runs or waits its turn is the brand blue; a build that waits for files the user
+   must add is the warning yellow, with dark text */
+.build-badge.processing,
+.build-badge.queued {
+    background-color: var(--ddb-primary);
+}
+
+.build-badge.pending {
+    background-color: var(--ddb-warning);
+    color: var(--ddb-text);
+}
+
+.build-badge i.icon {
+    margin: 0 !important;
+    font-size: var(--ddb-font-size-sm);
+    width: auto;
+    height: auto;
+    line-height: 1;
+}
+</style>

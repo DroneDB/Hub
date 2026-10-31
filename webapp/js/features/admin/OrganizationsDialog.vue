@@ -1,8 +1,8 @@
 <template>
-    <Window title="Manage User Organizations" id="organizationsDialog" @onClose="close" modal sizeClass="dialog-xl" fixedSize>
+    <Window id="organizationsDialog" title="Manage User Organizations" modal size-class="dialog-xl" fixed-size @close="close">
         <div class="organizations-dialog">
             <!-- Loading state -->
-            <div v-if="loading" class="ui active centered inline loader"></div>
+            <div v-if="loading" class="ui active centered inline loader" />
 
             <!-- Error message -->
             <PrimeMessage v-if="error" severity="error" @close="error = null">
@@ -14,19 +14,19 @@
             </PrimeMessage>
 
             <!-- Add organization section -->
-            <div class="add-org-section" v-if="!loading">
+            <div v-if="!loading" class="add-org-section">
                 <h4>Add Organization</h4>
                 <div class="d-flex gap-3 flex-wrap align-items-end">
-                    <div class="flex-grow-1" style="min-width: 12rem;">
-                        <label class="d-block mb-1 fw-semibold">Organization</label>
-                        <Select v-model="newOrg.slug" :options="availableOrganizations" optionLabel="displayName" optionValue="slug" filter placeholder="Search organization..." class="w-100" />
+                    <div class="flex-grow-1" style="min-width: min(12rem, 100%);">
+                        <label id="organizations-dialog-organization-label" for="organizations-dialog-organization" class="d-block mb-1 fw-semibold">Organization</label>
+                        <Select v-model="newOrg.slug" input-id="organizations-dialog-organization" aria-labelledby="organizations-dialog-organization-label" :options="availableOrganizations" option-label="displayName" option-value="slug" filter placeholder="Search organization..." class="w-100" />
                     </div>
-                    <div style="min-width: 10rem;">
-                        <label class="d-block mb-1 fw-semibold">Permissions</label>
-                        <Select v-model="newOrg.permissions" :options="permissionsOptions" optionLabel="label" optionValue="value" class="w-100" />
+                    <div style="min-width: min(10rem, 100%);">
+                        <label id="organizations-dialog-permissions-label" for="organizations-dialog-permissions" class="d-block mb-1 fw-semibold">Permissions</label>
+                        <Select v-model="newOrg.permissions" input-id="organizations-dialog-permissions" aria-labelledby="organizations-dialog-permissions-label" :options="permissionsOptions" option-label="label" option-value="value" class="w-100" />
                     </div>
                     <div>
-                        <Button severity="primary" @click="addOrganization" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" />
+                        <Button severity="primary" :disabled="!newOrg.slug || addingOrg" icon="fa-solid fa-plus" label="Add" @click="addOrganization" />
                     </div>
                 </div>
             </div>
@@ -35,12 +35,12 @@
 
             <!-- User organizations table -->
             <h4 v-if="!loading">User Organizations</h4>
-            <table class="ui celled table" v-if="!loading && userOrganizations.length > 0">
+            <table v-if="!loading && userOrganizations.length > 0" class="ui celled table">
                 <thead>
                     <tr>
                         <th>Organization</th>
                         <th>Permissions</th>
-                        <th>Granted</th>
+                        <th :class="showFrom('sm')">Granted</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -48,19 +48,20 @@
                     <tr v-for="org in userOrganizations" :key="org.slug">
                         <td>
                             {{ org.name || org.slug }}
-                            <Tag v-if="org.isOwner" severity="warn" value="Owner" class="ms-1" />
+                            <Tag v-if="org.isOwner" severity="secondary" value="Owner" class="ms-1" />
                         </td>
                         <td>
                             <Select v-if="!org.isOwner"
                                     v-model="org.permissions"
+                                    :aria-label="`Permissions in ${org.name || org.slug}`"
                                     :options="permissionsOptions"
-                                    optionLabel="label"
-                                    optionValue="value"
-                                    @change="updatePermission(org)"
-                                    class="w-full" />
+                                    option-label="label"
+                                    option-value="value"
+                                    class="w-100"
+                                    @change="updatePermission(org)" />
                             <Tag v-else severity="info" value="Full Access" />
                         </td>
-                        <td>
+                        <td :class="showFrom('sm')">
                             <span v-if="org.grantedAt">
                                 {{ formatDate(org.grantedAt) }}
                                 <span v-if="org.grantedBy"> by {{ org.grantedBy }}</span>
@@ -71,9 +72,9 @@
                         <td>
                             <Button v-if="!org.isOwner"
                                     severity="danger" size="small"
-                                    @click="confirmRemoveOrganization(org)"
                                     :disabled="removingOrg === org.slug"
-                                    icon="fa-solid fa-trash" label="Remove" />
+                                    icon="fa-solid fa-trash"
+                                    label="Remove" @click="confirmRemoveOrganization(org)" />
                             <span v-else>-</span>
                         </td>
                     </tr>
@@ -88,23 +89,22 @@
 
             <!-- Footer -->
             <div class="buttons">
-                <Button @click="close" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="close" />
             </div>
         </div>
 
         <ConfirmDialog v-if="removeOrgDialogOpen"
-            title="Remove from Organization"
-            :message="`Are you sure you want to remove <strong>${user.userName}</strong> from organization <strong>${orgToRemove ? (orgToRemove.name || orgToRemove.slug) : ''}</strong>?`"
-            confirmText="Remove"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleRemoveOrgDialogClose">
-        </ConfirmDialog>
+                       title="Remove from Organization"
+                       :message="`Are you sure you want to remove <strong>${user.userName}</strong> from organization <strong>${orgToRemove ? (orgToRemove.name || orgToRemove.slug) : ''}</strong>?`"
+                       confirm-text="Remove"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @close="handleRemoveOrgDialogClose" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Select from 'primevue/select';
 import Button from 'primevue/button';
@@ -112,6 +112,8 @@ import PrimeMessage from 'primevue/message';
 import Divider from 'primevue/divider';
 import Tag from 'primevue/tag';
 import reg from '@/libs/api/sharedRegistry';
+import { formatDate } from '@/libs/format';
+import { showFrom } from '@/libs/responsiveColumns';
 
 export default {
     components: { Window, ConfirmDialog, Select, Button, PrimeMessage, Divider, Tag },
@@ -122,7 +124,10 @@ export default {
             required: true
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
+    setup() {
+        return { showFrom };
+    },
 
     data() {
         return {
@@ -171,8 +176,8 @@ export default {
 
             try {
                 const [userOrgs, allOrgsInstances] = await Promise.all([
-                    reg.getUserOrganizations(this.user.userName),
-                    reg.getOrganizations()
+                    reg.admin.getUserOrganizations(this.user.userName),
+                    reg.orgs.getOrganizations()
                 ]);
 
                 // Extract org data from Organization instances
@@ -194,13 +199,13 @@ export default {
 
             this.addingOrg = true;
             try {
-                await reg.addUserToOrganization(
+                await reg.admin.addUserToOrganization(
                     this.user.userName,
                     this.newOrg.slug,
                     this.newOrg.permissions
                 );
 
-                this.$toast.add({ severity: 'success', summary: 'Organization Added', detail: `User added to organization successfully`, life: 3000 });
+                this.$notify.success(`User added to organization successfully`, { summary: 'Organization Added' });
                 this.hasChanges = true;
 
                 // Refresh organizations list
@@ -211,7 +216,7 @@ export default {
                 this.newOrg.permissions = 1;
 
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to add organization', life: 5000 });
+                this.$notify.error(e.message || 'Failed to add organization');
                 this.error = e.message || 'Failed to add organization';
             } finally {
                 this.addingOrg = false;
@@ -220,14 +225,14 @@ export default {
 
         async updatePermission(org) {
             try {
-                await reg.updateUserOrganizationPermissions(
+                await reg.admin.updateUserOrganizationPermissions(
                     this.user.userName,
                     org.slug,
                     org.permissions
                 );
-                this.$toast.add({ severity: 'success', summary: 'Permissions Updated', detail: `Permissions updated for organization "${org.name || org.slug}"`, life: 3000 });
+                this.$notify.success(`Permissions updated for organization "${org.name || org.slug}"`, { summary: 'Permissions Updated' });
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to update permissions', life: 5000 });
+                this.$notify.error(e.message || 'Failed to update permissions');
                 this.error = e.message || 'Failed to update permissions';
                 // Reload to get correct state
                 await this.loadData();
@@ -249,12 +254,12 @@ export default {
 
             this.removingOrg = this.orgToRemove.slug;
             try {
-                await reg.removeUserFromOrganization(this.user.userName, this.orgToRemove.slug);
-                this.$toast.add({ severity: 'success', summary: 'Organization Removed', detail: `User removed from organization successfully`, life: 3000 });
+                await reg.admin.removeUserFromOrganization(this.user.userName, this.orgToRemove.slug);
+                this.$notify.success(`User removed from organization successfully`, { summary: 'Organization Removed' });
                 this.hasChanges = true;
                 await this.loadData();
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: e.message || 'Failed to remove from organization', life: 5000 });
+                this.$notify.error(e.message || 'Failed to remove from organization');
                 this.error = e.message || 'Failed to remove from organization';
             } finally {
                 this.removingOrg = null;
@@ -262,14 +267,10 @@ export default {
             }
         },
 
-        formatDate(dateStr) {
-            if (!dateStr) return '';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString();
-        },
+        formatDate,
 
         close() {
-            this.$emit('onClose', this.hasChanges ? 'updated' : null);
+            this.$emit('close', this.hasChanges ? 'updated' : null);
         }
     }
 };

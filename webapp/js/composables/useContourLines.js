@@ -15,6 +15,7 @@
  * persisted via the toolbar Save button (which clears the flag) are kept.
  */
 import { buildContourFeature, colorForElevation } from '@/libs/map/contourStorage';
+import { createFeatureScope } from '@/composables/featureScope';
 
 function friendlyContourError(raw, fallback) {
     if (!raw) return fallback;
@@ -34,7 +35,7 @@ function friendlyContourError(raw, fallback) {
     return fallback;
 }
 
-export default {
+const definition = {
     data() {
         return {
             contourDialogVisible: false,
@@ -157,8 +158,8 @@ export default {
                     } else {
                         src.removeFeature(f);
                     }
-                } catch (e) {
-                    try { src.removeFeature(f); } catch (e) { /* noop */ }
+                } catch {
+                    try { src.removeFeature(f); } catch { /* noop */ }
                 }
             }
         },
@@ -230,14 +231,19 @@ export default {
             };
             try {
                 this.measureControls.importFromGeoJSON(measurementsFc);
-                if (typeof this.measureControls.updateButtonsVisibility === 'function') {
-                    this.measureControls.updateButtonsVisibility(
-                        this.measureControls.hasMeasurements(),
-                        !!this.hasSavedMeasurements);
-                }
+                this.measureControls.refreshButtons();
             } catch (e) {
                 console.warn('Could not import contours into measurement layer:', e);
             }
         }
     }
 };
+
+/**
+ * The feature's state and methods live on their own scope
+ * (createFeatureScope); `externals` supplies what it needs from the map view.
+ * @param {Record<string, any>} externals
+ */
+export function useContourLines(externals) {
+    return createFeatureScope({ ...definition, externals });
+}

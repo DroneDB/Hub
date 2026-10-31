@@ -1,15 +1,28 @@
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isThumbnailCandidate, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { isLocalVector } from '@/libs/openItemDefaults';
+import { isCadDrawing } from '@/libs/cadCrs';
+import { hasDedicatedViewer, isMapViewable, isPanoramaType, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { hasThumbnail, isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
-import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildSucceeded } from '@/libs/build/buildHelpers';
+import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import clipboard from '@/composables/useClipboard';
+import { useClipboardStore } from '@/stores/clipboard';
+import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
+import { BUILD_DOWNLOADS, offersBuildDownload } from '@/libs/build/buildDownloads';
+import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
+import { taskToolOffered } from '@/libs/tasks/taskTools';
+import { openCompare } from '@/libs/compare/compareLinks';
+import { MAX_LAYERS } from '@/libs/compare/compareState';
+import { transferModeFor } from '@/libs/dataset/transferMode';
 
 /**
+ * An item's `accelerator` names the key that does the same on the dataset page
+ * (useDatasetShortcuts, and the folder tree): only Ctrl/Cmd+C, +X, +V and Delete are bound.
+ *
  * Context object interface:
  * {
  *   getSelectedEntries: () => [{ entry, path, ... }]  - returns array of selected file objects
@@ -39,7 +52,8 @@ function openMapItem(ctx) {
         icon: 'fa-solid fa-map',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && isMapViewable(sel[0].entry.type);
+            // A drawing without geolocation has nothing to place on a map.
+            return sel.length === 1 && isMapViewable(sel[0].entry.type) && !isLocalVector(sel[0].entry);
         },
         click: () => {
             ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'map'));
@@ -186,7 +200,6 @@ function renameItem(ctx) {
         label: 'Rename',
         icon: 'fa-solid fa-pencil',
         isVisible: () => ctx.canWrite && ctx.getSelectedEntries().length === 1,
-        accelerator: 'CmdOrCtrl+M',
         click: () => ctx.emit('moveSelectedItems')
     };
 }
@@ -196,7 +209,6 @@ function propertiesItem(ctx) {
         label: 'Properties',
         icon: 'fa-solid fa-circle-info',
         isVisible: () => ctx.getSelectedEntries().length > 0,
-        accelerator: 'CmdOrCtrl+P',
         click: () => ctx.emit('openProperties')
     };
 }
@@ -222,7 +234,7 @@ function downloadItem(ctx) {
     };
     const isBulkBlocked = () =>
         !reg.isLoggedIn() &&
-        reg.getFeature(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
+        reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
         isBulkSelection();
 
     return {
@@ -267,10 +279,11 @@ function buildItem(ctx) {
     };
 }
 
+// A move to another dataset for a writer, a copy for a user who can only read this one
 function transferItem(ctx) {
     return {
-        label: 'Transfer',
-        icon: 'fa-solid fa-right-left',
+        get label() { return transferModeFor(ctx.canWrite).menuLabel; },
+        get icon() { return transferModeFor(ctx.canWrite).confirmIcon; },
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return reg.isLoggedIn() && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
@@ -279,7 +292,6 @@ function transferItem(ctx) {
             const sel = ctx.getSelectedEntries();
             return !sel.some(f => hasActiveBuild(ctx.dataset, f));
         },
-        accelerator: 'CmdOrCtrl+T',
         click: () => ctx.emit('transferSelectedItems')
     };
 }
@@ -315,7 +327,7 @@ function pasteClipboardItem(ctx) {
         label: 'Paste',
         icon: 'fa-solid fa-paste',
         accelerator: 'CmdOrCtrl+V',
-        isVisible: () => ctx.canWrite && !clipboard.isEmpty.value,
+        isVisible: () => ctx.canWrite && !useClipboardStore().isEmpty,
         click: () => ctx.emit('pasteFromClipboard')
     };
 }
@@ -326,7 +338,7 @@ function clipboardSeparator(ctx) {
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             const hasSel = sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-            return hasSel || (ctx.canWrite && !clipboard.isEmpty.value);
+            return hasSel || (ctx.canWrite && !useClipboardStore().isEmpty);
         }
     };
 }
@@ -340,10 +352,11 @@ function setThumbnailItem(ctx) {
             if (!ctx.canWrite || sel.length !== 1) return false;
             const file = sel[0];
             const type = file.entry.type;
-            if (!isThumbnailCandidate(type)) return false;
-            const candidates = reg.getFeatureValue(Features.DATASET_THUMBNAIL_CANDIDATES);
+            if (!hasThumbnail(type)) return false;
+            const candidates = reg.features.value(Features.DATASET_THUMBNAIL_CANDIDATES);
             if (candidates && candidates.some(c => c.toLowerCase() === pathutils.basename(file.entry.path).toLowerCase())) return false;
-            if (type === ddb.entry.type.GEORASTER || type === ddb.entry.type.GAUSSIAN_SPLAT) {
+            // A thumbnail of a built type comes from its build: not while it failed or runs
+            if (isBuildableType(type)) {
                 const buildState = BuildManager.getBuildState(ctx.dataset, file.entry.path);
                 if (!buildState) return true;
                 return buildState.currentState !== BUILD_STATES.FAILED && !hasActiveBuild(ctx.dataset, file);
@@ -371,7 +384,7 @@ function deleteItem(ctx) {
     return {
         label: 'Delete',
         icon: 'fa-solid fa-trash',
-        accelerator: 'CmdOrCtrl+D',
+        accelerator: 'Delete',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return ctx.canWrite && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
@@ -384,7 +397,6 @@ function selectAllNoneItem(ctx) {
     return {
         label: 'Select All/None',
         icon: 'fa-solid fa-list',
-        accelerator: 'CmdOrCtrl+A',
         click: () => {
             if (ctx.onSelectAllNone) ctx.onSelectAllNone();
         }
@@ -396,7 +408,6 @@ function createFolderItem(ctx) {
         label: 'Create Folder',
         icon: 'fa-solid fa-folder',
         isVisible: () => ctx.canWrite,
-        accelerator: 'CmdOrCtrl+N',
         click: () => ctx.emit('createFolder')
     };
 }
@@ -421,6 +432,34 @@ function experimentalMenuItems(ctx) {
     };
 }
 
+const isGeoraster = f => f.entry && f.entry.type === ddb.entry.type.GEORASTER;
+
+// One georaster: the compare view opens on it with the file picker, for the other rasters
+function compareToItem(ctx) {
+    return {
+        label: 'Compare to...',
+        icon: 'fa-solid fa-table-columns',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return !!ctx.dataset && sel.length === 1 && isGeoraster(sel[0]);
+        },
+        click: () => openCompare(ctx.dataset, { paths: [ctx.getSelectedEntries()[0].entry.path], pick: true })
+    };
+}
+
+// Several georasters: the compare view opens on them, side by side in the order they are listed
+function compareInMapItem(ctx) {
+    return {
+        label: 'Compare in Map',
+        icon: 'fa-solid fa-table-columns',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return !!ctx.dataset && sel.length >= 2 && sel.length <= MAX_LAYERS && sel.every(isGeoraster);
+        },
+        click: () => openCompare(ctx.dataset, { paths: ctx.getSelectedEntries().map(f => f.entry.path) })
+    };
+}
+
 /**
  * Build the standard viewer context menu items.
  * These are the Open/Open Map/Open Point Cloud/etc items shared across all views.
@@ -435,7 +474,9 @@ function buildViewerMenuItems(ctx) {
         openSplatItem(ctx),
         openMarkdownItem(ctx),
         openPdfItem(ctx),
-        plantHealthItem(ctx)
+        plantHealthItem(ctx),
+        compareToItem(ctx),
+        compareInMapItem(ctx)
     ];
 }
 
@@ -500,39 +541,99 @@ function extractItem(ctx) {
     };
 }
 
+function setCoordinateSystemItem(ctx) {
+    return {
+        label: 'Set Coordinate System',
+        icon: 'fa-solid fa-earth-europe',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return ctx.canWrite && sel.length === 1 && isCadDrawing(sel[0].entry);
+        },
+        click: () => ctx.emit('setCrs', ctx.getSelectedEntries()[0])
+    };
+}
+
 /**
- * Factory: create a context menu item for downloading a build artifact.
- * @param {string} label - Menu item label (e.g. "Download COG")
- * @param {string} icon - Font Awesome icon class
- * @param {number} entryType - ddb.entry.type constant (GEORASTER, POINTCLOUD, VECTOR)
+ * The downloads of built files: one item per row of BUILD_DOWNLOADS, shown when the selected file's
+ * complete build offers that artifact as a download (the artifacts say it, not the file type).
+ * Adding a download is adding a row there.
  * @param {object} ctx - Context menu context object
  */
-function makeDownloadItem(label, icon, entryType, ctx) {
-    return {
-        label,
-        icon,
+function buildDownloadItems(ctx) {
+    return BUILD_DOWNLOADS.map(row => ({
+        label: row.label,
+        icon: row.icon,
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return sel.length === 1
-                && sel[0].entry.type === entryType
-                && isBuildSucceeded(ctx.dataset, sel[0]);
+                && offersBuildDownload(sel[0].entry, row)
+                && isBuildComplete(ctx.dataset, sel[0]);
         },
         click: () => {
             const sel = ctx.getSelectedEntries();
-            if (sel.length === 1) ctx.emit('downloadBuildArtifact', sel[0]);
+            if (sel.length === 1) ctx.emit('downloadBuildArtifact', sel[0], row.role);
         }
+    }));
+}
+
+/**
+ * The downloads of a Gaussian splat: one item per row of SPLAT_DOWNLOADS, shown when the selected
+ * splat has it (the original always, an artifact once it is built, the .spz for other tools once it is
+ * built from a format that converts and the server offers the task). Adding a download is adding a row there.
+ * The original goes through the browser's own download, the others through the page ('downloadSplat').
+ * @param {object} ctx - Context menu context object
+ */
+function splatDownloadItems(ctx) {
+    const selected = () => {
+        const sel = ctx.getSelectedEntries();
+        return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GAUSSIAN_SPLAT ? sel[0] : null;
+    };
+    const available = (file, row) => splatDownloadsOf(file.entry, { building: hasActiveBuild(ctx.dataset, file), canExport: splatExportOffered() }).find(d => d.id === row.id);
+    return SPLAT_DOWNLOADS.map(row => ({
+        label: row.label,
+        icon: row.icon,
+        isVisible: () => {
+            const file = selected();
+            return !!file && !!available(file, row);
+        },
+        click: () => {
+            const file = selected();
+            const download = file && available(file, row);
+            if (!download) return;
+            if (download.kind === 'original') ctx.emit('downloadItems', [file]);
+            else ctx.emit('downloadSplat', file, download.id);
+        }
+    }));
+}
+
+/**
+ * Export of the training data of a Gaussian splat from the ODM project in the selected folder (the
+ * root of the dataset included), shown when the server offers the task. The file list does not know
+ * what a folder holds, so the dialog reads it and says if it does not look like an ODM project.
+ * @param {object} ctx - Context menu context object
+ */
+function splatTrainingExportItem(ctx) {
+    return {
+        label: 'Export splat training data',
+        icon: 'fa-solid fa-camera',
+        isVisible: () => {
+            const sel = ctx.getSelectedEntries();
+            return sel.length === 1 && isTrainingExportFolder(sel[0].entry) && taskToolOffered(TRAINING_EXPORT_TOOL);
+        },
+        click: () => ctx.emit('exportSplatTrainingData', ctx.getSelectedEntries()[0])
     };
 }
 
 function toolsItem(ctx) {
-    const cogItem = makeDownloadItem('Download COG', 'fa-solid fa-file-image', ddb.entry.type.GEORASTER, ctx);
-    const copcItem = makeDownloadItem('Download COPC', 'fa-solid fa-cube', ddb.entry.type.POINTCLOUD, ctx);
-    const gpkgItem = makeDownloadItem('Download GPKG', 'fa-solid fa-map', ddb.entry.type.VECTOR, ctx);
+    const buildDownloads = buildDownloadItems(ctx);
+    const splatItems = splatDownloadItems(ctx);
+    const trainingExport = splatTrainingExportItem(ctx);
 
     const mergeMultispectral = mergeMultispectralItem(ctx);
     const maskBorders = maskBordersItem(ctx);
     const alignGeoRaster = alignGeoRasterItem(ctx);
     const extract = extractItem(ctx);
+    const setCrs = setCoordinateSystemItem(ctx);
     const build = buildItem(ctx);
     const transfer = transferItem(ctx);
 
@@ -544,19 +645,22 @@ function toolsItem(ctx) {
             maskBorders,
             alignGeoRaster,
             extract,
+            setCrs,
             {
                 type: 'separator',
-                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() || extract.isVisible()
+                isVisible: () => mergeMultispectral.isVisible() || maskBorders.isVisible() || alignGeoRaster.isVisible() ||
+                    extract.isVisible() || setCrs.isVisible()
             },
             build,
             transfer,
             {
                 type: 'separator',
-                isVisible: () => cogItem.isVisible() || copcItem.isVisible() || gpkgItem.isVisible()
+                isVisible: () => buildDownloads.some(i => i.isVisible()) || splatItems.some(i => i.isVisible()) ||
+                    trainingExport.isVisible()
             },
-            cogItem,
-            copcItem,
-            gpkgItem
+            ...buildDownloads,
+            ...splatItems,
+            trainingExport
         ]
     };
 }
@@ -616,40 +720,43 @@ function buildStandardContextMenu(ctx) {
 
 export {
     // Individual items
-    openItem,
-    openMapItem,
-    openPointCloudItem,
-    openModelItem,
-    openUnifiedItem,
-    openPanoramaItem,
-    openMarkdownItem,
-    openPdfItem,
-    plantHealthItem,
-    editItem,
-    renameItem,
-    propertiesItem,
-    shareEmbedItem,
-    downloadItem,
-    buildItem,
-    toolsItem,
-    transferItem,
-    setThumbnailItem,
-    mergeMultispectralItem,
-    alignGeoRasterItem,
-    extractItem,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    setCoordinateSystemItem,
+    splatDownloadItems,
+    splatTrainingExportItem,
     deleteItem,
     deleteSeparator,
-    selectAllNoneItem,
-    createFolderItem,
-    selectionSeparator,
-    copyClipboardItem,
-    cutClipboardItem,
-    pasteClipboardItem,
-    clipboardSeparator,
+
+
+
+
+
+
+
     // Grouped builders
     buildViewerMenuItems,
     buildActionMenuItems,
-    buildFooterMenuItems,
+
     buildStandardContextMenu,
-    experimentalMenuItems
+
 };

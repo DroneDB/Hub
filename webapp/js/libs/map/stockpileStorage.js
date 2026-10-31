@@ -1,50 +1,46 @@
 /**
- * Persistent storage for stockpile volume polygons.
+ * Stockpile volume polygons as measurement features.
  *
  * Stockpiles are persisted side-by-side with regular 2D measurements in the same
- * `<basename>_measurements.geojson` file (the file MeasurementStorage uses).
- * Each stockpile is appended as a Feature with `measurementType === "stockpile"`
- * so it round-trips through `importFromGeoJSON()` and shows up in the
- * Measurement List dialog without any extra plumbing.
- *
- * Saves always APPEND a new feature - existing features (regular measurements
- * AND prior stockpiles) are preserved verbatim.
+ * `<basename>_measurements.geojson` file (the file MeasurementStorage writes).
+ * Each stockpile is a Feature with `measurementType === "stockpile"` so it
+ * round-trips through `importFromGeoJSON()` and shows up in the Measurement
+ * List dialog without any extra plumbing. This module builds that feature and
+ * reads the latest one back; the measurements toolbar saves the file.
  */
+
+import { pathutils } from 'ddb';
+import { newId as makeId } from '@/libs/ids';
+import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
+import { ANALYSIS_FILL } from '@/libs/map/analysisStyles';
 
 const SUFFIX = '_measurements.geojson';
 // Application id stamped on every file we own. Legacy values are still readable.
-export const APP_ID = 'DroneDB Registry';
+const APP_ID = 'DroneDB Registry';
 const LEGACY_APP_IDS = new Set([APP_ID, 'Registry-Stockpile', 'Registry-Orthophoto']);
+
+/**
+ * The properties of a stockpile feature beyond those of every measurement: what was measured, the
+ * base the volumes are from (libddb's basePlaneMethod), and what it was weighed and priced with
+ * (the material's name, density, price per tonne and currency), so a saved pile reads the same
+ * for a user whose materials differ.
+ */
+export const STOCKPILE_PROPERTIES = Object.freeze([
+    'id', 'title', 'material', 'materialName', 'materialDensity', 'costPerTon', 'currency',
+    'netVolume', 'cutVolume', 'fillVolume',
+    'area2d', 'area3d', 'baseElevation', 'basePlaneMethod', 'confidence',
+    'weightEstimate', 'costEstimate', 'unitSystem', 'savedAt'
+]);
 
 /**
  * Build the storage path for a given raster file path.
  * @param {string} rasterPath - Dataset-relative path of the raster.
  * @returns {string|null} The storage path, or null if input is invalid.
  */
-export function getStockpilePath(rasterPath) {
+function getStockpilePath(rasterPath) {
     if (!rasterPath) return null;
     if (rasterPath.endsWith(SUFFIX)) return rasterPath;
-    const lastDot = rasterPath.lastIndexOf('.');
-    const base = lastDot > 0 ? rasterPath.substring(0, lastDot) : rasterPath;
-    return `${base}${SUFFIX}`;
-}
-
-/**
- * Just the file name (no directory) of the storage path. Useful for user-facing
- * "saved to <filename>" toast messages.
- */
-export function getStockpileFileName(rasterPath) {
-    const p = getStockpilePath(rasterPath);
-    if (!p) return null;
-    const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-    return idx >= 0 ? p.substring(idx + 1) : p;
-}
-
-function makeId() {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return 'sp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+    return `${pathutils.dropExtension(rasterPath)}${SUFFIX}`;
 }
 
 async function readExisting(dataset, path) {
@@ -68,29 +64,11 @@ async function readExisting(dataset, path) {
     }
 }
 
-function buildEmptyFC(rasterPath) {
-    const now = new Date().toISOString();
-    return {
-        type: 'FeatureCollection',
-        crs: { type: 'name', properties: { name: 'EPSG:4326' } },
-        metadata: {
-            version: '1.0',
-            kind: 'measurements',
-            rasterFile: rasterPath,
-            createdAt: now,
-            modifiedAt: now,
-            application: APP_ID
-        },
-        features: []
-    };
-}
-
 /**
  * Build a GeoJSON Feature for a stockpile polygon ready to be inserted into
- * the shared measurements FeatureCollection. Used both by `saveStockpile`
- * (persisted file) and by the in-memory adoption flow that puts the just-
- * computed polygon directly into the OL measurements layer (so the user can
- * persist it via the regular toolbar Save button instead of a dedicated one).
+ * the shared measurements FeatureCollection. The just-computed polygon goes
+ * directly into the OL measurements layer, so the user persists it with the
+ * regular toolbar Save button.
  *
  * @param {Object} polygon - GeoJSON Polygon geometry (WGS84).
  * @param {Object} [properties] - Property bag (material, description, volumes, ...).
@@ -109,45 +87,14 @@ export function buildStockpileFeature(polygon, properties = {}) {
             // Force the discriminators / styling regardless of caller input.
             id: properties.id || makeId(),
             measurementType: 'stockpile',
-            stroke: properties.stroke || '#ff9800',
+            stroke: properties.stroke || ANALYSIS_COLOR,
             'stroke-width': properties['stroke-width'] || 2,
-            fill: properties.fill || 'rgba(255, 152, 0, 0.20)',
+            fill: properties.fill || ANALYSIS_FILL,
             'fill-opacity': properties['fill-opacity'] != null ? properties['fill-opacity'] : 0.2,
             createdAt: properties.createdAt || now,
             savedAt: now
         }
     };
-}
-
-/**
- * Persist a stockpile polygon + computed metrics by APPENDING a Feature to the
- * shared measurements file. Existing features (regular measurements and prior
- * stockpiles) are preserved.
- *
- * @returns {Promise<{path: string, fileName: string, feature: Object}>}
- */
-export async function saveStockpile(dataset, rasterPath, polygon, properties = {}) {
-    const path = getStockpilePath(rasterPath);
-    if (!path) throw new Error('Cannot derive storage path for stockpile.');
-    if (!dataset || typeof dataset.writeObj !== 'function') {
-        throw new Error('Dataset is not available.');
-    }
-
-    const fc = (await readExisting(dataset, path)) || buildEmptyFC(rasterPath);
-    fc.metadata = fc.metadata || {};
-    fc.metadata.application = APP_ID;
-    fc.metadata.modifiedAt = new Date().toISOString();
-    if (!fc.metadata.createdAt) fc.metadata.createdAt = fc.metadata.modifiedAt;
-
-    const feature = buildStockpileFeature(polygon, properties);
-
-    fc.features.push(feature);
-
-    const blob = new Blob([JSON.stringify(fc, null, 2)],
-        { type: 'application/geo+json' });
-    await dataset.writeObj(path, blob);
-
-    return { path, fileName: getStockpileFileName(rasterPath), feature };
 }
 
 /**
@@ -198,15 +145,4 @@ export async function loadStockpile(dataset, rasterPath, excludeIds) {
     }
     if (!feature) return null;
     return { polygon: feature.geometry, properties: feature.properties || {} };
-}
-
-/**
- * Best-effort delete of the entire saved file. Used by callers that want to
- * wipe all stockpile state (rarely - normal deletion happens through the
- * Measurement List dialog now).
- */
-export async function deleteStockpile(dataset, rasterPath) {
-    const path = getStockpilePath(rasterPath);
-    if (!path) return;
-    try { await dataset.deleteObj(path); } catch (e) { /* best-effort */ }
 }

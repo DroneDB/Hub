@@ -1,11 +1,11 @@
 <template>
-    <div class="opacity-control" v-if="visible">
-        <i class="fa-solid fa-adjust"></i>
-        <input type="range" min="0" max="1" step="0.05" :value="modelValue" @input="$emit('update:modelValue', parseFloat($event.target.value))" title="Layer opacity">
+    <div v-if="visible" class="opacity-control map-bottom-panel">
+        <i class="fa-solid fa-adjust" />
+        <input type="range" min="0" max="1" step="0.05" :value="modelValue" title="Layer opacity" aria-label="Layer opacity" @input="$emit('update:modelValue', parseFloat($event.target.value))">
         <span class="opacity-value">{{ Math.round(modelValue * 100) }}%</span>
         <button v-if="showPlantHealthBtn" class="ph-btn" :class="{ active: plantHealthActive }"
-                title="Plant Health" @click.stop="$emit('plant-health')">
-            <i class="fa-solid fa-leaf"></i>
+                title="Plant Health" aria-label="Plant Health" @click.stop="$emit('plant-health')">
+            <i class="fa-solid fa-leaf" />
         </button>
     </div>
 </template>
@@ -36,19 +36,11 @@ export default {
 
 <style scoped>
 .opacity-control {
-    position: absolute;
-    bottom: 2rem;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1;
     display: flex;
+    align-items: center;
     gap: 0.5rem;
-    background: rgba(0, 0, 0, 0.6);
     padding: 0.25rem 0.75rem;
     border-radius: 1.25rem;
-    color: white;
-    font-size: 0.75rem;
-    user-select: none;
 }
 
 .opacity-control i {
@@ -58,34 +50,8 @@ export default {
 }
 
 .opacity-control input[type="range"] {
-    width: 7.5rem;
+    flex: 1 1 7.5rem;
+    min-width: 4rem;
     cursor: pointer;
-    accent-color: var(--ddb-secondary);
-}
-
-.opacity-control .opacity-value {
-    min-width: 2rem;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-}
-
-.ph-btn {
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.75);
-    cursor: pointer;
-    padding: 0 0.15rem;
-    font-size: var(--ddb-font-size-base);
-    display: flex;
-    align-items: center;
-    transition: color 0.15s;
-}
-
-.ph-btn:hover {
-    color: #fff;
-}
-
-.ph-btn.active {
-    color: #7bc67e;
 }
 </style>

@@ -1,63 +1,63 @@
 <template>
-    <Window :title="title" id="importDatasetDialog" @onClose="onWindowClose" modal maxWidth="70%" fixedSize>
+    <Window id="importDatasetDialog" :title="title" modal max-width="70%" fixed-size @close="onWindowClose">
         <div class="import-dialog">
             <!-- Configure + verify -->
             <div v-if="!importing">
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Source</label>
-                    <Select v-model="sourceType" :options="sourceOptions" optionLabel="label" optionValue="type"
-                        @change="onSourceChange" class="w-100" :disabled="verifying" placeholder="Select a source" />
+                    <label id="import-dataset-dialog-source-label" for="import-dataset-dialog-source" class="d-block mb-1 fw-semibold">Source</label>
+                    <Select v-model="sourceType" input-id="import-dataset-dialog-source" aria-labelledby="import-dataset-dialog-source-label" :options="sourceOptions" option-label="label" option-value="type"
+                            class="w-100" :disabled="verifying" placeholder="Select a source" @change="onSourceChange" />
                     <small v-if="selectedSource" class="text-muted">{{ selectedSource.description }}</small>
                 </div>
 
                 <!-- Registry source: enhanced UI with org/dataset browsing -->
                 <template v-if="sourceType === 'registry' && selectedSource">
                     <div class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
-                        <InputText v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
-                            :disabled="verifying" @input="onRemoteUrlChange" @keyup.enter="canVerify && verify()" />
+                        <label for="import-dataset-dialog-registry-url" class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
+                        <InputText id="import-dataset-dialog-registry-url" v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
+                                   :disabled="verifying" @input="onRemoteUrlChange" @keyup.enter="canVerify && verify()" />
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col">
-                            <label class="d-block mb-1 fw-semibold">Username</label>
-                            <InputText v-model="params.username" placeholder="optional" class="w-100"
-                                :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                            <label for="import-dataset-dialog-username" class="d-block mb-1 fw-semibold">Username</label>
+                            <InputText id="import-dataset-dialog-username" v-model="params.username" placeholder="optional" class="w-100"
+                                       :disabled="verifying" @keyup.enter="canVerify && verify()" />
                         </div>
                         <div class="col">
-                            <label class="d-block mb-1 fw-semibold">Password</label>
-                            <InputText v-model="params.password" type="password" placeholder="optional" class="w-100"
-                                :disabled="verifying" @keyup.enter="canVerify && verify()" />
+                            <label for="import-dataset-dialog-password" class="d-block mb-1 fw-semibold">Password</label>
+                            <InputText id="import-dataset-dialog-password" v-model="params.password" type="password" placeholder="optional" class="w-100"
+                                       :disabled="verifying" @keyup.enter="canVerify && verify()" />
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">Organization <span class="text-danger">*</span></label>
+                        <label id="import-dataset-dialog-organization-label" for="import-dataset-dialog-organization" class="d-block mb-1 fw-semibold">Organization <span class="text-danger">*</span></label>
                         <div class="d-flex gap-2">
-                            <Select v-if="remoteOrgs !== null" v-model="params.organization"
-                                :options="remoteOrgs" optionLabel="label" optionValue="value"
-                                placeholder="Select an organization" class="flex-grow-1"
-                                :disabled="verifying || browsingOrgs" @change="onRemoteOrgChange" />
-                            <InputText v-else v-model="params.organization" placeholder="organization slug"
-                                class="flex-grow-1" :disabled="verifying || browsingOrgs"
-                                @keyup.enter="canVerify && verify()" />
+                            <Select v-if="remoteOrgs !== null" v-model="params.organization" input-id="import-dataset-dialog-organization" aria-labelledby="import-dataset-dialog-organization-label"
+                                    :options="remoteOrgs" option-label="label" option-value="value"
+                                    placeholder="Select an organization" class="flex-grow-1"
+                                    :disabled="verifying || browsingOrgs" @change="onRemoteOrgChange" />
+                            <InputText v-else v-model="params.organization" placeholder="organization slug" aria-label="Organization slug"
+                                       class="flex-grow-1" :disabled="verifying || browsingOrgs"
+                                       @keyup.enter="canVerify && verify()" />
                             <Button icon="fa-solid fa-list" severity="secondary" :loading="browsingOrgs"
-                                :disabled="!canBrowseOrgs || browsingOrgs" @click="browseOrgs"
-                                title="Browse organizations" />
+                                    :disabled="!canBrowseOrgs || browsingOrgs" title="Browse organizations" aria-label="Browse organizations"
+                                    @click="browseOrgs" />
                         </div>
                         <small v-if="browseOrgsError" class="text-danger">{{ browseOrgsError }}</small>
                     </div>
                     <div class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">Dataset <span class="text-danger">*</span></label>
+                        <label id="import-dataset-dialog-dataset-label" for="import-dataset-dialog-dataset" class="d-block mb-1 fw-semibold">Dataset <span class="text-danger">*</span></label>
                         <div class="d-flex gap-2">
-                            <Select v-if="remoteDatasets !== null" v-model="params.dataset"
-                                :options="remoteDatasets" optionLabel="label" optionValue="value"
-                                placeholder="Select a dataset" class="flex-grow-1"
-                                :disabled="verifying || browsingDatasets" />
-                            <InputText v-else v-model="params.dataset" placeholder="dataset slug"
-                                class="flex-grow-1" :disabled="verifying || browsingDatasets"
-                                @keyup.enter="canVerify && verify()" />
+                            <Select v-if="remoteDatasets !== null" v-model="params.dataset" input-id="import-dataset-dialog-dataset" aria-labelledby="import-dataset-dialog-dataset-label"
+                                    :options="remoteDatasets" option-label="label" option-value="value"
+                                    placeholder="Select a dataset" class="flex-grow-1"
+                                    :disabled="verifying || browsingDatasets" />
+                            <InputText v-else v-model="params.dataset" placeholder="dataset slug" aria-label="Dataset slug"
+                                       class="flex-grow-1" :disabled="verifying || browsingDatasets"
+                                       @keyup.enter="canVerify && verify()" />
                             <Button icon="fa-solid fa-list" severity="secondary" :loading="browsingDatasets"
-                                :disabled="!canBrowseDatasets || browsingDatasets" @click="browseDatasets"
-                                title="Browse datasets" />
+                                    :disabled="!canBrowseDatasets || browsingDatasets" title="Browse datasets" aria-label="Browse datasets"
+                                    @click="browseDatasets" />
                         </div>
                         <small v-if="browseDatasetsError" class="text-danger">{{ browseDatasetsError }}</small>
                     </div>
@@ -66,18 +66,18 @@
                 <!-- Generic fields for all other source types -->
                 <template v-else>
                     <div v-for="f in selectedSource ? selectedSource.fields : []" :key="f.name" class="mb-3">
-                        <label class="d-block mb-1 fw-semibold">
+                        <label :for="'import-dataset-field-' + f.name" class="d-block mb-1 fw-semibold">
                             {{ f.label }}<span v-if="f.required" class="text-danger"> *</span>
                         </label>
-                        <InputText v-model="params[f.name]" :type="f.type === 'password' ? 'password' : 'text'"
-                            :placeholder="f.placeholder" class="w-100" :disabled="verifying"
-                            @keyup.enter="canVerify && verify()" />
+                        <InputText :id="'import-dataset-field-' + f.name" v-model="params[f.name]" :type="f.type === 'password' ? 'password' : 'text'"
+                                   :placeholder="f.placeholder" class="w-100" :disabled="verifying"
+                                   @keyup.enter="canVerify && verify()" />
                     </div>
                 </template>
 
                 <div class="d-flex gap-2">
                     <Button label="Verify" icon="fa-solid fa-plug" severity="secondary"
-                        :disabled="!canVerify || verifying" :loading="verifying" @click="verify" />
+                            :disabled="!canVerify || verifying" :loading="verifying" @click="verify" />
                 </div>
 
                 <PrimeMessage v-if="verifyError" severity="error" :closable="false" class="mt-3">
@@ -89,31 +89,31 @@
 
                     <div class="verify-stats mt-2 d-flex flex-wrap gap-3">
                         <span v-if="verifyResult.fileCount != null" class="verify-stat">
-                            <i class="fa-solid fa-file"></i>
+                            <i class="fa-solid fa-file" />
                             {{ verifyResult.fileCount }} file{{ verifyResult.fileCount === 1 ? '' : 's' }}
                         </span>
                         <span v-if="verifyResult.estimatedBytes != null" class="verify-stat">
-                            <i class="fa-solid fa-database"></i> {{ bytesToSize(verifyResult.estimatedBytes) }}
+                            <i class="fa-solid fa-database" /> {{ bytesToSize(verifyResult.estimatedBytes) }}
                         </span>
                     </div>
                     <div v-if="verifyResult.note" class="mt-1">
-                        <small class="text-muted"><i class="fa-solid fa-circle-info"></i> {{ verifyResult.note }}</small>
+                        <small class="text-muted"><i class="fa-solid fa-circle-info" /> {{ verifyResult.note }}</small>
                     </div>
 
                     <div class="row g-3 mt-1">
                         <div class="col-md-6">
-                            <label class="d-block mb-1 fw-semibold">Dataset Name</label>
-                            <InputText v-model="name" placeholder="Dataset name" class="w-100" />
+                            <label for="import-dataset-dialog-dataset-name" class="d-block mb-1 fw-semibold">Dataset Name</label>
+                            <InputText id="import-dataset-dialog-dataset-name" v-model="name" placeholder="Dataset name" class="w-100" />
                         </div>
                         <div class="col-md-6">
-                            <label class="d-block mb-1 fw-semibold">Visibility</label>
-                            <Select v-model="visibility" :options="visibilityOptions" optionLabel="label"
-                                optionValue="value" class="w-100" />
+                            <label id="import-dataset-dialog-visibility-label" for="import-dataset-dialog-visibility" class="d-block mb-1 fw-semibold">Visibility</label>
+                            <Select v-model="visibility" input-id="import-dataset-dialog-visibility" aria-labelledby="import-dataset-dialog-visibility-label" :options="visibilityOptions" option-label="label"
+                                    option-value="value" class="w-100" />
                         </div>
                     </div>
                     <div class="mb-2 mt-2">
-                        <label class="d-block mb-1 fw-semibold">Slug</label>
-                        <InputText v-model="slug" placeholder="dataset-slug" class="w-100" @input="slugEdited = true" />
+                        <label for="import-dataset-dialog-slug" class="d-block mb-1 fw-semibold">Slug</label>
+                        <InputText id="import-dataset-dialog-slug" v-model="slug" placeholder="dataset-slug" class="w-100" @input="slugEdited = true" />
                         <small v-if="slug && slugFormatInvalid" class="text-danger">
                             A slug may only contain lowercase letters, numbers, dashes and underscores.
                         </small>
@@ -137,19 +137,19 @@
                 </div>
             </div>
 
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button v-if="!importing" @click="emitClose('close')" severity="secondary" label="Close" />
-                <Button v-if="!importing" @click="startImport" severity="primary" icon="fa-solid fa-download"
-                    :disabled="!canImport" :loading="submitting" label="Import" />
-                <Button v-if="importing" @click="emitClose('background')" severity="secondary"
-                    label="Run in background" />
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3 w-100">
+                <Button v-if="!importing" severity="secondary" label="Close" @click="emitClose('close')" />
+                <Button v-if="!importing" severity="primary" icon="fa-solid fa-download" :disabled="!canImport"
+                        :loading="submitting" label="Import" @click="startImport" />
+                <Button v-if="importing" severity="secondary" label="Run in background"
+                        @click="emitClose('background')" />
             </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
@@ -159,8 +159,9 @@ import { bytesToSize } from '@/libs/utils';
 import { slugFromName } from '@/libs/api/registryUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Visibility } from 'ddb';
-import useHeavyTask from '@/composables/useHeavyTask';
+import { useHeavyTask } from '@/composables/useHeavyTask';
 import { IMPORT_SOURCES, getImportSource } from './importSources';
+import { formatDurationSeconds } from '@/libs/format';
 
 const slugRe = /^[a-z0-9\-_]+$/;
 
@@ -175,7 +176,6 @@ const slugRe = /^[a-z0-9\-_]+$/;
  */
 export default {
     name: 'ImportDatasetDialog',
-    mixins: [useHeavyTask],
     components: {
         Window, Select, InputText, Button, PrimeMessage, ProgressBar
     },
@@ -183,8 +183,12 @@ export default {
         orgSlug: { type: String, required: true },
         forbiddenSlugs: { type: Array, default: () => [] }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        const { trackHeavyTask } = useHeavyTask();
+        return { trackHeavyTask };
+    },
     data() {
         return {
             title: 'Import dataset',
@@ -224,24 +228,6 @@ export default {
             logTail: [],
             etaText: ''
         };
-    },
-
-    async mounted() {
-        this.org = reg.Organization(this.orgSlug);
-
-        let enabled;
-        try {
-            enabled = await this.org.importSources();
-        } catch (e) {
-            // Fall back to the full catalog if the server does not expose the endpoint.
-            enabled = IMPORT_SOURCES.map(s => s.type);
-        }
-
-        this.sourceOptions = IMPORT_SOURCES.filter(s => enabled.includes(s.type));
-        if (this.sourceOptions.length) {
-            this.sourceType = this.sourceOptions[0].type;
-            this.onSourceChange();
-        }
     },
 
     computed: {
@@ -291,6 +277,24 @@ export default {
     watch: {
         name(val) {
             if (!this.slugEdited) this.slug = this.uniqueSlug(slugFromName(val) || '');
+        }
+    },
+
+    async mounted() {
+        this.org = reg.Organization(this.orgSlug);
+
+        let enabled;
+        try {
+            enabled = await this.org.importSources();
+        } catch {
+            // Fall back to the full catalog if the server does not expose the endpoint.
+            enabled = IMPORT_SOURCES.map(s => s.type);
+        }
+
+        this.sourceOptions = IMPORT_SOURCES.filter(s => enabled.includes(s.type));
+        if (this.sourceOptions.length) {
+            this.sourceType = this.sourceOptions[0].type;
+            this.onSourceChange();
         }
     },
 
@@ -437,7 +441,7 @@ export default {
             this.taskId = result.taskId;
 
             // Tell the parent the dataset now exists so it can show it in the list.
-            this.$emit('onClose', 'started', {
+            this.$emit('close', 'started', {
                 slug: result.dsSlug || this.slug,
                 name: this.name,
                 visibility: this.visibility
@@ -449,9 +453,9 @@ export default {
                     notify: false,
                     onProgress: this.onImportProgress
                 });
-                this.$emit('onClose', 'done', { slug: result.dsSlug || this.slug, success: true });
+                this.$emit('close', 'done', { slug: result.dsSlug || this.slug, success: true });
             } catch (e) {
-                this.$emit('onClose', 'done', {
+                this.$emit('close', 'done', {
                     slug: result.dsSlug || this.slug,
                     success: false,
                     error: (e && e.message) || 'Import failed.'
@@ -468,17 +472,10 @@ export default {
             if (p > 1 && p < 100) {
                 const elapsed = (Date.now() - this.importStartTime) / 1000;
                 const total = elapsed / (p / 100);
-                this.etaText = this.formatDuration(Math.max(0, total - elapsed));
+                this.etaText = formatDurationSeconds(Math.round(Math.max(0, total - elapsed)));
             } else if (p >= 100) {
                 this.etaText = '';
             }
-        },
-
-        formatDuration(seconds) {
-            const s = Math.round(seconds);
-            const m = Math.floor(s / 60);
-            const sec = s % 60;
-            return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
         },
 
         onWindowClose() {
@@ -486,7 +483,7 @@ export default {
         },
 
         emitClose(action) {
-            this.$emit('onClose', action, { slug: this.slug });
+            this.$emit('close', action, { slug: this.slug });
         }
     }
 };
@@ -494,7 +491,7 @@ export default {
 
 <style scoped>
 .import-dialog {
-    min-width: 24rem;
+    min-width: min(24rem, var(--window-content-width, 100%));
 }
 
 .verify-stats {
@@ -509,14 +506,14 @@ export default {
 }
 
 .verify-stat i {
-    color: var(--p-primary-color, #2563eb);
+    color: var(--p-primary-color);
 }
 
 .import-log {
     font-family: monospace;
     font-size: 0.8rem;
     color: var(--ddb-text-muted);
-    background: var(--p-content-background, rgba(0, 0, 0, 0.03));
+    background: var(--p-content-background);
     border-radius: 4px;
     padding: 0.5rem;
     max-height: 8rem;

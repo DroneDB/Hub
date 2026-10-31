@@ -1,0 +1,299 @@
+// ============================================================
+// Map analysis panels (Plant Health, Raster Analysis, Stockpile Volume): the dark
+// overlay they share and its palette. Owner: features/viewers/map. Everything is under
+// .analysis-panel; a modifier picks the panel's accent.
+// ============================================================
+.analysis-panel {
+    --panel-bg: rgba(0, 0, 0, 0.85);
+    --panel-text: #eee;
+    --panel-text-soft: #ccc;
+    --panel-muted: #aaa;
+    --panel-text-faint: #888;
+    --panel-line: rgba(255, 255, 255, 0.15);
+    --panel-field-bg: rgba(255, 255, 255, 0.1);
+    --panel-field-border: rgba(255, 255, 255, 0.2);
+    --panel-option-bg: #2a2a2a;
+    // The tool the map is in: the panel's accent
+    --panel-active: var(--panel-accent);
+    --panel-active-rgb: var(--panel-accent-rgb);
+    --panel-info: var(--ddb-primary-200);
+    --panel-error-text: #ff8a80;
+    // Warnings are yellow, as in the rest of the Hub
+    --panel-warn: #ffd54f;
+    --panel-warn-rgb: 255, 213, 79;
+    --panel-warn-text: #ffe082;
+    --panel-warn-light: #fff3c4;
+    // Thermal rasters: values and the profile line
+    --panel-thermal: #ff9800;
+    --panel-thermal-strong: #ff7043;
+    --panel-thermal-soft: #ffab91;
+    // Primary button: the accent unless a panel picks a stronger one
+    --panel-primary: var(--panel-accent);
+    --panel-primary-hover: var(--panel-accent);
+    --panel-primary-text: #fff;
+
+    position: absolute;
+    top: 0.5rem;
+    right: 4rem;
+    z-index: 2;
+    width: 16rem;
+    background: var(--panel-bg);
+    color: var(--panel-text);
+    border-radius: 0.5rem;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    max-height: calc(100% - 1rem);
+    overflow-y: auto;
+
+    .panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--panel-line);
+    }
+
+    .panel-title {
+        font-weight: 600;
+
+        i {
+            color: var(--panel-accent);
+            margin-right: 0.3rem;
+        }
+    }
+
+    .close-btn {
+        background: none;
+        border: none;
+        color: var(--panel-muted);
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 0;
+
+        &:hover {
+            color: #fff;
+        }
+    }
+
+    .panel-body {
+        padding: 0.5rem 0.75rem;
+
+        &.loading {
+            text-align: center;
+            padding: 1rem;
+            color: var(--panel-muted);
+        }
+    }
+
+    .section {
+        margin-bottom: 0.5rem;
+    }
+
+    .section-label {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--panel-muted);
+        margin-bottom: 0.15rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+
+    .info-icon-btn {
+        background: none;
+        border: none;
+        padding: 0;
+        margin-left: 0.35rem;
+        color: var(--panel-accent);
+        cursor: pointer;
+        opacity: 0.85;
+        font-size: 0.8rem;
+        line-height: 1;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    .sensor-badge {
+        display: inline-block;
+        background: rgba(var(--panel-accent-rgb), 0.25);
+        border: 1px solid rgba(var(--panel-accent-rgb), 0.5);
+        border-radius: 0.25rem;
+        padding: 0.1rem 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    .panel-select,
+    .panel-input,
+    .panel-range {
+        width: 100%;
+        box-sizing: border-box;
+        background: var(--panel-field-bg);
+        border: 1px solid var(--panel-field-border);
+        color: var(--panel-text);
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.4rem;
+        font-size: 0.8rem;
+    }
+
+    .panel-range {
+        padding: 0;
+        height: 1.4rem;
+        background: transparent;
+        border: 0;
+    }
+
+    .panel-textarea {
+        resize: vertical;
+        min-height: 2.4rem;
+        margin-top: 0.25rem;
+        font-family: inherit;
+    }
+
+    .panel-select:focus,
+    .panel-input:focus {
+        outline: none;
+        border-color: rgba(var(--panel-accent-rgb), 0.6);
+    }
+
+    .panel-select option,
+    .panel-select optgroup {
+        background: var(--panel-option-bg);
+        color: var(--panel-text);
+
+        &:disabled {
+            color: #777;
+        }
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.15rem;
+        font-size: 0.75rem;
+        color: var(--panel-text-soft);
+    }
+
+    // Action buttons: a three-column grid, icon over a short label
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem;
+        margin-top: 0.5rem;
+    }
+
+    .action-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        width: 100%;
+        padding: 0.4rem 0.3rem;
+        min-height: 2.6rem;
+        text-align: center;
+        line-height: 1.1;
+
+        .action-label {
+            font-size: 0.7rem;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        i {
+            font-size: 0.95rem;
+        }
+    }
+
+    .panel-btn {
+        border: 1px solid transparent;
+        border-radius: 0.25rem;
+        padding: 0.3rem 0.6rem;
+        cursor: pointer;
+        font-size: 0.8rem;
+        background: rgba(255, 255, 255, 0.15);
+        color: var(--panel-text-soft);
+
+        &:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        &:focus-visible {
+            outline: 2px solid var(--panel-accent);
+            outline-offset: 1px;
+        }
+
+        // The tool the map is in (drawing, inspecting)
+        &.is-active {
+            background: rgba(var(--panel-active-rgb), 0.45);
+            color: #fff;
+            border-color: var(--panel-active);
+            box-shadow: 0 0 0 1px rgba(var(--panel-active-rgb), 0.35);
+        }
+    }
+
+    .panel-btn--primary {
+        background: var(--panel-primary);
+        color: var(--panel-primary-text);
+
+        &:hover:not(:disabled) {
+            background: var(--panel-primary-hover);
+        }
+    }
+
+    .export-limit-hint {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 4px 8px;
+        font-size: 0.85rem;
+        color: var(--panel-muted);
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+}
+
+.analysis-panel--plant-health {
+    --panel-accent: #4caf50;
+    --panel-accent-rgb: 76, 175, 80;
+    --panel-primary-hover: #388e3c;
+}
+
+.analysis-panel--raster {
+    --panel-accent: var(--ddb-primary-300); // 5.5:1 on the panel
+    --panel-accent-rgb: 77, 156, 240; // shade 300 as a triplet
+    --panel-primary: var(--ddb-primary); // white text on the button: 4.8:1
+    --panel-primary-hover: var(--ddb-primary-hover);
+}
+
+.analysis-panel--stockpile {
+    --panel-accent: #ffd54f; // 10.7:1 on the panel
+    --panel-accent-rgb: 255, 213, 79;
+    --panel-primary: #ffc107; // dark text on the button: 10.7:1
+    --panel-primary-hover: #ffb300;
+    --panel-primary-text: #1a1a1a;
+}
+
+// Bottom sheet on phones
+@media (max-width: 768px) {
+    .analysis-panel {
+        position: fixed;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 50vh;
+        border-radius: 0.75rem 0.75rem 0 0;
+
+        .panel-body {
+            padding: 0.5rem;
+        }
+    }
+}
