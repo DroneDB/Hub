@@ -60,9 +60,9 @@
                                 <strong>Band misalignment detected</strong>
                                 <p>
                                     Multi-camera sensor (~{{ maxShift }}px shift).
-                                    Approximate correction will be applied.
-                                    For accurate results, process with
-                                    <a href="https://webodm.org/" target="_blank">WebODM</a>.
+                                    {{ validationResult.alignment.correctionApplied ? 'Approximate correction will be applied.' : 'No approximate correction applies to these images.' }}
+                                    For accurate results, process the band images with
+                                    <strong>Run Photogrammetry</strong> in the Tasks tab.
                                 </p>
                             </div>
                         </div>
