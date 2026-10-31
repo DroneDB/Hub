@@ -91,16 +91,30 @@ export default class SysApi {
     }
 
     /**
-     * Upload diagnostics: sends `body` to the probe endpoint and returns the raw Response
-     * (the caller reads the status: 429 means "try again later").
+     * Upload diagnostics: sends `body` to the probe endpoint and answers its status once the
+     * whole answer is in (the caller reads the status: 429 means "try again later").
      * @param {BodyInit} body
      */
     uploadProbe(body) {
-        return this.registry.fetchRaw('/sys/upload-probe', { method: 'POST', body, cache: 'no-store' });
+        return answered(this.registry.fetchRaw('/sys/upload-probe', { method: 'POST', body, cache: 'no-store' }));
     }
 
-    /** One round trip to the server (latency measurement). */
+    /** One round trip to the server (latency measurement), answered once the whole answer is in. */
     ping() {
-        return this.registry.fetchRaw('/sys/version', { cache: 'no-store' });
+        return answered(this.registry.fetchRaw('/sys/version', { cache: 'no-store' }));
     }
+}
+
+/**
+ * The status of a request whose body the caller does not need, once that body is read to its
+ * end: a response whose body is never read stays open in the browser (the request never shows
+ * as finished, and its connection is not free for the next one), and a measurement that stops
+ * at the headers leaves out the rest of the answer.
+ * @param {Promise<Response>} request
+ * @returns {Promise<{ status: number, ok: boolean }>}
+ */
+async function answered(request) {
+    const response = await request;
+    await response.arrayBuffer();
+    return { status: response.status, ok: response.ok };
 }

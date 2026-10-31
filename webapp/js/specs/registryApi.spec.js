@@ -101,3 +101,38 @@ describe('e-mail templates and notification status', () => {
         expect(error.message).toBe('Unknown placeholder {{foo}} in the body');
     });
 });
+
+describe('upload diagnostics requests', () => {
+    /** A response whose body reports when it is read to its end */
+    function trackedResponse(status, text) {
+        const state = { drained: false };
+        const body = new ReadableStream({
+            start(controller) { controller.enqueue(new TextEncoder().encode(text)); },
+            pull(controller) { state.drained = true; controller.close(); }
+        });
+        return { state, response: new Response(body, { status }) };
+    }
+
+    async function sysWith(response) {
+        const { default: SysApi } = await import('@/libs/ddb/sysApi');
+        const registry = { fetchRaw: vi.fn(async () => response) };
+        return { sys: new SysApi(registry), registry };
+    }
+
+    it('the upload probe reads its answer to the end and answers the status', async () => {
+        const { state, response } = trackedResponse(429, '{"error":"Too many"}');
+        const { sys, registry } = await sysWith(response);
+        const res = await sys.uploadProbe(new Blob(['x']));
+        expect(registry.fetchRaw).toHaveBeenCalledWith('/sys/upload-probe', expect.objectContaining({ method: 'POST', cache: 'no-store' }));
+        expect(state.drained).toBe(true);
+        expect(response.bodyUsed).toBe(true);
+        expect(res).toEqual({ status: 429, ok: false });
+    });
+
+    it('the round trip reads its answer to the end', async () => {
+        const { state, response } = trackedResponse(200, '{"version":"1"}');
+        const { sys } = await sysWith(response);
+        expect(await sys.ping()).toEqual({ status: 200, ok: true });
+        expect(state.drained).toBe(true);
+    });
+});
