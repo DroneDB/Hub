@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
+import { readSource, ruleOf } from '@/specs/cssSource';
 
 const h = vi.hoisted(() => ({ store: null, auth: null, reg: { notificationStatus: null } }));
 vi.mock('@/stores/preferences', async () => {
@@ -274,6 +275,21 @@ describe('PreferencesDialog', () => {
             const panel = dom().findAll('[role="tabpanel"]').find(p => p.find('[data-testid="stockpile-materials-editor"]').exists());
             await buttonWith('Reset section', panel).trigger('click');
             expect(h.store.resetSection).toHaveBeenCalledWith('stockpiles');
+        });
+
+        // The layout is CSS: the rules that keep the sticky column titles of the materials off the text above them
+        it('sticks the column titles at the top edge of the panels, painting nothing outside them', () => {
+            const dialog = readSource(__dirname, 'PreferencesDialog.vue');
+            // The scroller has no top padding for the rows to show through above a sticky title...
+            expect(ruleOf(dialog, '.pref-tabs :deep(.p-tabpanels)')).toMatch(/padding:\s*0;/);
+            // ...the padding of the panels is inside what scrolls
+            expect(ruleOf(dialog, '.pref-tabs :deep(.p-tabpanel)')).toMatch(/padding:\s*var\(--p-tabs-tabpanel-padding\);/);
+            // ...so the titles stick at the top, with no shadow over the panel's padding (which covered
+            // the last line of the text above them while the list is at its top)
+            const head = ruleOf(readSource(__dirname, 'StockpileMaterialsEditor.vue'), '.materials-head');
+            expect(head).toMatch(/position:\s*sticky;/);
+            expect(head).toMatch(/top:\s*0;/);
+            expect(head).not.toMatch(/box-shadow/);
         });
     });
 

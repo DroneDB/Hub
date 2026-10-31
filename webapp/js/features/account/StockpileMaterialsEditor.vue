@@ -217,13 +217,12 @@ function defaultsText(row) {
 .materials-head {
     font-size: var(--ddb-font-size-sm);
     color: var(--ddb-text-secondary);
-    /* The column titles stay in view while the list scrolls in the window */
+    /* The column titles stay in view while the list scrolls in the window (at its visible edge:
+       the Preferences scroller has no top padding for the rows to show through) */
     position: sticky;
     top: 0;
     z-index: 1;
     background: var(--ddb-bg-surface);
-    /* ... and cover the panel's top padding, which the rows would scroll through */
-    box-shadow: 0 -1.25rem 0 0 var(--ddb-bg-surface);
 }
 
 .col-shown { grid-area: shown; }

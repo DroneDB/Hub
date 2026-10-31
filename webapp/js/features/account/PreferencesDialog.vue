@@ -365,6 +365,14 @@ async function resetAll() {
 .pref-tabs :deep(.p-tabpanels) {
     height: min(26rem, 55vh);
     overflow-y: auto;
+    /* The padding is the panel's, inside what scrolls: a scroller with a top padding has a band
+       above its content that the rows scroll through, and a sticky title (the stockpile
+       materials) sticks below that band, not at the visible edge */
+    padding: 0;
+}
+
+.pref-tabs :deep(.p-tabpanel) {
+    padding: var(--p-tabs-tabpanel-padding);
 }
 
 .pref-group {

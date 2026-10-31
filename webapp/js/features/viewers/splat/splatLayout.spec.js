@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import fs from 'node:fs';
-import path from 'node:path';
+import { readSource, ruleOf } from '@/specs/cssSource';
 
-// The layout is CSS (no layout engine in the tests): the rules that keep the overlays apart
-const read = file => fs.readFileSync(path.join(__dirname, file), 'utf8');
-const ruleOf = (source, selector) => {
-    const start = source.indexOf(`${selector} {`);
-    return start < 0 ? '' : source.slice(start, source.indexOf('}', start));
-};
+// The rules that keep the overlays apart
+const read = file => readSource(__dirname, file);
 
 describe('the overlays of the splat viewer', () => {
     it('size the camera rail from the variables of the viewer', () => {
