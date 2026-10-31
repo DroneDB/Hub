@@ -4,7 +4,7 @@
         <div id="search-box">
             <IconField style="flex: 1; min-width: 0;">
                 <InputIcon class="fa-solid fa-magnifying-glass" />
-                <InputText v-model="filterRaw" placeholder="Search files" aria-label="Search files" style="width: 100%;" @keyup.enter="search()" />
+                <InputText v-model="filterRaw" placeholder="Search files" aria-label="Search files" style="width: 100%;" @keyup.enter="search(filterRaw)" />
             </IconField>
             <Button v-if="filterRaw != null && filterRaw.length > 0" icon="fa-solid fa-xmark"
                     title="Clear search" aria-label="Clear search" severity="secondary" text size="small"
@@ -52,6 +52,8 @@ import { usePreference } from '@/composables/usePreference';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 
 const { pathutils } = ddb;
+
+const isBlank = (text) => text == null || text.length === 0;
 
 export default {
     components: {
@@ -125,6 +127,7 @@ export default {
             loading: true,
             lastSelectedNode: null,
             contextMenu,
+            // What is in the search box, and the query last searched (null: no search)
             filterRaw: null,
             filter: null,
             searchStaticPaths: null,
@@ -132,14 +135,14 @@ export default {
         };
     },
     watch: {
+        // Search as the user types; Enter may have searched this text already
         filterRaw: debounce(function (newVal) {
-            this.filter = newVal;
-            if ((newVal == null || newVal.length === 0) && this.searchStaticPaths == null) return;
-            this.search();
+            if (isBlank(newVal) ? this.searchStaticPaths == null : newVal === this.filter) return;
+            this.search(newVal);
         }, 500),
         sortDescending: function () {
             if (this.searchStaticPaths != null) {
-                this.search();
+                this.search(this.filter);
             } else {
                 this.refreshNodes();
             }
@@ -229,18 +232,19 @@ export default {
             await this.refreshNodes();
         },
 
-        search: async function () {
+        // Searches the tree for query (a blank one clears the search)
+        search: async function (query) {
 
-            if (this.filter == null || this.filter.length == 0) {
+            if (isBlank(query)) {
                 await this.clearSearch();
                 return;
             };
 
+            this.filter = query;
+
             try {
 
                 var rootPath = this.nodes[0].path;
-
-                var query = this.filter;
 
                 if (!query.includes('*') && !query.includes('*'))
                     query = "*" + query + "*";
