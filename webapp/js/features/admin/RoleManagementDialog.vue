@@ -46,7 +46,7 @@
                             <div class="field">
                                 <label for="role-management-dialog-role-name">Role Name</label>
                                 <InputText id="role-management-dialog-role-name" ref="txtRoleName" v-model="newRoleName" placeholder="Enter role name"
-                                           class="w-full" @keydown="clearError()" @keyup.enter="confirmAddRole()" />
+                                           class="w-100" @keydown="clearError()" @keyup.enter="confirmAddRole()" />
                                 <small>Role names should be descriptive (e.g., "Editor", "Viewer", "Manager")</small>
                             </div>
                         </form>
@@ -256,9 +256,5 @@ export default {
 
 .add-role-actions {
     margin-top: 1rem;
-}
-
-.w-full {
-    width: 100%;
 }
 </style>

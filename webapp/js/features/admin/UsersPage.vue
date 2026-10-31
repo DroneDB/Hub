@@ -129,13 +129,13 @@
             <template #extra>
                 <div class="delete-options">
                     <div class="field">
-                        <label id="users-transfer-data-to-successor-label" for="users-transfer-data-to-successor">Transfer data to successor (optional)</label>
-                        <Select v-model="deleteSuccessor" input-id="users-transfer-data-to-successor" aria-labelledby="users-transfer-data-to-successor-label" :options="successorOptions" option-label="label" option-value="value" placeholder="-- Delete all data --" show-clear class="w-full" />
-                        <small class="text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
+                        <label id="users-transfer-data-to-successor-label" for="users-transfer-data-to-successor" class="d-block mb-1 fw-semibold">Transfer data to successor (optional)</label>
+                        <Select v-model="deleteSuccessor" input-id="users-transfer-data-to-successor" aria-labelledby="users-transfer-data-to-successor-label" :options="successorOptions" option-label="label" option-value="value" placeholder="-- Delete all data --" show-clear class="w-100" />
+                        <small class="d-block mt-1 text-muted">If selected, all organizations and datasets will be transferred to this user.</small>
                     </div>
 
                     <div v-if="deleteSuccessor" class="field">
-                        <span id="users-conflict-label">Conflict Resolution Strategy</span>
+                        <span id="users-conflict-label" class="d-block fw-semibold">Conflict Resolution Strategy</span>
                         <div class="radio-group" role="radiogroup" aria-labelledby="users-conflict-label">
                             <div class="radio-item">
                                 <input id="conflict-rename" v-model="deleteConflictResolution" type="radio" value="Rename">
