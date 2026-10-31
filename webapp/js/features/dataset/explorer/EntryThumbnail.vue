@@ -39,7 +39,7 @@ import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { isWaitingBackgroundTask } from '@/libs/tasks/taskStates';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
-import { shownBuildStatus } from '@/libs/build/entryBuild';
+import { shownBuildStatus, isBuildStopped } from '@/libs/build/entryBuild';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 import { thumbnailRequestSize } from '@/libs/thumbnailQueue';
 import { tileCssVars } from './tileGeometry';
@@ -198,8 +198,11 @@ export default {
             this.releaseImageSlot();
             // Bounded retry: MAX_RETRIES retries with backoff (thumbRetryPolicy),
             // so a server-side failure costs <= 4 requests per tile instead of an
-            // unbounded 5s retry loop that amplifies outages.
-            if (this.thumbnail && this.thumbnail.startsWith("/orgs") && shouldRetry(this.retryNumber)) {
+            // unbounded 5s retry loop that amplifies outages. A build that failed or
+            // is on hold makes no thumbnail while the tile waits: the fallback shows
+            // at once (a build that starts or succeeds later reloads the tile).
+            if (this.thumbnail && this.thumbnail.startsWith("/orgs") && shouldRetry(this.retryNumber)
+                && !isBuildStopped(this.buildState, this.file.entry)) {
                 if (this.loadTimeout) {
                     clearTimeout(this.loadTimeout);
                     this.loadTimeout = null;

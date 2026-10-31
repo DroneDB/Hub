@@ -53,6 +53,18 @@ export function shownBuildStatus(job, entry) {
 }
 
 /**
+ * Whether no build of the entry is under way or coming: it failed, or it is on hold until the
+ * user adds what it needs. What the build makes (a thumbnail, tiles) does not appear by itself.
+ * @param {{ currentState: string } | null | undefined} job  the build job of the entry, if any
+ * @param {{ buildStatus?: string } | null | undefined} entry
+ * @returns {boolean}
+ */
+export function isBuildStopped(job, entry) {
+    const status = shownBuildStatus(job, entry);
+    return status === 'failed' || status === 'pending';
+}
+
+/**
  * Copies the build fields of a fresh listing of an entry onto a held one (a field the server
  * omits is cleared), so what a build produced shows on the entry the page already has.
  * @param {Record<string, any>} held

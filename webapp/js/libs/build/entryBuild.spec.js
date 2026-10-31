@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { isBuilt, entryBuildStatus, shownBuildStatus, applyBuildFields, currentEntry } from './entryBuild';
+import { isBuilt, entryBuildStatus, shownBuildStatus, isBuildStopped, applyBuildFields, currentEntry } from './entryBuild';
 
 const COG = { role: 'raster.cog', url: '/orgs/o/ds/d/build/h/cog/cog.tif', mediaType: 'image/tiff' };
 
@@ -41,6 +41,21 @@ describe('build status shown', () => {
         expect(shownBuildStatus({ currentState: 'Succeeded' }, { buildStatus: 'pending' })).toBe('pending');
         expect(shownBuildStatus({ currentState: 'Succeeded' }, { artifacts: [COG] })).toBeNull();
         expect(shownBuildStatus(null, { buildStatus: 'queued' })).toBe('queued');
+    });
+});
+
+describe('isBuildStopped', () => {
+    it('is a build that failed or is on hold', () => {
+        expect(isBuildStopped(null, { buildStatus: 'failed' })).toBe(true);
+        expect(isBuildStopped(null, { buildStatus: 'pending' })).toBe(true);
+        expect(isBuildStopped({ currentState: 'Failed' }, {})).toBe(true);
+    });
+
+    it('is not a build that is queued, running or done, nor an entry without a build', () => {
+        expect(isBuildStopped(null, { buildStatus: 'queued' })).toBe(false);
+        expect(isBuildStopped({ currentState: 'Processing' }, { buildStatus: 'failed' })).toBe(false);
+        expect(isBuildStopped({ currentState: 'Succeeded' }, {})).toBe(false);
+        expect(isBuildStopped(null, {})).toBe(false);
     });
 });
 
