@@ -109,7 +109,7 @@ import SplatCameraRail from './SplatCameraRail.vue';
 import SplatMeasureToolbar from './SplatMeasureToolbar.vue';
 import SplatNavPad from './SplatNavPad.vue';
 import SplatSettings from './SplatSettings.vue';
-import { CameraRig, tiltUp } from './cameraRig';
+import { CameraRig, framingOf, tiltUp } from './cameraRig';
 import { FlyControls, MOVE_KEYS } from './flyControls';
 import { keyAction, consumesKey } from './splatKeys';
 import { createPointSize } from './pointSize';
@@ -270,7 +270,7 @@ function frameCamera() {
     if (!real) box = new THREE.Box3(new THREE.Vector3(-1, -1, -1), new THREE.Vector3(1, 1, 1));
     // The mesh stays at the origin and unit scale: the point size is in the splats, not the mesh
     splatMesh.position.set(0, 0, 0);
-    rig.frame(box, splatMesh.quaternion);
+    rig.frame(box, splatMesh.quaternion, framingOf({ georeferenced: georeferenced.value }));
     return real;
 }
 

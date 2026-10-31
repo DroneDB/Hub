@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { CameraRig, tiltUp } from './cameraRig';
+import { CameraRig, FRAMING, framingOf, tiltUp } from './cameraRig';
 
 function makeRig({ aspect = 2 } = {}) {
     const dom = document.createElement('canvas');
@@ -51,6 +51,64 @@ describe('frame', () => {
         expect(controls.target.distanceTo(new THREE.Vector3(1, -2, -3))).toBeLessThan(1e-6);
         expect(rig.boundsDiagonal).toBeCloseTo(Math.hypot(2, 4, 6), 6);
         expect(camera.near).toBeLessThan(camera.far);
+    });
+});
+
+describe('frame of a georeferenced scene', () => {
+    // A flat site, as a georeferenced splat is: wide, little relief, turned Z-up to Y-up
+    const site = new THREE.Box3(new THREE.Vector3(-75, -60, 140), new THREE.Vector3(75, 60, 180));
+    const zUp = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+    const forward = camera => new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+
+    it('is the overview; any other scene is framed from inside', () => {
+        expect(framingOf({ georeferenced: true })).toBe(FRAMING.OVERVIEW);
+        expect(framingOf({ georeferenced: false })).toBe(FRAMING.IMMERSIVE);
+        expect(framingOf({})).toBe(FRAMING.IMMERSIVE);
+    });
+
+    it('looks down at the centre from 45 degrees above its horizon, from outside the site', () => {
+        const { rig, camera, controls } = makeRig();
+        rig.frame(site, zUp, FRAMING.OVERVIEW);
+        const center = site.getCenter(new THREE.Vector3()).applyQuaternion(zUp);
+        expect(controls.target.distanceTo(center)).toBeLessThan(1e-6);
+        const offset = camera.position.clone().sub(center);
+        // Above the whole site, not at the height of its middle among the splats
+        expect(offset.dot(rig.sceneUp)).toBeGreaterThan(20 + 1);
+        expect(offset.angleTo(rig.sceneUp)).toBeCloseTo(Math.PI / 4, 6);
+        expect(offset.length()).toBeCloseTo(1.1 * 75 / Math.sin(THREE.MathUtils.degToRad(30)), 6);
+        expect(forward(camera).dot(offset.clone().normalize())).toBeCloseTo(-1, 6);
+        expect(rig.pitch).toBeCloseTo(-Math.PI / 4, 6);
+    });
+
+    it('keeps its height above the site while the presentation orbits', () => {
+        const { rig, camera, controls } = makeRig();
+        rig.frame(site, zUp, FRAMING.OVERVIEW);
+        const height = () => camera.position.clone().sub(controls.target).dot(rig.sceneUp);
+        const start = height();
+        controls.autoRotate = true;
+        for (let i = 0; i < 50; i++) rig.updateControls(0.1);
+        expect(height()).toBeCloseTo(start, 4);
+        expect(start).toBeGreaterThan(20);
+    });
+
+    it('has a view direction off the scene up also when the scene up is +Z', () => {
+        for (const framing of [FRAMING.IMMERSIVE, FRAMING.OVERVIEW]) {
+            const { rig, camera } = makeRig();
+            rig.setUp(new THREE.Vector3(0, 0, 1));
+            rig.frame(unitBox, identity, framing);
+            expect(camera.quaternion.toArray().every(Number.isFinite)).toBe(true);
+            expect(Math.abs(forward(camera).dot(rig.sceneUp))).toBeLessThan(0.75);
+            // Level about the scene up: no roll
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+            expect(Math.abs(right.dot(rig.sceneUp))).toBeLessThan(1e-9);
+        }
+    });
+
+    it('leaves the level framing of a Y-up scene as it was: on +Z of the centre', () => {
+        const { rig, camera, controls } = makeRig();
+        rig.frame(unitBox, identity, FRAMING.IMMERSIVE);
+        expect(camera.position.clone().sub(controls.target).normalize().distanceTo(new THREE.Vector3(0, 0, 1))).toBeLessThan(1e-9);
+        expect(rig.pitch).toBeCloseTo(0, 9);
     });
 });
 

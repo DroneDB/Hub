@@ -1,8 +1,27 @@
 import { fitDistance } from '@/features/viewers/unified/sceneUtils';
 
-// How much of the view the scene fills when framed: well under 1 (the sphere of the scene is
-// larger than the view), so the camera starts inside the model, which reads as immersive
-const FRAME_MARGIN = 0.4;
+/**
+ * How a scene is framed. A scene captured around an object or a room is framed level and close,
+ * from inside it, which reads as immersive. A georeferenced scene is a piece of the ground, framed
+ * whole from above at an angle: a level view of it stands at the height of the middle of its box,
+ * among the splats of a flat site, and the orbit about its centre keeps that height.
+ */
+export const FRAMING = Object.freeze({ IMMERSIVE: 'immersive', OVERVIEW: 'overview' });
+
+/**
+ * The framing of a scene: a georeferenced one is seen whole from above, any other from inside.
+ * @param {{ georeferenced?: boolean }} scene
+ */
+export const framingOf = ({ georeferenced }) => (georeferenced ? FRAMING.OVERVIEW : FRAMING.IMMERSIVE);
+
+// How the scene sphere fits the view (fitDistance's margin) and how high above the horizon of the
+// scene up the camera looks at it from
+const FRAMINGS = Object.freeze({
+    // Well under 1: the sphere is larger than the view, so the camera starts inside the model
+    [FRAMING.IMMERSIVE]: { margin: 0.4, elevationDeg: 0 },
+    // The whole sphere in view, seen from halfway between the horizon and straight down
+    [FRAMING.OVERVIEW]: { margin: 1.1, elevationDeg: 45 }
+});
 
 /**
  * Scene up from the calibration angles (degrees): pitch about world X, roll about world Z.
@@ -47,6 +66,8 @@ export class CameraRig {
         this._localQ = new THREE.Quaternion();
         this._euler = new THREE.Euler();
         this._fwd = new THREE.Vector3();
+        this._zAxis = new THREE.Vector3(0, 0, 1);
+        this._xAxis = new THREE.Vector3(1, 0, 0);
     }
 
     /**
@@ -101,23 +122,42 @@ export class CameraRig {
     }
 
     /**
-     * Frames a box (the splat's local bounds, turned by the mesh orientation `q`) so it
-     * fills the view closely (inside the model reads as immersive, not a distant dot).
-     * Sets the scene size, near/far planes, camera, target and look angles.
+     * The direction from the centre of the scene to a camera that frames it: on the +Z side of the
+     * scene, `elevationDeg` above its horizon (the plane across the scene up), so the scene up is
+     * never the direction the camera looks along.
+     * @param {number} elevationDeg
      */
-    frame(box, q) {
+    framingDirection(elevationDeg) {
+        const { THREE, sceneUp } = this;
+        const across = this._zAxis.clone().projectOnPlane(sceneUp);
+        // A scene up along Z: its horizon holds X
+        if (across.lengthSq() < 1e-12) across.copy(this._xAxis).projectOnPlane(sceneUp);
+        const elevation = THREE.MathUtils.degToRad(elevationDeg);
+        return across.normalize().multiplyScalar(Math.cos(elevation)).addScaledVector(sceneUp, Math.sin(elevation));
+    }
+
+    /**
+     * Frames a box (the splat's local bounds, turned by the mesh orientation `q`) the way
+     * `framing` says (FRAMING): close and level, or whole and from above.
+     * Sets the scene size, near/far planes, camera, target and look angles.
+     * @param {any} box
+     * @param {any} q
+     * @param {string} [framing]
+     */
+    frame(box, q, framing = FRAMING.IMMERSIVE) {
         const { THREE, camera, controls } = this;
+        const { margin, elevationDeg } = FRAMINGS[framing] ?? FRAMINGS[FRAMING.IMMERSIVE];
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3()).applyQuaternion(q);
         this.boundsDiagonal = Math.max(size.length(), 1e-3);
         const radius = 0.5 * Math.max(size.x, size.y, size.z) || 1;
         // The vertical field of view limits a landscape view, the horizontal one a portrait view
-        const dist = fitDistance(radius, camera.fov, camera.aspect, FRAME_MARGIN);
+        const dist = fitDistance(radius, camera.fov, camera.aspect, margin);
         // A small near plane lets splats render when the camera flies in among them
         camera.near = Math.max(this.boundsDiagonal / 5000, 0.001);
         camera.far = dist + this.boundsDiagonal * 10;
         camera.updateProjectionMatrix();
-        camera.position.set(center.x, center.y, center.z + dist);
+        camera.position.copy(center).addScaledVector(this.framingDirection(elevationDeg), dist);
         camera.up.copy(this.sceneUp);
         camera.lookAt(center);
         controls.target.copy(center);
