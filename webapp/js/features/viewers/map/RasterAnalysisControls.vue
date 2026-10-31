@@ -198,6 +198,7 @@ import RasterProfileChart from './RasterProfileChart.vue';
 import { downloadBlob, filenameFromDisposition } from '@/libs/download';
 import { useTimerGroup } from '@/composables/useTimers';
 import { noDataPixelCount } from '@/libs/map/rasterPixels';
+import { rasterValueUnit } from '@/libs/map/rasterUnit';
 import { formatNumber } from '@/libs/format';
 
 const formatCount = n => (typeof n === 'number' ? n.toLocaleString() : '-');
@@ -321,12 +322,12 @@ export default {
             try {
                 this.rasterInfo = await this.dataset.getRasterValueInfo(this.filePath);
 
-                // Default colormap and unit based on raster kind
+                // Default colormap and unit based on raster kind (metres only for an elevation model)
                 if (this.isThermal) {
                     this.selectedColormap = 'ironbow';
                 } else {
                     this.selectedColormap = 'viridis';
-                    this.unitLabel = this.rasterInfo.unit || 'm';
+                    this.unitLabel = rasterValueUnit(this.rasterInfo);
                 }
 
                 // Initial rescale from observed range

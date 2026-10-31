@@ -1,7 +1,8 @@
 /**
  * The Raster Analysis panel: Area draws a rectangle (the host does) and the panel shows the
  * statistics of its values in the raster's unit, with the pixels without data; the last value
- * read with Inspect is shown with where it was read.
+ * read with Inspect is shown with where it was read. The values of an elevation model are in
+ * metres, those of a raster of raw values have no unit.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
@@ -15,9 +16,14 @@ const STATS = {
     pixelCount: 9000, bounds: { x0: 1000, y0: 1000, x1: 1099, y1: 1099 }, unit: '', isThermal: false
 };
 
+// As libddb's raster value info answers them: a DSM without a unit type, and an airborne thermal
+// mosaic of raw digital numbers (odx/hat-creek) that libddb does not see as thermal
+const DSM_INFO = { valueMin: 194.7, valueMax: 229.5, bandCount: 1, dataType: 'Float32', isThermal: false, unit: '' };
+const RAW_INFO = { valueMin: 145, valueMax: 402, bandCount: 2, dataType: 'UInt16', isThermal: false, unit: '' };
+
 let wrapper;
-async function render(props = {}) {
-    const dataset = { getRasterValueInfo: vi.fn(async () => ({ valueMin: 194.7, valueMax: 229.5, isThermal: false, unit: '' })) };
+async function render(props = {}, info = DSM_INFO) {
+    const dataset = { getRasterValueInfo: vi.fn(async () => ({ ...info })) };
     wrapper = mount(RasterAnalysisControls, {
         props: { visible: true, dataset, filePath: 'odm_dem/dsm.tif', ...props },
         global: { stubs: { RasterProfileChart: true, ColormapDropdown: true } }
@@ -82,6 +88,20 @@ describe('RasterAnalysisControls area statistics', () => {
     it('has no statistics section before a rectangle is drawn', async () => {
         await render();
         expect(byId('raster-area-stats').exists()).toBe(false);
+    });
+});
+
+describe('RasterAnalysisControls unit', () => {
+    it('is none for the raw values of a raster that is not an elevation model', async () => {
+        await render({ areaStats: { ...STATS, min: 145, max: 402 }, filePath: 'Airborne_thermal_infrared_mosaic.tif' }, RAW_INFO);
+        expect(statRows()).toContain('Min: 145.00');
+        expect(statRows()).toContain('Max: 402.00');
+        expect(statRows().join(' ')).not.toMatch(/ m\b/);
+    });
+
+    it('is the own unit of the raster when it has one', async () => {
+        await render({ areaStats: STATS }, { ...DSM_INFO, unit: 'ft' });
+        expect(statRows()).toContain('Min: 196.96 ft');
     });
 });
 

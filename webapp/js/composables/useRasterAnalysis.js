@@ -14,6 +14,7 @@ import { analysisStyles } from '@/libs/map/analysisStyles';
 import { EPSG } from '@/libs/constants';
 import { createFeatureScope } from '@/composables/featureScope';
 import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/rasterPixels';
+import { rasterValueUnit } from '@/libs/map/rasterUnit';
 import { rasterLayerPath } from '@/libs/map/rasterLayers';
 
 // The server answers an area without any value with an error of its own
@@ -787,7 +788,7 @@ const definition = {
                     path: this.rasterFilePath,
                     width: Number(info.width),
                     height: Number(info.height),
-                    unit: info.unit || '',
+                    unit: rasterValueUnit(info),
                     isThermal: !!info.isThermal
                 };
                 return this._rasterDimsCache;
