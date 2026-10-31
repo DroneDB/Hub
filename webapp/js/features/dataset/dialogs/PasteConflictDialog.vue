@@ -2,8 +2,8 @@
     <Window id="paste-conflict" title="Paste Conflict" modal size-class="dialog-md" fixed-size @close="cancel">
         <div class="paste-conflict-content">
             <p>
-                <strong>{{ items.length }}</strong> file<span v-if="items.length !== 1">s</span>
-                in the destination folder have the same name as items being pasted.
+                <strong>{{ items.length }}</strong> {{ word('file') }} in the destination folder
+                {{ word('has', 'have') }} the same {{ word('name') }} as {{ word('an item', 'items') }} being pasted.
                 How would you like to proceed?
             </p>
             <ul class="file-list">
@@ -26,6 +26,7 @@
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import ddb from 'ddb';
+import { pluralize } from '@/libs/format';
 const { pathutils } = ddb;
 
 export default {
@@ -41,6 +42,8 @@ export default {
 
     methods: {
         basename(p) { return pathutils.basename(p); },
+        // The word that agrees with the number of conflicting files
+        word(singular, plural) { return pluralize(this.items.length, singular, plural); },
         cancel() { this.$emit('resolve', 'cancel'); },
         choose(mode) { this.$emit('resolve', mode); }
     }

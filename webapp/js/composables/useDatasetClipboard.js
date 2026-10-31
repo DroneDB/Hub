@@ -3,6 +3,7 @@
  * Ctrl+C / Ctrl+X / Ctrl+V and the context menu end here.
  */
 import ddb from 'ddb';
+import { countOf } from '@/libs/format';
 import reg from '@/libs/api/sharedRegistry';
 import { useClipboardStore } from '@/stores/clipboard';
 import { resolvePasteStrategy } from '@/composables/usePasteStrategy';
@@ -13,7 +14,6 @@ import PasteConflictDialog from '@/features/dataset/dialogs/PasteConflictDialog.
 import PasteResultDialog from '@/features/dataset/dialogs/PasteResultDialog.vue';
 
 const { pathutils } = ddb;
-const plural = (n, word) => `${n} ${word}${n !== 1 ? 's' : ''}`;
 
 /**
  * @param {object} ctx
@@ -43,7 +43,7 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         const { items, basePath } = pick(selection);
         if (!items.length) return notify.info('No items selected', { summary: 'Copy' });
         clipboard.copy({ ...here(), basePath }, items);
-        notify.success(`${plural(items.length, 'item')} copied to clipboard`, { summary: 'Copied' });
+        notify.success(`${countOf(items.length, 'item')} copied to clipboard`, { summary: 'Copied' });
     }
 
     function cut(selection) {
@@ -51,7 +51,7 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         const { items, basePath } = pick(selection);
         if (!items.length) return notify.info('No items selected', { summary: 'Cut' });
         clipboard.cut({ ...here(), basePath }, items);
-        notify.success(`${plural(items.length, 'item')} ready to move`, { summary: 'Cut' });
+        notify.success(`${countOf(items.length, 'item')} ready to move`, { summary: 'Cut' });
     }
 
     // Names in the destination, from the server: the loaded view can hold only part of the
@@ -131,7 +131,7 @@ export function useDatasetClipboard({ dataset, listing, dialogs, busy, canWrite,
         if (mode === 'cut') clipboard.clear();
 
         if (!Object.keys(result.failed).length && !result.skipped.length) {
-            notify.success(`${plural(result.succeeded.length, 'item')} ${mode === 'cut' ? 'moved' : 'copied'} successfully`, { summary: 'Paste' });
+            notify.success(`${countOf(result.succeeded.length, 'item')} ${mode === 'cut' ? 'moved' : 'copied'} successfully`, { summary: 'Paste' });
         } else {
             dialogs.open(PasteResultDialog, { mode, succeeded: result.succeeded, failed: result.failed, skipped: result.skipped });
         }

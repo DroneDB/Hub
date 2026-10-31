@@ -15,6 +15,27 @@ export { formatTimeAgo };
  * @typedef {{ placeholder?: string }} EmptyOption
  */
 
+/**
+ * The word that agrees with count: singular for 1, the plural form (singular + "s" unless
+ * given) for any other count, e.g. pluralize(2, 'has', 'have') is "have".
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} [plural]
+ */
+export function pluralize(count, singular, plural = `${singular}s`) {
+    return count === 1 ? singular : plural;
+}
+
+/**
+ * A count and its noun, e.g. "1 file", "0 files", "3 files".
+ * @param {number} count
+ * @param {string} singular
+ * @param {string} [plural]
+ */
+export function countOf(count, singular, plural) {
+    return `${count} ${pluralize(count, singular, plural)}`;
+}
+
 /** @param {DateInput} value @returns {Date|null} */
 function toDate(value) {
     if (value === null || value === undefined || value === '') return null;

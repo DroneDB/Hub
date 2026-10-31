@@ -7,6 +7,7 @@
  *   actions.rename(file);  actions.remove(files);  actions.upload();
  */
 import ddb from 'ddb';
+import { countOf } from '@/libs/format';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { clone } from '@/libs/utils';
@@ -42,7 +43,6 @@ const SplatTrainingExportDialog = lazy(() => import(/* webpackChunkName: "datase
 const ImportFromUrlDialog = lazy(() => import(/* webpackChunkName: "dataset-dialogs" */ '@/features/dataset/dialogs/ImportFromUrlDialog.vue'));
 
 const { pathutils } = ddb;
-const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 
 /**
  * @param {object} ctx
@@ -81,7 +81,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             onClose: (uploaded, ok) => {
                 if (!uploaded || !uploaded.length) return;
                 listing.uploaded(uploaded);
-                if (ok) notify.success(`Uploaded ${plural(uploaded.length, 'file')}`, { summary: 'Upload Complete' });
+                if (ok) notify.success(`Uploaded ${countOf(uploaded.length, 'file')}`, { summary: 'Upload Complete' });
             },
             onImportFromUrl: () => {
                 dialog.close();
@@ -125,7 +125,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                     // "2 files and 1 folder", from the types of the selection
                     const gone = new Set(deleted);
                     const folders = files.filter(f => gone.has(f.entry.path) && ddb.entry.isDirectory(f.entry)).length;
-                    const parts = [deleted.length - folders > 0 && plural(deleted.length - folders, 'file'), folders > 0 && plural(folders, 'folder')].filter(Boolean);
+                    const parts = [deleted.length - folders > 0 && countOf(deleted.length - folders, 'file'), folders > 0 && countOf(folders, 'folder')].filter(Boolean);
                     notify.success(`${parts.join(' and ')} deleted successfully`, { summary: 'Deleted' });
                 }
                 if (res.failed && Object.keys(res.failed).length) dialogs.open(DeleteResultDialog, { deleted, failed: res.failed });
@@ -186,7 +186,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                     if (item) await moveItem(item, sc.newPath, { silent: true });
                     else await dataset.moveObj(sc.oldPath, sc.newPath);
                 }
-                notify.success(`File and ${plural(sidecars.length, 'sidecar')} renamed successfully`, { summary: 'Renamed' });
+                notify.success(`File and ${countOf(sidecars.length, 'sidecar')} renamed successfully`, { summary: 'Renamed' });
             } catch (e) {
                 showError(e, 'Rename');
             }
@@ -238,7 +238,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
             onClose: (id, sent) => {
                 if (id !== 'transferred' || !sent || !sent.length) return;
                 if (!mode.keepSource) listing.removed(sent.map(f => f.entry.path));
-                notify.success(`${plural(sent.length, 'item')} ${mode.done} successfully`, { summary: mode.summary });
+                notify.success(`${countOf(sent.length, 'item')} ${mode.done} successfully`, { summary: mode.summary });
             }
         });
     }

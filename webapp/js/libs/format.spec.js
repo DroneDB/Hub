@@ -3,7 +3,7 @@
  * units, and back without drift.
  */
 import { describe, it, expect } from 'vitest';
-import { bulkUnits, currencyChoices, formatMoney, normalizeCurrency } from './format';
+import { bulkUnits, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize } from './format';
 
 describe('bulkUnits', () => {
     it('is the metric units as they are', () => {
@@ -59,5 +59,12 @@ describe('currencyChoices', () => {
         expect(choices.slice(0, 3).map(c => c.value)).toEqual(['USD', 'EUR', 'GBP']);
         expect(new Set(choices.map(c => c.value)).size).toBe(choices.length);
         expect(choices.find(c => c.value === 'EUR').label).toMatch(/^EUR - /);
+    });
+});
+
+describe('pluralize and countOf', () => {
+    it('use the singular for one only', () => {
+        expect([0, 1, 2].map(n => countOf(n, 'file'))).toEqual(['0 files', '1 file', '2 files']);
+        expect([1, 2].map(n => pluralize(n, 'has', 'have'))).toEqual(['has', 'have']);
     });
 });
