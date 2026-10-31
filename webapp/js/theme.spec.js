@@ -112,3 +112,11 @@ describe('no orange', () => {
             .toEqual(['js/libs/map/analysisStyles.js']);
     });
 });
+
+// The Hub loads Bootstrap's utilities (w-100), not those of PrimeFlex or Tailwind: a class of theirs styles nothing,
+// so a list in a table cell or a form field stays at its content's width
+describe('utility classes', () => {
+    it('names no w-full, which the Hub does not load (Bootstrap\'s w-100 is)', () => {
+        expect(sourcesMatching(/\bw-full\b/)).toEqual([]);
+    });
+});

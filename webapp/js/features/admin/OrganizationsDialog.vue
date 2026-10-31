@@ -57,7 +57,7 @@
                                     :options="permissionsOptions"
                                     option-label="label"
                                     option-value="value"
-                                    class="w-full"
+                                    class="w-100"
                                     @change="updatePermission(org)" />
                             <Tag v-else severity="info" value="Full Access" />
                         </td>

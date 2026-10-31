@@ -61,7 +61,7 @@
                                             :options="permissionsOptions"
                                             option-label="label"
                                             option-value="value"
-                                            class="w-full"
+                                            class="w-100"
                                             @change="updatePermission(member)" />
                                     <span v-else>{{ member.permissionName }}</span>
                                 </td>
