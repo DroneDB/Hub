@@ -33,4 +33,23 @@ describe('taskFormat', () => {
         expect(f.toolTitle('build', tools)).toBe('Build');
         expect(f.toolTitle('other', tools)).toBe('other');
     });
+
+    it('a succeeded build whose entry waits for files is a yellow Waiting for files, naming them', () => {
+        const tag = f.stateTag({ state: 'Succeeded', waitingForFiles: true, missingFiles: ['m.mtl', 't.png'] });
+        expect(tag).toEqual({
+            severity: 'warn', icon: 'fa-solid fa-hourglass-half', label: 'Waiting for files',
+            title: 'Waiting for files: m.mtl, t.png. Upload the missing files to this dataset and processing starts by itself.',
+            files: ['m.mtl', 't.png']
+        });
+        expect(f.isWaitingForFiles({ state: 'Succeeded', waitingForFiles: true })).toBe(true);
+    });
+
+    it('any other task has the tag of its state', () => {
+        expect(f.stateTag({ state: 'Succeeded', waitingForFiles: false, missingFiles: null }))
+            .toEqual({ severity: 'success', icon: 'fa-solid fa-check', label: 'Succeeded', title: 'Succeeded', files: [] });
+        // Only a succeeded task waits: the flag of another state is not read
+        expect(f.isWaitingForFiles({ state: 'Failed', waitingForFiles: true })).toBe(false);
+        expect(f.stateTag({ state: 'Failed', waitingForFiles: true }).severity).toBe('danger');
+        expect(f.isWaitingForFiles(null)).toBe(false);
+    });
 });

@@ -123,6 +123,22 @@ describe('tasksUpdated event', () => {
         expect(seen).toHaveLength(3); // every change was detected
     });
 
+    it('emits when a succeeded build starts or stops waiting for files', async () => {
+        const dataset = makeDataset();
+        const build = over => makeTask({ state: 'Succeeded', path: 'house.obj', ...over });
+        dataset.getTasks
+            .mockResolvedValueOnce([build({ waitingForFiles: true, missingFiles: ['house.mtl'] })])
+            .mockResolvedValueOnce([build({ waitingForFiles: true, missingFiles: ['texture.png'] })])
+            .mockResolvedValueOnce([build({ waitingForFiles: false, missingFiles: null })]);
+        const seen = watch('tasksUpdated');
+
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(seen).toHaveLength(3);
+    });
+
     it('emits when tasks are added or removed', async () => {
         const dataset = makeDataset();
         dataset.getTasks

@@ -25,8 +25,7 @@ export function useTaskFormatting() {
     return {
         now, taskTools, taskStates, stateOptions,
         isActive: state => fmt.isActiveTaskState(state, taskStates.value),
-        getTagSeverity: fmt.tagSeverity,
-        getStateIcon: fmt.stateIcon,
+        stateTag: fmt.stateTag,
         formatDateTime: fmt.taskDateTime,
         getRelativeTime: fmt.taskTimeAgo,
         runningTime: task => fmt.runningTime(task, now.value),

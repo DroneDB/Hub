@@ -30,9 +30,9 @@
                    :page-link-size="3" @page="onPage">
             <Column field="state" header="State" :sortable="!lazy" style="width: 5rem;">
                 <template #body="slotProps">
-                    <Tag :severity="getTagSeverity(slotProps.data.state)"
-                         :pt="{ root: { title: slotProps.data.state } }">
-                        <i :class="getStateIcon(slotProps.data.state)" style="font-size: 1rem;" />
+                    <Tag :severity="stateTag(slotProps.data).severity"
+                         :pt="{ root: { title: stateTag(slotProps.data).title, 'aria-label': stateTag(slotProps.data).label } }">
+                        <i :class="stateTag(slotProps.data).icon" style="font-size: 1rem;" />
                     </Tag>
                 </template>
             </Column>
@@ -57,7 +57,12 @@
             </Column>
             <Column header="Progress" v-bind="columnFrom('md')">
                 <template #body="slotProps">
-                    <template v-if="progressKind(slotProps.data) === 'bar'">
+                    <div v-if="progressKind(slotProps.data) === 'waiting'" class="waiting-for-files"
+                         :title="stateTag(slotProps.data).title">
+                        <Tag severity="warn" icon="fa-solid fa-hourglass-half" :value="stateTag(slotProps.data).label" />
+                        <small v-if="stateTag(slotProps.data).files.length" class="missing-files">{{ stateTag(slotProps.data).files.join(', ') }}</small>
+                    </div>
+                    <template v-else-if="progressKind(slotProps.data) === 'bar'">
                         <ProgressBar :value="progressValue(slotProps.data)" :mode="barMode(slotProps.data)"
                                      :show-value="true" style="height: 1rem;" />
                         <small v-if="slotProps.data.phaseMessage" class="muted">{{ slotProps.data.phaseMessage }}</small>
@@ -120,6 +125,7 @@ import Column from 'primevue/column';
 import Skeleton from 'primevue/skeleton';
 import ProgressBar from 'primevue/progressbar';
 import { columnFrom } from '@/libs/responsiveColumns';
+import { isWaitingForFiles } from '@/libs/tasks/taskFormat';
 
 /**
  * Presentational task table shared by the per-dataset Task History tab and the
@@ -179,12 +185,14 @@ export default {
 
     methods: {
         /**
-         * Whether the progress bar renders at all for a row: 'bar' or 'none'.
-         * Only Processing, Succeeded (100%) and Failed (100% + error text) render
-         * a bar. Queued states (Created/Enqueued/Scheduled/Reused/Awaiting) and
-         * Deleted (reached by the Cancel button) show a muted placeholder.
+         * What the Progress column renders for a row: 'waiting', 'bar' or 'none'.
+         * A build that succeeded without building, its entry waiting for files, shows
+         * what it waits for. Otherwise only Processing, Succeeded (100%) and Failed
+         * (100% + error text) render a bar. Queued states (Created/Enqueued/Scheduled/
+         * Reused/Awaiting) and Deleted (reached by the Cancel button) show a muted placeholder.
          */
         progressKind(task) {
+            if (isWaitingForFiles(task)) return 'waiting';
             if (task.state === 'Processing' || task.state === 'Succeeded' || task.state === 'Failed') return 'bar';
             return 'none';
         },
@@ -263,6 +271,22 @@ export default {
 
 .error-text {
     color: var(--ddb-danger);
+}
+
+.waiting-for-files {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ddb-spacing-xs);
+    min-width: 0;
+}
+
+.missing-files {
+    max-width: 100%;
+    color: var(--ddb-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .path-details {

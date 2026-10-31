@@ -4,6 +4,7 @@
  * /sys/features and are passed in.
  */
 import { formatTimeAgo, formatDateTime, formatDuration } from '@/libs/format';
+import { describePendingBuild } from '@/libs/build/pendingBuild';
 
 /** @typedef {{ id: string, title?: string, resultExtension?: string, producesArtifact?: boolean, hidden?: boolean, disabled?: boolean }} TaskTool */
 /** @typedef {{ value: string, terminal: boolean }} TaskState */
@@ -34,6 +35,37 @@ export function stateIcon(state) {
         case 'Deleted': return 'fa-solid fa-ban';
         default: return 'fa-regular fa-clock';
     }
+}
+
+/**
+ * Whether a task waits for files: a build that succeeded because libddb deferred it, its entry waiting now for the
+ * files it names (an .obj without its .mtl). The server says so (waitingForFiles, with missingFiles) when it lists
+ * the task; it builds by itself once one of those files is added.
+ * @param {{ state?: string, waitingForFiles?: boolean } | null | undefined} task
+ */
+export const isWaitingForFiles = task => task?.state === 'Succeeded' && task.waitingForFiles === true;
+
+/**
+ * @typedef {object} TaskStateTag
+ * @property {string} severity  PrimeVue Tag severity
+ * @property {string} icon  Font Awesome icon
+ * @property {string} label  the state in words
+ * @property {string} title  tooltip
+ * @property {string[]} files  the files a task that waits for files waits for; empty otherwise
+ */
+
+/**
+ * The state tag of a task: its state's, except for a task that waits for files, which is a warning (yellow) with the
+ * words of a deferred build (libs/build/pendingBuild), the same the file list shows for its entry.
+ * @param {{ state: string, waitingForFiles?: boolean, missingFiles?: string[] | null }} task
+ * @returns {TaskStateTag}
+ */
+export function stateTag(task) {
+    if (isWaitingForFiles(task)) {
+        const pending = describePendingBuild(task.missingFiles, true);
+        return { severity: 'warn', icon: 'fa-solid fa-hourglass-half', label: pending.label, title: pending.text, files: pending.files };
+    }
+    return { severity: tagSeverity(task.state), icon: stateIcon(task.state), label: task.state, title: task.state, files: [] };
 }
 
 /**
