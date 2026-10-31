@@ -26,12 +26,12 @@
                                     <div>
                                         <div class="role-name">{{ role }}</div>
                                         <div class="role-description">
-                                            {{ role === 'Admin' ? 'Administrator role with full system access' : 'Custom user role' }}
+                                            {{ isAdminRole(role) ? 'Administrator role with full system access' : 'Custom user role' }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="role-actions">
-                                    <Button v-if="role !== 'Admin'" severity="danger"
+                                    <Button v-if="!isSystemRole(role)" severity="danger"
                                             size="small" :disabled="deletingRole === role" icon="fa-solid fa-trash"
                                             :label="deletingRole === role ? 'Deleting...' : 'Delete'"
                                             @click="deleteRole(role)" />
@@ -89,6 +89,7 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
+import { isAdminRole, isSystemRole } from '@/libs/roles';
 
 export default {
     components: {
@@ -132,6 +133,8 @@ export default {
         });
     },
     methods: {
+        isAdminRole,
+        isSystemRole,
         focusRoleInput() {
             if (this.$refs.txtRoleName) {
                 const el = this.$refs.txtRoleName.$el || this.$refs.txtRoleName;
