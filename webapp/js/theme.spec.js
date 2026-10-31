@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PRIMARY } from '@/libs/palette';
 import { primeVueOptions } from './theme';
+import { readSource, ruleOf } from '@/specs/cssSource';
 
 const WEBAPP = path.resolve(__dirname, '..');
 const preset = primeVueOptions.theme.preset;
@@ -118,5 +119,12 @@ describe('no orange', () => {
 describe('utility classes', () => {
     it('names no w-full, which the Hub does not load (Bootstrap\'s w-100 is)', () => {
         expect(sourcesMatching(/\bw-full\b/)).toEqual([]);
+    });
+});
+
+describe('tab lists', () => {
+    it('bring a tab into view clear of the Previous and Next arrows that lie over their edges', () => {
+        const viewport = ruleOf(readSource(WEBAPP, 'css/app.scss'), '.p-tablist-viewport');
+        expect(viewport).toMatch(/scroll-padding-inline:\s*var\(--p-tabs-nav-button-width\);/);
     });
 });

@@ -370,6 +370,13 @@ $window-margin: 1rem; // the space left around a window on a phone
     }
 }
 
+// A tab list that does not fit scrolls under its Previous and Next arrows, which lie over its
+// edges: a tab brought into view (chosen by a link, or with the keyboard) stops clear of them,
+// not cut under one
+.p-tablist-viewport {
+    scroll-padding-inline: var(--p-tabs-nav-button-width);
+}
+
 // Tabs inside a window: the size of the window's buttons (Lara sizes tabs for a page)
 .p-dialog .p-tab {
     padding: 0.625rem 0.875rem;
