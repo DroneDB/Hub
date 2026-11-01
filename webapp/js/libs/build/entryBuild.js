@@ -1,8 +1,4 @@
 // @ts-check
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * What the Hub knows about the build of an entry comes from the entry itself: Registry lists the
  * artifacts that exist (libddb's build manifest) and the build status it could not leave out

@@ -63,8 +63,8 @@ describe('UsageAndContactCard', () => {
     it('offers the six declarations and the help text', async () => {
         const w = await show();
         const labels = w.findComponent(Select).props('options').map(o => o.label);
-        expect(labels).toEqual(['Not stated', 'Personal or homelab use', 'Non-profit organisation', 'Evaluation or trial',
-            'Commercial use, licensed', 'Commercial use, I need a licence']);
+        expect(labels).toEqual(['Not stated', 'Personal use by an individual', 'Teaching or research at a non-profit institution',
+            'Evaluation (up to 60 days)', 'Organisation or paid work, licensed', 'Organisation or paid work, I need a licence']);
         expect(w.text()).toContain('This helps us understand how Registry is used. It changes nothing in the software.');
     });
 

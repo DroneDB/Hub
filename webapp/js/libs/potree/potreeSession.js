@@ -1,7 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * PotreeSession - owns everything one Potree viewer creates, so closing the viewer frees it
  * (every open and close used to leak the whole scene, about 130 MB and a WebGL context).

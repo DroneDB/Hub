@@ -1,8 +1,4 @@
 // @ts-check
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * What libddb does with each entry type, as the server says it:
  * `GET /sys/features` carries `entryTypes` (libddb's DDBGetEntryTypes: id, buildable, thumbnail

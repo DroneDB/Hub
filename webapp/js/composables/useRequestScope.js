@@ -1,7 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * Request scope - requests a view starts are aborted when the view goes away, so
  * leaving a dataset while a folder listing is in flight cancels the listing instead of

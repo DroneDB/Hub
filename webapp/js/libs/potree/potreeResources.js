@@ -1,7 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * The files of Potree 1.8 that the point cloud viewer loads, with the Hub version in
  * their URL: the Registry serves versioned URLs as immutable (HubCachePolicy), so a browser

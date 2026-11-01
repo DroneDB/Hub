@@ -1,7 +1,3 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * uploadProbe - measures the upload path to the Registry: one 8 MB upload
  * on its own, then six at once, to POST /sys/upload-probe (the server discards the body).

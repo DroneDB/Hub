@@ -1,8 +1,4 @@
 // @ts-check
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
 /**
  * The words of a deferred build (an entry whose buildStatus is "pending"), the one place every
  * view takes them from: the badge tooltips of the file list and the thumbnails, the details panel

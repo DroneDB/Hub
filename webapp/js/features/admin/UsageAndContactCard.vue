@@ -55,13 +55,14 @@ defineOptions({ name: 'UsageAndContactCard' });
 
 // The select cannot hold null, so "not stated" has a value of its own
 const NOT_STATED = 'not_stated';
+// The labels follow the free uses of the licence (LICENSE.md); the values are the update-check contract
 const DECLARATIONS = [
     { value: NOT_STATED, label: 'Not stated' },
-    { value: 'personal', label: 'Personal or homelab use' },
-    { value: 'nonprofit', label: 'Non-profit organisation' },
-    { value: 'evaluation', label: 'Evaluation or trial' },
-    { value: 'commercial_licensed', label: 'Commercial use, licensed' },
-    { value: 'commercial_needs_license', label: 'Commercial use, I need a licence' }
+    { value: 'personal', label: 'Personal use by an individual' },
+    { value: 'nonprofit', label: 'Teaching or research at a non-profit institution' },
+    { value: 'evaluation', label: 'Evaluation (up to 60 days)' },
+    { value: 'commercial_licensed', label: 'Organisation or paid work, licensed' },
+    { value: 'commercial_needs_license', label: 'Organisation or paid work, I need a licence' }
 ];
 const CONSENT_TEXT = 'Send security notices, release news and offers for self-hosted Registry from DroneDB to this address. You can unsubscribe at any time.';
 
