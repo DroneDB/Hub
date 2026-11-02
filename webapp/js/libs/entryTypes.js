@@ -40,6 +40,12 @@ function countDataBands(entry) {
     return entry.properties.bands.filter(b => b.colorInterp !== 'Alpha').length;
 }
 
+// The one definition of "a georaster entry": the compare view, the context menu, the detail panel
+// and the map's added layers all accept exactly these. Takes no entry (nothing selected) as false.
+function isGeoraster(entry) {
+    return !!entry && entry.type === ddb.entry.type.GEORASTER;
+}
+
 function isPlantHealthCapable(entry) {
     // GeoRasters need at least 2 data bands for vegetation indices / band mapping
     if (entry.type === ddb.entry.type.GEORASTER) return countDataBands(entry) >= 2;
@@ -105,6 +111,7 @@ export {
     isMapViewable,
     isPanoramaType,
     isDroneDB,
+    isGeoraster,
     isPlantHealthCapable,
     isRasterAnalysisCapable,
     getTypeDisplayName,

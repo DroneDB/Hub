@@ -14,6 +14,7 @@ vi.mock('@/stores/auth', async () => {
 
 const { default: StockpileVolumePanel } = await import('./StockpileVolumePanel.vue');
 const { normalizeStockpileSettings, resolveStockpileCatalog } = await import('@/libs/stockpileMaterials');
+const { replaceQueryKeys, replaceHash } = await import('@/libs/routeQuery');
 
 const catalog = settings => resolveStockpileCatalog(normalizeStockpileSettings(settings)).filter(m => !m.hidden);
 const RESULT = {
@@ -108,10 +109,18 @@ describe('StockpileVolumePanel', () => {
     });
 
     describe('Edit materials…', () => {
-        it('opens the Preferences on the stockpile materials, keeping the page query', async () => {
+        it('opens the Preferences on the stockpile materials, keeping the query and the hash of the address', async () => {
+            window.history.replaceState({}, '', '/r/o/d/view/abc/map?t=map');
+            // The map adds its layers and Plant Health its hash without a navigation: the route
+            // keeps the query the page opened with
+            replaceQueryKeys({ layer: ['a', 'b'] });
+            replaceHash('path=f.tif');
             render({}, { query: { t: 'map' } });
             await wrapper.find('[data-testid="stockpile-edit-materials"]').trigger('click');
-            expect(router.push).toHaveBeenCalledWith({ query: { t: 'map', preferences: 'stockpiles' } });
+            expect(router.push).toHaveBeenCalledWith({
+                query: { t: 'map', layer: ['a', 'b'], preferences: 'stockpiles' },
+                hash: '#path=f.tif'
+            });
         });
 
         it('is not there for an anonymous user nor on an embedded map', () => {
@@ -123,5 +132,28 @@ describe('StockpileVolumePanel', () => {
             render({}, { embed: true });
             expect(wrapper.find('[data-testid="stockpile-edit-materials"]').exists()).toBe(false);
         });
+    });
+});
+
+describe('StockpileVolumePanel elevation model', () => {
+    const CANDIDATES = [{ path: 'odm_dem/dtm.tif', label: 'dtm.tif' }, { path: 'odm_dem/dsm.tif', label: 'dsm.tif' }];
+    const select = () => wrapper.find('[data-testid="analysis-target-select"]');
+
+    it('shows the selector with two rasters to measure on, and the current one', () => {
+        render({ targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
+        expect(wrapper.text()).toContain('Elevation model');
+        expect(select().findAll('option').map(o => o.text())).toEqual(['dtm.tif', 'dsm.tif']);
+        expect(select().element.value).toBe('odm_dem/dsm.tif');
+    });
+
+    it('shows none with one raster', () => {
+        render({ targetCandidates: [CANDIDATES[0]], targetPath: CANDIDATES[0].path });
+        expect(select().exists()).toBe(false);
+    });
+
+    it('asks for the raster that was picked', async () => {
+        render({ targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
+        await select().setValue('odm_dem/dtm.tif');
+        expect(wrapper.emitted('selectTarget')).toEqual([['odm_dem/dtm.tif']]);
     });
 });

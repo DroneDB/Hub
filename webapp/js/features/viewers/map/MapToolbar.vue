@@ -1,7 +1,7 @@
 <template>
     <Teleport :to="zones.topRight">
         <div class="ol-map-buttons ol-unselectable ol-control" style="order: -1">
-            <button v-if="showBack" title="Back to Dataset" aria-label="Back to Dataset" @click="emit('back')">
+            <button v-if="showBack && !embed" title="Back to Dataset" aria-label="Back to Dataset" @click="emit('back')">
                 <i class="fa-solid fa-arrow-left" />
             </button>
             <button title="Reset View (H)" aria-label="Reset View" @click="emit('reset')">
@@ -10,12 +10,17 @@
             <button v-if="canFullscreen" title="Fullscreen (F11)" aria-label="Fullscreen" @click="emit('fullscreen')">
                 <i class="fa-solid fa-expand" />
             </button>
+            <!-- data-map-link-toggle: the map link panel leaves a press on this button to the button -->
+            <button v-if="copyLink && !embed" title="Copy link" aria-label="Copy link" data-map-link-toggle
+                    data-testid="copy-link-toolbar-btn" @click="emit('copy-link')">
+                <i class="fa-solid fa-link" />
+            </button>
             <template v-if="analysisEntry">
-                <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis" :disabled="multiRaster"
+                <button :title="analysisTitle('Raster Analysis')" aria-label="Raster Analysis" :disabled="splitMode"
                         data-testid="raster-analysis-toolbar-btn" @click="emit('analysis', 'rasterAnalysis')">
                     <i class="fa-solid fa-chart-area" />
                 </button>
-                <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume" :disabled="multiRaster"
+                <button :title="analysisTitle('Stockpile Volume')" aria-label="Stockpile Volume" :disabled="splitMode"
                         data-testid="stockpile-toolbar-btn" @click="emit('analysis', 'stockpile')">
                     <i class="fa-solid fa-layer-group" />
                 </button>
@@ -45,23 +50,27 @@
 /**
  * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
- * - top right: Back (single-file map), Reset view, Fullscreen, Raster Analysis, Stockpile;
+ * - top right: Back and Copy link (single-file map; an embedded map has neither: it has no Hub
+ *   to go back to and its address is the host page's), Reset view, Fullscreen, Raster Analysis, Stockpile;
  * - top center: direction indicators and flight path (display options), compare: with two
  *   georasters or more it splits the map between them, with one it asks for another to compare to.
  */
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
 
 const props = defineProps({
     /** Zones from createControlZones */
     zones: { type: Object, required: true },
     showBack: { type: Boolean, default: false },
+    /** The Copy link button (single-file map) */
+    copyLink: { type: Boolean, default: false },
     /** Direction indicators and flight path (hidden on the single-file map) */
     displayOptions: { type: Boolean, default: true },
     /** The compare button, shown while the map has a georaster */
     splitToggle: { type: Boolean, default: true },
-    /** The entry the analysis tools open for; null hides them */
+    /** An entry the analysis tools work on (the map has one to choose); null hides them */
     analysisEntry: { type: Object, default: null },
+    /** The georasters on the map: the compare button needs one */
     rasterCount: { type: Number, default: 0 },
     directionIndicators: { type: Boolean, default: false },
     flightPath: { type: Boolean, default: false },
@@ -69,15 +78,15 @@ const props = defineProps({
     /** Two georasters or more: the button splits the map between them */
     canCompare: { type: Boolean, default: false }
 });
-const emit = defineEmits(['back', 'reset', 'fullscreen', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
+const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
 
 const canFullscreen = supportsFullScreen();
-// Raster Analysis and Stockpile Volume work on exactly one georaster
-const multiRaster = computed(() => props.rasterCount > 1);
-// No georaster: nothing to compare, no button
-const showCompare = computed(() => props.splitToggle && props.rasterCount > 0);
+// Provided by the app: true on a map embedded in another page
+const embed = inject('embed', false);
+// No georaster: nothing to compare, no button. An embedded map only views what it was given:
+// it splits the georasters it has, but does not pick another one to compare to.
+const showCompare = computed(() => props.splitToggle && props.rasterCount > 0 && (props.canCompare || !embed));
 const compareLabel = computed(() => (props.canCompare ? 'Compare georasters side by side' : 'Compare to another georaster'));
-const analysisTitle = name => multiRaster.value
-    ? `${name} - Requires a single georaster layer. Remove other layers or open the file individually.`
-    : name;
+// Split compare draws every raster opaque, which the tools cannot work with
+const analysisTitle = name => (props.splitMode ? `${name} - Turn off split compare to use this tool` : name);
 </script>

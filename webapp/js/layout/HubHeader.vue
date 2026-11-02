@@ -117,6 +117,7 @@ import { mapState } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { loginLocation, PREFERENCES_QUERY } from '@/libs/authRoutes';
+import { currentLocation, currentPath } from '@/libs/routeQuery';
 import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
 
 // Opened from the user menu only: its code loads the first time it is shown
@@ -482,8 +483,11 @@ export default {
         // A link with ?preferences=<tab> (e.g. the opt-out link of an e-mail) opens the window on
         // that tab, then leaves the URL as it would be without it, so a reload or a shared URL does
         // not open it again. The router guard signs an anonymous user in first, keeping the link.
+        // The query and the hash come from the address bar, not $route: a map writes its layers
+        // and its Plant Health hash without a navigation, and $route would put the old ones back.
         openPreferencesFromLink: function () {
-            const { query = {}, path, hash } = this.$route;
+            const { query, hash } = currentLocation();
+            const { path } = this.$route;
             if (!this.loggedIn || !Object.hasOwn(query, PREFERENCES_QUERY)) return;
             const { [PREFERENCES_QUERY]: tab, ...rest } = query;
             this.openPreferences(typeof tab === 'string' && tab ? tab : undefined);
@@ -550,7 +554,8 @@ export default {
         },
 
         login: function () {
-            this.$router.push(loginLocation(this.$route.fullPath)).catch(() => { });
+            // Back to the address as it is now, with what a map wrote without a navigation
+            this.$router.push(loginLocation(currentPath())).catch(() => { });
         },
 
         toggleUserMenu: function (event) {

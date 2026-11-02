@@ -16,3 +16,20 @@ export const ruleOf = (source, selector) => {
     const start = source.indexOf(`${selector} {`);
     return start < 0 ? '' : source.slice(start, source.indexOf('}', start));
 };
+
+/**
+ * The text inside the first `@media (query) { ... }` block (its nested braces balanced), '' when there is none;
+ * `ruleOf` reads the rules of a media query from it.
+ * @param {string} source @param {string} query the condition as written, e.g. 'max-width: 767.98px'
+ */
+export const mediaBlock = (source, query) => {
+    const start = source.indexOf(`@media (${query}) {`);
+    if (start < 0) return '';
+    const open = source.indexOf('{', start);
+    let depth = 0;
+    for (let i = open; i < source.length; i++) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}' && --depth === 0) return source.slice(open + 1, i);
+    }
+    return '';
+};

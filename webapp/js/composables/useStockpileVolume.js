@@ -117,7 +117,11 @@ const definition = {
             // as a regular measurement so it can be re-styled / replaced when
             // the user re-detects, and removed when leaving the panel without
             // ever saving via the toolbar.
-            _draftStockpileFeatureId: null
+            _draftStockpileFeatureId: null,
+            // Counts the opens and closes of the panel and the piles measured in it: a saved pile
+            // read for an earlier one is not shown (the panel may be open on another raster by
+            // the time it is read, or show a pile the user measured meanwhile)
+            _stockpileRestoreTurn: 0
         };
     },
     computed: {
@@ -169,18 +173,22 @@ const definition = {
             this.stockpileTitle = '';
             this.stockpileDescription = '';
             this._savedStockpileMaterial = null;
+            // The pile drawn for the raster the panel was open on is not this raster's
+            this._clearStockpileOverlay();
             // Restore a previously saved stockpile (if any) so the user sees it on the map.
             this._loadSavedStockpile();
         },
 
         async _loadSavedStockpile() {
             if (!this.rasterFilePath || !this.dataset) return;
+            const turn = ++this._stockpileRestoreTurn;
+            const path = this.rasterFilePath;
             try {
                 // Skip stockpiles the user has just removed via the Measurement
                 // List dialog (deletion is in-memory until the next save).
-                const saved = await loadStockpile(this.dataset, this.rasterFilePath,
-                    this.deletedMeasurementIds);
-                if (!saved) return;
+                const saved = await loadStockpile(this.dataset, path, this.deletedMeasurementIds);
+                // The panel closed, opened again (on another raster) or measured a pile while the file was read
+                if (!saved || turn !== this._stockpileRestoreTurn || path !== this.rasterFilePath) return;
                 this.stockpileDetectedPolygon = saved.polygon;
                 // The polygon may already be rendered by the regular measurements
                 // layer (when persisted with measurementType==='stockpile' it is
@@ -327,6 +335,7 @@ const definition = {
         },
 
         closeStockpileVolume() {
+            this._stockpileRestoreTurn++;
             this.stockpilePanelVisible = false;
             this.stockpileError = null;
             this.stockpileResult = null;
@@ -358,6 +367,22 @@ const definition = {
         },
 
         /**
+         * A new pile is measured (found by a click or drawn): an independent pile, so it is
+         * detached from the previous draft and the identification fields are reset, otherwise
+         * the previously-typed title/description would bleed into the next adopted feature (and
+         * the watcher would overwrite the previous pile). It takes the turn of a saved pile still
+         * being read, so that pile does not replace this one when it arrives.
+         */
+        _startNewStockpile() {
+            this._stockpileRestoreTurn++;
+            this.stockpileLoading = true;
+            this.stockpileError = null;
+            this._draftStockpileFeatureId = null;
+            this.stockpileTitle = '';
+            this.stockpileDescription = '';
+        },
+
+        /**
          * Auto-detect the stockpile under a given WGS84 [lon,lat].
          * After detection, immediately run volume calculation on the detected polygon.
          */
@@ -367,15 +392,7 @@ const definition = {
                 this.stockpileError = 'Invalid click coordinates';
                 return;
             }
-            this.stockpileLoading = true;
-            this.stockpileError = null;
-            // Each new detection is an independent pile - detach from the
-            // previous draft and reset the identification fields so the
-            // previously-typed title/description don't bleed into the next adopted
-            // feature (and the watcher doesn't overwrite the previous pile).
-            this._draftStockpileFeatureId = null;
-            this.stockpileTitle = '';
-            this.stockpileDescription = '';
+            this._startNewStockpile();
             try {
                 const detection = await this.dataset.detectStockpile(this.rasterFilePath, lat, lon, {
                     radius: this.stockpileRadius,
@@ -410,15 +427,7 @@ const definition = {
                 this.stockpileError = 'A polygon is required';
                 return;
             }
-            this.stockpileLoading = true;
-            this.stockpileError = null;
-            // Each new polygon is an independent pile - detach from the
-            // previous draft and reset the identification fields so the
-            // previously-typed title/description don't bleed into the next adopted
-            // feature (and the watcher doesn't overwrite the previous pile).
-            this._draftStockpileFeatureId = null;
-            this.stockpileTitle = '';
-            this.stockpileDescription = '';
+            this._startNewStockpile();
             try {
                 this.stockpileBaseMethod = baseMethodFor(PILE_OUTLINE.DRAWN, this._chosenStockpileBaseMethod);
                 const volume = await this._measureStockpile(polygonGeoJson);

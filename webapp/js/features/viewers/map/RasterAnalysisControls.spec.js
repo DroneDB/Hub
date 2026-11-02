@@ -117,3 +117,26 @@ describe('RasterAnalysisControls spot value', () => {
         expect(byId('raster-spot-value').text()).toContain('pixel 4, 5');
     });
 });
+
+describe('RasterAnalysisControls elevation model', () => {
+    const CANDIDATES = [{ path: 'odm_dem/dtm.tif', label: 'dtm.tif' }, { path: 'odm_dem/dsm.tif', label: 'dsm.tif' }];
+    const select = () => wrapper.find('[data-testid="analysis-target-select"]');
+
+    it('shows the selector with two rasters to work on, and the current one', async () => {
+        await render({ filePath: 'odm_dem/dsm.tif', targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
+        expect(wrapper.text()).toContain('Elevation model');
+        expect(select().findAll('option').map(o => o.text())).toEqual(['dtm.tif', 'dsm.tif']);
+        expect(select().element.value).toBe('odm_dem/dsm.tif');
+    });
+
+    it('shows none with one raster', async () => {
+        await render({ targetCandidates: [CANDIDATES[0]], targetPath: CANDIDATES[0].path });
+        expect(select().exists()).toBe(false);
+    });
+
+    it('asks for the raster that was picked', async () => {
+        await render({ targetCandidates: CANDIDATES, targetPath: 'odm_dem/dsm.tif' });
+        await select().setValue('odm_dem/dtm.tif');
+        expect(wrapper.emitted('selectTarget')).toEqual([['odm_dem/dtm.tif']]);
+    });
+});

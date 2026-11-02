@@ -5,6 +5,8 @@
 // ============================================================
 .analysis-panel {
     --panel-bg: rgba(0, 0, 0, 0.85);
+    // The same dark without the see-through, for the sheet on a phone
+    --panel-bg-solid: rgb(20 20 20);
     --panel-text: #eee;
     --panel-text-soft: #ccc;
     --panel-muted: #aaa;
@@ -62,7 +64,19 @@
         }
     }
 
-    .close-btn {
+    .panel-header-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    // Folding the sheet is for phones; the panel of a desktop map stays open
+    .sheet-toggle {
+        display: none;
+    }
+
+    .close-btn,
+    .sheet-toggle {
         background: none;
         border: none;
         color: var(--panel-muted);
@@ -280,20 +294,55 @@
     --panel-primary-text: #1a1a1a;
 }
 
-// Bottom sheet on phones
-@media (max-width: 768px) {
+// Bottom sheet on phones (the Hub's phone breakpoint): it floats over the bottom of the map, between
+// its left edge and the toolbar rail and above the map settings button (so that stays in reach),
+// opaque so the layers do not show through, and folds to its header
+@media (max-width: 767.98px) {
     .analysis-panel {
-        position: fixed;
+        position: absolute;
         top: auto;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        max-height: 50vh;
-        border-radius: 0.75rem 0.75rem 0 0;
+        right: var(--map-rail-reserve);
+        bottom: var(--map-bottom-reserve);
+        left: 0.5rem;
+        width: auto;
+        max-height: 50%;
+        background: var(--panel-bg-solid);
 
         .panel-body {
             padding: 0.5rem;
         }
+
+        // The header buttons are 2rem, as the map buttons are, which sets the height of the folded sheet
+        .close-btn,
+        .sheet-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2rem;
+            min-height: 2rem;
+        }
+
+        &.is-minimised {
+            max-height: var(--map-sheet-peek);
+            overflow: hidden;
+
+            > .panel-header {
+                border-bottom: 0;
+            }
+
+            > :not(.panel-header) {
+                display: none;
+            }
+        }
+    }
+
+    // On a phone the open sheet is the task: it takes the place of the layer panel, and folding
+    // it gives the layers back, above the folded header
+    .map-container:has(> .analysis-panel:not(.is-minimised)) > .map-bottom-panel {
+        display: none;
+    }
+
+    .map-container:has(> .analysis-panel.is-minimised) > .map-bottom-panel {
+        bottom: calc(var(--map-bottom-reserve) + var(--map-sheet-peek) + 0.5rem);
     }
 }

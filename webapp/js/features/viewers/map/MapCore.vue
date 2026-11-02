@@ -11,15 +11,20 @@
             <OpacityControl v-if="rasterLayerList.length <= 1 && !splitMode" v-model="rasterOpacity" :visible="hasRasters"
                             :show-plant-health-btn="rasterLayerList.length === 1 && !!rasterLayerList[0]?.plantHealthCapable"
                             :plant-health-active="plantHealthVisible"
-                            @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" />
+                            :can-add="layersEditable && canAddLayers" :add-disabled="addLayerDisabled" :add-title="addLayerTitle"
+                            @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" @add="$emit('addLayer')" />
             <RasterLayerOpacityPanel v-else-if="!splitMode" v-model:layers="rasterLayerList"
                                      :active-plant-health-path="plantHealthVisible ? plantHealthFilePath : null"
-                                     :removable="!!comparison"
+                                     :removable="layersEditable && !!comparison" :removable-paths="layersEditable ? (comparison ? null : addedLayerPaths) : []"
+                                     :remove-label="comparison ? 'Remove from comparison' : 'Remove layer'" :can-repick="layersEditable && !!comparison"
+                                     :can-add="layersEditable && canAddLayers" :add-disabled="addLayerDisabled" :add-title="addLayerTitle"
                                      @reorder="handleRasterLayerReorder"
                                      @plant-health="handleLayerPlantHealth"
+                                     @toggle-visible="toggleRasterLayerVisible"
                                      @remove="path => $emit('removeLayer', path)"
-                                     @repick="path => $emit('repick', path)" />
-            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" :removable="!!comparison"
+                                     @repick="path => $emit('repick', path)"
+                                     @add="$emit('addLayer')" />
+            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" :removable="layersEditable && !!comparison"
                                 @update:positions="onSplitPositionsChange"
                                 @move="(index, to) => handleRasterLayerReorder({ fromIndex: index, toIndex: to })"
                                 @remove="index => $emit('removeLayer', rasterLayerList[index].path)"
@@ -28,6 +33,7 @@
                               :initial-params="plantHealthInitialParams" @close="closePlantHealth"
                               @viz-params-changed="handleVizParamsChanged" />
             <RasterAnalysisControls :visible="rasterPanelVisible" :dataset="dataset" :file-path="rasterFilePath"
+                                    :target-candidates="analysisCandidates" :target-path="analysisTargetPath"
                                     :initial-params="rasterInitialParams" :spot-info="rasterSpotInfo" :area-stats="rasterAreaStats"
                                     :profile="rasterProfile" :profile-loading="rasterProfileLoading" :profile-error="rasterProfileError"
                                     :drawing-profile="rasterProfileDrawing" :inspect-active="rasterInspectActive"
@@ -37,7 +43,7 @@
                                     @clear-profile="handleClearProfile" @cancel-draw-profile="cancelRasterProfileDrawing"
                                     @toggle-inspect-value="toggleRasterInspect" @profile-hover="handleProfileHover"
                                     @toggle-area-stats="toggleRasterAreaDrawing" @clear-area-stats="handleClearAreaStats"
-                                    @open-contour-dialog="openContourDialog" />
+                                    @open-contour-dialog="openContourDialog" @select-target="selectAnalysisTarget" />
             <ContourOptionsDialog v-model:visible="contourDialogVisible" :loading="contourLoading" :unit="contourUnit"
                                   :raster-min="contourRasterMin" :raster-max="contourRasterMax" :initial-options="contourLastOptions"
                                   @generate="generateContourLines" @cancel="closeContourDialog" />
@@ -47,10 +53,15 @@
                                   v-model:title="stockpileTitle" v-model:description="stockpileDescription"
                                   :base-method="stockpileBaseMethod" :visible="stockpilePanelVisible" :loading="stockpileLoading" :error="stockpileError"
                                   :result="stockpileResult" :materials="stockpileMaterials" :currency="stockpileCurrency" :mode="stockpileMode" :unit-pref="currentUnitPref"
+                                  :target-candidates="analysisCandidates" :target-path="analysisTargetPath"
                                   @update:base-method="chooseStockpileBaseMethod"
                                   @close="closeStockpileVolume" @click-on-map="startStockpileClickMode"
                                   @draw-polygon="startStockpilePolygonDrawing" @clear-overlay="clearStockpileOverlay"
-                                  @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson" />
+                                  @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson"
+                                  @select-target="selectAnalysisTarget" />
+            <!-- The toolbar's Copy link button opens and closes it: a press on it is not a press outside -->
+            <MapLinkPanel v-if="linkPanelOpen && mainFilePath" :dataset="dataset" :path="mainFilePath" :layers="addedLayerPaths"
+                          toggle="[data-map-link-toggle]" @close="linkPanelOpen = false" />
         </div>
         <MapDialogs :alert-dialog-open="alertDialogOpen" :alert-title="alertTitle" :alert-message="alertMessage"
                     :clear-measurements-dialog-open="clearMeasurementsDialogOpen"
@@ -77,13 +88,14 @@
                            :unit-pref="currentUnitPref" @close="mapSettingsDialogOpen = false"
                            @basemap-changed="handleBasemapChanged" @units-changed="handleUnitsChanged" />
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
-        <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :display-options="!standalone"
+        <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :copy-link="standalone && !comparison && !!dataset"
+                    :display-options="!standalone"
                     :split-toggle="!standalone || !!comparison"
-                    :analysis-entry="analysisFile" :raster-count="rasterLayerList.length"
+                    :analysis-entry="analysisEntry" :raster-count="rasterLayerList.length"
                     :direction-indicators="showDirectionIndicators" :flight-path="showFlightPath"
                     :split-mode="splitMode" :can-compare="canCompare"
-                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen"
-                    @analysis="kind => toggleAnalysisPanel(kind, analysisFile)"
+                    @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen" @copy-link="toggleLinkPanel"
+                    @analysis="toggleAnalysisPanel"
                     @update:direction-indicators="setDirectionIndicators" @update:flight-path="setFlightPath"
                     @toggle-split="toggleSplit" @compare-to="compareTo" />
     </div>
@@ -99,7 +111,7 @@
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import { isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
-import { shallowRef } from 'vue';
+import { inject, shallowRef } from 'vue';
 
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
@@ -133,6 +145,7 @@ import PlantHealthPanel from './PlantHealthPanel.vue';
 import RasterAnalysisControls from './RasterAnalysisControls.vue';
 import ContourOptionsDialog from './ContourOptionsDialog.vue';
 import StockpileVolumePanel from './StockpileVolumePanel.vue';
+import MapLinkPanel from './MapLinkPanel.vue';
 import MapDialogs from './MapDialogs.vue';
 import ChangeUnitsDialog from './ChangeUnitsDialog.vue';
 import MapSettingsDialog from './MapSettingsDialog.vue';
@@ -147,7 +160,7 @@ export default {
     components: {
         DialogHost, MapToolbar, MapFilePopup, OpacityControl, RasterLayerOpacityPanel, RasterSplitOverlay, PlantHealthPanel,
         RasterAnalysisControls, ContourOptionsDialog, StockpileVolumePanel, MapDialogs, ChangeUnitsDialog, MapSettingsDialog,
-        MeasurementListDialog, MeasurementGroupDialog
+        MeasurementListDialog, MeasurementGroupDialog, MapLinkPanel
     },
     props: {
         files: {
@@ -185,6 +198,27 @@ export default {
         comparison: {
             type: Object,
             default: null
+        },
+        // The single-file map takes georasters on top of its file: the parent owns them and
+        // applies addLayer / removeLayer (a path). `addedLayerPaths` are the dataset paths of the
+        // layers it added, in the order of addition: only their rows can be removed, and the
+        // link to the map holds them. The add action is off while `addLayerDisabled`, whose
+        // reason is `addLayerTitle`
+        canAddLayers: {
+            type: Boolean,
+            default: false
+        },
+        addLayerDisabled: {
+            type: Boolean,
+            default: false
+        },
+        addLayerTitle: {
+            type: String,
+            default: ''
+        },
+        addedLayerPaths: {
+            type: Array,
+            default: () => []
         }
     },
     emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick', 'addLayer', 'fileWritten', 'fileRemoved'],
@@ -195,6 +229,8 @@ export default {
         });
         return {
             ...features,
+            // Provided by the app: true on a map embedded in another page
+            embed: inject('embed', false),
             ...useMapComparison({ ...features, comparison: () => props.comparison, emit }),
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
@@ -212,14 +248,29 @@ export default {
             selectPolygon: false,
             initialExtent: null,
             vectorLayerColors: {},
-            mapSettingsDialogOpen: false
+            mapSettingsDialogOpen: false,
+            linkPanelOpen: false
         };
     },
     computed: {
+        // A viewer-only map is locked to its layers: they can be hidden, faded and reordered
+        // (that changes the view only), not added, removed or picked again
+        layersEditable: function () {
+            return !this.embed;
+        },
         // Identity of the file set: a change (added, removed, reordered, replaced in place)
         // rebuilds the layers; anything else is a selection change
         filesKey: function () {
             return this.files.map(f => f.path || (f.entry && f.entry.path)).join('\n');
+        },
+        // Dataset path of the file the single-file map is open on (the first file)
+        mainFilePath: function () {
+            const main = this.files[0];
+            return main && main.entry ? main.entry.path : '';
+        },
+        // A panel that opens over the link panel's place (they share the corner)
+        analysisPanelOpen: function () {
+            return this.plantHealthVisible || this.rasterPanelVisible || this.stockpilePanelVisible;
         }
     },
     watch: {
@@ -235,6 +286,10 @@ export default {
             handler: function () {
                 if (this.fileLayers) this.fileLayers.setShotStyle(this.shotStyleKey());
             }
+        },
+        // One panel at a time in that corner: an analysis panel replaces the link panel
+        analysisPanelOpen: function (open) {
+            if (open) this.linkPanelOpen = false;
         },
         filesKey: function () {
             // Coalesce bursts (the explorer replaces the array, then patches entries)
@@ -286,7 +341,8 @@ export default {
 
         loadMap: function () {
             this.loaded = true;
-            this.comparisonFitPending = !!this.comparison && !this.comparison.view;
+            // A comparison fits once, unless its state has a view; the single-file map fits once
+            this.fitPending = this.comparison ? !this.comparison.view : this.standalone;
             this.vectorLayers = [];
             this.fileLayers = new FileLayers();
             this.fileLayers.setFlightPathVisible(this.showFlightPath);
@@ -379,26 +435,37 @@ export default {
             Promise.all(vectorFiles.map(f => this.addVectorLayer(f))).then(() => {
                 if (this.fitsToFiles()) this.zoomToFilesExtent();
             });
-            this.syncRasterLayers(this.fileLayers.rasterSlots);
+            // Every map but a comparison keeps the order the user gave the layers
+            this.syncRasterLayers(this.fileLayers.rasterSlots, { keepOrder: !this.comparison });
             // New layers get the plant-health styling remembered for their file
             this.refreshRasterLayers();
             this.loadSplatFootprints();
             this.updateRastersOpacity();
             // A comparison has no measurements of its own and its plant health is in its state
             if (!this.comparison) {
+                // A tool target that left the map is replaced first: it decides which measurements load
+                this.reconcileAnalysisTarget();
                 this.loadSavedMeasurements();
                 this.restorePlantHealthFromHash(this.files);
             }
             this.viewZoomCap.schedule();
         },
 
-        // A comparison keeps its view: the map fits its files once, on the first load of a state
-        // without a view (the world view the map starts with is reported before that fit)
+        // A comparison and the single-file map keep their view: the map fits its files once, on
+        // the first load (of a comparison state without a view; the world view the map starts with
+        // is reported before that fit), so adding or removing a layer never moves it
         fitsToFiles: function () {
-            if (!this.comparison) return true;
-            const first = this.comparisonFitPending;
-            this.comparisonFitPending = false;
+            if (!this.comparison && !this.standalone) return true;
+            const first = this.fitPending;
+            this.fitPending = false;
             return first;
+        },
+
+        // The single-file map with layers added opens on its own file, not on all of them
+        mainFileExtent: function () {
+            if (!this.standalone || this.comparison || this.files.length < 2) return null;
+            const geom = this.files[0].entry && this.files[0].entry.polygon_geom;
+            return geom ? mercatorExtent(geom) : null;
         },
 
         // The footprints of the georeferenced splats in view (the points of the others stay)
@@ -550,12 +617,15 @@ export default {
         },
 
         zoomToFilesExtent: function () {
-            const ext = this.fileLayers.extent();
+            const own = this.mainFileExtent();
+            const ext = own || this.fileLayers.extent();
             // Vector files: the entry's geometry (a VectorTileSource only knows its loaded tiles)
-            this.files.forEach(f => {
-                const geom = f.entry && f.entry.type === ddb.entry.type.VECTOR && (f.entry.polygon_geom || f.entry.point_geom);
-                if (geom) extendExtent(ext, mercatorExtent(geom));
-            });
+            if (!own) {
+                this.files.forEach(f => {
+                    const geom = f.entry && f.entry.type === ddb.entry.type.VECTOR && (f.entry.polygon_geom || f.entry.point_geom);
+                    if (geom) extendExtent(ext, mercatorExtent(geom));
+                });
+            }
             if (!isEmptyExtent(ext)) {
                 // Remember the first extent for Reset view
                 if (!this.initialExtent) this.initialExtent = ext.slice();
@@ -588,6 +658,16 @@ export default {
 
         setFlightPath: function (on) {
             this.showFlightPath = on;
+        },
+
+        toggleLinkPanel: function () {
+            if (!this.linkPanelOpen) {
+                // One panel at a time in that corner
+                if (this.plantHealthVisible) this.closePlantHealth();
+                if (this.rasterPanelVisible) this.closeRasterAnalysis();
+                if (this.stockpilePanelVisible) this.closeStockpileVolume();
+            }
+            this.linkPanelOpen = !this.linkPanelOpen;
         },
 
         goBack: function () {

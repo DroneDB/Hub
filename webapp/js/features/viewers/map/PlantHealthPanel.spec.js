@@ -8,6 +8,8 @@ import { mount, flushPromises } from '@vue/test-utils';
 
 vi.mock('@/libs/api/sharedRegistry', () => ({ default: { features: { value: () => null } } }));
 vi.mock('@/composables/useHeavyTask', () => ({ useHeavyTask: () => ({ runHeavyTask: vi.fn() }) }));
+const copyText = vi.hoisted(() => vi.fn());
+vi.mock('@/composables/useCopyText', async importOriginal => ({ ...(await importOriginal()), copyText }));
 
 const { default: PlantHealthPanel } = await import('./PlantHealthPanel.vue');
 const { default: HistogramChart } = await import('./HistogramChart.vue');
@@ -79,6 +81,21 @@ describe('PlantHealthPanel histogram with outliers', () => {
         expect(chart().props('data')).toEqual({ counts: CLEAN_STATS[1].histogram.counts, edges: CLEAN_STATS[1].histogram.edges });
         expect(note().exists()).toBe(false);
         expect(wrapper.find('#plant-health-panel-rescale').element.value).toBe('0.100,0.850');
+    });
+});
+
+describe('PlantHealthPanel Copy Link', () => {
+    it('writes the settings in the hash keeping the address and the history state of the router', async () => {
+        // The router keeps the address it is at in the history state; without it, its next
+        // navigation writes the address of its last one back over this entry
+        const url = '/r/o/d/view/abc/map?layer=a';
+        window.history.replaceState({ back: '/before', current: url, position: 2 }, '', url);
+        await renderWith(CLEAN_STATS);
+        await wrapper.find('button[title="Copy a shareable link with the current settings"]').trigger('click');
+        const address = window.location.pathname + window.location.search + window.location.hash;
+        expect(address).toMatch(/^\/r\/o\/d\/view\/abc\/map\?layer=a#path=odm_orthophoto%2Fodm_orthophoto\.tif&formula=NDVI/);
+        expect(window.history.state).toEqual({ back: '/before', position: 2, current: address });
+        expect(copyText).toHaveBeenCalledWith(window.location.href);
     });
 });
 

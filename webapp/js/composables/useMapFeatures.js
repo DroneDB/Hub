@@ -13,7 +13,9 @@ import { toLonLat } from 'ol/proj';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 import { isRasterAnalysisCapable } from '@/libs/entryTypes';
+import { escapeHtml } from '@/libs/sanitize';
 import { useDialogs } from '@/composables/useDialogs';
+import { useConfirm } from '@/composables/useConfirm';
 import { useMapAlerts } from '@/composables/useMapAlerts';
 import { useMapBasemap } from '@/composables/useMapBasemap';
 import { useMapTooltip } from '@/composables/useMapTooltip';
@@ -25,6 +27,7 @@ import { useContourLines } from '@/composables/useContourLines';
 import { useMapPanels } from '@/composables/useMapPanels';
 import { useMapSplitCompare } from '@/composables/useMapSplitCompare';
 import { useRasterLayers } from '@/composables/useRasterLayers';
+import { useAnalysisTarget, ANALYSIS_PANELS } from '@/composables/useAnalysisTarget';
 
 /**
  * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, comparison?: any }} props
@@ -47,9 +50,14 @@ export function useMapFeatures(props, fileEvents = {}) {
         return center ? toLonLat(center) : null;
     };
 
+    const rasters = useRasterLayers({ group: rasterLayer, vectorLayers, splitMode: () => split.splitMode.value });
+    const split = useMapSplitCompare({ map, rasterLayers: rasters.rasterLayerList, onChange: rasters.updateRastersOpacity });
+
     const measurements = useMapMeasurements({
         canWrite: () => props.canWrite, canDelete: () => props.canDelete, measureControls, currentUnitPref,
         files: () => props.files, dataset, showAlert, showFlash,
+        // The measurements follow the analysis target (see below)
+        analysisTarget: () => analysisTarget.targetEntry.value,
         onFileWritten: () => fileEvents.onFileWritten || (() => {}),
         onFileRemoved: () => fileEvents.onFileRemoved || (() => {})
     });
@@ -78,8 +86,39 @@ export function useMapFeatures(props, fileEvents = {}) {
         stockpile: { visible: () => stockpile.stockpilePanelVisible.value, open: stockpile.openStockpileVolume, close: stockpile.closeStockpileVolume }
     });
 
-    const rasters = useRasterLayers({ group: rasterLayer, vectorLayers, splitMode: () => split.splitMode.value });
-    const split = useMapSplitCompare({ map, rasterLayers: rasters.rasterLayerList, onChange: rasters.updateRastersOpacity });
+    // The drawn rasters the analysis tools accept, top first. Placeholders are not drawn, and a
+    // comparison has no analysis tools (its layers are part of its state, it is read only)
+    const analysisCandidates = () => {
+        if (props.comparison) return [];
+        return rasters.rasterLayerList.value
+            .filter(row => row.olLayer && !row.placeholder)
+            .map(row => {
+                const file = props.files.find(f => f.entry && f.entry.path === row.path) || row.olLayer.file;
+                return { path: row.path, label: row.name, entry: file && file.entry, file };
+            })
+            .filter(c => c.entry && isRasterAnalysisCapable(c.entry));
+    };
+    const confirm = useConfirm(dialogs);
+    const analysisTarget = useAnalysisTarget({
+        candidates: analysisCandidates,
+        measurementsPath: () => measurements.measurementsRasterPath(),
+        measurementsPathFor: entry => measurements.measurementEntryFor(entry).path,
+        isDirty: () => !!measureControls.value && measureControls.value.isDirty(),
+        confirmDiscard: file => confirm({
+            title: 'Discard measurements',
+            message: `Discard the unsaved measurements of ${escapeHtml(file)}?`,
+            confirmText: 'Discard',
+            cancelText: 'Cancel',
+            danger: true
+        }),
+        reloadMeasurements: () => measurements.loadSavedMeasurements(),
+        splitMode: () => split.splitMode.value,
+        panels: {
+            openKind: () => panels.openAmong(ANALYSIS_PANELS),
+            open: (kind, file) => panels.open(kind, file),
+            close: kind => panels.close(kind)
+        }
+    });
 
     return {
         map, measureControls, rasterLayer, vectorLayers, currentUnitPref, dialogs,
@@ -91,8 +130,14 @@ export function useMapFeatures(props, fileEvents = {}) {
         openPlantHealth: (...args) => panels.open('plantHealth', ...args),
         openRasterAnalysis: (...args) => panels.open('rasterAnalysis', ...args),
         openStockpileVolume: (...args) => panels.open('stockpile', ...args),
-        toggleAnalysisPanel: panels.toggle,
-        // The file the toolbar's Raster Analysis / Stockpile tools open for
-        analysisFile: computed(() => props.files.find(x => x.entry && isRasterAnalysisCapable(x.entry)) || null)
+        // The raster the Raster Analysis and Stockpile Volume tools work on (null until the first
+        // is opened), the rasters to choose from, and what the toolbar and the selector call
+        analysisTargetPath: analysisTarget.targetPath,
+        analysisCandidates: computed(() => analysisTarget.candidates.value.map(({ path, label }) => ({ path, label }))),
+        analysisEntry: analysisTarget.toolbarEntry,
+        toggleAnalysisPanel: analysisTarget.requestToggle,
+        selectAnalysisTarget: analysisTarget.requestSwitch,
+        // After the layers were rebuilt: a target that left the map is replaced
+        reconcileAnalysisTarget: analysisTarget.onCandidatesChanged
     };
 }

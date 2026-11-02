@@ -6,7 +6,7 @@
             <span v-if="dirty" class="compare-dirty" title="Unsaved changes">Unsaved changes</span>
         </div>
         <div class="compare-actions">
-            <Button size="small" severity="secondary" icon="fa-solid fa-plus" label="Add raster"
+            <Button v-if="!embed" size="small" severity="secondary" icon="fa-solid fa-plus" label="Add raster"
                     :disabled="!canAdd || busy" :title="canAdd ? 'Add a georaster to the comparison' : `A comparison shows at most ${maxLayers} rasters`"
                     @click="emit('add')" />
             <Button size="small" severity="secondary" :icon="copied ? 'fa-solid fa-check' : 'fa-solid fa-link'" :label="copied ? 'Copied' : 'Copy link'"
@@ -26,8 +26,10 @@
         </li>
         <li v-for="n in notices" :key="n.path + n.kind" :class="n.kind === 'changed' ? 'notice-info' : 'notice-warn'">
             <span class="notice-text">{{ n.text }}</span>
-            <Button v-if="n.kind === 'missing'" size="small" text label="Pick another" @click="emit('repick', n.path)" />
-            <Button v-if="n.kind !== 'changed' && layerCount > 1" size="small" text label="Remove" @click="emit('remove', n.path)" />
+            <template v-if="!embed">
+                <Button v-if="n.kind === 'missing'" size="small" text label="Pick another" @click="emit('repick', n.path)" />
+                <Button v-if="n.kind !== 'changed' && layerCount > 1" size="small" text label="Remove" @click="emit('remove', n.path)" />
+            </template>
         </li>
     </ul>
 </template>
@@ -36,9 +38,14 @@
 /**
  * CompareToolbar - the compare view's bar: the comparison's name and unsaved state, Add
  * raster, Copy link, Save / Save as new (writers), and the notices about missing, unavailable
- * and changed layers.
+ * and changed layers. An embedded compare view only shows the rasters it was given: no Add
+ * raster, and the notices have no Pick another or Remove.
  */
+import { inject } from 'vue';
 import Button from 'primevue/button';
+
+// Provided by the app: true on a view embedded in another page
+const embed = inject('embed', false);
 
 defineProps({
     name: { type: String, required: true },

@@ -1,5 +1,6 @@
 // @ts-check
 /** Route decisions that depend on the session; shared by the router, Login and the 401 handler. */
+import { currentPath } from './routeQuery';
 
 /**
  * The query that opens the Preferences window on any page, on the tab it names
@@ -50,5 +51,7 @@ export function handleUnauthorized(router, auth) {
     const route = router.currentRoute.value;
     if (route.name === 'Login' || route.name === 'LoginHome') return;
     if (auth.isLoggedIn) auth.logout();
-    router.push(loginLocation(route.fullPath)).catch(() => { });
+    // The address as it is now: a map writes its layers without a navigation, so the route's
+    // fullPath may be the address the page opened with
+    router.push(loginLocation(currentPath())).catch(() => { });
 }

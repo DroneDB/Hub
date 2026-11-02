@@ -40,10 +40,13 @@ describe('Organizations.fetchOrganizations', () => {
 });
 
 describe('handleUnauthorized', () => {
-    const router = path => ({
-        currentRoute: { value: { name: path === '/login' ? 'Login' : 'Organizations', fullPath: path } },
-        push: vi.fn(() => Promise.resolve())
-    });
+    const router = path => {
+        window.history.replaceState({}, '', path);
+        return {
+            currentRoute: { value: { name: path === '/login' ? 'Login' : 'Organizations', fullPath: path } },
+            push: vi.fn(() => Promise.resolve())
+        };
+    };
 
     it('ends the session and signs in again, coming back afterwards', async () => {
         const { handleUnauthorized } = await import('@/libs/authRoutes');
@@ -52,6 +55,16 @@ describe('handleUnauthorized', () => {
         handleUnauthorized(r, auth);
         expect(auth.logout).toHaveBeenCalledOnce();
         expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r' } });
+    });
+
+    it('comes back to the address as it is now, not to the one the route was opened at', async () => {
+        const { handleUnauthorized } = await import('@/libs/authRoutes');
+        const { replaceQueryKeys } = await import('@/libs/routeQuery');
+        const r = router('/r/o/d/view/abc/map?t=1');
+        // A map adds its layers without a navigation: the route keeps the address it opened at
+        replaceQueryKeys({ layer: ['a'] });
+        handleUnauthorized(r, { isLoggedIn: true, logout: vi.fn() });
+        expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/o/d/view/abc/map?t=1&layer=a' } });
     });
 
     it('does nothing on the Login page', async () => {

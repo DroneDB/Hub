@@ -5,32 +5,32 @@
  * dataset meta.
  *
  * Layers whose file is missing or cannot be drawn stay in the comparison as placeholders, so
- * a save never drops them; the user picks another file or removes them.
+ * a save never drops them; the user picks another file or removes them. An embedded view
+ * (embed: true) only shows the layers it was given: it neither adds, replaces nor removes one,
+ * and does not open the picker its link asks for.
  *
- *   const cmp = useComparison({ route, dialogs });   // route: useRoute()
+ *   const cmp = useComparison({ route, dialogs, embed });   // route: useRoute(), embed: inject('embed', false)
  */
 import { ref, shallowRef, computed, watch, onScopeDispose } from 'vue';
-import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { setTitle } from '@/libs/utils';
 import { permissionsOf } from '@/libs/datasetPermissions';
-import FileAvailabilityChecker from '@/libs/build/fileAvailabilityChecker';
+import { isGeoraster } from '@/libs/entryTypes';
+import { resolveLayers as resolveGeorasters, toMapFiles, pickGeoraster } from '@/libs/map/georasterLayers';
+import { replaceQueryKeys } from '@/libs/routeQuery';
 import { parseCompareQuery, compareQuery, workingState, sameComparison, MAX_LAYERS } from '@/libs/compare/compareState';
 import { addLayer, removeLayer, replaceLayer } from '@/libs/compare/layerRules';
 import { savedComparisons, savedChange, saveNew, updateSaved } from '@/libs/compare/comparisonStore';
 import { askComparisonName } from '@/composables/useComparisonActions';
 import { useNotify } from '@/composables/useNotify';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
-import FolderPicker from '@/components/FolderPicker.vue';
 
-const { pathutils } = ddb;
 const URL_DELAY_MS = 500;
-const isGeoraster = entry => !!entry && entry.type === ddb.entry.type.GEORASTER;
 
 /**
- * @param {{ route: any, dialogs: ReturnType<typeof import('./useDialogs').useDialogs> }} ctx
+ * @param {{ route: any, dialogs: ReturnType<typeof import('./useDialogs').useDialogs>, embed?: boolean }} ctx
  */
-export function useComparison({ route, dialogs }) {
+export function useComparison({ route, dialogs, embed = false }) {
     const notify = useNotify();
     const dataset = reg.Organization(String(route.params.org)).Dataset(String(route.params.ds));
 
@@ -52,29 +52,10 @@ export function useComparison({ route, dialogs }) {
     const dirty = computed(() => !!saved.value && !!state.value && !sameComparison(state.value, saved.value.data));
     const canAdd = computed(() => layerPaths.value.length < MAX_LAYERS);
 
-    /** What a layer's file is now: its entry, or why it cannot be shown. */
-    async function resolveLayer(path) {
-        let entry;
-        try {
-            entry = await dataset.listOne(path);
-        } catch {
-            return { status: 'missing', entry: null, reason: 'Missing' };
-        }
-        if (!isGeoraster(entry)) return { status: 'unavailable', entry, reason: 'Not a georaster' };
-        try {
-            const availability = await FileAvailabilityChecker.check(dataset, entry, 'map');
-            if (!availability.available) return { status: 'unavailable', entry, reason: availability.title || 'Not available' };
-        } catch (e) {
-            return { status: 'unavailable', entry, reason: e.message || 'Not available' };
-        }
-        return { status: 'ok', entry, reason: '' };
-    }
-
+    // Always resolves the given paths again: a file removed from the comparison and picked back
+    // later may have changed meanwhile
     async function resolveLayers(paths) {
-        const results = await Promise.all(paths.map(resolveLayer));
-        const next = new Map(resolved.value);
-        paths.forEach((p, i) => next.set(p, results[i]));
-        resolved.value = next;
+        resolved.value = await resolveGeorasters(dataset, paths, resolved.value, { fresh: true });
     }
 
     // MapCore's files: the last one is drawn on top and listed first (the leftmost band), so the
@@ -83,13 +64,7 @@ export function useComparison({ route, dialogs }) {
     const layersKey = computed(() => layerPaths.value.join('\n'));
     const files = computed(() => {
         const paths = layersKey.value ? layersKey.value.split('\n') : [];
-        return paths.map(path => {
-            const r = resolved.value.get(path) || { status: 'missing', entry: null, reason: 'Missing' };
-            const uri = dataset.remoteUri(path);
-            if (r.status === 'ok') return { path: uri, entry: r.entry, label: pathutils.basename(path), selected: false };
-            const kind = r.status === 'missing' ? 'missing' : 'unavailable';
-            return { path: uri, entry: null, label: pathutils.basename(path), selected: false, placeholder: { path, kind, text: `${r.reason}: ${path}` } };
-        }).reverse();
+        return toMapFiles(dataset, paths, resolved.value).reverse();
     });
 
     // Layers to tell the user about: missing, not drawable, or changed since the save
@@ -114,10 +89,10 @@ export function useComparison({ route, dialogs }) {
         const { query, tooLong } = compareQuery({ state: state.value, uid: saved.value?.uid, clean: !!saved.value && !dirty.value });
         urlTooLong.value = tooLong;
         if (tooLong) return;
-        const qs = new URLSearchParams(query).toString();
         // Not router.replace: a navigation would reset the page title and run the route guards
-        // on every change; the view reads its query once
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+        // on every change; the view reads its query once. The keys of the opening link that the
+        // state replaces (p, pick) are dropped at the first write; other keys and the hash stay.
+        replaceQueryKeys({ c: query.c ?? null, s: query.s ?? null, p: null, pick: null });
     }
 
     /** The URL of the comparison as it is now (for Copy link): the pending update is written first. */
@@ -179,6 +154,7 @@ export function useComparison({ route, dialogs }) {
     }
 
     function remove(path) {
+        if (embed) return;
         const i = indexOf(path);
         if (i >= 0) state.value = removeLayer(state.value, i);
     }
@@ -188,14 +164,11 @@ export function useComparison({ route, dialogs }) {
      * @param {string} [replacePath]
      */
     async function pick(replacePath) {
-        if (!state.value || (!replacePath && !canAdd.value)) return;
+        if (embed || !state.value || (!replacePath && !canAdd.value)) return;
         const near = replacePath || layerPaths.value[layerPaths.value.length - 1] || '';
-        const picked = await dialogs.open(FolderPicker, {
-            dataset,
-            mode: 'file',
+        const picked = await pickGeoraster(dialogs, dataset, {
             title: replacePath ? 'Pick another raster' : 'Add raster to compare',
-            initialPath: pathutils.getParentFolder(near) || '',
-            accept: entry => isGeoraster(entry),
+            near,
             exclude: layerPaths.value
         });
         if (!picked || !picked.path) return;

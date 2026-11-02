@@ -1,10 +1,6 @@
 <template>
-    <div v-if="visible" class="analysis-panel analysis-panel--plant-health plant-health-panel">
-        <div class="panel-header">
-            <span class="panel-title"><i class="fas fa-leaf" /> Plant Health</span>
-            <button class="close-btn" title="Close" aria-label="Close" @click="close"><i class="fas fa-times" /></button>
-        </div>
-
+    <AnalysisPanel v-if="visible" variant="plant-health" class="plant-health-panel"
+                   icon="fas fa-leaf" title="Plant Health" @close="close">
         <div v-if="rasterInfo" class="panel-body">
             <!-- Sensor Info -->
             <div v-if="rasterInfo.detectedSensor" class="section">
@@ -151,10 +147,11 @@
 
         <PlantHealthFormulasDialog v-model:visible="showFormulasInfo"
                                    :formulas="availableFormulas" />
-    </div>
+    </AnalysisPanel>
 </template>
 
 <script>
+import AnalysisPanel from './AnalysisPanel.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import HistogramChart from '@/features/viewers/map/HistogramChart.vue';
 import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
@@ -172,6 +169,7 @@ import { copyText } from '@/composables/useCopyText';
 import { formatNumber } from '@/libs/format';
 import { shownHistogram, percentileRange } from '@/libs/map/histogramRange';
 import { useTimerGroup } from '@/composables/useTimers';
+import { replaceHash } from '@/libs/routeQuery';
 
 /**
  * PlantHealthPanel - Plant health (NDVI / custom index) analysis panel.
@@ -181,7 +179,7 @@ import { useTimerGroup } from '@/composables/useTimers';
  * rescaling, and copy-link functionality.
  */
 export default {
-    components: { HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner },
+    components: { AnalysisPanel, HistogramChart, ColormapDropdown, BandSelector, PlantHealthFormulasDialog, LoadingSpinner },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
@@ -498,7 +496,6 @@ export default {
         },
 
         copyLink() {
-            const url = new URL(window.location.href);
             // Build hash params
             const hashParams = new URLSearchParams();
             hashParams.set('path', this.filePath);
@@ -508,12 +505,11 @@ export default {
             if (this.selectedFormula && this.selectedColormap) hashParams.set('colormap', this.selectedColormap);
             if (this.rescale) hashParams.set('rescale', this.rescale);
             if (this.selectedStretch) hashParams.set('stretch', this.selectedStretch);
-            url.hash = hashParams.toString();
+            // Into the address bar, keeping the router's history state: the router's next
+            // navigation would otherwise write back the address of its last one over this entry
+            replaceHash(hashParams.toString());
 
-            // Update browser URL
-            window.history.replaceState(null, '', url.toString());
-
-            copyText(url.toString());
+            copyText(window.location.href);
         },
 
         formatNum(val) {

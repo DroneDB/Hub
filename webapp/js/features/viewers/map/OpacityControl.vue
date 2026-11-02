@@ -7,11 +7,15 @@
                 title="Plant Health" aria-label="Plant Health" @click.stop="$emit('plant-health')">
             <i class="fa-solid fa-leaf" />
         </button>
+        <AddLayerButton v-if="canAdd" :disabled="addDisabled" :reason="addTitle" @click.stop="$emit('add')" />
     </div>
 </template>
 
 <script>
+import AddLayerButton from './AddLayerButton.vue';
+
 export default {
+    components: { AddLayerButton },
     props: {
         modelValue: {
             type: Number,
@@ -28,9 +32,22 @@ export default {
         plantHealthActive: {
             type: Boolean,
             default: false
+        },
+        // The action that adds a layer: shown with canAdd, off with addDisabled, which says why in addTitle
+        canAdd: {
+            type: Boolean,
+            default: false
+        },
+        addDisabled: {
+            type: Boolean,
+            default: false
+        },
+        addTitle: {
+            type: String,
+            default: ''
         }
     },
-    emits: ['update:modelValue', 'plant-health']
+    emits: ['update:modelValue', 'plant-health', 'add']
 };
 </script>
 
@@ -53,5 +70,12 @@ export default {
     flex: 1 1 7.5rem;
     min-width: 4rem;
     cursor: pointer;
+}
+
+/* A phone: the action goes under the slider instead of widening the panel */
+@media (max-width: 575.98px) {
+    .opacity-control {
+        flex-wrap: wrap;
+    }
 }
 </style>

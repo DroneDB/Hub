@@ -65,7 +65,7 @@
                        :placeholder="selectedPathPlaceholder" @keyup.enter="onConfirm" />
         </div>
 
-        <div class="folder-picker-new-folder">
+        <div v-if="mode !== 'file'" class="folder-picker-new-folder">
             <span class="folder-picker-new-folder-label">New folder:</span>
             <InputText ref="newFolderInput" v-model="newFolderName" aria-label="New folder name"
                        class="folder-picker-new-folder-input" :disabled="creatingFolder"
@@ -172,7 +172,8 @@ export default {
     data: function () {
         return {
             currentPath: this.normalizePath(this.initialPath),
-            selectedPath: this.normalizePath(this.initialPath),
+            // A file dialog starts in the initial folder with nothing selected: the folder is not a file.
+            selectedPath: this.mode === 'file' ? '' : this.normalizePath(this.initialPath),
             files: [],
             selectedFile: null,
             loading: false,

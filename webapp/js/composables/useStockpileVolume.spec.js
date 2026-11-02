@@ -21,6 +21,9 @@ let scope;
 let pile;
 let source;
 let savedFile;
+// The map the composable draws its overlay on (none unless a test gives one)
+let olMap;
+let dataset;
 // The base of every volume asked for, and the volume of each base (a pile on a slope)
 let measuredBases;
 let netVolumeOf;
@@ -39,7 +42,7 @@ function start() {
         },
         refreshButtons() {}
     };
-    const dataset = {
+    dataset = {
         calculateStockpileVolume: async (path, polygon, { baseMethod }) => {
             measuredBases.push(baseMethod);
             const net = netVolumeOf[baseMethod] ?? VOLUME.netVolume;
@@ -54,7 +57,7 @@ function start() {
     scope = effectScope();
     pile = scope.run(() => useStockpileVolume({
         dataset: () => dataset,
-        map: ref(null),
+        map: olMap = ref(null),
         measureControls: shallowRef(measureControls),
         currentUnitPref: ref('metric'),
         deletedMeasurementIds: ref([]),
@@ -223,6 +226,94 @@ describe('a restored pile', () => {
         await flushPromises();
         expect(pile.stockpileMaterials.value.some(m => m.saved)).toBe(false);
         expect(pile.stockpileMaterial.value).toBeNull();
+    });
+});
+
+describe('a saved pile read while the panel changes', () => {
+    /** A map that keeps the layers added to it, and the features of the overlay of the pile */
+    function withMap() {
+        const layers = [];
+        olMap.value = { addLayer: l => layers.push(l), getView: () => ({ getProjection: () => 'EPSG:3857' }) };
+        return () => layers.flatMap(l => l.getSource().getFeatures());
+    }
+    /** Each read of a file waits until the test answers it, with the saved pile of that raster */
+    function slowReads(dataset) {
+        const reads = [];
+        dataset.getFileContents = path => new Promise(resolve => reads.push({ path, answer: () => resolve(JSON.stringify(savedPile({ title: path }))) }));
+        return reads;
+    }
+
+    it('is not shown when the panel opened on another raster before it was read', async () => {
+        const overlay = withMap();
+        const reads = slowReads(dataset);
+        pile.openStockpileVolume('dsm.tif');
+        // The elevation model is switched while the pile of the DSM is still being read
+        pile.closeStockpileVolume();
+        pile.openStockpileVolume('dtm.tif');
+        reads.find(r => r.path === 'dsm_measurements.geojson').answer();
+        await flushPromises();
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileTitle.value).toBe('');
+        expect(pile.stockpileDetectedPolygon.value).toBeNull();
+        expect(overlay()).toHaveLength(0);
+        // The pile of the DTM is shown when it is read
+        reads.find(r => r.path === 'dtm_measurements.geojson').answer();
+        await flushPromises();
+        expect(pile.stockpileTitle.value).toBe('dtm_measurements.geojson');
+        expect(overlay()).toHaveLength(1);
+    });
+
+    it('is not shown once the panel closed', async () => {
+        const overlay = withMap();
+        const reads = slowReads(dataset);
+        pile.openStockpileVolume('dsm.tif');
+        pile.closeStockpileVolume();
+        reads[0].answer();
+        await flushPromises();
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(overlay()).toHaveLength(0);
+    });
+
+    it('does not replace a pile the user found by a click before it was read', async () => {
+        const overlay = withMap();
+        const reads = slowReads(dataset);
+        pile.openStockpileVolume('dsm.tif');
+        await pile.autoDetectAndCalculate(9.0005, 45.0005);
+        pile.stockpileTitle.value = 'North heap';
+        reads[0].answer();
+        await flushPromises();
+        expect(pile.stockpileResult.value).toMatchObject({ confidence: 0.8, estimatedFromDetection: 8.7 });
+        expect(pile.stockpileResult.value._restored).toBeUndefined();
+        expect(pile.stockpileTitle.value).toBe('North heap');
+        expect(pile.stockpileBaseMethod.value).toBe('best_fit');
+        expect(overlay()).toHaveLength(0);
+    });
+
+    it('does not replace a pile the user drew while it was read', async () => {
+        const overlay = withMap();
+        const reads = slowReads(dataset);
+        pile.openStockpileVolume('dsm.tif');
+        const drawn = pile.calculateStockpileVolume(POLYGON);
+        reads[0].answer();
+        await drawn;
+        await flushPromises();
+        expect(pile.stockpileResult.value._restored).toBeUndefined();
+        expect(pile.stockpileTitle.value).toBe('');
+        expect(pile.stockpileBaseMethod.value).toBe('lowest_perimeter');
+        expect(overlay()).toHaveLength(0);
+    });
+
+    it('drawn for one raster is cleared when the panel opens for another', async () => {
+        const overlay = withMap();
+        savedFile = savedPile({ title: 'DSM pile' });
+        pile.openStockpileVolume('dsm.tif');
+        await flushPromises();
+        expect(overlay()).toHaveLength(1);
+        savedFile = null;
+        pile.openStockpileVolume('dtm.tif');
+        await flushPromises();
+        expect(overlay()).toHaveLength(0);
+        expect(pile.stockpileTitle.value).toBe('');
     });
 });
 

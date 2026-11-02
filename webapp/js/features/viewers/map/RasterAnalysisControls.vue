@@ -1,13 +1,10 @@
 <template>
-    <div v-if="visible" class="analysis-panel analysis-panel--raster raster-panel">
-        <div class="panel-header">
-            <span class="panel-title">
-                <i :class="panelIconClass" /> {{ panelTitle }}
-            </span>
-            <button class="close-btn" title="Close" aria-label="Close" @click="close"><i class="fas fa-times" /></button>
-        </div>
-
+    <AnalysisPanel v-if="visible" variant="raster" class="raster-panel"
+                   :icon="panelIconClass" :title="panelTitle" @close="close">
         <div v-if="rasterInfo" class="panel-body">
+            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath"
+                                  @update:model-value="path => $emit('selectTarget', path)" />
+
             <!-- No-calibration warning (thermal only) -->
             <div v-if="isThermal && (loadError || !rasterInfo.calibration)" class="section">
                 <div class="no-calibration-info">
@@ -183,12 +180,14 @@
         <div v-else class="panel-body loading">
             <LoadingSpinner inline label="Loading raster info..." />
         </div>
-    </div>
+    </AnalysisPanel>
 </template>
 
 <script>
+import AnalysisPanel from './AnalysisPanel.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ColormapDropdown from '@/features/viewers/map/ColormapDropdown.vue';
+import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import { colormapList, THERMAL_COLORMAPS, GENERIC_COLORMAPS } from '@/libs/map/colormaps';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
@@ -204,11 +203,15 @@ import { formatNumber } from '@/libs/format';
 const formatCount = n => (typeof n === 'number' ? n.toLocaleString() : '-');
 
 export default {
-    components: { ColormapDropdown, RasterProfileChart, LoadingSpinner },
+    components: { AnalysisPanel, ColormapDropdown, RasterProfileChart, LoadingSpinner, AnalysisTargetSelect },
     props: {
         visible: { type: Boolean, default: false },
         dataset: { type: Object, default: null },
         filePath: { type: String, default: null },
+        // The rasters the panel can work on ({ path, label }) and the one it works on: the
+        // elevation model selector shows with two or more
+        targetCandidates: { type: Array, default: () => [] },
+        targetPath: { type: String, default: null },
         initialParams: { type: Object, default: null },
         spotInfo: { type: Object, default: null },
         areaStats: { type: Object, default: null },
@@ -227,7 +230,7 @@ export default {
 
     emits: ['close', 'vizParamsChanged', 'pickProfile', 'clearProfile',
             'profileHover', 'cancelDrawProfile', 'toggleInspectValue',
-            'openContourDialog', 'toggleAreaStats', 'clearAreaStats'],
+            'openContourDialog', 'toggleAreaStats', 'clearAreaStats', 'selectTarget'],
 
     setup() {
         return { applyLater: useTimerGroup() };
@@ -480,7 +483,7 @@ export default {
 <style scoped>
 /* Shared look and palette: css/_analysis-panel.scss */
 
-.raster-panel .panel-title i.fa-temperature-high {
+.raster-panel :deep(.panel-title i.fa-temperature-high) {
     color: var(--panel-thermal-strong);
 }
 

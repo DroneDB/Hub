@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { setTitle } from '@/libs/utils';
 import { useAuthStore } from '@/stores/auth';
 import { guard } from '@/libs/authRoutes';
+import { navigationTitle } from '@/libs/routeTitle';
 
 // Lazy-loaded route components
 const ViewDataset = () => import(/* webpackChunkName: "dataset" */ '@/features/dataset/ViewDataset.vue');
@@ -61,8 +62,10 @@ export function createAppRouter(embed = false) {
         routes
     });
 
-    router.beforeEach(to => {
-        setTitle(to.meta.title);
+    router.beforeEach((to, from) => {
+        // Views refine the title after load; a change of query or hash on the same page must keep it.
+        const title = navigationTitle(to, from);
+        if (title) setTitle(title);
         return guard(to, useAuthStore());
     });
 

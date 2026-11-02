@@ -28,7 +28,7 @@ let flashes;
 let alerts;
 let unitPref;
 
-function start({ canWrite = true } = {}) {
+function start({ canWrite = true, analysisTarget = () => null } = {}) {
     controls = new MeasureControls({});
     events = { written: [], removed: [] };
     flashes = [];
@@ -44,7 +44,8 @@ function start({ canWrite = true } = {}) {
         showAlert: () => title => alerts.push(title),
         showFlash: () => (message, color) => flashes.push({ message, color }),
         onFileWritten: () => path => events.written.push(path),
-        onFileRemoved: () => path => events.removed.push(path)
+        onFileRemoved: () => path => events.removed.push(path),
+        analysisTarget
     });
 }
 
@@ -123,6 +124,77 @@ describe('useMapMeasurements', () => {
         await m.loadSavedMeasurements();
         expect(onMap()).toEqual(['b1']);
         expect(flashes).toEqual([]);
+    });
+
+    describe('with an analysis target', () => {
+        let target;
+        beforeEach(() => {
+            target = null;
+            stored['a/dtm_measurements.geojson'] = fileOf('t1');
+            files.value = [
+                { entry: { path: 'a/ortho.tif', type: T.GEORASTER } },
+                { entry: { path: 'a/dtm.tif', type: T.GEORASTER } }
+            ];
+        });
+        // The target is an external of the feature, read on every load
+        const startOnTarget = () => start({ analysisTarget: () => target });
+
+        it('are the measurements of the target, not of the first georaster', async () => {
+            target = files.value[1].entry;
+            const m = startOnTarget();
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['t1']);
+            expect(m.measurementsRasterPath()).toBe('a/dtm.tif');
+        });
+
+        it('stay the default ones without a target', async () => {
+            const m = startOnTarget();
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['m1', 'm2']);
+            expect(m.measurementsRasterPath()).toBe('a/ortho.tif');
+            expect(m.defaultMeasurementEntry().path).toBe('a/ortho.tif');
+        });
+
+        it('move to the file of a new target, with the warning for what was unsaved', async () => {
+            const m = startOnTarget();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            target = files.value[1].entry;
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['t1']);
+            expect(flashes).toEqual([{ message: 'Unsaved measurement changes for "ortho_measurements.geojson" discarded', color: 'warning' }]);
+        });
+
+        it('save to the file of the target', async () => {
+            target = files.value[1].entry;
+            const m = startOnTarget();
+            await m.loadSavedMeasurements();
+            controls.importFromGeoJSON(JSON.parse(fileOf('n1')));
+            await m.saveMeasurements();
+            expect(events.written).toEqual(['a/dtm_measurements.geojson']);
+            expect(JSON.parse(stored['a/dtm_measurements.geojson']).features.map(f => f.properties.name)).toContain('n1');
+            expect(JSON.parse(stored['a/ortho_measurements.geojson']).features).toHaveLength(2);
+        });
+
+        it('stay where they are for a target that is not a georaster (a thermal photo drawn as a raster)', async () => {
+            const photo = { path: 'a/thermal.tif', type: T.GEOIMAGE };
+            files.value = [files.value[0], { entry: photo }];
+            target = photo;
+            const m = startOnTarget();
+            await m.loadSavedMeasurements();
+            expect(onMap()).toEqual(['m1', 'm2']);
+            expect(m.measurementsRasterPath()).toBe('a/ortho.tif');
+        });
+
+        it('answer for a target about to be chosen the file they would move to, as they do once it is chosen', () => {
+            const photo = { path: 'a/thermal.tif', type: T.GEOIMAGE };
+            const m = startOnTarget();
+            expect(m.measurementEntryFor(files.value[1].entry).path).toBe('a/dtm.tif');
+            expect(m.measurementEntryFor(photo).path).toBe('a/ortho.tif');
+            expect(m.measurementEntryFor(null).path).toBe('a/ortho.tif');
+            target = files.value[1].entry;
+            expect(m.measurementsRasterPath()).toBe(m.measurementEntryFor(target).path);
+        });
     });
 
     describe('next to a point cloud (the file the 3D viewer saves to)', () => {

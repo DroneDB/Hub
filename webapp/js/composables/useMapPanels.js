@@ -10,6 +10,8 @@
  *   });
  *   panels.open('plantHealth', file, options);   // closes the others first
  *   panels.toggle('rasterAnalysis', entry);
+ *   panels.openAmong(['rasterAnalysis', 'stockpile']);   // which of them is open, if any
+ *   panels.close('stockpile');
  */
 
 /**
@@ -38,5 +40,22 @@ export function useMapPanels(panels) {
         if (panels[kind].visible()) panels[kind].close();
         else open(kind, ...args);
     }
-    return { open, toggle };
+
+    /**
+     * The first of `kinds` that is open.
+     * @param {string[]} kinds
+     * @returns {string|null}
+     */
+    function openAmong(kinds) {
+        return kinds.find(kind => panels[kind].visible()) || null;
+    }
+
+    /**
+     * Closes `kind` when it is open.
+     * @param {string} kind
+     */
+    function close(kind) {
+        if (panels[kind].visible()) panels[kind].close();
+    }
+    return { open, toggle, openAmong, close };
 }

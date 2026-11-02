@@ -30,3 +30,27 @@ describe('useMapPanels', () => {
         expect(seen).toEqual([['y', { opt: 1 }]]);
     });
 });
+
+describe('useMapPanels openAmong and close', () => {
+    it('tells which of some panels is open, or none', () => {
+        const a = panel(), b = panel(), c = panel();
+        const { open, openAmong } = useMapPanels({ a, b, c });
+        expect(openAmong(['a', 'b'])).toBeNull();
+        open('c', 'z');
+        expect(openAmong(['a', 'b'])).toBeNull();
+        open('b', 'y');
+        expect(openAmong(['a', 'b'])).toBe('b');
+    });
+
+    it('closes a panel only when it is open', () => {
+        const a = panel();
+        let closed = 0;
+        const { open, close } = useMapPanels({ a: { ...a, close: () => { closed++; a.close(); } } });
+        close('a');
+        expect(closed).toBe(0);
+        open('a', 'x');
+        close('a');
+        expect(closed).toBe(1);
+        expect(a.state.entry).toBeNull();
+    });
+});

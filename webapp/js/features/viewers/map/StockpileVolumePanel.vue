@@ -1,13 +1,10 @@
 <template>
-    <div v-if="visible" class="analysis-panel analysis-panel--stockpile stockpile-panel" data-testid="stockpile-panel">
-        <div class="panel-header">
-            <span class="panel-title">
-                <i class="fa-solid fa-layer-group" /> Stockpile Volume
-            </span>
-            <button class="close-btn" title="Close" aria-label="Close" @click="$emit('close')"><i class="fas fa-times" /></button>
-        </div>
-
+    <AnalysisPanel v-if="visible" variant="stockpile" class="stockpile-panel" data-testid="stockpile-panel"
+                   icon="fa-solid fa-layer-group" title="Stockpile Volume" @close="$emit('close')">
         <div class="panel-body">
+            <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath"
+                                  @update:model-value="path => $emit('selectTarget', path)" />
+
             <div class="section">
                 <label for="stockpile-volume-panel-base-plane-method" class="section-label">
                     Base Plane Method
@@ -178,15 +175,18 @@
             </div>
         </div>
         <StockpileBaseMethodsDialog v-model:visible="showBaseMethodsInfo" />
-    </div>
+    </AnalysisPanel>
 </template>
 
 <script>
+import AnalysisPanel from './AnalysisPanel.vue';
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
+import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
 import { areaScale, bulkUnits, DEFAULT_CURRENCY, formatMoney } from '@/libs/format';
 import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
 import { BASE_METHOD, BASE_METHODS } from '@/libs/stockpileBase';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
+import { currentLocation } from '@/libs/routeQuery';
 import { useAuthStore } from '@/stores/auth';
 
 /**
@@ -202,11 +202,15 @@ import { useAuthStore } from '@/stores/auth';
  */
 export default {
     name: 'StockpileVolumePanel',
-    components: { StockpileBaseMethodsDialog },
+    components: { AnalysisPanel, StockpileBaseMethodsDialog, AnalysisTargetSelect },
     // An embedded map has no header, so no Preferences window to open
     inject: { embed: { default: false } },
     props: {
         visible: { type: Boolean, default: false },
+        // The rasters the volume can be measured on ({ path, label }) and the one it is measured on: the
+        // elevation model selector shows with two or more
+        targetCandidates: { type: Array, default: () => [] },
+        targetPath: { type: String, default: null },
         loading: { type: Boolean, default: false },
         error: { type: String, default: null },
         result: { type: Object, default: null },
@@ -230,7 +234,7 @@ export default {
         description: { type: String, default: '' }
     },
     emits: ['close', 'clickOnMap', 'drawPolygon', 'clearOverlay',
-        'cancelMode', 'exportGeoJson',
+        'cancelMode', 'exportGeoJson', 'selectTarget',
         'update:baseMethod', 'update:sensitivity', 'update:radius', 'update:material',
         'update:customDensity', 'update:customCostPerTon',
         'update:title', 'update:description'],
@@ -355,9 +359,10 @@ export default {
             if (!c || !isFinite(c.amount)) return '-';
             return formatMoney(c.amount, c.currency || DEFAULT_CURRENCY);
         },
-        // The Preferences window opens on the materials (HubHeader reads the query and removes it)
+        // The Preferences window opens on the materials (HubHeader reads the query and removes it).
+        // From the address bar, not $route: the map writes its layers without a navigation
         editMaterials() {
-            this.$router.push({ query: { ...this.$route.query, [PREFERENCES_QUERY]: 'stockpiles' } });
+            this.$router.push(currentLocation({ [PREFERENCES_QUERY]: 'stockpiles' }));
         }
     }
 };

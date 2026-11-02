@@ -57,7 +57,16 @@
                                 <Button title="Copy to clipboard" aria-label="Copy to clipboard" :icon="copyIcon"
                                         text @click="copyToClipboard(legacyUrl)" />
                             </div>
-                            <UrlRow v-else :value="legacyUrl" label="Share link" :copy-icon="copyIcon" @copy="copyToClipboard(legacyUrl)" />
+                            <template v-else>
+                                <UrlRow :value="legacyUrl" label="Share link" :copy-icon="copyIcon" @copy="copyToClipboard(legacyUrl)" />
+                                <div v-if="canViewerOnly" class="viewer-only-option">
+                                    <label class="viewer-only-label">
+                                        <input v-model="viewerOnly" type="checkbox" data-testid="share-viewer-only">
+                                        <span>Viewer only</span>
+                                    </label>
+                                    <div class="viewer-only-help" data-testid="share-viewer-only-help">{{ VIEWER_ONLY_HELP }}</div>
+                                </div>
+                            </template>
                         </template>
                     </template>
                 </div>
@@ -109,7 +118,7 @@ import Textarea from 'primevue/textarea';
 import ddb from 'ddb';
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
-import { b64encode } from '@/libs/base64';
+import { viewerUrl, VIEWER_ONLY_HELP } from '@/libs/viewerLinks';
 import { escapeHtml } from '@/libs/sanitize';
 import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';
@@ -136,7 +145,7 @@ export default {
     emits: ['close'],
     setup() {
         const { copy, copied } = useCopyText();
-        return { copy, copied };
+        return { copy, copied, VIEWER_ONLY_HELP };
     },
     data() {
         return {
@@ -148,6 +157,8 @@ export default {
             entry: null,
             dataset: null,
             hintsOpen: false,
+            // Off every time the window opens: a link that hides the Hub is the exception
+            viewerOnly: false,
             confirmUnlistedOpen: false
         };
     },
@@ -230,16 +241,27 @@ export default {
         hintsService() {
             return this.currentOgcService;
         },
+        defaultView() {
+            return this.entry ? defaultViewFor(this.entry) : null;
+        },
+        // The option is for the link of a file that opens in a viewer; the download address has no Hub to hide
+        canViewerOnly() {
+            return this.shareMode === 'link' && !!this.defaultView;
+        },
         legacyUrl() {
             if (this.scope !== 'entry' || !this.entry) return '';
             const baseUrl = this.baseUrl;
             if (this.shareMode === 'link' || this.shareMode === 'embed') {
-                const view = defaultViewFor(this.entry);
+                const view = this.defaultView;
                 if (view) {
-                    let url = `${baseUrl}/r/${this.org}/${this.ds}/view/${b64encode(this.entry.path)}/${view}`;
-                    if (this.shareMode === 'embed') {
-                        url += '?embed=1';
-                        url = `<iframe frameborder="0" width="600" height="400" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" allow="fullscreen" src="${url}"></iframe>`;
+                    const embed = this.shareMode === 'embed';
+                    const url = viewerUrl({
+                        baseUrl, org: this.org, ds: this.ds, path: this.entry.path, view,
+                        // The frame is always the viewer alone
+                        viewerOnly: embed || this.viewerOnly
+                    });
+                    if (embed) {
+                        return `<iframe frameborder="0" width="600" height="400" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" allow="fullscreen" src="${url}"></iframe>`;
                     }
                     return url;
                 }
@@ -328,6 +350,9 @@ label { font-weight: bold; }
     margin-top: 0.5rem;
     resize: vertical;
 }
+.viewer-only-option { margin-top: 0.5rem; }
+.viewer-only-label { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; cursor: pointer; }
+.viewer-only-help { margin-top: 0.15rem; font-size: var(--ddb-font-size-sm); color: var(--ddb-text-secondary); }
 .ogc-row-label {
     margin-top: 0.75rem;
     font-size: var(--ddb-font-size-sm);

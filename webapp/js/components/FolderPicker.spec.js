@@ -96,3 +96,44 @@ describe('FolderPicker confirm', () => {
         expect(closed(w)[0][0].path).toBe('b.tif');
     });
 });
+
+describe('FolderPicker initial state', () => {
+    const selectedInput = w => w.find('input[aria-label="Selected file"], input[aria-label="Selected folder"]');
+    const confirm = w => w.findAll('button').find(b => b.text() === 'Confirm');
+
+    it('starts a file dialog with nothing selected and Confirm disabled', async () => {
+        const w = await picker({ initialPath: 'odm_dem' });
+        expect(w.vm.currentPath).toBe('odm_dem');
+        expect(w.vm.selectedPath).toBe('');
+        expect(selectedInput(w).element.value).toBe('');
+        expect(confirm(w).attributes('disabled')).toBeDefined();
+    });
+
+    it('pre-fills a folder dialog with the initial folder', async () => {
+        const w = await picker({ mode: 'folder', initialPath: '/odm_dem/' });
+        expect(selectedInput(w).element.value).toBe('odm_dem');
+        expect(confirm(w).attributes('disabled')).toBeUndefined();
+    });
+
+    it('pre-fills an any dialog with the initial folder', async () => {
+        const w = await picker({ mode: 'any', initialPath: 'odm_dem' });
+        expect(w.vm.selectedPath).toBe('odm_dem');
+    });
+});
+
+describe('FolderPicker new folder row', () => {
+    it('is not offered when picking a file', async () => {
+        const w = await picker();
+        expect(w.find('.folder-picker-new-folder').exists()).toBe(false);
+    });
+
+    it('is offered when picking a folder', async () => {
+        const w = await picker({ mode: 'folder' });
+        expect(w.find('.folder-picker-new-folder').exists()).toBe(true);
+    });
+
+    it('is offered when picking either', async () => {
+        const w = await picker({ mode: 'any' });
+        expect(w.find('.folder-picker-new-folder').exists()).toBe(true);
+    });
+});

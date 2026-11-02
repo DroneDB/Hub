@@ -3,7 +3,7 @@ const { pathutils } = ddb;
 
 import { isLocalVector } from '@/libs/openItemDefaults';
 import { isCadDrawing } from '@/libs/cadCrs';
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isDroneDB, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { hasDedicatedViewer, isMapViewable, isPanoramaType, isDroneDB, isGeoraster, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { hasThumbnail, isBuildableType } from '@/libs/entryTypeCapabilities';
 import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
@@ -432,8 +432,6 @@ function experimentalMenuItems(ctx) {
     };
 }
 
-const isGeoraster = f => f.entry && f.entry.type === ddb.entry.type.GEORASTER;
-
 // One georaster: the compare view opens on it with the file picker, for the other rasters
 function compareToItem(ctx) {
     return {
@@ -441,7 +439,7 @@ function compareToItem(ctx) {
         icon: 'fa-solid fa-table-columns',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return !!ctx.dataset && sel.length === 1 && isGeoraster(sel[0]);
+            return !!ctx.dataset && sel.length === 1 && isGeoraster(sel[0].entry);
         },
         click: () => openCompare(ctx.dataset, { paths: [ctx.getSelectedEntries()[0].entry.path], pick: true })
     };
@@ -454,7 +452,7 @@ function compareInMapItem(ctx) {
         icon: 'fa-solid fa-table-columns',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
-            return !!ctx.dataset && sel.length >= 2 && sel.length <= MAX_LAYERS && sel.every(isGeoraster);
+            return !!ctx.dataset && sel.length >= 2 && sel.length <= MAX_LAYERS && sel.every(f => isGeoraster(f.entry));
         },
         click: () => openCompare(ctx.dataset, { paths: ctx.getSelectedEntries().map(f => f.entry.path) })
     };

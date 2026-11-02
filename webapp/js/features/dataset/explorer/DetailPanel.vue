@@ -82,6 +82,7 @@
 import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
+import { isGeoraster as isGeorasterEntry } from '@/libs/entryTypes';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
@@ -131,7 +132,7 @@ export default {
     },
     computed: {
         isGeoraster() {
-            return !!this.file && !!this.dataset && this.file.entry.type === ddb.entry.type.GEORASTER;
+            return !!this.dataset && !!this.file && isGeorasterEntry(this.file.entry);
         },
         usedInComparisons() {
             return this.isGeoraster ? comparisonsUsing(this.comparisons, this.file.entry.path) : [];

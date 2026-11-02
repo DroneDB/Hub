@@ -43,6 +43,7 @@ vi.mock('@/stores/preferences', async () => {
 
 const { default: HubHeader } = await import('./HubHeader.vue');
 const { resetUpdateCheck } = await import('@/composables/useUpdateCheck');
+const { replaceQueryKeys, replaceHash } = await import('@/libs/routeQuery');
 
 const AVAILABLE = { currentVersion: '2.0.0', latestVersion: '2.1.0', isUpdateAvailable: true, isSecurityUpdate: false, releaseNotes: 'Notes' };
 
@@ -246,18 +247,27 @@ describe('HubHeader: a link to the Preferences window', () => {
     const preferencesWindow = () => document.body.querySelector('#preferencesDialog');
     const selectedTab = () => preferencesWindow()?.querySelector('[role="tab"][aria-selected="true"]')?.textContent.trim();
     let replace;
+    let push;
 
-    async function land(query, { loggedIn = true } = {}) {
+    // The address bar of a navigation to `path` with `query`
+    const goTo = (path, query) => {
+        const search = new URLSearchParams(query).toString();
+        window.history.replaceState({}, '', `${path}${search ? `?${search}` : ''}`);
+    };
+
+    async function land(query, { loggedIn = true, path = '/r' } = {}) {
         h.auth.isLoggedIn = loggedIn;
         h.auth.isAdmin = false;
         h.auth.flags.emailEnabled = true;
         h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(AVAILABLE));
         replace = vi.fn(() => Promise.resolve());
-        const route = reactive({ params: {}, path: '/r', fullPath: '/r', hash: '', query });
+        push = vi.fn(() => Promise.resolve());
+        goTo(path, query);
+        const route = reactive({ params: {}, path, fullPath: path, hash: '', query });
         wrapper = mount(HubHeader, {
             global: {
                 plugins: [PrimeVue, createPinia()],
-                mocks: { $route: route, $router: { push: vi.fn(), replace } },
+                mocks: { $route: route, $router: { push, replace } },
                 stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
             },
             attachTo: document.body
@@ -295,10 +305,33 @@ describe('HubHeader: a link to the Preferences window', () => {
     it('opens the window once the user is signed in and back on the link', async () => {
         const route = await land({}, { loggedIn: false });
         h.auth.isLoggedIn = true;
+        goTo('/r', { preferences: 'notifications' });
         route.query = { preferences: 'notifications' };
         await flushPromises();
         await vi.waitFor(() => expect(selectedTab()).toBe('Notifications'));
         expect(replace).toHaveBeenCalled();
+    });
+
+    it('removes the query from the address as it is now, keeping what a map wrote without a navigation', async () => {
+        const path = '/r/o/d/view/abc/map';
+        const route = await land({ t: 'map' }, { path });
+        // The map adds its layers and Plant Health its hash without a navigation, so the route
+        // still has the query it was opened with
+        replaceQueryKeys({ layer: ['a', 'b'], preferences: 'stockpiles' });
+        replaceHash('path=f.tif');
+        route.query = { t: 'map', preferences: 'stockpiles' };
+        // As on the navigation that adds the query
+        wrapper.vm.openPreferencesFromLink();
+        expect(wrapper.vm.preferencesOpen).toBe(true);
+        expect(replace).toHaveBeenCalledWith({ path, query: { t: 'map', layer: ['a', 'b'] }, hash: '#path=f.tif' });
+    });
+
+    it('signs in coming back to the address as it is now', async () => {
+        const path = '/r/o/d/view/abc/map';
+        await land({ t: 'map' }, { path, loggedIn: false });
+        replaceQueryKeys({ layer: ['a'] });
+        wrapper.vm.login();
+        expect(push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: `${path}?t=map&layer=a` } });
     });
 
     it('does not open the window without the query', async () => {

@@ -26,6 +26,7 @@
  * by side on MapCore, picked from any folder, with a URL that holds the comparison and saved
  * comparisons in the dataset meta. useComparison owns the comparison; MapCore shows it.
  */
+import { inject } from 'vue';
 import { useRoute } from 'vue-router';
 import ViewerShell from '@/components/ViewerShell.vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -39,7 +40,7 @@ const dialogs = useDialogs();
 const {
     dataset, loading, error, busy, canWrite, state, saved, files, notices, dirty, canAdd, urlTooLong, maxLayers,
     currentLink, onMapUpdate, remove, pick, pickOnFirstShow, save, saveAsNew
-} = useComparison({ route: useRoute(), dialogs });
+} = useComparison({ route: useRoute(), dialogs, embed: inject('embed', false) });
 const { copied, copy } = useCopyText();
 
 const copyLink = () => copy(currentLink());

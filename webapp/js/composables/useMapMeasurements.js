@@ -1,5 +1,5 @@
 /**
- * The map's measurements: where they are saved (the first georaster / point cloud on
+ * The map's measurements: where they are saved (the analysis target, else the first georaster / point cloud on
  * show, else the folder's measurements.geojson), load, save, export (GeoJSON, CSV), delete, clear,
  * the measurement list, groups and the units change.
  *
@@ -10,7 +10,8 @@
  * the map shows the new file and unsaved measurements are dropped with a notice.
  *
  * Externals: measureControls, files, dataset, canWrite, canDelete, currentUnitPref,
- * showAlert, showFlash, onFileWritten(path), onFileRemoved(path).
+ * showAlert, showFlash, onFileWritten(path), onFileRemoved(path), analysisTarget (the entry
+ * of the analysis target, or null: the measurements follow it).
  */
 import ddb from 'ddb';
 import { newId } from '@/libs/ids';
@@ -18,6 +19,7 @@ import { MeasurementStorage, MeasurementOwner, saveResultMessage } from '@/libs/
 import MeasureControls from '@/libs/map/controls/measureControl';
 import { GROUP_COLOR } from '@/libs/map/mapUtils';
 import { createFeatureScope } from '@/composables/featureScope';
+import { measurementsFollow } from '@/composables/useAnalysisTarget';
 import { measurementsToCsv } from '@/libs/map/measurementCsv';
 import { downloadCsv } from '@/libs/csv';
 
@@ -91,11 +93,37 @@ const definition = {
             return { path: folder ? `${folder}/measurements.geojson` : 'measurements.geojson' };
         },
 
-        // The entry the measurements belong to: the first georaster / point cloud on show, else the folder
-        _measurementTargetEntry() {
+        /**
+         * The measurements entry while no analysis target decides it: the first georaster / point
+         * cloud on show, else the folder.
+         */
+        defaultMeasurementEntry() {
             const T = ddb.entry.type;
             const anchor = this.files.find(f => f.entry && (f.entry.type === T.GEORASTER || f.entry.type === T.POINTCLOUD));
             return anchor ? anchor.entry : this.standaloneMeasurementEntry();
+        },
+
+        /**
+         * The entry the measurements belong to with `target` as the analysis target (null: no
+         * target): the target, so a pile is saved with the elevation model it was measured on;
+         * else the default. A target that is not a georaster (a thermal photo drawn as a raster)
+         * leaves the measurements where they are, otherwise the measurements of the folder would
+         * disappear with it. The analysis target asks it for a target it is about to choose.
+         * @param {any} target  the entry of the analysis target, or null
+         */
+        measurementEntryFor(target) {
+            if (target && measurementsFollow(target)) return target;
+            return this.defaultMeasurementEntry();
+        },
+
+        /** The entry the measurements belong to now, with the current analysis target. */
+        _measurementTargetEntry() {
+            return this.measurementEntryFor(this.analysisTarget);
+        },
+
+        /** Path of the raster (or folder file) whose measurements the map shows now. */
+        measurementsRasterPath() {
+            return this._measurementTargetEntry().path;
         },
 
         _setSaved(saved) {
@@ -428,5 +456,5 @@ const definition = {
  */
 export function useMapMeasurements(externals) {
     const none = () => () => {};
-    return createFeatureScope({ ...definition, externals: { onFileWritten: none, onFileRemoved: none, ...externals } });
+    return createFeatureScope({ ...definition, externals: { onFileWritten: none, onFileRemoved: none, analysisTarget: () => null, ...externals } });
 }
