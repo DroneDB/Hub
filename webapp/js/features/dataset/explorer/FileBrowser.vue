@@ -20,9 +20,9 @@
         </div>
         <TreeView v-show="!noResults" ref="treeView" :nodes="nodes" :get-children="getChildren"
                   :can-write="canWrite" @selection-changed="handleSelectionChanged" @opened="handleOpen" />
-        <SavedComparisons v-if="comparisons.length && dataset && !loading && searchStaticPaths == null" :comparisons="comparisons"
-                          :dataset="dataset" :can-write="canWrite" @rename="c => $emit('renameComparison', c)"
-                          @delete="c => $emit('deleteComparison', c)" />
+        <SavedViews v-if="views.length && dataset && !loading && searchStaticPaths == null" :views="views"
+                    :dataset="dataset" :can-write="canWrite" @rename="v => $emit('renameView', v)"
+                    @delete="v => $emit('deleteView', v)" />
         <LoadingSpinner v-if="loading" />
         <div v-if="!loading && noResults" class="no-results">
             No files found
@@ -33,7 +33,7 @@
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import TreeView from './TreeView.vue';
-import SavedComparisons from './SavedComparisons.vue';
+import SavedViews from './SavedViews.vue';
 import ContextMenu from '@/features/dataset/explorer/ContextMenu';
 import InputText from 'primevue/inputtext';
 import InputIcon from 'primevue/inputicon';
@@ -58,7 +58,7 @@ const isBlank = (text) => text == null || text.length === 0;
 export default {
     components: {
         LoadingSpinner,
-        TreeView, SavedComparisons, ContextMenu, InputText, InputIcon, IconField, Button
+        TreeView, SavedViews, ContextMenu, InputText, InputIcon, IconField, Button
     },
     // Listings in flight are aborted when the browser goes away
     inject: { showBuildConfirm: { default: null } },
@@ -75,13 +75,13 @@ export default {
             type: Object,
             default: null
         },
-        // The dataset's saved comparisons, listed under the tree (not while searching)
-        comparisons: {
+        // The dataset's saved views, listed under the tree (not while searching)
+        views: {
             type: Array,
             default: () => []
         }
     },
-    emits: ['renameComparison', 'deleteComparison', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['renameView', 'deleteView', 'openItem', 'openAsText', 'selectionChanged', 'openProperties', 'downloadItems', 'moveSelectedItems', 'transferSelectedItems', 'setAsCover', 'deleteSelecteditems', 'error', 'currentUriChanged', 'createFolder', 'selectAll', 'shareEmbed', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadSplat', 'exportSplatTrainingData'],
     setup() {
         return { requestSignal: useRequestScope().signal, sortDescending: usePreference(PREF.SORT_DESCENDING, PREF_DEFAULTS[PREF.SORT_DESCENDING]) };
     },

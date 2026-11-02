@@ -152,6 +152,45 @@ describe('Dataset.buildArtifactUrl', () => {
     });
 });
 
+describe('Dataset meta reads', () => {
+    function datasetReading(answer = [{ id: 'm1', data: '{}', mtime: 1 }]) {
+        const registry = { remote: 'hub.example.com', secure: true, getRequest: vi.fn(async () => answer) };
+        return { ds: new Dataset(registry, 'my_org', 'my_ds'), get: registry.getRequest };
+    }
+
+    it('metaGet reads the key from meta/get and returns the parsed answer', async () => {
+        const { ds, get } = datasetReading();
+        expect(await ds.metaGet('views')).toEqual([{ id: 'm1', data: '{}', mtime: 1 }]);
+        expect(get).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/meta/get/views');
+    });
+
+    it('metaGet sends the path only when there is one, and encodes both', async () => {
+        const { ds, get } = datasetReading();
+        await ds.metaGet('a b/c', 'flights/ortho & dsm.tif');
+        expect(get).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/meta/get/a%20b%2Fc?path=flights%2Fortho%20%26%20dsm.tif');
+        get.mockClear();
+        await ds.metaGet('views', '');
+        expect(get.mock.calls[0][0]).not.toContain('?');
+    });
+
+    it('metaGet skips the request cache only when asked to', async () => {
+        const { ds, get } = datasetReading();
+        await ds.metaGet('views', '', { cache: false });
+        expect(get).toHaveBeenCalledWith('/orgs/my_org/ds/my_ds/meta/get/views', { cache: false });
+        get.mockClear();
+        await ds.metaGet('views', '', { cache: true });
+        expect(get.mock.calls[0]).toHaveLength(1);
+    });
+
+    it('metaGet refuses a missing key and lets the error of the server through', async () => {
+        const { ds, get } = datasetReading();
+        await expect(ds.metaGet('')).rejects.toThrow('Invalid key');
+        expect(get).not.toHaveBeenCalled();
+        get.mockRejectedValueOnce(Object.assign(new Error('none'), { status: 404 }));
+        await expect(ds.metaGet('views')).rejects.toMatchObject({ status: 404 });
+    });
+});
+
 describe('Dataset meta writes', () => {
     function datasetPosting() {
         const registry = { remote: 'hub.example.com', secure: true, postFormData: vi.fn(async () => ({ ok: true })) };

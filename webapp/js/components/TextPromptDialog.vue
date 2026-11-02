@@ -12,7 +12,7 @@
  * TextPromptDialog - asks for one line of text (a name). Closes with the trimmed text, or
  * null when cancelled.
  *
- *   const name = await dialogs.open(TextPromptDialog, { title: 'Save comparison', label: 'Name', maxLength: 100 });
+ *   const name = await dialogs.open(TextPromptDialog, { title: 'Save view', label: 'Name', maxLength: 100 });
  */
 import { ref, computed, useId } from 'vue';
 import InputText from 'primevue/inputtext';

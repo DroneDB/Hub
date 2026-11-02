@@ -30,7 +30,7 @@ import { useRasterLayers } from '@/composables/useRasterLayers';
 import { useAnalysisTarget, ANALYSIS_PANELS } from '@/composables/useAnalysisTarget';
 
 /**
- * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, comparison?: any }} props
+ * @param {{ files: any[], dataset: any, canWrite: boolean, canDelete: boolean, view?: any }} props  `view`: the state of the view the map shows, null on the dataset map
  * @param {{ onFileWritten?: (path: string) => void, onFileRemoved?: (path: string) => void }} [fileEvents]
  *   told when the map writes or removes a file of the dataset (the measurements)
  */
@@ -50,7 +50,11 @@ export function useMapFeatures(props, fileEvents = {}) {
         return center ? toLonLat(center) : null;
     };
 
-    const rasters = useRasterLayers({ group: rasterLayer, vectorLayers, splitMode: () => split.splitMode.value });
+    const rasters = useRasterLayers({
+        group: rasterLayer, vectorLayers, splitMode: () => split.splitMode.value,
+        // A view has a row, with its own opacity and eye, for a lone raster too
+        perRow: () => !!props.view
+    });
     const split = useMapSplitCompare({ map, rasterLayers: rasters.rasterLayerList, onChange: rasters.updateRastersOpacity });
 
     const measurements = useMapMeasurements({
@@ -86,18 +90,14 @@ export function useMapFeatures(props, fileEvents = {}) {
         stockpile: { visible: () => stockpile.stockpilePanelVisible.value, open: stockpile.openStockpileVolume, close: stockpile.closeStockpileVolume }
     });
 
-    // The drawn rasters the analysis tools accept, top first. Placeholders are not drawn, and a
-    // comparison has no analysis tools (its layers are part of its state, it is read only)
-    const analysisCandidates = () => {
-        if (props.comparison) return [];
-        return rasters.rasterLayerList.value
-            .filter(row => row.olLayer && !row.placeholder)
-            .map(row => {
-                const file = props.files.find(f => f.entry && f.entry.path === row.path) || row.olLayer.file;
-                return { path: row.path, label: row.name, entry: file && file.entry, file };
-            })
-            .filter(c => c.entry && isRasterAnalysisCapable(c.entry));
-    };
+    // The drawn rasters the analysis tools accept, top first. Placeholders are not drawn
+    const analysisCandidates = () => rasters.rasterLayerList.value
+        .filter(row => row.olLayer && !row.placeholder)
+        .map(row => {
+            const file = props.files.find(f => f.entry && f.entry.path === row.path) || row.olLayer.file;
+            return { path: row.path, label: row.name, entry: file && file.entry, file };
+        })
+        .filter(c => c.entry && isRasterAnalysisCapable(c.entry));
     const confirm = useConfirm(dialogs);
     const analysisTarget = useAnalysisTarget({
         candidates: analysisCandidates,
@@ -123,8 +123,7 @@ export function useMapFeatures(props, fileEvents = {}) {
     return {
         map, measureControls, rasterLayer, vectorLayers, currentUnitPref, dialogs,
         ...alerts,
-        // A comparison's basemap is part of the comparison, not a preference
-        ...useMapBasemap(map, { persist: !props.comparison }),
+        ...useMapBasemap(map),
         ...measurements, ...plantHealth, ...raster, ...stockpile, ...contours, ...tooltip, ...rasters, ...split,
         // Opening an analysis panel closes the others
         openPlantHealth: (...args) => panels.open('plantHealth', ...args),
@@ -137,6 +136,9 @@ export function useMapFeatures(props, fileEvents = {}) {
         analysisEntry: analysisTarget.toolbarEntry,
         toggleAnalysisPanel: analysisTarget.requestToggle,
         selectAnalysisTarget: analysisTarget.requestSwitch,
+        // What a view records: the model the tools pick when none was chosen, and a saved choice put back without a question
+        defaultAnalysisTarget: analysisTarget.defaultTarget,
+        restoreAnalysisTarget: analysisTarget.restoreTarget,
         // After the layers were rebuilt: a target that left the map is replaced
         reconcileAnalysisTarget: analysisTarget.onCandidatesChanged
     };

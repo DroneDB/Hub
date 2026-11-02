@@ -6,11 +6,12 @@ import { getTypeDisplayName } from '@/libs/entryTypes';
 import { bytesToSize, formatTimeAgo } from '@/libs/utils';
 import { formatGroundResolution } from '@/libs/groundResolution';
 import { fixedLengthParts, formatSpeed } from '@/libs/format';
-import { COMPARISONS_KEY } from '@/libs/compare/comparisonStore';
+import { VIEWS_KEY } from '@/libs/views/viewStore';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 
-// Meta keys that hold app data (saved map comparisons are raw JSON), not something to show users
-export const HIDDEN_META_KEYS = [COMPARISONS_KEY];
+// Meta keys that hold app data (saved map views are raw JSON), not something to show users.
+// A Registry that has not been updated still sends the views in the dataset's properties.
+export const HIDDEN_META_KEYS = [VIEWS_KEY];
 
 /** The meta of an entry without the keys that are not for users to read. */
 export function visibleMeta(meta) {

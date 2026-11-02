@@ -226,18 +226,18 @@ describe('buildCopyableValues', () => {
 describe('raw metadata rows', () => {
     const file = meta => ({ entry: { type: ddb.entry.type.GENERIC, path: 'a.txt', properties: { meta } } });
 
-    it('hides the saved comparisons but keeps the other keys', () => {
-        const props = buildAllProperties(file({ name: { data: 'Site' }, comparisons: [{ id: '1', data: '{}' }] }));
+    it('hides the saved views but keeps the other keys', () => {
+        const props = buildAllProperties(file({ name: { data: 'Site' }, views: [{ id: '1', data: '{}' }] }));
         expect(props.metadata).toEqual({ name: { data: 'Site' } });
     });
 
     it('leaves no metadata row when only hidden keys exist', () => {
-        expect(buildAllProperties(file({ comparisons: [] })).metadata).toBeUndefined();
+        expect(buildAllProperties(file({ views: [] })).metadata).toBeUndefined();
     });
 
     it('visibleMeta drops every hidden key and tolerates no meta', () => {
-        expect(HIDDEN_META_KEYS).toContain('comparisons');
-        expect(visibleMeta({ license: 1, comparisons: 2 })).toEqual({ license: 1 });
+        expect(HIDDEN_META_KEYS).toContain('views');
+        expect(visibleMeta({ license: 1, views: 2 })).toEqual({ license: 1 });
         expect(visibleMeta(undefined)).toEqual({});
     });
 });

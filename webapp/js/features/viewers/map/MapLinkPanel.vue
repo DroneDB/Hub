@@ -22,6 +22,14 @@
                 <p class="hint" data-testid="map-link-viewer-only-help">{{ VIEWER_ONLY_HELP }}</p>
             </div>
 
+            <div v-if="note" class="section share-note" data-testid="map-link-note">
+                <p class="hint note-text">{{ SHARE_NOTE }}</p>
+                <button v-if="canSave" type="button" class="panel-btn panel-btn--primary save-btn" data-testid="map-link-save"
+                        @click="emit('save')">
+                    <i class="fa-solid fa-floppy-disk" /> Save
+                </button>
+            </div>
+
             <p v-if="isPrivate" class="hint private-note" data-testid="map-link-private-note">
                 <i class="fa-solid fa-lock" /> Only people with access to this dataset can open this link.
             </p>
@@ -31,9 +39,10 @@
 
 <script setup>
 /**
- * The link to the map as it is now: the file and the layers added to it, nothing else of the
- * address (not the position, the hash or the other keys of the page). "Viewer only" adds the
- * option that opens it without the Hub header and back button.
+ * The link to the map: a saved view (`{ uid }`) or a file (`{ path }`), nothing else of the
+ * address (not the position, the hash or the other keys of the page). When the map shows more
+ * than the link opens (`note`) it says so and, for a user who can save (`canSave`), offers the
+ * save there. "Viewer only" adds the option that opens it without the Hub header and back button.
  *
  * It closes with its close button, with Esc, and with a press anywhere outside it.
  */
@@ -41,17 +50,19 @@ import { ref, computed, onMounted, onBeforeUnmount, useId, useTemplateRef } from
 import ddb from 'ddb';
 import AnalysisPanel from './AnalysisPanel.vue';
 import Keyboard from '@/libs/keyboard';
-import { viewerUrl, VIEWER_ONLY_HELP } from '@/libs/viewerLinks';
+import { fileViewUrl, savedViewUrl, VIEWER_ONLY_HELP } from '@/libs/views/viewLinks';
 import { useCopyText } from '@/composables/useCopyText';
 import { useEventListener } from '@/composables/useEventListener';
 
 const props = defineProps({
     /** The dataset of the map (ddb Dataset); gives the organization and the dataset of the link */
     dataset: { type: Object, required: true },
-    /** Dataset-relative path of the main file of the map */
-    path: { type: String, required: true },
-    /** Dataset-relative paths of the layers added to the map, in the order they were added */
-    layers: { type: Array, default: () => [] },
+    /** What the link opens: `{ uid }` for a saved view, `{ path }` (dataset-relative) for a file */
+    linkTarget: { type: Object, required: true },
+    /** The map shows changes the link does not open: tell the user to save the view */
+    note: { type: Boolean, default: false },
+    /** The user can save the view (a writer): the note comes with a Save button */
+    canSave: { type: Boolean, default: false },
     /**
      * Selector of the control that opens and closes the panel (the toolbar button): a press on it
      * is not a press outside, its click closes the panel, and closing on the press would open it
@@ -59,7 +70,9 @@ const props = defineProps({
      */
     toggle: { type: String, default: '' }
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'save']);
+
+const SHARE_NOTE = 'Save the view to share your changes.';
 
 const inputId = useId();
 const { copy, copied } = useCopyText();
@@ -68,15 +81,13 @@ const { copy, copied } = useCopyText();
 const viewerOnly = ref(false);
 const isPrivate = ref(false);
 
-const url = computed(() => viewerUrl({
-    baseUrl: window.location.origin,
-    org: props.dataset.org,
-    ds: props.dataset.ds,
-    path: props.path,
-    view: 'map',
-    layers: props.layers,
-    viewerOnly: viewerOnly.value
-}));
+const url = computed(() => {
+    const options = { baseUrl: window.location.origin, viewerOnly: viewerOnly.value };
+    const { org, ds } = props.dataset;
+    return props.linkTarget.uid
+        ? savedViewUrl({ org, ds }, props.linkTarget.uid, options)
+        : fileViewUrl({ org, ds }, props.linkTarget.path, options);
+});
 
 const root = useTemplateRef('root');
 // Capture: the map and its controls do not see the press first, so they cannot keep it from the panel
@@ -109,4 +120,6 @@ onMounted(async () => {
 .viewer-only { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: var(--panel-text); }
 .hint { margin: 0.25rem 0 0; color: var(--panel-muted); font-size: 0.75rem; line-height: 1.3; overflow-wrap: anywhere; }
 .private-note { color: var(--panel-text-soft); }
+.note-text { margin: 0 0 0.35rem; color: var(--panel-text-soft); }
+.save-btn { display: inline-flex; align-items: center; gap: 0.35rem; }
 </style>

@@ -84,6 +84,36 @@ export function replaceHash(hash) {
     replaceAddress(`${pathname}${search}${fragment ? `#${fragment}` : ''}`);
 }
 
+/**
+ * What a page keeps in the browser's history entry under `key` (it survives a reload of the tab
+ * and a step back to the entry), or undefined.
+ * @param {string} key
+ * @returns {any}
+ */
+export function readHistoryState(key) {
+    const state = window.history.state;
+    return state && typeof state === 'object' ? state[key] : undefined;
+}
+
+/**
+ * Keeps `value` in the history entry under `key` without changing the address or adding an entry.
+ * Every other key stays, the router's own among them (it reads `current`, `back` and `position`
+ * from there). `undefined` or null removes the key. The value must be cloneable by the
+ * browser (plain data).
+ * @param {string} key
+ * @param {any} value
+ */
+export function writeHistoryState(key, value) {
+    const next = { ...(window.history.state && typeof window.history.state === 'object' ? window.history.state : {}) };
+    const had = key in next;
+    delete next[key];
+    if (value === undefined || value === null) {
+        if (had) window.history.replaceState(next, '');
+        return;
+    }
+    window.history.replaceState({ ...next, [key]: value }, '');
+}
+
 /** The address bar as an in-app path (path, query and hash), as a route's fullPath. */
 export function currentPath() {
     const { pathname, search, hash } = window.location;

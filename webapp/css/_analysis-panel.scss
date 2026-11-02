@@ -37,7 +37,7 @@
     position: absolute;
     top: 0.5rem;
     right: 4rem;
-    z-index: 2;
+    z-index: var(--map-layer-panel);
     width: 16rem;
     background: var(--panel-bg);
     color: var(--panel-text);

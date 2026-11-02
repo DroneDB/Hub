@@ -51,18 +51,12 @@ describe('RasterLayerOpacityPanel remove and repick', () => {
         expect(removes()).toHaveLength(0);
     });
 
-    it('removes any row when removable, with the default label', async () => {
+    it('removes any row when removable, named after the layer', async () => {
         render({ removable: true });
         expect(removes().map(b => b.attributes('aria-label'))).toEqual(['Remove layer: b.tif', 'Remove layer: a.tif']);
         expect(removes()[0].attributes('title')).toBe('Remove layer');
         await removes()[1].trigger('click');
         expect(wrapper.emitted('remove')).toEqual([['a.tif']]);
-    });
-
-    it('names the remove control from removeLabel', () => {
-        render({ removable: true, removeLabel: 'Remove from comparison' });
-        expect(removes()[0].attributes('title')).toBe('Remove from comparison');
-        expect(removes()[0].attributes('aria-label')).toBe('Remove from comparison: b.tif');
     });
 
     it('lets a row decide for itself, placeholders too', () => {
@@ -140,5 +134,145 @@ describe('RasterLayerOpacityPanel', () => {
         await wrapper.find('input[aria-label="Opacity of a.tif"]').setValue('0.5');
         const [updated] = wrapper.emitted('update:layers')[0];
         expect(updated.map(l => [l.path, l.opacity, l.visible])).toEqual([['b.tif', 1, false], ['a.tif', 0.5, true]]);
+    });
+});
+
+describe('RasterLayerOpacityPanel changed badge', () => {
+    const badges = () => wrapper.findAll('.changed-badge');
+
+    it('shows no badge unless the path is in changedPaths', () => {
+        render();
+        expect(badges()).toHaveLength(0);
+        wrapper.unmount();
+        render({ changedPaths: ['other.tif'] });
+        expect(badges()).toHaveLength(0);
+    });
+
+    it('shows the badge, as text, on the rows of those paths only', () => {
+        render({ changedPaths: ['a.tif'] });
+        const rows = wrapper.findAll('.raster-opacity-row');
+        expect(rows[0].find('.changed-badge').exists()).toBe(false);
+        expect(rows[1].find('.changed-badge').text()).toBe('Changed since this view was saved');
+    });
+
+    it('follows changedPaths when it changes', async () => {
+        render({ changedPaths: ['a.tif'] });
+        await wrapper.setProps({ changedPaths: ['a.tif', 'b.tif'] });
+        expect(badges()).toHaveLength(2);
+        await wrapper.setProps({ changedPaths: [] });
+        expect(badges()).toHaveLength(0);
+    });
+});
+
+describe('RasterLayerOpacityPanel with one row', () => {
+    const one = extra => render({ layers: [row('a.tif', extra)] });
+
+    it('is shown, with its eye, slider and value', async () => {
+        one({ opacity: 0.4 });
+        expect(wrapper.find('.raster-opacity-panel').exists()).toBe(true);
+        expect(wrapper.text()).toContain('40%');
+        await eye('a.tif').trigger('click');
+        expect(wrapper.emitted('toggle-visible')).toEqual([['a.tif']]);
+        await wrapper.find('input[aria-label="Opacity of a.tif"]').setValue('0.5');
+        expect(wrapper.emitted('update:layers')[0][0].map(l => [l.path, l.opacity])).toEqual([['a.tif', 0.5]]);
+    });
+
+    it('has no remove control, whatever the panel or the row allows', () => {
+        render({ layers: [row('a.tif', { removable: true })], removable: true, removablePaths: ['a.tif'] });
+        expect(removes()).toHaveLength(0);
+    });
+
+    it('has no arrows to reorder', () => {
+        one();
+        expect(wrapper.findAll('.order-btn')).toHaveLength(0);
+        expect(wrapper.find('button[aria-label="Move layer up"]').exists()).toBe(false);
+        expect(wrapper.find('button[aria-label="Move layer down"]').exists()).toBe(false);
+    });
+
+    it('keeps the plant health button, the badge and Add layer', async () => {
+        render({ layers: [row('a.tif', { plantHealthCapable: true })], activePlantHealthPath: 'a.tif', canAdd: true, changedPaths: ['a.tif'] });
+        const ph = wrapper.find('button[aria-label="Plant Health"]');
+        expect(ph.classes()).toContain('active');
+        await ph.trigger('click');
+        expect(wrapper.emitted('plant-health')).toEqual([['a.tif']]);
+        await addButton().trigger('click');
+        expect(wrapper.emitted('add')).toHaveLength(1);
+        expect(wrapper.find('.changed-badge').exists()).toBe(true);
+    });
+
+    it('shows the text of a missing row and offers to pick another file', async () => {
+        render({ layers: [missing('gone.tif')], canRepick: true });
+        expect(wrapper.find('.placeholder-text').text()).toBe('Missing: gone.tif');
+        expect(eye('gone.tif').exists()).toBe(false);
+        expect(removes()).toHaveLength(0);
+        await repicks()[0].trigger('click');
+        expect(wrapper.emitted('repick')).toEqual([['gone.tif']]);
+    });
+
+    it('is not shown for no rows', () => {
+        render({ layers: [] });
+        expect(wrapper.find('.raster-opacity-panel').exists()).toBe(false);
+    });
+});
+
+describe('RasterLayerOpacityPanel with no rows', () => {
+    it('shows Add layer alone when asked for (a view of a file that is not a georaster)', async () => {
+        render({ layers: [], canAdd: true });
+        expect(wrapper.find('.raster-opacity-panel').exists()).toBe(true);
+        expect(wrapper.findAll('.raster-opacity-row')).toHaveLength(0);
+        expect(wrapper.find('.layers-header').exists()).toBe(false);
+        await addButton().trigger('click');
+        expect(wrapper.emitted('add')).toHaveLength(1);
+    });
+
+    it('keeps Add layer disabled at the limit, with its reason', () => {
+        render({ layers: [], canAdd: true, addDisabled: true, addTitle: 'A view shows at most 6 rasters' });
+        expect(addButton().attributes('disabled')).toBeDefined();
+        expect(addButton().attributes('title')).toBe('A view shows at most 6 rasters');
+    });
+});
+
+describe('RasterLayerOpacityPanel fold', () => {
+    const toggle = () => wrapper.find('.fold-toggle');
+    const three = () => render({ layers: [row('c.tif'), row('b.tif', { opacity: 0.3 }), row('a.tif')], canAdd: true });
+
+    it('opens unfolded, with a toggle that names the action', () => {
+        three();
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(toggle().attributes('aria-label')).toBe('Fold layers');
+        expect(wrapper.find('.raster-opacity-panel').classes()).not.toContain('is-folded');
+    });
+
+    it('counts the layers in the title', () => {
+        three();
+        expect(wrapper.find('.layers-title').text()).toBe('Layers (3)');
+        wrapper.unmount();
+        render({ layers: [row('a.tif')] });
+        expect(wrapper.find('.layers-title').text()).toBe('Layers (1)');
+    });
+
+    it('folds and unfolds, flipping aria-expanded and the name', async () => {
+        three();
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+        expect(toggle().attributes('aria-label')).toBe('Unfold layers');
+        expect(wrapper.find('.raster-opacity-panel').classes()).toContain('is-folded');
+        await toggle().trigger('click');
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        expect(toggle().attributes('aria-label')).toBe('Fold layers');
+        expect(wrapper.find('.raster-opacity-panel').classes()).not.toContain('is-folded');
+    });
+
+    it('keeps the rows mounted, with their settings, while folded', async () => {
+        three();
+        await toggle().trigger('click');
+        expect(wrapper.findAll('.raster-opacity-row')).toHaveLength(3);
+        expect(wrapper.find('input[aria-label="Opacity of b.tif"]').element.value).toBe('0.3');
+        expect(addButton()).toBeDefined();
+    });
+
+    it('stays one element that is a bottom panel, so the rules for the sheets over the map still find it', () => {
+        three();
+        expect(wrapper.element.classList.contains('map-bottom-panel')).toBe(true);
     });
 });

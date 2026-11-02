@@ -118,7 +118,7 @@ import Textarea from 'primevue/textarea';
 import ddb from 'ddb';
 
 import { defaultViewFor } from '@/libs/openItemDefaults';
-import { viewerUrl, VIEWER_ONLY_HELP } from '@/libs/viewerLinks';
+import { viewerUrl, VIEWER_ONLY_HELP } from '@/libs/views/viewLinks';
 import { escapeHtml } from '@/libs/sanitize';
 import { buildOgcShareUrls, OGC_SHARE_MODES, streamableArtifactRole } from '@/libs/ogcShareUrls';
 import OgcUsageHints from './OgcUsageHints.vue';

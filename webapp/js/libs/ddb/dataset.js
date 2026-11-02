@@ -399,6 +399,15 @@ export default class Dataset {
         return this.registry.postFormData(`${this.baseApi}/rename`, formData);
     }
 
+    // The values of a meta key (the parsed JSON the server answers: for a list key, [{ id, data, mtime }]);
+    // a 404 means the key has no value. Reads share the short request cache unless `cache` is false,
+    // for a caller that has to see what the server holds now (before it writes, or to check a conflict).
+    async metaGet(key, path = "", { cache = true } = {}) {
+        if (!key) throw new Error(`Invalid key ${key}`);
+        const url = `${this.baseApi}/meta/get/${encodeURIComponent(key)}${path ? `?path=${encodeURIComponent(path)}` : ""}`;
+        return cache ? this.registry.getRequest(url) : this.registry.getRequest(url, { cache: false });
+    }
+
     // The server parses the value as JSON, so strings are quoted and objects serialized
     async metaSet(key, data, path = "") {
         return this.metaWrite('set', key, data, path);

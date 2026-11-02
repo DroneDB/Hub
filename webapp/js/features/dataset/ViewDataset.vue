@@ -26,7 +26,7 @@
                                 <TableView v-else ref="explorer" v-bind="explorerProps" :expanded-grid="expandedGrid" v-on="fileEvents" />
                             </div>
                             <div v-if="detailFile && !isMobile" class="detail-side">
-                                <DetailPanel :file="detailFile" :dataset="dataset" :comparisons="comparisons" v-on="detailEvents" />
+                                <DetailPanel :file="detailFile" :dataset="dataset" :views="views" v-on="detailEvents" />
                             </div>
                         </div>
                     </template>
@@ -34,7 +34,7 @@
                         <TaskHistory v-if="openedTabs.tasks" :dataset="dataset" :can-write="canWrite" />
                     </template>
                     <template v-if="isMobile" #properties>
-                        <DetailPanel :file="detailFile" :dataset="dataset" :comparisons="comparisons" v-on="detailEvents" />
+                        <DetailPanel :file="detailFile" :dataset="dataset" :views="views" v-on="detailEvents" />
                     </template>
                 </TabSwitcher>
             </template>
@@ -85,9 +85,9 @@ import { useDatasetActions } from '@/composables/useDatasetActions';
 import { useDatasetClipboard } from '@/composables/useDatasetClipboard';
 import { useOpenItem } from '@/composables/useOpenItem';
 import { useDatasetShortcuts } from '@/composables/useDatasetShortcuts';
-import { useComparisonActions } from '@/composables/useComparisonActions';
+import { useViewActions } from '@/composables/useViewActions';
 import { useEventListener } from '@/composables/useEventListener';
-import { savedComparisons } from '@/libs/compare/comparisonStore';
+import { listViews } from '@/libs/views/viewStore';
 import Message from '@/components/HubMessage.vue';
 import Panel from '@/features/dataset/HubPanel.vue';
 import TabSwitcher from '@/features/dataset/TabSwitcher.vue';
@@ -139,8 +139,8 @@ const rootEntry = ref(null);
 const permissions = computed(() => permissionsOf(rootEntry.value));
 const canWrite = computed(() => permissions.value.canWrite);
 const canDelete = computed(() => permissions.value.canDelete);
-// Saved comparisons are in the root entry's meta
-const comparisons = computed(() => savedComparisons(rootEntry.value));
+// The saved views of the dataset, sorted by name (read with meta/get/views, not from the info)
+const views = ref([]);
 
 const tabs = ref(null);
 const explorer = ref(null);
@@ -302,19 +302,29 @@ async function rootNodes() {
     }
 }
 
-// The root entry again (permissions, saved comparisons) without reloading the tree
-async function refreshRootEntry() {
+// ---- Saved views -----------------------------------------------------------------------
+
+// Reads started later win: an answer that arrives after a newer read began is dropped
+let viewsRead = 0;
+
+/**
+ * Loads the saved views. `fresh` skips the request cache, for a list that may have changed since
+ * it was read. A failed read keeps the list the page has: none on the first read (the page works
+ * without them), the last one read on a read again (a network blip on focus does not empty it).
+ */
+async function loadViews({ fresh = false } = {}) {
+    const read = ++viewsRead;
     try {
-        const entries = await dataset.info({ signal: requestSignal });
-        if (entries.length) rootEntry.value = entries[0];
+        const loaded = await listViews(dataset, { fresh });
+        if (read === viewsRead) views.value = loaded;
     } catch (e) {
-        if (!isAbort(e)) console.warn('Cannot refresh the dataset info:', e);
+        console.error('Cannot load the saved views:', e);
     }
 }
 
-// Comparisons are saved in the compare view, another tab: the list catches up when this tab is back
-useEventListener(window, 'focus', refreshRootEntry);
-const comparisonActions = useComparisonActions({ dataset, dialogs, onChanged: refreshRootEntry });
+// Views are saved in the map, another tab: the list catches up when this tab is back
+useEventListener(window, 'focus', () => loadViews({ fresh: true }));
+const viewActions = useViewActions({ dataset, dialogs, onChanged: () => loadViews({ fresh: true }) });
 
 // ---- Bindings --------------------------------------------------------------------------
 
@@ -351,13 +361,13 @@ const treeEvents = {
     currentUriChanged: onCurrentUriChanged,
     selectAll: () => selectAll(true),
     error: e => actions.showError(e, 'Error'),
-    renameComparison: comparisonActions.rename,
-    deleteComparison: comparisonActions.remove
+    renameView: viewActions.rename,
+    deleteView: viewActions.remove
 };
 const fileEvents = { ...commonEvents(() => listing.selected.value), selectionChanged: onSelectionChanged };
 const detailEvents = { close: closeDetail, open: file => onOpenItem(file), share: actions.share, buildStarted: handleBuildStarted, buildError: handleBuildError };
 
-const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, comparisons: comparisons.value }));
+const treeProps = computed(() => ({ rootNodes, canWrite: canWrite.value, dataset, views: views.value }));
 const tools = computed(() => explorerTools({
     canWrite: canWrite.value, files: listing.files.value, selected: listing.selected.value,
     viewMode: viewMode.value, expandedGrid: expandedGrid.value
@@ -391,6 +401,7 @@ watch(() => session.settingsRequests, () => actions.settings());
 onMounted(() => {
     document.getElementById('app').classList.add('fullpage');
     setTitle(params.ds);
+    loadViews();
     BuildManager.registerDataset(dataset);
     BuildManager.loadBuilds(dataset).catch(e => console.warn('Error loading builds:', e));
     watchBuildEvents(() => dataset, (message, title) => actions.showError(message, title));

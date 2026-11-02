@@ -53,7 +53,8 @@
  * - top right: Back and Copy link (single-file map; an embedded map has neither: it has no Hub
  *   to go back to and its address is the host page's), Reset view, Fullscreen, Raster Analysis, Stockpile;
  * - top center: direction indicators and flight path (display options), compare: with two
- *   georasters or more it splits the map between them, with one it asks for another to compare to.
+ *   georasters or more it splits the map between them, with one (where `pickToCompare`) it asks
+ *   for another to compare to.
  */
 import { computed, inject } from 'vue';
 import { supportsFullScreen } from '@/libs/utils';
@@ -76,7 +77,12 @@ const props = defineProps({
     flightPath: { type: Boolean, default: false },
     splitMode: { type: Boolean, default: false },
     /** Two georasters or more: the button splits the map between them */
-    canCompare: { type: Boolean, default: false }
+    canCompare: { type: Boolean, default: false },
+    /**
+     * With one georaster the button asks for another to compare to (the dataset map). Off, the
+     * button is only the split toggle, from two georasters: a view adds layers in its layer panel
+     */
+    pickToCompare: { type: Boolean, default: true }
 });
 const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'analysis', 'update:directionIndicators', 'update:flightPath', 'toggle-split', 'compare-to']);
 
@@ -85,7 +91,7 @@ const canFullscreen = supportsFullScreen();
 const embed = inject('embed', false);
 // No georaster: nothing to compare, no button. An embedded map only views what it was given:
 // it splits the georasters it has, but does not pick another one to compare to.
-const showCompare = computed(() => props.splitToggle && props.rasterCount > 0 && (props.canCompare || !embed));
+const showCompare = computed(() => props.splitToggle && props.rasterCount > 0 && (props.canCompare || (props.pickToCompare && !embed)));
 const compareLabel = computed(() => (props.canCompare ? 'Compare georasters side by side' : 'Compare to another georaster'));
 // Split compare draws every raster opaque, which the tools cannot work with
 const analysisTitle = name => (props.splitMode ? `${name} - Turn off split compare to use this tool` : name);

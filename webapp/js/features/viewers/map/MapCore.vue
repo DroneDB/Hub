@@ -8,15 +8,17 @@
             'cursor-pointer': selectSingle,
             'cursor-crosshair': selectPolygon
         }">
-            <OpacityControl v-if="rasterLayerList.length <= 1 && !splitMode" v-model="rasterOpacity" :visible="hasRasters"
+            <!-- A view always has the layer panel (a row has its eye, badge and Pick another; with no georaster yet, a view of
+                 another file, it is the Add layer); the dataset map has the one opacity control up to one raster -->
+            <OpacityControl v-if="!view && rasterLayerList.length <= 1 && !splitMode" v-model="rasterOpacity" :visible="hasRasters"
                             :show-plant-health-btn="rasterLayerList.length === 1 && !!rasterLayerList[0]?.plantHealthCapable"
                             :plant-health-active="plantHealthVisible"
                             :can-add="layersEditable && canAddLayers" :add-disabled="addLayerDisabled" :add-title="addLayerTitle"
                             @plant-health="handleLayerPlantHealth(rasterLayerList[0]?.path)" @add="$emit('addLayer')" />
-            <RasterLayerOpacityPanel v-else-if="!splitMode" v-model:layers="rasterLayerList"
+            <RasterLayerOpacityPanel v-else-if="!splitMode && (rasterLayerList.length || view)" v-model:layers="rasterLayerList"
                                      :active-plant-health-path="plantHealthVisible ? plantHealthFilePath : null"
-                                     :removable="layersEditable && !!comparison" :removable-paths="layersEditable ? (comparison ? null : addedLayerPaths) : []"
-                                     :remove-label="comparison ? 'Remove from comparison' : 'Remove layer'" :can-repick="layersEditable && !!comparison"
+                                     :removable="layersEditable && !!view" :can-repick="layersEditable && !!view"
+                                     :changed-paths="changedPaths"
                                      :can-add="layersEditable && canAddLayers" :add-disabled="addLayerDisabled" :add-title="addLayerTitle"
                                      @reorder="handleRasterLayerReorder"
                                      @plant-health="handleLayerPlantHealth"
@@ -24,7 +26,7 @@
                                      @remove="path => $emit('removeLayer', path)"
                                      @repick="path => $emit('repick', path)"
                                      @add="$emit('addLayer')" />
-            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" :removable="layersEditable && !!comparison"
+            <RasterSplitOverlay v-if="splitMode" :bands="splitBands" :positions="splitPositions" :removable="layersEditable && !!view"
                                 @update:positions="onSplitPositionsChange"
                                 @move="(index, to) => handleRasterLayerReorder({ fromIndex: index, toIndex: to })"
                                 @remove="index => $emit('removeLayer', rasterLayerList[index].path)"
@@ -60,8 +62,8 @@
                                   @cancel-mode="stopStockpileInteractions" @export-geo-json="exportStockpileGeoJson"
                                   @select-target="selectAnalysisTarget" />
             <!-- The toolbar's Copy link button opens and closes it: a press on it is not a press outside -->
-            <MapLinkPanel v-if="linkPanelOpen && mainFilePath" :dataset="dataset" :path="mainFilePath" :layers="addedLayerPaths"
-                          toggle="[data-map-link-toggle]" @close="linkPanelOpen = false" />
+            <MapLinkPanel v-if="linkPanelOpen && linkTarget" :dataset="dataset" :link-target="linkTarget" :note="shareNote" :can-save="canSave"
+                          toggle="[data-map-link-toggle]" @close="linkPanelOpen = false" @save="$emit('save')" />
         </div>
         <MapDialogs :alert-dialog-open="alertDialogOpen" :alert-title="alertTitle" :alert-message="alertMessage"
                     :clear-measurements-dialog-open="clearMeasurementsDialogOpen"
@@ -88,12 +90,12 @@
                            :unit-pref="currentUnitPref" @close="mapSettingsDialogOpen = false"
                            @basemap-changed="handleBasemapChanged" @units-changed="handleUnitsChanged" />
         <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
-        <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :copy-link="standalone && !comparison && !!dataset"
+        <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :copy-link="!!linkTarget && !!dataset"
                     :display-options="!standalone"
-                    :split-toggle="!standalone || !!comparison"
+                    :split-toggle="!standalone || !!view"
                     :analysis-entry="analysisEntry" :raster-count="rasterLayerList.length"
                     :direction-indicators="showDirectionIndicators" :flight-path="showFlightPath"
-                    :split-mode="splitMode" :can-compare="canCompare"
+                    :split-mode="splitMode" :can-compare="canCompare" :pick-to-compare="!view"
                     @back="goBack" @reset="resetToInitialView" @fullscreen="toggleFullscreen" @copy-link="toggleLinkPanel"
                     @analysis="toggleAnalysisPanel"
                     @update:direction-indicators="setDirectionIndicators" @update:flight-path="setFlightPath"
@@ -103,8 +105,8 @@
 
 <script>
 /**
- * MapCore - the map shared by the dataset Map tab (DatasetMap.vue) and the single-file map
- * (SingleMap.vue, `standalone`). It wires OpenLayers to the map features
+ * MapCore - the map shared by the dataset Map tab (DatasetMap.vue) and the map viewer
+ * (MapViewer.vue: `standalone`, showing a `view`). It wires OpenLayers to the map features
  * (composables), the file layers (libs/map/fileLayers) and its child components
  * (toolbar, popup, panels, dialogs).
  */
@@ -131,9 +133,9 @@ import { getVectorColor, FIT_OPTIONS } from '@/libs/map/mapUtils';
 import { useListenerBag } from '@/composables/useEventListener';
 import { useTimerGroup } from '@/composables/useTimers';
 import { useMapFeatures } from '@/composables/useMapFeatures';
-import { useMapComparison } from '@/composables/useMapComparison';
+import { useMapViewState } from '@/composables/useMapViewState';
 import { usePreference } from '@/composables/usePreference';
-import { openCompare } from '@/libs/compare/compareLinks';
+import { fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
 
 import DialogHost from '@/components/DialogHost.vue';
 import MapToolbar from './MapToolbar.vue';
@@ -184,26 +186,30 @@ export default {
             type: Boolean,
             default: true
         },
-        // The single-file map route (SingleMap): a Back button, no selection tools, and a
-        // photo with a footprint is drawn as a raster instead of a camera marker
+        // The map viewer route (MapViewer): a Back button, no selection tools, and a photo with a
+        // footprint is drawn as a raster instead of a camera marker
         standalone: {
             type: Boolean,
             default: false
         },
-        // A comparison (the compare view): its state is the parent's, the map shows it and
-        // emits what the user changes (update:comparison), plus removeLayer, repick (a path)
-        // and addLayer (the compare button with one georaster)
-        // for the parent to apply. Every map emits fileWritten / fileRemoved (a path) when it
-        // saves or removes a file of the dataset (the measurements). Set before the map mounts; null on the other maps.
-        comparison: {
+        // The view the map shows (the map viewer): its state is the parent's, the map shows it and
+        // emits what the user changes (update:view, the complete new state), plus removeLayer and
+        // repick (a path) and addLayer for the parent to apply. `files` are its
+        // layers in draw order (the rows follow them), and the map fits its base file once unless
+        // the state has a position. Set before the map mounts; null on the dataset map, whose
+        // rasters are the files of the folder. Every map emits fileWritten / fileRemoved (a path)
+        // when it saves or removes a file of the dataset (the measurements)
+        view: {
             type: Object,
             default: null
         },
-        // The single-file map takes georasters on top of its file: the parent owns them and
-        // applies addLayer / removeLayer (a path). `addedLayerPaths` are the dataset paths of the
-        // layers it added, in the order of addition: only their rows can be removed, and the
-        // link to the map holds them. The add action is off while `addLayerDisabled`, whose
-        // reason is `addLayerTitle`
+        // Paths of the layers whose file is not the one the saved view was made with (a badge on their rows)
+        changedPaths: {
+            type: Array,
+            default: () => []
+        },
+        // A view takes georasters: the parent owns them and applies addLayer / removeLayer (a
+        // path). The add action is off while `addLayerDisabled`, whose reason is `addLayerTitle`
         canAddLayers: {
             type: Boolean,
             default: false
@@ -216,12 +222,23 @@ export default {
             type: String,
             default: ''
         },
-        addedLayerPaths: {
-            type: Array,
-            default: () => []
+        // What the Copy link panel links to: { uid } for a saved view, { path } for a file; null
+        // has no panel. `shareNote`: the link does not show what the map shows, so the panel says
+        // to save; `canSave` offers the save there
+        linkTarget: {
+            type: Object,
+            default: null
+        },
+        shareNote: {
+            type: Boolean,
+            default: false
+        },
+        canSave: {
+            type: Boolean,
+            default: false
         }
     },
-    emits: ['scrollTo', 'openItem', 'update:comparison', 'removeLayer', 'repick', 'addLayer', 'fileWritten', 'fileRemoved'],
+    emits: ['scrollTo', 'openItem', 'update:view', 'removeLayer', 'repick', 'addLayer', 'save', 'fileWritten', 'fileRemoved'],
     setup(props, { emit }) {
         const features = useMapFeatures(props, {
             onFileWritten: path => emit('fileWritten', path),
@@ -231,7 +248,7 @@ export default {
             ...features,
             // Provided by the app: true on a map embedded in another page
             embed: inject('embed', false),
-            ...useMapComparison({ ...features, comparison: () => props.comparison, emit }),
+            ...useMapViewState({ ...features, view: () => props.view, emit }),
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
             // Toolbar zones (createControlZones), set when the map is built
@@ -263,10 +280,11 @@ export default {
         filesKey: function () {
             return this.files.map(f => f.path || (f.entry && f.entry.path)).join('\n');
         },
-        // Dataset path of the file the single-file map is open on (the first file)
-        mainFilePath: function () {
-            const main = this.files[0];
-            return main && main.entry ? main.entry.path : '';
+        // The entry of the base file of the view, when it is on the map (a missing one is a placeholder)
+        baseEntry: function () {
+            const path = this.view && this.view.base.path;
+            const base = path && this.files.find(f => f.entry && f.entry.path === path);
+            return base ? base.entry : null;
         },
         // A panel that opens over the link panel's place (they share the corner)
         analysisPanelOpen: function () {
@@ -341,8 +359,8 @@ export default {
 
         loadMap: function () {
             this.loaded = true;
-            // A comparison fits once, unless its state has a view; the single-file map fits once
-            this.fitPending = this.comparison ? !this.comparison.view : this.standalone;
+            // A view fits once, unless its state has a position; the standalone map fits once
+            this.fitPending = this.view ? !this.view.view : this.standalone;
             this.vectorLayers = [];
             this.fileLayers = new FileLayers();
             this.fileLayers.setFlightPathVisible(this.showFlightPath);
@@ -435,36 +453,32 @@ export default {
             Promise.all(vectorFiles.map(f => this.addVectorLayer(f))).then(() => {
                 if (this.fitsToFiles()) this.zoomToFilesExtent();
             });
-            // Every map but a comparison keeps the order the user gave the layers
-            this.syncRasterLayers(this.fileLayers.rasterSlots, { keepOrder: !this.comparison });
+            // The dataset map keeps the order the user gave the layers; a view's order is its state's
+            this.syncRasterLayers(this.fileLayers.rasterSlots, { keepOrder: !this.view });
             // New layers get the plant-health styling remembered for their file
             this.refreshRasterLayers();
             this.loadSplatFootprints();
             this.updateRastersOpacity();
-            // A comparison has no measurements of its own and its plant health is in its state
-            if (!this.comparison) {
-                // A tool target that left the map is replaced first: it decides which measurements load
-                this.reconcileAnalysisTarget();
-                this.loadSavedMeasurements();
-                this.restorePlantHealthFromHash(this.files);
-            }
+            // A tool target that left the map is replaced first: it decides which measurements load
+            this.reconcileAnalysisTarget();
+            this.loadSavedMeasurements();
+            this.restorePlantHealthFromHash(this.files);
             this.viewZoomCap.schedule();
         },
 
-        // A comparison and the single-file map keep their view: the map fits its files once, on
-        // the first load (of a comparison state without a view; the world view the map starts with
-        // is reported before that fit), so adding or removing a layer never moves it
+        // A view and the standalone map keep their position: the map fits its files once, on the
+        // first load (of a view without a saved position; the world view the map starts with is
+        // reported before that fit), so adding or removing a layer never moves it
         fitsToFiles: function () {
-            if (!this.comparison && !this.standalone) return true;
+            if (!this.view && !this.standalone) return true;
             const first = this.fitPending;
             this.fitPending = false;
             return first;
         },
 
-        // The single-file map with layers added opens on its own file, not on all of them
+        // A view opens on its base file, not on all of its layers
         mainFileExtent: function () {
-            if (!this.standalone || this.comparison || this.files.length < 2) return null;
-            const geom = this.files[0].entry && this.files[0].entry.polygon_geom;
+            const geom = this.baseEntry && this.baseEntry.polygon_geom;
             return geom ? mercatorExtent(geom) : null;
         },
 
@@ -674,11 +688,11 @@ export default {
             this.$router.push({ name: 'ViewDataset', params: { org: this.dataset.org, ds: this.dataset.ds } });
         },
 
-        // The compare button with one georaster: the compare view adds another from its
-        // picker; the dataset map opens the compare view with this one and the picker
+        // The compare button of the dataset map with one georaster opens a view of it, with the
+        // picker, in a new tab. A view has no such button: it adds a layer in its layer panel, and
+        // only a view that starts from several files turns split on by itself
         compareTo: function () {
-            if (this.comparison) this.$emit('addLayer');
-            else if (this.dataset && this.rasterLayerList.length) openCompare(this.dataset, { paths: [this.rasterLayerList[0].path], pick: true });
+            if (this.dataset && this.rasterLayerList.length) openInNewTab(fileViewUrl(this.dataset, this.rasterLayerList[0].path, { pick: true }));
         },
 
         toggleFullscreen: function () {

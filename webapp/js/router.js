@@ -6,8 +6,7 @@ import { navigationTitle } from '@/libs/routeTitle';
 
 // Lazy-loaded route components
 const ViewDataset = () => import(/* webpackChunkName: "dataset" */ '@/features/dataset/ViewDataset.vue');
-const SingleMap = () => import(/* webpackChunkName: "map" */ '@/features/viewers/map/SingleMap.vue');
-const CompareMap = () => import(/* webpackChunkName: "map" */ '@/features/viewers/map/CompareMap.vue');
+const MapViewer = () => import(/* webpackChunkName: "map" */ '@/features/viewers/map/MapViewer.vue');
 const Login = () => import(/* webpackChunkName: "auth" */ '@/features/account/LoginPage.vue');
 const Datasets = () => import(/* webpackChunkName: "datasets" */ '@/features/datasets/DatasetsPage.vue');
 const Organizations = () => import(/* webpackChunkName: "orgs" */ '@/features/organizations/OrganizationsPage.vue');
@@ -37,8 +36,9 @@ export function createAppRouter(embed = false) {
 
     const routes = [
         { path: '/r/:org/:ds', name: 'ViewDataset', components: viewsFor(ViewDataset), meta: { title: 'View Dataset' } },
-        { path: '/r/:org/:ds/compare', name: 'CompareMap', components: viewsFor(CompareMap), meta: { title: 'Compare' } },
-        { path: '/r/:org/:ds/view/:encodedPath/map', name: 'SingleMap', components: viewsFor(SingleMap), meta: { title: 'Map' } },
+        // The map viewer: a new view of a file, and a saved view
+        { path: '/r/:org/:ds/view/:encodedPath/map', name: 'MapViewer', components: viewsFor(MapViewer), meta: { title: 'Map' } },
+        { path: '/r/:org/:ds/views/:uid', name: 'SavedView', components: viewsFor(MapViewer), meta: { title: 'Map' } },
         { path: '/r/:org/:ds/view/:encodedPath/pointcloud', name: 'PointCloud', components: viewsFor(Potree), meta: { title: 'Point Cloud' } },
         { path: '/r/:org/:ds/view/:encodedPath/markdown', name: 'Markdown', components: viewsFor(Markdown), meta: { title: 'Markdown' } },
         { path: '/r/:org/:ds/view/:encodedPath/model', name: 'Model', components: viewsFor(Model), meta: { title: 'Model' } },

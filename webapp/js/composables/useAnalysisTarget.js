@@ -28,6 +28,8 @@
  *   await target.requestToggle('stockpile');    // the toolbar button
  *   await target.requestSwitch(path);           // the "Elevation model" selector
  *   await target.onCandidatesChanged();         // after the layers were rebuilt
+ *   target.restoreTarget(path);                 // a saved view's target: no question, no panel of its own
+ *   target.defaultTarget();                     // the path a tool picks when nothing was chosen
  */
 import { ref, computed, watch } from 'vue';
 import { isGeoraster } from '@/libs/entryTypes';
@@ -54,7 +56,7 @@ export function measurementsFollow(entry) {
 
 /**
  * @param {object} ctx
- * @param {() => AnalysisCandidate[]} ctx.candidates       top first; none in a comparison
+ * @param {() => AnalysisCandidate[]} ctx.candidates       top first
  * @param {() => string|null} ctx.measurementsPath         the raster the measurements belong to now
  * @param {(entry: any) => string|null} ctx.measurementsPathFor  the raster (or folder file) they would belong to with
  *   this entry as the target (the rule of the measurements feature, which they follow)
@@ -117,12 +119,23 @@ export function useAnalysisTarget({
      * What a click on a tool button picks while there is no target, and what replaces a target
      * that left the map: the raster the measurements belong to if it is a candidate, else the
      * topmost candidate.
+     * The raster the measurements belong to is read as if there were no target (the measurements
+     * follow the target, so with one chosen they would always name it).
      * @param {AnalysisCandidate[]} found
      * @returns {AnalysisCandidate|null}
      */
     function defaultCandidate(found) {
-        const own = measurementsPath();
+        const own = measurementsPathFor(null);
         return found.find(c => c.path === own) || found[0] || null;
+    }
+
+    /**
+     * The path of the raster a tool picks while no target was chosen (null with no candidate):
+     * what a saved view records as "no particular elevation model".
+     * @returns {string|null}
+     */
+    function defaultTarget() {
+        return defaultCandidate(items())?.path ?? null;
     }
 
     // The tools show while the map has a candidate, whether a target was chosen or not
@@ -203,6 +216,24 @@ export function useAnalysisTarget({
     }
 
     /**
+     * Sets the target to a candidate the app chose, not the user (a saved view's elevation
+     * model): no question and no panel of its own. A panel that is open (or waiting for the
+     * measurements) is opened again for the new raster, as for a selector change. Refused when
+     * the measurements would move to another file with unsaved changes, which the user did not
+     * ask to drop. A later request of the user takes a later turn and wins; the measurements load
+     * on in the background.
+     * @param {string} path
+     * @returns {boolean}  whether the target is `path` now
+     */
+    function restoreTarget(path) {
+        if (path === targetPath.value) return true;
+        const next = items().find(c => c.path === path);
+        if (!next || dropsUnsaved(next)) return false;
+        commit(next, openKind()).catch(error => console.error('The measurements of the elevation model did not load', error));
+        return true;
+    }
+
+    /**
      * After the layers were rebuilt: a target that left the map is chosen again by the first
      * rule, and its panel opens again; with no candidate left the target is cleared and the
      * panel closes. Nothing happens while the target is still on the map.
@@ -230,7 +261,7 @@ export function useAnalysisTarget({
         if (kind) panels.close(kind);
     });
 
-    return { targetPath, targetEntry, candidates: list, toolbarEntry, requestOpen, requestToggle, requestSwitch, onCandidatesChanged };
+    return { targetPath, targetEntry, candidates: list, toolbarEntry, requestOpen, requestToggle, requestSwitch, restoreTarget, defaultTarget, onCandidatesChanged };
 }
 
 /** @param {string|null} path */

@@ -1,7 +1,7 @@
 /**
  * The map's analysis tools as the map wires them: the tools show as soon as a drawn raster
  * accepts them, a tool opens for the raster chosen at its first use, the measurements follow
- * it, a comparison has none, and split compare closes them.
+ * it, a view has them like any map, and split compare closes them.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { effectScope, reactive, nextTick } from 'vue';
@@ -38,7 +38,7 @@ function start(entries, extra = {}) {
     };
     props = reactive({
         files: entries.map(entry => ({ path: `ddb://x/y/${entry.path}`, entry, selected: false })),
-        dataset, canWrite: true, canDelete: true, comparison: null, ...extra
+        dataset, canWrite: true, canDelete: true, view: null, ...extra
     });
     scope = effectScope();
     features = scope.run(() => useMapFeatures(props));
@@ -111,10 +111,10 @@ describe('the analysis tools of the map', () => {
         expect(paths()).toEqual([THERMAL.path, DSM.path]);
     });
 
-    it('are not offered by a comparison', () => {
-        start([DSM, DTM], { comparison: { layers: [] } });
-        expect(features.analysisCandidates.value).toEqual([]);
-        expect(features.analysisEntry.value).toBeNull();
+    it('are offered in a view like on any map', () => {
+        start([DSM, DTM], { view: { layers: [] } });
+        expect(paths()).toEqual([DTM.path, DSM.path]);
+        expect(features.analysisEntry.value).not.toBeNull();
     });
 
     it('do not count a layer that is only a placeholder', () => {
@@ -122,6 +122,22 @@ describe('the analysis tools of the map', () => {
         const placeholder = { path: 'x.tif', entry: null, placeholder: { path: 'odm_dem/x.tif', kind: 'missing', text: 'Missing' } };
         features.syncRasterLayers([...props.files.map(file => ({ file, olLayer: Object.assign(new TileLayer(), { file }) })), { file: placeholder, olLayer: null }]);
         expect(paths()).toEqual([DSM.path]);
+    });
+});
+
+describe('the elevation model of a view', () => {
+    it('is the one a tool would pick when none was chosen', () => {
+        start([DSM, DTM], { view: {} });
+        expect(features.defaultAnalysisTarget()).toBe(DSM.path);
+    });
+
+    it('is put back without a question or a panel', () => {
+        start([DSM, DTM], { view: {} });
+        expect(features.restoreAnalysisTarget(DTM.path)).toBe(true);
+        expect(features.analysisTargetPath.value).toBe(DTM.path);
+        expect(features.rasterFilePath.value).toBeFalsy();
+        expect(features.stockpilePanelVisible.value).toBe(false);
+        expect(features.dialogs.stack.value).toHaveLength(0);
     });
 });
 

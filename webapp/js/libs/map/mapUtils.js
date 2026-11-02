@@ -1,5 +1,5 @@
 /**
- * Shared utility functions for Map.vue and SingleMap.vue
+ * Shared utility functions of the maps of the Hub (the map viewer, the dataset Map tab, the measurement tools)
  */
 import { PRIMARY, ANALYSIS_YELLOW } from '@/libs/palette';
 

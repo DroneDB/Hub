@@ -18,8 +18,8 @@
                         title="Pick another raster" aria-label="Pick another raster" @click="$emit('repick', i)">
                     <i class="fa-solid fa-arrows-rotate" />
                 </button>
-                <button v-if="removable && bands.length > 1" class="split-label-btn" title="Remove from comparison"
-                        aria-label="Remove from comparison" @click="$emit('remove', i)">
+                <button v-if="removable && bands.length > 1" class="split-label-btn" title="Remove layer"
+                        aria-label="Remove layer" @click="$emit('remove', i)">
                     <i class="fa-solid fa-xmark" />
                 </button>
                 <button v-if="i < bands.length - 1" class="split-label-btn" title="Move right" aria-label="Move right" @click="$emit('move', i, i + 1)">
@@ -44,9 +44,9 @@
 
 <script>
 /**
- * RasterSplitOverlay - the labels and dividers of the split compare mode. A band label moves
- * its layer one band left or right (the band widths stay); with `removable` (a comparison) it
- * also removes it, and a missing layer's label picks another file.
+ * RasterSplitOverlay - the labels and dividers of the split mode. A band label moves its layer
+ * one band left or right (the band widths stay); with `removable` (the map viewer, not Viewer
+ * only) it also removes it, and a missing layer's label picks another file.
  */
 export default {
     name: 'RasterSplitOverlay',
@@ -130,17 +130,20 @@ export default {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 2;
+    /* Under the map's controls (ol-controls.css), so a divider under the toolbar leaves it its clicks */
+    z-index: var(--map-layer-split);
     overflow: hidden;
 }
 
+/* Below the row of buttons at the top centre of the map, so the label of a middle band is not
+   under them */
 .split-band-label {
     position: absolute;
-    top: 0.6rem;
+    top: var(--map-top-reserve);
     pointer-events: none;
 }
 
-/* Only the buttons take clicks: the label itself may sit over the map's own buttons */
+/* Only the buttons take clicks: the label itself lets them through to the map */
 .split-label-pill {
     display: inline-flex;
     align-items: center;
@@ -156,8 +159,10 @@ export default {
     user-select: none;
     box-shadow: 0 1px 4px rgba(0,0,0,0.35);
 
+    /* A missing or unavailable file: the Hub's warning look, yellow with dark text */
     &.placeholder {
-        background: rgba(120, 60, 0, 0.8);
+        background: var(--ddb-warning);
+        color: var(--ddb-text);
     }
 }
 
@@ -184,12 +189,12 @@ export default {
     }
 }
 
-/* A phone: the labels go to the bottom, above the corner buttons, so they do not cover the
-   zoom and tool buttons at the top */
+/* A phone: the labels go to the bottom, above the map settings button by the measure the panels
+   keep from it, so they stay clear of the zoom and tool buttons at the top */
 @media (max-width: 575.98px) {
     .split-band-label {
         top: auto;
-        bottom: 3.25rem;
+        bottom: var(--map-bottom-reserve);
     }
 
     .split-label-pill {

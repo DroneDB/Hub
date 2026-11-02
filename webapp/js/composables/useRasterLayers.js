@@ -3,7 +3,11 @@
  * rows of the opacity panel (top first, the reverse of the OpenLayers collection), the
  * global or per-layer opacity, reordering, and dimming of selected rasters.
  *
- *   const rasters = useRasterLayers({ group, vectorLayers, splitMode: () => ... });
+ * On the dataset map a lone raster has the one opacity control and always shows. In a view the
+ * panel has a row for it as for any other (its own opacity and eye), so the rows decide whatever
+ * their number (`perRow`).
+ *
+ *   const rasters = useRasterLayers({ group, vectorLayers, splitMode: () => ..., perRow: () => ... });
  *   rasters.syncRasterLayers(fileLayers.rasterSlots);
  */
 import { ref, watch, markRaw } from 'vue';
@@ -16,8 +20,9 @@ import { rasterLayerPath } from '@/libs/map/rasterLayers';
  * @param {import('vue').Ref<any>} ctx.group          the rasters' LayerGroup
  * @param {import('vue').Ref<any[]>} ctx.vectorLayers  redrawn on restyle (their style reads the selection)
  * @param {() => boolean} ctx.splitMode               split compare shows every raster opaque
+ * @param {() => boolean} [ctx.perRow]                 the rows set opacity and visibility even for a lone raster (a view)
  */
-export function useRasterLayers({ group, vectorLayers, splitMode }) {
+export function useRasterLayers({ group, vectorLayers, splitMode, perRow = () => false }) {
     // [{ name, path, olLayer, opacity, visible, plantHealthCapable, placeholder }], top first; a
     // placeholder row (olLayer null) keeps the place of a raster that cannot be drawn
     const rasterLayerList = ref([]);
@@ -41,7 +46,7 @@ export function useRasterLayers({ group, vectorLayers, splitMode }) {
      * each layer's opacity and visibility. Names are the file names, with enough of the folders
      * to tell apart files of the same name.
      * With `keepOrder` the rows that stay keep the order they have in the list (the user's) and
-     * the new rows go on top of them, the last file highest; a comparison does without it, its
+     * the new rows go on top of them, the last file highest; a view does without it, its
      * order is the one of its state.
      * @param {{ file: any, olLayer: any }[]} slots
      * @param {{ keepOrder?: boolean }} [options]
@@ -104,9 +109,9 @@ export function useRasterLayers({ group, vectorLayers, splitMode }) {
             });
             return;
         }
-        // The eye is in the panel of two rows or more: the only layer of a map always shows,
-        // there would be no control to bring it back
-        const perLayer = rasterLayerList.value.length > 1;
+        // The eye is in the panel of two rows or more (of any number in a view): the only layer of
+        // the dataset map always shows, there would be no control to bring it back
+        const perLayer = perRow() || rasterLayerList.value.length > 1;
         rasters.forEach(layer => {
             let opacity = rasterOpacity.value;
             let visible = true;

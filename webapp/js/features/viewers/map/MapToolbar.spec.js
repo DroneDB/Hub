@@ -45,6 +45,16 @@ describe('MapToolbar compare button', () => {
         expect(wrapper.emitted('compare-to')).toBeUndefined();
     });
 
+    it('without pickToCompare (a view) is only the split toggle: none with one georaster, the toggle from two', () => {
+        expect(render({ rasterCount: 1, canCompare: false, pickToCompare: false })).toBeNull();
+        wrapper.unmount();
+        const button = render({ rasterCount: 2, canCompare: true, pickToCompare: false });
+        expect(button.getAttribute('aria-label')).toBe('Compare georasters side by side');
+        button.click();
+        expect(wrapper.emitted('toggle-split')).toHaveLength(1);
+        expect(wrapper.emitted('compare-to')).toBeUndefined();
+    });
+
     it('is not shown where the map has no compare (a single-file map)', () => {
         expect(render({ rasterCount: 1, canCompare: false, splitToggle: false })).toBeNull();
     });
@@ -89,7 +99,7 @@ describe('MapToolbar analysis buttons', () => {
         expect(wrapper.emitted('analysis')).toEqual([['stockpile'], ['rasterAnalysis']]);
     });
 
-    it('are hidden when the map has no analysis entry (no elevation raster, or a comparison)', () => {
+    it('are hidden when the map has no analysis entry (no elevation raster, or split mode)', () => {
         mountWith({ rasterCount: 2, analysisEntry: null });
         expect(button('stockpile-toolbar-btn')).toBeNull();
         expect(button('raster-analysis-toolbar-btn')).toBeNull();
@@ -103,14 +113,14 @@ describe('MapToolbar back and copy link', () => {
         wrapper = mount(MapToolbar, { props: { zones, ...props }, global: embed === undefined ? {} : { provide: { embed } } });
     };
 
-    it('shows Back when asked, and Copy link when the map is a single-file map', () => {
+    it('shows Back when asked, and Copy link on the map viewer', () => {
         mountWith({ showBack: true, copyLink: true });
         expect(back()).not.toBeNull();
         expect(copyLink()).not.toBeNull();
         expect(copyLink().title).toBe('Copy link');
     });
 
-    it('has no Copy link unless asked (the dataset map, a comparison)', () => {
+    it('has no Copy link unless asked (the dataset map)', () => {
         mountWith({ showBack: true });
         expect(copyLink()).toBeNull();
     });

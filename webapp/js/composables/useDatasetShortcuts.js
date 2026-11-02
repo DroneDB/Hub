@@ -8,7 +8,7 @@ import { getFilesFromClipboard, isHttpUrl } from '@/libs/dragDropUtils';
 import { useEventListener } from '@/composables/useEventListener';
 
 const isTyping = t => t instanceof Element && (t.closest('input, textarea') || t.isContentEditable);
-// Keys typed in a list of things that are not files (the saved comparisons) are not file shortcuts
+// Keys typed in a list of things that are not files (the saved views) are not file shortcuts
 const notForFiles = t => t instanceof Element && !!t.closest('[data-no-file-shortcuts]');
 
 /**

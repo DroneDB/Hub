@@ -50,11 +50,32 @@
    + 2rem (button) = 3.5rem, and 0.5rem of air between it and the panels.
    Bottom: the same sum upwards for the one button of the bottom-left zone: 0.5rem (inset) + 0.5rem
    (padding) + 0.5rem (margins) + 2rem (button) = 3.5rem, and 0.5rem of air above it.
-   Peek: the panel header on a phone: 0.5rem + 2rem button + 0.5rem. */
+   Top: the same sum downwards for the row of buttons of the top-centre zone (direction, flight path,
+   split): what sits at the top of the map in the middle (the labels of the split) goes below it.
+   Peek: the panel header on a phone: 0.5rem + 2rem button + 0.5rem.
+
+   Layers, bottom to top: the map, the bottom panels, the split of the map (dividers and labels),
+   the controls (the toolbar zones and what OpenLayers puts with them: its own controls, popups and
+   tooltips), the analysis panels and sheets. The controls are above the split, so a divider dragged
+   under the toolbar never takes its clicks; the panels stay above the controls, as they keep out of
+   the rail by themselves. The map is its own stacking context, so these numbers never compete with
+   the page around it. */
 .map-container {
     --map-rail-reserve: 4rem;
     --map-bottom-reserve: 4rem;
+    --map-top-reserve: 4rem;
     --map-sheet-peek: 3rem;
+    --map-layer-bottom-panel: 1;
+    --map-layer-split: 2;
+    --map-layer-controls: 3;
+    --map-layer-panel: 4;
+    isolation: isolate;
+}
+
+/* OpenLayers writes z-index: 0 inline on the container of its controls (the toolbar zones live in it),
+   which put every overlay of the map above the toolbar; only !important lifts it over the inline style */
+.map-container .ol-overlaycontainer-stopevent {
+    z-index: var(--map-layer-controls) !important;
 }
 
 .ol-zone {
@@ -216,7 +237,7 @@
     bottom: 2rem;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 1;
+    z-index: var(--map-layer-bottom-panel);
     width: max-content;
     max-width: calc(100% - 2 * var(--map-rail-reserve));
     box-sizing: border-box;

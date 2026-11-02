@@ -40,7 +40,7 @@ export class FileLayers {
         // Raster layers by file and content, reused by the next build so their tiles stay loaded
         this.rasterCache = new Map();
         // The raster files in file order: { file, olLayer }, olLayer null for a placeholder file
-        // (a layer the comparison view keeps but cannot draw: missing, or not built)
+        // (a layer a saved view keeps but the map cannot draw: missing, or not built)
         this.rasterSlots = [];
         this.footprints = new LayerGroup();
         // Georeferenced splats: a point, the footprint of the build once the map has read it

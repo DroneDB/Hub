@@ -6,10 +6,12 @@ import { useRasterLayers } from './useRasterLayers';
 
 const entry = path => ({ path, type: ddb.entry.type.GEORASTER, properties: {} });
 
-function setup({ split = false } = {}) {
+function setup({ split = false, perRow = false } = {}) {
     const group = shallowRef(new LayerGroup());
     const splitMode = { value: split };
-    const rasters = effectScope().run(() => useRasterLayers({ group, vectorLayers: shallowRef([]), splitMode: () => splitMode.value }));
+    const rasters = effectScope().run(() => useRasterLayers({
+        group, vectorLayers: shallowRef([]), splitMode: () => splitMode.value, perRow: () => perRow
+    }));
     return { rasters, group, splitMode };
 }
 
@@ -134,8 +136,36 @@ describe('useRasterLayers', () => {
         });
     });
 
+    describe('a lone raster', () => {
+        it('shows whatever its row says on the dataset map: the global opacity is its only control', () => {
+            const { rasters, group } = setup();
+            rasters.syncRasterLayers(slotsOf(group, 'a.tif'));
+            rasters.rasterOpacity.value = 0.7;
+            rasters.rasterLayerList.value = [{ ...rasters.rasterLayerList.value[0], opacity: 0.2, visible: false }];
+            rasters.updateRastersOpacity();
+            expect(layerOf('a.tif').getVisible()).toBe(true);
+            expect(layerOf('a.tif').getOpacity()).toBe(0.7);
+        });
+
+        it('has its own opacity and eye in a view, where its row is in the panel', () => {
+            const { rasters, group } = setup({ perRow: true });
+            rasters.syncRasterLayers(slotsOf(group, 'a.tif'));
+            rasters.rasterOpacity.value = 0.7;
+            rasters.rasterLayerList.value = [{ ...rasters.rasterLayerList.value[0], opacity: 0.2 }];
+            rasters.updateRastersOpacity();
+            expect(layerOf('a.tif').getOpacity()).toBe(0.2);
+
+            rasters.toggleRasterLayerVisible('a.tif');
+            rasters.updateRastersOpacity();
+            expect(layerOf('a.tif').getVisible()).toBe(false);
+            rasters.toggleRasterLayerVisible('a.tif');
+            rasters.updateRastersOpacity();
+            expect(layerOf('a.tif').getVisible()).toBe(true);
+        });
+    });
+
     describe('order across rebuilds', () => {
-        it('puts the rows in comparison order when the order is not kept', () => {
+        it('puts the rows in the order of the files when the order is not kept', () => {
             const { rasters, group } = setup();
             rasters.syncRasterLayers(slotsOf(group, 'a.tif', 'b.tif'));
             rasters.handleRasterLayerReorder({ fromIndex: 0, toIndex: 1 });

@@ -57,13 +57,13 @@
                 </div>
             </div>
 
-            <!-- Saved comparisons that show this file -->
-            <div v-if="usedInComparisons.length" class="comparisons-section">
-                <h4>Used in comparisons</h4>
+            <!-- Saved views that show this file -->
+            <div v-if="usedInViews.length" class="views-section">
+                <h4>Used in views</h4>
                 <ul>
-                    <li v-for="c in usedInComparisons" :key="c.uid">
-                        <a :href="comparisonUrl(c)" target="_blank" rel="noopener">
-                            <i class="fa-solid fa-table-columns" aria-hidden="true" /> {{ c.name }}
+                    <li v-for="v in usedInViews" :key="v.uid">
+                        <a :href="viewUrl(v)" target="_blank" rel="noopener">
+                            <i class="fa-regular fa-map" aria-hidden="true" /> {{ v.name }}
                         </a>
                     </li>
                 </ul>
@@ -93,8 +93,8 @@ import Message from 'primevue/message';
 import { buildAllProperties, buildCopyableValues, buildRowNotes, isDirectory, getFileTypeName, getFileSizeDisplay, formatModifiedDate } from '@/libs/propertiesUtils';
 import { usePreference } from '@/composables/usePreference';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
-import { compareUrl, openCompare } from '@/libs/compare/compareLinks';
-import { comparisonsUsing } from '@/libs/compare/comparisonStore';
+import { savedViewUrl, fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
+import { viewsUsing } from '@/libs/views/viewStore';
 
 export default {
     components: { PropsTable, Button, Message },
@@ -110,8 +110,8 @@ export default {
             type: Object,
             default: null
         },
-        // The dataset's saved comparisons (libs/compare/comparisonStore savedComparisons)
-        comparisons: {
+        // The dataset's saved views (libs/views/viewStore listViews)
+        views: {
             type: Array,
             default: () => []
         }
@@ -134,8 +134,8 @@ export default {
         isGeoraster() {
             return !!this.dataset && !!this.file && isGeorasterEntry(this.file.entry);
         },
-        usedInComparisons() {
-            return this.isGeoraster ? comparisonsUsing(this.comparisons, this.file.entry.path) : [];
+        usedInViews() {
+            return this.isGeoraster ? viewsUsing(this.views, this.file.entry.path) : [];
         },
         isDirectory() {
             return this.file && isDirectory(this.file.entry);
@@ -327,10 +327,10 @@ export default {
         },
 
         handleCompareTo() {
-            openCompare(this.dataset, { paths: [this.file.entry.path], pick: true });
+            openInNewTab(fileViewUrl(this.dataset, this.file.entry.path, { pick: true }));
         },
-        comparisonUrl(comparison) {
-            return compareUrl(this.dataset, { uid: comparison.uid });
+        viewUrl(view) {
+            return savedViewUrl(this.dataset, view.uid);
         },
         handleShare() {
             this.$emit('share', this.file);
@@ -490,7 +490,7 @@ export default {
     gap: 0.5rem;
 }
 
-.comparisons-section {
+.views-section {
     margin-bottom: 1rem;
 
     h4 {

@@ -5,6 +5,8 @@ import { readSource, ruleOf, mediaBlock } from '@/specs/cssSource';
 // analysis panels are sheets inside the map that fold; the layout is CSS, so the rules are read
 const css = readSource(__dirname, '../../../../css/ol-controls.css');
 const scss = readSource(__dirname, '../../../../css/_analysis-panel.scss');
+const layerPanel = readSource(__dirname, './RasterLayerOpacityPanel.vue');
+const layerPanelStyle = layerPanel.slice(layerPanel.indexOf('<style'));
 const PHONE = 'max-width: 767.98px';
 
 describe('the panels over the bottom of the map', () => {
@@ -71,5 +73,80 @@ describe('the panels over the bottom of the map', () => {
             .toMatch(/display:\s*none/);
         expect(ruleOf(phone, '.map-container:has(> .analysis-panel.is-minimised) > .map-bottom-panel'))
             .toMatch(/bottom:\s*calc\(.*var\(--map-sheet-peek\)/);
+    });
+});
+
+describe('the layer panel on a phone', () => {
+    const tablet = mediaBlock(layerPanelStyle, PHONE);
+    const phone = mediaBlock(layerPanelStyle, 'max-width: 575.98px');
+
+    it('shows the fold toggle only at the phone breakpoint', () => {
+        expect(ruleOf(layerPanelStyle.replace(tablet, ''), '.fold-toggle')).toMatch(/display:\s*none/);
+        expect(ruleOf(layerPanelStyle.replace(tablet, ''), '.layers-header')).toMatch(/display:\s*none/);
+        expect(ruleOf(tablet, '.fold-toggle')).toMatch(/display:\s*inline-flex/);
+        expect(ruleOf(tablet, '.layers-header')).toMatch(/display:\s*flex/);
+    });
+
+    it('folds by hiding everything but the header', () => {
+        expect(tablet).toMatch(/\.is-folded > :not\(\.layers-header\)\s*\{\s*display:\s*none/);
+    });
+
+    it('stays a direct child of the map and a bottom panel, so the rules for the sheets reach it', () => {
+        expect(layerPanel).toMatch(/<div v-if="[^"]*" class="raster-opacity-panel map-bottom-panel"/);
+    });
+
+    it('lays a row out as two lines: the name and the eye, then the slider and the actions', () => {
+        expect(ruleOf(phone, '.raster-opacity-row')).toMatch(/flex-direction:\s*column/);
+        expect(ruleOf(phone, '.row-controls')).toMatch(/display:\s*flex/);
+        expect(ruleOf(layerPanelStyle.replace(phone, ''), '.row-controls')).toMatch(/display:\s*contents/);
+        // The name takes what the eye leaves and the slider what the actions leave, so none wraps
+        expect(ruleOf(phone, '.raster-label')).toMatch(/flex:\s*1 1 0/);
+        expect(ruleOf(phone, '.raster-opacity-row input[type="range"]')).toMatch(/flex:\s*1 1 0/);
+        expect(ruleOf(phone, '.row-controls')).not.toMatch(/flex-wrap:\s*wrap/);
+        expect(phone).not.toMatch(/flex:\s*1 0 100%/);
+    });
+});
+
+describe('the layers of the map', () => {
+    const split = readSource(__dirname, './RasterSplitOverlay.vue');
+    const splitStyle = split.slice(split.indexOf('<style'));
+    const map = ruleOf(css, '.map-container');
+    /** The number a `--map-layer-*` token of the map stands for. @param {string} name */
+    const layer = name => {
+        const value = map.match(new RegExp(`--map-layer-${name}:\\s*(\\d+);`));
+        expect(value, `--map-layer-${name}`).not.toBeNull();
+        return Number(value[1]);
+    };
+
+    it('belong to the map alone, so the page around it never mixes with them', () => {
+        expect(map).toMatch(/isolation:\s*isolate/);
+    });
+
+    it('lift the container of the toolbar zones over the inline z-index OpenLayers gives it', () => {
+        expect(ruleOf(css, '.map-container .ol-overlaycontainer-stopevent'))
+            .toMatch(/z-index:\s*var\(--map-layer-controls\)\s*!important/);
+    });
+
+    it('take their place from the tokens of the map', () => {
+        expect(ruleOf(splitStyle, '.split-overlay')).toMatch(/z-index:\s*var\(--map-layer-split\)/);
+        expect(ruleOf(css, '.map-bottom-panel')).toMatch(/z-index:\s*var\(--map-layer-bottom-panel\)/);
+        expect(ruleOf(scss, '.analysis-panel')).toMatch(/z-index:\s*var\(--map-layer-panel\)/);
+    });
+
+    it('keep the toolbar above the split, so a divider under a map button never takes its click', () => {
+        expect(layer('controls')).toBeGreaterThan(layer('split'));
+        expect(layer('controls')).toBeGreaterThan(layer('bottom-panel'));
+    });
+
+    it('keep the analysis panels and sheets above the toolbar and the split, as they were', () => {
+        expect(layer('panel')).toBeGreaterThan(layer('controls'));
+        expect(layer('split')).toBeGreaterThan(layer('bottom-panel'));
+    });
+
+    it('put the labels of the split below the row of buttons at the top centre, and above the settings button on a phone', () => {
+        expect(map).toMatch(/--map-top-reserve:\s*4rem/);
+        expect(ruleOf(splitStyle, '.split-band-label')).toMatch(/top:\s*var\(--map-top-reserve\)/);
+        expect(ruleOf(mediaBlock(splitStyle, 'max-width: 575.98px'), '.split-band-label'))
+            .toMatch(/bottom:\s*var\(--map-bottom-reserve\)/);
     });
 });

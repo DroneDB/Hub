@@ -30,7 +30,8 @@
 /**
  * MapSettingsDialog - the basemap and the measurement units of a map. "Custom" opens the editor of
  * the custom basemap; the map switches to it once a source is saved. The basemap is emitted, not
- * stored here: a comparison keeps its own basemap instead of the user's preference.
+ * stored here: the map draws it and saves it as the user's preference (useMapBasemap), which also
+ * draws the basemap of a saved view without saving it.
  */
 import { computed } from 'vue';
 import Button from 'primevue/button';

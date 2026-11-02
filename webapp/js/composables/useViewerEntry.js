@@ -13,13 +13,21 @@
  * `dataset`, `ddbURI`, `canRead`, `canWrite`, `canDelete`, `loading`, `error` (the view's
  * one error, shown by ViewerShell) and `entryLoaded`, a promise of whether the entry
  * loaded and has an accepted type.
+ *
+ * A viewer whose file is not named by the route (a saved view names it in its data) passes
+ * `path`: the dataset path, or a getter, ref or promise of it. A path that turns out to be
+ * empty means there is nothing to load: no request is made, no error is set, and `entryLoaded`
+ * is false. `allowMissing` lets a file that is not in the dataset load as `entry = null` (the
+ * rest of the viewer still opens, and `entryLoaded` is true); other failures stay errors.
+ * `title: null` leaves the page title to the caller.
  */
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, unref } from 'vue';
 import { useRoute } from 'vue-router';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { b64decode } from '@/libs/base64';
 import { setTitle } from '@/libs/utils';
+import { ApiError, isNotFound } from '@/libs/ddb/apiError';
 import { permissionsOf, NO_PERMISSIONS } from '@/libs/datasetPermissions';
 import { useDatasetSessionStore } from '@/stores/datasetSession';
 
@@ -27,9 +35,12 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
  * @param {object} options
  * @param {string[]} [options.types]   accepted entry types (any when omitted)
  * @param {string} [options.typeLabel] "a 3D model": the error says the file "cannot be opened as <typeLabel>"
- * @param {string} options.title       page title suffix ("<file> - <title>")
+ * @param {string|null} options.title  page title suffix ("<file> - <title>"); null leaves the title alone
+ * @param {string|import('vue').Ref<string|null>|Promise<string|null>|(() => string|null|Promise<string|null>)} [options.path]
+ *   the dataset path of the file, when the route does not name it (its `encodedPath` is used by default)
+ * @param {boolean} [options.allowMissing]  a file that is not in the dataset loads as `entry = null`, not as an error
  */
-export function useViewerEntry({ types, typeLabel = 'this view', title }) {
+export function useViewerEntry({ types, typeLabel = 'this view', title, path: pathOption, allowMissing = false }) {
     const route = useRoute();
     const entry = shallowRef(null);
     const dataset = shallowRef(null);
@@ -40,14 +51,33 @@ export function useViewerEntry({ types, typeLabel = 'this view', title }) {
     const loading = ref(true);
     const error = ref('');
 
+    /** The dataset path of the file, or null when the caller has none to load. */
+    async function filePath() {
+        if (pathOption === undefined) {
+            const { encodedPath } = route.params;
+            if (!encodedPath) throw new Error('Invalid uri');
+            return b64decode(String(encodedPath));
+        }
+        return (await (typeof pathOption === 'function' ? pathOption() : unref(pathOption))) || null;
+    }
+
+    /** The Registry answers an empty listing, which listOne reports as a plain error, for a file that is not there. */
+    const isMissing = (/** @type {unknown} */ e) => !(e instanceof ApiError) || isNotFound(e);
+
+    /** @returns {Promise<boolean>} whether there was a file to load */
     async function load() {
-        const { org, ds: slug, encodedPath } = route.params;
-        if (!encodedPath) throw new Error('Invalid uri');
+        const { org, ds: slug } = route.params;
+        const path = await filePath();
+        if (path === null) return false;
         const ds = reg.Organization(String(org)).Dataset(String(slug));
-        const path = b64decode(String(encodedPath));
         ddbURI.value = ds.remoteUri(path);
-        const e = await ds.listOne(path);
-        if (types && !types.includes(e.type)) throw new Error(`${e.path} cannot be opened as ${typeLabel}`);
+        let e = null;
+        try {
+            e = await ds.listOne(path);
+        } catch (listError) {
+            if (!allowMissing || !isMissing(listError)) throw listError;
+        }
+        if (e && types && !types.includes(e.type)) throw new Error(`${e.path} cannot be opened as ${typeLabel}`);
 
         let permissions = { ...NO_PERMISSIONS };
         try {
@@ -61,11 +91,14 @@ export function useViewerEntry({ types, typeLabel = 'this view', title }) {
         dataset.value = ds;
         entry.value = e;
 
-        useDatasetSessionStore().setSelectedFiles([{ path: ddbURI.value }]);
-        setTitle(`${ddb.pathutils.basename(e.path)} - ${title}`);
+        if (e) {
+            useDatasetSessionStore().setSelectedFiles([{ path: ddbURI.value }]);
+            if (title !== null) setTitle(`${ddb.pathutils.basename(e.path)} - ${title}`);
+        }
+        return true;
     }
 
-    const entryLoaded = load().then(() => true, e => {
+    const entryLoaded = load().catch(e => {
         error.value = e.message;
         return false;
     }).finally(() => { loading.value = false; });

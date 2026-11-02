@@ -15,8 +15,8 @@ import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/feature
 import { BUILD_DOWNLOADS, offersBuildDownload } from '@/libs/build/buildDownloads';
 import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
 import { taskToolOffered } from '@/libs/tasks/taskTools';
-import { openCompare } from '@/libs/compare/compareLinks';
-import { MAX_LAYERS } from '@/libs/compare/compareState';
+import { fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
+import { MAX_LAYERS } from '@/libs/views/viewState';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 
 /**
@@ -432,7 +432,7 @@ function experimentalMenuItems(ctx) {
     };
 }
 
-// One georaster: the compare view opens on it with the file picker, for the other rasters
+// One georaster: the map opens on it with the file picker, for the other rasters
 function compareToItem(ctx) {
     return {
         label: 'Compare to...',
@@ -441,11 +441,11 @@ function compareToItem(ctx) {
             const sel = ctx.getSelectedEntries();
             return !!ctx.dataset && sel.length === 1 && isGeoraster(sel[0].entry);
         },
-        click: () => openCompare(ctx.dataset, { paths: [ctx.getSelectedEntries()[0].entry.path], pick: true })
+        click: () => openInNewTab(fileViewUrl(ctx.dataset, ctx.getSelectedEntries()[0].entry.path, { pick: true }))
     };
 }
 
-// Several georasters: the compare view opens on them, side by side in the order they are listed
+// Several georasters: the map opens on the first with the others added, in the order they are listed
 function compareInMapItem(ctx) {
     return {
         label: 'Compare in Map',
@@ -454,7 +454,10 @@ function compareInMapItem(ctx) {
             const sel = ctx.getSelectedEntries();
             return !!ctx.dataset && sel.length >= 2 && sel.length <= MAX_LAYERS && sel.every(f => isGeoraster(f.entry));
         },
-        click: () => openCompare(ctx.dataset, { paths: ctx.getSelectedEntries().map(f => f.entry.path) })
+        click: () => {
+            const [first, ...rest] = ctx.getSelectedEntries().map(f => f.entry.path);
+            openInNewTab(fileViewUrl(ctx.dataset, first, { add: rest }));
+        }
     };
 }
 

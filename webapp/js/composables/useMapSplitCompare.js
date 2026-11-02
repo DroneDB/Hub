@@ -9,7 +9,7 @@
 import { ref, computed, watch, onScopeDispose } from 'vue';
 import { unByKey } from 'ol/Observable';
 import { getRenderPixel } from 'ol/render';
-import { equalPositions } from '@/libs/compare/compareState';
+import { equalPositions } from '@/libs/views/viewState';
 
 /**
  * @param {object} ctx
@@ -98,7 +98,7 @@ export function useMapSplitCompare({ map, rasterLayers, onChange = () => {} }) {
     }
 
     /**
-     * Sets the mode and the dividers at once (a comparison's saved state).
+     * Sets the mode and the dividers at once (the state of a view).
      * @param {boolean} enabled @param {number[]} positions
      */
     function setSplit(enabled, positions) {

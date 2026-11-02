@@ -12,7 +12,7 @@ import {
 
 /**
  * rasterZoom.spec - zoom math contract owned by rasterZoom.js and consumed
- * by MapCore, SingleMap.vue and usePlantHealth.js.
+ * by rasterLayers.js (the rasters MapCore draws) and usePlantHealth.js.
  *
  * Expectations are derived from the zoom contract (native zoom of a raster from its
  * footprint and size, source and view zoom limits), not from existing implementation

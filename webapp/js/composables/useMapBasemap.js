@@ -4,6 +4,11 @@
  * Owns the selection and draws it; the custom WMS/XYZ source is saved by CustomBasemapEditor and
  * followed here through its preference.
  *
+ * The selection is what the map draws; the user's preference is where it starts from and where a
+ * basemap the user picks is saved. A basemap a saved view carries is drawn with `applyBasemap`
+ * and leaves the preference alone; while it is drawn, a change of the preference from elsewhere
+ * does not replace it (the view would change without anything done on this map).
+ *
  *   const basemap = useMapBasemap(map);    // map: ShallowRef<ol/Map|null>
  *   new Map({ layers: [basemap.createBasemapLayer(), ...] })
  */
@@ -16,7 +21,7 @@ import { get as getProjection } from 'ol/proj';
 import { getWidth } from 'ol/extent';
 import { Basemaps, getCustomBasemapConfig } from '@/libs/map/basemaps';
 import { EPSG } from '@/libs/constants';
-import { getPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { usePreference } from '@/composables/usePreference';
 
 /** Tile layer of a custom WMS/XYZ configuration. @param {any} config */
@@ -41,15 +46,15 @@ function customLayer(config) {
     return new TileLayer({ source: new TileWMS(options) });
 }
 
-/**
- * @param {import('vue').ShallowRef<any>} map
- * @param {{ persist?: boolean }} [options]  persist: false keeps a change of basemap to this map (a
- *        comparison carries its own basemap and must not change the user's preference)
- */
-export function useMapBasemap(map, { persist = true } = {}) {
-    const selectedBasemap = persist
-        ? usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP])
-        : ref(getPref(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]));
+/** @param {import('vue').ShallowRef<any>} map */
+export function useMapBasemap(map) {
+    const preferredBasemap = usePreference(PREF.BASEMAP, PREF_DEFAULTS[PREF.BASEMAP]);
+    const selectedBasemap = ref(preferredBasemap.value);
+    // The map draws a basemap of its own (applyBasemap with a name), not the preference
+    let ownBasemap = false;
+    // A change of the preference from elsewhere (the Preferences page, another tab, the account)
+    // shows too, unless the map draws a basemap of its own
+    watch(preferredBasemap, name => { if (!ownBasemap) selectedBasemap.value = name; }, { flush: 'sync' });
     const customBasemapConfig = ref(getCustomBasemapConfig());
 
     /** Tile layer of the current selection. */
@@ -76,9 +81,21 @@ export function useMapBasemap(map, { persist = true } = {}) {
         layers.insertAt(0, createBasemapLayer());
     }
 
-    /** Settings dialog: another basemap. @param {string} name */
+    /** Settings dialog: the user picks another basemap, which becomes their preference. @param {string} name */
     function handleBasemapChanged(name) {
+        ownBasemap = false;
+        preferredBasemap.value = name;
         selectedBasemap.value = name;
+    }
+
+    /**
+     * Draws a basemap without saving it as the preference (the one a saved view carries), and
+     * keeps it when the preference changes elsewhere; none draws, and follows, the preference.
+     * @param {string|null|undefined} name
+     */
+    function applyBasemap(name) {
+        ownBasemap = !!name;
+        selectedBasemap.value = name || preferredBasemap.value;
     }
 
     // Applies the selection however it changed: the dialog, the Preferences page, another tab, the account
@@ -89,5 +106,5 @@ export function useMapBasemap(map, { persist = true } = {}) {
         if (selectedBasemap.value === 'custom') updateBasemap();
     }));
 
-    return { selectedBasemap, basemaps: Basemaps, createBasemapLayer, updateBasemap, handleBasemapChanged };
+    return { selectedBasemap, basemaps: Basemaps, createBasemapLayer, updateBasemap, handleBasemapChanged, applyBasemap };
 }

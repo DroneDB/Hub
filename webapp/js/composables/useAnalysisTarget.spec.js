@@ -344,3 +344,92 @@ describe('a target that is not a georaster', () => {
         expect(m.target.targetEntry.value).toEqual(thermal.entry);
     });
 });
+
+describe('the default target', () => {
+    it('is the raster the measurements belong to, else the topmost candidate, and none without candidates', () => {
+        expect(map().target.defaultTarget()).toBe(DSM);
+        expect(map({ rows: [DTM, ORTHO], own: DSM }).target.defaultTarget()).toBe(DTM);
+        expect(map({ rows: [] }).target.defaultTarget()).toBeNull();
+    });
+
+    it('does not follow the target the user chose (the measurements do, the default is what a tool would pick)', async () => {
+        const m = await opened();
+        const done = m.target.requestSwitch(DTM);
+        await m.settle();
+        await done;
+        expect(m.target.targetPath.value).toBe(DTM);
+        expect(m.target.defaultTarget()).toBe(DSM);
+    });
+
+    it('is chosen by a tool button as before, with another target on the map the measurements are not of', async () => {
+        const m = map({ rows: [DTM, DSM], own: DSM });
+        const done = m.target.requestOpen('stockpile');
+        await m.settle();
+        await done;
+        expect(m.target.targetPath.value).toBe(m.target.defaultTarget());
+    });
+});
+
+describe('restoring a saved target', () => {
+    it('sets the target without a question and without opening a panel, and loads its measurements', async () => {
+        const m = map({ dirty: false });
+        expect(m.target.restoreTarget(DTM)).toBe(true);
+        expect(m.target.targetPath.value).toBe(DTM);
+        await m.settle();
+        expect(m.ask).not.toHaveBeenCalled();
+        expect(m.log).toEqual(['load']);
+        expect(m.state.kind).toBeNull();
+    });
+
+    it('is refused for a path that is not a candidate, and when it would drop unsaved measurements', () => {
+        const m = map({ dirty: true });
+        expect(m.target.restoreTarget('elsewhere.tif')).toBe(false);
+        expect(m.target.restoreTarget(DTM)).toBe(false);
+        expect(m.target.targetPath.value).toBeNull();
+        expect(m.ask).not.toHaveBeenCalled();
+        expect(m.log).toEqual([]);
+    });
+
+    it('is true without a reload when the target is that path already', async () => {
+        const m = await opened();
+        expect(m.target.restoreTarget(DSM)).toBe(true);
+        expect(m.log).toEqual([]);
+    });
+
+    it('opens the panel that is open again for the new raster, after the measurements are in', async () => {
+        const m = await opened();
+        expect(m.target.restoreTarget(DTM)).toBe(true);
+        await nextTick();
+        expect(m.log).toEqual(['close stockpile', 'load']);
+        await m.settle();
+        expect(m.log).toEqual(['close stockpile', 'load', `open stockpile ${DTM}`]);
+    });
+
+    it('gives way to the user: a tool opened while the measurements load opens its panel, once', async () => {
+        const m = map();
+        m.target.restoreTarget(DTM);
+        const done = m.target.requestToggle('rasterAnalysis');
+        await m.settle();
+        await done;
+        expect(m.log.filter(l => l.startsWith('open'))).toEqual([`open rasterAnalysis ${DTM}`]);
+    });
+
+    it('is overtaken by a selector change made while its measurements load', async () => {
+        const m = map({ rows: [DTM, DSM, ORTHO], own: DSM });
+        m.target.restoreTarget(DTM);
+        const done = m.target.requestSwitch(ORTHO);
+        await m.settle();
+        await done;
+        expect(m.target.targetPath.value).toBe(ORTHO);
+    });
+
+    it('does not open a panel in split compare', async () => {
+        const m = await opened();
+        m.splitMode.value = true;
+        await nextTick();
+        m.log.length = 0;
+        m.target.restoreTarget(DTM);
+        await m.settle();
+        expect(m.log).toEqual(['load']);
+    });
+});

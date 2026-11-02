@@ -1,20 +1,20 @@
 <template>
     <!-- Right clicks here are this list's: its menu stops them before the file browser's -->
-    <div class="saved-comparisons" data-no-file-shortcuts>
+    <div class="saved-views" data-no-file-shortcuts>
         <ContextMenu :items="menu" />
-        <ul role="tree" aria-label="Saved comparisons">
+        <ul role="tree" aria-label="Saved views">
             <li role="treeitem" :aria-expanded="expanded" aria-selected="false">
                 <button type="button" class="entry group" :aria-expanded="expanded" @click="expanded = !expanded" @contextmenu="current = null">
                     <i class="icon" :class="expanded ? 'fa-solid fa-caret-down' : 'fa-solid fa-caret-right'" aria-hidden="true" />
                     <i class="icon fa-solid fa-table-columns" aria-hidden="true" />
-                    <span class="text">Comparisons</span>
+                    <span class="text">Views</span>
                 </button>
                 <ul v-show="expanded" role="group">
-                    <li v-for="c in comparisons" :key="c.uid" role="treeitem" :aria-selected="current === c">
-                        <button type="button" class="entry child" :class="{ selected: current === c }" :title="`${c.name} (double-click to open)`"
-                                @click="current = c" @dblclick="open(c)" @keydown.enter.prevent="open(c)" @contextmenu="current = c">
+                    <li v-for="v in views" :key="v.uid" role="treeitem" :aria-selected="current === v">
+                        <button type="button" class="entry child" :class="{ selected: current === v }" :title="`${v.name} (double-click to open)`"
+                                @click="current = v" @dblclick="open(v)" @keydown.enter.prevent="open(v)" @contextmenu="current = v">
                             <i class="icon fa-regular fa-map" aria-hidden="true" />
-                            <span class="text">{{ c.name }}</span>
+                            <span class="text">{{ v.name }}</span>
                         </button>
                     </li>
                 </ul>
@@ -25,20 +25,20 @@
 
 <script setup>
 /**
- * SavedComparisons - the dataset's saved comparisons under the folder tree. They are not
- * dataset files: they open in the compare view (double click, Enter, Open) and none of the
- * file operations apply to them; writers rename and delete them (the page does, `rename` /
- * `delete` events).
+ * SavedViews - the dataset's saved map views under the folder tree. They are not dataset
+ * files: they open in the map (double click, Enter, Open) in a new tab and none of the file
+ * operations apply to them; writers rename and delete them (the page does, `rename` /
+ * `delete` events). Names are shown as text, whatever they contain.
  */
 import { ref } from 'vue';
 import ContextMenu from './ContextMenu.vue';
-import { compareUrl, absoluteUrl, openCompare } from '@/libs/compare/compareLinks';
+import { savedViewUrl, absoluteUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { copyText } from '@/composables/useCopyText';
 import { useNotify } from '@/composables/useNotify';
 
 const props = defineProps({
-    // [{ uid, name }] (libs/compare/comparisonStore savedComparisons)
-    comparisons: { type: Array, required: true },
+    // [{ uid, name }] (libs/views/viewStore listViews), sorted by name
+    views: { type: Array, required: true },
     dataset: { type: Object, required: true },
     canWrite: { type: Boolean, default: false }
 });
@@ -46,18 +46,18 @@ const emit = defineEmits(['rename', 'delete']);
 const notify = useNotify();
 
 const expanded = ref(true);
-// The comparison the menu acts on
+// The view the menu acts on
 const current = ref(null);
 
-const open = c => openCompare(props.dataset, { uid: c.uid });
+const open = v => openInNewTab(savedViewUrl(props.dataset, v.uid));
 const has = () => !!current.value;
 
-async function copyLink(c) {
+async function copyLink(v) {
     try {
-        await copyText(absoluteUrl(compareUrl(props.dataset, { uid: c.uid })));
-        notify.success('Link copied to the clipboard', { summary: c.name });
+        await copyText(absoluteUrl(savedViewUrl(props.dataset, v.uid)));
+        notify.success('Link copied to the clipboard', { summary: v.name });
     } catch {
-        notify.error('The link could not be copied', { summary: c.name });
+        notify.error('The link could not be copied', { summary: v.name });
     }
 }
 
@@ -71,7 +71,7 @@ const menu = [
 </script>
 
 <style scoped>
-.saved-comparisons {
+.saved-views {
     border-top: var(--ddb-border-width) solid var(--ddb-border);
     padding: 0.25rem 0;
     user-select: none;

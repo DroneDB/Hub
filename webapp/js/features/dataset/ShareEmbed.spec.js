@@ -15,7 +15,7 @@ vi.mock('ddb', async importOriginal => {
 });
 
 const { default: ShareEmbed } = await import('./ShareEmbed.vue');
-const { VIEWER_ONLY_HELP } = await import('@/libs/viewerLinks');
+const { VIEWER_ONLY_HELP } = await import('@/libs/views/viewLinks');
 
 const WindowStub = { props: ['title'], template: '<div><h1 data-title>{{ title }}</h1><slot /><slot name="footer" /></div>' };
 const photo = { path: 'ddb://h/org/ds/a.jpg', entry: { path: 'a.jpg', type: ddb.entry.type.GEOIMAGE } };
@@ -144,6 +144,29 @@ describe('ShareEmbed', () => {
             await open(ortho);
             expect(viewerOnlyBox().checked).toBe(false);
             expect(linkInput().value).toBe(orthoPrefix());
+        });
+
+        // The links the dialog built before the viewer links moved to one module: origin, org, ds,
+        // the path in base64 and the viewer of the route, then embed=1 when asked
+        it.each([
+            ['markdown', ddb.entry.type.MARKDOWN, undefined, 'markdown'],
+            ['georaster', ddb.entry.type.GEORASTER, undefined, 'map'],
+            ['point cloud', ddb.entry.type.POINTCLOUD, undefined, 'pointcloud'],
+            ['model', ddb.entry.type.MODEL, undefined, 'model'],
+            ['panorama', ddb.entry.type.PANORAMA, undefined, 'panorama'],
+            ['geo panorama', ddb.entry.type.GEOPANORAMA, undefined, 'panorama'],
+            ['vector', ddb.entry.type.VECTOR, undefined, 'map'],
+            ['local vector', ddb.entry.type.VECTOR, { georeferenced: false }, 'unified'],
+            ['gaussian splat', ddb.entry.type.GAUSSIAN_SPLAT, undefined, 'splat'],
+            ['3D tiles', ddb.entry.type.TILES3D, undefined, 'unified']
+        ])('gives the same link as ever for a %s, with and without Viewer only', async (_, type, properties, view) => {
+            const path = 'sub dir/ünï.file';
+            await open({ path: `ddb://h/org/ds/${path}`, entry: { path, type, properties } });
+            const plain = `${origin()}/r/org/ds/view/${Buffer.from(path).toString('base64')}/${view}`;
+            expect(linkInput().value).toBe(plain);
+            viewerOnlyBox().click();
+            await flushPromises();
+            expect(linkInput().value).toBe(`${plain}?embed=1`);
         });
 
         it('is not offered for a file with no default view, whose link is the download address', async () => {
