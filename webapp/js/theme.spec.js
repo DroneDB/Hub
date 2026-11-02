@@ -66,7 +66,8 @@ walk(path.join(WEBAPP, 'js'));
 walk(path.join(WEBAPP, 'css'));
 /** The sources that match a pattern, relative to webapp/. @param {RegExp} pattern */
 const sourcesMatching = pattern => sources.filter(file => pattern.test(fs.readFileSync(file, 'utf8')))
-    .map(file => path.relative(WEBAPP, file));
+    // '/' on every platform: the names below are written with it
+    .map(file => path.relative(WEBAPP, file).split(path.sep).join('/'));
 
 describe('no blue of its own', () => {
     it.each([
