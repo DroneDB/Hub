@@ -1,18 +1,27 @@
 /**
  * The 3D viewer's Giro3D scene: the instance in a flat
- * CRS or on the globe, lights, the OSM basemap, the one navigation control, framing and the
- * Home pose, the layer list and teardown. The loaders (loaders.js) put the data in it.
+ * CRS or on the globe, lights, the OSM basemap, the navigation control (the bm3d viewer's, in
+ * every scene), framing and the Home pose, the layer list and teardown. The loaders (loaders.js) put the data in it.
  *
  * `view` is the component's reactive state the scene reports into: loadingText, progress,
  * layers, isLocalPointCloud, isLocalDrawing, localUnits, activeTool.
  */
 import ddb from 'ddb';
-import { createNavControls, applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV } from './navControls';
+import {
+    createNavControls, aimCamera, navPivot, orbitTweenStep, stopNavAnimation, focusPosition,
+    applySceneMetrics, createDoubleClickRecenter, createCameraTweener, NAV
+} from './navControls';
 import { alignContentUpAxis } from './contentOrientation';
 import { geojsonBbox, isFiniteBox, fitDistance, ELEVATION_RAMP } from './sceneUtils';
 
 // Direction (east, south, up) the camera looks at a framed model from
 const THREE_QUARTER_VIEW = [1.2, -1.2, 0.9];
+
+/** North on the ground of an ECEF point whose vertical is `up` (east where north is undefined, at a pole). */
+function northOf(THREE, up) {
+    const north = new THREE.Vector3(0, 0, 1).addScaledVector(up, -up.z);
+    return north.lengthSq() > 1e-12 ? north.normalize() : new THREE.Vector3(0, 1, 0);
+}
 
 export class UnifiedScene {
     /**
@@ -32,6 +41,9 @@ export class UnifiedScene {
         this.instance = null;
         this.map = null;
         this.controls = null;
+        // The scene's up axis: Z in a flat scene, the local vertical of the data on the globe
+        // (camera.up is the screen's: see navControls)
+        this.sceneUp = null;
         this.globe = null;
         this.globeUpSet = false;
         this.lights = {};
@@ -53,16 +65,16 @@ export class UnifiedScene {
         const instance = new this.libs.Instance({ target: this.container, crs, backgroundColor: 0x1a1a2e });
         this.instance = instance;
         instance.view.camera.up.set(0, 0, 1);
+        this.sceneUp = instance.view.camera.up.clone();
         this.addLights({ fill: true });
-        // Focusable, so the control's arrow keys work once the canvas is clicked
+        // Focusable: a click on the view takes the keyboard focus
         instance.domElement.tabIndex = 0;
         this.attachControls();
     }
 
     /**
-     * A globe (EPSG:4978) with the OSM basemap on the ellipsoid. The control is built by
-     * frameGlobe, once the local up (the ellipsoid normal under the data) is known: the
-     * control freezes camera.up when it is built.
+     * A globe (EPSG:4978) with the OSM basemap on the ellipsoid. Its up axis is the ellipsoid
+     * normal under the data, which frameGlobe knows.
      */
     setupGlobe() {
         const { Instance, Globe, ColorLayer, TiledImageSource, OSM, CoordinateSystem } = this.libs;
@@ -70,6 +82,7 @@ export class UnifiedScene {
         this.instance = instance;
         this.mercatorScale = 1;
         instance.view.camera.up.set(0, 0, 1);
+        this.sceneUp = instance.view.camera.up.clone();
         this.addLights({ fill: false });
         try {
             const globe = new Globe({ backgroundColor: 0x0b1021 });
@@ -80,11 +93,11 @@ export class UnifiedScene {
         } catch {
             // The basemap is optional
         }
-        this.userInteracted = false;
         this.globeUpSet = false;
+        this.attachControls();
     }
 
-    /** The navigation control (and its double-click re-centre); replaces the previous one. */
+    /** The navigation control and its double-click focus; replaces the previous ones. */
     attachControls() {
         const { instance } = this;
         const camera = instance.view.camera;
@@ -92,23 +105,22 @@ export class UnifiedScene {
         if (this.controls) {
             try { this.controls.dispose(); } catch { /* already gone */ }
         }
-        // Its turntable drags never fire 'start': take ownership of the camera here
-        const controls = createNavControls(this.libs, camera, instance.domElement, {
-            onDragStart: () => {
-                this.userInteracted = true;
-                this.tweener.stop();
-            }
-        });
+        const controls = createNavControls(this.libs, camera, instance.domElement, instance.scene);
         // Giro3D then updates it every frame and relays its changes (what keeps 3D Tiles streaming)
         instance.view.setControls(controls);
         this.controls = controls;
         this.userInteracted = false;
-        // lifetime: owner (the control is disposed with the scene)
-        controls.addEventListener('start', () => { this.userInteracted = true; });
-        // OrbitControls resets touch-action on attach: a touch drag must never scroll the page
+        // lifetime: owner (the control is disposed with the scene). A press or a wheel notch
+        // takes the camera over from a flight
+        controls.addEventListener('start', () => {
+            this.userInteracted = true;
+            this.tweener.stop();
+        });
+        // A touch drag must never scroll the page
         instance.domElement.style.touchAction = 'none';
+        // Navigation is disabled while a measurement is drawn; the focus is too
         this.dblClickDispose = createDoubleClickRecenter(this.libs, instance, camera, controls,
-            () => !this.view.activeTool, point => this.flyTo(point));
+            () => !this.view.activeTool && controls.enabled, point => this.flyTo(point), () => this.sceneUp);
     }
 
     /** Ambient, hemisphere (sky/ground fill: 3D Tiles are dark without it), sun and fill lights. */
@@ -305,7 +317,7 @@ export class UnifiedScene {
     /** Stands a flat-scene tileset up when its content is not Z-up (measured once it rendered). */
     uprightTileset(tileset, box) {
         const camera = this.instance.view.camera;
-        const rotation = alignContentUpAxis(this.libs, tileset.object3d, camera.up);
+        const rotation = alignContentUpAxis(this.libs, tileset.object3d, this.sceneUp);
         if (!rotation) return box;
         const upright = box.clone().applyMatrix4(rotation);
         if (!this.userInteracted && isFiniteBox(upright)) this.frameBox(upright);
@@ -336,7 +348,9 @@ export class UnifiedScene {
 
     savePose(target) {
         const camera = this.instance.view.camera;
-        this.homePose = { position: camera.position.clone(), target: target.clone(), up: camera.up.clone() };
+        this.homePose = {
+            position: camera.position.clone(), target: target.clone(), up: camera.up.clone(), quaternion: camera.quaternion.clone()
+        };
     }
 
     /** Oblique top-down view of a map extent; sets the Mercator correction. */
@@ -350,7 +364,7 @@ export class UnifiedScene {
         this.instance.view.minNearPlane = Math.max(dist / 1000, 0.1);
         this.controls.target.set(cx, cy, 0);
         applySceneMetrics(this.controls, span);
-        this.controls.update();
+        aimCamera(this.instance.view.camera, this.controls, this.sceneUp);
         this.savePose(this.controls.target);
         this.instance.notifyChange();
     }
@@ -371,7 +385,7 @@ export class UnifiedScene {
         camera.position.set(THREE_QUARTER_VIEW[0], THREE_QUARTER_VIEW[1], THREE_QUARTER_VIEW[2]).normalize().multiplyScalar(distance).add(center);
         this.controls.target.copy(center);
         applySceneMetrics(this.controls, maxDim);
-        this.controls.update();
+        aimCamera(camera, this.controls, this.sceneUp);
         this.savePose(center);
         this.instance.notifyChange();
     }
@@ -379,7 +393,7 @@ export class UnifiedScene {
     /**
      * Frames a georeferenced tileset from its declared bounding volume (view.goTo would use
      * the still empty object hierarchy and park the camera at the Earth's centre, where no
-     * tile ever loads). The first call fixes the local up and builds the control.
+     * tile ever loads), straight down with north up. The first call fixes the scene's up axis.
      */
     frameGlobe(tileset, box) {
         const { THREE } = this.libs;
@@ -392,34 +406,50 @@ export class UnifiedScene {
         this.instance.view.maxFarPlane = Math.max(maxDim * 1000, 5.0e7);
         camera.position.copy(center).add(up.clone().multiplyScalar(maxDim * 2.5));
         if (!this.globeUpSet) {
-            camera.up.copy(up);
+            this.sceneUp = up.clone();
             this.globeUpSet = true;
         }
-        camera.lookAt(center);
-        camera.updateMatrixWorld();
-        if (!this.controls) this.attachControls();
         this.controls.target.copy(center);
         // Pulling back to the continent is legitimate on a globe
         applySceneMetrics(this.controls, maxDim, NAV.globeMaxDistanceFactor);
-        this.controls.update();
+        aimCamera(camera, this.controls, northOf(THREE, up));
         this.savePose(center);
         this.instance.notifyChange(camera);
     }
 
-    /** Re-centres on a point, keeping the view direction and distance (double click). */
+    /**
+     * Focuses on a point (double click), as the bm3d viewer does: the point becomes the pivot,
+     * in the middle of the view, which keeps its direction and comes closer by a wheel notch.
+     */
     flyTo(point) {
         if (!this.instance || !this.controls) return;
         const camera = this.instance.view.camera;
-        const position = camera.position.clone().add(point.clone().sub(this.controls.target));
-        this.tweener.tweenTo(camera, this.controls, position, point, NAV.dblClickDurationMs, () => { this.userInteracted = true; });
+        const controls = this.controls;
+        stopNavAnimation(controls);
+        const position = focusPosition(camera, controls, point);
+        controls.target.copy(navPivot(controls));
+        this.tweener.tweenTo(camera, controls, position, point, NAV.dblClickDurationMs, () => {
+            controls.updateMatrixState();
+            this.userInteracted = true;
+        });
     }
 
-    /** Back to the pose the last framing computed. */
+    /**
+     * Back to the pose the last framing computed: the camera turns around the pivot to it (and
+     * rolls back upright), from wherever a pan or a focus left the pivot.
+     */
     goHome() {
         if (!this.instance || !this.homePose || !this.controls) return;
-        const { position, target } = this.homePose;
-        this.tweener.tweenTo(this.instance.view.camera, this.controls, position.clone(), target.clone(), NAV.dblClickDurationMs,
-            () => { this.userInteracted = false; });
+        const { position, target, quaternion } = this.homePose;
+        const camera = this.instance.view.camera;
+        const controls = this.controls;
+        stopNavAnimation(controls);
+        controls.target.copy(navPivot(controls));
+        const onStep = orbitTweenStep(this.libs.THREE, camera, controls, quaternion, position.distanceTo(target));
+        this.tweener.tweenTo(camera, controls, position.clone(), target.clone(), NAV.dblClickDurationMs, () => {
+            controls.updateMatrixState();
+            this.userInteracted = false;
+        }, onStep);
     }
 
     setNavigationEnabled(enabled) {

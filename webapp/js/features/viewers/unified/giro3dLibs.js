@@ -6,13 +6,14 @@ import { withColorDepth } from './pointCloudColors';
  */
 export async function loadGiro3dLibs() {
     const [
-        THREE, controls, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
+        THREE, arcball, Instance, GMap, Extent, CoordinateSystem, ColorLayer,
         TiledImageSource, VectorTileSource, PointCloud, COPCSource, Tiles3D, DrawTool,
         XYZ, OSM, olStyle, olProj, ColorMap, ColorMapMode, lasConfig, Globe,
         FeatureCollection, OlVectorSource, OlGeoJSON
     ] = await Promise.all([
         import(/* webpackChunkName: "giro3d" */ 'three'),
-        import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/OrbitControls.js'),
+        // The navigation of every scene, the one of the bm3d viewer
+        import(/* webpackChunkName: "giro3d" */ 'three/examples/jsm/controls/ArcballControls.js'),
         import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/Instance.js'),
         import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/entities/Map.js'),
         import(/* webpackChunkName: "giro3d" */ '@giro3d/giro3d/core/geographic/Extent.js'),
@@ -43,7 +44,7 @@ export async function loadGiro3dLibs() {
 
     return {
         THREE,
-        OrbitControls: controls.OrbitControls,
+        ArcballControls: arcball.ArcballControls,
         Instance: Instance.default,
         Map: GMap.default,
         Extent: Extent.default,
