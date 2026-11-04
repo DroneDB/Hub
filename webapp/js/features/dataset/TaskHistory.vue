@@ -765,7 +765,10 @@ export default {
                 message: `Are you sure you want to cancel this task?<br/>${what} will be stopped.`
             })) return;
             try {
-                await this.dataset.cancelTask(task.taskId);
+                // Not deleted: the task ended between the list and the click (the list below shows how)
+                const { deleted } = (await this.dataset.cancelTask(task.taskId)) || {};
+                if (deleted === false)
+                    this.$notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
             } catch (e) {
