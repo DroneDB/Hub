@@ -94,9 +94,10 @@ describe('OrganizationsPage sort', () => {
         expect(shown()).toEqual(['beta', 'alpha']);
     });
 
-    it('has the sort controls in the header actions', async () => {
+    it('has the sort controls in the toolbar above the list, not in the header actions', async () => {
         await render();
-        expect(wrapper.find('.org-actions .sort-select').exists()).toBe(true);
+        expect(wrapper.find('.list-toolbar .sort-select').exists()).toBe(true);
+        expect(wrapper.find('.org-actions .sort-select').exists()).toBe(false);
     });
 });
 

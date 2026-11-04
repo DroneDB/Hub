@@ -53,6 +53,16 @@ describe('severity info', () => {
     });
 });
 
+// An outlined secondary button sits next to fields and select buttons (the toolbars of the lists):
+// it has their border, and text dark enough not to read as disabled
+describe('outlined secondary buttons', () => {
+    it('have the border of a form field and dark text', () => {
+        const secondary = preset.components.button.colorScheme.light.outlined.secondary;
+        expect(secondary.borderColor).toBe('{surface.300}');
+        expect(secondary.color).toBe('{surface.700}');
+    });
+});
+
 // The app's own sources (no specs): what the guards below read
 const sources = [];
 const walk = dir => {

@@ -52,6 +52,12 @@ function toggle() {
     flex: 1 1 auto;
 }
 
+/* The line of a field and a button (normal), not the 1.5 of the page: the select is as high as
+   the search field and the buttons beside it */
+.sort-select-field :deep(.p-select-label) {
+    line-height: normal;
+}
+
 .sort-select-direction {
     flex-shrink: 0;
 }

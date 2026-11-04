@@ -36,10 +36,15 @@ defineProps({
     margin-left: var(--ddb-spacing-xs);
 }
 
-/* Only the icons on a narrow screen */
+/* Only the icons on a narrow screen. The label keeps its line (no width, not display: none), so
+   the switch stays as high as the fields and buttons beside it: an icon alone has a shorter line */
 @media screen and (max-width: 575.98px) {
     .view-select-label {
-        display: none;
+        display: inline-block;
+        width: 0;
+        margin-left: 0;
+        overflow: hidden;
+        vertical-align: top;
     }
 }
 </style>

@@ -91,8 +91,8 @@ describe('OrganizationsPage map view', () => {
         expect(wrapper.find('.map-stub').exists()).toBe(true);
         expect(wrapper.find('.org-card').exists()).toBe(false);
         expect(wrapper.find('.org-pagination').exists()).toBe(false);
-        expect(wrapper.find('.org-actions .sort-select').exists()).toBe(false);
-        expect(wrapper.find('.org-actions .view-select').exists()).toBe(true);
+        expect(wrapper.find('.list-toolbar .sort-select').exists()).toBe(false);
+        expect(wrapper.find('.list-toolbar .view-select').exists()).toBe(true);
     });
 
     it('asks for every organization the filter leaves, not only the page, four at a time', async () => {

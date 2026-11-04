@@ -29,6 +29,12 @@ const infoOutlined = {
 };
 const infoText = { hoverBackground: '{primary.50}', activeBackground: '{primary.100}', color: '{primary.color}' };
 
+// Lara's outlined secondary (surface.500 text on a surface.200 border) reads as disabled next to a
+// select button or a field: it takes their border (form.field.border.color is surface.300) and dark text
+const secondaryOutlined = {
+    hoverBackground: '{surface.50}', activeBackground: '{surface.100}', borderColor: '{surface.300}', color: '{surface.700}'
+};
+
 // "warn" is yellow, as Lara's warning messages and toasts already are: its orange, darkened for
 // white text, read as a second red next to danger. Yellow takes dark text (yellow.950 on
 // yellow.400 is 9.5:1, on yellow.600 5.0:1; yellow.800 on white 6.9:1).
@@ -61,7 +67,7 @@ const DdbPreset = definePreset(Lara, {
             colorScheme: {
                 light: {
                     root: { ...each(solid), info: infoSolid, warn: warnSolid },
-                    outlined: { info: infoOutlined, warn: warnOutlined },
+                    outlined: { secondary: secondaryOutlined, info: infoOutlined, warn: warnOutlined },
                     text: { info: infoText, warn: warnText }
                 }
             }

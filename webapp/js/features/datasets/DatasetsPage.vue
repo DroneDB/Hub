@@ -34,7 +34,7 @@
         <div v-else class="ds-content">
             <!-- Organization header -->
             <div class="org-header">
-                <div class="org-header-layout d-flex align-items-center">
+                <div class="org-header-layout">
                     <!-- Left: identity -->
                     <div class="org-identity">
                         <div class="d-flex align-items-center gap-3">
@@ -62,22 +62,25 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Right: actions -->
-                    <div class="org-actions">
-                        <div class="d-flex flex-wrap align-items-center gap-2">
-                            <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" />
-                            <ViewSelect v-model="view" label="Show the datasets as" />
-                            <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" title="Manage Members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
-                            <Button v-if="canCreateDataset" severity="secondary" outlined size="small" title="Import Dataset" icon="fa-solid fa-download" label="Import Dataset" @click.stop="openImportDialog()" />
-                            <Button v-if="canCreateDataset" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Dataset" @click.stop="handleNew()" />
-                        </div>
-                        <IconField v-if="view === 'list'" class="mt-2">
-                            <InputIcon class="fa-solid fa-magnifying-glass" />
-                            <InputText v-model="searchQuery" small placeholder="Search datasets" aria-label="Search datasets" fluid />
-                        </IconField>
+                    <!-- Right: what the user can do in the organization -->
+                    <div v-if="(memberManagementEnabled && canManageOrg) || canCreateDataset" class="org-actions">
+                        <Button v-if="memberManagementEnabled && canManageOrg" severity="secondary" outlined size="small" class="org-secondary-action"
+                                title="Manage Members" aria-label="Manage members" icon="fa-solid fa-users" label="Members" @click.stop="openMembersDialog()" />
+                        <Button v-if="canCreateDataset" severity="secondary" outlined size="small" class="org-secondary-action"
+                                title="Import Dataset" aria-label="Import dataset" icon="fa-solid fa-download" label="Import" @click.stop="openImportDialog()" />
+                        <Button v-if="canCreateDataset" severity="primary" size="small" class="org-primary-action"
+                                icon="fa-solid fa-plus" label="Create Dataset" @click.stop="handleNew()" />
                     </div>
                 </div>
             </div>
+
+            <!-- How the datasets are shown: the search, the datasets without a location, list or map -->
+            <ListToolbar v-model:search="searchQuery" :search-label="view === 'list' ? 'Search datasets' : ''">
+                <template #end>
+                    <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" />
+                    <ViewSelect v-model="view" label="Show the datasets as" />
+                </template>
+            </ListToolbar>
 
             <!-- Where the datasets are -->
             <DatasetLocationsMap v-if="view === 'map'" :groups="locationGroups" :loading="locationsLoading" />
@@ -201,6 +204,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
 import Message from '@/components/HubMessage.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
+import ListToolbar from '@/components/ListToolbar.vue';
 import { DatasetLocationsMap } from './locationsMap';
 import UnlocatedDatasetsButton from './UnlocatedDatasetsButton.vue';
 import { setTitle, bytesToSize, formatTimeAgo, parseTimestamp } from '@/libs/utils';
@@ -219,9 +223,6 @@ import Loader from '@/components/HubLoader.vue';
 import Button from 'primevue/button';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
-import InputText from 'primevue/inputtext';
-import IconField from 'primevue/iconfield';
-import InputIcon from 'primevue/inputicon';
 import Paginator from 'primevue/paginator';
 import Tag from 'primevue/tag';
 import ProgressSpinner from 'primevue/progressspinner';
@@ -251,6 +252,7 @@ export default {
         EmptyState,
         Message,
         ViewSelect,
+        ListToolbar,
         DatasetLocationsMap,
         UnlocatedDatasetsButton,
         DialogHost,
@@ -263,9 +265,6 @@ export default {
         Button,
         DataTable,
         Column,
-        InputText,
-        IconField,
-        InputIcon,
         Paginator,
         Tag,
         VisibilityTag,
@@ -949,7 +948,7 @@ export default {
 
         .org-header-layout {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
             gap: var(--ddb-spacing-xl);
         }
 
@@ -961,8 +960,8 @@ export default {
         .org-actions {
             flex-shrink: 0;
             display: flex;
-            flex-direction: column;
-            align-items: flex-end;
+            align-items: center;
+            gap: var(--ddb-spacing-sm);
         }
 
         .org-icon-wrapper {
@@ -993,17 +992,25 @@ export default {
         .org-header {
             .org-header-layout {
                 flex-direction: column;
+                align-items: stretch;
                 gap: var(--ddb-spacing-md);
             }
 
-            .org-actions {
-                align-items: stretch;
-                width: 100%;
-
-                > .d-flex {
-                    justify-content: stretch;
-                }
+            /* Create takes the room the other actions leave */
+            .org-primary-action {
+                flex: 1 1 auto;
             }
+        }
+    }
+
+    /* A phone: the secondary actions as icons (their name stays in aria-label and title), as high as Create */
+    @media screen and (max-width: 575.98px) {
+        .org-header .org-secondary-action {
+            align-self: stretch;
+        }
+
+        .org-header .org-secondary-action :deep(.p-button-label) {
+            display: none;
         }
     }
 

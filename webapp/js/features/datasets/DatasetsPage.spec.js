@@ -136,6 +136,27 @@ describe('DatasetsPage map view', () => {
         expect(locations).not.toHaveBeenCalled();
     });
 
+    it('has the search and the view in the toolbar above the table, and Import and Create in the header', async () => {
+        pendingLocations();
+        await render();
+        const toolbar = wrapper.find('.list-toolbar');
+        expect(toolbar.find('input[aria-label="Search datasets"]').exists()).toBe(true);
+        expect(toolbar.find('.view-select').exists()).toBe(true);
+        expect(wrapper.find('.org-header .org-actions').exists()).toBe(false); // a user who cannot write
+        wrapper.vm.orgInfo = { ...wrapper.vm.orgInfo, permissions: { canWrite: true } };
+        await flushPromises();
+        const actions = wrapper.find('.org-header .org-actions');
+        expect(actions.findAll('button').map(b => b.attributes('title') || b.text())).toEqual(['Import Dataset', 'Create Dataset']);
+        expect(actions.find('input').exists()).toBe(false);
+    });
+
+    it('has no search in the map view, which does not filter by it, and keeps the view where it was', async () => {
+        pendingLocations();
+        await render('map');
+        expect(wrapper.find('.list-toolbar input').exists()).toBe(false);
+        expect(wrapper.find('.list-toolbar .view-select').exists()).toBe(true);
+    });
+
     it('shows the map of the organization instead of the table when that is the stored view', async () => {
         const calls = pendingLocations();
         await render('map');

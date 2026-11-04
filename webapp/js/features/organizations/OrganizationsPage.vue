@@ -14,31 +14,35 @@
                                 <Tag rounded severity="info" icon="fa-solid fa-layer-group">
                                     {{ filteredOrganizations.length }}
                                 </Tag>
-                                <div class="d-flex align-items-center gap-2 ms-2">
-                                    <ToggleSwitch v-model="showAll" input-id="organizations-show-all" />
-                                    <label for="organizations-show-all" class="show-all-label">Show all</label>
-                                </div>
                             </div>
                             <p class="org-description mt-1 mb-0">Organize your datasets into groups and manage team access.</p>
                         </div>
                     </div>
                 </div>
-                <div class="org-actions">
-                    <IconField>
-                        <InputIcon class="fa-solid fa-magnifying-glass" />
-                        <InputText v-model="searchQuery" small placeholder="Search organizations" aria-label="Search organizations" />
-                    </IconField>
-                    <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" show-organization />
-                    <ViewSelect v-model="view" label="Show the organizations as" />
-                    <SortSelect v-if="view === 'list'" v-model:column="sortColumn" v-model:direction="sortDirection" :options="ORG_SORT_OPTIONS"
-                                label="Sort organizations by" />
-                    <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" aria-label="Create organization" class="d-inline-flex d-sm-none"
+                <div v-if="!readyOnly" class="org-actions">
+                    <Button severity="primary" size="small" icon="fa-solid fa-plus" aria-label="Create organization" class="d-inline-flex d-sm-none"
                             :loading="creatingOrganization" :disabled="creatingOrganization" @click.stop="handleNew()" />
-                    <Button v-if="!readyOnly" severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" class="d-none d-sm-inline-flex"
+                    <Button severity="primary" size="small" icon="fa-solid fa-plus" label="Create Organization" class="d-none d-sm-inline-flex"
                             :loading="creatingOrganization" :disabled="creatingOrganization" @click.stop="handleNew()" />
                 </div>
             </div>
         </div>
+
+        <!-- Which organizations, and how they are shown: the search and Show all filter the list and the map -->
+        <ListToolbar v-model:search="searchQuery" search-label="Search organizations">
+            <template #start>
+                <div class="d-flex align-items-center gap-2">
+                    <ToggleSwitch v-model="showAll" input-id="organizations-show-all" />
+                    <label for="organizations-show-all" class="show-all-label">Show all</label>
+                </div>
+            </template>
+            <template #end>
+                <UnlocatedDatasetsButton v-if="view === 'map'" :groups="locationGroups" show-organization />
+                <SortSelect v-if="view === 'list'" v-model:column="sortColumn" v-model:direction="sortDirection" :options="ORG_SORT_OPTIONS"
+                            label="Sort organizations by" />
+                <ViewSelect v-model="view" label="Show the organizations as" />
+            </template>
+        </ListToolbar>
 
         <!-- Skeleton loading state -->
         <div v-if="showSkeleton" class="org-cards-area">
@@ -142,6 +146,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
 import SortSelect from '@/components/SortSelect.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
+import ListToolbar from '@/components/ListToolbar.vue';
 import { DatasetLocationsMap } from '@/features/datasets/locationsMap';
 import UnlocatedDatasetsButton from '@/features/datasets/UnlocatedDatasetsButton.vue';
 import { createLocationFanOut } from '@/libs/locationFanOut';
@@ -163,9 +168,6 @@ import Card from 'primevue/card';
 import Tag from 'primevue/tag';
 import Skeleton from 'primevue/skeleton';
 import ToggleSwitch from 'primevue/toggleswitch';
-import InputText from 'primevue/inputtext';
-import InputIcon from 'primevue/inputicon';
-import IconField from 'primevue/iconfield';
 import Paginator from 'primevue/paginator';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { Visibility } from 'ddb';
@@ -188,6 +190,7 @@ export default {
         EmptyState,
         SortSelect,
         ViewSelect,
+        ListToolbar,
         DatasetLocationsMap,
         UnlocatedDatasetsButton,
         DialogHost,
@@ -200,9 +203,6 @@ export default {
         VisibilityTag,
         Skeleton,
         ToggleSwitch,
-        InputText,
-        InputIcon,
-        IconField,
         Paginator
     },
 
@@ -699,33 +699,6 @@ export default {
 
     /* Responsive */
     @media screen and (max-width: 767.98px) {
-        .org-page-header {
-            .org-header-layout {
-                flex-direction: column;
-                gap: var(--ddb-spacing-md);
-            }
-
-            /* The search on a row of its own, the view, sort and create controls on the next one:
-               in one row they are wider than a phone, and the page (overflow hidden) would cut
-               them off, or scroll sideways to the one the user taps */
-            .org-actions {
-                width: 100%;
-                flex-wrap: wrap;
-
-                > .p-iconfield {
-                    flex: 1 0 100%;
-
-                    :deep(.p-inputtext) {
-                        width: 100%;
-                    }
-                }
-
-                > .sort-select {
-                    flex: 1 1 0;
-                }
-            }
-        }
-
         .org-card {
             :deep(.p-card-body) {
                 padding: var(--ddb-spacing-sm);
