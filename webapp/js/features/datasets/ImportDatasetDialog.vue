@@ -15,7 +15,9 @@
                     <div class="mb-3">
                         <label for="import-dataset-dialog-registry-url" class="d-block mb-1 fw-semibold">Registry URL <span class="text-danger">*</span></label>
                         <InputText id="import-dataset-dialog-registry-url" v-model="params.url" placeholder="https://hub.dronedb.app" class="w-100"
-                                   :disabled="verifying" @input="onRemoteUrlChange" @keyup.enter="canVerify && verify()" />
+                                   :disabled="verifying" @input="onRemoteUrlChange" @paste="onRemoteUrlPaste" @change="applyRegistryLink"
+                                   @keyup.enter="applyRegistryLink(); canVerify && verify()" />
+                        <small class="text-muted">The address of the registry, or paste the link of a dataset (https://hub.dronedb.app/r/odm/brighton-beach) to fill in every field.</small>
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col">
@@ -160,7 +162,7 @@ import { slugFromName } from '@/libs/api/registryUtils';
 import reg from '@/libs/api/sharedRegistry';
 import { Visibility } from 'ddb';
 import { useHeavyTask } from '@/composables/useHeavyTask';
-import { IMPORT_SOURCES, getImportSource } from './importSources';
+import { IMPORT_SOURCES, getImportSource, splitRegistryLink } from './importSources';
 import { formatDurationSeconds } from '@/libs/format';
 
 const slugRe = /^[a-z0-9\-_]+$/;
@@ -340,6 +342,32 @@ export default {
             this.verifyResult = null;
         },
 
+        // A link of a dataset (a page, the API or a ddb tag) in the URL field: the field keeps the address
+        // of the registry and the organization and the dataset of the link fill their fields.
+        // Returns true when the field held such a link.
+        applyRegistryLink() {
+            if (this.sourceType !== 'registry') return false;
+            const link = splitRegistryLink(this.params.url);
+            if (!link) return false;
+            this._resetBrowseState();
+            this.verifyResult = null;
+            this.verifyError = null;
+            this.params.url = link.url;
+            this.params.organization = link.organization;
+            this.params.dataset = link.dataset;
+            return true;
+        },
+
+        // A pasted link of a dataset fills every field and verifies the dataset at once.
+        onRemoteUrlPaste(e) {
+            const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+            if (!splitRegistryLink(text)) return;
+            e.preventDefault();
+            this.params.url = text;
+            this.applyRegistryLink();
+            if (this.params.dataset && this.canVerify) this.verify();
+        },
+
         // Called when the user selects an org from the browse dropdown: reset dataset browse.
         onRemoteOrgChange() {
             this.remoteDatasets = null;
@@ -349,6 +377,7 @@ export default {
         },
 
         async browseOrgs() {
+            this.applyRegistryLink();
             this.browsingOrgs = true;
             this.browseOrgsError = null;
             this.remoteOrgs = null;
@@ -374,6 +403,7 @@ export default {
         },
 
         async browseDatasets() {
+            this.applyRegistryLink();
             this.browsingDatasets = true;
             this.browseDatasetsError = null;
             this.remoteDatasets = null;
@@ -397,6 +427,7 @@ export default {
         },
 
         async verify() {
+            this.applyRegistryLink();
             this.verifying = true;
             this.verifyError = null;
             this.verifyResult = null;
