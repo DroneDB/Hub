@@ -1,14 +1,70 @@
 /**
  * Handles saving and loading of GeoJSON measurement files
  */
+import { pathutils } from 'ddb';
+import { downloadText } from '@/libs/download';
+
+/** Whether a path is a measurements file (`<name>_measurements.geojson` or `measurements.geojson`). */
+export function isMeasurementFile(path) {
+    return path.endsWith('_measurements.geojson') || pathutils.basename(path) === 'measurements.geojson';
+}
+
+/** A missing file, as the dataset API reports it. */
+const isNotFound = e => !!(e && (e.status === 404 || /not found/i.test(String(e.message || ''))));
+
+/**
+ * The views that keep measurements in the same file: the 2D map and the 3D point-cloud viewer
+ * (the map of a folder with a point cloud saves next to it, like the 3D viewer does).
+ */
+export const MeasurementOwner = Object.freeze({ MAP: 'map', POINT_CLOUD: 'pointCloud' });
+
+const OWNER_LABEL = Object.freeze({ [MeasurementOwner.MAP]: '2D map', [MeasurementOwner.POINT_CLOUD]: '3D viewer' });
+
+// Types that only the 3D viewer writes
+const POINT_CLOUD_TYPES = new Set(['distance', 'height', 'circle', 'angle', 'annotation']);
+
+// File metadata that belongs to one view: the other view's save leaves it as it is
+const OWNED_METADATA = Object.freeze({ [MeasurementOwner.MAP]: ['groups'], [MeasurementOwner.POINT_CLOUD]: [] });
+
+/**
+ * The view a saved feature belongs to. The 3D viewer writes the local coordinates of every
+ * feature (points and areas included, which the map also has); everything else is the map's.
+ * @param {object} feature  GeoJSON feature
+ * @returns {string} a MeasurementOwner
+ */
+export function ownerOf(feature) {
+    const props = (feature && feature.properties) || {};
+    return props.localCoordinates || POINT_CLOUD_TYPES.has(props.measurementType)
+        ? MeasurementOwner.POINT_CLOUD
+        : MeasurementOwner.MAP;
+}
+
+/**
+ * What a save or a delete did, for the message of either view.
+ * @param {{ fileName: string, count: number, deleted: boolean, owner: string }} result
+ */
+export function saveResultMessage(result) {
+    if (result.count) return `Saved ${result.count} measurement${result.count > 1 ? 's' : ''} to "${result.fileName}"`;
+    if (result.deleted) return `Removed "${result.fileName}": no measurements left`;
+    const other = OWNER_LABEL[result.owner === MeasurementOwner.MAP ? MeasurementOwner.POINT_CLOUD : MeasurementOwner.MAP];
+    return `Removed the ${OWNER_LABEL[result.owner]} measurements from "${result.fileName}" (the ${other} ones stay)`;
+}
+
+/**
+ * The measurements file of an entry, as one view sees it. A view loads, saves and deletes its own
+ * measurements only: those of the other view stay in the file as they are, and the file goes when
+ * nothing is left in it.
+ */
 export class MeasurementStorage {
     /**
      * @param {Dataset} dataset - ddb dataset
-     * @param {Entry} entry - Point cloud entry
+     * @param {Entry} entry - the entry the measurements belong to (a raster, a point cloud or a folder's file)
+     * @param {string} [owner] - the view that reads and writes (a MeasurementOwner)
      */
-    constructor(dataset, entry) {
+    constructor(dataset, entry, owner = MeasurementOwner.MAP) {
         this.dataset = dataset;
         this.entry = entry;
+        this.owner = owner;
         this.measurementPath = this.getMeasurementPath();
     }
 
@@ -20,152 +76,97 @@ export class MeasurementStorage {
         const path = this.entry.path;
 
         // If the path is already a measurements file, use it directly
-        const fileName = path.split('/').pop();
-        if (path.endsWith('_measurements.geojson') || fileName === 'measurements.geojson') {
-            return path;
-        }
+        if (isMeasurementFile(path)) return path;
 
         // Remove extension and add _measurements.geojson
-        const lastDot = path.lastIndexOf('.');
-        const basePath = lastDot > 0 ? path.substring(0, lastDot) : path;
-
-        return `${basePath}_measurements.geojson`;
+        return `${pathutils.dropExtension(path)}_measurements.geojson`;
     }
 
-    /**
-     * Default set of measurement types considered "owned" by olMeasure (2D map
-     * viewer). When saving, features with these `measurementType` values are
-     * replaced by the incoming GeoJSON; all others are preserved verbatim
-     * (e.g. stockpiles or 3D viewer measurements).
-     */
-    static OL_MEASURE_OWNED_TYPES = Object.freeze(['point', 'length', 'area']);
-
-    /**
-     * Set of measurement types considered "owned" by the Potree (3D point
-     * cloud) viewer.
-     */
-    static POTREE_OWNED_TYPES = Object.freeze(['point', 'distance', 'area', 'height', 'circle', 'angle', 'annotation']);
-
-    /**
-     * Save measurements as GeoJSON file.
-     *
-     * Foreign feature types (anything written by other DroneDB subsystems
-     * into the same file) are preserved verbatim - we only replace features
-     * whose `measurementType` is in `ownedTypes`. Defaults to the 2D
-     * olMeasure types for backward compatibility; callers from the 3D
-     * Potree viewer must pass `POTREE_OWNED_TYPES`.
-     *
-     * @param {Object} geojsonData - GeoJSON FeatureCollection from the caller.
-     * @param {Object} [options]
-     * @param {Iterable<string>} [options.ownedTypes] - measurementType values
-     *   the caller fully owns and intends to overwrite.
-     * @returns {Promise<{path: string, fileName: string}>} Storage path info.
-     */
-    async save(geojsonData, options = {}) {
-        try {
-            const ownedTypes = new Set(options.ownedTypes || MeasurementStorage.OL_MEASURE_OWNED_TYPES);
-            // Read the existing file (if any) and keep all foreign features.
-            let foreign = [];
-            try {
-                const prev = await this.dataset.getFileContents(this.measurementPath);
-                if (prev && (typeof prev !== 'string' || prev.trim())) {
-                    const parsed = JSON.parse(prev);
-                    if (parsed && Array.isArray(parsed.features)) {
-                        foreign = parsed.features.filter(f => {
-                            const t = f && f.properties && f.properties.measurementType;
-                            return !t || !ownedTypes.has(t);
-                        });
-                    }
-                }
-            } catch (e) {
-                // 404 / missing / unreadable: nothing to preserve.
-                if (!(e && (e.status === 404 || /not found/i.test(String(e.message || ''))))) {
-                    console.warn('Existing measurements file unreadable; will overwrite:', e);
-                }
-            }
-
-            const merged = {
-                ...geojsonData,
-                metadata: {
-                    ...(geojsonData.metadata || {}),
-                    modifiedAt: new Date().toISOString()
-                },
-                features: [...(geojsonData.features || []), ...foreign]
-            };
-
-            const content = JSON.stringify(merged, null, 2);
-            const blob = new Blob([content], { type: 'application/geo+json' });
-
-            await this.dataset.writeObj(this.measurementPath, blob);
-
-            console.log(`Measurements saved to: ${this.measurementPath} (${merged.features.length} feature(s), ${foreign.length} preserved)`);
-            return { path: this.measurementPath, fileName: this._fileName() };
-        } catch (error) {
-            console.error('Failed to save measurements:', error);
-            throw new Error(`Failed to save measurements: ${error.message}`);
-        }
+    _owns(feature) {
+        return ownerOf(feature) === this.owner;
     }
 
-    /** Just the file name component of the storage path (for toasts). */
-    _fileName() {
-        const p = this.measurementPath || '';
-        const idx = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
-        return idx >= 0 ? p.substring(idx + 1) : p;
-    }
-
-    /**
-     * Load measurements from GeoJSON file
-     * @returns {Promise<Object|null>} GeoJSON or null if not found
-     */
-    async load() {
+    /** The file as it is (null when there is none or it cannot be read). */
+    async _read() {
         try {
             const content = await this.dataset.getFileContents(this.measurementPath);
-
-            if (!content || content.trim() === '') {
-                return null;
-            }
-
-            const geojson = JSON.parse(content);
-            console.log(`Measurements loaded from: ${this.measurementPath}`);
-
-            return geojson;
-        } catch (error) {
-            // File doesn't exist or parsing error
-            if (error.status === 404) {
-                console.log('No measurements file found');
-                return null;
-            }
-
-            console.error('Failed to load measurements:', error);
+            if (!content || (typeof content === 'string' && !content.trim())) return null;
+            const geojson = typeof content === 'string' ? JSON.parse(content) : content;
+            return geojson && Array.isArray(geojson.features) ? geojson : null;
+        } catch (e) {
+            if (!isNotFound(e)) console.warn('Measurements file unreadable:', e);
             return null;
         }
     }
 
     /**
-     * Check if a measurements file exists
-     * @returns {Promise<boolean>}
+     * Makes the file hold the given measurements of this view, next to those of the other view.
+     * The file is removed when nothing is left in it.
+     *
+     * @param {Object} geojsonData - GeoJSON FeatureCollection of this view's measurements
+     * @returns {Promise<{path: string, fileName: string, count: number, deleted: boolean, owner: string}>}
+     *   `count` measurements of this view are in the file; `deleted` when the file was removed.
      */
-    async exists() {
+    async save(geojsonData) {
         try {
-            await this.dataset.list(this.measurementPath);
-            return true;
+            const previous = await this._read();
+            const kept = previous ? previous.features.filter(f => !this._owns(f)) : [];
+            const own = geojsonData.features || [];
+            const features = [...own, ...kept];
+            const result = { path: this.measurementPath, fileName: this._fileName(), count: own.length, owner: this.owner };
+            if (!features.length) {
+                await this._deleteIfPresent();
+                return { ...result, deleted: true };
+            }
+
+            // The other view's metadata stays; this view's is replaced
+            const previousMetadata = { ...((previous && previous.metadata) || {}) };
+            OWNED_METADATA[this.owner].forEach(key => { delete previousMetadata[key]; });
+            const merged = {
+                ...geojsonData,
+                metadata: { ...previousMetadata, ...(geojsonData.metadata || {}), modifiedAt: new Date().toISOString() },
+                features
+            };
+            const blob = new Blob([JSON.stringify(merged, null, 2)], { type: 'application/geo+json' });
+            await this.dataset.writeObj(this.measurementPath, blob);
+            return { ...result, deleted: false };
         } catch (error) {
-            return false;
+            console.error('Failed to save measurements:', error);
+            throw new Error(`Failed to save measurements: ${error.message}`, { cause: error });
         }
     }
 
     /**
-     * Delete the measurements file
-     * @returns {Promise<void>}
+     * Removes this view's measurements from the file (the file goes when nothing is left).
+     * @returns {Promise<{path: string, fileName: string, count: number, deleted: boolean, owner: string}>}
      */
-    async delete() {
+    deleteSaved() {
+        return this.save({ type: 'FeatureCollection', features: [] });
+    }
+
+    /** Deletes the file; a file that is already gone is not an error. */
+    async _deleteIfPresent() {
         try {
             await this.dataset.deleteObj(this.measurementPath);
-            console.log(`Measurements deleted: ${this.measurementPath}`);
-        } catch (error) {
-            console.error('Failed to delete measurements:', error);
-            throw new Error(`Failed to delete measurements: ${error.message}`);
+        } catch (e) {
+            if (!isNotFound(e)) throw e;
         }
+    }
+
+    /** Just the file name component of the storage path (for toasts). */
+    _fileName() {
+        return this.measurementPath ? pathutils.basename(this.measurementPath) : '';
+    }
+
+    /**
+     * This view's saved measurements (with the file's metadata).
+     * @returns {Promise<Object|null>} GeoJSON, or null when the file has none of this view's
+     */
+    async load() {
+        const geojson = await this._read();
+        if (!geojson) return null;
+        const features = geojson.features.filter(f => this._owns(f));
+        return features.length ? { ...geojson, features } : null;
     }
 
     /**
@@ -175,17 +176,7 @@ export class MeasurementStorage {
      */
     exportToFile(geojsonData, filename = null) {
         const fname = filename || `measurements_${Date.now()}.geojson`;
-        const content = JSON.stringify(geojsonData, null, 2);
-        const blob = new Blob([content], { type: 'application/geo+json' });
-        const url = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fname;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        downloadText(JSON.stringify(geojsonData, null, 2), fname, 'application/geo+json');
 
         console.log(`Measurements exported as: ${fname}`);
     }

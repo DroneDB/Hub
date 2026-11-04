@@ -42,6 +42,42 @@
    how short the viewport is. Each zone is itself transparent to pointer events
    so only the actual controls capture clicks; the gaps fall through to the map.
 */
+/* What the right-hand toolbar rail takes from the width of the map, what the bottom-left controls
+   (map settings) take from its height, and the height of a folded sheet. They are defined on the
+   map so the panels over it (the bottom panels here, the analysis sheets in _analysis-panel.scss)
+   keep out of the controls by the same measure.
+   Rail: 0.5rem (inset of the zone) + 0.5rem (padding of the control) + 0.5rem (margins of a button)
+   + 2rem (button) = 3.5rem, and 0.5rem of air between it and the panels.
+   Bottom: the same sum upwards for the one button of the bottom-left zone: 0.5rem (inset) + 0.5rem
+   (padding) + 0.5rem (margins) + 2rem (button) = 3.5rem, and 0.5rem of air above it.
+   Top: the same sum downwards for the row of buttons of the top-centre zone (direction, flight path,
+   split): what sits at the top of the map in the middle (the labels of the split) goes below it.
+   Peek: the panel header on a phone: 0.5rem + 2rem button + 0.5rem.
+
+   Layers, bottom to top: the map, the bottom panels, the split of the map (dividers and labels),
+   the controls (the toolbar zones and what OpenLayers puts with them: its own controls, popups and
+   tooltips), the analysis panels and sheets. The controls are above the split, so a divider dragged
+   under the toolbar never takes its clicks; the panels stay above the controls, as they keep out of
+   the rail by themselves. The map is its own stacking context, so these numbers never compete with
+   the page around it. */
+.map-container {
+    --map-rail-reserve: 4rem;
+    --map-bottom-reserve: 4rem;
+    --map-top-reserve: 4rem;
+    --map-sheet-peek: 3rem;
+    --map-layer-bottom-panel: 1;
+    --map-layer-split: 2;
+    --map-layer-controls: 3;
+    --map-layer-panel: 4;
+    isolation: isolate;
+}
+
+/* OpenLayers writes z-index: 0 inline on the container of its controls (the toolbar zones live in it),
+   which put every overlay of the map above the toolbar; only !important lifts it over the inline style */
+.map-container .ol-overlaycontainer-stopevent {
+    z-index: var(--map-layer-controls) !important;
+}
+
 .ol-zone {
     position: absolute;
     display: flex;
@@ -184,6 +220,84 @@
 
 .ol-tooltip-value {
     font-size: 0.75rem;
+}
+
+/* The hint that follows the pointer while drawing: long, so it wraps (a phone screen is narrower
+   than one line of it) and sits on the side of the pointer that has the room */
+.ol-tooltip-help {
+    width: max-content;
+    max-width: min(16rem, 60vw);
+    white-space: normal;
+}
+
+/* Panels over the bottom centre of the map (layer opacity): as wide as their content but never
+   wider than the map, and above the bottom controls on a phone */
+.map-bottom-panel {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: var(--map-layer-bottom-panel);
+    width: max-content;
+    max-width: calc(100% - 2 * var(--map-rail-reserve));
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    font-size: 0.75rem;
+    user-select: none;
+}
+
+.map-bottom-panel .opacity-value {
+    min-width: 2.2rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.map-bottom-panel .ph-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+    padding: 0 0.15rem;
+    font-size: var(--ddb-font-size-base);
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    transition: color 0.15s;
+}
+
+.map-bottom-panel .ph-btn:hover {
+    color: var(--ddb-text-on-color);
+}
+
+.map-bottom-panel .ph-btn.active {
+    color: var(--ddb-map-control-active);
+}
+
+/* A phone: from the left edge to the rail, not centred, so it never reaches the toolbar, and above
+   the map settings button, which it would cover at that width */
+@media (max-width: 575.98px) {
+    .map-bottom-panel {
+        left: 0.5rem;
+        right: var(--map-rail-reserve);
+        transform: none;
+        width: auto;
+        max-width: none;
+        bottom: var(--map-bottom-reserve);
+    }
+}
+
+/* Fingers: the buttons and sliders of the panel are as tall as the map buttons are wide */
+@media (pointer: coarse) {
+    .map-bottom-panel .ph-btn {
+        min-width: 2rem;
+        min-height: 2rem;
+        justify-content: center;
+    }
+
+    .map-bottom-panel input[type="range"] {
+        min-height: 2rem;
+    }
 }
 
 /* Point location popup */

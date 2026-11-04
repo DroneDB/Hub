@@ -1,0 +1,62 @@
+// ============================================================
+// The button of a dark overlay on a 3D view: the splat viewer's round buttons, its camera rail
+// and movement pad, and the unified viewer's toolbars. A centred square or round button in a
+// translucent dark fill that darkens on hover, takes the brand blue while it is active and
+// fades when it is disabled. The size, shape and fills differ per overlay and are arguments.
+// Emits no CSS by itself: `@use` it and `@include overlay-button(...)` in the button's rule.
+// ============================================================
+@mixin overlay-button(
+    $size,
+    $radius,
+    $background,
+    $hover-background,
+    $active-background,
+    $border: none,
+    $active-border-color: null,
+    $font-size: null,
+    $transition-time: 0.1s
+) {
+    width: $size;
+    height: $size;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: $border;
+    border-radius: $radius;
+    background: $background;
+    color: var(--ddb-text-on-dark);
+    font-size: $font-size;
+    cursor: pointer;
+    transition: background $transition-time ease, border-color $transition-time ease;
+
+    // Not on an active button: its own fill stays under the pointer
+    &:hover:not(:disabled):not(.active) {
+        background: $hover-background;
+    }
+
+    &.active {
+        background: $active-background;
+        border-color: $active-border-color;
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+}
+
+// The button of a toolbar: a square button with square-ish corners and no fill of its own, inside a
+// bar that has the translucent background. The 3D viewer's toolbars and the splat viewer's measure
+// toolbar use it, so the two look the same.
+@mixin toolbar-button {
+    @include overlay-button(
+        $size: 2.25rem,
+        $radius: 4px,
+        $background: transparent,
+        $hover-background: rgba(255, 255, 255, 0.15),
+        $active-background: var(--ddb-primary),
+        $font-size: var(--ddb-font-size-base),
+        $transition-time: 0.2s
+    );
+}

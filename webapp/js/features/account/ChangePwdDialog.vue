@@ -1,59 +1,57 @@
 <template>
-    <Window title="Change Password" id="changePwdDialog" @onClose="close" modal maxWidth="70%" fixedSize>
+    <Window id="changePwdDialog" title="Change Password" modal max-width="70%" fixed-size cancel-label="Close" confirm-label="Change Password" :confirm-disabled="!isFilled()" :busy="changing" @confirm="changePwd()" @close="$emit('close')">
         <div class="dialog">
-            <form v-on:submit.prevent>
+            <form @submit.prevent>
                 <Message v-if="error" severity="error">{{ error }}</Message>
                 <Message v-if="success" severity="success"><strong>Password changed successfully!</strong></Message>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Old Password</label>
-                    <Password ref="oldPwd" @keydown="clearError()" @keyup.enter="changePwd()"
-                        v-model="oldPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
+                    <label for="change-pwd-dialog-old-password" class="d-block mb-1 fw-semibold">Old Password</label>
+                    <Password ref="oldPwd" v-model="oldPwd" input-id="change-pwd-dialog-old-password" :feedback="false"
+                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" />
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="changePwd()" v-model="newPwd"
-                        :feedback="false" toggleMask @input="onPasswordInput" class="w-100" inputClass="w-100" />
+                    <label for="change-pwd-dialog-new-password" class="d-block mb-1 fw-semibold">New Password</label>
+                    <Password v-model="newPwd" input-id="change-pwd-dialog-new-password" :feedback="false" toggle-mask
+                              class="w-100" input-class="w-100" @keydown="clearError()" @input="onPasswordInput" />
                     <div v-if="passwordPolicy && newPwd" class="password-requirements">
                         <small v-for="(req, idx) in passwordRequirements" :key="idx"
-                            :class="{ met: isRequirementMet(req) }">
+                               :class="{ met: isRequirementMet(req) }">
                             <i :class="isRequirementMet(req) ? 'fa-solid fa-check text-success' : 'fa-solid fa-xmark text-danger'" />
                             {{ req }}
                         </small>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="d-block mb-1 fw-semibold">Confirm New Password</label>
-                    <Password @keydown="clearError()" @keyup.enter="changePwd()"
-                        v-model="confirmPwd" :feedback="false" toggleMask class="w-100" inputClass="w-100" />
+                    <label for="change-pwd-dialog-confirm-new-password" class="d-block mb-1 fw-semibold">Confirm New Password</label>
+                    <Password v-model="confirmPwd" input-id="change-pwd-dialog-confirm-new-password" :feedback="false"
+                              toggle-mask class="w-100" input-class="w-100" @keydown="clearError()" />
                 </div>
             </form>
-            <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-                <Button @click="close()" severity="secondary" :disabled="changing" label="Close" />
-                <Button @click="changePwd()" :disabled="changing || !isFilled()" :loading="changing"
-                    severity="info" label="Change Password" />
-            </div>
         </div>
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Button from 'primevue/button';
+import Window from '@/components/HubWindow.vue';
 import Password from 'primevue/password';
 import Message from 'primevue/message';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import { validatePassword, getPasswordRequirements } from '@/libs/passwordValidator';
+import { useTimerGroup } from '@/composables/useTimers';
 
 export default {
     components: {
-        Window, Button, Password, Message
+        Window, Password, Message
     },
     props: {
 
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
+    setup() {
+        return { later: useTimerGroup() };
+    },
     data: function () {
         return {
             changing: false,
@@ -68,13 +66,10 @@ export default {
         };
     },
     mounted: function () {
-        this.passwordPolicy = reg.getFeatureValue(Features.PASSWORD_POLICY);
+        this.passwordPolicy = reg.features.value(Features.PASSWORD_POLICY);
         this.passwordRequirements = getPasswordRequirements(this.passwordPolicy);
     },
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose');
-        },
         clearError: function () {
             this.error = "";
         },
@@ -114,8 +109,8 @@ export default {
             try {
                 await reg.changePwd(this.oldPwd, this.newPwd);
                 this.success = true;
-                setTimeout(() => {
-                    this.close();
+                this.later(() => {
+                    this.$emit('close');
                     this.changing = false;
                 }, 2500);
             } catch (e) {
@@ -129,7 +124,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 20rem;
+    min-width: min(20rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 

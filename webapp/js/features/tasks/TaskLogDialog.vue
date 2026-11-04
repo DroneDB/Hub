@@ -1,33 +1,29 @@
 <template>
-    <Dialog :visible="visible" @update:visible="$emit('update:visible', $event)" modal
-        :header="`Log - ${title}`" :style="{ width: '48rem' }" @show="onShow">
+    <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position
+            width="48rem" max-width="95vw" height="auto"
+            @update:visible="$emit('update:visible', $event)" @show="onShow">
         <pre ref="logContainer" class="task-log">{{ logText || 'No log output.' }}</pre>
         <template #footer>
             <!-- Toggles on the left -->
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 me-auto">
                 <div v-if="isActive" class="d-flex align-items-center gap-2">
-                    <ToggleSwitch v-model="autoRefresh" />
-                    <span class="muted" style="font-size: 0.8rem;">Auto-refresh</span>
+                    <ToggleSwitch v-model="autoRefresh" input-id="task-log-auto-refresh" />
+                    <label for="task-log-auto-refresh" class="muted" style="font-size: 0.8rem;">Auto-refresh</label>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <ToggleSwitch v-model="autoScroll" />
-                    <span class="muted" style="font-size: 0.8rem;">Auto-scroll</span>
+                    <ToggleSwitch v-model="autoScroll" input-id="task-log-auto-scroll" />
+                    <label for="task-log-auto-scroll" class="muted" style="font-size: 0.8rem;">Auto-scroll</label>
                 </div>
             </div>
-            <!-- Spacer to push buttons to the right -->
-            <div style="flex-grow: 1;"></div>
-            <!-- Buttons on the right -->
-            <div class="d-flex align-items-center gap-2">
-                <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
+            <Button label="Refresh" severity="secondary" icon="fa-solid fa-arrows-rotate"
                     @click="$emit('refresh')" />
-                <Button label="Close" @click="$emit('update:visible', false)" />
-            </div>
+            <Button label="Close" data-autofocus @click="$emit('update:visible', false)" />
         </template>
-    </Dialog>
+    </Window>
 </template>
 
 <script>
-import Dialog from 'primevue/dialog';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
 
@@ -44,7 +40,7 @@ import ToggleSwitch from 'primevue/toggleswitch';
 export default {
     name: 'TaskLogDialog',
 
-    components: { Dialog, Button, ToggleSwitch },
+    components: { Window, Button, ToggleSwitch },
 
     props: {
         visible: { type: Boolean, default: false },
@@ -59,9 +55,7 @@ export default {
     data() {
         return {
             autoRefresh: true,
-            autoScroll: true,
-            _refreshInterval: null,
-            _wasNearBottom: true  // Track whether user was near bottom before last change
+            autoScroll: true
         };
     },
 
@@ -84,6 +78,16 @@ export default {
         logText() {
             this.handleLogTextChange();
         }
+    },
+
+    // Instance state, not reactive (Vue does not proxy data keys that start with "_")
+    created() {
+        this._refreshInterval = null;
+        this._wasNearBottom = true; // whether the user was near the bottom before the last change
+    },
+
+    beforeUnmount() {
+        this.clearRefreshInterval();
     },
 
     methods: {
@@ -109,6 +113,7 @@ export default {
         attachScrollListener() {
             const el = this.$refs.logContainer;
             if (!el) return;
+            // lifetime: element (the dialog's own log container)
             el.addEventListener('scroll', this.onScroll, { passive: true });
         },
 
@@ -156,10 +161,6 @@ export default {
                 }
             });
         }
-    },
-
-    beforeUnmount() {
-        this.clearRefreshInterval();
     }
 };
 </script>
@@ -168,8 +169,8 @@ export default {
 .task-log {
     max-height: 24rem;
     overflow: auto;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--ddb-console-bg);
+    color: var(--ddb-console-text);
     padding: 0.75rem;
     border-radius: 4px;
     font-size: 0.8rem;

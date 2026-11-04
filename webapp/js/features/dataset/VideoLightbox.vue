@@ -1,23 +1,27 @@
 <template>
     <Teleport to="body">
-        <div v-if="visible" class="video-lightbox-overlay" @click.self="close" @keydown.esc="close" tabindex="-1"
-            ref="overlay">
+        <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/no-static-element-interactions -- a click beside the video closes it; Escape (document listener) and the Close button are the keyboard way -->
+        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" role="dialog" aria-modal="true"
+             :aria-label="entryName || 'Video'" tabindex="-1" @click="onBackdropClick">
             <div class="video-lightbox-toolbar">
-                <div class="video-lightbox-name" v-if="entry">{{ entryName }}</div>
+                <div v-if="entry" class="video-lightbox-name">{{ entryName }}</div>
                 <div class="video-lightbox-actions">
-                    <a class="video-lightbox-action" :href="src" target="_blank" rel="noopener" title="Open in new tab">
-                        <i class="fa-solid fa-up-right-from-square"></i>
+                    <a class="video-lightbox-action" :href="src" target="_blank" rel="noopener"
+                       title="Open in new tab" aria-label="Open in new tab">
+                        <i class="fa-solid fa-up-right-from-square" aria-hidden="true" />
                     </a>
-                    <div class="video-lightbox-action" @click="close" title="Close">
-                        <i class="fa-solid fa-xmark"></i>
-                    </div>
+                    <button type="button" class="btn-reset video-lightbox-action" title="Close" aria-label="Close"
+                            @click="$emit('close')">
+                        <i class="fa-solid fa-xmark" aria-hidden="true" />
+                    </button>
                 </div>
             </div>
-            <div class="video-lightbox-content" @click.self="close">
+            <div ref="content" class="video-lightbox-content">
+                <!-- eslint-disable-next-line vuejs-accessibility/media-has-caption -- uploaded footage comes without caption files -->
                 <video ref="videoEl" :src="src" controls preload="metadata" class="video-lightbox-player"
-                    @error="handleError"></video>
+                       @error="handleError" />
                 <div v-if="error" class="video-lightbox-error">
-                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <i class="fa-solid fa-triangle-exclamation" />
                     Could not play video. Your browser may not support this format.
                 </div>
             </div>
@@ -32,12 +36,12 @@ const { pathutils } = ddb;
 
 export default {
     name: 'VideoLightbox',
-    emits: ['close'],
     props: {
         visible: { type: Boolean, default: false },
         src: { type: String, default: '' },
         entry: { type: Object, default: null }
     },
+    emits: ['close'],
     data() {
         return {
             error: false
@@ -61,7 +65,7 @@ export default {
                 });
             } else {
                 if (this.$refs.videoEl) {
-                    try { this.$refs.videoEl.pause(); } catch (e) { /* noop */ }
+                    try { this.$refs.videoEl.pause(); } catch { /* noop */ }
                 }
             }
         }
@@ -73,14 +77,15 @@ export default {
         document.removeEventListener('keydown', this.onKey);
     },
     methods: {
-        close() {
-            this.$emit('close');
-        },
         handleError() {
             this.error = true;
         },
+        // Only the empty space around the video and toolbar
+        onBackdropClick(e) {
+            if (e.target === this.$refs.overlay || e.target === this.$refs.content) this.$emit('close');
+        },
         onKey(e) {
-            if (this.visible && e.key === 'Escape') this.close();
+            if (this.visible && e.key === 'Escape') this.$emit('close');
         }
     }
 };
@@ -102,7 +107,7 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 8px 16px;
-    color: #fff;
+    color: var(--ddb-text-on-dark);
     background: rgba(0, 0, 0, 0.4);
 }
 
@@ -120,7 +125,7 @@ export default {
 }
 
 .video-lightbox-action {
-    color: #fff;
+    color: var(--ddb-text-on-dark);
     cursor: pointer;
     padding: 6px 10px;
     border-radius: 4px;
@@ -150,7 +155,7 @@ export default {
 
 .video-lightbox-error {
     position: absolute;
-    color: #fff;
+    color: var(--ddb-text-on-dark);
     background: rgba(180, 30, 30, 0.85);
     padding: 12px 18px;
     border-radius: 6px;

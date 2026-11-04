@@ -1,101 +1,151 @@
 /**
- * Local Storage utility functions for managing user preferences
+ * Named user preferences of the dataset and organisation pages, stored through
+ * libs/preferences.js.
  */
+import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
+import { ORG_SORT_FIELDS, SORT_DIRECTIONS } from '@/libs/organizationList';
+import { LIST_VIEWS } from '@/libs/listViews';
 
-const DATASET_TABLE_PREFS_KEY = 'dataset_table_prefs';
+/** @param {unknown} value @returns {Record<string, any>|null} */
+const asObject = value => (value && typeof value === 'object' && !Array.isArray(value) ? value : null);
+
+/** A stored field stands for its default when it has the default's type and, unless a boolean, is not empty. */
+const usable = (value, fallback) => typeof value === typeof fallback && (typeof value === 'boolean' || !!value);
 
 /**
- * Get dataset table preferences from Local Storage
- * @returns {Object|null} The preferences object with sortColumn, sortDirection, and itemsPerPage, or null if not found
+ * The values a field of a settings object accepts when it has a fixed set (settings key -> field
+ * -> values). A stored value outside the set (a hand-edited store, an account written by a newer
+ * Hub) stands for the default.
+ * @type {Record<string, Record<string, readonly string[]>>}
  */
+const FIELD_CHOICES = {
+    [PREF.DATASET_TABLE]: { view: LIST_VIEWS },
+    [PREF.ORG_PAGE]: { sortColumn: ORG_SORT_FIELDS, sortDirection: SORT_DIRECTIONS, view: LIST_VIEWS }
+};
+
+/** @param {string} key @param {string} name @param {unknown} value */
+const allowed = (key, name, value) => !FIELD_CHOICES[key]?.[name] || FIELD_CHOICES[key][name].includes(/** @type {string} */ (value));
+
+/**
+ * The settings object stored under `key` (a PREF key whose default is an object): every field of
+ * the default, taken from storage when usable there.
+ * @param {string} key
+ * @returns {Record<string, any>}
+ */
+function readSettings(key) {
+    const stored = asObject(getPref(key, null)) ?? {};
+    return Object.fromEntries(Object.entries(PREF_DEFAULTS[key]).map(([name, fallback]) =>
+        [name, usable(stored[name], fallback) && allowed(key, name, stored[name]) ? stored[name] : fallback]));
+}
+
+/**
+ * `value` when the organisation list accepts it for the field (sortColumn, sortDirection, view),
+ * else the default of the field.
+ * @param {'sortColumn'|'sortDirection'|'view'} field
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function orgPageChoice(field, value) {
+    return allowed(PREF.ORG_PAGE, field, value) ? /** @type {string} */ (value) : PREF_DEFAULTS[PREF.ORG_PAGE][field];
+}
+
+/**
+ * Stores `settings` under `key` only when they differ from what reads there: a page that took its
+ * values from storage (the Preferences page, another tab, the account) does not write them back
+ * as a change of its own, which would send stale values to the account.
+ * @param {string} key
+ * @param {Record<string, any>} settings
+ */
+function saveSettings(key, settings) {
+    const current = readSettings(key);
+    if (Object.keys(current).every(name => current[name] === settings[name])) return;
+    setPref(key, settings);
+}
+
+/**
+ * Calls `apply(settings)` with the settings read under `key` after they change.
+ * @param {string} key
+ * @param {(settings: Record<string, any>) => void} apply
+ * @returns {() => void} unsubscribe
+ */
+function followSettings(key, apply) {
+    return onPrefChange(changed => { if (changed === key) apply(readSettings(key)); });
+}
+
+/**
+ * @typedef {object} DatasetTableSettings
+ * @property {string} sortColumn
+ * @property {'asc'|'desc'} sortDirection
+ * @property {number} itemsPerPage
+ * @property {'list'|'map'} view
+ */
+
+/** @returns {DatasetTableSettings} the stored settings of the dataset table over the defaults */
 export function getDatasetTablePreferences() {
-    try {
-        const prefs = localStorage.getItem(DATASET_TABLE_PREFS_KEY);
-        if (prefs) {
-            return JSON.parse(prefs);
-        }
-    } catch (e) {
-        console.error('Error reading dataset table preferences from Local Storage:', e);
-    }
-    return null;
+    return /** @type {DatasetTableSettings} */ (readSettings(PREF.DATASET_TABLE));
 }
 
 /**
- * Save dataset table preferences to Local Storage
- * @param {string} sortColumn - The column to sort by
- * @param {string} sortDirection - The sort direction ('asc' or 'desc')
- * @param {number} itemsPerPage - The number of items per page
+ * Stores the settings that changed over the stored ones, so a page that changes one of them
+ * (the sort) keeps the others (the view).
+ * @param {Partial<DatasetTableSettings>} changes
  */
-export function saveDatasetTablePreferences(sortColumn, sortDirection, itemsPerPage) {
-    const prefs = {
-        sortColumn,
-        sortDirection,
-        itemsPerPage
-    };
-    try {
-        localStorage.setItem(DATASET_TABLE_PREFS_KEY, JSON.stringify(prefs));
-    } catch (e) {
-        console.error('Error saving dataset table preferences to Local Storage:', e);
-    }
+export function saveDatasetTablePreferences(changes) {
+    saveSettings(PREF.DATASET_TABLE, { ...readSettings(PREF.DATASET_TABLE), ...changes });
 }
 
-/**
- * Clear dataset table preferences from Local Storage
- */
-export function clearDatasetTablePreferences() {
-    try {
-        localStorage.removeItem(DATASET_TABLE_PREFS_KEY);
-    } catch (e) {
-        console.error('Error clearing dataset table preferences from Local Storage:', e);
-    }
-}
+/** @param {(settings: DatasetTableSettings) => void} apply @returns {() => void} unsubscribe */
+export const followDatasetTablePreferences = apply => followSettings(PREF.DATASET_TABLE, apply);
 
-const OPEN_AFTER_CREATE_KEY = 'open_dataset_after_create';
-
-/**
- * Get the preference for opening a dataset after creation
- * @returns {boolean} True if the user wants to open the dataset after creation, false otherwise
- */
+/** @returns {boolean} open a dataset right after creating it */
 export function getOpenAfterCreatePreference() {
-    try {
-        return localStorage.getItem(OPEN_AFTER_CREATE_KEY) === 'true';
-    } catch (e) {
-        console.error('Error reading open after create preference from Local Storage:', e);
-    }
-    return false;
+    return getPref(PREF.OPEN_AFTER_CREATE, PREF_DEFAULTS[PREF.OPEN_AFTER_CREATE]) === true;
+}
+
+/** @param {boolean} value */
+export function saveOpenAfterCreatePreference(value) {
+    setPref(PREF.OPEN_AFTER_CREATE, !!value);
 }
 
 /**
- * Save the preference for opening a dataset after creation
- * @param {boolean} value - True to open the dataset after creation, false otherwise
+ * @typedef {object} OrgPageSettings
+ * @property {number} itemsPerPage
+ * @property {boolean} ownedOnly
+ * @property {string} sortColumn one of ORG_SORT_FIELDS
+ * @property {'asc'|'desc'} sortDirection
+ * @property {'list'|'map'} view
  */
-export function saveOpenAfterCreatePreference(value) {
-    try {
-        localStorage.setItem(OPEN_AFTER_CREATE_KEY, value.toString());
-    } catch (e) {
-        console.error('Error saving open after create preference to Local Storage:', e);
-    }
+
+/**
+ * The organisation page's list settings, which follow the account (its position is stored apart).
+ * @returns {OrgPageSettings}
+ */
+export function getOrgPageSettings() {
+    return /** @type {OrgPageSettings} */ (readSettings(PREF.ORG_PAGE));
 }
 
-const ORG_PAGE_PREFS_KEY = 'org_page_prefs';
-
-export function getOrgPagePreferences() {
-    try {
-        const prefs = localStorage.getItem(ORG_PAGE_PREFS_KEY);
-        if (prefs) {
-            return JSON.parse(prefs);
-        }
-    } catch (e) {
-        console.error('Error reading org page preferences from Local Storage:', e);
-    }
-    return null;
+/**
+ * Stores the settings that changed over the stored ones, so a page that changes one of them
+ * (the sort) keeps the others (the view another page set).
+ * @param {Partial<OrgPageSettings>} changes
+ */
+export function saveOrgPageSettings(changes) {
+    saveSettings(PREF.ORG_PAGE, { ...readSettings(PREF.ORG_PAGE), ...changes });
 }
 
-export function saveOrgPagePreferences(itemsPerPage, ownedOnly, currentPage = 1, scrollTop = 0) {
-    const prefs = { itemsPerPage, ownedOnly, currentPage, scrollTop };
-    try {
-        localStorage.setItem(ORG_PAGE_PREFS_KEY, JSON.stringify(prefs));
-    } catch (e) {
-        console.error('Error saving org page preferences to Local Storage:', e);
-    }
+/** @param {(settings: OrgPageSettings) => void} apply @returns {() => void} unsubscribe */
+export const followOrgPageSettings = apply => followSettings(PREF.ORG_PAGE, apply);
+
+/**
+ * Where the organisation page was left; it stays on the device. A position inside the settings
+ * written by an older Hub counts only while no position is stored.
+ * @returns {{currentPage?: number, scrollTop?: number}}
+ */
+export function getOrgPagePosition() {
+    const position = asObject(getPref(PREF.ORG_PAGE_POSITION, null)) ?? asObject(getPref(PREF.ORG_PAGE, null)) ?? {};
+    return { currentPage: position.currentPage, scrollTop: position.scrollTop };
+}
+
+export function saveOrgPagePosition(currentPage = 1, scrollTop = 0) {
+    setPref(PREF.ORG_PAGE_POSITION, { currentPage, scrollTop });
 }

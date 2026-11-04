@@ -1,19 +1,12 @@
 /**
  * Keyboard state module.
  *
- * Exports:
- *   - `keyboardState`  (reactive): { shiftPressed, ctrlPressed, metaPressed }
- *   - Default export   (legacy API): onKeyDown, onKeyUp, onShortcut, off*, isShiftPressed(), etc.
- *
- * The reactive state can be imported in composition-API components:
- *   import { keyboardState } from '@/libs/keyboard';
- *   // keyboardState.shiftPressed is reactive
- *
- * The legacy API is kept for backward compatibility with Options API components.
+ * The default export tracks which modifier keys are held (shift, ctrl, meta) and lets
+ * components subscribe to key down / key up: onKeyDown, onKeyUp, off*, isShiftPressed(), etc.
  */
 import { reactive } from 'vue';
 
-// Reactive state - usable in Vue templates and composables
+// Which modifier keys are held
 const keyboardState = reactive({
     shiftPressed: false,
     ctrlPressed: false,
@@ -22,7 +15,6 @@ const keyboardState = reactive({
 
 let keyDownListeners = [];
 let keyUpListeners = [];
-let shortcutListeners = [];
 
 const api = {
     onKeyDown: function (listener) {
@@ -31,14 +23,6 @@ const api = {
 
     onKeyUp: function (listener) {
         keyUpListeners.push(listener);
-    },
-
-    onShortcut: function (listener) {
-        shortcutListeners.push(listener);
-    },
-
-    offShortcut: function (listener) {
-        shortcutListeners = shortcutListeners.filter(l => l !== listener);
     },
 
     offKeyDown: function (listener) {
@@ -57,18 +41,13 @@ const api = {
         return keyboardState.ctrlPressed;
     },
 
-    isMetaPressed: function () {
-        return keyboardState.metaPressed;
+    // Toggle-select modifier: Ctrl, or Cmd on macOS where Ctrl-click is a right click
+    isToggleSelectPressed: function () {
+        return keyboardState.ctrlPressed || keyboardState.metaPressed;
     },
 
     isModifierPressed: function () {
         return keyboardState.shiftPressed || keyboardState.ctrlPressed || keyboardState.metaPressed;
-    },
-
-    resetModifiers: function () {
-        keyboardState.shiftPressed = false;
-        keyboardState.ctrlPressed = false;
-        keyboardState.metaPressed = false;
     },
 
     updateState: function (e) {
@@ -78,12 +57,7 @@ const api = {
     }
 };
 
-const fireShortcutEvent = (accelerator) => {
-    for (let i = 0; i < shortcutListeners.length; i++) {
-        if (shortcutListeners[i](accelerator)) break;
-    }
-};
-
+// lifetime: app (module-level keyboard state for the whole page)
 window.addEventListener("keydown", e => {
     // e.key can be undefined on some browsers/devices (e.g. iOS virtual keyboards, synthetic events)
     const key = e.key || "";
@@ -99,19 +73,10 @@ window.addEventListener("keydown", e => {
 
     api.updateState(state);
 
-    // Shortcuts
-    if (key.length === 1 && (state.ctrlKey || state.metaKey)) {
-        fireShortcutEvent("CmdOrCtrl+" + key.toUpperCase());
-    } else if (key.length === 2 && key[0] === 'F') {
-        fireShortcutEvent(key);
-    } else if (key.length === 6) {
-        // Delete
-        fireShortcutEvent(key);
-    }
-
     keyDownListeners.forEach(l => l(e));
 });
 
+// lifetime: app (module-level keyboard state for the whole page)
 window.addEventListener("keyup", e => {
     const state = {
         ctrlKey: e.ctrlKey,
@@ -128,10 +93,9 @@ window.addEventListener("keyup", e => {
     keyUpListeners.forEach(l => l(e));
 });
 
-window.addEventListener("contextmenuopened", api.resetModifiers, false);
-
 // iOS fix, when keyboard is open it pushes the viewport out
-document.addEventListener('focusout', function (e) {
+// lifetime: app (module-level keyboard state for the whole page)
+document.addEventListener('focusout', function () {
     if (window.scrollY > 0) window.scrollTo(0, 0);
 });
 

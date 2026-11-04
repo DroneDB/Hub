@@ -21,7 +21,8 @@
 // Bootstrap grid + utilities are imported in main.js
 // Font Awesome 6 is imported in main.js
 
-@import 'variables';
+@use 'variables';
+@use 'analysis-panel';
 
 html {
     font-size: 16px;
@@ -41,6 +42,60 @@ body {
     line-height: 1.5;
 }
 
+// Native checkboxes, radios, ranges and progress bars take the brand blue, not the browser's.
+:root {
+    accent-color: var(--ddb-primary);
+}
+
+// The keyboard focus ring of the Hub: the brand blue, not the browser's.
+@mixin focus-ring {
+    outline: 2px solid var(--ddb-primary, currentColor);
+    outline-offset: 2px;
+}
+
+// Native fields (sliders included) take it; :where() gives the rule no specificity, so the
+// PrimeVue fields keep the focus style of the theme.
+:where(input, select, textarea):focus-visible {
+    @include focus-ring;
+}
+
+// Links: the brand blue, visited or not (the browser's blue and purple clash with the theme).
+// :where() gives these rules no specificity, so any component style or class wins over them.
+:where(a),
+:where(a:visited) {
+    color: var(--ddb-link);
+}
+
+:where(a:hover),
+:where(a:focus-visible) {
+    color: var(--ddb-link-hover);
+}
+
+// The tint of an info message is lighter than the page: its links need the darker shade
+.p-message-info a,
+.p-inline-message-info a,
+.p-toast-message-info a {
+    color: var(--ddb-link-on-tint);
+}
+
+// Headings: the page title (h1) is the one the Datasets and Organizations pages always used;
+// h2 to h4 step down from it. Phones (below the md breakpoint) take one step smaller titles.
+h1, h2, h3, h4, h5, h6 {
+    margin: 0 0 var(--ddb-spacing-sm);
+    font-weight: bold;
+    line-height: 1.2;
+}
+
+h1 { font-size: var(--ddb-font-size-title); }
+h2 { font-size: var(--ddb-font-size-lg); }
+h3 { font-size: var(--ddb-font-size-md); }
+h4, h5, h6 { font-size: var(--ddb-font-size-base); }
+
+@media only screen and (max-width: 767.98px) {
+    h1 { font-size: var(--ddb-font-size-lg); }
+    h2 { font-size: var(--ddb-font-size-md); }
+}
+
 /*
  * GLOBAL USER-SELECT DISABLE
  *
@@ -50,9 +105,9 @@ body {
  * Disabling text selection globally prevents accidental text selection during:
  * - Map panning/zooming (OpenLayers, Leaflet)
  * - 3D model rotation/pan (Potree, Three.js)
- * - Window dragging (Window.vue)
- * - Panel resizing (Panel.vue)
- * - File selection in browsers (FileBrowser.vue, Explorer.vue)
+ * - Window dragging (HubWindow.vue)
+ * - Panel resizing (HubPanel.vue)
+ * - File selection in browsers (FileBrowser.vue, DatasetExplorer.vue)
  *
  * Use .text-selectable class on elements where text should be selectable.
  * Example: <div class="text-selectable">Copy me</div>
@@ -74,13 +129,27 @@ body {
     display: none !important;
 }
 
-.spin {
-    animation: rotation 2s infinite linear;
+// A <button> that looks like the element it replaces: clickable text, icons
+// and headers get keyboard focus and Enter/Space for free.
+.btn-reset {
+    appearance: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+    cursor: pointer;
+
+    &:focus-visible {
+        @include focus-ring;
+    }
 }
 
 // ============================================================
 // Badge styles removed - use PrimeVue Tag component:
-// <Tag severity="warning" value="Owner" />
+// <Tag severity="secondary" value="Owner" />
 // ============================================================
 
 // ============================================================
@@ -124,6 +193,7 @@ body {
     td {
         padding: var(--ddb-spacing-sm);
         border-top: var(--ddb-border-width) solid var(--ddb-border-light);
+        overflow-wrap: anywhere; // a long value wraps in a narrow window instead of widening the table
     }
 
     tfoot th {
@@ -187,16 +257,6 @@ div.loading {
     }
 }
 
-@keyframes rotation {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
 #app {
     display: flex;
     flex-direction: column;
@@ -207,6 +267,17 @@ div.loading {
         flex: 1;
         overflow: hidden;
         min-height: 0;
+    }
+
+    // A routed page that scrolls itself: html, body and the content area clip, so a page taller
+    // than the screen (a phone, a long list) scrolls inside its own root element - put
+    // .page-scroll on it. The page keeps its own padding; border-box keeps that padding inside
+    // the height it is given. Written under #app, after the rule above, so it outranks the
+    // content area's overflow: hidden.
+    > .page-scroll {
+        height: 100%;
+        overflow-y: auto;
+        box-sizing: border-box;
     }
 }
 
@@ -221,28 +292,120 @@ body:fullscreen {
 /* Responsive breakpoints (aligned with Bootstrap) */
 
 @media only screen and (max-width: 575.98px) {
-    body,
+    body {
+        font-size: 120%;
+    }
+
+    /* Form controls do not inherit the font size by default. They take the body's scaled size once:
+       a percentage here would scale it a second time (1.2 x 1.2), so tab headers and plain buttons
+       came out larger than the text around them. */
     button,
     input,
     optgroup,
     select,
     textarea {
-        font-size: 120%;
+        font-size: inherit;
+    }
+
+    // Toasts (App.vue shows them bottom-left): PrimeVue gives the container a fixed 25rem and puts
+    // it 20px from its corner with inline styles, wider than a phone. Here it spans the screen
+    // less a small margin; !important is the only way past the inline position.
+    .p-toast.p-toast-bottom-left {
+        width: calc(100vw - 2 * var(--ddb-spacing-sm));
+        left: var(--ddb-spacing-sm) !important;
+        bottom: var(--ddb-spacing-sm) !important;
     }
 }
 
 // ============================================================
-// Dialog / Window size classes
+// Windows (HubWindow)
 // ============================================================
-.dialog-xs  { max-width: 17.5rem;  }  // 280px
-.dialog-sm  { max-width: 25rem;    }  // 400px
-.dialog-md  { max-width: 31.25rem; }  // 500px
-.dialog-lg  { max-width: 37.5rem;  }  // 600px
-.dialog-xl  { max-width: 47rem;    }  // ~750px
+//
+// HubWindow passes the size it was asked for as --window-width, --window-height and
+// --window-max-width; the .dialog-* size classes set --window-max-width. The rules below turn
+// them into sizes that never exceed the screen (also on a tablet or a narrow desktop window)
+// and give phones their own layout from a media query, so nothing has to override inline styles.
+
+$window-margin: 1rem; // the space left around a window on a phone
+
+.dialog-xs  { --window-max-width: 17.5rem;  }  // 280px
+.dialog-sm  { --window-max-width: 25rem;    }  // 400px
+.dialog-md  { --window-max-width: 31.25rem; }  // 500px
+.dialog-lg  { --window-max-width: 37.5rem;  }  // 600px
+.dialog-xl  { --window-max-width: 47rem;    }  // ~750px
+
+.p-dialog.window-dialog {
+    // What the content of a window can use on the narrowest screens, for the minimum widths of
+    // forms: min-width: min(25rem, var(--window-content-width, 100%))
+    --window-content-width: calc(100vw - 4rem);
+
+    width: var(--window-width, auto);
+    height: var(--window-height, auto);
+    max-width: min(var(--window-max-width, 100vw), calc(100vw - #{$window-margin}));
+
+    .p-dialog-title {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .window-footer {
+        flex-wrap: wrap;
+    }
+}
+
+@media only screen and (max-width: 575.98px) {
+    .p-dialog.window-dialog {
+        --p-dialog-header-padding: 1rem;
+        --p-dialog-content-padding: 0 1rem 1rem 1rem;
+
+        width: calc(100vw - #{$window-margin});
+        max-width: none;
+        height: auto;
+        max-height: calc(100dvh - #{$window-margin});
+
+        // Windows made to fill the screen (editors, documents) keep all of it
+        &.window-tall {
+            height: calc(100dvh - #{$window-margin});
+        }
+    }
+}
+
+// A tab list that does not fit scrolls under its Previous and Next arrows, which lie over its
+// edges: a tab brought into view (chosen by a link, or with the keyboard) stops clear of them,
+// not cut under one
+.p-tablist-viewport {
+    scroll-padding-inline: var(--p-tabs-nav-button-width);
+}
+
+// Tabs inside a window: the size of the window's buttons (Lara sizes tabs for a page)
+.p-dialog .p-tab {
+    padding: 0.625rem 0.875rem;
+    font-size: 0.875rem;
+}
+
+.p-dialog .p-tab .tab-label {
+    margin-inline-start: 0.375rem;
+}
+
+// On a phone tabs (in a window or on a page) show only their icon, except the active one, so
+// every tab fits: wrap the label in a .tab-label. The label stays in the accessibility tree
+// (visually hidden, not display: none).
+@media only screen and (max-width: 575.98px) {
+    .p-tab:not(.p-tab-active) .tab-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        padding: 0;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+    }
+}
 
 // ============================================================
-// Tooltip shared styles (replaces duplicated inline CSS in
-// Potree.vue, mapUtils.js, etc.)
+// Tooltip shared styles (used by the Potree viewer, mapUtils.js, etc.)
 // ============================================================
 .ddb-tooltip {
     position: absolute;
@@ -326,4 +489,14 @@ body:fullscreen {
 
 .p-button-icon {
     cursor: pointer;
+}
+
+// Character counter under a text field ("12/256"): right-aligned on its own line, so it stays
+// inside the field's block instead of floating over whatever follows
+.char-count {
+    display: block;
+    margin-top: var(--ddb-spacing-xs);
+    text-align: end;
+    color: var(--ddb-text-muted);
+    font-size: var(--ddb-font-size-sm);
 }

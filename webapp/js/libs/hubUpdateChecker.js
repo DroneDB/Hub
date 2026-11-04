@@ -14,12 +14,15 @@
  * record so the UI can show a one-shot dialog.
  */
 
-const STORAGE_KEY = 'hubUpdateNotice';
-const SESSION_GUARD_KEY = 'hubUpdateAttempted';
+import { getPref, setPref, removePref, safeStorage, PREF } from '@/libs/preferences';
+const SESSION = { session: true };
 
 /* global __HUB_VERSION__ */
 const BUNDLE_VERSION =
     typeof __HUB_VERSION__ !== 'undefined' ? __HUB_VERSION__ : null;
+
+/** The Hub version this bundle was built from (package.json), or null outside webpack. */
+export const HUB_VERSION = BUNDLE_VERSION;
 
 /**
  * If the server reports a Hub version different from the one this bundle
@@ -42,16 +45,11 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
     // the current tab session, give up to avoid an infinite refresh loop
     // when the server keeps reporting a version the browser cannot pick
     // up (stale proxy, mid-deploy, etc.).
-    try {
-        if (sessionStorage.getItem(SESSION_GUARD_KEY) === serverVersion) {
-            // eslint-disable-next-line no-console
-            console.warn(
-                `[hub-update] Mismatch persists after reload (bundle=${BUNDLE_VERSION}, server=${serverVersion}). Skipping further reloads in this session.`
-            );
-            return false;
-        }
-    } catch (e) {
-        // sessionStorage unavailable (private mode, etc.): proceed without the guard.
+    if (safeStorage.getItem(PREF.HUB_UPDATE_ATTEMPTED, SESSION) === serverVersion) {
+        console.warn(
+            `[hub-update] Mismatch persists after reload (bundle=${BUNDLE_VERSION}, server=${serverVersion}). Skipping further reloads in this session.`
+        );
+        return false;
     }
 
     const notice = {
@@ -60,18 +58,10 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
         at: new Date().toISOString()
     };
 
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(notice));
-    } catch (e) {
-        // localStorage unavailable: still reload (notice will be skipped).
-    }
-    try {
-        sessionStorage.setItem(SESSION_GUARD_KEY, serverVersion);
-    } catch (e) {
-        // best-effort
-    }
+    setPref(PREF.HUB_UPDATE_NOTICE, notice);
+    safeStorage.setItem(PREF.HUB_UPDATE_ATTEMPTED, serverVersion, SESSION);
 
-    // eslint-disable-next-line no-console
+     
     console.info(
         `[hub-update] Server Hub ${serverVersion} differs from bundle ${BUNDLE_VERSION}. Reloading...`
     );
@@ -84,17 +74,11 @@ export function checkAndHandleUpdate(serverVersion, ctx) {
  * @returns {{from: string, to: string, at: string} | null}
  */
 export function consumePendingUpdateNotice() {
-    try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return null;
-        localStorage.removeItem(STORAGE_KEY);
-        // Also clear the per-tab loop guard so a future legitimate
-        // upgrade can trigger a reload again.
-        try { sessionStorage.removeItem(SESSION_GUARD_KEY); } catch (e) { /* noop */ }
-        return JSON.parse(raw);
-    } catch (e) {
-        return null;
-    }
+    const notice = getPref(PREF.HUB_UPDATE_NOTICE, null);
+    if (!notice) return null;
+    removePref(PREF.HUB_UPDATE_NOTICE);
+    // Also clear the per-tab loop guard so a future legitimate
+    // upgrade can trigger a reload again.
+    safeStorage.removeItem(PREF.HUB_UPDATE_ATTEMPTED, SESSION);
+    return notice;
 }
-
-export const __TEST__ = { STORAGE_KEY, SESSION_GUARD_KEY, BUNDLE_VERSION };

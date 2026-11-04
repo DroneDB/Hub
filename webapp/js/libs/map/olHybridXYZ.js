@@ -2,35 +2,12 @@ import XYZ from 'ol/source/XYZ';
 import TileState from 'ol/TileState';
 import ddb from 'ddb';
 
-// A class capable of loading tiles
-// from internet and file:// URLs via
-// DDB tiling
-
-function genTileFSLoadFunction(filePath, minZoom, retina) {
-    return (tile, src) => {
-        tile.setState(TileState.LOADING);
-        const { tileCoord } = tile;
-        let [tz, tx, ty] = tileCoord;
-
-        if (minZoom !== undefined && tz < minZoom) {
-            // Do not load this one
-            tile.setState(TileState.EMPTY);
-        } else {
-            ddb.tile.getFromUserCache(filePath.replace(/^file:\/\//, ""), tz, tx, ty, { size: retina ? 512 : 256, tms: true }).then((tilePath) => {
-                tile.getImage().src = "file://" + tilePath;
-                tile.setState(TileState.LOADED);
-            }).catch(e => {
-                console.error(e);
-                tile.setState(TileState.ERROR);
-            });
-        }
-    };
-}
-
-function genTileDDBLoadFunction(ddbUri, minZoom, vizParams, retina) {
+// An XYZ source whose tiles come from a DroneDB dataset (ddb:// URI): tile URLs carry the
+// visualisation parameters and the entry hash, so a changed entry gets new tiles
+function genTileDDBLoadFunction(ddbUri, minZoom, vizParams, retina, hash) {
     const [dataset, path] = ddb.utils.datasetPathFromUri(ddbUri);
 
-    return (tile, src) => {
+    return (tile) => {
         tile.setState(TileState.LOADING);
         const { tileCoord } = tile;
         let [tz, tx, ty] = tileCoord;
@@ -49,7 +26,7 @@ function genTileDDBLoadFunction(ddbUri, minZoom, vizParams, retina) {
             if (vizParams && Object.keys(vizParams).length > 0) {
                 tile.getImage().src = dataset.tileExUrl(path, tz, tx, ty, vizParams, { retina });
             } else {
-                tile.getImage().src = dataset.tileUrl(path, tz, tx, ty, { retina });
+                tile.getImage().src = dataset.tileUrl(path, tz, tx, ty, { retina, hash });
             }
         }
     };
@@ -57,16 +34,13 @@ function genTileDDBLoadFunction(ddbUri, minZoom, vizParams, retina) {
 
 class HybridXYZ extends XYZ {
     constructor(opt_options) {
-        const isFS = opt_options.url && opt_options.url.startsWith("file://");
         const isDDB = opt_options.url && ddb.utils.isDDBUri(opt_options.url);
-
-        let minZoom = opt_options.minZoom;
-        if (isFS && isDDB) {
-            // minZoom freezes OL. Bho... so we remove it
-            delete (opt_options.minZoom);
-        }
+        const minZoom = opt_options.minZoom;
         const url = opt_options.url;
         const vizParams = opt_options.vizParams || null;
+        // Entry hash, when known: versions the tile URLs (see Dataset.tileUrl).
+        const hash = opt_options.hash;
+        delete opt_options.hash;
 
         // Retina requests 512 px tiles into 256 px slots (tilePixelRatio 2),
         // which doubles the effective on-screen resolution of rasters.
@@ -79,11 +53,11 @@ class HybridXYZ extends XYZ {
         opt_options.url = "https://{z}/{x}/{y}";
         delete opt_options.vizParams;
         super(opt_options);
+        // What the tiles show, so a layer is re-sourced only when this changes
+        this.vizParams = vizParams;
 
-        if (isFS) {
-            this.tileLoadFunction = genTileFSLoadFunction(url, minZoom, retina).bind(this);
-        } else if (isDDB) {
-            this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom, vizParams, retina).bind(this);
+        if (isDDB) {
+            this.tileLoadFunction = genTileDDBLoadFunction(url, minZoom, vizParams, retina, hash).bind(this);
         }
     }
 };

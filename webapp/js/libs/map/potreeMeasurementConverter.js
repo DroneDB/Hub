@@ -2,13 +2,14 @@
  * Utility to convert Potree measurements to GeoJSON and vice versa
  */
 
+import { EPSG } from '@/libs/constants';
 /**
  * Convert a Potree measurement to a GeoJSON Feature
  * @param {Potree.Measure} measure - Potree measurement
  * @param {Object} coordinateSystem - Coordinate system from EPT
  * @returns {Object} GeoJSON Feature
  */
-export function measureToGeoJSON(measure, coordinateSystem) {
+function measureToGeoJSON(measure, coordinateSystem) {
     const points = measure.points.map(point => {
         // Convert local coordinates to geographic
         const coords = localToGeographic(point.position, coordinateSystem);
@@ -129,7 +130,7 @@ export function measureToGeoJSON(measure, coordinateSystem) {
  * @param {Object} coordinateSystem - Coordinate system
  * @returns {Potree.Measure} Potree measurement
  */
-export function geoJSONToMeasure(feature, viewer, coordinateSystem) {
+function geoJSONToMeasure(feature, viewer, coordinateSystem) {
     const measure = new Potree.Measure();
     const props = feature.properties;
 
@@ -225,7 +226,7 @@ export function exportMeasurements(viewer, pointCloudPath, coordinateSystem, gro
         crs: {
             type: 'name',
             properties: {
-                name: 'EPSG:4326' // Output is always in WGS84
+                name: EPSG.WGS84 // Output is always in WGS84
             }
         },
         metadata: {
@@ -344,6 +345,21 @@ export function importMeasurements(geojson, viewer, coordinateSystem) {
 // ============================================================================
 
 /**
+ * The SRS definition proj4 takes: an EPSG code string or WKT, from a string, from
+ * { wkt } or from the nested { srs: { wkt } } of an EPT file. Null when there is none.
+ * @param {string|object|null|undefined} srs
+ * @returns {string|null}
+ */
+function srsDefinitionOf(srs) {
+    if (typeof srs === 'string') return srs;
+    if (srs && typeof srs === 'object') {
+        if (srs.srs && srs.srs.wkt) return srs.srs.wkt;
+        if (srs.wkt) return srs.wkt;
+    }
+    return null;
+}
+
+/**
  * Convert local coordinates to geographic
  * @param {THREE.Vector3} localCoords - Local coordinates
  * @param {Object} coordinateSystem - Coordinate system from EPT
@@ -357,18 +373,7 @@ function localToGeographic(localCoords, coordinateSystem) {
     const y = localCoords.y * scale[1] + offset[1];
     const z = localCoords.z * scale[2] + offset[2];
 
-    // Extract SRS definition (can be string EPSG code or object with wkt property)
-    let srsDefinition = null;
-    if (typeof srs === 'string') {
-        srsDefinition = srs;
-    } else if (srs && typeof srs === 'object') {
-        // Handle nested structure like {"srs":{"wkt":"..."}}
-        if (srs.srs && srs.srs.wkt) {
-            srsDefinition = srs.srs.wkt;
-        } else if (srs.wkt) {
-            srsDefinition = srs.wkt;
-        }
-    }
+    const srsDefinition = srsDefinitionOf(srs);
 
     // If no SRS or already WGS84, return directly
     if (!srsDefinition) {
@@ -378,7 +383,7 @@ function localToGeographic(localCoords, coordinateSystem) {
     // Use proj4 to transform to WGS84 (proj4 handles both EPSG codes and WKT)
     if (typeof proj4 !== 'undefined') {
         try {
-            const transformed = proj4(srsDefinition, 'EPSG:4326', [x, y]);
+            const transformed = proj4(srsDefinition, EPSG.WGS84, [x, y]);
             return [transformed[0], transformed[1], z];
         } catch (e) {
             console.warn('Projection failed, using raw coordinates:', e);
@@ -400,23 +405,12 @@ function geographicToLocal(geoCoords, coordinateSystem) {
     const { scale, offset, srs } = coordinateSystem;
     let [x, y, z] = geoCoords;
 
-    // Extract SRS definition (can be string EPSG code or object with wkt property)
-    let srsDefinition = null;
-    if (typeof srs === 'string') {
-        srsDefinition = srs;
-    } else if (srs && typeof srs === 'object') {
-        // Handle nested structure like {"srs":{"wkt":"..."}}
-        if (srs.srs && srs.srs.wkt) {
-            srsDefinition = srs.srs.wkt;
-        } else if (srs.wkt) {
-            srsDefinition = srs.wkt;
-        }
-    }
+    const srsDefinition = srsDefinitionOf(srs);
 
     // Transform from WGS84 to local system if necessary
     if (srsDefinition && typeof proj4 !== 'undefined') {
         try {
-            [x, y] = proj4('EPSG:4326', srsDefinition, [x, y]);
+            [x, y] = proj4(EPSG.WGS84, srsDefinition, [x, y]);
         } catch (e) {
             console.warn('Reverse projection failed:', e);
         }

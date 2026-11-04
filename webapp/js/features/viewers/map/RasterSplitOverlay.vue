@@ -1,13 +1,31 @@
 <template>
-    <div class="split-overlay" ref="overlay">
-        <!-- Per-band top label -->
+    <div ref="overlay" class="split-overlay">
+        <!-- Per-band top label, with the controls of its layer -->
         <div
             v-for="(band, i) in bands"
             :key="'band-' + i"
             class="split-band-label"
             :style="bandLabelStyle(i)"
         >
-            <span class="split-label-pill">{{ band }}</span>
+            <span class="split-label-pill" :class="{ placeholder: !!band.placeholder }">
+                <button v-if="i > 0" class="split-label-btn" title="Move left" aria-label="Move left" @click="$emit('move', i, i - 1)">
+                    <i class="fa-solid fa-caret-left" />
+                </button>
+                <span class="split-label-text" :title="band.placeholder ? band.placeholder.text : band.name">
+                    {{ band.placeholder ? band.placeholder.text : band.name }}
+                </span>
+                <button v-if="removable && band.placeholder && band.placeholder.kind === 'missing'" class="split-label-btn"
+                        title="Pick another raster" aria-label="Pick another raster" @click="$emit('repick', i)">
+                    <i class="fa-solid fa-arrows-rotate" />
+                </button>
+                <button v-if="removable && bands.length > 1" class="split-label-btn" title="Remove layer"
+                        aria-label="Remove layer" @click="$emit('remove', i)">
+                    <i class="fa-solid fa-xmark" />
+                </button>
+                <button v-if="i < bands.length - 1" class="split-label-btn" title="Move right" aria-label="Move right" @click="$emit('move', i, i + 1)">
+                    <i class="fa-solid fa-caret-right" />
+                </button>
+            </span>
         </div>
 
         <!-- Draggable vertical handles (N-1) -->
@@ -25,9 +43,15 @@
 </template>
 
 <script>
+/**
+ * RasterSplitOverlay - the labels and dividers of the split mode. A band label moves its layer
+ * one band left or right (the band widths stay); with `removable` (the map viewer, not Viewer
+ * only) it also removes it, and a missing layer's label picks another file.
+ */
 export default {
     name: 'RasterSplitOverlay',
     props: {
+        // [{ name, placeholder: { kind, text } | null }], leftmost first
         bands: {
             type: Array,
             required: true
@@ -35,9 +59,13 @@ export default {
         positions: {
             type: Array,
             required: true
+        },
+        removable: {
+            type: Boolean,
+            default: false
         }
     },
-    emits: ['update:positions'],
+    emits: ['update:positions', 'move', 'remove', 'repick'],
     data() {
         return {
             draggingIndex: -1,
@@ -102,30 +130,84 @@ export default {
     position: absolute;
     inset: 0;
     pointer-events: none;
-    z-index: 2;
+    /* Under the map's controls (ol-controls.css), so a divider under the toolbar leaves it its clicks */
+    z-index: var(--map-layer-split);
     overflow: hidden;
 }
 
+/* Below the row of buttons at the top centre of the map, so the label of a middle band is not
+   under them */
 .split-band-label {
     position: absolute;
-    top: 0.6rem;
+    top: var(--map-top-reserve);
     pointer-events: none;
 }
 
+/* Only the buttons take clicks: the label itself lets them through to the map */
 .split-label-pill {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
     background: rgba(0, 0, 0, 0.65);
-    color: #fff;
+    color: var(--ddb-text-on-color);
     font-size: 0.7rem;
     font-weight: 500;
     padding: 0.2rem 0.55rem;
     border-radius: 1rem;
     white-space: nowrap;
-    max-width: 14rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: 18rem;
     user-select: none;
     box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+
+    /* A missing or unavailable file: the Hub's warning look, yellow with dark text */
+    &.placeholder {
+        background: var(--ddb-warning);
+        color: var(--ddb-text);
+    }
+}
+
+.split-label-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.split-label-btn {
+    flex-shrink: 0;
+    pointer-events: auto;
+    background: none;
+    border: none;
+    color: inherit;
+    padding: 0 0.15rem;
+    cursor: pointer;
+    line-height: 1;
+    font-size: 0.75rem;
+    opacity: 0.8;
+
+    &:hover {
+        opacity: 1;
+    }
+}
+
+/* A phone: the labels go to the bottom, above the map settings button by the measure the panels
+   keep from it, so they stay clear of the zoom and tool buttons at the top */
+@media (max-width: 575.98px) {
+    .split-band-label {
+        top: auto;
+        bottom: var(--map-bottom-reserve);
+    }
+
+    .split-label-pill {
+        max-width: 45vw;
+    }
+}
+
+/* Fingers: each control a touch target */
+@media (pointer: coarse) {
+    .split-label-btn {
+        min-width: 1.75rem;
+        min-height: 1.75rem;
+    }
 }
 
 .split-handle {
@@ -156,7 +238,7 @@ export default {
 .split-handle-grip {
     position: relative;
     background: rgba(0, 0, 0, 0.6);
-    color: #fff;
+    color: var(--ddb-text-on-color);
     border-radius: 0.4rem;
     padding: 0.3rem 0.35rem;
     font-size: 0.75rem;

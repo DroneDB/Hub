@@ -1,23 +1,30 @@
 /**
  * navControls - unit tests for the unified viewer navigation module.
  *
- * Covers the pure logic (wheel normalization, scene distance metrics), the single control
- * factory configuration (button mapping, damping, zoom-to-cursor, ground-plane panning, wheel
- * re-dispatch), the double-click re-centre (surface pick and the up-vector-aware ground-plane
- * fallback) and the camera tweener (easing endpoint, retarget, stop). three.js math classes are
- * the real thing; OrbitControls/Giro3D are stubbed.
+ * Covers the pure logic (wheel normalization, scene distance metrics), the one control of every
+ * scene (the real ArcballControls of the bm3d viewer: rotation, pan, the upright aim, the orbit
+ * Home flight, the focus of a double-click), the double-click pick (surface pick and the
+ * up-vector-aware ground-plane fallback) and the camera tweener (easing endpoint, retarget,
+ * stop). three.js is the real thing; Giro3D is stubbed.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { ArcballControls } from 'three/examples/jsm/controls/ArcballControls.js';
 import {
     NAV,
-    wheelNotches,
     createNavControls,
-    createTurntableRotate,
+    aimCamera,
+    navPivot,
+    orbitTweenStep,
+    stopNavAnimation,
+    focusPosition,
+    screenUp,
+    wheelNotches,
     applySceneMetrics,
     createDoubleClickRecenter,
-    createCameraTweener
+    createCameraTweener,
+    easeInOutCubic,
+    groundPlaneHit
 } from './navControls';
 
 afterEach(() => {
@@ -51,307 +58,6 @@ describe('wheelNotches', () => {
 
     it('returns 0 for no movement', () => {
         expect(wheelNotches({ deltaMode: 0, deltaY: 0 })).toBe(0);
-    });
-});
-
-// ---- createNavControls ----
-
-/** Stub OrbitControls with the surface navControls touches. */
-function makeFakeOrbitControls() {
-    return class FakeOrbitControls {
-        constructor(camera, domElement) {
-            this.object = camera;
-            this.domElement = domElement;
-            this.target = new THREE.Vector3();
-            this.stopListenToKeyEvents = vi.fn();
-            this.listenToKeyEvents = vi.fn();
-            this.update = vi.fn();
-            this._disposed = false;
-        }
-        dispose() {
-            this._disposed = true;
-        }
-    };
-}
-
-describe('createNavControls', () => {
-    it('configures Potree-parity defaults instead of three map defaults', () => {
-        const el = document.createElement('div');
-        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-        const OrbitControls = makeFakeOrbitControls();
-
-        const controls = createNavControls({ THREE, OrbitControls }, camera, el);
-
-        expect(controls.enableDamping).toBe(true);
-        expect(controls.dampingFactor).toBe(NAV.dampingFactor);
-        // Rotation must NOT be OrbitControls' own: its pole handling flips/sticks the camera
-        // (verified live). LEFT/single-touch are handed to the custom turntable instead, so the
-        // control itself gets null there while keeping dolly/pan/two-finger.
-        expect(controls.mouseButtons).toEqual({
-            LEFT: null,
-            MIDDLE: THREE.MOUSE.DOLLY,
-            RIGHT: THREE.MOUSE.PAN
-        });
-        expect(controls.zoomToCursor).toBe(false);
-        expect(controls.touches).toEqual({
-            ONE: null,
-            TWO: THREE.TOUCH.DOLLY_PAN
-        });
-        expect(controls.listenToKeyEvents).toHaveBeenCalledWith(el);
-    });
-
-    it('spans the full sphere around the pivot and pans along the ground plane', () => {
-        const el = document.createElement('div');
-        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-        const OrbitControls = makeFakeOrbitControls();
-
-        const controls = createNavControls({ THREE, OrbitControls }, camera, el);
-
-        // Unconstrained pitch (Potree Orbit parity): inspecting an underside needs no mode switch.
-        expect(controls.minPolarAngle).toBe(0);
-        expect(controls.maxPolarAngle).toBe(Math.PI);
-        // Panning must stay in the plane through the pivot perpendicular to camera.up - the ground
-        // plane when up is Z, the local horizontal plane in an ECEF globe scene.
-        expect(controls.screenSpacePanning).toBe(false);
-    });
-
-    it('re-dispatches Firefox line-delta wheel events as normalized pixel deltas', () => {
-        const el = document.createElement('div');
-        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-        const OrbitControls = makeFakeOrbitControls();
-        createNavControls({ THREE, OrbitControls }, camera, el);
-
-        const received = [];
-        el.addEventListener('wheel', e => received.push(e));
-
-        // Firefox: deltaMode 1 (lines), 3 lines per notch
-        const ff = new WheelEvent('wheel', { deltaY: 3, deltaMode: 1, bubbles: true, cancelable: true });
-        el.dispatchEvent(ff);
-
-        expect(ff.defaultPrevented).toBe(true);
-        expect(received).toHaveLength(1);
-        expect(received[0].deltaMode).toBe(0);
-        expect(received[0].deltaY).toBe(100);
-    });
-
-    it('does not re-normalize its own synthetic wheel events (no recursion)', () => {
-        const el = document.createElement('div');
-        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-        const OrbitControls = makeFakeOrbitControls();
-        createNavControls({ THREE, OrbitControls }, camera, el);
-
-        const received = [];
-        el.addEventListener('wheel', e => received.push(e));
-
-        el.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, deltaMode: 0, bubbles: true, cancelable: true }));
-        // Exactly one event: the synthetic one passes through untouched.
-        expect(received).toHaveLength(1);
-    });
-
-    it('removes the wheel normalizer on dispose', () => {
-        const el = document.createElement('div');
-        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-        const OrbitControls = makeFakeOrbitControls();
-        const controls = createNavControls({ THREE, OrbitControls }, camera, el);
-
-        controls.dispose();
-
-        expect(controls._disposed).toBe(true);
-        expect(controls.stopListenToKeyEvents).toHaveBeenCalled();
-
-        const received = [];
-        el.addEventListener('wheel', e => received.push(e));
-        el.dispatchEvent(new WheelEvent('wheel', { deltaY: 3, deltaMode: 1, bubbles: true, cancelable: true }));
-        // Normalizer gone: the raw Firefox event is no longer intercepted/rewritten.
-        expect(received).toHaveLength(1);
-        expect(received[0].deltaMode).toBe(1);
-    });
-});
-
-// ---- turntable rotation, against the real OrbitControls ----
-//
-// The invariant the whole navigation model rests on: a left-drag must rotate the camera about the
-// vertical axis through the pivot - the model's own vertical centre axis right after framing - and
-// must not move the pivot. Tested with the real three.js control (everything above stubs it) so a
-// library or configuration change that breaks turntable rotation fails here instead of in the UI.
-
-describe('turntable rotation (real OrbitControls)', () => {
-    const VIEWPORT_H = 800;
-    const VIEWPORT_W = 600;
-
-    function makeCanvas() {
-        const el = document.createElement('canvas');
-        Object.defineProperty(el, 'clientWidth', { value: VIEWPORT_W });
-        Object.defineProperty(el, 'clientHeight', { value: VIEWPORT_H });
-        el.getBoundingClientRect = () => ({ left: 0, top: 0, width: VIEWPORT_W, height: VIEWPORT_H, right: VIEWPORT_W, bottom: VIEWPORT_H });
-        el.setPointerCapture = () => {};
-        el.releasePointerCapture = () => {};
-        return el;
-    }
-
-    function pointer(type, x, y) {
-        return new PointerEvent(type, {
-            clientX: x, clientY: y, button: 0, pointerId: 1,
-            pointerType: 'mouse', isPrimary: true, bubbles: true, cancelable: true
-        });
-    }
-
-    function fixture() {
-        const el = makeCanvas();
-        // A 20 m cube on z = 0, so the Z axis through the origin is its vertical centre axis.
-        const center = new THREE.Vector3(0, 0, 10);
-        const camera = new THREE.PerspectiveCamera(50, VIEWPORT_W / VIEWPORT_H, 0.02, 20000);
-        camera.up.set(0, 0, 1);
-        const controls = createNavControls({ THREE, OrbitControls }, camera, el);
-        camera.position.set(24, -24, 28);
-        controls.target.copy(center);
-        applySceneMetrics(controls, 20);
-        controls.update();
-        // Azimuth in the horizontal plane, measured the way a viewer sees it.
-        const azimuth = () => {
-            const off = camera.position.clone().sub(center);
-            return THREE.MathUtils.radToDeg(Math.atan2(off.y, off.x));
-        };
-        // Elevation of the camera above the pivot, in degrees (90 = level, 0 = straight above).
-        const elevation = () => {
-            const off = camera.position.clone().sub(center);
-            return THREE.MathUtils.radToDeg(Math.acos(off.z / off.length()));
-        };
-        const drag = (dx, dy = 0, steps = 5) => {
-            el.dispatchEvent(pointer('pointerdown', VIEWPORT_W / 2, VIEWPORT_H / 2));
-            for (let i = 1; i <= steps; i++) {
-                el.dispatchEvent(pointer('pointermove', VIEWPORT_W / 2 + (dx * i) / steps, VIEWPORT_H / 2 + (dy * i) / steps));
-            }
-            el.dispatchEvent(pointer('pointerup', VIEWPORT_W / 2 + dx, VIEWPORT_H / 2 + dy));
-            for (let i = 0; i < 40; i++) controls.update(); // let damping settle
-        };
-        return { el, camera, controls, center, azimuth, elevation, drag };
-    }
-
-    it('rotates about the pivot on an axis-parallel drag without moving the pivot', () => {
-        const { camera, controls, center, azimuth, drag } = fixture();
-        const startAz = azimuth();
-        const startDist = camera.position.distanceTo(center);
-        const startHeight = camera.position.z;
-
-        drag(160);
-
-        // The pivot is the rotation axis: it must not budge.
-        expect(controls.target.distanceTo(center)).toBeLessThan(1e-9);
-        // A pure turntable: same radius and same height above the ground plane.
-        expect(camera.position.distanceTo(center)).toBeCloseTo(startDist, 6);
-        expect(camera.position.z).toBeCloseTo(startHeight, 6);
-        // And it must turn by exactly the pointer travel over the viewport height.
-        expect(azimuth() - startAz).toBeCloseTo(-360 * 160 / VIEWPORT_H, 1);
-    });
-
-    it('pitches about the screen-horizontal axis on a vertical drag without rolling', () => {
-        const { camera, controls, center, azimuth, elevation, drag } = fixture();
-        const startAz = azimuth();
-        const startEl = elevation();
-        const startDist = camera.position.distanceTo(center);
-        const startUp = camera.up.clone();
-
-        drag(0, -160); // OrbitControls' native sign (verified live): drag UP drives phi UP
-
-        expect(controls.target.distanceTo(center)).toBeLessThan(1e-9);
-        expect(camera.position.distanceTo(center)).toBeCloseTo(startDist, 4);
-        expect(azimuth()).toBeCloseTo(startAz, 6); // pure pitch: no yaw leakage
-        // Dragging up by 160 px over an 800 px viewport carries the camera 72 deg toward the
-        // nadir (elevation = angle to the up axis, so it increases toward 180 = under the model).
-        expect(elevation() - startEl).toBeCloseTo(360 * 160 / VIEWPORT_H, 1);
-        // No roll, ever: the up axis is not what the rotation acts on.
-        expect(camera.up.distanceTo(startUp)).toBeLessThan(1e-12);
-    });
-
-    it('never flips at the poles: a huge vertical drag stops short and drags stay responsive', () => {
-        const { camera, controls, center, azimuth, elevation, drag } = fixture();
-        const startUp = camera.up.clone();
-
-        // 2 viewport heights in one drag: the equivalent accumulated rotation carried the real
-        // OrbitControls camera through the pole into the antipodal flipped view and left it dead.
-        // The turntable must instead clamp just short of straight-BELOW ...
-        drag(0, -VIEWPORT_H * 2);
-        expect(elevation()).toBeGreaterThan(179.9); // deg, ≈ EPS rad under the south pole ...
-        expect(elevation()).toBeLessThan(180); // ... but never AT it
-        expect(camera.up.distanceTo(startUp)).toBeLessThan(1e-12);
-
-        // At the pole the yaw orbit degenerates to an r*sin(eps) circle (inherent to every
-        // spherical camera, Potree included) - the azimuth still advances exactly, proven below
-        // one quadrant off the pole. The first thing a user does there is drag the other way:
-        // it must release off the pole immediately, by the expected amount ...
-        const el0 = elevation();
-        drag(0, VIEWPORT_H / 4); // drag down = back toward the zenith
-        expect(el0 - elevation()).toBeCloseTo(360 * (VIEWPORT_H / 4) / VIEWPORT_H, 1);
-
-        // ... and at normal latitude horizontal drags rotate normally: azimuth by exactly the
-        // pointer travel over the viewport height, camera actually moving (the native control,
-        // stuck at the pole, changed only its internal azimuth and froze the camera instead).
-        const az = azimuth();
-        const posBefore = camera.position.clone();
-        drag(160);
-        expect(azimuth() - az).toBeCloseTo(-360 * 160 / VIEWPORT_H, 1);
-        expect(camera.position.distanceTo(posBefore)).toBeGreaterThan(1);
-    });
-
-    it('yields rotation to a second finger so pinch goes to the dolly-pan control', () => {
-        const el = makeCanvas();
-        const center = new THREE.Vector3(0, 0, 10);
-        const camera = new THREE.PerspectiveCamera(50, VIEWPORT_W / VIEWPORT_H, 0.02, 20000);
-        camera.up.set(0, 0, 1);
-        camera.position.set(24, -24, 28);
-        const controls = { target: center.clone(), update: () => {}, enabled: true, rotateSpeed: 1 };
-        createTurntableRotate({ THREE }, camera, controls, el, () => camera.up);
-        const posBefore = camera.position.clone();
-        const touch = (type, id, x, y) => el.dispatchEvent(new PointerEvent(type, {
-            clientX: x, clientY: y, button: 0, pointerId: id,
-            pointerType: 'touch', isPrimary: id === 1, bubbles: true, cancelable: true
-        }));
-
-        touch('pointerdown', 1, 100, 100);
-        // Second finger down: the turntable must disarm itself immediately ...
-        touch('pointerdown', 2, 200, 200);
-        // ... so the first finger dragging changes nothing.
-        touch('pointermove', 1, 400, 200);
-        expect(camera.position.distanceTo(posBefore)).toBeLessThan(1e-9);
-
-        // A fresh single-finger drag right after still rotates normally.
-        touch('pointerdown', 3, 100, 100);
-        touch('pointermove', 3, 260, 100);
-        touch('pointerup', 3, 260, 100);
-        expect(camera.position.distanceTo(posBefore)).toBeGreaterThan(1);
-    });
-
-    it('stop responding once the control is disposed', () => {
-        const { el, camera, controls, azimuth, drag } = fixture();
-        controls.dispose();
-        const az = azimuth();
-        // Replaying the whole gesture on the disposed control must be inert: the listeners are
-        // gone with it (the wheel normalizer and key events are covered in the stub suite above).
-        el.dispatchEvent(pointer('pointerdown', VIEWPORT_W / 2, VIEWPORT_H / 2));
-        el.dispatchEvent(pointer('pointermove', VIEWPORT_W / 2 + 160, VIEWPORT_H / 2));
-        el.dispatchEvent(pointer('pointerup', VIEWPORT_W / 2 + 160, VIEWPORT_H / 2));
-        controls.update();
-        expect(azimuth()).toBeCloseTo(az, 9);
-    });
-
-    it('keeps the pivot on the model axis across wheel zooms (no zoom-to-cursor drift)', () => {
-        const { el, camera, controls, center, azimuth } = fixture();
-
-        for (let i = 0; i < 3; i++) {
-            el.dispatchEvent(new WheelEvent('wheel', {
-                clientX: VIEWPORT_W * 0.3, clientY: VIEWPORT_H * 0.6,
-                deltaY: -100, deltaMode: 0, bubbles: true, cancelable: true
-            }));
-            controls.update();
-        }
-
-        expect(controls.target.distanceTo(center)).toBeLessThan(1e-9);
-        expect(camera.position.distanceTo(center)).toBeLessThan(38.42);
-        // Zooming must not rotate the view either, and every component of the camera must stay
-        // finite (the zoom-to-cursor path could produce NaN positions for a near-horizontal ray).
-        expect(azimuth()).toBeCloseTo(-45, 6);
-        expect(camera.position.toArray().every(Number.isFinite)).toBe(true);
     });
 });
 
@@ -550,5 +256,252 @@ describe('createCameraTweener', () => {
         expect(onDone).not.toHaveBeenCalled();
         // the cancelled frame no longer runs
         expect(() => { if (frames[1]) frames[1](start + 400); }).not.toThrow();
+    });
+
+    it('tells onStep the eased progress, so a caller can move more than the position and target', () => {
+        const { frames, camera, controls } = makeTweenerHarness();
+        const tweener = createCameraTweener();
+        const onStep = vi.fn();
+
+        const start = 1000;
+        vi.spyOn(performance, 'now').mockReturnValue(start);
+        tweener.tweenTo(camera, controls, new THREE.Vector3(0, 0, 100), new THREE.Vector3(), 400, undefined, onStep);
+        frames[0](start + 100);
+        expect(onStep).toHaveBeenLastCalledWith(easeInOutCubic(0.25));
+        frames[1](start + 500);
+        expect(onStep).toHaveBeenLastCalledWith(1);
+        vi.restoreAllMocks();
+    });
+});
+
+// ---- easing ----
+
+describe('easeInOutCubic', () => {
+    it('starts at 0, ends at 1 and passes the middle at one half', () => {
+        expect(easeInOutCubic(0)).toBe(0);
+        expect(easeInOutCubic(1)).toBe(1);
+        expect(easeInOutCubic(0.5)).toBe(0.5);
+    });
+
+    it('eases in slowly and out slowly, never going backwards', () => {
+        expect(easeInOutCubic(0.25)).toBeCloseTo(0.0625);
+        expect(easeInOutCubic(0.75)).toBeCloseTo(0.9375);
+        let last = 0;
+        for (let t = 0; t <= 1; t += 0.05) {
+            const e = easeInOutCubic(t);
+            expect(e).toBeGreaterThanOrEqual(last);
+            last = e;
+        }
+    });
+});
+
+// ---- ground plane under a pointer ----
+
+describe('groundPlaneHit', () => {
+    function fixture(up) {
+        const domElement = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
+        const camera = new THREE.PerspectiveCamera(90, 1, 0.1, 2000);
+        camera.up.copy(up);
+        camera.position.set(-5, 0, 10);
+        camera.updateMatrixWorld();
+        return { domElement, camera, controls: { target: new THREE.Vector3(0, 0, 4) } };
+    }
+
+    it('meets the plane through the pivot perpendicular to camera.up', () => {
+        const { domElement, camera, controls } = fixture(new THREE.Vector3(0, 0, 1));
+        const hit = groundPlaneHit(THREE, { domElement }, camera, controls, { clientX: 800, clientY: 600 });
+        expect(hit.distanceTo(new THREE.Vector3(1, -6, 4))).toBeLessThan(1e-9);
+    });
+
+    it('is null for a pointer whose ray points away from the plane, and for an element with no size', () => {
+        const { domElement, camera, controls } = fixture(new THREE.Vector3(0, 0, 1));
+        // Looking up from above the plane: the ray through the top of the view never reaches it
+        camera.position.set(0, 0, 10);
+        camera.lookAt(0, 10, 12);
+        camera.updateMatrixWorld();
+        expect(groundPlaneHit(THREE, { domElement }, camera, controls, { clientX: 400, clientY: 0 })).toBeNull();
+        const hidden = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 0, height: 0 }) };
+        expect(groundPlaneHit(THREE, { domElement: hidden }, camera, controls, { clientX: 1, clientY: 1 })).toBeNull();
+    });
+});
+
+// ---- the navigation of every scene (the bm3d viewer's ArcballControls) ----
+
+describe('navigation (real ArcballControls)', () => {
+    const W = 600;
+    const H = 800;
+    const Z_UP = new THREE.Vector3(0, 0, 1);
+
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    function makeCanvas() {
+        const el = document.createElement('canvas');
+        Object.defineProperty(el, 'clientWidth', { value: W });
+        Object.defineProperty(el, 'clientHeight', { value: H });
+        el.getBoundingClientRect = () => ({ left: 0, top: 0, width: W, height: H, right: W, bottom: H, x: 0, y: 0 });
+        return el;
+    }
+
+    // The scene of a flat Giro3D instance: Z up, a model whose centre is (0, 0, 10)
+    function fixture() {
+        // The inertia after a drag runs on animation frames: none here
+        vi.stubGlobal('requestAnimationFrame', () => 1);
+        vi.stubGlobal('cancelAnimationFrame', () => {});
+        const el = makeCanvas();
+        const camera = new THREE.PerspectiveCamera(50, W / H, 0.02, 20000);
+        camera.up.copy(Z_UP);
+        const scene = new THREE.Scene();
+        const controls = createNavControls({ ArcballControls }, camera, el, scene);
+        camera.position.set(24, -24, 28);
+        controls.target.set(0, 0, 10);
+        applySceneMetrics(controls, 20);
+        aimCamera(camera, controls, Z_UP);
+        // A frame is rendered before the user touches the view (the matrices of the scene)
+        scene.updateMatrixWorld();
+        return { el, camera, controls };
+    }
+
+    const forward = camera => new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+    const right = camera => new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+
+    function pointer(type, x, y, button = 0) {
+        return new PointerEvent(type, {
+            clientX: x, clientY: y, button, buttons: 1 << button, pointerId: 1,
+            pointerType: 'mouse', isPrimary: true, bubbles: true, cancelable: true
+        });
+    }
+
+    function drag(el, dx, dy, button = 0) {
+        el.dispatchEvent(pointer('pointerdown', W / 2, H / 2, button));
+        for (let i = 1; i <= 5; i++) window.dispatchEvent(pointer('pointermove', W / 2 + (dx * i) / 5, H / 2 + (dy * i) / 5, button));
+        window.dispatchEvent(pointer('pointerup', W / 2 + dx, H / 2 + dy, button));
+    }
+
+    it('are the ArcballControls of the bm3d viewer, gizmos hidden, and keep the scene up of the camera', () => {
+        const { camera, controls } = fixture();
+        expect(controls).toBeInstanceOf(ArcballControls);
+        expect(controls._gizmos.visible).toBe(false);
+        // The bm3d viewer's defaults: inertia, wheel zoom to the pivot by 1.1 a notch
+        expect(controls.enableAnimations).toBe(true);
+        expect(controls.cursorZoom).toBe(false);
+        expect(controls.scaleFactor).toBe(1.1);
+        // The double-click focus is the viewer's (Giro3D picks points and map tiles too)
+        expect(controls.enableFocus).toBe(false);
+        expect(camera.up.dot(Z_UP)).toBeGreaterThan(0);
+        controls.dispose();
+    });
+
+    it('aims an upright camera at the target (no roll) and keeps camera.up the up of the screen', () => {
+        const { camera, controls } = fixture();
+        const toTarget = controls.target.clone().sub(camera.position).normalize();
+        expect(forward(camera).distanceTo(toTarget)).toBeLessThan(1e-9);
+        // The screen's horizontal stays level, the screen's up points up
+        expect(right(camera).z).toBeCloseTo(0, 9);
+        expect(camera.up.z).toBeGreaterThan(0);
+        expect(camera.up.distanceTo(screenUp(camera.quaternion, new THREE.Vector3()))).toBeLessThan(1e-9);
+        expect(navPivot(controls).distanceTo(controls.target)).toBeLessThan(1e-9);
+        controls.dispose();
+    });
+
+    it('rotates freely around the pivot on a left drag, and later updates leave that view alone', () => {
+        const { el, camera, controls } = fixture();
+        const pivot = controls.target.clone();
+        const distance = camera.position.distanceTo(pivot);
+        const before = camera.quaternion.clone();
+
+        drag(el, 120, 80);
+
+        expect(camera.quaternion.angleTo(before)).toBeGreaterThan(0.1);
+        expect(camera.position.distanceTo(pivot)).toBeCloseTo(distance, 6);
+        // camera.up is the screen's up after a rotation: Giro3D's update() of every frame (a
+        // lookAt) keeps the view instead of spinning it
+        expect(camera.up.distanceTo(screenUp(camera.quaternion, new THREE.Vector3()))).toBeLessThan(1e-6);
+        const rotated = camera.quaternion.clone();
+        for (let i = 0; i < 10; i++) controls.update();
+        expect(camera.quaternion.angleTo(rotated)).toBeLessThan(1e-6);
+        controls.dispose();
+    });
+
+    it('pans in the screen plane on a right drag, the pivot with it', () => {
+        const { el, camera, controls } = fixture();
+        const pivot = navPivot(controls).clone();
+        const before = camera.quaternion.clone();
+
+        drag(el, 100, 0, 2);
+
+        expect(camera.quaternion.angleTo(before)).toBeLessThan(1e-9);
+        const moved = navPivot(controls).clone().sub(pivot);
+        expect(moved.length()).toBeGreaterThan(0.1);
+        // Along the screen's horizontal, not along the ground or the view direction
+        expect(Math.abs(moved.clone().normalize().dot(right(camera)))).toBeCloseTo(1, 6);
+        controls.dispose();
+    });
+
+    it('turns the camera home around the pivot, never through the model, and ends upright', () => {
+        const { el, camera, controls } = fixture();
+        const home = { quaternion: camera.quaternion.clone(), distance: camera.position.distanceTo(controls.target) };
+        // From the other side of the model, rolled and closer
+        drag(el, 300, 250);
+        camera.position.sub(controls.target).multiplyScalar(0.5).add(controls.target);
+        const target = controls.target.clone();
+        const from = camera.position.distanceTo(target);
+
+        const step = orbitTweenStep(THREE, camera, controls, home.quaternion, home.distance);
+        for (let i = 0; i <= 20; i++) {
+            const e = i / 20;
+            step(e);
+            const d = camera.position.distanceTo(target);
+            expect(d).toBeGreaterThanOrEqual(Math.min(from, home.distance) - 1e-9);
+            expect(d).toBeLessThanOrEqual(Math.max(from, home.distance) + 1e-9);
+            controls.update();
+        }
+        expect(camera.quaternion.angleTo(home.quaternion)).toBeLessThan(1e-6);
+        expect(camera.position.distanceTo(target)).toBeCloseTo(home.distance, 6);
+        expect(right(camera).z).toBeCloseTo(0, 6);
+        controls.dispose();
+    });
+
+    it('stops the inertia of the controls', () => {
+        const cancel = vi.fn();
+        vi.stubGlobal('cancelAnimationFrame', cancel);
+        const controls = { _animationId: 7, _timeStart: 1234 };
+        stopNavAnimation(controls);
+        expect(cancel).toHaveBeenCalledWith(7);
+        expect(controls).toEqual({ _animationId: -1, _timeStart: -1 });
+        stopNavAnimation(controls);
+        expect(cancel).toHaveBeenCalledTimes(1);
+    });
+
+    it('focuses like ArcballControls: the view direction kept, a wheel notch closer, the point in the middle', () => {
+        const { camera, controls } = fixture();
+        const point = new THREE.Vector3(5, 3, 2);
+        const dir = forward(camera);
+        const distance = camera.position.distanceTo(navPivot(controls));
+
+        const position = focusPosition(camera, controls, point);
+
+        expect(position.distanceTo(point)).toBeCloseTo(distance / 1.1, 9);
+        expect(point.clone().sub(position).normalize().distanceTo(dir)).toBeLessThan(1e-9);
+        // Never closer than the minimum distance
+        camera.position.copy(navPivot(controls)).addScaledVector(dir, -controls.minDistance * 1.05);
+        expect(focusPosition(camera, controls, point).distanceTo(point)).toBeCloseTo(controls.minDistance, 9);
+        controls.dispose();
+    });
+
+    it('aims a camera straight down with the given direction at the top of the screen (the globe, north up)', () => {
+        const { camera, controls } = fixture();
+        const north = new THREE.Vector3(0, 1, 0);
+        camera.position.copy(controls.target).add(new THREE.Vector3(0, 0, 50));
+        aimCamera(camera, controls, north);
+        expect(forward(camera).distanceTo(new THREE.Vector3(0, 0, -1))).toBeLessThan(1e-9);
+        expect(camera.up.distanceTo(north)).toBeLessThan(1e-9);
+        expect(right(camera).distanceTo(new THREE.Vector3(1, 0, 0))).toBeLessThan(1e-9);
+        // The controls' update of every frame keeps that view
+        const q = camera.quaternion.clone();
+        for (let i = 0; i < 5; i++) controls.update();
+        expect(camera.quaternion.angleTo(q)).toBeLessThan(1e-9);
+        controls.dispose();
     });
 });

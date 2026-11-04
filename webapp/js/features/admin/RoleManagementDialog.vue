@@ -1,17 +1,15 @@
 <template>
-    <Window title="Role Management" id="roleManagementDialog" @onClose="close" modal maxWidth="60%" fixedSize>
+    <Window id="roleManagementDialog" title="Role Management" modal max-width="60%" fixed-size @close="$emit('close')">
 
-        <div v-if="loading" class="loading">
-            <i class="fa-solid fa-circle-notch fa-spin" />
-        </div>
+        <LoadingSpinner v-if="loading" />
 
         <div v-else class="dialog">
-            <Message bindTo="error" />
+            <Message v-model="error" />
 
             <Tabs :value="activeTab" @update:value="val => activeTab = val">
                 <TabList>
-                    <Tab value="view"><i class="fa-solid fa-eye me-1"></i>View Roles</Tab>
-                    <Tab value="add"><i class="fa-solid fa-plus me-1"></i>Add Role</Tab>
+                    <Tab value="view"><i class="fa-solid fa-eye" aria-hidden="true" /><span class="tab-label">View Roles</span></Tab>
+                    <Tab value="add"><i class="fa-solid fa-plus" aria-hidden="true" /><span class="tab-label">Add Role</span></Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel value="view">
@@ -24,19 +22,19 @@
                         <div v-else class="role-list">
                             <div v-for="role in currentRoles" :key="role" class="role-item">
                                 <div class="role-info">
-                                    <i class="fa-solid fa-users"></i>
+                                    <i class="fa-solid fa-users" />
                                     <div>
                                         <div class="role-name">{{ role }}</div>
                                         <div class="role-description">
-                                            {{ role === 'Admin' ? 'Administrator role with full system access' : 'Custom user role' }}
+                                            {{ isAdminRole(role) ? 'Administrator role with full system access' : 'Custom user role' }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="role-actions">
-                                    <Button v-if="role !== 'Admin'" @click="deleteRole(role)"
-                                            severity="danger" size="small" :disabled="deletingRole === role"
-                                            icon="fa-solid fa-trash"
-                                            :label="deletingRole === role ? 'Deleting...' : 'Delete'" />
+                                    <Button v-if="!isSystemRole(role)" severity="danger"
+                                            size="small" :disabled="deletingRole === role" icon="fa-solid fa-trash"
+                                            :label="deletingRole === role ? 'Deleting...' : 'Delete'"
+                                            @click="deleteRole(role)" />
                                     <Tag v-else severity="secondary" value="System Role" />
                                 </div>
                             </div>
@@ -44,42 +42,42 @@
                     </TabPanel>
                     <TabPanel value="add">
                         <h4>Add New Role</h4>
-                        <form v-on:submit.prevent class="form" v-bind:class="{ error: !!error }">
+                        <form class="form" :class="{ error: !!error }" @submit.prevent>
                             <div class="field">
-                                <label>Role Name</label>
-                                <InputText ref="txtRoleName" @keydown="clearError()" @keyup.enter="confirmAddRole()"
-                                       v-model="newRoleName" placeholder="Enter role name" class="w-full" />
+                                <label for="role-management-dialog-role-name">Role Name</label>
+                                <InputText id="role-management-dialog-role-name" ref="txtRoleName" v-model="newRoleName" placeholder="Enter role name"
+                                           class="w-100" @keydown="clearError()" @keyup.enter="confirmAddRole()" />
                                 <small>Role names should be descriptive (e.g., "Editor", "Viewer", "Manager")</small>
                             </div>
                         </form>
                         <div class="add-role-actions">
-                            <Button @click="confirmAddRole()" :disabled="addingRole || !newRoleName.trim()"
-                                    :loading="addingRole" severity="primary" icon="fa-solid fa-plus" label="Add Role" />
+                            <Button :disabled="addingRole || !newRoleName.trim()" :loading="addingRole"
+                                    severity="primary" icon="fa-solid fa-plus" label="Add Role" @click="confirmAddRole()" />
                         </div>
                     </TabPanel>
                 </TabPanels>
             </Tabs>
 
             <div class="dialog-buttons">
-                <Button @click="close()" severity="secondary" label="Close" />
+                <Button severity="secondary" label="Close" @click="$emit('close')" />
             </div>
         </div>
 
         <!-- Delete Role Confirmation Dialog -->
         <ConfirmDialog v-if="showDeleteDialog"
-            title="Delete Role"
-            :message="`Are you sure you want to delete the role <strong>${roleToDelete}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. Users with this role will lose associated permissions.`"
-            confirmText="Delete Role"
-            cancelText="Cancel"
-            confirmButtonClass="danger"
-            @onClose="handleDeleteDialogClose">
-        </ConfirmDialog>
+                       title="Delete Role"
+                       :message="`Are you sure you want to delete the role <strong>${roleToDelete}</strong>?<br/><br/><i class='fa-solid fa-triangle-exclamation'></i> This action cannot be undone. Users with this role will lose associated permissions.`"
+                       confirm-text="Delete Role"
+                       cancel-text="Cancel"
+                       confirm-button-class="danger"
+                       @close="handleDeleteDialogClose" />
     </Window>
 </template>
 
 <script>
-import Window from '@/components/Window.vue';
-import Message from '@/components/Message.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import Window from '@/components/HubWindow.vue';
+import Message from '@/components/HubMessage.vue';
 import ConfirmDialog from '@/components/ConfirmDialog.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
@@ -91,9 +89,11 @@ import Tab from 'primevue/tab';
 import TabPanels from 'primevue/tabpanels';
 import TabPanel from 'primevue/tabpanel';
 import reg from '@/libs/api/sharedRegistry';
+import { isAdminRole, isSystemRole } from '@/libs/roles';
 
 export default {
     components: {
+        LoadingSpinner,
         Window, Message, ConfirmDialog, Button, PrimeMessage, InputText, Tag,
         Tabs, TabList, Tab, TabPanels, TabPanel
     },
@@ -103,7 +103,7 @@ export default {
             required: true
         }
     },
-    emits: ['onClose', 'onRolesChanged'],
+    emits: ['close', 'rolesChanged'],
 
     data: function () {
         return {
@@ -118,13 +118,6 @@ export default {
             roleToDelete: null
         };
     },
-    mounted: function () {
-        this.$nextTick(() => {
-            if (this.activeTab === 'add') {
-                this.focusRoleInput();
-            }
-        });
-    },
     watch: {
         activeTab: function(newTab) {
             if (newTab === 'add') {
@@ -132,7 +125,16 @@ export default {
             }
         }
     },
+    mounted: function () {
+        this.$nextTick(() => {
+            if (this.activeTab === 'add') {
+                this.focusRoleInput();
+            }
+        });
+    },
     methods: {
+        isAdminRole,
+        isSystemRole,
         focusRoleInput() {
             if (this.$refs.txtRoleName) {
                 const el = this.$refs.txtRoleName.$el || this.$refs.txtRoleName;
@@ -140,9 +142,6 @@ export default {
             }
         },
 
-        close: function () {
-            this.$emit('onClose');
-        },
 
         clearError: function () {
             this.error = "";
@@ -153,16 +152,16 @@ export default {
 
             this.addingRole = true;
             try {
-                await reg.createRole(this.newRoleName.trim());
+                await reg.admin.createRole(this.newRoleName.trim());
 
                 this.currentRoles.push(this.newRoleName.trim());
-                this.$toast.add({ severity: 'success', summary: 'Role Created', detail: `Role "${this.newRoleName}" created successfully`, life: 3000 });
+                this.$notify.success(`Role "${this.newRoleName}" created successfully`, { summary: 'Role Created' });
                 this.newRoleName = "";
                 this.activeTab = 'view';
 
-                this.$emit('onRolesChanged');
+                this.$emit('rolesChanged');
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to create role: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to create role: ' + e.message);
                 this.error = e.message;
             }
             this.addingRole = false;
@@ -187,19 +186,19 @@ export default {
 
             this.deletingRole = this.roleToDelete;
             try {
-                const result = await reg.deleteRole(this.roleToDelete);
+                await reg.admin.deleteRole(this.roleToDelete);
                 // NOTE: DELETE role endpoint returns 204 No Content (empty response)
                 // This is normal and indicates success
 
                 this.currentRoles = this.currentRoles.filter(role => role !== this.roleToDelete);
-                this.$toast.add({ severity: 'success', summary: 'Role Deleted', detail: `Role "${this.roleToDelete}" deleted successfully`, life: 3000 });
+                this.$notify.success(`Role "${this.roleToDelete}" deleted successfully`, { summary: 'Role Deleted' });
 
-                this.$emit('onRolesChanged');
+                this.$emit('rolesChanged');
 
                 this.showDeleteDialog = false;
                 this.roleToDelete = null;
             } catch (e) {
-                this.$toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to delete role: ' + e.message, life: 5000 });
+                this.$notify.error('Failed to delete role: ' + e.message);
                 this.error = e.message;
             }
             this.deletingRole = null;
@@ -210,7 +209,7 @@ export default {
 
 <style scoped>
 .dialog {
-    min-width: 25rem;
+    min-width: min(25rem, var(--window-content-width, 100%));
     padding: 0.25rem;
 }
 
@@ -229,8 +228,10 @@ export default {
 
 .role-item {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
+    gap: var(--ddb-spacing-sm);
     padding: var(--ddb-spacing-sm) var(--ddb-spacing-md);
     border: var(--ddb-border-width) solid var(--ddb-border-light);
     border-radius: var(--ddb-radius-sm);
@@ -240,6 +241,8 @@ export default {
     display: flex;
     align-items: center;
     gap: var(--ddb-spacing-sm);
+    flex: 1 1 12rem;
+    min-width: 0;
 }
 
 .role-name {
@@ -253,9 +256,5 @@ export default {
 
 .add-role-actions {
     margin-top: 1rem;
-}
-
-.w-full {
-    width: 100%;
 }
 </style>

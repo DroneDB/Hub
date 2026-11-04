@@ -1,0 +1,347 @@
+// Point-cloud viewer and the DOM Potree builds inside it (sidebar, menus, map): every rule
+// is under #potree, so nothing applies outside the viewer.
+#potree {
+    #potree_quick_buttons {
+        left: auto !important;
+        right: 3rem !important;
+    }
+
+    .potree-container {
+        &.loading {
+            visibility: hidden;
+        }
+
+        margin: 0;
+        display: flex;
+        width: 100%;
+        height: 100%;
+        background: var(--ddb-viewer-gradient-center);
+        background: -moz-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
+        background: -webkit-gradient(radial, center center, 0px, center center, 100%, color-stop(0%, rgba(79, 79, 79, 1)), color-stop(100%, rgba(22, 22, 22, 1)));
+        background: -webkit-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
+        background: -o-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
+        background: -ms-radial-gradient(center, ellipse cover, rgba(79, 79, 79, 1) 0%, rgba(22, 22, 22, 1) 100%);
+        background: radial-gradient(ellipse at center, var(--ddb-viewer-gradient-center) 0%, var(--ddb-viewer-gradient-edge) 100%);
+        position: relative;
+        padding: 0;
+
+        #potree_render_area {
+            -webkit-transition: right .35s;
+            transition: right .35s;
+        }
+
+        // The sidebar lies under the view and shows where the open menu takes the room from it
+        &.sidebar-open #potree_render_area {
+            right: var(--ddb-sidebar-width);
+        }
+
+        #potree_render_area>canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        i.icon {
+            margin: 0 !important;
+        }
+    }
+
+    .dg {
+        &.main {
+            position: absolute;
+            right: 0;
+        }
+
+        .c {
+            select {
+                color: black;
+            }
+        }
+    }
+
+
+    /* Potree specific */
+    #potree_map {
+        position: absolute;
+        left: 3rem;
+        top: 3rem;
+        width: 25rem;
+        height: 25rem;
+        display: none
+    }
+
+    #potree_menu {
+        input {
+            color: buttontext;
+        }
+
+        legend {
+            display: initial !important;
+            width: initial !important;
+            padding: initial !important;
+            margin-bottom: initial !important;
+            font-size: inherit !important;
+            line-height: initial !important;
+            color: inherit !important;
+            border: initial !important;
+            border-bottom: initial !important;
+        }
+
+        #show_2d_profile {
+            color: initial !important;
+        }
+    }
+
+    #potree_map_header {
+        position: absolute;
+        width: 100%;
+        height: 1.5rem;
+        top: 0;
+        background-color: var(--ddb-viewer-toolbar-overlay);
+        z-index: 1000;
+        border-top-left-radius: var(--ddb-radius-sm);
+        border-top-right-radius: var(--ddb-radius-sm);
+    }
+
+    #potree_map_content {
+        position: absolute;
+        z-index: 100;
+        top: 1.5rem;
+        width: 100%;
+        height: calc(100% - 1.5rem);
+        border: var(--ddb-border-width) solid var(--ddb-viewer-toolbar-overlay);
+        box-sizing: border-box;
+    }
+
+    #potree_sidebar_container {
+        overflow-y: auto;
+        overflow-x: hidden;
+        background-color: var(--ddb-viewer-sidebar-bg);
+        right: 0;
+
+        a {
+            color: var(--ddb-text);
+        }
+
+        #sidebar_root {
+            width: var(--ddb-sidebar-width);
+
+            .pv-menu-list {
+                padding-right: 0.75rem;
+
+                .divider {
+                    padding: var(--ddb-spacing-sm) 0 var(--ddb-spacing-lg) 0;
+                }
+
+                a {
+                    color: var(--ddb-viewer-sidebar-link);
+                }
+            }
+
+            .measurement-panel-remove:hover {
+                cursor: pointer;
+            }
+
+            position: absolute;
+            min-height: 100%;
+            height: 100%;
+
+            .potree_sidebar_brand {
+                display: flex;
+                flex-direction: row;
+            }
+
+            #potree_version_number {
+                color: var(--ddb-viewer-sidebar-muted);
+                font-size: 80%;
+                font-weight: 100;
+            }
+        }
+    }
+
+    #profile_window {
+        z-index: 999999999999 !important;
+    }
+
+    /* Top-left toolbar container */
+    .top-left-toolbar {
+        position: absolute;
+        top: var(--ddb-spacing-sm);
+        left: var(--ddb-spacing-sm);
+        // Leaves the menu button at the right edge free
+        max-width: calc(100% - 4.5rem);
+        z-index: 1001;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    /* Undo/Redo toolbar */
+    .undo-redo-toolbar {
+        background: var(--ddb-viewer-toolbar-bg);
+        padding: var(--ddb-spacing-xs);
+        border-radius: var(--ddb-radius-sm);
+        display: flex;
+        gap: 0.25rem;
+        align-items: center;
+    }
+
+    .btn-undo-redo {
+        background: var(--ddb-viewer-btn-bg);
+        color: white;
+        border: none;
+        padding: var(--ddb-spacing-sm) var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-sm);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        transition: background 0.2s;
+        min-width: 2.25rem;
+        min-height: 2.25rem;
+    }
+
+    .btn-undo-redo:hover:not(:disabled) {
+        background: var(--ddb-viewer-btn-hover);
+    }
+
+    .btn-undo-redo:disabled {
+        background: var(--ddb-viewer-btn-disabled-bg);
+        color: var(--ddb-viewer-btn-disabled-color);
+        cursor: not-allowed;
+    }
+
+    .btn-undo-redo.btn-delete-tool {
+        background: var(--ddb-viewer-btn-active-bg);
+        margin-left: var(--ddb-spacing-sm);
+    }
+
+    .btn-undo-redo.btn-delete-tool:hover:not(:disabled) {
+        background: var(--ddb-viewer-btn-danger);
+    }
+
+    .btn-undo-redo.btn-delete-tool.active {
+        background: var(--ddb-viewer-btn-danger);
+        box-shadow: var(--ddb-shadow-sm);
+    }
+
+    /* Toolbar for measurements */
+    .measurements-toolbar {
+        position: absolute;
+        top: 3.75rem;
+        left: var(--ddb-spacing-sm);
+        z-index: 1000;
+        background: var(--ddb-viewer-toolbar-bg);
+        padding: var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-sm);
+        display: flex;
+        gap: var(--ddb-spacing-sm);
+        align-items: center;
+    }
+
+    .btn-measurement {
+        background: var(--ddb-viewer-btn-primary);
+        color: white;
+        border: none;
+        padding: var(--ddb-spacing-sm) var(--ddb-spacing-lg);
+        border-radius: var(--ddb-radius-sm);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: var(--ddb-spacing-xs);
+        font-size: var(--ddb-font-size-base);
+        transition: background 0.3s;
+    }
+
+    .btn-measurement:hover {
+        background: var(--ddb-viewer-btn-primary-hover);
+    }
+
+    .btn-measurement:disabled {
+        background: var(--ddb-viewer-btn-active-bg);
+        cursor: not-allowed;
+    }
+
+    .btn-measurement--danger {
+        background: var(--ddb-viewer-btn-danger);
+    }
+
+    .btn-measurement--danger:hover {
+        background: var(--ddb-viewer-btn-danger-hover);
+    }
+
+    /* Unit selector toolbar */
+    .unit-selector-toolbar {
+        background: var(--ddb-viewer-toolbar-bg);
+        padding: var(--ddb-spacing-xs) var(--ddb-spacing-md);
+        border-radius: var(--ddb-radius-sm);
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        color: white;
+        font-size: var(--ddb-font-size-base);
+    }
+
+    .unit-selector-toolbar label {
+        margin: 0;
+        font-weight: 500;
+    }
+
+    .unit-selector-toolbar select {
+        background: var(--ddb-viewer-select-bg);
+        color: white;
+        border: var(--ddb-border-width) solid var(--ddb-viewer-select-border);
+        padding: var(--ddb-spacing-xs) var(--ddb-spacing-sm);
+        border-radius: var(--ddb-radius-sm);
+        cursor: pointer;
+        font-size: var(--ddb-font-size-base);
+        outline: none;
+    }
+
+    .unit-selector-toolbar select:hover {
+        background: var(--ddb-viewer-btn-active-bg);
+    }
+
+    .unit-selector-toolbar select:focus {
+        border-color: var(--ddb-viewer-btn-primary);
+    }
+
+    /* Phones: the menu covers the view (below the menu button) instead of squeezing it to a strip */
+    @media (max-width: 767.98px) {
+        .potree-container {
+            &.sidebar-open #potree_render_area {
+                right: 0;
+            }
+
+            #potree_sidebar_container {
+                top: 4rem;
+                bottom: 0;
+                height: auto !important;
+                max-width: 100%;
+                z-index: 2;
+                visibility: hidden;
+            }
+
+            &.sidebar-open #potree_sidebar_container {
+                visibility: visible;
+            }
+        }
+
+        .unit-selector-toolbar label {
+            display: none;
+        }
+
+        .unit-selector-toolbar select {
+            min-height: 2.25rem;
+        }
+
+        // Out of the way of the toolbar above
+        .measurements-toolbar {
+            top: auto;
+            bottom: var(--ddb-spacing-sm);
+            flex-wrap: wrap;
+            max-width: calc(100% - 2 * var(--ddb-spacing-sm));
+        }
+    }
+}

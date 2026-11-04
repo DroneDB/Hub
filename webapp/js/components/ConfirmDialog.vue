@@ -1,27 +1,27 @@
 <template>
-    <Window :title="title" id="confirmDialog" @onClose="close('cancel')" modal maxWidth="70%" fixedSize>
-        <div v-html="safeMessage"></div>
+    <Window id="confirmDialog" :title="title" modal max-width="70%" fixed-size @close="$emit('close', 'cancel')" @confirm="$emit('close', 'confirm')">
+        <!-- eslint-disable-next-line vue/no-v-html -- sanitised with libs/sanitize.js -->
+        <div v-html="safeMessage" />
 
         <PrimeMessage v-if="warningMessage" severity="warn" :closable="false" class="mt-3">
             <template v-if="warningTitle" #default>
-                <strong>{{ warningTitle }}</strong><br />{{ warningMessage }}
+                <strong>{{ warningTitle }}</strong><br>{{ warningMessage }}
             </template>
             <template v-else #default>{{ warningMessage }}</template>
         </PrimeMessage>
 
-        <slot name="extra"></slot>
+        <slot name="extra" />
 
-        <div class="d-flex justify-content-end gap-2 mt-3 w-100">
-            <Button :label="cancelText" @click="close('cancel')" severity="secondary" />
-            <Button v-if="secondaryText" :label="secondaryText" @click="close('secondary')" :severity="secondaryButtonClass" />
-            <Button :label="confirmText" @click="close('confirm')" :severity="confirmButtonClass" />
-        </div>
+        <template #footer>
+            <Button :label="cancelText" severity="secondary" @click="$emit('close', 'cancel')" />
+            <Button v-if="secondaryText" :label="secondaryText" :severity="secondaryButtonClass" @click="$emit('close', 'secondary')" />
+            <Button :label="confirmText" :severity="confirmButtonClass" data-confirm @click="$emit('close', 'confirm')" />
+        </template>
     </Window>
 </template>
 
 <script>
-import Keyboard from '@/libs/keyboard';
-import Window from '@/components/Window.vue';
+import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import { sanitizeHtml } from '@/libs/sanitize';
@@ -88,7 +88,7 @@ export default {
             default: null
         }
     },
-    emits: ['onClose'],
+    emits: ['close'],
 
     data: function () {
         return {};
@@ -98,21 +98,7 @@ export default {
             return sanitizeHtml(this.message);
         }
     },
-    mounted: function () {
-        Keyboard.onKeyDown(this.handleKeyDown);
-    },
-    beforeUnmount: function () {
-        Keyboard.offKeyDown(this.handleKeyDown);
-    },
     methods: {
-        close: function (buttonId) {
-            this.$emit('onClose', buttonId);
-        },
-
-        handleKeyDown: function (e) {
-            if (e.key === 'Enter') this.close('confirm');
-            if (e.key === 'Escape') this.close('cancel');
-        }
     }
 }
 </script>
