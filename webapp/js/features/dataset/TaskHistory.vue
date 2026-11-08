@@ -184,6 +184,7 @@
 import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
+import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -765,14 +766,15 @@ export default {
                 message: `Are you sure you want to cancel this task?<br/>${what} will be stopped.`
             })) return;
             try {
-                // Not deleted: the task ended between the list and the click (the list below shows how)
-                const { deleted } = (await this.dataset.cancelTask(task.taskId)) || {};
-                if (deleted === false)
+                const result = await cancelTaskOutcome(this.dataset, task.taskId);
+                if (result.outcome === 'alreadyEnded')
                     this.$notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
+                else if (result.outcome === 'failed')
+                    this.$notify.error(result.error?.message, { summary: 'Cancel failed' });
+            } finally {
+                // The row shows the real state at once, whatever the answer (D-002)
                 await taskMonitor.forceRefresh(this.dataset);
                 await this.loadTasks();
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Cancel failed' });
             }
         },
 

@@ -3,13 +3,16 @@
  * - filter changes reset back to the first page (via onFilterChange)
  * - background store refreshes (applyFilters(false)) keep the current page
  * - a shrinking list clamps onto the last valid page
- * and cancelTask: a cancel the server answers with "not deleted" says so instead of nothing
+ * and cancelTask (FR-PRC-10): a cancel refused for a task that has already ended is a neutral message,
+ * and the row is refreshed whatever the answer
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import TaskHistory from './TaskHistory.vue';
+import taskMonitor from '@/libs/tasks/taskMonitor';
+import { ApiError } from '@/libs/ddb/apiError';
 
-// cancelTask refreshes the shared task store: not under test here
+// cancelTask refreshes the shared task store: the calls are asserted, the store is not under test
 vi.mock('@/libs/tasks/taskMonitor', () => ({
     default: { forceRefresh: vi.fn(() => Promise.resolve()), on: vi.fn(), off: vi.fn() },
     datasetKey: vi.fn()
@@ -120,36 +123,79 @@ describe('onFilterChange', () => {
 describe('cancelTask', () => {
     const { cancelTask } = TaskHistory.methods;
 
-    function cancelVm(answer) {
+    beforeEach(() => taskMonitor.forceRefresh.mockClear());
+
+    function cancelVm(answer, read = () => Promise.resolve({ state: 'Succeeded' })) {
         return {
             tools: [],
             toolTitle: id => id,
             confirm: vi.fn(() => Promise.resolve(true)),
-            dataset: { cancelTask: vi.fn(() => answer) },
+            dataset: { cancelTask: vi.fn(() => answer), getTask: vi.fn(read) },
             loadTasks: vi.fn(() => Promise.resolve()),
             $notify: { info: vi.fn(), error: vi.fn(), success: vi.fn() }
         };
     }
 
-    it('says so when the server cancelled nothing, the task having ended meanwhile', async () => {
-        const vm = cancelVm(Promise.resolve({ deleted: false }));
+    function expectRefreshed(vm) {
+        expect(taskMonitor.forceRefresh).toHaveBeenCalledWith(vm.dataset);
+        expect(vm.loadTasks).toHaveBeenCalled();
+    }
+
+    it('shows a neutral message when the server refuses the cancel of a task that has already ended', async () => {
+        const vm = cancelVm(Promise.reject(new ApiError('The task has already ended (Succeeded)', 400)));
         await cancelTask.call(vm, fixedTask(1, { state: 'Processing' }));
         expect(vm.dataset.cancelTask).toHaveBeenCalledWith('t1');
-        expect(vm.$notify.info).toHaveBeenCalledWith(expect.stringContaining('already ended'), expect.anything());
-        expect(vm.loadTasks).toHaveBeenCalled();
+        expect(vm.dataset.getTask).toHaveBeenCalledWith('t1');
+        expect(vm.$notify.info).toHaveBeenCalledWith('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
+        expect(vm.$notify.error).not.toHaveBeenCalled();
+        expectRefreshed(vm);
+    });
+
+    it('shows the refusal as an error when the task is still active', async () => {
+        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.resolve({ state: 'Processing' }));
+        await cancelTask.call(vm, fixedTask(2, { state: 'Processing' }));
+        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
+        expect(vm.$notify.info).not.toHaveBeenCalled();
+        expectRefreshed(vm);
+    });
+
+    it('shows an error when the task cannot be read again after a 400', async () => {
+        const vm = cancelVm(Promise.reject(new ApiError('Refused', 400)), () => Promise.reject(new ApiError('Not found', 404)));
+        await cancelTask.call(vm, fixedTask(6, { state: 'Processing' }));
+        expect(vm.$notify.error).toHaveBeenCalledWith('Refused', { summary: 'Cancel failed' });
+        expect(vm.$notify.info).not.toHaveBeenCalled();
+        expectRefreshed(vm);
+    });
+
+    it('shows an error on another status, without reading the task again', async () => {
+        const vm = cancelVm(Promise.reject(new ApiError('Server error', 500)));
+        await cancelTask.call(vm, fixedTask(7, { state: 'Processing' }));
+        expect(vm.$notify.error).toHaveBeenCalledWith('Server error', { summary: 'Cancel failed' });
+        expect(vm.dataset.getTask).not.toHaveBeenCalled();
+        expectRefreshed(vm);
     });
 
     it('says nothing more when the task was cancelled', async () => {
         const vm = cancelVm(Promise.resolve({ deleted: true }));
-        await cancelTask.call(vm, fixedTask(2, { state: 'Processing' }));
+        await cancelTask.call(vm, fixedTask(3, { state: 'Processing' }));
         expect(vm.$notify.info).not.toHaveBeenCalled();
         expect(vm.$notify.error).not.toHaveBeenCalled();
-        expect(vm.loadTasks).toHaveBeenCalled();
+        expectRefreshed(vm);
     });
 
-    it('shows the reason of a refusal (a task that has already ended is a bad request)', async () => {
-        const vm = cancelVm(Promise.reject(new Error('The task has already ended (Succeeded)')));
-        await cancelTask.call(vm, fixedTask(3, { state: 'Processing' }));
-        expect(vm.$notify.error).toHaveBeenCalledWith('The task has already ended (Succeeded)', { summary: 'Cancel failed' });
+    it('says nothing when the server deleted nothing, the refreshed row showing how the task ended', async () => {
+        const vm = cancelVm(Promise.resolve({ deleted: false }));
+        await cancelTask.call(vm, fixedTask(4, { state: 'Processing' }));
+        expect(vm.$notify.info).not.toHaveBeenCalled();
+        expect(vm.$notify.error).not.toHaveBeenCalled();
+        expectRefreshed(vm);
+    });
+
+    it('does nothing when the cancel is not confirmed', async () => {
+        const vm = cancelVm(Promise.resolve({ deleted: true }));
+        vm.confirm = vi.fn(() => Promise.resolve(false));
+        await cancelTask.call(vm, fixedTask(5, { state: 'Processing' }));
+        expect(vm.dataset.cancelTask).not.toHaveBeenCalled();
+        expect(vm.loadTasks).not.toHaveBeenCalled();
     });
 });

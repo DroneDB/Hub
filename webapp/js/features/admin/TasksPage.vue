@@ -58,6 +58,7 @@ import Button from 'primevue/button';
 import Select from 'primevue/select';
 import reg from '@/libs/api/sharedRegistry';
 import { isForbidden } from '@/libs/ddb/apiError';
+import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
 
 /**
  * Admin global tasks dashboard. Lists tasks across all users and
@@ -127,6 +128,7 @@ export default {
     },
 
     beforeUnmount() {
+        this._unmounted = true;
         if (this._refreshTimer) clearTimeout(this._refreshTimer);
     },
 
@@ -171,6 +173,8 @@ export default {
 
         scheduleAutoRefresh() {
             if (this._refreshTimer) clearTimeout(this._refreshTimer);
+            // A cancel or retry that ends after the page has gone must not start polling again.
+            if (this._unmounted) return;
             const delay = this.hasActiveTasks ? 2500 : 15000;
             this._refreshTimer = setTimeout(async () => {
                 await this.loadTasks();
@@ -209,10 +213,15 @@ export default {
             const task = this.cancellingTask;
             this.cancellingTask = null;
             try {
-                await this.datasetFor(task).cancelTask(task.taskId);
+                const result = await cancelTaskOutcome(this.datasetFor(task), task.taskId);
+                if (result.outcome === 'alreadyEnded')
+                    this.$notify.info('The task had already ended, so there was nothing to cancel.', { summary: 'Not cancelled' });
+                else if (result.outcome === 'failed')
+                    this.$notify.error(result.error?.message, { summary: 'Cancel failed' });
+            } finally {
+                // The row shows the real state at once, whatever the answer (D-002)
                 await this.loadTasks();
-            } catch (e) {
-                this.$notify.error(e.message, { summary: 'Cancel failed' });
+                this.scheduleAutoRefresh();
             }
         },
 
