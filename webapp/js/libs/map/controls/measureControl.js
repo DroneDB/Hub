@@ -65,6 +65,14 @@ class MeasureControls extends Control {
         btnList.innerHTML = '<i class="fa-solid fa-list" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
         [btnSave, btnClear, btnExport, btnExportCsv, btnDelete, btnList].forEach(btn => { btn.style.display = 'none'; });
 
+        // The 'Measure' toggle: on a compact map (css/ol-controls.css: a phone, a small frame) it is the one button of the
+        // measure tools in the rail, and the toolbars below open from it (FR-MAP-12). Elsewhere it is not shown
+        const btnToggle = controlButton('Measure', 'Show the measure tools.');
+        btnToggle.innerHTML = '<i class="fa-solid fa-ruler-combined" style="font-size: 1rem; line-height: 2rem" aria-hidden="true"></i>';
+        btnToggle.setAttribute('aria-expanded', 'false');
+        const toolbarToggle = controlGroup('Measure', 'ol-measure-toggle');
+        toolbarToggle.appendChild(btnToggle);
+
         // First toolbar: drawing tools (always visible)
         const toolbar1 = controlGroup('Measure Tools');
         toolbar1.appendChild(btnPoint);
@@ -86,6 +94,7 @@ class MeasureControls extends Control {
 
         const element = document.createElement('div');
         element.className = 'ol-measure-control ol-unselectable';
+        element.appendChild(toolbarToggle);
         element.appendChild(toolbar1);
         element.appendChild(toolbar2);
 
@@ -95,6 +104,7 @@ class MeasureControls extends Control {
         });
 
         // lifetime: element (the control's own toolbar buttons, dropped with the control)
+        btnToggle.addEventListener('click', this.handleToggle.bind(this), false);
         btnPoint.addEventListener('click', this.handlePointLocation.bind(this), false);
         btnLength.addEventListener('click', this.handleMeasureLength.bind(this), false);
         btnArea.addEventListener('click', this.handleMeasureArea.bind(this), false);
@@ -109,6 +119,9 @@ class MeasureControls extends Control {
         btnList.addEventListener('click', this.handleListOpen.bind(this), false);
 
         this.selectedTool = null;
+        // On a compact map the tools are shown from the Measure toggle (the class and the toggle's state)
+        this.toolsOpen = false;
+        this.btnToggle = btnToggle;
         this.onToolSelected = options.onToolSelected || (() => { });
         this.onToolDeselected = options.onToolDeselected || (() => { });
         this.canWrite = options.canWrite !== undefined ? options.canWrite : true;
@@ -723,6 +736,8 @@ class MeasureControls extends Control {
 
         this.isEditMode = true;
         this.btnEdit.classList.add('active');
+        // Edit mode keeps the tools open, as a drawing tool does: Edit (which ends it) stays in reach
+        this.setToolsOpen(true);
         // Drop any hover highlight - the edit interaction has its own visual
         // language for selected/active features.
         this._setHoveredFeature && this._setHoveredFeature(null);
@@ -850,6 +865,7 @@ class MeasureControls extends Control {
 
         this.isEditMode = false;
         this.btnEdit.classList.remove('active');
+        this._syncToggle();
 
         if (this.modifyInteraction && map) {
             map.removeInteraction(this.modifyInteraction);
@@ -955,17 +971,8 @@ class MeasureControls extends Control {
         if (output) {
             feature.set('tooltipText', output);
 
-            // Update tooltip element
-            const tooltipElement = feature.get('measureTooltipElement');
-            if (tooltipElement) {
-                const name = feature.get('name');
-                let tooltipContent = '';
-                if (name) {
-                    tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
-                }
-                tooltipContent += `<div class="ol-tooltip-value">${output}</div>`;
-                tooltipElement.innerHTML = tooltipContent;
-            }
+            // Update tooltip element (the name and the text escaped: they may come from a saved file)
+            updateFeatureTooltip(feature);
         }
     }
 
@@ -1208,6 +1215,8 @@ class MeasureControls extends Control {
             let type = types[tool];
 
             this.selectedTool = tool;
+            // A tool in use keeps the tools open, so Stop (and the tool) stay in reach on a compact map
+            this.setToolsOpen(true);
 
             if (!this.loaded) {
                 // Lazy init
@@ -1389,7 +1398,7 @@ class MeasureControls extends Control {
                     }
 
                     // Save tooltip text and timestamp to feature
-                    feat.set('tooltipText', self.measureTooltipElement.innerHTML);
+                    feat.set('tooltipText', self.measureTooltipElement.textContent);
                     feat.set('createdAt', new Date().toISOString());
                     feat.set('measurementType', tool);
 
@@ -1447,8 +1456,41 @@ class MeasureControls extends Control {
         } else {
             removeHandlers();
             this.selectedTool = null;
+            this._syncToggle();
             this.onToolDeselected();
         }
+    }
+
+    /**
+     * The Measure toggle of a compact map. Closing the tools folds Stop and Edit away with them, so the
+     * tool in use (or edit mode) ends first: taps on the map must not keep adding points behind closed tools.
+     */
+    handleToggle() {
+        if (!this.toolsOpen) {
+            this.setToolsOpen(true);
+            return;
+        }
+        this.deselectCurrent();
+        if (this.isEditMode) this.disableEditMode();
+        this.setToolsOpen(false);
+    }
+
+    /**
+     * Opens or closes the measure tools of a compact map (the Measure toggle). A map that is not
+     * compact shows them always: the class only matters to css/ol-controls.css under `.is-compact`.
+     * @param {boolean} open
+     */
+    setToolsOpen(open) {
+        this.toolsOpen = open;
+        this.element.classList.toggle('is-open', open);
+        this.btnToggle.setAttribute('aria-expanded', String(open));
+        this.btnToggle.title = open ? 'Measure - Hide the measure tools.' : 'Measure - Show the measure tools.';
+        this._syncToggle();
+    }
+
+    /** The Measure toggle looks pressed while the tools are open or a tool (or edit mode) is in use */
+    _syncToggle() {
+        this.btnToggle.classList.toggle('active', this.toolsOpen || !!this.selectedTool || !!this.isEditMode);
     }
 
     createMeasureTooltipElement(map) {

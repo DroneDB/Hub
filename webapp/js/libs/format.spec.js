@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-    bulkUnits, stockpileLabel, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize,
+    bulkUnits, stockpileLabel, distinctLabels, middleEllipsis, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize,
     formatNumber, formatNumberList, formatInputNumber, joinNumberTexts, parseNumber, formatBytes, formatDateTime, formatTime, formatTimeAgo, utcClockToLocal,
     lengthParts, areaParts, fixedLengthParts, formatVolume, formatWeight, formatDensity, formatSpeed,
     PRECISION, UNKNOWN, EMPTY_CELL, displayLocale
@@ -260,8 +260,9 @@ describe('stockpileLabel (FR-MAP-13)', () => {
     // Worked out by hand, not with the formatter:
     //   8097.19 m³ x 1.307950619 yd³/m³ = 10,590.7247 yd³ -> "10,590.72 yd³" (2 decimals)
     //   1.68 t/m³ x (0.764554858 m³/yd³ / 0.90718474 t/ST = 0.8427774) = 1.415866 ST/yd³ -> "1.416 ST/yd³" (3 decimals)
-    const METRIC = 'North pile - 8,097.19 m³ - Gravel - 1.68 t/m³';
-    const IMPERIAL = 'North pile - 10,590.72 yd³ - Gravel - 1.416 ST/yd³';
+    // The title is the name heading above the label on the map and in the list, so the label does not repeat it (FR-MAP-26)
+    const METRIC = '8,097.19 m³ - Gravel - 1.68 t/m³';
+    const IMPERIAL = '10,590.72 yd³ - Gravel - 1.416 ST/yd³';
 
     it('is built from the metric properties in the units asked for', () => {
         inLocale('en-US');
@@ -283,12 +284,66 @@ describe('stockpileLabel (FR-MAP-13)', () => {
     it('leaves out what the pile does not have', () => {
         inLocale('en-US');
         expect(stockpileLabel({ netVolume: 8097.19 }, 'imperial')).toBe('10,590.72 yd³');
-        expect(stockpileLabel({ title: 'North pile', materialName: 'Gravel' }, 'imperial')).toBe('North pile - Gravel');
+        expect(stockpileLabel({ title: 'North pile', materialName: 'Gravel' }, 'imperial')).toBe('Gravel');
+    });
+
+    it('never has the title in it, whatever the title is (FR-MAP-26)', () => {
+        inLocale('en-US');
+        expect(stockpileLabel({ ...pile, title: 'North pile' }, 'metric')).not.toContain('North pile');
+        expect(stockpileLabel({ title: 'North pile' }, 'metric')).toBe('Stockpile');
     });
 
     it('is the word Stockpile for a pile with nothing to say', () => {
         expect(stockpileLabel({}, 'metric')).toBe('Stockpile');
         expect(stockpileLabel(undefined)).toBe('Stockpile');
+    });
+});
+
+describe('distinctLabels (FR-RAS-12)', () => {
+    // The two mosaics of r3thermal/hat-creek and the masked variant of the first one
+    const A = 'Hat_Creek_Fire_Thermal_08242018_16bit.tif';
+    const B = 'Hat_Creek_Fire_Thermal_08252018_16bit.tif';
+    const C = 'Hat_Creek_Fire_Thermal_08242018_16bit_masked.tif';
+
+    it('drops the start the names share, so the two dates tell the layers apart', () => {
+        expect(distinctLabels([A, B], 40)).toEqual(['08242018_16bit.tif', '08252018_16bit.tif']);
+    });
+
+    it('keeps the date of the masked variant too', () => {
+        expect(distinctLabels([A, B, C], 40)).toEqual(['08242018_16bit.tif', '08252018_16bit.tif', '08242018_16bit_masked.tif']);
+    });
+
+    it('cuts a label that is still too long in the middle, keeping its end and its extension', () => {
+        // 16 characters: the first 8 (the date), the ellipsis, the last 7
+        expect(distinctLabels([A, B, C], 16)).toEqual(['08242018\u2026bit.tif', '08252018\u2026bit.tif', '08242018\u2026ked.tif']);
+    });
+
+    it('keeps the whole name of a single layer, or of names that are all the same', () => {
+        expect(distinctLabels([A], 60)).toEqual([A]);
+        expect(distinctLabels([A, A], 60)).toEqual([A, A]);
+        expect(distinctLabels([], 10)).toEqual([]);
+    });
+
+    it('does not cut a word in half and never leaves a label empty', () => {
+        expect(distinctLabels(['ortho1.tif', 'ortho2.tif'], 20)).toEqual(['ortho1.tif', 'ortho2.tif']);
+        expect(distinctLabels(['site_a.tif', 'site_b.tif'], 20)).toEqual(['a.tif', 'b.tif']);
+        // One name is the start of the other: the shorter keeps its whole text
+        expect(distinctLabels(['site.tif', 'site.tif.aux'], 20)).toEqual(['site.tif', 'site.tif.aux']);
+    });
+});
+
+describe('middleEllipsis', () => {
+    it('returns a text that fits as it is', () => {
+        expect(middleEllipsis('ortho.tif', 9)).toBe('ortho.tif');
+    });
+
+    it('is as long as asked, with the start and the end of the text around the ellipsis', () => {
+        expect(middleEllipsis('abcdefghijklmnopqrstuvwxyz', 10)).toBe('abcde\u2026wxyz');
+        expect(middleEllipsis('abcdefghijklmnopqrstuvwxyz', 10)).toHaveLength(10);
+    });
+
+    it('takes the first characters of a very short limit', () => {
+        expect(middleEllipsis('abcdef', 3)).toBe('abc');
     });
 });
 

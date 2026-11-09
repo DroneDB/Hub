@@ -641,10 +641,11 @@ export const formatDensity = (tonnesPerCubicMeter, units, { placeholder } = {}) 
 
 /**
  * The label of a stockpile (on the map, in the Measurement List, in the saved file's tooltip): its
- * title, volume, material and density, built at render time from the stored metric properties, in
- * the units the user has now (or the pile's own `unitSystem` when none is given), so Convert and a
- * reload show yd³ and ST like the stockpile panel.
- * @param {{ title?: string, netVolume?: unknown, materialName?: string, materialDensity?: unknown, unitSystem?: string }} [props]
+ * volume, material and density, built at render time from the stored metric properties, in the
+ * units the user has now (or the pile's own `unitSystem` when none is given), so Convert and a
+ * reload show yd³ and ST like the stockpile panel. It leaves the title out: where the label is
+ * shown, the title is the name heading above it (FR-MAP-26).
+ * @param {{ netVolume?: unknown, materialName?: string, materialDensity?: unknown, unitSystem?: string }} [props]
  * @param {string} [unitPref]  'metric' or 'imperial'
  * @returns {string}
  */
@@ -652,11 +653,56 @@ export function stockpileLabel(props, unitPref) {
     const p = props || {};
     const units = unitPref || p.unitSystem;
     const parts = [];
-    if (p.title) parts.push(p.title);
     if (typeof p.netVolume === 'number') parts.push(formatVolume(p.netVolume, units));
     if (p.materialName) parts.push(p.materialName);
     if (p.materialDensity) parts.push(formatDensity(p.materialDensity, units));
     return parts.join(' - ') || 'Stockpile';
+}
+
+// A name is cut where it has one of these: the shared start of the names of a set ends after one
+const NAME_SEPARATOR = /[\s_\-./]/;
+
+/**
+ * A name cut to `max` characters by an ellipsis in the middle, so its start and its end (the date
+ * and the extension of a file) both show. A name that fits is returned as it is.
+ * @param {string} text
+ * @param {number} max  at least 1
+ * @returns {string}
+ */
+export function middleEllipsis(text, max) {
+    const chars = Array.from(String(text ?? ''));
+    if (chars.length <= max) return chars.join('');
+    if (max < 4) return chars.slice(0, Math.max(0, max)).join('');
+    // Half and half: once the shared start is dropped (distinctLabels) the start is what tells names apart, and the end has
+    // the extension; the middle is what a name can lose
+    const head = Math.ceil((max - 1) / 2);
+    const tail = max - 1 - head;
+    return chars.slice(0, head).join('') + '\u2026' + chars.slice(chars.length - tail).join('');
+}
+
+/**
+ * The labels of a set of layer or file names that are told apart at a glance (FR-RAS-12): the start
+ * that all the names share (up to its last separator) is dropped, so '..._08242018_16bit.tif' and
+ * '..._08252018_16bit.tif' keep their dates, and a label that is still longer than `max` gets an
+ * ellipsis in the middle (middleEllipsis), which keeps its end and its extension. A single name, or
+ * names that are all the same, keep their whole text.
+ * @param {string[]} names
+ * @param {number} max  the longest label
+ * @returns {string[]}  one label for each name, in the same order
+ */
+export function distinctLabels(names, max) {
+    const list = names.map(n => String(n ?? ''));
+    let labels = list;
+    if (list.length > 1 && list.some(n => n !== list[0])) {
+        let prefix = 0;
+        while (list.every(n => n.length > prefix && n[prefix] === list[0][prefix])) prefix++;
+        // A name that is the whole start of another one tells nothing by what follows it: the names stay whole
+        if (list.some(n => n.length === prefix)) prefix = 0;
+        // Back to the end of the last whole word, so a label never starts in the middle of one
+        while (prefix > 0 && !NAME_SEPARATOR.test(list[0][prefix - 1])) prefix--;
+        if (prefix > 0 && list.every(n => n.length > prefix)) labels = list.map(n => n.slice(prefix));
+    }
+    return labels.map(label => middleEllipsis(label, max));
 }
 
 /**

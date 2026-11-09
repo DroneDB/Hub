@@ -12,7 +12,7 @@
                     <i class="fa-solid fa-caret-left" />
                 </button>
                 <span class="split-label-text" :title="band.placeholder ? band.placeholder.text : band.name">
-                    {{ band.placeholder ? band.placeholder.text : band.name }}
+                    {{ band.placeholder ? band.placeholder.text : labels[i] }}
                 </span>
                 <button v-if="removable && band.placeholder && band.placeholder.kind === 'missing'" class="split-label-btn"
                         title="Pick another raster" aria-label="Pick another raster" @click="$emit('repick', i)">
@@ -59,9 +59,12 @@
  * separator that a pointer drags and the keyboard moves: ArrowLeft and ArrowRight by 5 % (Shift:
  * 1 %), Home and End to the end of its range; it never comes closer than 5 % to its neighbours.
  */
+import { distinctLabels } from '@/libs/format';
 
 // The least width of a band, as a fraction of the map
 const MIN_GAP = 0.05;
+// The longest label of a band; a longer name is cut in the middle, so the part that tells the layers apart stays
+const LABEL_MAX = 26;
 // A key press moves a divider by this much, and by the fine step with Shift
 const STEP = 0.05;
 const FINE_STEP = 0.01;
@@ -90,11 +93,27 @@ export default {
             dragStartPos: 0,
         };
     },
+    computed: {
+        // The part of each name that tells the layers apart (the date of two mosaics), cut in the middle if still long (FR-RAS-12)
+        labels() {
+            return distinctLabels(this.bands.map(b => b.name || ''), LABEL_MAX);
+        }
+    },
     methods: {
         bandLabelStyle(i) {
             // Band i occupies [leftBound, rightBound] as percentages
             const leftBound = i === 0 ? 0 : this.positions[i - 1];
             const rightBound = i === this.positions.length ? 1 : this.positions[i];
+            const left = (leftBound * 100) + '%';
+            if (i === this.positions.length) {
+                // The last band ends under the toolbar rail: its label is centred in what the rail leaves of it
+                // (the --map-rail-reserve token of the map) and never wider than that
+                return {
+                    left: `calc((${left} + 100% - var(--map-rail-reserve)) / 2)`,
+                    maxWidth: `calc(100% - var(--map-rail-reserve) - ${left})`,
+                    transform: 'translateX(-50%)',
+                };
+            }
             const center = (leftBound + rightBound) / 2;
             return {
                 left: (center * 100) + '%',
@@ -111,7 +130,7 @@ export default {
         handleLabel(i) {
             const name = j => {
                 const band = this.bands[j];
-                return band ? (band.placeholder ? band.placeholder.text : band.name) : `band ${j + 1}`;
+                return band ? (band.placeholder ? band.placeholder.text : this.labels[j]) : `band ${j + 1}`;
             };
             return `Divider between ${name(i)} and ${name(i + 1)}`;
         },
@@ -207,7 +226,7 @@ export default {
     padding: 0.2rem 0.55rem;
     border-radius: 1rem;
     white-space: nowrap;
-    max-width: 18rem;
+    max-width: min(18rem, 100%);
     user-select: none;
     box-shadow: 0 1px 4px rgba(var(--ddb-shade-rgb), 0.35);
 
@@ -250,7 +269,7 @@ export default {
     }
 
     .split-label-pill {
-        max-width: 45vw;
+        max-width: min(45vw, 100%);
     }
 }
 

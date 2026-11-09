@@ -10,6 +10,10 @@ import { extractFeatureDisplayName } from '@/libs/propertiesUtils';
 import { findVectorLayerForFeature, tooltipCssText } from '@/libs/map/mapUtils';
 import FeatureInfoDialog from '@/features/viewers/map/FeatureInfoDialog.vue';
 import { createFeatureScope } from '@/composables/featureScope';
+import { keepOverlayInView } from '@/libs/map/overlayPlacement';
+
+// The label goes on the right of the pointer; keepOverlayInView moves it to the left (or along the edge) where the map ends
+const TOOLTIP_PLACEMENT = Object.freeze({ positioning: 'center-left', offset: [12, 0] });
 
 const definition = {
     data() {
@@ -29,8 +33,8 @@ const definition = {
 
             this.tooltipOverlay = new Overlay({
                 element: this.tooltipElement,
-                offset: [12, 0],
-                positioning: 'center-left'
+                offset: [...TOOLTIP_PLACEMENT.offset],
+                positioning: TOOLTIP_PLACEMENT.positioning
             });
         },
 
@@ -58,6 +62,8 @@ const definition = {
             this.tooltipElement.innerHTML = content;
             this.tooltipElement.style.display = 'block';
             this.tooltipOverlay.setPosition(this.map.getCoordinateFromPixel(pixel));
+            // The label has its content and its place: it stays out of the toolbar rail and inside the map (FR-MAP-19)
+            keepOverlayInView(this.map, this.tooltipOverlay, this.tooltipElement, TOOLTIP_PLACEMENT);
         },
 
         /**

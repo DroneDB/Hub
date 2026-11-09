@@ -152,3 +152,35 @@ describe('the layers of the map', () => {
             .toMatch(/bottom:\s*var\(--map-bottom-reserve\)/);
     });
 });
+
+describe('the toolbar rail of a compact map (FR-MAP-12, FR-SHR-05)', () => {
+    // MapCore puts .is-compact on the map from the size of the map itself; the same rules serve a phone and a 600 x 400 frame
+    it('shows the Measure toggle only on a compact map, and nowhere else', () => {
+        expect(ruleOf(css, '.ol-measure-toggle')).toMatch(/display:\s*none/);
+        expect(ruleOf(css, '.map-container.is-compact .ol-measure-toggle')).toMatch(/display:\s*block/);
+    });
+
+    it('hides the groups of the measure tools of a compact map until the toggle opens them', () => {
+        const hidden = ruleOf(css, '.map-container.is-compact .ol-measure-control:not(.is-open) > .ol-control:not(.ol-measure-toggle)');
+        expect(hidden).toMatch(/display:\s*none\s*!important/);
+    });
+
+    it('lets the rail of a compact map scroll when the open tools are taller than the map', () => {
+        expect(ruleOf(css, '.map-container.is-compact .ol-zone-top-right')).toMatch(/overflow-y:\s*auto/);
+    });
+
+    it('turns the arrow of a popup below its point up', () => {
+        const arrow = ruleOf(css, '.ol-point-popup-below::after');
+        expect(arrow).toMatch(/top:\s*-0\.5rem/);
+        expect(arrow).toMatch(/border-bottom:\s*0\.5rem solid white/);
+    });
+});
+
+describe('the layer names of a map with several layers (FR-RAS-12)', () => {
+    const split = readSource(__dirname, './RasterSplitOverlay.vue');
+
+    it('centres the label of the last band in what the toolbar rail leaves of it, never wider', () => {
+        expect(split).toMatch(/left: `calc\(\(\$\{left\} \+ 100% - var\(--map-rail-reserve\)\) \/ 2\)`/);
+        expect(split).toMatch(/maxWidth: `calc\(100% - var\(--map-rail-reserve\) - \$\{left\}\)`/);
+    });
+});

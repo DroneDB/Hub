@@ -6,6 +6,8 @@
     --splat-rail-button: 2.1rem;
     --splat-rail-padding: 0.3rem;
     --splat-rail-width: calc(var(--splat-rail-button) + 2 * var(--splat-rail-padding));
+    // The height of the bar of buttons at the bottom left (btn-stack): the movement pad of a phone sits above it (FR-VWR-14)
+    --splat-bar-height: 2.25rem;
 }
 
 #splat canvas {
@@ -86,7 +88,7 @@
 
 #splat .btn-overlay {
     @include overlay-button(
-        $size: 2.25rem,
+        $size: var(--splat-bar-height),
         $radius: 50%,
         $background: rgba(var(--ddb-shade-rgb), 0.55),
         $hover-background: rgba(var(--ddb-shade-rgb), 0.75),

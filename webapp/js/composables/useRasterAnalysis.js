@@ -17,6 +17,7 @@ import { rasterPixelAt, rasterPixelWindow, isInsideExtent } from '@/libs/map/ras
 import { rasterValueUnit } from '@/libs/map/rasterUnit';
 import { rasterLayerPath } from '@/libs/map/rasterLayers';
 import { formatNumber, lengthParts } from '@/libs/format';
+import { measurementTooltipHtml } from '@/libs/map/olMeasurementConverter';
 
 // The server answers an area without any value with an error of its own
 const AREA_NO_DATA_MESSAGE = 'No statistics for this area: it may hold only pixels without data.';
@@ -490,10 +491,8 @@ const definition = {
             const name = feature.get('name');
             const el = document.createElement('div');
             el.className = 'ol-tooltip ol-tooltip-static ol-tooltip-hidden';
-            let content = '';
-            if (name) content += `<div class="ol-tooltip-name">${name}</div>`;
-            content += `<div class="ol-tooltip-value">${tooltipText}</div>`;
-            el.innerHTML = content;
+            // The name and the text are escaped (a saved name is user input)
+            el.innerHTML = measurementTooltipHtml(name, tooltipText);
             const overlay = new Overlay({
                 element: el,
                 offset: [0, -7],

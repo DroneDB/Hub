@@ -58,3 +58,16 @@ describe('AnalysisTargetSelect', () => {
         expect(wrapper.find('select').element.value).toBe('odm_dem/dtm.tif');
     });
 });
+
+describe('AnalysisTargetSelect names (FR-RAS-12)', () => {
+    const A = { path: 'hat/Hat_Creek_Thermal_08242018_16bit.tif', label: 'Hat_Creek_Thermal_08242018_16bit.tif' };
+    const B = { path: 'hat/Hat_Creek_Thermal_08252018_16bit.tif', label: 'Hat_Creek_Thermal_08252018_16bit.tif' };
+
+    it('lists the rasters by the part of the name that differs, with the whole name as the title of the option', () => {
+        render({ candidates: [A, B], modelValue: B.path });
+        const options = wrapper.findAll('option');
+        expect(options.map(o => o.text())).toEqual(['08242018_16bit.tif', '08252018_16bit.tif']);
+        expect(options.map(o => o.attributes('title'))).toEqual([A.label, B.label]);
+        expect(wrapper.find('select').element.value).toBe(B.path);
+    });
+});

@@ -7,7 +7,11 @@
         <!-- Focusable from code (tabindex -1): a focus in the photo popup comes back here when it closes -->
         <div ref="map-container" class="map-container" tabindex="-1" :class="{
             'cursor-pointer': selectSingle,
-            'cursor-crosshair': selectPolygon
+            'cursor-crosshair': selectPolygon,
+            // The size class of the map itself (not of the window): the rules of ol-controls.css and the panels read it
+            'is-narrow': mapSize.narrow,
+            'is-short': mapSize.short,
+            'is-compact': mapSize.compact
         }">
             <!-- A view always has the layer panel (a row has its eye, badge and Pick another; with no georaster yet, a view of
                  another file, it is the Add layer); the dataset map has the one opacity control up to one raster -->
@@ -114,7 +118,7 @@
 import 'ol/ol.css';
 import { Map, View } from 'ol';
 import { isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
-import { inject, shallowRef } from 'vue';
+import { inject, provide, shallowRef } from 'vue';
 
 import ddb from 'ddb';
 import emitter from '@/libs/eventBus';
@@ -133,6 +137,7 @@ import { getVectorColor, FIT_OPTIONS } from '@/libs/map/mapUtils';
 
 import { useListenerBag } from '@/composables/useEventListener';
 import { useTimerGroup } from '@/composables/useTimers';
+import { useMapSize } from '@/composables/useMapSize';
 import { useMapFeatures } from '@/composables/useMapFeatures';
 import { useMapViewState } from '@/composables/useMapViewState';
 import { usePreference } from '@/composables/usePreference';
@@ -242,6 +247,9 @@ export default {
     },
     emits: ['scrollTo', 'openItem', 'update:view', 'removeLayer', 'repick', 'addLayer', 'save', 'fileWritten', 'fileRemoved'],
     setup(props, { emit }) {
+        // The size class of the map's container: the panels over the map inject it
+        const { size: mapSize, observe: observeMapSize } = useMapSize();
+        provide('mapSize', mapSize);
         const features = useMapFeatures(props, {
             onFileWritten: path => emit('fileWritten', path),
             onFileRemoved: path => emit('fileRemoved', path)
@@ -253,6 +261,8 @@ export default {
             ...useMapViewState({ ...features, view: () => props.view, emit }),
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
+            mapSize,
+            observeMapSize,
             // Toolbar zones (createControlZones), set when the map is built
             zones: shallowRef(null),
             later: useTimerGroup(),
@@ -328,6 +338,7 @@ export default {
         }
     },
     mounted: function () {
+        this.observeMapSize(this.$refs['map-container']);
         if (!this.deferLoad) this.activate();
     },
     beforeUnmount: function () {

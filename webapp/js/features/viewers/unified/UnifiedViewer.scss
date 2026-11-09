@@ -1,5 +1,11 @@
 // The 3D viewer's overlays: toolbars, layer panel, badges.
 
+// The row of the measure toolbar at the top left: a 2.25rem button, the padding of the bar (0.25rem each side) and its border.
+// The badge of local coordinates goes below it on a phone (FR-VWR-27)
+#unified-viewer {
+    --unified-toolbar-height: calc(2.25rem + 2 * 0.25rem + 2 * var(--ddb-border-width));
+}
+
 #unified-viewer .giro3d-view {
     position: absolute;
     top: 0;
@@ -72,4 +78,14 @@
     color: var(--ddb-text-on-dark);
     font-size: 0.85rem;
     pointer-events: none;
+}
+
+// A phone: the badge is no longer between the toolbar (left) and the Layers panel (right) at the top centre, where it
+// covers both; it goes under the toolbar row, at the left edge
+@media (max-width: 575.98px) {
+    #unified-viewer .local-coords-badge {
+        top: calc(var(--ddb-spacing-md) + var(--unified-toolbar-height) + var(--ddb-spacing-sm));
+        left: var(--ddb-spacing-md);
+        transform: none;
+    }
 }

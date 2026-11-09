@@ -9,7 +9,8 @@ import proj4 from 'proj4';
 import { fromLonLat } from 'ol/proj';
 import Feature from 'ol/Feature';
 import { LineString, Polygon } from 'ol/geom';
-import { exportMeasurements, importMeasurements, measurementSizeText } from './olMeasurementConverter';
+import OlMap from 'ol/Map';
+import { exportMeasurements, importMeasurements, measurementSizeText, updateFeatureTooltip } from './olMeasurementConverter';
 import { ANALYSIS_COLOR } from './mapUtils';
 import { ANALYSIS_FILL } from './analysisStyles';
 
@@ -59,16 +60,60 @@ describe('importMeasurements tooltip text', () => {
         // Reloaded in imperial: yd³ and ST, whatever the file's text says
         // (8097.19 m³ x 1.307950619 = 10,590.72 yd³; 1.68 t/m³ x 0.8427774 = 1.416 ST/yd³)
         const imperial = importOne(featureOf('Polygon', ROOF, props), 'imperial');
-        expect(imperial.get('tooltipText')).toBe('North - 10,590.72 yd³ - Gravel - 1.416 ST/yd³');
+        expect(imperial.get('tooltipText')).toBe('10,590.72 yd³ - Gravel - 1.416 ST/yd³');
         // The stored properties stay metric
         expect(imperial.get('netVolume')).toBe(8097.19);
         expect(imperial.get('materialDensity')).toBe(1.68);
-        expect(importOne(featureOf('Polygon', ROOF, props), 'metric').get('tooltipText')).toBe('North - 8,097.19 m³ - Gravel - 1.68 t/m³');
+        expect(importOne(featureOf('Polygon', ROOF, props), 'metric').get('tooltipText')).toBe('8,097.19 m³ - Gravel - 1.68 t/m³');
     });
 
     it('gives an untyped feature saved without text its size', () => {
         const f = importOne(featureOf('Polygon', ROOF, {}));
         expect(f.get('tooltipText')).toMatch(/ ft²$/);
+    });
+});
+
+describe('the labels of measurements from a saved file are text, not HTML', () => {
+    const NAME = '<img src=x onerror=alert(1)>';
+    let map;
+    afterEach(() => map?.setTarget(undefined));
+
+    function importOnMap(feature) {
+        const target = document.createElement('div');
+        document.body.appendChild(target);
+        map = new OlMap({ target });
+        const { features } = importMeasurements({ type: 'FeatureCollection', features: [feature] }, new VectorSource(), 'metric', map);
+        return features[0];
+    }
+    const label = f => /** @type {HTMLElement} */ (f.get('measureTooltipElement'));
+
+    it('shows the name of an imported measurement as written', () => {
+        const f = importOnMap(featureOf('Polygon', ROOF, { measurementType: 'profile', name: NAME, tooltipText: 'Profile: 11.1 m' }));
+        expect(label(f).querySelector('img')).toBeNull();
+        expect(label(f).querySelector('.ol-tooltip-name').textContent).toBe(NAME);
+        expect(label(f).querySelector('.ol-tooltip-value').textContent).toBe('Profile: 11.1 m');
+    });
+
+    it('shows the material of a stockpile in its label as written', () => {
+        Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true });
+        const f = importOnMap(featureOf('Polygon', ROOF, { measurementType: 'stockpile', id: 'p1', netVolume: 8097.19,
+            materialName: NAME, materialDensity: 1.68, unitSystem: 'metric' }));
+        expect(label(f).querySelector('img')).toBeNull();
+        expect(label(f).querySelector('.ol-tooltip-value').textContent).toBe('8,097.19 m³ - <img src=x onerror=alert(1)> - 1.68 t/m³');
+    });
+
+    it('shows saved label text as written', () => {
+        const f = importOnMap(featureOf('LineString', LINE, { measurementType: 'profile', tooltipText: `Profile ${NAME}` }));
+        expect(label(f).querySelector('img')).toBeNull();
+        expect(label(f).querySelector('.ol-tooltip-value').textContent).toBe('Profile <img src=x onerror=alert(1)>');
+    });
+
+    it('keeps the name as text when the label is written again (updateFeatureTooltip)', () => {
+        const f = importOnMap(featureOf('LineString', LINE, { measurementType: 'length', name: 'Fence' }));
+        f.set('name', NAME);
+        updateFeatureTooltip(f);
+        expect(label(f).querySelector('img')).toBeNull();
+        expect(label(f).querySelector('.ol-tooltip-name').textContent).toBe(NAME);
     });
 });
 

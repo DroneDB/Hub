@@ -100,3 +100,42 @@ describe('RasterSplitOverlay dividers', () => {
         expect(arrow.defaultPrevented).toBe(true);
     });
 });
+
+describe('RasterSplitOverlay labels (FR-RAS-12)', () => {
+    const A = 'Hat_Creek_Fire_Thermal_08242018_16bit.tif';
+    const B = 'Hat_Creek_Fire_Thermal_08252018_16bit.tif';
+    const texts = () => wrapper.findAll('.split-label-text').map(label => label.text());
+
+    it('shows the part of each name that differs, the date of each mosaic, with the whole name as its title', () => {
+        render({ bands: [band(A), band(B)] });
+        expect(texts()).toEqual(['08242018_16bit.tif', '08252018_16bit.tif']);
+        expect(wrapper.findAll('.split-label-text').map(label => label.attributes('title'))).toEqual([A, B]);
+    });
+
+    it('cuts a label longer than 26 characters in the middle: 13, the ellipsis, 12', () => {
+        const long = 'Hat_Creek_Fire_Thermal_08242018_16bit_orthomosaic_masked.tif';
+        render({ bands: [band(A), band(long)] });
+        // After the shared start up to '08242018_': '16bit.tif' and '16bit_orthomosaic_masked.tif' (28 characters)
+        expect(texts()).toEqual(['16bit.tif', '16bit_orthomo\u2026c_masked.tif']);
+    });
+
+    it('names the dividers after the labels, and a missing band by its placeholder text', () => {
+        render({ bands: [band(A), band(B, { kind: 'missing', text: 'Missing: b.tif' })] });
+        expect(wrapper.find('[role="separator"]').attributes('aria-label')).toBe('Divider between 08242018_16bit.tif and Missing: b.tif');
+    });
+
+    it('centres the last label in what the toolbar rail leaves of its band, never wider (the --map-rail-reserve token)', () => {
+        render({ bands: [band('a.tif'), band('b.tif')], positions: [0.4] });
+        // The styles the component computes (jsdom drops the calc() with a var() of the written style)
+        const first = wrapper.vm.bandLabelStyle(0);
+        const last = wrapper.vm.bandLabelStyle(1);
+        // The first band is centred on its middle, 20 %
+        expect(first).toEqual({ left: '20%', transform: 'translateX(-50%)' });
+        // The last band starts at 40 % and ends at the rail: centred between 40 % and 100 % - rail
+        expect(last).toEqual({
+            left: 'calc((40% + 100% - var(--map-rail-reserve)) / 2)',
+            maxWidth: 'calc(100% - var(--map-rail-reserve) - 40%)',
+            transform: 'translateX(-50%)'
+        });
+    });
+});

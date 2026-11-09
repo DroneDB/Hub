@@ -150,3 +150,30 @@ describe('MapToolbar back and copy link', () => {
         expect(copyLink()).not.toBeNull();
     });
 });
+
+describe('MapToolbar on a map narrower than sm (FR-MAP-12)', () => {
+    const labels = () => [...zones.topRight.querySelectorAll('button')].map(b => b.getAttribute('aria-label'));
+    const mountOn = (mapSize, props) => {
+        wrapper = mount(MapToolbar, {
+            props: { zones, showBack: true, copyLink: true, analysisEntry: { path: 'dsm.tif' }, rasterCount: 1, ...props },
+            global: { provide: { mapSize } }
+        });
+    };
+
+    it('leaves the Back button out of the rail, as the bar of the viewer has the way back', () => {
+        mountOn({ narrow: true });
+        expect(labels()).not.toContain('Back to Dataset');
+    });
+
+    it('keeps the rail of a map viewer at 6 buttons with the Measure toggle: Reset, Fullscreen, Copy link and the two analysis tools', () => {
+        mountOn({ narrow: true });
+        // Fullscreen shows where the browser supports it (jsdom: not); the other four are always there
+        expect(labels().filter(l => l !== 'Fullscreen')).toEqual(['Reset View', 'Copy link', 'Raster Analysis', 'Stockpile Volume']);
+        expect(labels().length + 1).toBeLessThanOrEqual(6);
+    });
+
+    it('keeps Back on a wider map', () => {
+        mountOn({ narrow: false });
+        expect(labels()).toContain('Back to Dataset');
+    });
+});

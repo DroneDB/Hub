@@ -1,7 +1,7 @@
 <template>
     <Teleport :to="zones.topRight">
         <div class="ol-map-buttons ol-unselectable ol-control" style="order: -1">
-            <button v-if="showBack && !embed" title="Back to Dataset" aria-label="Back to Dataset" @click="emit('back')">
+            <button v-if="showBack && !embed && !mapSize.narrow" title="Back to Dataset" aria-label="Back to Dataset" @click="emit('back')">
                 <i class="fa-solid fa-arrow-left" />
             </button>
             <button title="Reset View (H)" aria-label="Reset View" @click="emit('reset')">
@@ -51,7 +51,7 @@
  * The dataset map's own buttons,
  * teleported into the map's toolbar zones (libs/map/controlZones):
  * - top right: Back and Copy link (single-file map; an embedded map has neither: it has no Hub
- *   to go back to and its address is the host page's), Reset view, Fullscreen, Raster Analysis, Stockpile;
+ *   to go back to and its address is the host page's; a map narrower than `sm` has no Back, its viewer bar does), Reset view, Fullscreen, Raster Analysis, Stockpile;
  * - top center: direction indicators and flight path (display options), compare: with two
  *   georasters or more it splits the map between them, with one (where `pickToCompare`) it asks
  *   for another to compare to.
@@ -89,6 +89,9 @@ const emit = defineEmits(['back', 'reset', 'fullscreen', 'copy-link', 'analysis'
 const canFullscreen = supportsFullScreen();
 // Provided by the app: true on a map embedded in another page
 const embed = inject('embed', false);
+// The size class of the map (MapCore provides it): a map narrower than `sm` leaves its Back button out of the rail,
+// which keeps 6 buttons with the Measure toggle; the bar of the viewer has the way back to the dataset (FR-MAP-12)
+const mapSize = inject('mapSize', { narrow: false });
 // No georaster: nothing to compare, no button. An embedded map only views what it was given:
 // it splits the georasters it has, but does not pick another one to compare to.
 const showCompare = computed(() => props.splitToggle && props.rasterCount > 0 && (props.canCompare || (props.pickToCompare && !embed)));

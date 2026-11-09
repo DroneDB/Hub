@@ -5,66 +5,75 @@
             <AnalysisTargetSelect :candidates="targetCandidates" :model-value="targetPath"
                                   @update:model-value="path => $emit('selectTarget', path)" />
 
-            <div class="section">
-                <label for="stockpile-volume-panel-base-plane-method" class="section-label">
-                    Base Plane Method
-                    <button type="button" class="info-icon-btn"
-                            :title="baseMethodTooltip" :aria-label="baseMethodTooltip"
-                            data-testid="stockpile-base-method-info"
-                            @click="showBaseMethodsInfo = true">
-                        <i class="fas fa-info-circle" />
-                    </button>
-                </label>
-                <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select"
-                        :disabled="loading" data-testid="stockpile-base-method">
-                    <option v-for="m in baseMethods" :key="m.id" :value="m.id">{{ m.name }}</option>
-                </select>
-            </div>
-
-            <div class="section">
-                <label for="stockpile-volume-panel-detection-sensitivity" class="section-label">Detection Sensitivity: <strong>{{ localSensitivity.toFixed(2) }}</strong></label>
-                <input id="stockpile-volume-panel-detection-sensitivity" v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
-                       class="panel-range" data-testid="stockpile-sensitivity">
-            </div>
-
-            <div class="section">
-                <label for="stockpile-volume-panel-search-radius" class="section-label">Search Radius (m)</label>
-                <input id="stockpile-volume-panel-search-radius" v-model.number="localRadius" type="number" min="5" step="5"
-                       class="panel-input" data-testid="stockpile-radius">
-            </div>
-
-            <div class="section">
-                <div class="section-label-row">
-                    <label for="stockpile-volume-panel-material" class="section-label">Material (optional)</label>
-                    <button v-if="canEditMaterials" type="button" class="link-btn" data-testid="stockpile-edit-materials"
-                            title="Change the densities and prices of your materials, add your own"
-                            @click="editMaterials">
-                        Edit materials…
-                    </button>
+            <!-- A map narrower than `sm` with a mode active or a result: the settings fold behind this button, so the
+                 prompt of the mode and the result are in view (FR-MAP-16) -->
+            <button v-if="foldable" type="button" class="settings-toggle" data-testid="stockpile-settings-toggle"
+                    :aria-expanded="String(settingsOpen)" aria-controls="stockpile-volume-panel-settings" @click="settingsOpen = !settingsOpen">
+                <i class="fas" :class="settingsOpen ? 'fa-chevron-down' : 'fa-chevron-right'" aria-hidden="true" />
+                Settings
+            </button>
+            <div v-show="!foldable || settingsOpen" id="stockpile-volume-panel-settings" class="panel-settings" data-testid="stockpile-settings">
+                <div class="section">
+                    <label for="stockpile-volume-panel-base-plane-method" class="section-label">
+                        Base Plane Method
+                        <button type="button" class="info-icon-btn"
+                                :title="baseMethodTooltip" :aria-label="baseMethodTooltip"
+                                data-testid="stockpile-base-method-info"
+                                @click="showBaseMethodsInfo = true">
+                            <i class="fas fa-info-circle" />
+                        </button>
+                    </label>
+                    <select id="stockpile-volume-panel-base-plane-method" v-model="localBaseMethod" class="panel-select"
+                            :disabled="loading" data-testid="stockpile-base-method">
+                        <option v-for="m in baseMethods" :key="m.id" :value="m.id">{{ m.name }}</option>
+                    </select>
                 </div>
-                <select id="stockpile-volume-panel-material" v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
-                    <option :value="null">- none -</option>
-                    <option v-for="m in savedMaterials" :key="m.slug" :value="m.slug">
-                        {{ m.name }} (saved, {{ formatDensity(m.densityTonPerM3) }})
-                    </option>
-                    <optgroup v-for="group in materialGroups" :key="group.label" :label="group.label">
-                        <option v-for="m in group.materials" :key="m.slug" :value="m.slug">
-                            {{ m.name }} ({{ formatDensity(m.densityTonPerM3) }})
+
+                <div class="section">
+                    <label for="stockpile-volume-panel-detection-sensitivity" class="section-label">Detection Sensitivity: <strong>{{ localSensitivity.toFixed(2) }}</strong></label>
+                    <input id="stockpile-volume-panel-detection-sensitivity" v-model.number="localSensitivity" type="range" min="0" max="1" step="0.05"
+                           class="panel-range" data-testid="stockpile-sensitivity">
+                </div>
+
+                <div class="section">
+                    <label for="stockpile-volume-panel-search-radius" class="section-label">Search Radius (m)</label>
+                    <input id="stockpile-volume-panel-search-radius" v-model.number="localRadius" type="number" min="5" step="5"
+                           class="panel-input" data-testid="stockpile-radius">
+                </div>
+
+                <div class="section">
+                    <div class="section-label-row">
+                        <label for="stockpile-volume-panel-material" class="section-label">Material (optional)</label>
+                        <button v-if="canEditMaterials" type="button" class="link-btn" data-testid="stockpile-edit-materials"
+                                title="Change the densities and prices of your materials, add your own"
+                                @click="editMaterials">
+                            Edit materials…
+                        </button>
+                    </div>
+                    <select id="stockpile-volume-panel-material" v-model="localMaterial" class="panel-select" data-testid="stockpile-material">
+                        <option :value="null">- none -</option>
+                        <option v-for="m in savedMaterials" :key="m.slug" :value="m.slug">
+                            {{ m.name }} (saved, {{ formatDensity(m.densityTonPerM3) }})
                         </option>
-                    </optgroup>
-                    <option :value="customSlug">+ Custom…</option>
-                </select>
-                <div v-if="localMaterial === customSlug" class="custom-material-grid">
-                    <label>
-                        <span>Density ({{ units.density.unit }})</span>
-                        <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
-                               class="panel-input" data-testid="stockpile-custom-density">
-                    </label>
-                    <label>
-                        <span>Cost / {{ units.perWeight.unit }} ({{ currency }})</span>
-                        <input v-model.number="localCustomCostPerTon" type="number" min="0" step="1"
-                               class="panel-input" data-testid="stockpile-custom-cost">
-                    </label>
+                        <optgroup v-for="group in materialGroups" :key="group.label" :label="group.label">
+                            <option v-for="m in group.materials" :key="m.slug" :value="m.slug">
+                                {{ m.name }} ({{ formatDensity(m.densityTonPerM3) }})
+                            </option>
+                        </optgroup>
+                        <option :value="customSlug">+ Custom…</option>
+                    </select>
+                    <div v-if="localMaterial === customSlug" class="custom-material-grid">
+                        <label>
+                            <span>Density ({{ units.density.unit }})</span>
+                            <input v-model.number="localCustomDensity" type="number" min="0" step="0.05"
+                                   class="panel-input" data-testid="stockpile-custom-density">
+                        </label>
+                        <label>
+                            <span>Cost / {{ units.perWeight.unit }} ({{ currency }})</span>
+                            <input v-model.number="localCustomCostPerTon" type="number" min="0" step="1"
+                                   class="panel-input" data-testid="stockpile-custom-cost">
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -91,14 +100,14 @@
                 </button>
             </div>
 
-            <div v-if="mode === 'click'" class="section click-banner" data-testid="stockpile-click-banner">
+            <div v-if="mode === 'click'" ref="banner" class="section click-banner" data-testid="stockpile-click-banner">
                 <i class="fa-solid fa-crosshairs" />
                 <span data-testid="stockpile-hint">{{ clickHint }}</span>
                 <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
                     <i class="fas fa-times" />
                 </button>
             </div>
-            <div v-else-if="mode === 'draw'" class="section click-banner" data-testid="stockpile-draw-banner">
+            <div v-else-if="mode === 'draw'" ref="banner" class="section click-banner" data-testid="stockpile-draw-banner">
                 <i class="fa-solid fa-draw-polygon" />
                 <span data-testid="stockpile-hint">{{ drawHint }}</span>
                 <button class="banner-cancel" title="Cancel" aria-label="Cancel" @click="$emit('cancelMode')">
@@ -110,7 +119,7 @@
                 <i class="fas fa-exclamation-triangle" /> {{ error }}
             </div>
 
-            <div v-if="result" class="section result" data-testid="stockpile-result">
+            <div v-if="result" ref="resultSection" class="section result" data-testid="stockpile-result">
                 <label for="stockpile-volume-panel-identification" class="section-label">Identification</label>
                 <input id="stockpile-volume-panel-identification" v-model="localTitle" type="text" class="panel-input"
                        placeholder="Title (e.g. North pile)" maxlength="120"
@@ -205,7 +214,8 @@ export default {
     name: 'StockpileVolumePanel',
     components: { AnalysisPanel, StockpileBaseMethodsDialog, AnalysisTargetSelect },
     // An embedded map has no header, so no Preferences window to open
-    inject: { embed: { default: false } },
+    // The size class of the map (MapCore provides it); a panel mounted without one is on a map that is not narrow
+    inject: { embed: { default: false }, mapSize: { default: null } },
     props: {
         visible: { type: Boolean, default: false },
         // The rasters the volume can be measured on ({ path, label }) and the one it is measured on: the
@@ -243,9 +253,11 @@ export default {
         return { auth: useAuthStore() };
     },
     data() {
-        return { customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false };
+        return { customSlug: CUSTOM_MATERIAL_SLUG, baseMethods: BASE_METHODS, showBaseMethodsInfo: false, settingsOpen: false };
     },
     computed: {
+        // Below `sm`, while a mode is active or a result shows, the settings (base plane, sensitivity, radius, material) fold
+        foldable() { return !!this.mapSize?.narrow && !!(this.mode || this.result); },
         localBaseMethod: {
             get() { return this.baseMethod; },
             set(v) { this.$emit('update:baseMethod', v); }
@@ -332,7 +344,22 @@ export default {
             ].join('\n');
         }
     },
+    watch: {
+        // A new mode starts with the settings folded: the prompt is what the user needs next
+        mode(mode) {
+            if (mode) this.settingsOpen = false;
+            this.scrollTo('banner');
+        },
+        result(result) {
+            if (result) this.scrollTo('resultSection');
+        }
+    },
     methods: {
+        /** Brings a part of the panel (the prompt of the mode, the result) into the visible part of the sheet (FR-MAP-16) */
+        async scrollTo(ref) {
+            await this.$nextTick();
+            this.$refs[ref]?.scrollIntoView?.({ block: 'nearest' });
+        },
         // Every number through the one formatter (libs/format.js), so the panel and the label of the
         // pile on the map write the same quantity the same way
         _fmt(n, quantity) {
@@ -371,6 +398,21 @@ export default {
 
 <style scoped>
 /* Shared look and palette: css/_analysis-panel.scss */
+
+/* The disclosure of the settings: a line the width of the panel */
+.settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 0.15rem 0;
+    color: var(--panel-text);
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
 
 .section-label strong {
     color: var(--panel-text);

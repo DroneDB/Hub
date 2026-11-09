@@ -10,6 +10,8 @@ import { Polygon } from 'ol/geom';
 import LineString from 'ol/geom/LineString';
 import MeasureControls from './measureControl';
 import { _resetPrefListenersForTests } from '@/libs/preferences';
+import { mount } from '@vue/test-utils';
+import MeasurementListDialog from '@/features/viewers/map/MeasurementListDialog.vue';
 
 let control;
 let map;
@@ -45,8 +47,9 @@ afterEach(() => {
 
 describe('stockpile label after a units change (FR-MAP-13)', () => {
     // Worked out by hand: 8097.19 m³ x 1.307950619 yd³/m³ = 10,590.72 yd³; 1.68 t/m³ x 0.8427774 = 1.416 ST/yd³
-    const METRIC = 'North - 8,097.19 m³ - Gravel - 1.68 t/m³';
-    const IMPERIAL = 'North - 10,590.72 yd³ - Gravel - 1.416 ST/yd³';
+    // The title is the name heading above the label, not part of it (FR-MAP-26)
+    const METRIC = '8,097.19 m³ - Gravel - 1.68 t/m³';
+    const IMPERIAL = '10,590.72 yd³ - Gravel - 1.416 ST/yd³';
     beforeEach(() => Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true }));
     afterEach(() => { delete navigator.language; });
 
@@ -94,6 +97,56 @@ describe('stockpile label after a units change (FR-MAP-13)', () => {
         f.set('netVolume', '12');
         control.showUnit('metric');
         expect(f.get('tooltipText')).toBe('Old pile - 12.0 m³ - <b>Sand</b>');
+    });
+});
+
+describe('a name or a material from a saved file is text on the map and in the list', () => {
+    const NAME = '<img src=x onerror=alert(1)>';
+    beforeEach(() => Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true }));
+    afterEach(() => { delete navigator.language; });
+
+    /** A pile named NAME of the material NAME, with the label element the map shows over it */
+    const craftedPile = () => {
+        const f = pile();
+        f.setProperties({ name: NAME, materialName: NAME });
+        f.set('measureTooltipElement', document.createElement('div'));
+        control.source.addFeature(f);
+        return f;
+    };
+
+    it('writes the name and the stockpile label of the map tooltip as text', () => {
+        const f = craftedPile();
+        control.showUnit('metric');
+        const el = f.get('measureTooltipElement');
+        expect(el.querySelector('img')).toBeNull();
+        expect(el.querySelector('.ol-tooltip-name').textContent).toBe(NAME);
+        expect(el.querySelector('.ol-tooltip-value').textContent).toBe('8,097.19 m³ - <img src=x onerror=alert(1)> - 1.68 t/m³');
+    });
+
+    it('writes the name of a length as text when its size changes', () => {
+        const f = distance();
+        f.set('name', NAME);
+        f.set('measureTooltipElement', document.createElement('div'));
+        control.source.addFeature(f);
+        control.updateMeasurementValue(f);
+        const el = f.get('measureTooltipElement');
+        expect(el.querySelector('img')).toBeNull();
+        expect(el.querySelector('.ol-tooltip-name').textContent).toBe(NAME);
+    });
+
+    it('shows the name and the stockpile label as text in the Measurement List', () => {
+        craftedPile();
+        const items = control.getMeasurementsList();
+        expect(items[0].name).toBe(NAME);
+        expect(items[0].value).toBe('8,097.19 m³ - <img src=x onerror=alert(1)> - 1.68 t/m³');
+        const wrapper = mount(MeasurementListDialog, {
+            props: { measurements: items },
+            global: { stubs: { Window: { template: '<div><slot /></div>' } } }
+        });
+        expect(wrapper.find('img').exists()).toBe(false);
+        expect(wrapper.find('.measurement-name').text()).toBe(NAME);
+        expect(wrapper.find('.measurement-value').text()).toBe('8,097.19 m³ - <img src=x onerror=alert(1)> - 1.68 t/m³');
+        wrapper.unmount();
     });
 });
 

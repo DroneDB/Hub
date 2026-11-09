@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { reactive, nextTick } from 'vue';
 import RasterLayerOpacityPanel from './RasterLayerOpacityPanel.vue';
 
 const row = (path, extra = {}) => ({ path, name: path, opacity: 1, visible: true, plantHealthCapable: false, placeholder: null, ...extra });
@@ -274,5 +275,88 @@ describe('RasterLayerOpacityPanel fold', () => {
     it('stays one element that is a bottom panel, so the rules for the sheets over the map still find it', () => {
         three();
         expect(wrapper.element.classList.contains('map-bottom-panel')).toBe(true);
+    });
+});
+
+describe('RasterLayerOpacityPanel on a map narrower than sm (FR-MAP-12)', () => {
+    const renderOn = (mapSize, props) => {
+        wrapper = mount(RasterLayerOpacityPanel, { props: { layers: [row('b.tif'), row('a.tif')], ...props }, global: { provide: { mapSize } } });
+        return wrapper;
+    };
+    const panel = () => wrapper.find('.raster-opacity-panel');
+    const foldButton = () => wrapper.find('.fold-toggle');
+
+    it('starts folded, so no panel covers the map on load', () => {
+        renderOn(reactive({ narrow: true }));
+        expect(panel().classes()).toContain('is-folded');
+        expect(foldButton().attributes('aria-expanded')).toBe('false');
+        expect(foldButton().attributes('aria-label')).toBe('Unfold layers');
+    });
+
+    it('starts unfolded on a map that is not narrow, and with no size class at all', () => {
+        renderOn(reactive({ narrow: false }));
+        expect(panel().classes()).not.toContain('is-folded');
+        wrapper.unmount();
+        render();
+        expect(panel().classes()).not.toContain('is-folded');
+    });
+
+    it('unfolds on a press, and a map that changes size afterwards does not take the choice back', async () => {
+        const size = reactive({ narrow: true });
+        renderOn(size);
+        await foldButton().trigger('click');
+        expect(panel().classes()).not.toContain('is-folded');
+        size.narrow = false;
+        await nextTick();
+        size.narrow = true;
+        await nextTick();
+        expect(panel().classes()).not.toContain('is-folded');
+    });
+
+    it('follows the map until it is used: folds when the map narrows, unfolds when it widens', async () => {
+        const size = reactive({ narrow: false });
+        renderOn(size);
+        size.narrow = true;
+        await nextTick();
+        expect(panel().classes()).toContain('is-folded');
+        size.narrow = false;
+        await nextTick();
+        expect(panel().classes()).not.toContain('is-folded');
+    });
+
+    it('keeps the rows when folded (they are hidden, not removed), so their settings stay', () => {
+        renderOn(reactive({ narrow: true }), { layers: [row('b.tif', { opacity: 0.4 }), row('a.tif')] });
+        expect(wrapper.find('input[aria-label="Opacity of b.tif"]').element.value).toBe('0.4');
+    });
+});
+
+describe('RasterLayerOpacityPanel layer names (FR-RAS-12)', () => {
+    // The two mosaics of r3thermal/hat-creek, and the masked one
+    const A = 'Hat_Creek_Fire_Thermal_08242018_16bit.tif';
+    const B = 'Hat_Creek_Fire_Thermal_08252018_16bit.tif';
+    const C = 'Hat_Creek_Fire_Thermal_08242018_16bit_masked.tif';
+    const names = () => wrapper.findAll('.raster-label').map(label => label.text());
+
+    it('shows the part of the name that differs: each of the two dates, and the masked variant with its date', () => {
+        render({ layers: [row(A, { name: A }), row(B, { name: B }), row(C, { name: C })] });
+        // The shared 'Hat_Creek_Fire_Thermal_' is dropped; the masked one (25 characters) is cut to 22: 11, the ellipsis, 10
+        expect(names()).toEqual(['08242018_16bit.tif', '08252018_16bit.tif', '08242018_16\u2026masked.tif']);
+    });
+
+    it('keeps the whole name in the title of the label', () => {
+        render({ layers: [row(A, { name: A }), row(B, { name: B })] });
+        expect(wrapper.findAll('.raster-label').map(label => label.attributes('title'))).toEqual([A, B]);
+    });
+
+    it('cuts a label that is still longer than 22 characters in the middle, keeping its start (the date) and its end', () => {
+        const long = 'Hat_Creek_Fire_Thermal_08242018_16bit_orthomosaic_masked.tif';
+        render({ layers: [row(A, { name: A }), row(long, { name: long })] });
+        // After the shared start up to '08242018_': '16bit.tif' and '16bit_orthomosaic_masked.tif' (27): 11, the ellipsis, 10
+        expect(names()).toEqual(['16bit.tif', '16bit_ortho\u2026masked.tif']);
+    });
+
+    it('shows a single layer by its whole name', () => {
+        render({ layers: [row('dsm.tif', { name: 'dsm.tif' })] });
+        expect(names()).toEqual(['dsm.tif']);
     });
 });

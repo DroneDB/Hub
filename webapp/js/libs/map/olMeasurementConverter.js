@@ -9,6 +9,7 @@ import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
 import { pointCoordinates, showPointPopup } from './pointPopup';
 import { copyText } from '@/composables/useCopyText';
+import { escapeHtml } from '@/libs/sanitize';
 import { areaParts, lengthParts, stockpileLabel } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
 import { geodesicArea, geodesicLength } from './geodesic';
@@ -229,17 +230,22 @@ export function updateFeatureTooltip(feature) {
     const tooltipElement = feature.get('measureTooltipElement');
     if (!tooltipElement) return;
 
-    const name = feature.get('name');
-    const tooltipText = feature.get('tooltipText');
+    tooltipElement.innerHTML = measurementTooltipHtml(feature.get('name'), feature.get('tooltipText'));
+}
 
-    let tooltipContent = '';
-    if (name) {
-        tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
-    }
-    if (tooltipText) {
-        tooltipContent += `<div class="ol-tooltip-value">${tooltipText}</div>`;
-    }
-    tooltipElement.innerHTML = tooltipContent;
+/**
+ * The HTML of the label of a measurement: its name (when it has one) above its text. Both are plain
+ * text, and may come from a saved measurements file (the name, a stockpile's material in the text),
+ * so both are escaped: a name such as `<img src=x onerror=...>` shows as it is written.
+ * @param {unknown} name
+ * @param {unknown} text
+ * @returns {string}
+ */
+export function measurementTooltipHtml(name, text) {
+    let html = '';
+    if (name) html += `<div class="ol-tooltip-name">${escapeHtml(name)}</div>`;
+    if (text) html += `<div class="ol-tooltip-value">${escapeHtml(text)}</div>`;
+    return html;
 }
 
 /**
@@ -333,12 +339,7 @@ function createStaticTooltip(feature, text, map) {
     measureTooltipElement.className = 'ol-tooltip ol-tooltip-static ol-tooltip-hidden';
 
     // Build tooltip content with optional name
-    let tooltipContent = '';
-    if (name) {
-        tooltipContent += `<div class="ol-tooltip-name">${name}</div>`;
-    }
-    tooltipContent += `<div class="ol-tooltip-value">${text}</div>`;
-    measureTooltipElement.innerHTML = tooltipContent;
+    measureTooltipElement.innerHTML = measurementTooltipHtml(name, text);
 
     // Determine tooltip position based on geometry type
     let position;

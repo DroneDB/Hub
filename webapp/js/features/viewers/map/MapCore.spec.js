@@ -626,3 +626,36 @@ describe('the photo popup', () => {
         expect(wrapper.find('.map-container').attributes('tabindex')).toBe('-1');
     });
 });
+
+describe('the size class of the map (FR-MAP-12, FR-SHR-05)', () => {
+    /** The container of the map has this size (jsdom has no layout: its elements have none) */
+    const sized = (width, height) => {
+        Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => width });
+        Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get: () => height });
+    };
+    afterEach(() => {
+        delete HTMLElement.prototype.clientWidth;
+        delete HTMLElement.prototype.clientHeight;
+    });
+    const classes = () => wrapper.find('.map-container').classes();
+
+    it('is narrow and compact on a phone, whatever the window is', async () => {
+        sized(390, 844);
+        await mountMap([]);
+        expect(classes()).toEqual(expect.arrayContaining(['is-narrow', 'is-compact']));
+        expect(classes()).not.toContain('is-short');
+    });
+
+    it('is short and compact, not narrow, in the default 600 x 400 frame of an embed', async () => {
+        sized(600, 400);
+        await mountMap([]);
+        expect(classes()).toEqual(expect.arrayContaining(['is-short', 'is-compact']));
+        expect(classes()).not.toContain('is-narrow');
+    });
+
+    it('is none of them on a desktop map', async () => {
+        sized(1280, 800);
+        await mountMap([]);
+        for (const name of ['is-narrow', 'is-short', 'is-compact']) expect(classes()).not.toContain(name);
+    });
+});

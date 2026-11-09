@@ -172,6 +172,27 @@
     margin: 0 !important;
 }
 
+/* A compact map (MapCore sets .is-compact from the size of the map itself: narrower than `sm`, or too low
+   for the whole rail, as the default 600x400 frame of an embed is) keeps one button of the measure tools
+   in the rail, 'Measure', and the tools open from it (FR-MAP-12, FR-SHR-05). The same rule serves a phone
+   and a small frame. The rail scrolls when the open tools are still taller than the map. */
+.ol-measure-toggle {
+    display: none;
+}
+
+.map-container.is-compact .ol-measure-toggle {
+    display: block;
+}
+
+.map-container.is-compact .ol-measure-control:not(.is-open) > .ol-control:not(.ol-measure-toggle) {
+    display: none !important;
+}
+
+.map-container.is-compact .ol-zone-top-right {
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
 .ol-settings {
     bottom: 0.5rem;
     left: 0.5rem;
@@ -378,6 +399,14 @@
     font-weight: 600;
     font-size: 0.8rem;
     color: var(--ddb-text);
+}
+
+/* Below its point (no room above it): the arrow points up */
+.ol-point-popup-below::after {
+    bottom: auto;
+    top: -0.5rem;
+    border-top: 0;
+    border-bottom: 0.5rem solid white;
 }
 
 .ol-point-popup-title {

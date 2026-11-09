@@ -6,7 +6,7 @@
         <div v-if="layers.length > 0" class="layers-header">
             <span class="layers-title">Layers ({{ layers.length }})</span>
             <button class="fold-toggle" type="button" :title="foldLabel" :aria-label="foldLabel"
-                    :aria-expanded="String(!folded)" @click="folded = !folded">
+                    :aria-expanded="String(!folded)" @click="toggleFold">
                 <i class="fas" :class="folded ? 'fa-chevron-up' : 'fa-chevron-down'" />
             </button>
         </div>
@@ -14,7 +14,7 @@
         <div v-for="(layer, index) in layers" :key="layer.path" class="raster-opacity-row"
              :class="{ 'raster-opacity-row--hidden': !layer.placeholder && layer.visible === false, 'raster-opacity-row--placeholder': !!layer.placeholder }">
             <div class="row-head">
-                <span class="raster-label" :title="layer.name">{{ truncate(layer.name) }}</span>
+                <span class="raster-label" :title="layer.name">{{ labels[index] }}</span>
                 <span v-if="isChanged(layer)" class="changed-badge" :title="CHANGED_TEXT"><i class="fa-solid fa-circle-info" /> {{ CHANGED_TEXT }}</span>
                 <span v-if="layer.placeholder" class="placeholder-text" :title="layer.placeholder.text">{{ layer.placeholder.text }}</span>
                 <!-- Pressed = the layer is shown; the name stays the same, the state is aria-pressed -->
@@ -76,7 +76,12 @@
 </template>
 
 <script>
+import { inject } from 'vue';
 import AddLayerButton from './AddLayerButton.vue';
+import { distinctLabels } from '@/libs/format';
+
+// The longest name a row shows; a longer one is cut in the middle, so its date and extension stay
+const LABEL_MAX = 22;
 
 const CHANGED_TEXT = 'Changed since this view was saved';
 
@@ -131,16 +136,27 @@ export default {
     },
     emits: ['update:layers', 'reorder', 'plant-health', 'remove', 'repick', 'toggle-visible', 'add'],
     setup() {
-        return { CHANGED_TEXT };
+        // The size class of the map (MapCore provides it); a panel mounted without one is on a map that is not narrow
+        return { CHANGED_TEXT, mapSize: inject('mapSize', null) };
     },
     data() {
         return {
             // Only a phone shows the fold toggle (the CSS hides it elsewhere, and the rows come back
             // with the width); the rows stay mounted when folded, so their settings are kept
-            folded: false
+            folded: false,
+            // The user folded or unfolded it: the width of the map no longer decides
+            foldChosen: false
         };
     },
     computed: {
+        // A map narrower than `sm` starts with the panel folded, so no panel covers it on load (FR-MAP-12)
+        narrow() {
+            return !!this.mapSize?.narrow;
+        },
+        // What the rows show: the part of the name that tells the layers apart (the date), cut in the middle if still long (FR-RAS-12)
+        labels() {
+            return distinctLabels(this.layers.map(l => l.name || ''), LABEL_MAX);
+        },
         repickable() {
             return this.canRepick === undefined ? this.removable : this.canRepick;
         },
@@ -148,17 +164,25 @@ export default {
             return this.folded ? 'Unfold layers' : 'Fold layers';
         }
     },
+    watch: {
+        narrow: {
+            immediate: true,
+            handler(narrow) {
+                if (!this.foldChosen) this.folded = narrow;
+            }
+        }
+    },
     methods: {
+        toggleFold() {
+            this.foldChosen = true;
+            this.folded = !this.folded;
+        },
         isChanged(layer) {
             return this.changedPaths.includes(layer.path);
         },
         isRemovable(layer) {
             if (layer.removable !== undefined) return !!layer.removable;
             return this.removablePaths ? this.removablePaths.includes(layer.path) : this.removable;
-        },
-        truncate(name) {
-            if (!name) return '';
-            return name.length > 22 ? name.slice(0, 20) + '…' : name;
         },
         onInput(layer, event) {
             const newOpacity = parseFloat(event.target.value);

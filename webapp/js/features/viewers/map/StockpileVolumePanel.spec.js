@@ -195,3 +195,94 @@ describe('StockpileVolumePanel Click map and Draw state', () => {
         expect(hint).toContain('Esc cancels');
     });
 });
+
+describe('StockpileVolumePanel on a map narrower than sm (FR-MAP-16)', () => {
+    const scrolled = vi.fn();
+    beforeEach(() => { Element.prototype.scrollIntoView = scrolled; scrolled.mockClear(); });
+    afterEach(() => { delete Element.prototype.scrollIntoView; });
+
+    const renderOn = (mapSize, props = {}) => {
+        wrapper = mount(StockpileVolumePanel, {
+            props: { visible: true, materials: catalog({}), ...props },
+            global: { provide: { embed: false, mapSize }, mocks: { $router: { push: vi.fn() }, $route: { query: {} } }, stubs: { StockpileBaseMethodsDialog: true } }
+        });
+        return wrapper;
+    };
+    const settings = () => wrapper.find('[data-testid="stockpile-settings"]');
+    const toggle = () => wrapper.find('[data-testid="stockpile-settings-toggle"]');
+    const hidden = () => settings().attributes('style')?.includes('display: none');
+    const scrolledTo = testId => scrolled.mock.contexts.some(el => el.getAttribute('data-testid') === testId);
+
+    it('shows the settings and no toggle before any mode: the user sets them first', () => {
+        renderOn({ narrow: true });
+        expect(toggle().exists()).toBe(false);
+        expect(hidden()).toBeFalsy();
+    });
+
+    it('folds the settings behind a Settings button when a mode is active, so the banner is in view', () => {
+        renderOn({ narrow: true }, { mode: 'click' });
+        expect(toggle().text()).toBe('Settings');
+        expect(toggle().attributes('aria-expanded')).toBe('false');
+        expect(hidden()).toBe(true);
+        expect(wrapper.find('[data-testid="stockpile-click-banner"]').exists()).toBe(true);
+        // What is behind the button is the four settings, and not the banner or the buttons of the modes
+        expect(settings().find('[data-testid="stockpile-base-method"]').exists()).toBe(true);
+        expect(settings().find('[data-testid="stockpile-sensitivity"]').exists()).toBe(true);
+        expect(settings().find('[data-testid="stockpile-radius"]').exists()).toBe(true);
+        expect(settings().find('[data-testid="stockpile-material"]').exists()).toBe(true);
+        expect(settings().find('[data-testid="stockpile-click-btn"]').exists()).toBe(false);
+        expect(settings().find('[data-testid="stockpile-click-banner"]').exists()).toBe(false);
+    });
+
+    it('opens and folds the settings from the button', async () => {
+        renderOn({ narrow: true }, { mode: 'draw' });
+        await toggle().trigger('click');
+        expect(hidden()).toBeFalsy();
+        expect(toggle().attributes('aria-expanded')).toBe('true');
+        await toggle().trigger('click');
+        expect(hidden()).toBe(true);
+    });
+
+    it('folds them while a result shows, too, so the result is in view', () => {
+        renderOn({ narrow: true }, { result: RESULT });
+        expect(hidden()).toBe(true);
+    });
+
+    it('never folds the settings on a map that is not narrow', () => {
+        renderOn({ narrow: false }, { mode: 'click', result: RESULT });
+        expect(toggle().exists()).toBe(false);
+        expect(hidden()).toBeFalsy();
+    });
+
+    it('starts a new mode with the settings folded again', async () => {
+        renderOn({ narrow: true }, { mode: 'click' });
+        await toggle().trigger('click');
+        await wrapper.setProps({ mode: null });
+        await wrapper.setProps({ mode: 'draw' });
+        expect(hidden()).toBe(true);
+    });
+
+    it('scrolls the prompt of the mode into view when the mode starts', async () => {
+        renderOn({ narrow: true });
+        await wrapper.setProps({ mode: 'click' });
+        await wrapper.vm.$nextTick();
+        expect(scrolledTo('stockpile-click-banner')).toBe(true);
+        expect(scrolled).toHaveBeenCalledWith({ block: 'nearest' });
+    });
+
+    it('scrolls the result into view when it arrives', async () => {
+        renderOn({ narrow: true }, { mode: 'click' });
+        scrolled.mockClear();
+        await wrapper.setProps({ result: RESULT });
+        await wrapper.vm.$nextTick();
+        expect(scrolledTo('stockpile-result')).toBe(true);
+    });
+
+    it('does not fail where the browser cannot scroll an element into view', async () => {
+        delete Element.prototype.scrollIntoView;
+        renderOn({ narrow: true });
+        await wrapper.setProps({ mode: 'click' });
+        await wrapper.vm.$nextTick();
+        expect(wrapper.find('[data-testid="stockpile-click-banner"]').exists()).toBe(true);
+    });
+});
