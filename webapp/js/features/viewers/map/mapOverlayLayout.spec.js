@@ -34,6 +34,15 @@ describe('the panels over the bottom of the map', () => {
         expect(ruleOf(css, '.map-bottom-panel')).toMatch(/max-width:\s*calc\(100% - 2 \* var\(--map-rail-reserve\)\)/);
     });
 
+    it('keep the bottom panel above the scale bar at any size (FR-MAP-30): on a narrow or short map it reaches over the bottom left', () => {
+        // The scale bar of OpenLayers with its text is about 3rem high (0.5rem + 25px + 12px of text), under the 4rem of the reserve
+        const scaleBar = ruleOf(css, '.map-container .ol-scale-bar');
+        expect(scaleBar).toMatch(/bottom:\s*0\.5rem/);
+        expect(scaleBar).toMatch(/left:\s*4rem/);
+        expect(ruleOf(css, '.map-bottom-panel')).toMatch(/bottom:\s*var\(--map-bottom-reserve\)/);
+        expect(ruleOf(css, '.map-bottom-panel')).not.toMatch(/bottom:\s*2rem/);
+    });
+
     it('stretch the bottom panel from the left edge to the rail on a phone, not centred', () => {
         const panel = ruleOf(mediaBlock(css, 'max-width: 575.98px'), '.map-bottom-panel');
         expect(panel).toMatch(/left:\s*0\.5rem/);

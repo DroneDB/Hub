@@ -1,5 +1,6 @@
 <template>
-    <ViewerShell id="potree" v-model:error="error" dark :loading="loading" :load-error="loadError" loading-text="Loading point cloud...">
+    <ViewerShell id="potree" v-model:error="error" dark fullscreen-button fullscreen-corner="bottom-right" :fullscreen-key="fullscreenKeyFree"
+                 :loading="loading" :load-error="loadError" loading-text="Loading point cloud...">
         <DialogHost :dialogs="dialogs" />
 
         <div class="potree-container" :class="{ loading, 'sidebar-open': sidebarOpen }">
@@ -109,6 +110,8 @@ let session = new PotreeSession();
 let viewer = null;
 // Stops following the ratio of the screen (potreeScale)
 let stopScale = () => {};
+// The key F toggles fullscreen (ViewerShell), but not in fly mode, where it flies down (FirstPersonControls of Potree)
+const fullscreenKeyFree = () => !viewer?.fpControls || viewer.getControls() !== viewer.fpControls;
 
 // The measures follow the gesture rule of every measuring tool (D-027): click adds a point; double click, Enter or
 // right click ends it; Escape cancels it (libs/potree/measureGestures). The toolbar shows the kind being drawn; a

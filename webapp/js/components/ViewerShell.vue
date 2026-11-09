@@ -1,5 +1,5 @@
 <template>
-    <div ref="shellEl" class="viewer-shell" :class="{ dark }">
+    <div ref="shellEl" class="viewer-shell" :class="{ dark, 'has-fullscreen-overlay': fullscreenOverlay }">
         <div v-if="!embed" class="viewer-bar">
             <RouterLink v-if="datasetLocation" :to="datasetLocation" class="viewer-back"
                         title="Back to the dataset" aria-label="Back to the dataset">
@@ -8,6 +8,11 @@
             <slot name="bar">
                 <span class="viewer-name" :title="shownName">{{ shownName }}</span>
             </slot>
+            <!-- A viewer without the navigation toolbar (the point cloud and the splat) has its fullscreen button here -->
+            <button v-if="fullscreenButton && canFullscreen" type="button" class="viewer-fullscreen" :title="fullscreenTitle"
+                    :aria-label="fullscreenLabel" :aria-pressed="isFullscreen" @click="toggleFullscreen">
+                <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'" />
+            </button>
         </div>
 
         <!-- The file or its dataset did not load: not found, no access, sign in, a link that cannot be read -->
@@ -31,6 +36,11 @@
 
             <div class="container-wrapper">
                 <slot />
+                <!-- Embedded there is no view bar: the same button stands over the view, in the corner the viewer leaves free -->
+                <button v-if="fullscreenOverlay" type="button" class="viewer-fullscreen-overlay" :class="fullscreenCorner"
+                        :title="fullscreenTitle" :aria-label="fullscreenLabel" :aria-pressed="isFullscreen" @click="toggleFullscreen">
+                    <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'" />
+                </button>
                 <button v-if="settingsButton && ready" class="btn-settings" :class="settingsButton" :title="settingsTitle"
                         :aria-label="settingsTitle" :aria-expanded="settingsOpen" :aria-controls="panelId" @click="settingsOpen = !settingsOpen">
                     <i class="fa-solid fa-gear" />
@@ -43,7 +53,7 @@
                         <i class="fa-solid fa-house" />
                     </button>
                     <button v-if="canFullscreen" type="button" class="viewer-nav-button"
-                            :title="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'" :aria-label="isFullscreen ? 'Exit fullscreen' : 'Fullscreen'"
+                            :title="fullscreenTitle" :aria-label="fullscreenLabel"
                             :aria-pressed="isFullscreen" @click="toggleFullscreen">
                         <i class="fa-solid" :class="isFullscreen ? 'fa-compress' : 'fa-expand'" />
                     </button>
@@ -98,6 +108,12 @@
  * Home, H and 0 unless a field has the focus), fullscreen of the shell and a "?" help that lists
  * the `gestures` the viewer passes in. A viewer adds its own buttons in the `nav` slot.
  *
+ * Fullscreen of the shell is on the toolbar, and on the F key (FR-VWR-38) unless a field has the focus. A viewer
+ * that has no navigation toolbar (`fullscreen-button`) has the same button, at the end of its view bar, and the F key;
+ * embedded (no view bar) the button stands over the view, in its `fullscreen-corner`. The F key is not taken while a
+ * modal dialog has the focus, when a handler before the shell has taken the key, or when the viewer's
+ * `fullscreen-key` says the key is its own (it returns false: Potree's fly mode flies down on F).
+ *
  *   <ViewerShell id="model" v-model:error="error" v-model:settings-open="showSettings" :loading="loading"
  *                :load-error="loadError" loading-text="Loading model..." :ready="loaded" settings-title="Lighting"
  *                settings-button="bottom-left">
@@ -136,6 +152,16 @@ const props = defineProps({
     settingsId: { type: String, default: undefined },
     /** Show the navigation toolbar (Home, fullscreen, help) once `ready`, and take the keys Home, H and 0 */
     navToolbar: { type: Boolean, default: false },
+    /** Show a fullscreen button in the view bar, and take the key F, for a viewer that has no navigation toolbar */
+    fullscreenButton: { type: Boolean, default: false },
+    /** Embedded, the corner of the view where the fullscreen button of `fullscreen-button` stands: the one the viewer leaves free */
+    fullscreenCorner: {
+        type: String,
+        default: 'top-right',
+        validator: corner => ['top-right', 'bottom-right'].includes(String(corner))
+    },
+    /** Asked on the key F: false leaves the key to the viewer (a key of its own mode), anything else toggles fullscreen */
+    fullscreenKey: { type: Function, default: null },
     /** The gestures the viewer understands, listed in the help of the toolbar: [{ input: 'Left drag', action: 'Rotate' }] */
     gestures: { type: Array, default: () => [] }
 });
@@ -144,6 +170,7 @@ const emit = defineEmits(['home']);
 // The side the settings panel takes when the viewer has no settings button of the shell (the splat viewer has its own)
 const DEFAULT_PANEL_SIDE = 'right';
 const HOME_KEYS = ['Home', 'h', 'H', '0'];
+const FULLSCREEN_KEYS = ['f', 'F'];
 
 // Provided by the app: true on a page embedded in another one, which has no view bar
 const embed = inject('embed', false);
@@ -185,6 +212,10 @@ const panelPlace = computed(() => {
 const navSide = computed(() => (props.settingsButton === 'bottom-left' ? 'bottom-right' : 'bottom-left'));
 const helpRows = computed(() => [...props.gestures, { input: 'Home, H or 0', action: 'Back to the framed view' }]);
 const canFullscreen = supportsFullScreen();
+const fullscreenLabel = computed(() => (isFullscreen.value ? 'Exit fullscreen' : 'Fullscreen'));
+const fullscreenTitle = computed(() => `${fullscreenLabel.value} (F)`);
+// Embedded, the fullscreen button of the view bar has no bar: it stands over the view (the frame of ShareEmbed allows fullscreen)
+const fullscreenOverlay = computed(() => !!embed && props.fullscreenButton && canFullscreen);
 
 // Escape closes the panel and the help, the topmost first (and returns the focus to what opened it)
 useOverlay({
@@ -215,12 +246,28 @@ function isTyping(target) {
     return target instanceof Element && (!!target.closest('input, textarea, select, [role="combobox"]') || target.isContentEditable);
 }
 
-// Home, H and 0 reset the view, whatever has the focus but a field
+/** A modal dialog has the focus: the keys belong to it (a non-modal Window of the viewers is a PrimeVue dialog too) */
+function inDialog(target) {
+    return target instanceof Element && !!target.closest('[role="dialog"][aria-modal="true"], .p-dialog');
+}
+
+/** The viewer leaves the key F to the shell: it has no `fullscreen-key`, or that does not return false */
+function fullscreenKeyFree(e) {
+    return !props.fullscreenKey || props.fullscreenKey(e) !== false;
+}
+
+// Home, H and 0 reset the view and F toggles fullscreen, whatever has the focus but a field
 function onNavKey(e) {
-    if (!props.navToolbar || !props.ready || e.ctrlKey || e.metaKey || e.altKey || !HOME_KEYS.includes(e.key)) return;
-    if (isTyping(e.target)) return;
-    e.preventDefault();
-    goHome();
+    if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+    if (props.navToolbar && props.ready && HOME_KEYS.includes(e.key)) {
+        e.preventDefault();
+        goHome();
+    } else if (canFullscreen && FULLSCREEN_KEYS.includes(e.key) && ((props.navToolbar && props.ready) || props.fullscreenButton)
+        && !e.defaultPrevented && !inDialog(e.target) && fullscreenKeyFree(e)) {
+        e.preventDefault();
+        // A held key repeats: one toggle per press
+        if (!e.repeat) toggleFullscreen();
+    }
 }
 
 // A click away from the help closes it
@@ -300,9 +347,28 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
 }
 
 /* The name, or the viewer's own bar content, takes the rest of the line */
-.viewer-bar > :deep(:not(.viewer-back)) {
+.viewer-bar > :deep(:not(.viewer-back, .viewer-fullscreen)) {
     flex: 1 1 0;
     min-width: 0;
+}
+
+.viewer-fullscreen {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    margin-left: auto;
+    border: none;
+    border-radius: var(--ddb-radius-sm);
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.viewer-fullscreen:hover {
+    background: var(--ddb-bg-hover);
 }
 
 .viewer-name {
@@ -336,6 +402,32 @@ const stateMessage = computed(() => (loadKind.value === LoadErrorKind.INVALID_LI
     min-height: 0;
     width: 100%;
     position: relative;
+}
+
+/* Embedded: the fullscreen button over the view, in the corner the viewer leaves free (`fullscreen-corner`) */
+.viewer-fullscreen-overlay {
+    @include toolbar-button;
+
+    position: absolute;
+    z-index: 100;
+    background: var(--ddb-overlay-bg);
+    border: var(--ddb-border-width) solid rgba(var(--ddb-glass-rgb), 0.25);
+}
+
+.viewer-fullscreen-overlay.top-right {
+    top: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-md);
+}
+
+.viewer-fullscreen-overlay.bottom-right {
+    bottom: var(--ddb-spacing-md);
+    right: var(--ddb-spacing-md);
+}
+
+/* The settings panel docked at the top right starts below the button (2.25rem), not over it */
+.viewer-fullscreen-overlay.top-right ~ .viewer-settings-panel.from-top.side-right {
+    top: calc(2 * var(--ddb-spacing-md) + 2.25rem);
+    max-height: calc(100% - 3 * var(--ddb-spacing-md) - 2.25rem);
 }
 
 .btn-settings {

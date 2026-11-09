@@ -209,3 +209,48 @@ describe('PotreeViewer menu style (the sidebar of Potree kept for the advanced s
         expect(scss).toMatch(/#sidebar_root \{[\s\S]*?height: 100%;\s*font-family: inherit;/);
     });
 });
+
+describe('PotreeViewer fullscreen (FR-VWR-38)', () => {
+    let shellProps;
+    const Shell = {
+        props: { fullscreenButton: Boolean, fullscreenCorner: { type: String, default: null }, fullscreenKey: { type: Function, default: null } },
+        setup(props) { shellProps = props; },
+        template: '<div><slot /></div>'
+    };
+    const mountWithShell = async () => {
+        wrapper = mount(PotreeViewer, { global: { stubs: { ...stubs, ViewerShell: Shell } } });
+        await flushPromises();
+    };
+
+    it('asks its shell for the fullscreen button, at the bottom right when embedded (Potree has its buttons at the top right)', async () => {
+        await mountWithShell();
+        expect(shellProps.fullscreenButton).toBe(true);
+        expect(shellProps.fullscreenCorner).toBe('bottom-right');
+    });
+
+    it('leaves the key F to Potree in fly mode, where F flies down, and gives it to the shell in the other modes', async () => {
+        await mountWithShell();
+        const fly = { name: 'fly' };
+        const orbit = { name: 'orbit' };
+        let controls = orbit;
+        Object.assign(viewer, { fpControls: fly, getControls: () => controls });
+        expect(shellProps.fullscreenKey()).toBe(true);
+        controls = fly;
+        expect(shellProps.fullscreenKey()).toBe(false);
+        controls = orbit;
+        expect(shellProps.fullscreenKey()).toBe(true);
+    });
+
+    it('gives the key F to the shell before Potree has its fly controls', async () => {
+        await mountWithShell();
+        expect(viewer.fpControls).toBeUndefined();
+        expect(shellProps.fullscreenKey()).toBe(true);
+    });
+
+    it('moves the button of the shell beside the open menu, and hides it on a phone, where the menu covers the view', () => {
+        const scss = readSource(__dirname, 'PotreeViewer.scss');
+        expect(scss).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*right: calc\(var\(--ddb-sidebar-width\) \+ var\(--ddb-spacing-md\)\);/);
+        const phone = scss.slice(scss.indexOf('@media (max-width: 767.98px)'));
+        expect(phone).toMatch(/&\.sidebar-open ~ \.viewer-fullscreen-overlay \{\s*visibility: hidden;/);
+    });
+});

@@ -35,6 +35,11 @@
             right: var(--ddb-sidebar-width);
         }
 
+        // Embedded, the fullscreen button of the shell (bottom right) stays in the view, not over the open menu
+        &.sidebar-open ~ .viewer-fullscreen-overlay {
+            right: calc(var(--ddb-sidebar-width) + var(--ddb-spacing-md));
+        }
+
         #potree_render_area>canvas {
             width: 100% !important;
             height: 100% !important;
@@ -367,6 +372,11 @@
 
             &.sidebar-open #potree_sidebar_container {
                 visibility: visible;
+            }
+
+            // The menu covers the view: the fullscreen button of the shell waits for it to close
+            &.sidebar-open ~ .viewer-fullscreen-overlay {
+                visibility: hidden;
             }
         }
 

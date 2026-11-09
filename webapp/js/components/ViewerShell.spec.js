@@ -320,3 +320,247 @@ describe('ViewerShell settings panel (FR-VWR-11)', () => {
         expect(panel().exists()).toBe(false);
     });
 });
+
+describe('ViewerShell fullscreen (FR-VWR-38)', () => {
+    const request = vi.fn();
+    const exit = vi.fn();
+    const supportFullscreen = () => {
+        request.mockClear();
+        exit.mockClear();
+        // supportsFullScreen asks the body; the request goes to the element
+        HTMLElement.prototype.requestFullScreen = request;
+        document.exitFullscreen = exit;
+    };
+    const barButton = () => wrapper.find('.viewer-bar .viewer-fullscreen');
+    const setFullscreenElement = async element => {
+        Object.defineProperty(document, 'fullscreenElement', { value: element, configurable: true });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        await flushPromises();
+    };
+
+    it('a viewer without the toolbar has the button in its view bar, which asks the root of the shell for fullscreen', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        expect(nav().exists()).toBe(false);
+        expect(barButton().attributes('aria-label')).toBe('Fullscreen');
+        expect(barButton().attributes('title')).toBe('Fullscreen (F)');
+        await barButton().trigger('click');
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        expect(wrapper.element.classList.contains('viewer-shell')).toBe(true);
+    });
+
+    it('shows the way out and the compress icon while the browser is in fullscreen, and leaves it again', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        expect(barButton().find('i').classes()).toContain('fa-expand');
+        await setFullscreenElement(wrapper.element);
+        expect(barButton().attributes('aria-label')).toBe('Exit fullscreen');
+        expect(barButton().attributes('aria-pressed')).toBe('true');
+        expect(barButton().find('i').classes()).toContain('fa-compress');
+        await barButton().trigger('click');
+        expect(exit).toHaveBeenCalledTimes(1);
+        await setFullscreenElement(null);
+        expect(barButton().attributes('aria-label')).toBe('Fullscreen');
+    });
+
+    it('has no button of the bar unless the viewer asks, where the browser cannot, or when the toolbar has it', async () => {
+        supportFullscreen();
+        await render({});
+        expect(barButton().exists()).toBe(false);
+        wrapper.unmount();
+        delete HTMLElement.prototype.requestFullScreen;
+        await render({ fullscreenButton: true });
+        expect(barButton().exists()).toBe(false);
+    });
+
+    it('the key F toggles fullscreen of the shell, with the toolbar or with the button of the bar', async () => {
+        supportFullscreen();
+        await render({ navToolbar: true, ready: true });
+        expect(press('f').defaultPrevented).toBe(true);
+        expect(press('F').defaultPrevented).toBe(true);
+        expect(request).toHaveBeenCalledTimes(2);
+        expect(request.mock.contexts[0]).toBe(wrapper.element);
+        wrapper.unmount();
+        request.mockClear();
+        await render({ fullscreenButton: true });
+        press('f');
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(nav().exists()).toBe(false);
+    });
+
+    it('the key F leaves fullscreen when the browser is in it', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        await setFullscreenElement(wrapper.element);
+        press('f');
+        expect(exit).toHaveBeenCalledTimes(1);
+        expect(request).not.toHaveBeenCalled();
+    });
+
+    it('the key F is not taken while typing, with a modifier (Ctrl+F finds), on a held key, before ready or without the button', async () => {
+        supportFullscreen();
+        await render({ navToolbar: true, ready: true });
+        for (const tag of ['input', 'textarea', 'select']) {
+            const field = document.createElement(tag);
+            document.body.append(field);
+            expect(press('f', { target: field }).defaultPrevented, tag).toBe(false);
+        }
+        expect(press('f', { ctrlKey: true }).defaultPrevented).toBe(false);
+        expect(press('f', { metaKey: true }).defaultPrevented).toBe(false);
+        expect(press('f', { altKey: true }).defaultPrevented).toBe(false);
+        expect(press('f', { repeat: true }).defaultPrevented).toBe(true);
+        expect(request).not.toHaveBeenCalled();
+        wrapper.unmount();
+        await render({ navToolbar: true, ready: false });
+        press('f');
+        wrapper.unmount();
+        await render({ ready: true });
+        press('f');
+        expect(request).not.toHaveBeenCalled();
+    });
+
+    it('does not take the key F where the browser has no fullscreen, or after the shell is gone', async () => {
+        await render({ fullscreenButton: true });
+        expect(press('f').defaultPrevented).toBe(false);
+        wrapper.unmount();
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        const gone = wrapper;
+        await render({ fullscreenButton: true });
+        gone.unmount();
+        press('f');
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('ViewerShell fullscreen when embedded (FR-VWR-38)', () => {
+    const request = vi.fn();
+    const exit = vi.fn();
+    const supportFullscreen = () => {
+        request.mockClear();
+        exit.mockClear();
+        HTMLElement.prototype.requestFullScreen = request;
+        document.exitFullscreen = exit;
+    };
+    const overlay = () => wrapper.find('.container-wrapper > button.viewer-fullscreen-overlay');
+
+    it('has no view bar, and the same button stands over the view, where it toggles fullscreen of the shell', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true }, { embed: true });
+        expect(bar().exists()).toBe(false);
+        expect(wrapper.findAll('button.viewer-fullscreen')).toHaveLength(0);
+        expect(overlay().exists()).toBe(true);
+        expect(overlay().attributes('aria-label')).toBe('Fullscreen');
+        expect(overlay().attributes('title')).toBe('Fullscreen (F)');
+        expect(overlay().attributes('aria-pressed')).toBe('false');
+        expect(overlay().find('i').classes()).toContain('fa-expand');
+        await overlay().trigger('click');
+        expect(request).toHaveBeenCalledTimes(1);
+        expect(request.mock.contexts[0]).toBe(wrapper.element);
+
+        Object.defineProperty(document, 'fullscreenElement', { value: wrapper.element, configurable: true });
+        document.dispatchEvent(new Event('fullscreenchange'));
+        await flushPromises();
+        expect(overlay().attributes('aria-label')).toBe('Exit fullscreen');
+        expect(overlay().attributes('aria-pressed')).toBe('true');
+        expect(overlay().find('i').classes()).toContain('fa-compress');
+        await overlay().trigger('click');
+        expect(exit).toHaveBeenCalledTimes(1);
+    });
+
+    it('stands in the top right corner by default, or in the corner the viewer names, and marks the shell', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true }, { embed: true });
+        expect(overlay().classes()).toContain('top-right');
+        expect(wrapper.element.classList.contains('has-fullscreen-overlay')).toBe(true);
+        wrapper.unmount();
+        await render({ fullscreenButton: true, fullscreenCorner: 'bottom-right' }, { embed: true });
+        expect(overlay().classes()).toContain('bottom-right');
+        expect(overlay().classes()).not.toContain('top-right');
+    });
+
+    it('the key F toggles it embedded too', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true }, { embed: true });
+        expect(press('f').defaultPrevented).toBe(true);
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('is not over the view of a page that is not embedded, of a viewer that did not ask, or where the browser cannot', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        expect(overlay().exists()).toBe(false);
+        expect(wrapper.element.classList.contains('has-fullscreen-overlay')).toBe(false);
+        wrapper.unmount();
+        await render({}, { embed: true });
+        expect(overlay().exists()).toBe(false);
+        wrapper.unmount();
+        delete HTMLElement.prototype.requestFullScreen;
+        await render({ fullscreenButton: true }, { embed: true });
+        expect(overlay().exists()).toBe(false);
+    });
+});
+
+describe('ViewerShell key F and the keys of others (FR-VWR-38)', () => {
+    const request = vi.fn();
+    const supportFullscreen = () => {
+        request.mockClear();
+        HTMLElement.prototype.requestFullScreen = request;
+    };
+
+    it('leaves F to the viewer when its fullscreen-key returns false (fly mode flies down on F), and asks it on every press', async () => {
+        supportFullscreen();
+        let flying = true;
+        const fullscreenKey = vi.fn(() => !flying);
+        await render({ fullscreenButton: true, fullscreenKey });
+        const first = press('f');
+        expect(first.defaultPrevented).toBe(false);
+        expect(fullscreenKey).toHaveBeenCalledTimes(1);
+        expect(fullscreenKey.mock.calls[0][0]).toBe(first);
+        expect(request).not.toHaveBeenCalled();
+        flying = false;
+        expect(press('F').defaultPrevented).toBe(true);
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes F when fullscreen-key returns anything but false', async () => {
+        supportFullscreen();
+        await render({ navToolbar: true, ready: true, fullscreenKey: () => undefined });
+        press('f');
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not take F that a handler before it has taken', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        const canvas = document.createElement('div');
+        document.body.append(canvas);
+        canvas.addEventListener('keydown', e => e.preventDefault());
+        press('f', { target: canvas });
+        expect(request).not.toHaveBeenCalled();
+    });
+
+    it('does not take F while a modal dialog or a PrimeVue dialog has the focus, and takes it in a non-modal popup', async () => {
+        supportFullscreen();
+        await render({ fullscreenButton: true });
+        const modal = document.createElement('div');
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.innerHTML = '<button type="button">OK</button>';
+        const primeDialog = document.createElement('div');
+        primeDialog.className = 'p-dialog';
+        primeDialog.innerHTML = '<button type="button">Go to</button>';
+        const popup = document.createElement('div');
+        popup.setAttribute('role', 'dialog');
+        popup.setAttribute('aria-modal', 'false');
+        popup.innerHTML = '<button type="button">Help</button>';
+        document.body.append(modal, primeDialog, popup);
+        expect(press('f', { target: modal.querySelector('button') }).defaultPrevented).toBe(false);
+        expect(press('f', { target: modal }).defaultPrevented).toBe(false);
+        expect(press('f', { target: primeDialog.querySelector('button') }).defaultPrevented).toBe(false);
+        expect(request).not.toHaveBeenCalled();
+        expect(press('f', { target: popup.querySelector('button') }).defaultPrevented).toBe(true);
+        expect(request).toHaveBeenCalledTimes(1);
+    });
+});

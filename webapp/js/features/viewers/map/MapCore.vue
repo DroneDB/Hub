@@ -117,7 +117,8 @@
  */
 import 'ol/ol.css';
 import { Map, View } from 'ol';
-import { isEmpty as isEmptyExtent, extend as extendExtent } from 'ol/extent';
+import { ScaleLine } from 'ol/control';
+import { isEmpty as isEmptyExtent, extend as extendExtent, getWidth as extentWidth, getHeight as extentHeight } from 'ol/extent';
 import { inject, provide, shallowRef } from 'vue';
 
 import ddb from 'ddb';
@@ -133,7 +134,7 @@ import { createControlZones, moveToZone } from '@/libs/map/controlZones';
 import { FileLayers, createVectorFileLayer, mercatorExtent } from '@/libs/map/fileLayers';
 import { featureAt, toggleSelectionAt, filesInPolygon } from '@/libs/map/fileSelection';
 import { ViewZoomCap } from '@/libs/map/rasterLayers';
-import { getVectorColor, FIT_OPTIONS } from '@/libs/map/mapUtils';
+import { getVectorColor, FILE_FIT_OPTIONS, POINT_FIT_MIN_RESOLUTION } from '@/libs/map/mapUtils';
 
 import { useListenerBag } from '@/composables/useEventListener';
 import { useTimerGroup } from '@/composables/useTimers';
@@ -161,6 +162,14 @@ import MeasurementListDialog from './MeasurementListDialog.vue';
 import MeasurementGroupDialog from './MeasurementGroupDialog.vue';
 import { onColorSchemeChange } from '@/libs/colorScheme';
 import { appliedPixelRatio, watchPixelRatio } from '@/libs/pixelRatio';
+
+/** The options to fit the view to the extent of the files: the whole extent in the map; an extent with no size (one point) stops at a small scale */
+function fileFitOptions(extent) {
+    return extentWidth(extent) === 0 && extentHeight(extent) === 0 ? { ...FILE_FIT_OPTIONS, minResolution: POINT_FIT_MIN_RESOLUTION } : FILE_FIT_OPTIONS;
+}
+
+/** The ScaleLine units of a measurement-units preference: metric or imperial (anything else reads as metric) */
+const scaleLineUnits = unit => (unit === 'imperial' ? 'imperial' : 'metric');
 
 // Pointer over one of these: no feature tooltip
 const MAP_CONTROLS = '.ol-map-display-buttons, .ol-map-buttons, .ol-measure-control, .ol-selection, .ol-zoom, .ol-settings';
@@ -262,6 +271,8 @@ export default {
             ...useMapViewState({ ...features, view: () => props.view, emit }),
             showFlightPath: usePreference(PREF.SHOW_FLIGHT_PATH, PREF_DEFAULTS[PREF.SHOW_FLIGHT_PATH]),
             showDirectionIndicators: usePreference(PREF.SHOW_DIRECTION_INDICATORS, PREF_DEFAULTS[PREF.SHOW_DIRECTION_INDICATORS]),
+            // The units of the scale bar (FR-MAP-30): the measurement units, which the Preferences page and the measure tools change
+            measureUnit: usePreference(PREF.MEASURE_UNIT, PREF_DEFAULTS[PREF.MEASURE_UNIT]),
             mapSize,
             observeMapSize,
             // Toolbar zones (createControlZones), set when the map is built
@@ -318,6 +329,12 @@ export default {
                 if (this.fileLayers) this.fileLayers.setShotStyle(this.shotStyleKey());
             }
         },
+        measureUnit: {
+            flush: 'sync',
+            handler: function (unit) {
+                if (this.scaleLine) this.scaleLine.setUnits(scaleLineUnits(unit));
+            }
+        },
         // One panel at a time in that corner: an analysis panel replaces the link panel
         analysisPanelOpen: function (open) {
             if (open) this.linkPanelOpen = false;
@@ -354,6 +371,7 @@ export default {
             if (this.tooltipOverlay) this.map.removeOverlay(this.tooltipOverlay);
             // Releases the control's subscription to the unit preference
             if (this.measureControls) this.map.removeControl(this.measureControls);
+            if (this.scaleLine) this.map.removeControl(this.scaleLine);
             this.vectorLayers.forEach(layer => this.map.removeLayer(layer));
         }
         this.tooltipOverlay = null;
@@ -458,6 +476,9 @@ export default {
                 onOpenSettings: () => { this.mapSettingsDialogOpen = true; }
             });
             this.map.addControl(this.settingsControl);
+            // The scale bar, at the bottom left beside the settings button (ol-controls.css)
+            this.scaleLine = new ScaleLine({ bar: true, minWidth: 100, units: scaleLineUnits(this.measureUnit) });
+            this.map.addControl(this.scaleLine);
 
             // Toolbar zones: the controls stack without overlapping; MapToolbar teleports in
             const zones = createControlZones(this.map);
@@ -681,7 +702,7 @@ export default {
             if (!isEmptyExtent(ext)) {
                 // Remember the first extent for Reset view
                 if (!this.initialExtent) this.initialExtent = ext.slice();
-                this.later(() => this.map.getView().fit(ext, FIT_OPTIONS), 10);
+                this.later(() => this.map.getView().fit(ext, fileFitOptions(ext)), 10);
             } else if (this.vectorLayers.length === 0 && this.files.length === 0) {
                 this.map.getView().setCenter([0, 0]);
                 this.map.getView().setZoom(2);
@@ -689,7 +710,7 @@ export default {
         },
 
         resetToInitialView: function () {
-            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) this.map.getView().fit(this.initialExtent, FIT_OPTIONS);
+            if (this.initialExtent && !isEmptyExtent(this.initialExtent)) this.map.getView().fit(this.initialExtent, fileFitOptions(this.initialExtent));
             else this.zoomToFilesExtent();
         },
 

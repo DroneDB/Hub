@@ -1,6 +1,6 @@
 <template>
     <ViewerShell id="splat" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading" :load-error="loadError"
-                 settings-title="View settings" settings-id="splat-settings">
+                 settings-title="View settings" settings-id="splat-settings" fullscreen-button>
         <template #loading>
             <LoadingSpinner label="Loading Gaussian Splat..." />
             <LoadProgress :progress="progress" />

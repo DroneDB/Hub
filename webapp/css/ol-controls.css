@@ -198,6 +198,13 @@
     left: 0.5rem;
 }
 
+/* The scale bar (FR-MAP-30), beside the settings button (about 3rem wide) and clear of the attribution at the bottom right;
+   with its text it is about 3rem high, under --map-bottom-reserve, which the bottom panels keep clear */
+.map-container .ol-scale-bar {
+    bottom: 0.5rem;
+    left: 4rem;
+}
+
 .ol-map-buttons {
     top: 0.5rem;
     right: 0.5rem;
@@ -290,10 +297,11 @@
 }
 
 /* Panels over the bottom centre of the map (layer opacity): as wide as their content but never
-   wider than the map, and above the bottom controls on a phone */
+   wider than the map, and above the bottom controls at any size: centred, a wide panel on a compact
+   or narrow map reaches over the bottom left, where the scale bar stands up to about 3rem high */
 .map-bottom-panel {
     position: absolute;
-    bottom: 2rem;
+    bottom: var(--map-bottom-reserve);
     left: 50%;
     transform: translateX(-50%);
     z-index: var(--map-layer-bottom-panel);

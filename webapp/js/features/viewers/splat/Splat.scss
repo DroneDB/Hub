@@ -29,6 +29,11 @@
     pointer-events: none;
 }
 
+/* Embedded, the fullscreen button of the shell takes the top right corner (2.25rem): the stack stands beside it */
+#splat.has-fullscreen-overlay .top-right-stack {
+    right: calc(2 * var(--ddb-spacing-md) + 2.25rem);
+}
+
 #splat .camera-hud {
     background: color-mix(in srgb, var(--ddb-primary-800) 70%, transparent);
     color: var(--ddb-text-on-dark);

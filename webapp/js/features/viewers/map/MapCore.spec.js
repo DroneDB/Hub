@@ -9,7 +9,9 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { defineComponent, h, nextTick } from 'vue';
 import { fromLonLat } from 'ol/proj';
 import ddb from 'ddb';
+import { ScaleLine } from 'ol/control';
 import { b64encode } from '@/libs/base64';
+import { PREF, setPref } from '@/libs/preferences';
 
 const T = ddb.entry.type;
 const POLYGON = { type: 'Polygon', coordinates: [[[10, 45], [10.01, 45], [10.01, 45.01], [10, 45.01], [10, 45]]] };
@@ -97,7 +99,11 @@ vi.mock('ol', async importOriginal => {
 });
 vi.mock('@/libs/map/mapUtils', async importOriginal => {
     const utils = await importOriginal();
-    return { ...utils, FIT_OPTIONS: { ...utils.FIT_OPTIONS, duration: 0 } };
+    return {
+        ...utils,
+        FIT_OPTIONS: { ...utils.FIT_OPTIONS, duration: 0 },
+        FILE_FIT_OPTIONS: { ...utils.FILE_FIT_OPTIONS, duration: 0 }
+    };
 });
 
 const { default: MapCore } = await import('./MapCore.vue');
@@ -266,6 +272,91 @@ describe('the position of the map in a view', () => {
         expect(near(center(), farCenter)).toBe(false);
         expect(center()[0]).toBeGreaterThan(mainCenter[0]);
         expect(center()[0]).toBeLessThan(farCenter[0]);
+    });
+});
+
+describe('the fit to the files (FR-MAP-28)', () => {
+    // Literal numbers: about 1.1 m wide at 45 degrees (the old fit stopped at 0.5 m per pixel, which a survey never reaches in a 100 px view)
+    const TINY = { type: 'Polygon', coordinates: [[[10, 45], [10.00001, 45], [10.00001, 45.00001], [10, 45.00001], [10, 45]]] };
+    const POINT = { type: 'Polygon', coordinates: [[[10, 45], [10, 45], [10, 45], [10, 45], [10, 45]]] };
+    const fitSpy = () => vi.spyOn(wrapper.vm.map.getView(), 'fit');
+
+    it('has no minimum resolution for the extent of a file, on the first fit and on Reset view', async () => {
+        await mountView([georaster('dsm.tif', TINY)]);
+        const fit = fitSpy();
+        wrapper.vm.resetToInitialView();
+        await settle();
+        expect(fit).toHaveBeenCalledTimes(1);
+        expect(fit.mock.calls[0][1]).not.toHaveProperty('minResolution');
+        expect(fit.mock.calls[0][1]).toMatchObject({ padding: [40, 40, 40, 40], maxZoom: 22 });
+    });
+
+    it('fills the view with a small extent: it ends closer than 0.5 m per pixel (the old cap)', async () => {
+        await mountView([georaster('dsm.tif', TINY)]);
+        const resolution = wrapper.vm.map.getView().getResolution();
+        expect(resolution).toBeLessThan(0.5);
+        expect(resolution).toBeGreaterThan(0);
+    });
+
+    it('keeps a small minimum resolution for an extent with no size (one point)', async () => {
+        await mountView([georaster('dsm.tif', POINT)]);
+        const fit = fitSpy();
+        wrapper.vm.resetToInitialView();
+        await settle();
+        expect(fit.mock.calls[0][1].minResolution).toBe(0.5);
+        expect(wrapper.vm.map.getView().getResolution()).toBeGreaterThanOrEqual(0.5);
+    });
+
+    it('fits two photos a few metres apart closer than 0.5 m per pixel, and no closer than zoom 22', async () => {
+        // About 3 m apart on the ground at 45 degrees (0.00004 degrees of longitude), 4.45 m in Web Mercator
+        const photo = (path, lon) => ({ path, type: T.GEOIMAGE, hash: `h-${path}`, point_geom: { type: 'Point', coordinates: [lon, 45, 100] }, properties: {} });
+        await mountMap([file(photo('a.jpg', 10)), file(photo('b.jpg', 10.00004))]);
+        const extent = wrapper.vm.initialExtent;
+        expect(extent[2] - extent[0]).toBeCloseTo(4.45, 2);
+        const fit = fitSpy();
+        wrapper.vm.resetToInitialView();
+        await settle();
+        expect(fit).toHaveBeenCalledTimes(1);
+        expect(fit.mock.calls[0][1]).not.toHaveProperty('minResolution');
+        expect(fit.mock.calls[0][1]).toMatchObject({ maxZoom: 22 });
+        const view = wrapper.vm.map.getView();
+        // The resolution of zoom 22 in Web Mercator: 156543.03392804097 / 2^22 m per pixel
+        expect(view.getResolution()).toBeLessThan(0.5);
+        expect(view.getResolution()).toBeGreaterThanOrEqual(0.0373227 - 1e-7);
+        expect(view.getZoom()).toBeLessThanOrEqual(22);
+    });
+});
+
+describe('the scale bar (FR-MAP-30)', () => {
+    afterEach(() => setPref(PREF.MEASURE_UNIT, 'metric'));
+    const scaleLine = () => wrapper.vm.map.getControls().getArray().find(c => c instanceof ScaleLine);
+
+    it('is a bar of at least 100 px, in metric by default', async () => {
+        await mountMap([MAIN]);
+        expect(scaleLine()).toBeTruthy();
+        expect(scaleLine().getUnits()).toBe('metric');
+        expect(scaleLine().element.classList.contains('ol-scale-bar')).toBe(true);
+        expect(scaleLine().minWidth_).toBe(100);
+    });
+
+    it('starts in imperial when the preference is imperial, and follows the preference while open', async () => {
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await mountMap([MAIN]);
+        expect(scaleLine().getUnits()).toBe('imperial');
+        setPref(PREF.MEASURE_UNIT, 'metric');
+        await settle();
+        expect(scaleLine().getUnits()).toBe('metric');
+        setPref(PREF.MEASURE_UNIT, 'imperial');
+        await settle();
+        expect(scaleLine().getUnits()).toBe('imperial');
+    });
+
+    it('goes with the map', async () => {
+        await mountMap([MAIN]);
+        const map = wrapper.vm.map;
+        const control = scaleLine();
+        wrapper.unmount();
+        expect(map.getControls().getArray()).not.toContain(control);
     });
 });
 

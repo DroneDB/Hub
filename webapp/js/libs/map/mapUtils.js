@@ -9,6 +9,17 @@ import { PRIMARY, ANALYSIS_YELLOW } from '@/libs/palette';
  */
 export const FIT_OPTIONS = Object.freeze({ padding: [40, 40, 40, 40], duration: 500, minResolution: 0.5, maxZoom: 22 });
 
+/**
+ * How a map fits its view to the extent of its files (FR-MAP-28): the same room and animation, and no limit
+ * but the zoom range. A drone survey is a few hundred metres wide and has to fill the map; FIT_OPTIONS stops
+ * at 0.5 m per pixel, which is right for a cluster of pins and shows a survey as a postage stamp. The
+ * view never zooms past the native zoom of the rasters (ViewZoomCap).
+ */
+export const FILE_FIT_OPTIONS = Object.freeze({ padding: FIT_OPTIONS.padding, duration: FIT_OPTIONS.duration, maxZoom: FIT_OPTIONS.maxZoom });
+
+/** The closest a fit goes to an extent with no size (one point): the resolution of FIT_OPTIONS, metres per pixel. */
+export const POINT_FIT_MIN_RESOLUTION = FIT_OPTIONS.minResolution;
+
 /** Default colour of measurements and point annotations (map and point cloud). */
 export const MEASURE_COLOR = '#ffcc33';
 
