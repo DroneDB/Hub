@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ref } from 'vue';
 import { useDatasetActions } from './useDatasetActions';
+import { replaceConfirmation } from './useConfirmReplace';
 
 vi.mock('@/composables/useNotify', () => ({ useNotify: () => ({ success: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }));
 vi.mock('@/libs/build/buildManager', () => ({ default: { startPolling: vi.fn() } }));
@@ -42,6 +43,13 @@ describe('Mask Borders of the dataset page', () => {
         await maskWith(true);
         expect(dialogs.open).toHaveBeenCalledTimes(2);
         expect(dataset.maskBorders).toHaveBeenCalledWith('ortho/ortho.tif', undefined, undefined, true);
+    });
+
+    it('asks the one replace question of the Hub (confirmReplace, FR-XC-07)', async () => {
+        await maskWith(true);
+        const { title, message, confirmText } = replaceConfirmation('ortho/ortho_masked.tif');
+        expect(title).toBe('Replace “ortho_masked.tif”?');
+        expect(dialogs.open.mock.calls[1][1]).toMatchObject({ title, message, confirmText, confirmButtonClass: 'danger' });
     });
 
     it('asks nothing and sends no overwrite when there is no masked copy', async () => {

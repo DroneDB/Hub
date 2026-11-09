@@ -22,6 +22,7 @@ import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { transferModeFor } from '@/libs/dataset/transferMode';
 import { useNotify } from '@/composables/useNotify';
 import { useConfirm } from '@/composables/useConfirm';
+import { useConfirmReplace } from '@/composables/useConfirmReplace';
 import Alert from '@/components/HubAlert.vue';
 import DeleteResultDialog from '@/features/dataset/dialogs/DeleteResultDialog.vue';
 import RenameDialog from '@/features/dataset/dialogs/RenameDialog.vue';
@@ -59,6 +60,7 @@ const { pathutils } = ddb;
 export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, route, openItem, refresh }) {
     const notify = useNotify();
     const confirm = useConfirm(dialogs);
+    const confirmReplace = useConfirmReplace(dialogs);
 
     function showError(error, title = 'Error') {
         dialogs.open(Alert, { title, message: String((error && error.message) || error) });
@@ -325,8 +327,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
 
     function mergeMultispectral(files) {
         if (!files || files.length < 2) return;
-        dialogs.open(MergeMultispectralDialog, {
-            files, dataset,
+        dialogs.open(MergeMultispectralDialog, () => ({
+            files, dataset, allEntries: listing.files.value,
             onClose: async (action, result) => {
                 if (action !== 'merged' || !result) return;
                 const sources = result.sourceNames || [];
@@ -334,15 +336,15 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 notify.success(`${list} merged into ${result.outputPath || 'output'}`, { summary: 'Merge Completed', life: 'long' });
                 try {
                     await listing.addEntry(result.outputPath);
+                    // The merge task deleted the sources itself, after the output was written and opened (FR-PRC-02)
                     if (result.deleteSource && result.sourcePaths && result.sourcePaths.length) {
-                        await dataset.deleteObjs(result.sourcePaths);
                         listing.removed(result.sourcePaths);
                     }
                 } catch (e) {
                     console.warn('Could not refresh file browser after merge:', e);
                 }
             }
-        });
+        }));
     }
 
     function align(entry) {
@@ -402,10 +404,7 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                 if (action !== 'confirm') return;
                 try {
                     const check = await dataset.checkMaskedFileExists(item.entry.path);
-                    if (check.exists && !await confirm({
-                        title: 'Mask Borders', danger: true, confirmText: 'Overwrite',
-                        message: `The file <strong>${check.outputPath}</strong> already exists. Do you want to overwrite it?`
-                    })) return;
+                    if (check.exists && !await confirmReplace(check.outputPath)) return;
                     // The Registry replaces an existing copy only when asked: the user has just confirmed it
                     await dataset.maskBorders(item.entry.path, undefined, undefined, check.exists === true);
                     notify.info(`Masking started for ${item.label}...`, { summary: 'Mask Borders', life: 'normal' });

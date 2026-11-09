@@ -1,5 +1,5 @@
 <template>
-    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position @close="$emit('close', 'close')">
+    <Window id="align-georaster" title="Align GeoTIFF to Reference" modal width="600px" height="auto" fixed-position :busy="running" @close="$emit('close', 'close')">
         <div class="align-dialog">
             <!-- Explanation -->
             <PrimeMessage severity="info" :closable="false" icon="fa-solid fa-circle-info" class="align-info">
@@ -39,8 +39,11 @@
             <div class="section">
                 <label for="align-dialog-output-file-name" class="section-label">Output file name</label>
                 <InputText id="align-dialog-output-file-name" v-model="outputName" fluid class="w-100" :invalid="!isOutputValid"
-                           placeholder="aligned.tif" @input="validateOutputName" />
-                <small v-if="outputNameError" class="hint-error">{{ outputNameError }}</small>
+                           placeholder="aligned.tif" :disabled="running" @input="validateOutputName" />
+                <small v-if="outputProblem" class="hint-error">{{ outputProblem }}</small>
+                <small v-else-if="existingOutput" class="hint-warn">
+                    <i class="fa-solid fa-triangle-exclamation" /> This file exists and will be replaced
+                </small>
             </div>
 
             <!-- Validation result -->
@@ -94,15 +97,17 @@
                 <Button label="Validate" icon="fa-solid fa-check" severity="secondary"
                         :disabled="!selectedReference || validating || running" @click="validate" />
                 <Button label="Align" icon="fa-solid fa-crosshairs" severity="primary"
-                        :disabled="!canAlign" @click="startAlign" />
+                        :disabled="!canAlign" :loading="running" @click="startAlign" />
                 <Button label="Close" severity="secondary" :disabled="running" @click="$emit('close', 'close')" />
             </div>
         </div>
+        <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import ddb from 'ddb';
 import Window    from '@/components/HubWindow.vue';
 import Button    from 'primevue/button';
@@ -110,11 +115,22 @@ import InputText from 'primevue/inputtext';
 import Select    from 'primevue/select';
 import PrimeMessage from 'primevue/message';
 import { useHeavyTask } from '@/composables/useHeavyTask';
+import { useDialogs } from '@/composables/useDialogs';
+import {
+    useConfirmReplace, replaceConflictPath, conflictIsFolder, existingItem, namesInFolder
+} from '@/composables/useConfirmReplace';
+import { freeName, namesClash, nameClashMessage } from '@/libs/nameRules';
 import { DOCS } from '@/libs/docsLinks';
 
+/**
+ * One click starts one task (FR-PRC-02): the form is busy from the click until the tasks end. The
+ * proposed output is a free name of the source's folder (FR-PRC-04); a name that exists is replaced
+ * only after the user confirmed it (overwrite: true), also when the Registry finds it at the submit
+ * (409 with conflictPath).
+ */
 export default {
     name: 'AlignDialog',
-    components: { Window, Button, InputText, Select, PrimeMessage, LoadingSpinner },
+    components: { Window, Button, InputText, Select, PrimeMessage, LoadingSpinner, DialogHost },
 
     props: {
         sourceEntry: { type: Object, required: true },
@@ -125,10 +141,14 @@ export default {
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask, docsLink: DOCS.alignRaster };
+        const dialogs = useDialogs();
+        return { runHeavyTask, docsLink: DOCS.alignRaster, dialogs, confirmReplace: useConfirmReplace(dialogs) };
     },
     data() {
         const stem = (this.sourceEntry?.entry?.path ?? 'output').replace(/\.tiff?$/i, '');
+        const slash = stem.lastIndexOf('/');
+        const folder = stem.substring(0, slash + 1);
+        const name = freeName(stem.substring(slash + 1) + '_aligned.tif', namesInFolder(folder, this.allEntries));
         return {
             mode: 'similarity',
             modeOptions: [
@@ -136,7 +156,7 @@ export default {
                 { label: 'Translation only (fast, no rotation)',  value: 'translation' }
             ],
             selectedReference: null,
-            outputName: stem + '_aligned.tif',
+            outputName: folder + name,
             outputNameError: null,
 
             validating:       false,
@@ -167,8 +187,26 @@ export default {
                     /\.tiff?$/i.test(e.entry.path))
                 .map(e => ({ label: e.entry.path, value: e.entry.path }));
         },
+        outputPath() {
+            return this.outputName.trim();
+        },
+        // The listed entry the output would replace (letter case ignored, D-040)
+        existingOutput() {
+            return existingItem(this.outputPath, this.allEntries);
+        },
+        // What makes the output unusable beyond its syntax: the source, the reference, or a folder of that name
+        outputProblem() {
+            if (this.outputNameError) return this.outputNameError;
+            if (namesClash(this.sourceEntry.entry.path, this.outputPath)) return 'The output cannot be the source file';
+            if (namesClash(this.selectedReference, this.outputPath)) return 'The output cannot be the reference file';
+            const existing = this.existingOutput;
+            if (existing && ddb.entry.isDirectory(existing.entry)) {
+                return nameClashMessage(existing.entry.path.substring(existing.entry.path.lastIndexOf('/') + 1));
+            }
+            return null;
+        },
         isOutputValid() {
-            return this.outputName.trim().length > 0 && !this.outputNameError;
+            return this.outputPath.length > 0 && !this.outputProblem;
         },
         canAlign() {
             return this.isOutputValid &&
@@ -239,32 +277,63 @@ export default {
             return null;
         },
 
+        /** Submits the align-raster task and waits for its end. */
+        submitAlign(outputPath, overwrite) {
+            return this.runHeavyTask(this.dataset, 'align-raster', {
+                params: {
+                    sourcePath:    this.sourceEntry.entry.path,
+                    referencePath: this.selectedReference,
+                    outputPath,
+                    mode: this.mode,
+                    overwrite
+                },
+                notify: false,
+                onProgress: (entry) => {
+                    this.alignTaskId    = entry.taskId;
+                    this.alignTaskState = entry.state;
+                    this.alignPhase     = entry.phase;
+                    this.alignPct       = entry.percent ?? null;
+                }
+            });
+        },
+
         async startAlign() {
-            if (!this.canAlign) return;
+            // Busy before the first await: a second click finds it set
+            if (this.running || !this.canAlign) return;
             this.running     = true;
             this.errorMsg    = null;
             this.alignResult = null;
 
-            const outputPath = this.outputName.trim();
+            const requested = this.outputPath;
+            // The path written: a replaced file keeps its own (the Registry writes the existing entry, D-040)
+            let outputPath = requested;
 
             // ── Step 1: align-raster heavy task ───────────────────────────────
             try {
-                const alignEntry = await this.runHeavyTask(this.dataset, 'align-raster', {
-                    params: {
-                        sourcePath:    this.sourceEntry.entry.path,
-                        referencePath: this.selectedReference,
-                        outputPath,
-                        mode: this.mode
-                    },
-                    force:  true,
-                    notify: false,
-                    onProgress: (entry) => {
-                        this.alignTaskId    = entry.taskId;
-                        this.alignTaskState = entry.state;
-                        this.alignPhase     = entry.phase;
-                        this.alignPct       = entry.percent ?? null;
+                let overwrite = false;
+                if (this.existingOutput) {
+                    if (!await this.confirmReplace(this.existingOutput.entry.path)) {
+                        this.running = false;
+                        return;
                     }
-                });
+                    overwrite = true;
+                    outputPath = this.existingOutput.entry.path;
+                }
+                let alignEntry;
+                try {
+                    alignEntry = await this.submitAlign(requested, overwrite);
+                } catch (e) {
+                    // The file appeared after the dialog read the folder: ask once, then replace it. A folder is
+                    // never replaced: its clash message is shown
+                    const conflict = overwrite ? null : replaceConflictPath(e);
+                    if (!conflict || await conflictIsFolder(this.dataset, conflict, this.allEntries)) throw e;
+                    if (!await this.confirmReplace(conflict)) {
+                        this.running = false;
+                        return;
+                    }
+                    alignEntry = await this.submitAlign(requested, true);
+                    outputPath = conflict;
+                }
                 this.alignTaskId    = alignEntry.taskId;
                 this.alignTaskState = alignEntry.state;
                 this.alignPhase     = alignEntry.phase;
@@ -348,6 +417,13 @@ export default {
     display: block;
     margin-top: 0.25rem;
     color: var(--p-red-500);
+    font-size: 0.8rem;
+}
+
+.hint-warn {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--p-yellow-700);
     font-size: 0.8rem;
 }
 

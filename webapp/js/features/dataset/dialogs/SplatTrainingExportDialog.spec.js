@@ -47,7 +47,7 @@ describe('SplatTrainingExportDialog', () => {
         expect(w.text()).not.toContain('does not look like an ODM project');
     });
 
-    it('submits the folder and the options, forced and without a toast of its own', async () => {
+    it('submits the folder and the options, not forced (the Registry dedups it) and without a toast of its own', async () => {
         runHeavyTask.mockResolvedValue({ taskId: 't1', logTail: [] });
         const w = open();
         await flushPromises();
@@ -57,9 +57,24 @@ describe('SplatTrainingExportDialog', () => {
         const [, toolId, options] = runHeavyTask.mock.calls[0];
         expect(toolId).toBe('splat-training-export');
         expect(options).toMatchObject({
-            path: 'odm', force: true, notify: false,
+            path: 'odm', notify: false,
             params: { maxImageSize: 1600, maxPoints: 100000, fileName: 'odm-training-data.zip' }
         });
+        expect(options.force).toBeUndefined();
+    });
+
+    it('starts one task on a double click, and is busy while it runs (FR-PRC-02)', async () => {
+        runHeavyTask.mockImplementation(() => new Promise(() => {}));
+        const w = open();
+        await flushPromises();
+        // Two confirms in the same tick: the second one finds the dialog busy
+        const window = w.findComponent(WindowStub);
+        window.vm.$emit('confirm');
+        window.vm.$emit('confirm');
+        await flushPromises();
+        expect(runHeavyTask).toHaveBeenCalledOnce();
+        expect(window.props('busy')).toBe(true);
+        expect(w.find('[data-confirm]').element.disabled).toBe(true);
     });
 
     it('submits the root of the dataset without a path', async () => {

@@ -8,7 +8,7 @@ import reg from '@/libs/api/sharedRegistry';
 import vectors from './__vectors__/input-rules.json';
 import {
     FALLBACK_INPUT_RULES, inputRule, isEmail, emailProblem, emailDescription, isEntryName, nameClashMessage, namesClash,
-    isCronDisableWord, cronDisableWords, hasLatinLetterOrDigit, latinNameProblem
+    freeName, isCronDisableWord, cronDisableWords, hasLatinLetterOrDigit, latinNameProblem
 } from './nameRules';
 
 const serve = features => { reg.features.values = features; };
@@ -105,5 +105,41 @@ describe('the rule texts', () => {
         expect(latinNameProblem('Москва', { withSlugField: false })).toBe('Use at least one Latin letter (a–z) or digit');
         expect(latinNameProblem('Москва', { slug: 'moskva' })).toBeNull();
         expect(latinNameProblem('Équipe Été')).toBeNull();
+    });
+});
+
+describe('freeName (FR-XC-07)', () => {
+    it('keeps a name no sibling has', () => {
+        expect(freeName('merged.tif', ['a.tif', 'b.tif'])).toBe('merged.tif');
+        expect(freeName('merged.tif', [])).toBe('merged.tif');
+    });
+
+    it('puts the lowest free number of 2 or more before the last extension', () => {
+        expect(freeName('merged.tif', ['merged.tif'])).toBe('merged (2).tif');
+        expect(freeName('merged.tif', ['merged.tif', 'merged (2).tif'])).toBe('merged (3).tif');
+        expect(freeName('IMG_0180.b.tif', ['IMG_0180.b.tif'])).toBe('IMG_0180.b (2).tif');
+        expect(freeName('data.tar.gz', ['data.tar.gz'])).toBe('data.tar (2).gz');
+    });
+
+    it('takes the first gap', () => {
+        expect(freeName('a.txt', ['a.txt', 'a (2).txt', 'a (4).txt'])).toBe('a (3).txt');
+        expect(freeName('a.txt', ['a.txt', 'a (3).txt'])).toBe('a (2).txt');
+    });
+
+    it('adds the number at the end of a name without an extension (a leading dot is not one)', () => {
+        expect(freeName('notes', ['notes'])).toBe('notes (2)');
+        expect(freeName('.env', ['.env'])).toBe('.env (2)');
+        expect(freeName('notes', ['notes', 'notes (2)'])).toBe('notes (3)');
+    });
+
+    it('compares names without regard to case (D-040), and keeps the case asked for', () => {
+        expect(freeName('Merged.TIF', ['merged.tif'])).toBe('Merged (2).TIF');
+        expect(freeName('merged.tif', ['MERGED.TIF', 'Merged (2).tif'])).toBe('merged (3).tif');
+        serve({ inputRules: { nameClash: { caseInsensitive: false } } });
+        expect(freeName('Merged.TIF', ['merged.tif'])).toBe('Merged.TIF');
+    });
+
+    it('ignores siblings that are not names', () => {
+        expect(freeName('a.tif', [null, undefined, 'a.tif'])).toBe('a (2).tif');
     });
 });

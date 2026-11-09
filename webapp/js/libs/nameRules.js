@@ -195,6 +195,28 @@ export function namesClash(a, b) {
     return inputRule('nameClash').caseInsensitive ? a.toLowerCase() === b.toLowerCase() : a === b;
 }
 
+/**
+ * A name for a new entry that no sibling has (FR-XC-07): `name` itself when it is free, else
+ * `<stem> (<n>).<ext>` with the lowest free n of 2 or more, put before the last extension
+ * ("a.b.tif" -> "a.b (2).tif"), or `<name> (<n>)` for a name without one (a leading dot, as in
+ * ".env", is not an extension). Names are compared by the rule of D-040 (namesClash).
+ * @param {string} name  one entry name, without its folder
+ * @param {Iterable<string|null|undefined>} siblings  the names of the entries of the folder
+ * @returns {string}
+ */
+export function freeName(name, siblings) {
+    const taken = [...siblings].filter(s => typeof s === 'string');
+    const isTaken = (/** @type {string} */ candidate) => taken.some(s => namesClash(s, candidate));
+    if (!isTaken(name)) return name;
+
+    const dot = name.lastIndexOf('.');
+    const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ''];
+    for (let n = 2; ; n++) {
+        const candidate = `${stem} (${n})${ext}`;
+        if (!isTaken(candidate)) return candidate;
+    }
+}
+
 // ---- Cron -----------------------------------------------------------------------------------
 
 /** The cron rule as a form shows it. */

@@ -1,5 +1,5 @@
 <template>
-    <Window id="merge-multispectral" title="Merge Multispectral Bands" modal width="900px" height="auto" fixed-position @close="close">
+    <Window id="merge-multispectral" title="Merge Multispectral Bands" modal width="900px" height="auto" fixed-position :busy="submitting" @close="close">
         <div class="merge-ms-dialog">
             <!-- 3-column layout -->
             <div class="columns-row">
@@ -92,11 +92,14 @@
                     <div class="section">
                         <label for="merge-multispectral-dialog-output-path" class="section-label">Output path</label>
                         <InputText id="merge-multispectral-dialog-output-path" v-model="outputName" class="w-100" :invalid="!isOutputValid" fluid
-                                   placeholder="merged.tif" @input="validateOutputName" />
-                        <small v-if="outputNameError" class="output-error">{{ outputNameError }}</small>
+                                   placeholder="merged.tif" :disabled="submitting" @input="validateOutputName" />
+                        <small v-if="outputProblem" class="output-error">{{ outputProblem }}</small>
+                        <small v-else-if="existingOutput" class="output-warning">
+                            <i class="fa-solid fa-triangle-exclamation" /> This file exists and will be replaced
+                        </small>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <Checkbox v-model="deleteSource" :binary="true" input-id="deleteSrcCheckbox" />
+                        <Checkbox v-model="deleteSource" :binary="true" input-id="deleteSrcCheckbox" :disabled="submitting" />
                         <label for="deleteSrcCheckbox">Delete source files after merge</label>
                     </div>
                     <div v-if="deleteSource" class="delete-warning">
@@ -104,22 +107,29 @@
                     </div>
                 </div>
                 <div class="bottom-actions">
-                    <Button severity="secondary" label="Cancel" @click="close" />
-                    <Button :disabled="!canMerge" severity="primary" label="Merge" @click="merge" />
+                    <Button severity="secondary" label="Cancel" :disabled="submitting" @click="close" />
+                    <Button :disabled="!canMerge" :loading="submitting" severity="primary" label="Merge" @click="merge" />
                 </div>
             </div>
         </div>
+        <DialogHost :dialogs="dialogs" />
     </Window>
 </template>
 
 <script>
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import DialogHost from '@/components/DialogHost.vue';
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
 import Checkbox from 'primevue/checkbox';
 import { useHeavyTask } from '@/composables/useHeavyTask';
-import { pathutils } from 'ddb';
+import { useDialogs } from '@/composables/useDialogs';
+import {
+    useConfirmReplace, replaceConflictPath, conflictIsFolder, existingItem, namesInFolder
+} from '@/composables/useConfirmReplace';
+import { freeName, namesClash, nameClashMessage } from '@/libs/nameRules';
+import ddb, { pathutils } from 'ddb';
 
 /**
  * MergeMultispectralDialog - Dialog for merging multispectral bands into a
@@ -127,18 +137,27 @@ import { pathutils } from 'ddb';
  *
  * Validates band availability, exposes merge options, and tracks task
  * progress via the useHeavyTask composable.
+ *
+ * One click starts one task (FR-PRC-02): the form is busy from the click until the task ends.
+ * The proposed output is a free name of its folder (FR-PRC-04); a name that exists is replaced
+ * only after the user confirmed it (overwrite: true), also when the Registry finds it at the
+ * submit (409 with conflictPath). With "Delete source files" the Registry deletes the bands
+ * itself (deleteSources), once the output is written and opens.
  */
 export default {
-    components: { Window, Button, InputText, Checkbox, LoadingSpinner },
+    components: { Window, Button, InputText, Checkbox, LoadingSpinner, DialogHost },
     props: {
         files: { type: Array, required: true },
-        dataset: { type: Object, required: true }
+        dataset: { type: Object, required: true },
+        // The items of the folder in view (file browser items): tell whether the output exists
+        allEntries: { type: Array, default: () => [] }
     },
     emits: ['close'],
 
     setup() {
         const { runHeavyTask } = useHeavyTask();
-        return { runHeavyTask };
+        const dialogs = useDialogs();
+        return { runHeavyTask, dialogs, confirmReplace: useConfirmReplace(dialogs) };
     },
     data() {
         return {
@@ -151,19 +170,40 @@ export default {
             outputName: '',
             outputNameError: null,
             deleteSource: false,
-            bandInfo: {}
+            bandInfo: {},
+            submitting: false
         };
     },
 
     computed: {
+        outputPath() {
+            return this.outputName.trim();
+        },
+        // The listed entry the output would replace (letter case ignored, D-040)
+        existingOutput() {
+            return existingItem(this.outputPath, this.allEntries);
+        },
+        // What makes the output unusable beyond its syntax: a source band, or a folder of that name
+        outputProblem() {
+            if (this.outputNameError) return this.outputNameError;
+            if (this.orderedFiles.some(f => namesClash(f.entry.path, this.outputPath))) {
+                return 'The output cannot be one of the source bands';
+            }
+            const existing = this.existingOutput;
+            if (existing && ddb.entry.isDirectory(existing.entry)) {
+                return nameClashMessage(pathutils.basename(existing.entry.path));
+            }
+            return null;
+        },
         isOutputValid() {
-            return this.outputName.length > 0 && !this.outputNameError;
+            return this.outputName.length > 0 && !this.outputProblem;
         },
         canMerge() {
             return this.isOutputValid &&
                 this.validationResult &&
                 this.validationResult.ok &&
-                !this.validating;
+                !this.validating &&
+                !this.submitting;
         },
         estimatedSize() {
             const s = this.validationResult?.summary;
@@ -239,7 +279,7 @@ export default {
                     now.getSeconds().toString().padStart(2, '0');
                 filename = 'merged_' + ts + '.tif';
             }
-            this.outputName = commonFolder + filename;
+            this.outputName = commonFolder + freeName(filename, namesInFolder(commonFolder, this.allEntries));
         },
 
         async validate() {
@@ -337,22 +377,47 @@ export default {
         },
 
         async merge() {
-            if (!this.canMerge) return;
+            // Busy before the first await: a second click finds it set
+            if (this.submitting || !this.canMerge) return;
+            this.submitting = true;
 
             try {
                 const paths = this.orderedFiles.map(f => f.entry.path);
-                let outputPath = this.outputName.trim();
+                const outputPath = this.outputPath;
+                const deleteSources = this.deleteSource;
+
+                // A replaced file keeps its own path (the Registry writes the existing entry, D-040)
+                let written = outputPath;
+                let overwrite = false;
+                if (this.existingOutput) {
+                    if (!await this.confirmReplace(this.existingOutput.entry.path)) return;
+                    overwrite = true;
+                    written = this.existingOutput.entry.path;
+                }
 
                 // Offloaded to the merge-multispectral heavy task (progress visible in
                 // the Tasks tab). Awaits completion so the file listing can refresh.
-                await this.runHeavyTask(this.dataset, 'merge-multispectral', {
-                    params: { paths, outputPath }, force: true, notify: false
+                const submit = replace => this.runHeavyTask(this.dataset, 'merge-multispectral', {
+                    params: { paths, outputPath, overwrite: replace, deleteSources }, notify: false
                 });
+                try {
+                    await submit(overwrite);
+                } catch (e) {
+                    // The file appeared after the dialog read the folder: ask once, then replace it. A folder is
+                    // never replaced: its clash message is shown
+                    const conflict = overwrite ? null : replaceConflictPath(e);
+                    if (!conflict || await conflictIsFolder(this.dataset, conflict, this.allEntries)) throw e;
+                    if (!await this.confirmReplace(conflict)) return;
+                    await submit(true);
+                    written = conflict;
+                }
 
                 const sourceNames = paths.map(p => pathutils.basename(p));
-                this.$emit('close', 'merged', { outputPath, deleteSource: this.deleteSource, sourceNames, sourcePaths: paths });
+                this.$emit('close', 'merged', { outputPath: written, deleteSource: deleteSources, sourceNames, sourcePaths: paths });
             } catch (e) {
                 this.validationResult = { ok: false, errors: [e.message || 'Merge failed'], warnings: [] };
+            } finally {
+                this.submitting = false;
             }
         },
 
@@ -523,6 +588,12 @@ export default {
 
 .output-error {
     color: var(--p-red-600);
+    display: block;
+    margin-top: 0.2rem;
+}
+
+.output-warning {
+    color: var(--p-yellow-700);
     display: block;
     margin-top: 0.2rem;
 }

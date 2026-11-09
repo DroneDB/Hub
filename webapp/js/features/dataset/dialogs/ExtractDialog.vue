@@ -237,7 +237,7 @@ export default {
                         deleteArchive: this.deleteArchive,
                         overwrite: this.overwrite
                     },
-                    force: true,
+                    // No force: a second submit of the same extraction gets the running task (FR-PRC-02)
                     notify: false,
                     onProgress: (t) => {
                         this.progress = t.percent || 0;

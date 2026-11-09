@@ -123,7 +123,7 @@ async function start() {
         const result = await runHeavyTask(props.dataset, TRAINING_EXPORT_TOOL, {
             path: path ?? undefined,
             params,
-            force: true,
+            // No force: a second submit of the same export gets the running task (FR-PRC-02)
             notify: false,
             onProgress: entry => {
                 percent.value = Math.max(0, Math.round(entry.percent ?? 0));
