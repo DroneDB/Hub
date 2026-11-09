@@ -406,7 +406,8 @@ export function useDatasetActions({ dataset, listing, dialogs, busy, canWrite, r
                         title: 'Mask Borders', danger: true, confirmText: 'Overwrite',
                         message: `The file <strong>${check.outputPath}</strong> already exists. Do you want to overwrite it?`
                     })) return;
-                    await dataset.maskBorders(item.entry.path);
+                    // The Registry replaces an existing copy only when asked: the user has just confirmed it
+                    await dataset.maskBorders(item.entry.path, undefined, undefined, check.exists === true);
                     notify.info(`Masking started for ${item.label}...`, { summary: 'Mask Borders', life: 'normal' });
                     BuildManager.startPolling(dataset);
                 } catch (e) {

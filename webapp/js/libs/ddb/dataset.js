@@ -218,8 +218,9 @@ export default class Dataset {
         return this.registry.postRequest(`${this.baseApi}/mask-borders/check`, { path });
     }
 
-    async maskBorders(path, near = 15, white = false) {
-        return this.registry.postRequest(`${this.baseApi}/mask-borders`, { path, near, white });
+    /** Starts masking the borders of path; an existing masked copy is replaced only with overwrite (409 otherwise). */
+    async maskBorders(path, near = 15, white = false, overwrite = false) {
+        return this.registry.postRequest(`${this.baseApi}/mask-borders`, { path, near, white, overwrite });
     }
 
     exportUrl(path, vizParams = {}) {
