@@ -29,7 +29,7 @@ import { ref, shallowRef, computed, watch, unref } from 'vue';
 import ddb from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { b64decode, b64urlDecode } from '@/libs/base64';
-import { isGeoraster } from '@/libs/entryTypes';
+import { isGeoraster, canOpenInMap } from '@/libs/entryTypes';
 import { readHistoryState, writeHistoryState, replaceQueryKeys, currentLocation } from '@/libs/routeQuery';
 import { validateState, workingState, defaultState, buildEntryState, sameView } from '@/libs/views/viewState';
 import { listViews, saveNewView, updateView, viewChange } from '@/libs/views/viewStore';
@@ -133,7 +133,10 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
     // A saved view names its base file in its data: read it first, the file follows
     /** @type {Promise<{ view: SavedView|null, problem: string|null }>|null} */
     const savedLookup = uid ? lookup(uid) : null;
+    // The map opens what the explorer offers to open in it, and refuses any other file with one message
     const viewerEntry = useViewerEntry({
+        accepts: canOpenInMap,
+        typeLabel: 'a map',
         title: null,
         allowMissing: !!uid,
         path: savedLookup ? async () => {

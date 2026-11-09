@@ -1,16 +1,14 @@
 import ddb from 'ddb';
 const { pathutils } = ddb;
 
-import { isLocalVector } from '@/libs/openItemDefaults';
 import { isCadDrawing } from '@/libs/cadCrs';
-import { hasDedicatedViewer, isMapViewable, isPanoramaType, isDroneDB, isGeoraster, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
+import { isDroneDB, isGeoraster, isPlantHealthCapable, isArchiveFile } from '@/libs/entryTypes';
 import { hasThumbnail, isBuildableType } from '@/libs/entryTypeCapabilities';
-import { isPdfFile, canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
+import { canOpenAsText, shouldOpenAsText } from '@/libs/textFileUtils';
 import { isBuildableFile, hasActiveBuild, buildFile, isFileBuilt, isBuildComplete } from '@/libs/build/buildHelpers';
 import BuildManager, { BUILD_STATES } from '@/libs/build/buildManager';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
-import { useClipboardStore } from '@/stores/clipboard';
 import { SPLAT_DOWNLOADS, splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
 import { BUILD_DOWNLOADS, offersBuildDownload } from '@/libs/build/buildDownloads';
 import { TRAINING_EXPORT_TOOL, isTrainingExportFolder } from '@/features/viewers/splat/trainingExport';
@@ -18,10 +16,15 @@ import { taskToolOffered } from '@/libs/tasks/taskTools';
 import { fileViewUrl, openInNewTab } from '@/libs/views/viewLinks';
 import { MAX_LAYERS } from '@/libs/views/viewState';
 import { transferModeFor } from '@/libs/dataset/transferMode';
+import { VIEWERS } from '@/libs/openItemDefaults';
+import { actionMenuItem } from '@/libs/dataset/explorerActions';
 
 /**
- * An item's `accelerator` names the key that does the same on the dataset page
- * (useDatasetShortcuts, and the folder tree): only Ctrl/Cmd+C, +X, +V and Delete are bound.
+ * The context menu of the file explorer (grid, table and tree). The actions that other surfaces
+ * offer too (Open and the viewers, Rename, Share/Embed, Copy, Cut, Paste, the folder's actions,
+ * Delete) come from the action registry (libs/dataset/explorerActions.js) with their accelerator;
+ * the items here are the menu's own. Each item has a `group`: ContextMenu.vue draws a separator
+ * between two groups. With nothing selected the menu is the folder's (the background menu).
  *
  * Context object interface:
  * {
@@ -32,66 +35,10 @@ import { transferModeFor } from '@/libs/dataset/transferMode';
  * }
  */
 
-function openItem(ctx) {
-    return {
-        label: 'Open',
-        icon: 'fa-regular fa-folder-open',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length > 0 && (sel.length > 1 || !hasDedicatedViewer(sel[0].entry.type));
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f));
-        }
-    };
-}
-
-function openMapItem(ctx) {
-    return {
-        label: 'Open Map',
-        icon: 'fa-solid fa-map',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            // A drawing without geolocation has nothing to place on a map.
-            return sel.length === 1 && isMapViewable(sel[0].entry.type) && !isLocalVector(sel[0].entry);
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'map'));
-        }
-    };
-}
-
-function openPointCloudItem(ctx) {
-    return {
-        label: 'Open Point Cloud',
-        icon: 'fa-solid fa-cube',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.POINTCLOUD;
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'pointcloud'));
-        }
-    };
-}
-
-function openModelItem(ctx) {
-    return {
-        label: 'Open 3D Model',
-        icon: 'fa-solid fa-cube',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.MODEL;
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'model'));
-        }
-    };
-}
-
 function openUnifiedItem(ctx) {
     const T = ddb.entry.type;
-    const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL, T.TILES3D];
+    // 3D Tiles open in this viewer by default: their Open 3D Tiles item is the viewer table's
+    const supported = [T.POINTCLOUD, T.GEORASTER, T.VECTOR, T.MODEL];
     return {
         label: 'Unified Viewer',
         icon: 'fa-solid fa-earth-europe',
@@ -105,66 +52,11 @@ function openUnifiedItem(ctx) {
     };
 }
 
-function openPanoramaItem(ctx) {
-    return {
-        label: 'Open Panorama',
-        icon: 'fa-solid fa-globe',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && isPanoramaType(sel[0].entry.type);
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'panorama'));
-        }
-    };
-}
-
-function openSplatItem(ctx) {
-    return {
-        label: 'Open Gaussian Splat',
-        icon: 'fa-solid fa-spray-can-sparkles',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.GAUSSIAN_SPLAT;
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'splat'));
-        }
-    };
-}
-
-function openMarkdownItem(ctx) {
-    return {
-        label: 'Open Markdown',
-        icon: 'fa-solid fa-book',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && sel[0].entry.type === ddb.entry.type.MARKDOWN;
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f, 'markdown'));
-        }
-    };
-}
-
-function openPdfItem(ctx) {
-    return {
-        label: 'Open PDF',
-        icon: 'file pdf outline',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length === 1 && isPdfFile(sel[0].entry);
-        },
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('openItem', f));
-        }
-    };
-}
-
 function plantHealthItem(ctx) {
     return {
         label: 'Plant Health',
         icon: 'fa-solid fa-leaf',
+        group: 'open',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return sel.length === 1 && isPlantHealthCapable(sel[0].entry);
@@ -180,6 +72,7 @@ function editItem(ctx) {
     return {
         label: 'Edit',
         icon: 'fa-regular fa-pen-to-square',
+        group: 'edit',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             if (sel.length !== 1) return false;
@@ -195,32 +88,13 @@ function editItem(ctx) {
     };
 }
 
-function renameItem(ctx) {
-    return {
-        label: 'Rename',
-        icon: 'fa-solid fa-pencil',
-        isVisible: () => ctx.canWrite && ctx.getSelectedEntries().length === 1,
-        click: () => ctx.emit('moveSelectedItems')
-    };
-}
-
 function propertiesItem(ctx) {
     return {
         label: 'Properties',
         icon: 'fa-solid fa-circle-info',
+        group: 'tools',
         isVisible: () => ctx.getSelectedEntries().length > 0,
         click: () => ctx.emit('openProperties')
-    };
-}
-
-function shareEmbedItem(ctx) {
-    return {
-        label: 'Share/Embed',
-        icon: 'fa-solid fa-share-nodes',
-        isVisible: () => ctx.getSelectedEntries().length === 1,
-        click: () => {
-            ctx.getSelectedEntries().forEach(f => ctx.emit('shareEmbed', f));
-        }
     };
 }
 
@@ -240,6 +114,7 @@ function downloadItem(ctx) {
     return {
         label: 'Download',
         icon: 'fa-solid fa-download',
+        group: 'share',
         isVisible: () => ctx.getSelectedEntries().length > 0,
         isEnabled: () => !isBulkBlocked(),
         click: () => {
@@ -296,57 +171,11 @@ function transferItem(ctx) {
     };
 }
 
-function copyClipboardItem(ctx) {
-    return {
-        label: 'Copy',
-        icon: 'fa-solid fa-copy',
-        accelerator: 'CmdOrCtrl+C',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-        },
-        click: () => ctx.emit('copySelectedItems')
-    };
-}
-
-function cutClipboardItem(ctx) {
-    return {
-        label: 'Cut',
-        icon: 'fa-solid fa-scissors',
-        accelerator: 'CmdOrCtrl+X',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return ctx.canWrite && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-        },
-        click: () => ctx.emit('cutSelectedItems')
-    };
-}
-
-function pasteClipboardItem(ctx) {
-    return {
-        label: 'Paste',
-        icon: 'fa-solid fa-paste',
-        accelerator: 'CmdOrCtrl+V',
-        isVisible: () => ctx.canWrite && !useClipboardStore().isEmpty,
-        click: () => ctx.emit('pasteFromClipboard')
-    };
-}
-
-function clipboardSeparator(ctx) {
-    return {
-        type: 'separator',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            const hasSel = sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-            return hasSel || (ctx.canWrite && !useClipboardStore().isEmpty);
-        }
-    };
-}
-
 function setThumbnailItem(ctx) {
     return {
         label: 'Set as Dataset Thumbnail',
         icon: 'fa-solid fa-image',
+        group: 'edit',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             if (!ctx.canWrite || sel.length !== 1) return false;
@@ -370,55 +199,6 @@ function setThumbnailItem(ctx) {
     };
 }
 
-function deleteSeparator(ctx) {
-    return {
-        type: 'separator',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return ctx.canWrite && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-        }
-    };
-}
-
-function deleteItem(ctx) {
-    return {
-        label: 'Delete',
-        icon: 'fa-solid fa-trash',
-        accelerator: 'Delete',
-        isVisible: () => {
-            const sel = ctx.getSelectedEntries();
-            return ctx.canWrite && sel.length > 0 && !sel.find(f => isDroneDB(f.entry.type));
-        },
-        click: () => ctx.emit('deleteSelecteditems')
-    };
-}
-
-function selectAllNoneItem(ctx) {
-    return {
-        label: 'Select All/None',
-        icon: 'fa-solid fa-list',
-        click: () => {
-            if (ctx.onSelectAllNone) ctx.onSelectAllNone();
-        }
-    };
-}
-
-function createFolderItem(ctx) {
-    return {
-        label: 'Create Folder',
-        icon: 'fa-solid fa-folder',
-        isVisible: () => ctx.canWrite,
-        click: () => ctx.emit('createFolder')
-    };
-}
-
-function selectionSeparator(ctx) {
-    return {
-        type: 'separator',
-        isVisible: () => ctx.getSelectedEntries().length > 0
-    };
-}
-
 /**
  * Build the Experimental submenu containing experimental viewer features.
  */
@@ -426,6 +206,7 @@ function experimentalMenuItems(ctx) {
     return {
         label: 'Experimental',
         icon: 'fa-solid fa-flask',
+        group: 'open',
         items: [
             openUnifiedItem(ctx)
         ]
@@ -437,6 +218,7 @@ function compareToItem(ctx) {
     return {
         label: 'Compare to...',
         icon: 'fa-solid fa-table-columns',
+        group: 'open',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return !!ctx.dataset && sel.length === 1 && isGeoraster(sel[0].entry);
@@ -450,6 +232,7 @@ function compareInMapItem(ctx) {
     return {
         label: 'Compare in Map',
         icon: 'fa-solid fa-table-columns',
+        group: 'open',
         isVisible: () => {
             const sel = ctx.getSelectedEntries();
             return !!ctx.dataset && sel.length >= 2 && sel.length <= MAX_LAYERS && sel.every(f => isGeoraster(f.entry));
@@ -462,22 +245,17 @@ function compareInMapItem(ctx) {
 }
 
 /**
- * Build the standard viewer context menu items.
- * These are the Open/Open Map/Open Point Cloud/etc items shared across all views.
+ * The Open group: Open (where no viewer opens the file by default), one item per row of the viewer
+ * table that accepts the file (libs/openItemDefaults.js VIEWERS), then the map comparisons.
  */
 function buildViewerMenuItems(ctx) {
     return [
-        openItem(ctx),
-        openMapItem(ctx),
-        openPointCloudItem(ctx),
-        openModelItem(ctx),
-        openPanoramaItem(ctx),
-        openSplatItem(ctx),
-        openMarkdownItem(ctx),
-        openPdfItem(ctx),
+        actionMenuItem('open', ctx),
+        ...VIEWERS.map(row => actionMenuItem(row.id, ctx)),
         plantHealthItem(ctx),
         compareToItem(ctx),
-        compareInMapItem(ctx)
+        compareInMapItem(ctx),
+        experimentalMenuItems(ctx)
     ];
 }
 
@@ -641,6 +419,7 @@ function toolsItem(ctx) {
     return {
         label: 'Tools',
         icon: 'fa-solid fa-wrench',
+        group: 'tools',
         items: [
             mergeMultispectral,
             maskBorders,
@@ -666,48 +445,32 @@ function toolsItem(ctx) {
     };
 }
 
+/**
+ * The groups after Open, in order: Edit, Share & download, Organize, the folder's actions (the
+ * background menu), Tools.
+ */
 function buildActionMenuItems(ctx) {
-    const shareDownloadVisible = () => ctx.getSelectedEntries().length > 0;
     return [
         editItem(ctx),
-        propertiesItem(ctx),
-        {
-            type: 'separator',
-            isVisible: shareDownloadVisible
-        },
-        shareEmbedItem(ctx),
-        downloadItem(ctx),
-        {
-            type: 'separator',
-            isVisible: shareDownloadVisible
-        },
-        toolsItem(ctx),
-        experimentalMenuItems(ctx),
+        actionMenuItem('rename', ctx),
         setThumbnailItem(ctx),
-        clipboardSeparator(ctx),
-        renameItem(ctx),
-        copyClipboardItem(ctx),
-        cutClipboardItem(ctx),
-        pasteClipboardItem(ctx)
+        actionMenuItem('share-embed', ctx),
+        downloadItem(ctx),
+        actionMenuItem('copy', ctx),
+        actionMenuItem('cut', ctx),
+        actionMenuItem('paste', ctx),
+        actionMenuItem('new-folder', ctx),
+        actionMenuItem('upload', ctx),
+        actionMenuItem('select-all', ctx),
+        actionMenuItem('refresh', ctx),
+        toolsItem(ctx),
+        propertiesItem(ctx)
     ];
 }
 
 /**
- * Build the standard footer context menu items.
- * Separator, Select All/None, Create Folder, Delete separator, Delete.
- */
-function buildFooterMenuItems(ctx) {
-    return [
-        selectionSeparator(ctx),
-        selectAllNoneItem(ctx),
-        createFolderItem(ctx),
-        deleteSeparator(ctx),
-        deleteItem(ctx)
-    ];
-}
-
-/**
- * Build the full standard context menu for Explorer and TableView.
+ * The full context menu of the grid, the table and the tree: Open, Edit, Share & download,
+ * Organize, the folder's actions, Tools, and Delete at the end.
  * @param {object} ctx - Context object
  * @returns {Array} context menu items
  */
@@ -715,49 +478,14 @@ function buildStandardContextMenu(ctx) {
     return [
         ...buildViewerMenuItems(ctx),
         ...buildActionMenuItems(ctx),
-        ...buildFooterMenuItems(ctx)
+        actionMenuItem('delete', ctx)
     ];
 }
 
 export {
-    // Individual items
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     setCoordinateSystemItem,
     splatDownloadItems,
     splatTrainingExportItem,
-    deleteItem,
-    deleteSeparator,
-
-
-
-
-
-
-
-    // Grouped builders
-    buildViewerMenuItems,
     buildActionMenuItems,
-
-    buildStandardContextMenu,
-
+    buildStandardContextMenu
 };

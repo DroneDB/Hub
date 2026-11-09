@@ -12,7 +12,8 @@
              @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)"
              @dragover.prevent
-             @click="onClick">
+             @click="onClick"
+             @contextmenu="onBackgroundContextMenu">
             <DataTable :value="sortedFiles" :paginator="false" scrollable scroll-height="flex" size="small"
                        data-key="path" striped-rows
                        :row-class="rowClass"
@@ -124,7 +125,7 @@ export default {
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'selectionChanged', 'buildStarted', 'buildError', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         return {
@@ -142,13 +143,8 @@ export default {
             get dataset() { return self.dataset; },
             get showBuildConfirm() { return self.showBuildConfirm; },
             emit: (...args) => self.$emit(...args),
-            onSelectAllNone: () => {
-                if (self.selectedFiles.length === self.files.length) {
-                    self.deselectAll();
-                } else {
-                    self.selectAll();
-                }
-            },
+            getFiles: () => self.files,
+            selectAll: on => (on ? self.selectAll() : self.deselectAll()),
             component: self
         };
 
@@ -272,12 +268,19 @@ export default {
 
         // startDrag, onDrop and explorerDropHandler come from useDragDrop() (setup)
 
+        // The empty area: the wrapper, the empty message, or the table outside its rows
+        isBackground: function (target) {
+            return target.id === 'table-view' || !!target.closest('.p-datatable-empty-message') || (!target.closest('tr') && !!target.closest('.p-datatable'));
+        },
+
         onClick: function (e) {
-            // Clicked an empty area (DataTable wrapper or empty body)
-            const target = e.target;
-            if (target.id === 'table-view' || target.closest('.p-datatable-empty-message') || (!target.closest('tr') && target.closest('.p-datatable'))) {
-                this.clearSelection();
-            }
+            if (this.isBackground(e.target)) this.clearSelection();
+        },
+
+        // A right click on the empty area clears the selection first: the menu that opens is the
+        // folder's (New folder, Upload, Paste, Select all, Refresh), as in a file manager
+        onBackgroundContextMenu: function (e) {
+            if (this.isBackground(e.target)) this.clearSelection();
         },
 
         selectAll: function () {

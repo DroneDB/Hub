@@ -48,7 +48,7 @@
             <!-- Actions section -->
             <div class="actions-section">
                 <div class="action-buttons">
-                    <Button severity="secondary" icon="fa-regular fa-folder-open" label="Open" @click="handleOpen" />
+                    <Button severity="secondary" :icon="openAction.icon" :label="openAction.label" @click="handleOpen" />
                     <Button v-if="!isDirectory" severity="secondary" icon="fa-solid fa-share-nodes" label="Share/Embed" @click="handleShare" />
                     <Button v-if="isBuildableFile && !hasActiveBuild" severity="secondary"
                             icon="fa-solid fa-gear" label="Build" @click="handleBuild" />
@@ -83,6 +83,7 @@ import { thumbs } from 'ddb';
 import BuildManager from '@/libs/build/buildManager';
 import { isBuildableType, hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { isGeoraster as isGeorasterEntry } from '@/libs/entryTypes';
+import { openPresentation } from '@/libs/dataset/explorerActions';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import { describeEntryPendingBuild } from '@/libs/build/pendingBuild';
 import { shownBuildStatus } from '@/libs/build/entryBuild';
@@ -131,6 +132,10 @@ export default {
         }
     },
     computed: {
+        // Open says where the file opens, as the toolbar's Open does (the viewer table)
+        openAction() {
+            return openPresentation(this.file);
+        },
         isGeoraster() {
             return !!this.dataset && !!this.file && isGeorasterEntry(this.file.entry);
         },

@@ -84,6 +84,15 @@ describe('useViewerEntry from the route', () => {
         expect(await v.entryLoaded).toBe(false);
         expect(v.error.value).toBe('f/a.tif cannot be opened as a 3D model');
     });
+
+    it('rejects a file its accepts test refuses, with the same message', async () => {
+        const accepts = vi.fn(() => false);
+        const v = useViewerEntry({ accepts, typeLabel: 'a map', title: 'Map' });
+        expect(await v.entryLoaded).toBe(false);
+        expect(accepts).toHaveBeenCalledWith(entryOf('f/a.tif'));
+        expect(v.error.value).toBe('f/a.tif cannot be opened as a map');
+        expect(v.entry.value).toBeNull();
+    });
 });
 
 describe('useViewerEntry with a path of its own', () => {

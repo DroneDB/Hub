@@ -8,7 +8,7 @@
         <div id="explorer" ref="explorer" :class="{ loading, dropping, virtual: virtualGrid }"
              :style="{ '--grid-cell-width': gridCellWidth + 'px' }"
              role="listbox" aria-label="Files" aria-multiselectable="true" tabindex="-1"
-             @click="onClick" @keydown.esc="clearSelection"
+             @click="onClick" @contextmenu="onBackgroundContextMenu" @keydown.esc="clearSelection"
              @drop="explorerDropHandler($event)" @dragleave="explorerDragLeave($event)"
              @dragenter="explorerDragEnter($event)" @dragover.prevent>
             <div v-if="isLoadingFiles && files.length === 0" class="explorer-notice m-3">
@@ -99,7 +99,7 @@ export default {
         canWrite: { type: Boolean, default: false },
         isLoadingFiles: { type: Boolean, default: false }
     },
-    emits: ['openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
+    emits: ['upload', 'refresh', 'openItem', 'openAsText', 'moveSelectedItems', 'openProperties', 'shareEmbed', 'downloadItems', 'transferSelectedItems', 'setAsCover', 'createFolder', 'deleteSelecteditems', 'buildStarted', 'buildError', 'selectionChanged', 'mergeMultispectral', 'maskBorders', 'extractItem', 'setCrs', 'copySelectedItems', 'cutSelectedItems', 'pasteFromClipboard', 'downloadBuildArtifact', 'downloadSplat', 'exportSplatTrainingData'],
     setup(props) {
         const instance = getCurrentInstance();
         return {
@@ -115,15 +115,9 @@ export default {
             get dataset() { return self.dataset; },
             get showBuildConfirm() { return self.showBuildConfirm; },
             emit: (...args) => self.$emit(...args),
-            onSelectAllNone: () => {
-                if (self.files.length === 0) return;
-                // Every file of the folder, rendered or not (the virtual grid renders only some)
-                if (self.selectedFiles.length === self.files.length) {
-                    self.deselectAll();
-                } else {
-                    self.selectAll();
-                }
-            },
+            // Every file of the folder, rendered or not (the virtual grid renders only some)
+            getFiles: () => self.files,
+            selectAll: on => (on ? self.selectAll() : self.deselectAll()),
             component: self
         };
 
@@ -200,6 +194,11 @@ export default {
             if (e.target.id === 'explorer') {
                 this.clearSelection();
             }
+        },
+        // A right click on the empty area clears the selection first: the menu that opens is the
+        // folder's (New folder, Upload, Paste, Select all, Refresh), as in a file manager
+        onBackgroundContextMenu: function (e) {
+            if (!(e.target instanceof Element) || !e.target.closest('.thumbnail')) this.clearSelection();
         },
         selectAll: function () {
             this.selection.selectAll();

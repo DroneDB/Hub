@@ -15,6 +15,13 @@
 const BREAKPOINTS = Object.freeze(['sm', 'md', 'lg', 'xl', 'xxl']);
 
 /**
+ * The width in px each breakpoint starts at. A phone layout is below `sm`, a tablet layout below
+ * `lg`: the toolbars that move tools into an overflow menu (HubToolbar) read these too.
+ * @type {Readonly<Record<Breakpoint, number>>}
+ */
+export const BREAKPOINT_PX = Object.freeze({ sm: 576, md: 768, lg: 992, xl: 1200, xxl: 1400 });
+
+/**
  * The classes of a cell (<th>, <td> or a Column's header/body) shown from `breakpoint` up.
  * @param {Breakpoint} breakpoint
  * @returns {string} e.g. 'd-none d-md-table-cell'
