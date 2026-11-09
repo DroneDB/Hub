@@ -65,8 +65,13 @@ export default class Organization {
         return `/orgs/${this.org}/ds${query ? '?' + query : ''}`;
     }
 
-    async info(){
-        return this.registry.getRequest(`/orgs/${this.org}/`);
+    /**
+     * The organization descriptor.
+     * @param {object} [opts] request options (see Registry.makeRequest), for example
+     *   `{ skipUnauthorized: true }` for a look-up the user did not start
+     */
+    async info(opts = {}) {
+        return this.registry.getRequest(`/orgs/${this.org}/`, opts);
     }
 
     Dataset(ds) {

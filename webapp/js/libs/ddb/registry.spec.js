@@ -137,4 +137,50 @@ describe('Registry writes and the request cache', () => {
         await reg.getRequest('/users/preferences', { cache: false });
         expect(gets('/users/preferences')).toBe(2);
     });
+
+    // FR-XC-05: skipUnauthorized is part of the cache key
+    it('a silent and a normal GET of the same endpoint are two flights', async () => {
+        const reg = newRegistry();
+        await Promise.all([
+            reg.getRequest('/orgs/x/', { skipUnauthorized: true }),
+            reg.getRequest('/orgs/x/')
+        ]);
+        expect(gets('/orgs/x/')).toBe(2);
+        // The real endpoint is sent, without the cache marker
+        expect(calls.every(c => c.url === `http://cache${n}.test/orgs/x/`)).toBe(true);
+    });
+
+    it('invalidate of the endpoint prefix drops the silent and the normal read', async () => {
+        const reg = newRegistry();
+        await reg.getRequest('/orgs/x/', { skipUnauthorized: true });
+        await reg.getRequest('/orgs/x/');
+        reg.invalidateCache('/orgs/x/');
+        await reg.getRequest('/orgs/x/', { skipUnauthorized: true });
+        await reg.getRequest('/orgs/x/');
+        expect(gets('/orgs/x/')).toBe(4);
+    });
+
+    it('the TTL of the endpoint applies to the silent read', async () => {
+        let now = 1_000_000;
+        vi.spyOn(Date, 'now').mockImplementation(() => now);
+        const reg = newRegistry();
+        await reg.getRequest('/orgs/x/', { skipUnauthorized: true });
+        await reg.getRequest('/orgs/x/', { skipUnauthorized: true });
+        expect(gets('/orgs/x/')).toBe(1);
+        now += 10_001;
+        await reg.getRequest('/orgs/x/', { skipUnauthorized: true });
+        expect(gets('/orgs/x/')).toBe(2);
+    });
+
+    it('a 401 of a silent read rejects without reaching the unauthorized handler; a normal one reaches it', async () => {
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+            new Response(JSON.stringify({ title: 'Unauthorized', status: 401 }), { status: 401, headers: { 'Content-Type': 'application/problem+json' } }));
+        const reg = newRegistry();
+        const handler = vi.fn();
+        reg.onUnauthorized(handler);
+        await expect(reg.getRequest('/orgs/x/', { skipUnauthorized: true })).rejects.toMatchObject({ status: 401 });
+        expect(handler).not.toHaveBeenCalled();
+        await expect(reg.getRequest('/orgs/x/')).rejects.toMatchObject({ status: 401 });
+        expect(handler).toHaveBeenCalledTimes(1);
+    });
 });

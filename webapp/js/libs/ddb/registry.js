@@ -21,6 +21,19 @@ import OrganizationsApi from './organizationsApi';
 
 const registries = new Map();
 
+/**
+ * Request-cache key of a GET: the endpoint, plus a query-style `~silent` marker for a
+ * `skipUnauthorized` request, so a silent and a normal read never share one flight (the
+ * 401 of a shared flight would reach the unauthorized handler, or not, by who asked first).
+ * The marker sits after the path, so TTL rules (path without query) and invalidate(prefix)
+ * still apply to it.
+ * @param {string} endpoint @param {{ skipUnauthorized?: boolean }} options
+ */
+function cacheKeyOf(endpoint, options) {
+    if (!options.skipUnauthorized) return endpoint;
+    return endpoint + (endpoint.includes('?') ? '&' : '?') + '~silent';
+}
+
 export default class Registry {
     constructor(url = "https://" + DEFAULT_REGISTRY) {
         this.url = url;
@@ -151,7 +164,7 @@ export default class Registry {
      * One request to the Registry.
      *
      * makeRequest(endpoint, options) with options { method, body, contentType, responseType,
-     * signal, headers, cache, readOnly, invalidate, onHeaders }; the positional form makeRequest(endpoint, method, body,
+     * signal, headers, cache, readOnly, invalidate, onHeaders, skipUnauthorized }; the positional form makeRequest(endpoint, method, body,
      * contentType, responseType) still works.
      *
      * GETs go through the request cache (single flight, short read cache, conditional
@@ -159,6 +172,8 @@ export default class Registry {
      * (all, or the endpoints starting with `invalidate` when a write changes only those).
      * `signal` aborts the request (AbortError); requests time out after 5 minutes.
      * `onHeaders(headers)` receives the response headers (requests that skip the cache only).
+     * `skipUnauthorized` keeps a 401 of a request the user did not start from the unauthorized
+     * handler (it still rejects); it is part of the cache key.
      * @param {string} endpoint
      * @param {string | Record<string, any>} [methodOrOptions]
      * @param {any} [body] @param {string|null} [contentType] @param {string|null} [responseType]
@@ -191,15 +206,16 @@ export default class Registry {
             return this._send(endpoint, method, options);
 
         const load = ({ etag }) => this._send(endpoint, method, { ...options, signal: undefined, etag, withMeta: true });
+        const key = cacheKeyOf(endpoint, options);
         // A caller that can abort: the descriptors that are reused anyway are shared (the caller
         // stops waiting when it aborts); anything else gets its own request, which the abort
         // cancels, so aborting it cannot abort another caller
         if (options.signal) {
-            return this.requestCache.keeps(endpoint)
-                ? this.requestCache.getAbortable(endpoint, load, options.signal)
+            return this.requestCache.keeps(key)
+                ? this.requestCache.getAbortable(key, load, options.signal)
                 : this._send(endpoint, method, options);
         }
-        return this.requestCache.get(endpoint, load);
+        return this.requestCache.get(key, load);
     }
 
     // Sends one request; with `withMeta` resolves { value, etag, notModified } (request cache)

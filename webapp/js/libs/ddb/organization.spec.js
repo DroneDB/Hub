@@ -27,6 +27,15 @@ describe('Organization', () => {
         expect(registry.getRequest).toHaveBeenCalledWith('/orgs/acme/locations', { cache: false, signal });
     });
 
+    it('reads the organization descriptor, passing the request options on', async () => {
+        const registry = { getRequest: vi.fn(async () => ({ slug: 'acme' })) };
+        const org = new Organization(registry, 'acme');
+        expect(await org.info({ skipUnauthorized: true })).toEqual({ slug: 'acme' });
+        expect(registry.getRequest).toHaveBeenCalledWith('/orgs/acme/', { skipUnauthorized: true });
+        await org.info();
+        expect(registry.getRequest).toHaveBeenLastCalledWith('/orgs/acme/', {});
+    });
+
     it('takes an answer that is not a list for no locations, and lets a failure through', async () => {
         expect(await new Organization({ getRequest: async () => null }, 'a').datasetLocations()).toEqual([]);
         const failing = { getRequest: async () => { throw Object.assign(new Error('Forbidden'), { status: 403 }); } };

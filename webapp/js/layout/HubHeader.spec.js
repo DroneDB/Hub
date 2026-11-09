@@ -367,3 +367,48 @@ describe('HubHeader accessible names', () => {
         expect(wrapper.vm.userMenuPt.item({ context: { item: { label: 'Logout' } } })).toEqual({});
     });
 });
+
+// FR-ACC-01 / FR-XC-05: an anonymous visitor of a shared dataset of a private organization
+describe('HubHeader back-to-organization look-up', () => {
+    const backButton = () => wrapper.find('button[title="Back to organization"]');
+    let original;
+    beforeEach(() => { original = h.reg.Organization; });
+    afterEach(() => { h.reg.Organization = original; });
+
+    async function renderWith(info, { loggedIn = false } = {}) {
+        h.auth.isLoggedIn = loggedIn;
+        h.auth.isAdmin = false;
+        h.reg.Organization = vi.fn(() => ({ info }));
+        h.reg.sys.updateInfo = vi.fn(() => Promise.resolve(AVAILABLE));
+        const push = vi.fn();
+        const replace = vi.fn();
+        wrapper = mount(HubHeader, {
+            global: {
+                plugins: [PrimeVue, createPinia()],
+                mocks: { $route: { params: { org: 'acme', ds: 'site' }, query: {} }, $router: { push, replace } },
+                stubs: { UpdateNotesDialog: true, Menu: true, ShareEmbed: true }
+            }
+        });
+        await flushPromises();
+        return { push, replace };
+    }
+
+    it('asks for the organization without the global 401 handler', async () => {
+        const info = vi.fn(() => Promise.resolve({ isPublic: true }));
+        await renderWith(info, { loggedIn: true });
+        expect(h.reg.Organization).toHaveBeenCalledWith('acme');
+        expect(info).toHaveBeenCalledWith({ skipUnauthorized: true });
+        expect(backButton().exists()).toBe(true);
+    });
+
+    it.each([401, 403])('hides the button and does not navigate when the look-up answers %i', async status => {
+        const { ApiError } = await import('@/libs/ddb/apiError');
+        const info = vi.fn(() => Promise.reject(new ApiError('No access', status)));
+        const { push, replace } = await renderWith(info);
+        expect(info).toHaveBeenCalledWith({ skipUnauthorized: true });
+        expect(wrapper.vm.showBackToOrg).toBe(false);
+        expect(backButton().exists()).toBe(false);
+        expect(push).not.toHaveBeenCalled();
+        expect(replace).not.toHaveBeenCalled();
+    });
+});

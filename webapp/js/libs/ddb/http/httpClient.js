@@ -175,6 +175,9 @@ function encodeBody(headers, body, contentType) {
  * @property {string} [etag]  sent as If-None-Match
  * @property {boolean} [withMeta]  resolve { value, etag, notModified } (request cache)
  * @property {(headers: Headers) => void} [onHeaders]
+ * @property {boolean} [skipUnauthorized]  a request the user did not start (a header look-up,
+ *   an optional side file): its 401/403 rejects as usual but never reaches the unauthorized
+ *   handler, so it cannot send the visitor to Login (FR-XC-05)
  */
 
 /**
@@ -218,8 +221,8 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
     }
 
     /**
-     * One request, parsed. A 401 (except for sign-in) is reported to the unauthorized
-     * handler before it is thrown.
+     * One request, parsed. A 401 (except for sign-in and `skipUnauthorized` requests) is
+     * reported to the unauthorized handler before it is thrown.
      * @param {string} endpoint
      * @param {SendOptions} [options]
      */
@@ -240,7 +243,8 @@ export function createHttpClient({ baseUrl, getToken, onUnauthorized, timeoutMs 
             }
             return await handleResponse(response, method, options.responseType ?? null);
         } catch (error) {
-            if (error.status === 401 && unauthorizedHandler && !endpoint.startsWith('/users/authenticate')) {
+            if (error.status === 401 && unauthorizedHandler && !options.skipUnauthorized
+                && !endpoint.startsWith('/users/authenticate')) {
                 unauthorizedHandler(error);
             }
             if (error.status !== undefined || error.name === 'AbortError') throw error;

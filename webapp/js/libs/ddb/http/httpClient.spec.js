@@ -64,3 +64,34 @@ describe('httpClient error messages', () => {
         await expect(client().send('/x')).resolves.toEqual({ state: 'Failed', error: 'Timeout' });
     });
 });
+
+// FR-XC-05: a request the user did not start can opt out of the global 401 handler
+describe('httpClient skipUnauthorized', () => {
+    const withHandler = () => {
+        const onUnauthorized = vi.fn();
+        return { onUnauthorized, http: createHttpClient({ baseUrl: 'http://http.test', getToken: () => null, onUnauthorized }) };
+    };
+
+    it('a 401 with skipUnauthorized does not reach the handler and still rejects with 401', async () => {
+        respondWith(401, { title: 'Unauthorized', status: 401 }, 'application/problem+json');
+        const { onUnauthorized, http } = withHandler();
+        const error = await http.send('/orgs/acme/', { skipUnauthorized: true }).catch(e => e);
+        expect(error.status).toBe(401);
+        expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('a 403 with skipUnauthorized does not reach the handler and still rejects with 403', async () => {
+        respondWith(403, { title: 'Forbidden', status: 403 }, 'application/problem+json');
+        const { onUnauthorized, http } = withHandler();
+        await expect(http.send('/orgs/acme/', { skipUnauthorized: true })).rejects.toMatchObject({ status: 403 });
+        expect(onUnauthorized).not.toHaveBeenCalled();
+    });
+
+    it('a 401 without the option reaches the handler', async () => {
+        respondWith(401, { title: 'Unauthorized', status: 401 }, 'application/problem+json');
+        const { onUnauthorized, http } = withHandler();
+        await expect(http.send('/orgs/acme/')).rejects.toMatchObject({ status: 401 });
+        expect(onUnauthorized).toHaveBeenCalledTimes(1);
+        expect(onUnauthorized.mock.calls[0][0].status).toBe(401);
+    });
+});

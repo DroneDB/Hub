@@ -199,3 +199,54 @@ describe('cancelTask', () => {
         expect(vm.loadTasks).not.toHaveBeenCalled();
     });
 });
+
+// FR-ACC-01: GET /sys/processingNodes needs a signed-in user; its 401 would send an anonymous
+// visitor of a shared dataset to Login, and only a user who can write is offered the nodes
+describe('processing nodes', () => {
+    const { loadProcessingNodes } = TaskHistory.methods;
+    const canWriteChanged = TaskHistory.watch.canWrite;
+
+    function nodesVm(canWrite) {
+        const processingNodes = vi.fn(() => Promise.resolve([{ id: 'n1', title: 'Node' }]));
+        const vm = {
+            canWrite,
+            photogrammetryNodes: [],
+            photogrammetryForm: { nodeId: undefined },
+            dataset: { registry: { sys: { processingNodes } } },
+            loadTools: vi.fn(() => Promise.resolve()),
+            loadTasks: vi.fn(() => Promise.resolve()),
+            registerTabChild: null
+        };
+        vm.loadProcessingNodes = () => loadProcessingNodes.call(vm);
+        return { vm, processingNodes };
+    }
+
+    it('never asks for them for a visitor who cannot write (an anonymous visitor)', async () => {
+        const { vm, processingNodes } = nodesVm(false);
+        await TaskHistory.mounted.call(vm);
+        expect(processingNodes).not.toHaveBeenCalled();
+        expect(vm.photogrammetryNodes).toEqual([]);
+        expect(vm.loadTasks).toHaveBeenCalled();
+    });
+
+    it('asks for them for a writer and selects the first node', async () => {
+        const { vm, processingNodes } = nodesVm(true);
+        await TaskHistory.mounted.call(vm);
+        expect(processingNodes).toHaveBeenCalledTimes(1);
+        expect(vm.photogrammetryNodes.map(n => n.id)).toEqual(['n1']);
+        expect(vm.photogrammetryForm.nodeId).toBe('n1');
+    });
+
+    it('asks for them once the user can write, and only once', async () => {
+        const { vm, processingNodes } = nodesVm(false);
+        await TaskHistory.mounted.call(vm);
+        vm.canWrite = true;
+        await canWriteChanged.call(vm, true);
+        await canWriteChanged.call(vm, true);
+        expect(processingNodes).toHaveBeenCalledTimes(1);
+
+        vm.canWrite = false;
+        canWriteChanged.call(vm, false);
+        expect(processingNodes).toHaveBeenCalledTimes(1);
+    });
+});

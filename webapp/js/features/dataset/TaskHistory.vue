@@ -373,6 +373,13 @@ export default {
         }
     },
 
+    watch: {
+        // The permissions of the dataset may arrive after the tab: ask for the nodes once the user can write
+        canWrite(value) {
+            if (value) this.loadProcessingNodes();
+        }
+    },
+
     async mounted() {
         // Flag runs before the first await so an unmount during the loads below
         // is observed here and never registers a permanent listener on a
@@ -420,6 +427,11 @@ export default {
         },
 
         async loadProcessingNodes() {
+            // The nodes are only offered to a user who can write. GET /sys/processingNodes needs a
+            // signed-in user: for an anonymous visitor of a shared dataset its 401 would send them to
+            // Login (FR-ACC-01), so a reader never asks. Asked once per tab.
+            if (!this.canWrite || this._nodesRequested) return;
+            this._nodesRequested = true;
             try {
                 const nodes = await this.dataset.registry.sys.processingNodes() || [];
                 this.photogrammetryNodes = nodes.map(n => ({

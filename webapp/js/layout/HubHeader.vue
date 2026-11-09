@@ -435,7 +435,9 @@ export default {
             try {
                 let orgInfo = this.orgInfoCache[org];
                 if (!orgInfo) {
-                    orgInfo = await reg.Organization(org).info();
+                    // The user did not ask for it: an anonymous visitor of a shared dataset of a
+                    // private organization gets a 401 here, which only hides the button (FR-XC-05)
+                    orgInfo = await reg.Organization(org).info({ skipUnauthorized: true });
                     this.orgInfoCache[org] = orgInfo;
                 }
                 this.showBackToOrg = orgInfo.isPublic || (orgInfo.permissions && orgInfo.permissions.canRead);
