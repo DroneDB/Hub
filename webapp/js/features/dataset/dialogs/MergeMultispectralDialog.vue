@@ -18,7 +18,8 @@
                             @dragend="onDragEnd">
                             <span class="drag-handle" aria-hidden="true"><i class="fa-solid fa-grip-vertical" /></span>
                             <span class="band-index">{{ index + 1 }}.</span>
-                            <span class="band-name" :title="item.entry.path">{{ item.label }}</span>
+                            <span class="band-name" :title="item.entry.path">{{ shortName(item.label) }}</span>
+                            <span v-if="cameraName(index)" class="band-camera" data-testid="band-camera-name">{{ cameraName(index) }}</span>
                             <span v-if="bandInfo[item.entry.path]" class="band-meta">
                                 ({{ bandInfo[item.entry.path].dataType }})
                             </span>
@@ -47,10 +48,10 @@
                                 <i class="fa-solid fa-circle-xmark" /> {{ err }}
                             </div>
                         </div>
-                        <!-- Warnings (filtered to remove misalignment duplicates) -->
+                        <!-- Warnings (filtered to remove misalignment duplicates; an identical warning is said once) -->
                         <div v-if="filteredWarnings.length > 0" class="validation-warnings">
                             <div v-for="(warn, i) in filteredWarnings" :key="'w'+i" class="validation-msg warning">
-                                <i class="fa-solid fa-triangle-exclamation" /> {{ warn }}
+                                <i class="fa-solid fa-triangle-exclamation" /> {{ warn.text }}<span v-if="warn.count > 1"> (×{{ warn.count }})</span>
                             </div>
                         </div>
                         <!-- Alignment banner -->
@@ -129,6 +130,7 @@ import {
     useConfirmReplace, replaceConflictPath, conflictIsFolder, existingItem, namesInFolder
 } from '@/composables/useConfirmReplace';
 import { freeName, namesClash, nameClashMessage } from '@/libs/nameRules';
+import { shortenMiddle, groupWarnings, cameraBandName } from '@/libs/dataset/mergeBands';
 import ddb, { pathutils } from 'ddb';
 
 /**
@@ -171,7 +173,9 @@ export default {
             outputNameError: null,
             deleteSource: false,
             bandInfo: {},
-            submitting: false
+            submitting: false,
+            // The number of the latest check (validate): the answers of the older ones are ignored
+            validationRequest: 0
         };
     },
 
@@ -216,8 +220,9 @@ export default {
         },
         filteredWarnings() {
             const warnings = this.validationResult?.warnings || [];
-            if (!this.alignmentWarning) return warnings;
-            return warnings.filter(w => !w.toLowerCase().includes('misalignment'));
+            return groupWarnings(this.alignmentWarning
+                ? warnings.filter(w => !w.toLowerCase().includes('misalignment'))
+                : warnings);
         },
         alignmentWarning() {
             const a = this.validationResult?.alignment;
@@ -240,6 +245,16 @@ export default {
     },
 
     methods: {
+        // The file name with its middle cut, so that the suffix that tells the bands apart stays
+        shortName(label) {
+            return shortenMiddle(label);
+        },
+
+        // What the camera calls the band at that position of the order (Blue, Red edge)
+        cameraName(index) {
+            return cameraBandName(this.validationResult, index);
+        },
+
         generateOutputName() {
             if (this.files.length === 0) return;
 
@@ -282,7 +297,10 @@ export default {
             this.outputName = commonFolder + freeName(filename, namesInFolder(commonFolder, this.allEntries));
         },
 
+        // Every move of a band starts a new check: only the answer of the latest one is shown (an
+        // older one describes the bands in an order that is gone)
         async validate() {
+            const request = ++this.validationRequest;
             this.validating = true;
             this.validationResult = null;
             this.previewUrl = null;
@@ -290,6 +308,7 @@ export default {
             try {
                 const paths = this.orderedFiles.map(f => f.entry.path);
                 const result = await this.dataset.validateMergeMultispectral(paths);
+                if (request !== this.validationRequest) return;
                 this.validationResult = typeof result === 'string' ? JSON.parse(result) : result;
 
                 // Build bandInfo from validation summary
@@ -303,19 +322,21 @@ export default {
 
                 // Load preview if validation passed
                 if (this.validationResult.ok) {
-                    this.loadPreview();
+                    this.loadPreview(request);
                 }
             } catch (e) {
+                if (request !== this.validationRequest) return;
                 this.validationResult = { ok: false, errors: [e.message || 'Validation failed'], warnings: [] };
             } finally {
-                this.validating = false;
+                if (request === this.validationRequest) this.validating = false;
             }
         },
 
-        async loadPreview() {
+        async loadPreview(request) {
             try {
                 const paths = this.orderedFiles.map(f => f.entry.path);
                 const result = await this.dataset.previewMergeMultispectral(paths, '1,2,3', 256);
+                if (request !== this.validationRequest) return;
                 if (result instanceof Blob) {
                     this.previewUrl = URL.createObjectURL(result);
                 } else if (typeof result === 'string') {
@@ -522,6 +543,11 @@ export default {
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.band-camera {
+    font-weight: 600;
     white-space: nowrap;
 }
 

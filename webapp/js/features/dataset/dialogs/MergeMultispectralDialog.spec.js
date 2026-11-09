@@ -20,28 +20,33 @@ vi.mock('@/composables/useConfirmReplace', async importOriginal => ({
 
 const BANDS = ['IMG_0001_1.tif', 'IMG_0001_2.tif', 'IMG_0001_3.tif'];
 
+const CAMERA_IMAGES = 'These are camera images without map coordinates: the result will not be placed on the map';
+
 function validation(correctionApplied) {
     return {
         ok: true,
         errors: [],
         warnings: [
-            'Cannot read geotransform from reference file: IMG_0001_1.tif',
+            CAMERA_IMAGES,
             'Band misalignment detected (~14 pixels). Bands from multi-camera sensors (e.g. MicaSense, DJI Multispectral) '
                 + 'are captured from slightly different viewpoints. For accurate vegetation indices (NDVI, NDRE, etc.), '
                 + 'process raw imagery with a photogrammetry tool (e.g. WebODM, Pix4D) before merging.'
         ],
-        summary: { totalBands: 3, dataType: 'UInt16', width: 1280, height: 960, crs: '' },
-        alignment: { detected: true, maxShiftPixels: 14.2, correctionApplied, bands: [] }
+        summary: { totalBands: 3, dataType: 'UInt16', width: 1261, height: 942, crs: '' },
+        alignment: {
+            detected: true, maxShiftPixels: 14.2, correctionApplied,
+            bands: [{ index: 0, name: 'Blue' }, { index: 1, name: 'Green' }, { index: 2, name: 'Red' }]
+        }
     };
 }
 
-async function mountDialog(correctionApplied = true) {
+async function mountDialog(correctionApplied = true, { result = validation(correctionApplied), names = BANDS } = {}) {
     const dataset = {
-        validateMergeMultispectral: vi.fn().mockResolvedValue(validation(correctionApplied)),
+        validateMergeMultispectral: vi.fn().mockResolvedValue(result),
         previewMergeMultispectral: vi.fn().mockResolvedValue(null)
     };
     const w = mount(MergeMultispectralDialog, {
-        props: { files: BANDS.map(path => ({ label: path, entry: { path } })), dataset },
+        props: { files: names.map(path => ({ label: path, entry: { path } })), dataset },
         global: { plugins: [PrimeVue], stubs: { Window: { template: '<div><slot /><slot name="footer" /></div>' } } }
     });
     await flushPromises();
@@ -56,9 +61,11 @@ describe('MergeMultispectralDialog band misalignment', () => {
         expect(banner.find('a').exists()).toBe(false);
     });
 
-    it('keeps the warning that the band images have no geotransform', async () => {
+    it('shows the one plain warning about camera images, not one for each band', async () => {
         const w = await mountDialog();
-        expect(w.find('.validation-warnings').text()).toContain('Cannot read geotransform from reference file: IMG_0001_1.tif');
+        const warnings = w.findAll('.validation-warnings .validation-msg');
+        expect(warnings.map(x => x.text())).toEqual([CAMERA_IMAGES]);
+        expect(w.text()).not.toContain('Cannot read geotransform');
         expect(w.text()).not.toMatch(/WebODM/i);
     });
 
@@ -67,6 +74,89 @@ describe('MergeMultispectralDialog band misalignment', () => {
         const without = (await mountDialog(false)).find('.alignment-warning').text();
         expect(without).toContain('No approximate correction applies to these images.');
         expect(without).not.toContain('will be applied');
+    });
+});
+
+// ---- The check says each thing once, names the files and the bands (FR-PRC-14) --------------------
+
+describe('MergeMultispectralDialog check', () => {
+    it('says an identical warning once, with how many there were', async () => {
+        const result = { ...validation(true), alignment: null, warnings: Array(5).fill('Cannot read geotransform') };
+        const rows = (await mountDialog(true, { result })).findAll('.validation-warnings .validation-msg');
+        expect(rows.map(x => x.text())).toEqual(['Cannot read geotransform (×5)']);
+    });
+
+    it('keeps different warnings apart, in the order they came', async () => {
+        const result = { ...validation(true), alignment: null, warnings: ['b one', 'a two', 'b one'] };
+        const rows = (await mountDialog(true, { result })).findAll('.validation-warnings .validation-msg');
+        expect(rows.map(x => x.text())).toEqual(['b one (×2)', 'a two']);
+    });
+
+    it('shows the band name from the camera next to each file', async () => {
+        const w = await mountDialog();
+        const names = w.findAll('.band-item').map(li => li.find('[data-testid="band-camera-name"]').text());
+        expect(names).toEqual(['Blue', 'Green', 'Red']);
+    });
+
+    it('follows the band names when the order of the files changes', async () => {
+        const w = await mountDialog();
+        w.vm.dataset.validateMergeMultispectral.mockResolvedValue({
+            ...validation(true),
+            alignment: { ...validation(true).alignment, bands: [{ name: 'Green' }, { name: 'Blue' }, { name: 'Red' }] }
+        });
+        await w.findAll('.band-move button')[1].trigger('click'); // the first file down: it is second now
+        await flushPromises();
+        expect(w.findAll('.band-item').map(li => li.find('.band-name').attributes('title')))
+            .toEqual(['IMG_0001_2.tif', 'IMG_0001_1.tif', 'IMG_0001_3.tif']);
+        expect(w.findAll('[data-testid="band-camera-name"]').map(x => x.text())).toEqual(['Green', 'Blue', 'Red']);
+    });
+
+    it('shows the answer of the latest check when an older one comes back after it', async () => {
+        const w = await mountDialog();
+        /** @type {Array<(value: unknown) => void>} */
+        const answer = [];
+        w.vm.dataset.validateMergeMultispectral.mockImplementation(() => new Promise(resolve => answer.push(resolve)));
+        const checked = (/** @type {string[]} */ names) => ({
+            ...validation(true),
+            alignment: { ...validation(true).alignment, bands: names.map(name => ({ name })) }
+        });
+        await w.findAll('.band-move button')[1].trigger('click'); // 2, 1, 3
+        await w.findAll('.band-move button')[3].trigger('click'); // 2, 3, 1
+        expect(answer).toHaveLength(2);
+
+        answer[1](checked(['Green', 'Red', 'Blue']));
+        await flushPromises();
+        answer[0](checked(['Green', 'Blue', 'Red']));
+        await flushPromises();
+
+        expect(w.findAll('.band-item').map(li => li.find('.band-name').attributes('title')))
+            .toEqual(['IMG_0001_2.tif', 'IMG_0001_3.tif', 'IMG_0001_1.tif']);
+        expect(w.findAll('[data-testid="band-camera-name"]').map(x => x.text())).toEqual(['Green', 'Red', 'Blue']);
+        expect(w.vm.dataset.previewMergeMultispectral).toHaveBeenLastCalledWith(
+            ['IMG_0001_2.tif', 'IMG_0001_3.tif', 'IMG_0001_1.tif'], '1,2,3', 256);
+        expect(w.vm.validating).toBe(false);
+    });
+
+    it('shows no band name when the check gives none', async () => {
+        const result = { ...validation(true), alignment: null };
+        expect((await mountDialog(true, { result })).find('[data-testid="band-camera-name"]').exists()).toBe(false);
+    });
+
+    it('shortens a long file name in the middle and keeps the suffix that tells the bands apart', async () => {
+        const names = ['IMG_180822_135805_0467_GRE.TIF', 'IMG_180822_135805_0467_NIR.TIF'];
+        const w = await mountDialog(true, { names });
+        const shown = w.findAll('.band-name').map(x => x.text());
+        expect(shown).toEqual(['IMG_180822_135…7_GRE.TIF', 'IMG_180822_135…7_NIR.TIF']);
+        // the full path stays in the tooltip
+        expect(w.find('.band-name').attributes('title')).toBe(names[0]);
+    });
+
+    it('shows a name that fits as it is', async () => {
+        expect((await mountDialog()).find('.band-name').text()).toBe('IMG_0001_1.tif');
+    });
+
+    it('shows the size of the merged raster that the check reports', async () => {
+        expect((await mountDialog()).find('.merge-summary').text()).toContain('1261×942');
     });
 });
 
