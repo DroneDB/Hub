@@ -37,7 +37,7 @@ import {
     samePricing
 } from '@/libs/stockpileMaterials';
 import { usePreference } from '@/composables/usePreference';
-import { formatDensity, formatVolume, normalizeCurrency } from '@/libs/format';
+import { normalizeCurrency, stockpileLabel } from '@/libs/format';
 import { PREF, PREF_DEFAULTS } from '@/libs/preferences';
 import { downloadText } from '@/libs/download';
 import { pathutils } from 'ddb';
@@ -360,10 +360,17 @@ const definition = {
             this.stockpileLoading = false;
             this._stopStockpileInteractions();
             this._clearStockpileOverlay();
-            // Also remove the draft polygon (and its floating label/tooltip)
-            // from the shared measurement layer if it was already adopted,
-            // otherwise the label stays orphaned on the map.
-            this._removeDraftStockpileFromMeasureSource();
+            // A pile not saved yet is removed from the shared measurement layer (with its floating
+            // label), otherwise the label stays orphaned on the map. A pile that is in the saved
+            // file stays: Clear resets the panel and the overlay only, and removing it from the
+            // map would delete it from the dataset with the next Save.
+            const id = this._draftStockpileFeatureId;
+            const mc = this.measureControls;
+            if (!id || !(mc && mc.isSaved(id))) {
+                this._removeDraftStockpileFromMeasureSource();
+            }
+            // The panel no longer tracks the pile, so a pile found next is a new one
+            this._draftStockpileFeatureId = null;
         },
 
         /**
@@ -755,20 +762,10 @@ const definition = {
             // tooltipText is what the Measurement List dialog shows in the
             // "Value" column; build a compact human description here so the
             // saved feature looks meaningful when re-imported.
-            props.tooltipText = this._formatStockpileTooltip(props);
+            props.tooltipText = stockpileLabel(props, this.currentUnitPref);
             // The user-visible name in the list (preferred over a generic label).
             if (title) props.name = title;
             return props;
-        },
-
-        _formatStockpileTooltip(p) {
-            const parts = [];
-            if (p.title) parts.push(p.title);
-            // In the units and with the formatter of the panel, so the label reads as the panel does
-            if (typeof p.netVolume === 'number') parts.push(formatVolume(p.netVolume, p.unitSystem));
-            if (p.materialName) parts.push(p.materialName);
-            if (p.materialDensity) parts.push(formatDensity(p.materialDensity, p.unitSystem));
-            return parts.join(' - ') || 'Stockpile';
         },
 
         /**

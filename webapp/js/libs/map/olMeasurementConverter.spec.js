@@ -3,7 +3,7 @@
  * its geometry, so a measurement saved as "0.03 acres" reads in ft² after a reload. Other
  * measurements keep the text they were saved with.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { Vector as VectorSource } from 'ol/source';
 import { importMeasurements, measurementSizeText } from './olMeasurementConverter';
 import { ANALYSIS_COLOR } from './mapUtils';
@@ -22,6 +22,10 @@ function importOne(feature, unitPref = 'imperial') {
     expect(features).toHaveLength(1);
     return features[0];
 }
+
+afterEach(() => {
+    delete navigator.language;
+});
 
 describe('importMeasurements tooltip text', () => {
     it('recalculates a saved area in the current units instead of keeping its saved text', () => {
@@ -42,6 +46,20 @@ describe('importMeasurements tooltip text', () => {
         const profile = importOne(featureOf('LineString', LINE,
             { measurementType: 'profile', tooltipText: 'Profile: 11.1 m' }));
         expect(profile.get('tooltipText')).toBe('Profile: 11.1 m');
+    });
+
+    it('builds the label of a stockpile from its metric properties in the current units (FR-MAP-13)', () => {
+        Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true });
+        const props = { measurementType: 'stockpile', id: 'p1', title: 'North', netVolume: 8097.19, materialName: 'Gravel',
+            materialDensity: 1.68, unitSystem: 'metric', tooltipText: 'North - 8,097.19 m³ - Gravel - 1.68 t/m³' };
+        // Reloaded in imperial: yd³ and ST, whatever the file's text says
+        // (8097.19 m³ x 1.307950619 = 10,590.72 yd³; 1.68 t/m³ x 0.8427774 = 1.416 ST/yd³)
+        const imperial = importOne(featureOf('Polygon', ROOF, props), 'imperial');
+        expect(imperial.get('tooltipText')).toBe('North - 10,590.72 yd³ - Gravel - 1.416 ST/yd³');
+        // The stored properties stay metric
+        expect(imperial.get('netVolume')).toBe(8097.19);
+        expect(imperial.get('materialDensity')).toBe(1.68);
+        expect(importOne(featureOf('Polygon', ROOF, props), 'metric').get('tooltipText')).toBe('North - 8,097.19 m³ - Gravel - 1.68 t/m³');
     });
 
     it('gives an untyped feature saved without text its size', () => {

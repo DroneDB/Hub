@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import {
-    bulkUnits, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize,
+    bulkUnits, stockpileLabel, countOf, currencyChoices, formatMoney, normalizeCurrency, pluralize,
     formatNumber, formatNumberList, formatInputNumber, joinNumberTexts, parseNumber, formatBytes, formatDateTime, formatTime, formatTimeAgo, utcClockToLocal,
     lengthParts, areaParts, fixedLengthParts, formatVolume, formatWeight, formatDensity, formatSpeed,
     PRECISION, UNKNOWN, EMPTY_CELL, displayLocale
@@ -252,6 +252,43 @@ describe('bulkUnits', () => {
         const { volume, weight, density } = bulkUnits('imperial');
         const tons = 250 * 1.68;
         expect((250 * volume.factor) * (1.68 * density.factor)).toBeCloseTo(tons * weight.factor, 9);
+    });
+});
+
+describe('stockpileLabel (FR-MAP-13)', () => {
+    const pile = { title: 'North pile', netVolume: 8097.19, materialName: 'Gravel', materialDensity: 1.68, unitSystem: 'metric' };
+    // Worked out by hand, not with the formatter:
+    //   8097.19 m³ x 1.307950619 yd³/m³ = 10,590.7247 yd³ -> "10,590.72 yd³" (2 decimals)
+    //   1.68 t/m³ x (0.764554858 m³/yd³ / 0.90718474 t/ST = 0.8427774) = 1.415866 ST/yd³ -> "1.416 ST/yd³" (3 decimals)
+    const METRIC = 'North pile - 8,097.19 m³ - Gravel - 1.68 t/m³';
+    const IMPERIAL = 'North pile - 10,590.72 yd³ - Gravel - 1.416 ST/yd³';
+
+    it('is built from the metric properties in the units asked for', () => {
+        inLocale('en-US');
+        expect(stockpileLabel(pile, 'metric')).toBe(METRIC);
+    });
+
+    it('shows yd³ and ST/yd³ for imperial from netVolume 8097.19 m³ and 1.68 t/m³', () => {
+        inLocale('en-US');
+        expect(stockpileLabel(pile, 'imperial')).toBe(IMPERIAL);
+    });
+
+    it('follows the units asked for over the units the pile was saved in, and falls back to them', () => {
+        inLocale('en-US');
+        expect(stockpileLabel({ ...pile, unitSystem: 'imperial' })).toBe(IMPERIAL);
+        expect(stockpileLabel({ ...pile, unitSystem: 'imperial' }, 'metric')).toBe(METRIC);
+        expect(stockpileLabel(pile)).toBe(METRIC);
+    });
+
+    it('leaves out what the pile does not have', () => {
+        inLocale('en-US');
+        expect(stockpileLabel({ netVolume: 8097.19 }, 'imperial')).toBe('10,590.72 yd³');
+        expect(stockpileLabel({ title: 'North pile', materialName: 'Gravel' }, 'imperial')).toBe('North pile - Gravel');
+    });
+
+    it('is the word Stockpile for a pile with nothing to say', () => {
+        expect(stockpileLabel({}, 'metric')).toBe('Stockpile');
+        expect(stockpileLabel(undefined)).toBe('Stockpile');
     });
 });
 

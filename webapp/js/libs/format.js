@@ -640,6 +640,26 @@ export const formatWeight = (tonnes, units, { placeholder } = {}) => bulkText('w
 export const formatDensity = (tonnesPerCubicMeter, units, { placeholder } = {}) => bulkText('density', tonnesPerCubicMeter, units, placeholder);
 
 /**
+ * The label of a stockpile (on the map, in the Measurement List, in the saved file's tooltip): its
+ * title, volume, material and density, built at render time from the stored metric properties, in
+ * the units the user has now (or the pile's own `unitSystem` when none is given), so Convert and a
+ * reload show yd³ and ST like the stockpile panel.
+ * @param {{ title?: string, netVolume?: unknown, materialName?: string, materialDensity?: unknown, unitSystem?: string }} [props]
+ * @param {string} [unitPref]  'metric' or 'imperial'
+ * @returns {string}
+ */
+export function stockpileLabel(props, unitPref) {
+    const p = props || {};
+    const units = unitPref || p.unitSystem;
+    const parts = [];
+    if (p.title) parts.push(p.title);
+    if (typeof p.netVolume === 'number') parts.push(formatVolume(p.netVolume, units));
+    if (p.materialName) parts.push(p.materialName);
+    if (p.materialDensity) parts.push(formatDensity(p.materialDensity, units));
+    return parts.join(' - ') || 'Stockpile';
+}
+
+/**
  * An amount of money in a currency, as the locale writes it: "$1,234.50", "€1,234.50".
  * An unknown currency code is written after the number.
  * @param {number} amount

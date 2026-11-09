@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { COORD_MODE, createGeorefFrame, coordinateFormatter, availableModes, nextMode, modeLabel, enuToWgs84, utmDefinition, crsToWgs84 } from './georefCoords';
+import { COORD_MODE, createGeorefFrame, coordinateFormatter, availableModes, nextMode, modeLabel, enuToWgs84 } from './georefCoords';
+import { utmDefinition, crsToWgs84 } from '@/libs/map/crsProjection';
 
 // Expected values below were worked out with PROJ (cs2cs / cct), not with the code under test
 const BRIGHTON_OFFSET = [576705, 5188170, 0];

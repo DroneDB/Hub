@@ -19,6 +19,7 @@ import MeasurementPropertiesDialog from '@/components/measurements/MeasurementPr
 import PointAnnotationDialog from '@/features/viewers/map/PointAnnotationDialog.vue';
 import { showPointPopup } from '@/libs/map/pointPopup';
 import { MEASURE_COLOR } from '@/libs/map/mapUtils';
+import { stockpileLabel } from '@/libs/format';
 import { colorToken, tokenRgba } from '@/libs/colorScheme';
 import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/preferences';
 
@@ -28,6 +29,13 @@ import { getPref, setPref, onPrefChange, PREF, PREF_DEFAULTS } from '@/libs/pref
 // load them and others re-normalize the value on read-back, breaking any
 // equality check used to detect ownership of the cursor.
 const ERASE_HOVER_CURSOR = `url('${'/images/measure-erase.svg'}') 12 12, crosshair`;
+
+/**
+ * The label of a stockpile in the units of the map, from its stored metric properties; null for one
+ * with no volume (saved before the volume was stored), which keeps its own text (as on import).
+ * @param {Record<string, any>} props @param {string} unitPref
+ */
+const stockpileText = (props, unitPref) => (typeof props.netVolume === 'number' ? stockpileLabel(props, unitPref) : null);
 
 class MeasureControls extends Control {
     /**
@@ -457,6 +465,21 @@ class MeasureControls extends Control {
         return this._snapshot() !== this._savedSnapshot;
     }
 
+    /**
+     * Whether the measurement with this id is in the saved file (as last loaded or saved), whatever
+     * else changed on the map since: isDirty is for the whole map.
+     * @param {string} id  the `id` property of the measurement
+     */
+    isSaved(id) {
+        if (!id) return false;
+        try {
+            const saved = JSON.parse(this._savedSnapshot);
+            return Array.isArray(saved) && saved.some(f => f && f.properties && f.properties.id === id);
+        } catch {
+            return false;
+        }
+    }
+
     handleListOpen() {
         this.onListOpen();
     }
@@ -478,9 +501,10 @@ class MeasureControls extends Control {
                     const lonLat = toLonLat(coords);
                     value = `${lonLat[1].toFixed(6)}, ${lonLat[0].toFixed(6)}`;
                 } else {
-                    // Strip HTML tags from tooltip text
-                    const tooltipText = f.get('tooltipText') || '';
-                    value = tooltipText.replace(/<[^>]*>/g, '');
+                    // A stockpile with its volume: built from the stored metric properties, in the units of the map now
+                    const label = type === 'stockpile' ? stockpileText(f.getProperties(), this.unitPref) : null;
+                    // Otherwise the tooltip text, without its HTML tags
+                    value = label ?? (f.get('tooltipText') || '').replace(/<[^>]*>/g, '');
                 }
                 return { name, type, value, feature: f, groupId: f.get('groupId') || '' };
             });
@@ -923,7 +947,11 @@ class MeasureControls extends Control {
 
         if (!geometry || !measurementType) return;
 
-        const output = measurementSizeText(geometry, measurementType, this.unitPref);
+        // A stockpile has no size of its own: its label is built from its stored metric properties
+        // (one saved without a volume keeps its text, as on import)
+        const output = measurementType === 'stockpile'
+            ? stockpileText(feature.getProperties(), this.unitPref)
+            : measurementSizeText(geometry, measurementType, this.unitPref);
 
         if (output) {
             feature.set('tooltipText', output);

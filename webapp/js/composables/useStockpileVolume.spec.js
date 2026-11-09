@@ -14,6 +14,11 @@ import { Vector as VectorSource } from 'ol/source';
 import { useStockpileVolume } from './useStockpileVolume';
 import { PREF, setPref, _resetPrefListenersForTests } from '@/libs/preferences';
 import { formatDensity, formatVolume } from '@/libs/format';
+import OlMap from 'ol/Map';
+import { LineString } from 'ol/geom';
+import MeasureControls from '@/libs/map/controls/measureControl';
+import { MeasurementStorage } from '@/libs/map/measurementStorage';
+import { ApiError } from '@/libs/ddb/apiError';
 
 const POLYGON = { type: 'Polygon', coordinates: [[[9, 45], [9.001, 45], [9.001, 45.001], [9, 45]]] };
 const VOLUME = { cutVolume: 100, fillVolume: 0, netVolume: 100, area2d: 50 };
@@ -22,6 +27,10 @@ let scope;
 let pile;
 let source;
 let savedFile;
+// The ids of the measurements in the file, as the measure control tells
+let savedIds;
+// The units of the map
+let unitPref;
 // The map the composable draws its overlay on (none unless a test gives one)
 let olMap;
 let dataset;
@@ -29,9 +38,11 @@ let dataset;
 let measuredBases;
 let netVolumeOf;
 
-function start() {
-    source = new VectorSource();
-    const measureControls = {
+/** @param {any} [controls]  the real measure control (default: one that does what the composable needs) */
+function start(controls) {
+    source = controls ? controls.source : new VectorSource();
+    savedIds = new Set();
+    const measureControls = controls || {
         source,
         // As the measure control does: one OL feature per GeoJSON feature, with its properties
         importFromGeoJSON(fc) {
@@ -41,7 +52,10 @@ function start() {
                 source.addFeature(feature);
             }
         },
-        refreshButtons() {}
+        refreshButtons() {},
+        // As the measure control does: in the saved file, whatever else changed on the map
+        isSaved: id => savedIds.has(id),
+        deleteMeasurement(feature) { source.removeFeature(feature); }
     };
     dataset = {
         calculateStockpileVolume: async (path, polygon, { baseMethod }) => {
@@ -60,7 +74,7 @@ function start() {
         dataset: () => dataset,
         map: olMap = ref(null),
         measureControls: shallowRef(measureControls),
-        currentUnitPref: ref('metric'),
+        currentUnitPref: unitPref = ref('metric'),
         deletedMeasurementIds: ref([]),
         rasterFilePath: ref(''),
         getMapCenterLatLon: () => () => null
@@ -109,6 +123,144 @@ describe('the label of a measured pile', () => {
         await measure('gravel');
         expect(draft().get('tooltipText')).toBe(`${formatVolume(1234.567, 'metric')} - Gravel - ${formatDensity(1.68, 'metric')}`);
         expect(draft().get('tooltipText')).toBe('1.234,57 m³ - Gravel - 1,68 t/m³');
+    });
+});
+
+describe('the label of a measured pile in imperial (FR-MAP-13)', () => {
+    afterEach(() => { delete navigator.language; });
+
+    it('is built from the metric result in yd³ and ST/yd³, the properties stay metric', async () => {
+        Object.defineProperty(navigator, 'language', { value: 'en-US', configurable: true });
+        unitPref.value = 'imperial';
+        dataset.calculateStockpileVolume = async () => ({ ...VOLUME, cutVolume: 8097.19, netVolume: 8097.19 });
+        await measure('gravel');
+        // 8097.19 m³ x 1.307950619 = 10,590.72 yd³; 1.68 t/m³ x 0.8427774 = 1.416 ST/yd³
+        expect(draft().get('tooltipText')).toBe('10,590.72 yd³ - Gravel - 1.416 ST/yd³');
+        expect(draft().get('netVolume')).toBe(8097.19);
+        expect(draft().get('materialDensity')).toBe(1.68);
+    });
+});
+
+describe('Clear (FR-MAP-02, AC-014)', () => {
+    it('removes a pile that is not saved from the map', async () => {
+        await measure('gravel');
+        expect(draft()).toBeDefined();
+        pile.clearStockpileOverlay();
+        expect(draft()).toBeUndefined();
+        expect(pile.stockpileResult.value).toBeNull();
+    });
+
+    it('keeps a pile that was saved: after adopt, markSaved and Clear it is still in the source', async () => {
+        await measure('gravel');
+        savedIds.add(draft().get('id'));
+        pile.clearStockpileOverlay();
+        expect(draft()).toBeDefined();
+        expect(pile.stockpileResult.value).toBeNull();
+        expect(pile.stockpileDetectedPolygon.value).toBeNull();
+    });
+
+    it('keeps a saved pile also when the map has other unsaved changes', async () => {
+        await measure('gravel');
+        savedIds.add(draft().get('id'));
+        // A distance drawn after the save: the map is dirty, the pile is still saved
+        source.addFeature(new Feature({ measurementType: 'length', id: 'd1' }));
+        pile.clearStockpileOverlay();
+        expect(source.getFeatures().filter(f => f.get('measurementType') === 'stockpile')).toHaveLength(1);
+        expect(source.getFeatures()).toHaveLength(2);
+    });
+
+    it('then a pile measured next is a new one: the saved pile is not replaced or removed by it', async () => {
+        await measure('gravel');
+        const first = draft().get('id');
+        savedIds.add(first);
+        pile.clearStockpileOverlay();
+        await pile.calculateStockpileVolume(POLYGON);
+        await flushPromises();
+        const ids = source.getFeatures().filter(f => f.get('measurementType') === 'stockpile').map(f => f.get('id'));
+        expect(ids).toHaveLength(2);
+        expect(ids).toContain(first);
+    });
+});
+
+describe('Clear after a save, then Save, with the real measure control and storage (FR-MAP-02, AC-014)', () => {
+    let control;
+    let olMapOfControl;
+    let file;
+    let storage;
+
+    beforeEach(() => {
+        scope.stop();
+        control = new MeasureControls({});
+        const target = document.createElement('div');
+        document.body.appendChild(target);
+        olMapOfControl = new OlMap({ target });
+        control.setMap(olMapOfControl);
+        file = { content: null };
+        // The dataset's file: the client's 404 until the first save writes it
+        const fileDataset = {
+            getFileContents: async () => {
+                if (file.content === null) throw new ApiError('Not found', 404);
+                return file.content;
+            },
+            writeObj: async (_path, blob) => { file.content = await blob.text(); },
+            deleteObj: async () => { file.content = null; }
+        };
+        storage = new MeasurementStorage(fileDataset, { path: 'dsm.tif' });
+        start(control);
+    });
+    afterEach(() => {
+        control.setMap(null);
+        olMapOfControl.setTarget(undefined);
+    });
+
+    // The toolbar's Save
+    async function save() {
+        await storage.save(control.exportToGeoJSON('dsm.tif'));
+        control.markSaved();
+    }
+    const fileFeatures = type => JSON.parse(file.content).features.filter(f => f.properties.measurementType === type);
+
+    it('a title edit after the save, then Clear, then Save: the pile is still in the file, with its new title', async () => {
+        await measure('gravel');
+        await save();
+        const id = draft().get('id');
+        expect(fileFeatures('stockpile').map(f => f.properties.id)).toEqual([id]);
+
+        pile.stockpileTitle.value = 'North pile';
+        await nextTick();
+        expect(control.isDirty()).toBe(true);
+        pile.clearStockpileOverlay();
+        await save();
+        const piles = fileFeatures('stockpile');
+        expect(piles.map(f => f.properties.id)).toEqual([id]);
+        expect(piles[0].properties.title).toBe('North pile');
+    });
+
+    it('a new measurement after the save, then Clear, then Save: the pile and the new measurement are in the file', async () => {
+        await measure('gravel');
+        await save();
+        const id = draft().get('id');
+
+        const line = new Feature(new LineString([[0, 0], [100, 0]]));
+        line.setProperties({ measurementType: 'length', name: 'Fence' });
+        control.source.addFeature(line);
+        expect(control.isDirty()).toBe(true);
+        pile.clearStockpileOverlay();
+        await save();
+        expect(fileFeatures('stockpile').map(f => f.properties.id)).toEqual([id]);
+        expect(fileFeatures('length').map(f => f.properties.name)).toEqual(['Fence']);
+    });
+
+    it('a pile that was never saved goes with Clear, and the next Save does not write it', async () => {
+        await measure('gravel');
+        pile.clearStockpileOverlay();
+        expect(draft()).toBeUndefined();
+        const line = new Feature(new LineString([[0, 0], [100, 0]]));
+        line.setProperties({ measurementType: 'length', name: 'Fence' });
+        control.source.addFeature(line);
+        await save();
+        expect(fileFeatures('length')).toHaveLength(1);
+        expect(fileFeatures('stockpile')).toEqual([]);
     });
 });
 

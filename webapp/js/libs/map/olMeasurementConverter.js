@@ -10,9 +10,10 @@ import GeoJSON from 'ol/format/GeoJSON';
 import { toLonLat } from 'ol/proj';
 import { pointCoordinates, showPointPopup } from './pointPopup';
 import { copyText } from '@/composables/useCopyText';
-import { areaParts, lengthParts } from '@/libs/format';
+import { areaParts, lengthParts, stockpileLabel } from '@/libs/format';
 import { EPSG } from '@/libs/constants';
 import { STOCKPILE_PROPERTIES } from './stockpileStorage';
+import { write, sectionOf, VIEW } from './measurementFormat';
 import { ANALYSIS_MEASUREMENT_TYPES, currentAnalysisColour } from './analysisStyles';
 
 /**
@@ -201,9 +202,11 @@ function geoJSONToFeature(geoJsonFeature, unitPref) {
     if (props.groupId) feature.set('groupId', props.groupId);
 
     // An area or a length shows its size in today's units, not the text it was saved with (which
-    // may be in other units or an older format); other measurements keep their text. A feature
-    // saved without text gets its size, as its geometry gives it.
+    // may be in other units or an older format); a stockpile builds its label from its stored metric
+    // properties in today's units; other measurements keep their text. A feature saved without text
+    // gets its size, as its geometry gives it.
     const tooltipText = measurementSizeText(geometry, props.measurementType, unitPref)
+        || (props.measurementType === 'stockpile' && typeof props.netVolume === 'number' ? stockpileLabel(props, unitPref) : null)
         || props.tooltipText
         || measurementSizeText(geometry, sizeKind(geometry), unitPref);
 
@@ -240,7 +243,9 @@ export function updateFeatureTooltip(feature) {
 }
 
 /**
- * Export all measurements in GeoJSON format
+ * Export all measurements in GeoJSON format: the document of the map's measurements (its features and
+ * its section of the file, with the groups), which the storage merges into the file next to the 3D
+ * viewer's.
  * @param {ol.source.Vector} source - OpenLayers vector source
  * @param {string} orthophotoPath - Orthophoto file path
  * @param {string} unitPref - Unit preference
@@ -248,45 +253,20 @@ export function updateFeatureTooltip(feature) {
  * @returns {Object} GeoJSON FeatureCollection
  */
 export function exportMeasurements(source, orthophotoPath, unitPref = 'metric', groups = []) {
-    const features = source.getFeatures();
+    const features = source.getFeatures()
+        .filter(f => {
+            // Only export actual measurement features (not temporary draw features)
+            const geom = f.getGeometry();
+            const hasType = f.get('measurementType');
+            return geom && (
+                geom instanceof Polygon
+                || geom instanceof LineString
+                || (geom instanceof Point && hasType === 'point')
+            );
+        })
+        .map(f => featureToGeoJSON(f, unitPref));
 
-    const geojson = {
-        type: 'FeatureCollection',
-        crs: {
-            type: 'name',
-            properties: {
-                name: EPSG.WGS84 // Output is always in WGS84
-            }
-        },
-        metadata: {
-            version: groups && groups.length > 0 ? '1.1' : '1.0',
-            kind: 'measurements',
-            orthophotoFile: orthophotoPath,
-            createdAt: new Date().toISOString(),
-            modifiedAt: new Date().toISOString(),
-            // Standardized identifier across all DroneDB-Registry-written
-            // measurement files. Older values ("Registry-Orthophoto",
-            // "Registry-Stockpile") are still accepted by the importer.
-            application: 'DroneDB Registry',
-            unitPreference: unitPref,
-            // Serialize groups only when they exist (retrocompat: omit when empty)
-            ...(groups && groups.length > 0 ? { groups } : {})
-        },
-        features: features
-            .filter(f => {
-                // Only export actual measurement features (not temporary draw features)
-                const geom = f.getGeometry();
-                const hasType = f.get('measurementType');
-                return geom && (
-                    geom instanceof Polygon
-                    || geom instanceof LineString
-                    || (geom instanceof Point && hasType === 'point')
-                );
-            })
-            .map(f => featureToGeoJSON(f, unitPref))
-    };
-
-    return geojson;
+    return write(null, VIEW.MAP, features, { orthophotoFile: orthophotoPath, unitPreference: unitPref, groups });
 }
 
 /**
@@ -330,11 +310,9 @@ export function importMeasurements(geojson, source, unitPref, map, onPointEdit) 
 
     console.log(`Imported ${imported.length} measurements`);
 
-    // Return imported features AND groups from metadata (for group state restoration)
-    return {
-        features: imported,
-        groups: (geojson.metadata && Array.isArray(geojson.metadata.groups)) ? geojson.metadata.groups : []
-    };
+    // Return imported features AND the map's groups from metadata.views.map (for group state restoration)
+    const { groups } = sectionOf(geojson, VIEW.MAP);
+    return { features: imported, groups: Array.isArray(groups) ? groups : [] };
 }
 
 /**

@@ -53,7 +53,9 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
     let dialog = null;
 
     const labelCtx = () => ({ viewer, session });
-    const storageFor = () => storage || (storage = new MeasurementStorage(dataset.value, entry.value, MeasurementOwner.POINT_CLOUD));
+    // The file's migration needs the point cloud's SRS when the file states none
+    const storageFor = () => storage
+        || (storage = new MeasurementStorage(dataset.value, entry.value, MeasurementOwner.POINT_CLOUD, { pointCloudCrs: coordinateSystem }));
 
     // What Save writes: the measures and the annotations (profiles and volumes are not saved)
     function countMeasurements() {
@@ -151,6 +153,7 @@ export function usePotreeMeasurements({ entry, dataset, canWrite, error, dialogs
         viewer = potreeViewer;
         session = potreeSession;
         coordinateSystem = crs;
+        storage = null;
         const scene = viewer.scene;
 
         ['measurement_added', 'measurement_removed']

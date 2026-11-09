@@ -155,7 +155,17 @@ const definition = {
             this._setSaved(false);
             this.measureControls.markSaved();
 
-            const geojson = await storage.load();
+            let geojson;
+            try {
+                geojson = await storage.load();
+            } catch (e) {
+                // A file that cannot be read stays as it is: Save refuses to replace it too
+                console.error('Error loading measurements:', e);
+                if (this._loadedMeasurementPath === storage.measurementPath) {
+                    this.showAlert('Error', `Could not load the saved measurements: ${e.message}`);
+                }
+                return;
+            }
             // Another target took over while the file was read
             if (this._loadedMeasurementPath !== storage.measurementPath) return;
             if (geojson) {
@@ -439,7 +449,7 @@ const definition = {
 
         /**
          * Called after loading measurements from storage: restore groups from GeoJSON metadata.
-         * @param {Array} groups - Groups array from geojson.metadata.groups
+         * @param {Array} groups - Groups array from the map's section of the file (metadata.views.map.groups)
          */
         restoreGroupsFromMetadata(groups) {
             if (Array.isArray(groups) && groups.length > 0) {

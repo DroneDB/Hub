@@ -13,11 +13,10 @@ import { pathutils } from 'ddb';
 import { newId as makeId } from '@/libs/ids';
 import { ANALYSIS_COLOR } from '@/libs/map/mapUtils';
 import { ANALYSIS_FILL } from '@/libs/map/analysisStyles';
+import { parse } from '@/libs/map/measurementFormat';
+import { isNotFound } from '@/libs/ddb/apiError';
 
 const SUFFIX = '_measurements.geojson';
-// Application id stamped on every file we own. Legacy values are still readable.
-const APP_ID = 'DroneDB Registry';
-const LEGACY_APP_IDS = new Set([APP_ID, 'Registry-Stockpile', 'Registry-Orthophoto']);
 
 /**
  * The properties of a stockpile feature beyond those of every measurement: what was measured, the
@@ -43,22 +42,17 @@ function getStockpilePath(rasterPath) {
     return `${pathutils.dropExtension(rasterPath)}${SUFFIX}`;
 }
 
+/**
+ * The measurements file as measurementFormat reads it (the files of every earlier writer, the 3D
+ * viewer's among them, and of the stockpile panel). Nothing is written. A missing file, or one that
+ * cannot be used (not GeoJSON, of another application), has no stockpile to show: null.
+ */
 async function readExisting(dataset, path) {
     try {
-        const content = await dataset.getFileContents(path);
-        if (!content || (typeof content === 'string' && !content.trim())) return null;
-        const fc = JSON.parse(content);
-        if (!fc || fc.type !== 'FeatureCollection' || !Array.isArray(fc.features)) return null;
-        if (fc.metadata && fc.metadata.application
-            && !LEGACY_APP_IDS.has(fc.metadata.application)) {
-            // Foreign file; refuse to merge to avoid corrupting unrelated data.
-            console.warn('Refusing to merge stockpile into foreign GeoJSON file:',
-                fc.metadata.application);
-            return null;
-        }
-        return fc;
+        return parse(await dataset.getFileContents(path));
     } catch (e) {
-        if (e && (e.status === 404 || /not found/i.test(String(e.message || '')))) return null;
+        // No file yet (the Registry's 404): nothing saved, nothing to say
+        if (isNotFound(e)) return null;
         console.warn('Failed to read existing measurements file:', e);
         return null;
     }
