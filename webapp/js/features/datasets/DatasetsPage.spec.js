@@ -3,7 +3,7 @@
  * `lastModified`, and asks the server to sort by it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import PrimeVue from 'primevue/config';
 
 const reg = vi.hoisted(() => ({
@@ -45,6 +45,7 @@ describe('DatasetsPage table', () => {
         const wrapper = mount(DatasetsPage, {
             global: {
                 plugins: [PrimeVue],
+                components: { RouterLink: RouterLinkStub },
                 mocks: { $route: { params: { org: 'org' } }, $router: { push: vi.fn() } },
                 stubs: { DatasetDialog: true, ImportDatasetDialog: true, OrganizationDialog: true, OrganizationMembersDialog: true, MessageDialog: true, DialogHost: true, EmptyState: true, Paginator: true }
             }
@@ -115,6 +116,7 @@ describe('DatasetsPage map view', () => {
         wrapper = mount(DatasetsPage, {
             global: {
                 plugins: [PrimeVue],
+                components: { RouterLink: RouterLinkStub },
                 mocks: { $route: { params: { org: 'org' } }, $router: { push: vi.fn() }, $notify: { success: vi.fn(), error: vi.fn() } },
                 stubs: {
                     DatasetDialog: true, ImportDatasetDialog: true, OrganizationDialog: true, OrganizationMembersDialog: true, MessageDialog: true,
@@ -408,6 +410,7 @@ describe('DatasetsPage create actions', () => {
         wrapper = mount(DatasetsPage, {
             global: {
                 plugins: [PrimeVue],
+                components: { RouterLink: RouterLinkStub },
                 mocks: { $route: { params: { org: 'org' } }, $router: { push: vi.fn() }, $notify: { success: vi.fn(), error: vi.fn() } },
                 stubs: {
                     DatasetDialog: true, ImportDatasetDialog: true, OrganizationDialog: true, OrganizationMembersDialog: true, MessageDialog: true,
@@ -445,5 +448,98 @@ describe('DatasetsPage create actions', () => {
         await renderEmpty(null);
         expect(wrapper.vm.canCreateDataset).toBe(true);
         expect(createActions()).toEqual(['Import Dataset', 'Create Dataset']);
+    });
+});
+
+describe('DatasetsPage keyboard (ORG-01)', () => {
+    let wrapper;
+    beforeEach(() => {
+        globalThis.HubOptions = {};
+        _resetPrefListenersForTests();
+        localStorage.clear();
+    });
+    afterEach(() => {
+        wrapper?.unmount();
+        wrapper = null;
+        document.body.innerHTML = '';
+        _resetPrefListenersForTests();
+    });
+
+    async function render() {
+        const { createRouter, createMemoryHistory } = await import('vue-router');
+        const router = createRouter({
+            history: createMemoryHistory(),
+            routes: [
+                { path: '/r/:org', name: 'Datasets', component: { render: () => null } },
+                { path: '/r/:org/:ds', name: 'ViewDataset', component: { render: () => null } }
+            ]
+        });
+        await router.push('/r/org');
+        reg.Organization = vi.fn(() => ({
+            info: () => Promise.resolve({ name: 'Org', slug: 'org', permissions: { canRead: true, canWrite: true } }),
+            datasetsPage: () => Promise.resolve({ items: [serverDataset({ slug: 'site', permissions: { canRead: true, canWrite: true } })], total: 1 }),
+            datasets: () => Promise.resolve([])
+        }));
+        wrapper = mount(DatasetsPage, {
+            attachTo: document.body,
+            global: {
+                plugins: [PrimeVue, router],
+                // The menu's transition runs, so that it reports when it is shown
+                stubs: {
+                    transition: false, DatasetDialog: true, ImportDatasetDialog: true, OrganizationDialog: true, OrganizationMembersDialog: true,
+                    MessageDialog: true, DialogHost: true, EmptyState: true, Paginator: true
+                }
+            }
+        });
+        await flushPromises();
+        return router;
+    }
+    const menu = () => document.querySelector('[role="menubar"]');
+    const settle = async () => {
+        await flushPromises();
+        await new Promise(resolve => setTimeout(resolve, 20));
+        await flushPromises();
+    };
+
+    it('renders the dataset name as a link to the dataset, which Enter opens', async () => {
+        await render();
+        const link = wrapper.find('a.ds-name');
+        expect(link.attributes('href')).toBe('/r/org/site');
+        expect(link.classes()).toContain('stretched-link');
+    });
+
+    it('opens the dataset once on a click of the name: the link, not the row too', async () => {
+        const router = await render();
+        const push = vi.spyOn(router, 'push');
+        await wrapper.find('a.ds-name').trigger('click');
+        await flushPromises();
+        expect(push).toHaveBeenCalledTimes(1);
+        expect(router.currentRoute.value.name).toBe('ViewDataset');
+    });
+
+    it('has a row menu button in the Actions column, which opens the row menu', async () => {
+        await render();
+        const kebab = wrapper.find('button.ds-row-menu');
+        expect(kebab.attributes('aria-haspopup')).toBe('menu');
+        expect(kebab.attributes('aria-expanded')).toBe('false');
+        await kebab.trigger('click');
+        await settle();
+        expect(menu()).not.toBeNull();
+        expect(menu().textContent).toContain('Open');
+        expect(wrapper.vm.contextMenuDataset.slug).toBe('site');
+        expect(wrapper.find('button.ds-row-menu').attributes('aria-expanded')).toBe('true');
+    });
+
+    it('opens the row menu with Shift+F10 or the Menu key on the name', async () => {
+        for (const key of [{ key: 'F10', shiftKey: true }, { key: 'ContextMenu' }]) {
+            await render();
+            await wrapper.find('a.ds-name').trigger('keydown', key);
+            await settle();
+            expect(menu()).not.toBeNull();
+            expect(wrapper.vm.contextMenuDataset.slug).toBe('site');
+            wrapper.unmount();
+            wrapper = null;
+            document.body.innerHTML = '';
+        }
     });
 });

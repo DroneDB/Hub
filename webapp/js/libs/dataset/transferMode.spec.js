@@ -5,6 +5,7 @@ describe('the transfer a user gets', () => {
     it('moves the files for a writer: the server does not keep the source', () => {
         expect(transferModeFor(true)).toBe(TRANSFER_MODES.move);
         expect(TRANSFER_MODES.move.keepSource).toBe(false);
+        expect(TRANSFER_MODES.move.confirmLabel).toBe('Move to dataset');
     });
 
     it('copies them for a user who can only read the dataset, and says so', () => {
@@ -12,7 +13,7 @@ describe('the transfer a user gets', () => {
         expect(mode).toBe(TRANSFER_MODES.copy);
         expect(mode.keepSource).toBe(true);
         expect(mode.menuLabel).toMatch(/^Copy/);
-        expect(mode.confirmLabel).toBe('Copy');
+        expect(mode.confirmLabel).toBe('Copy to dataset');
         expect(mode.note).toMatch(/stay here/);
     });
 

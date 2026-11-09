@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 import PrimeVue from 'primevue/config';
 import RoleManagementDialog from './RoleManagementDialog.vue';
 
@@ -54,5 +55,34 @@ describe('RoleManagementDialog delete question', () => {
         const props = RoleManagementDialog.computed.deleteDialog.call({ roleToDelete: 'editor' });
         expect(props).toMatchObject({ title: 'Delete role “editor”', confirmText: 'Delete', cancelText: 'Cancel', confirmButtonClass: 'danger' });
         expect(props.message).toContain('<strong>editor</strong>');
+    });
+});
+
+describe('RoleManagementDialog focus (ADM-03)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => {
+        vi.runOnlyPendingTimers();
+        vi.useRealTimers();
+        document.body.innerHTML = '';
+    });
+
+    it('takes the focus into the window, never into the hidden Add Role panel, and gives it back on close', async () => {
+        const Dialog = (await import('primevue/dialog')).default;
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+        const wrapper = mount(RoleManagementDialog, {
+            props: { roles: ['admin', 'editor'] },
+            attachTo: document.body, global: { plugins: [PrimeVue] }
+        });
+        await nextTick();
+        await wrapper.findComponent(Dialog).vm.$emit('show');
+        const active = document.activeElement;
+        expect(document.getElementById('roleManagementDialog').contains(active)).toBe(true);
+        expect(active.id).not.toBe('role-management-dialog-role-name');
+        expect(active.getAttribute('role')).toBe('tab');
+        expect(active.textContent).toContain('View Roles');
+        wrapper.unmount();
+        expect(document.activeElement).toBe(opener);
     });
 });

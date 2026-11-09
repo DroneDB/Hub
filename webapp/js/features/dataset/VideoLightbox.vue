@@ -1,7 +1,7 @@
 <template>
     <Teleport to="body">
-        <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/no-static-element-interactions -- a click beside the video closes it; Escape (document listener) and the Close button are the keyboard way -->
-        <div v-if="visible" ref="overlay" class="video-lightbox-overlay" role="dialog" aria-modal="true"
+        <!-- eslint-disable-next-line vuejs-accessibility/click-events-have-key-events, vuejs-accessibility/no-static-element-interactions -- a click beside the video closes it; Escape (the overlay stack) and the Close button are the keyboard way -->
+        <div v-if="visible" ref="overlay" v-focustrap class="video-lightbox-overlay" role="dialog" aria-modal="true"
              :aria-label="entryName || 'Video'" tabindex="-1" @click="onBackdropClick">
             <div class="video-lightbox-toolbar">
                 <div v-if="entry" class="video-lightbox-name">{{ entryName }}</div>
@@ -10,7 +10,7 @@
                        title="Open in new tab" aria-label="Open in new tab">
                         <i class="fa-solid fa-up-right-from-square" aria-hidden="true" />
                     </a>
-                    <button type="button" class="btn-reset video-lightbox-action" title="Close" aria-label="Close"
+                    <button type="button" class="btn-reset video-lightbox-action" title="Close" aria-label="Close" data-autofocus
                             @click="$emit('close')">
                         <i class="fa-solid fa-xmark" aria-hidden="true" />
                     </button>
@@ -30,18 +30,37 @@
 </template>
 
 <script>
+/**
+ * VideoLightbox - a video over the whole page. It is an overlay of the overlay stack
+ * (composables/useOverlay): the focus goes to its Close button and stays inside (focus trap),
+ * Escape closes it when it is the topmost overlay, and the focus goes back to the file that
+ * opened it.
+ */
+import { ref } from 'vue';
 import ddb from 'ddb';
+import { useOverlay, vFocusTrap } from '@/composables/useOverlay';
 
 const { pathutils } = ddb;
 
 export default {
     name: 'VideoLightbox',
+    directives: { focustrap: vFocusTrap },
     props: {
         visible: { type: Boolean, default: false },
         src: { type: String, default: '' },
         entry: { type: Object, default: null }
     },
     emits: ['close'],
+    setup(props, { emit }) {
+        const overlay = ref(null);
+        useOverlay({
+            active: () => props.visible,
+            container: () => overlay.value,
+            onEscape: e => { e.preventDefault(); emit('close'); },
+            autoFocus: true
+        });
+        return { overlay };
+    },
     data() {
         return {
             error: false
@@ -54,27 +73,22 @@ export default {
         }
     },
     watch: {
-        visible(v) {
-            this.error = false;
-            if (v) {
-                this.$nextTick(() => {
-                    if (this.$refs.overlay) this.$refs.overlay.focus();
-                    if (this.$refs.videoEl) {
-                        this.$refs.videoEl.play().catch(() => { /* autoplay blocked by browser */ });
-                    }
-                });
-            } else {
-                if (this.$refs.videoEl) {
+        // Immediate: the lightbox is usually mounted already visible
+        visible: {
+            immediate: true,
+            handler(v) {
+                this.error = false;
+                if (v) {
+                    this.$nextTick(() => {
+                        if (this.$refs.videoEl) {
+                            this.$refs.videoEl.play().catch(() => { /* autoplay blocked by browser */ });
+                        }
+                    });
+                } else if (this.$refs.videoEl) {
                     try { this.$refs.videoEl.pause(); } catch { /* noop */ }
                 }
             }
         }
-    },
-    mounted() {
-        document.addEventListener('keydown', this.onKey);
-    },
-    beforeUnmount() {
-        document.removeEventListener('keydown', this.onKey);
     },
     methods: {
         handleError() {
@@ -83,9 +97,6 @@ export default {
         // Only the empty space around the video and toolbar
         onBackdropClick(e) {
             if (e.target === this.$refs.overlay || e.target === this.$refs.content) this.$emit('close');
-        },
-        onKey(e) {
-            if (this.visible && e.key === 'Escape') this.$emit('close');
         }
     }
 };

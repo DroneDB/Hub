@@ -301,6 +301,24 @@ describe('PreferencesDialog', () => {
         });
     });
 
+    it('takes the focus to the first field of the shown tab, not of a hidden one, and gives it back on close (ACC-10)', async () => {
+        const Dialog = (await import('primevue/dialog')).default;
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+        await render({ initialTab: 'map' });
+        await wrapper.findComponent(Dialog).vm.$emit('show');
+        const active = document.activeElement;
+        const panel = active.closest('[role="tabpanel"]');
+        expect(document.getElementById('preferencesDialog').contains(active)).toBe(true);
+        expect(panel).not.toBeNull();
+        expect(panel.style.display).not.toBe('none');
+        expect(dom().find('[role="tab"][aria-selected="true"]').text()).toBe('Map');
+        wrapper.unmount();
+        wrapper = null;
+        expect(document.activeElement).toBe(opener);
+    });
+
     it('Close emits close', async () => {
         await render();
         expect(wrapper.emitted('close')).toBeUndefined();

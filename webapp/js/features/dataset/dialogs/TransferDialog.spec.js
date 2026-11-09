@@ -42,7 +42,7 @@ describe('TransferDialog', () => {
     it('moves the files by default: the server is told not to keep them', async () => {
         const w = await open({});
         expect(w.find('[data-title]').text()).toBe('Transfer to Dataset');
-        expect(w.find('[data-confirm]').text()).toBe('Transfer');
+        expect(w.find('[data-confirm]').text()).toBe('Move to dataset');
         expect(w.find('[data-transfer-note]').text()).toMatch(/removed from this dataset/);
         await w.find('[data-confirm]').trigger('click');
         await flushPromises();
@@ -53,7 +53,7 @@ describe('TransferDialog', () => {
     it('copies them when it keeps the source, and its texts say copy', async () => {
         const w = await open({ keepSource: true });
         expect(w.find('[data-title]').text()).toBe('Copy to Another Dataset');
-        expect(w.find('[data-confirm]').text()).toBe('Copy');
+        expect(w.find('[data-confirm]').text()).toBe('Copy to dataset');
         expect(w.find('[data-confirm]').attributes('data-icon')).toBe('fa-solid fa-copy');
         expect(w.find('[data-transfer-note]').text()).toMatch(/stay here/);
         await w.find('[data-confirm]').trigger('click');
@@ -84,5 +84,53 @@ describe('TransferDialog', () => {
             { label: 'Mine', value: 'mine' },
             { label: 'Team', value: 'team' }
         ]);
+    });
+
+    it('starts in the current organization, with its datasets loaded (EXP-13)', async () => {
+        const datasets = vi.fn(async () => [{ slug: 'ds', properties: {} }, { slug: 'other', properties: { meta: { name: { data: 'Other' } } } }]);
+        getOrganizations.mockResolvedValueOnce([{ org: { slug: 'org', name: 'Org', permissions: writable } }, { org: { slug: 'dest', name: 'Dest', permissions: writable } }]);
+        const spy = vi.spyOn(await import('@/libs/api/sharedRegistry').then(m => m.default), 'Organization')
+            .mockImplementation(() => ({ Dataset: () => ({ transferObj }), datasets }));
+        const w = mount(TransferDialog, {
+            props: { files, sourceOrg: 'org', sourceDs: 'ds' },
+            global: { plugins: [PrimeVue], stubs: { Window: WindowStub } }
+        });
+        await flushPromises();
+        expect(w.vm.destOrg).toBe('org');
+        expect(spy).toHaveBeenCalledWith('org');
+        expect(w.vm.datasetOptions).toEqual([
+            { label: 'ds', value: 'ds', disabled: true },
+            { label: 'Other', value: 'other', disabled: false }
+        ]);
+        spy.mockRestore();
+    });
+
+    it('leaves the organization to choose when the user may not write the current one', async () => {
+        const w = mount(TransferDialog, {
+            props: { files, sourceOrg: 'org', sourceDs: 'ds', keepSource: true },
+            global: { plugins: [PrimeVue], stubs: { Window: WindowStub } }
+        });
+        await flushPromises();
+        expect(w.vm.destOrg).toBeNull();
+        expect(w.vm.datasetOptions).toEqual([]);
+    });
+
+    it('picks the destination path with the folder picker of the destination dataset', async () => {
+        const FolderPickerStub = { name: 'FolderPicker', props: ['dataset', 'mode', 'initialPath', 'title'], emits: ['close'], template: '<div data-picker />' };
+        const w = mount(TransferDialog, {
+            props: { files, sourceOrg: 'org', sourceDs: 'ds' },
+            global: { plugins: [PrimeVue], stubs: { Window: WindowStub, FolderPicker: FolderPickerStub } }
+        });
+        await flushPromises();
+        expect(w.find('[data-browse]').attributes('disabled')).toBeDefined();
+        await w.setData({ destOrg: 'dest', destDs: 'target' });
+        await w.find('[data-browse]').trigger('click');
+        const picker = w.findComponent(FolderPickerStub);
+        expect(picker.props('mode')).toBe('folder');
+        expect(picker.props('dataset')).toBeTruthy();
+        picker.vm.$emit('close', { path: 'images/2024', entry: null });
+        await flushPromises();
+        expect(w.vm.destPath).toBe('images/2024');
+        expect(w.find('[data-picker]').exists()).toBe(false);
     });
 });

@@ -24,23 +24,26 @@
  * - `close` (with an optional result) on the X, a mask click (closeModalOnClick) or Escape;
  *   `update:visible` too, so `v-model:visible` works. Rendered with v-if, visible stays true.
  * - `confirm` on Enter (not from a button, a link, a text area or a menu, where Enter means
- *   something else; never with `enterConfirms` false or `confirmDisabled`). Only the topmost
- *   open Window reacts to the keyboard.
+ *   something else; never with `enterConfirms` false or `confirmDisabled`).
  * - `busy` disables closing and the footer buttons.
  * - A footer: the `footer` slot; Cancel and `confirmLabel` buttons when confirmLabel is set;
  *   just the Cancel (`cancelLabel`) button with `closeButton`. A footer of its own marks its
  *   buttons [data-cancel] and [data-confirm].
- * - Focuses, when shown, the [data-autofocus] element; for a destructive confirmation
- *   (`danger`, or confirmSeverity 'danger') the [data-cancel] button; else the first field,
- *   then the confirm button; so the keyboard never stays on the page behind the dialog, and
- *   Enter never confirms a destructive action by default.
+ * - The overlay stack (composables/useOverlay) owns the rest: only the topmost open overlay
+ *   reacts to the keyboard, and Escape with an open Select in it only closes the Select; when
+ *   shown, the focus goes to the [data-autofocus] element, for a destructive confirmation
+ *   (`danger`, or confirmSeverity 'danger') the [data-cancel] button, else the first visible
+ *   field, then the confirm button; so the keyboard never stays on the page behind the dialog,
+ *   and Enter never confirms a destructive action by default; on close it goes back to the
+ *   control that opened the window.
  *
  *   <Window id="rename" title="Rename" modal confirm-label="Rename" :busy="saving" @confirm="rename" @close="cancel">
  */
-import { ref, computed, watch, onBeforeUnmount, useId } from 'vue';
+import { ref, computed, useId } from 'vue';
 import Dialog from 'primevue/dialog';
 import Button from 'primevue/button';
 import { useEventListener } from '@/composables/useEventListener';
+import { useOverlay } from '@/composables/useOverlay';
 
 defineOptions({ name: 'HubWindow' });
 
@@ -85,27 +88,31 @@ function close(result) {
     emit('close', result);
 }
 
-// ---- Keyboard: the topmost visible Window only -------------------------------------------
+// ---- Keyboard and focus: the overlay stack ------------------------------------------------
 
-const token = {};
-watch(() => props.visible, visible => {
-    openWindows.delete(token);
-    if (visible) openWindows.add(token);
-}, { immediate: true });
-onBeforeUnmount(() => openWindows.delete(token));
+// The dialog element (PrimeVue renders it, with role="dialog", around the content)
+const dialogElement = () => contentRoot.value?.closest('[role="dialog"]') || contentRoot.value;
 
-const NOT_FOR_ENTER = 'button, a, textarea, select, [role="button"], [role="menuitem"], [role="option"], [contenteditable="true"]';
-
-// Something inside the dialog that handled the key (a dropdown closing) keeps it; a key
-// handled elsewhere (focus left in a closed context menu) does not
-const handledInside = e => e.defaultPrevented && !!contentRoot.value && !!contentRoot.value.closest('.p-dialog')?.contains(e.target);
-
-useEventListener(document, 'keydown', e => {
-    if (!props.visible || [...openWindows].pop() !== token || handledInside(e) || e.isComposing) return;
-    if (e.key === 'Escape' && props.closable) {
+const overlay = useOverlay({
+    active: () => props.visible,
+    container: dialogElement,
+    focusRoot: () => contentRoot.value,
+    danger: () => props.danger || props.confirmSeverity === 'danger',
+    onEscape: e => {
+        if (!props.closable) return;
         e.preventDefault();
         close();
-    } else if (e.key === 'Enter' && props.enterConfirms && !props.busy && !props.confirmDisabled && !(e.target instanceof Element && e.target.closest(NOT_FOR_ENTER))) {
+    }
+});
+
+const NOT_FOR_ENTER = 'button, a, textarea, select, [role="button"], [role="menuitem"], [role="option"], [contenteditable="true"], [aria-expanded="true"]';
+
+// Something inside the dialog that handled Enter (a dropdown choosing an option) keeps it
+const handledInside = e => e.defaultPrevented && !!dialogElement()?.contains(e.target);
+
+useEventListener(document, 'keydown', e => {
+    if (e.key !== 'Enter' || !props.visible || !overlay.isTopmost() || handledInside(e) || e.isComposing) return;
+    if (props.enterConfirms && !props.busy && !props.confirmDisabled && !(e.target instanceof Element && e.target.closest(NOT_FOR_ENTER))) {
         emit('confirm');
     }
 });
@@ -131,35 +138,18 @@ const dialogPt = computed(() => ({
     root: { id: props.id || generatedId, class: ['window-dialog', props.sizeClass, isTall.value && 'window-tall'].filter(Boolean).join(' ') }
 }));
 
-const FIELD = 'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])';
-
-const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
-
-const isDanger = computed(() => props.danger || props.confirmSeverity === 'danger');
-
-// PrimeVue focuses the [autofocus] element after its enter transition: tag the target
-// ([data-autofocus] (a typed confirmation's input), else the Cancel button of a destructive
-// confirmation, the first field, the confirm button, anything focusable) and focus it now
-// too, without scrolling mid-animation
-function focusTarget(root) {
-    const explicit = root.querySelector('[data-autofocus]');
-    if (explicit) return explicit.matches(FIELD) ? explicit : explicit.querySelector(FIELD) || explicit;
-    const cancel = isDanger.value && root.querySelector('[data-cancel]:not([disabled])');
-    return cancel || root.querySelector(FIELD) || root.querySelector('[data-confirm]:not([disabled])') || root.querySelector(FOCUSABLE);
-}
-
+// PrimeVue's Dialog keeps the element focused when it shows (the opener) and focuses it again
+// when it hides, then focuses the [autofocus] element after its enter transition. The target
+// is focused after the Dialog has kept the opener (not an element inside, which an
+// InputNumber's handlers no longer have once it unmounts), without scrolling mid-animation,
+// and tagged [autofocus] for the end of the transition.
 function onShow() {
     emit('show');
-    const root = contentRoot.value;
-    if (!props.focusOnShow || !root) return;
-    const target = focusTarget(root);
-    if (!target) return;
-    target.setAttribute('autofocus', '');
-    target.focus({ preventScroll: true });
+    if (!props.focusOnShow) return;
+    queueMicrotask(() => {
+        const target = overlay.focusInitial();
+        if (target && contentRoot.value?.contains(target)) target.setAttribute('autofocus', '');
+    });
 }
 </script>
 
-<script>
-// Visible Windows in opening order (the last one has the keyboard)
-const openWindows = new Set();
-</script>

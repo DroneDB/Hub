@@ -77,3 +77,26 @@ describe('MapSettingsDialog', () => {
         expect(wrapper.emitted('unitsChanged')).toEqual([['imperial', 'metric']]);
     });
 });
+
+describe('MapSettingsDialog keyboard (MAP-03)', () => {
+    const escapeOn = target => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+
+    it('closes on Escape, also from the basemap Select after a basemap was chosen', async () => {
+        await render();
+        await chooseBasemap('osm');
+        const combo = document.getElementById('map-settings-dialog-basemap');
+        combo.focus();
+        escapeOn(combo);
+        expect(wrapper.emitted('close')).toHaveLength(1);
+    });
+
+    it('with the basemap list open, Escape closes only the list', async () => {
+        await render();
+        wrapper.findAllComponents({ name: 'Select' }).find(c => c.props('inputId') === 'map-settings-dialog-basemap').vm.show();
+        await flushPromises();
+        const combo = document.getElementById('map-settings-dialog-basemap');
+        expect(combo.getAttribute('aria-expanded')).toBe('true');
+        escapeOn(combo);
+        expect(wrapper.emitted('close')).toBeUndefined();
+    });
+});

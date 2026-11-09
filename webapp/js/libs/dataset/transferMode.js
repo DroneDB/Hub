@@ -17,7 +17,8 @@ export const TRANSFER_MODES = Object.freeze({
         keepSource: false,
         menuLabel: 'Transfer',
         title: 'Transfer to Dataset',
-        confirmLabel: 'Transfer',
+        // The button says what happens to the files
+        confirmLabel: 'Move to dataset',
         confirmIcon: 'fa-solid fa-right-left',
         working: 'Transferring',
         done: 'transferred',
@@ -29,7 +30,7 @@ export const TRANSFER_MODES = Object.freeze({
         keepSource: true,
         menuLabel: 'Copy to another dataset...',
         title: 'Copy to Another Dataset',
-        confirmLabel: 'Copy',
+        confirmLabel: 'Copy to dataset',
         confirmIcon: 'fa-solid fa-copy',
         working: 'Copying',
         done: 'copied',

@@ -56,3 +56,22 @@ describe('HubWindow.vue keyboard ownership', () => {
         w.unmount();
     });
 });
+
+describe('HubWindow.vue in the overlay stack', () => {
+    it('closes only the topmost of two open windows on Escape, then the other one', async () => {
+        const Window = (await import('@/components/HubWindow.vue')).default;
+        const PrimeVue = (await import('primevue/config')).default;
+        const options = { attachTo: document.body, global: { plugins: [PrimeVue], stubs: { teleport: true } } };
+        const lower = mount(Window, { props: { visible: true, title: 'Lower' }, ...options });
+        const upper = mount(Window, { props: { visible: true, title: 'Upper' }, ...options });
+        const escape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        escape();
+        expect(upper.emitted('close')).toHaveLength(1);
+        expect(lower.emitted('close')).toBeUndefined();
+        await upper.setProps({ visible: false });
+        escape();
+        expect(lower.emitted('close')).toHaveLength(1);
+        upper.unmount();
+        lower.unmount();
+    });
+});

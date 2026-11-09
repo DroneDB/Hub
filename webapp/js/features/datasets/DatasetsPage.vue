@@ -97,12 +97,16 @@
                              :class="{ 'ds-thumb-placeholder': !slotProps.data.thumbLoaded }">
                     </template>
                 </Column>
-                <Column field="name" :sortable="true">
+                <Column field="name" :sortable="true" :pt="{ bodyCell: { class: 'ds-name-cell' } }">
                     <template #header>
                         <i class="fa-solid fa-database" /> Dataset
                     </template>
                     <template #body="slotProps">
-                        <span class="ds-name">{{ slotProps.data.name || slotProps.data.slug }}</span>
+                        <!-- A link (Tab, Enter, open in a new tab) over the whole cell; Shift+F10 or the Menu key opens the row menu -->
+                        <router-link :to="{ name: 'ViewDataset', params: { org: $route.params.org, ds: slotProps.data.slug } }"
+                                     class="ds-name stretched-link" @keydown="onNameKeydown($event, slotProps.data)">
+                            {{ slotProps.data.name || slotProps.data.slug }}
+                        </router-link>
                         <i v-if="slotProps.data.visibility === Visibility.PRIVATE" class="fa-solid fa-lock d-sm-none ms-1"
                            role="img" :aria-label="visibilityLabel(slotProps.data.visibility)" />
                         <div v-if="slotProps.data.tagline" class="ds-tagline">{{ slotProps.data.tagline }}</div>
@@ -142,7 +146,7 @@
                         <VisibilityTag :visibility="slotProps.data.visibility" />
                     </template>
                 </Column>
-                <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 7.5rem;">
+                <Column v-if="showActionsColumn" header="Actions" :pt="{ bodyCell: { style: 'text-align: center; white-space: nowrap' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }" style="width: 9.5rem;">
                     <template #body="slotProps">
                         <Button v-if="slotProps.data.permissions && slotProps.data.permissions.canWrite"
                                 severity="secondary" outlined size="small" :loading="slotProps.data.editing"
@@ -152,6 +156,10 @@
                                 severity="danger" size="small" :loading="slotProps.data.deleting"
                                 :disabled="slotProps.data.deleting || slotProps.data.editing" icon="fa-solid fa-trash"
                                 class="ms-1" aria-label="Delete dataset" @click.stop="handleDelete(slotProps.data)" />
+                        <Button severity="secondary" text size="small" icon="fa-solid fa-ellipsis-vertical" class="ms-1 ds-row-menu"
+                                aria-haspopup="menu" :aria-expanded="rowMenuOpen && contextMenuDataset === slotProps.data ? 'true' : 'false'"
+                                :aria-label="`Actions for ${slotProps.data.name || slotProps.data.slug}`"
+                                @click.stop="openRowMenu($event, slotProps.data)" />
                     </template>
                 </Column>
                 <template #empty>
@@ -161,7 +169,7 @@
                 </template>
             </DataTable>
 
-            <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" />
+            <PrimeContextMenu ref="datasetContextMenu" :model="datasetContextMenuItems" @show="rowMenuOpen = true" @hide="onRowMenuHide" />
 
             <!-- Pagination -->
             <div v-if="view === 'list' && totalPages > 0" class="ds-pagination d-flex justify-content-between align-items-center mt-2 p-2">
@@ -240,6 +248,7 @@ import { visibilityLabel } from '@/libs/visibility';
 import { formatDateTime } from '@/libs/format';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
+import { hasOpenOverlay } from '@/composables/useOverlay';
 
 // The width each secondary column appears from, shared by the table and its loading skeleton.
 // Every column with the actions takes about 790 px, more than a 768 px screen holds: the creation
@@ -311,6 +320,8 @@ export default {
             membersDialogOpen: false,
 
             contextMenuDataset: null,
+            // The row menu is shown (the kebab's aria-expanded)
+            rowMenuOpen: false,
 
             orgName: "",
             orgInfo: null,
@@ -766,12 +777,60 @@ export default {
         },
 
         onRowClick(event) {
+            // The name link opens the dataset itself (also in a new tab)
+            const target = event.originalEvent && event.originalEvent.target;
+            if (target instanceof Element && target.closest('a')) return;
             this.viewDataset(event.data);
         },
 
         onRowContextMenu(event) {
+            const e = event.originalEvent;
+            // The Menu key on the focused name: at the name, not at the corner of the page
+            const fromKeyboard = !e.pageX && !e.pageY && e.target instanceof Element;
             this.contextMenuDataset = event.data;
-            this.$refs.datasetContextMenu.show(event.originalEvent);
+            this.$refs.datasetContextMenu.show(fromKeyboard ? this.menuEventAt(e, e.target) : e);
+        },
+
+        /**
+         * The row menu under an element (the kebab, the name): the focus comes back to it when
+         * the menu closes without opening anything.
+         * @param {Event} event
+         * @param {object} ds
+         */
+        openRowMenu(event, ds) {
+            const element = /** @type {HTMLElement} */ (event.currentTarget);
+            this.contextMenuDataset = ds;
+            this._rowMenuOpener = element;
+            this.$refs.datasetContextMenu.show(this.menuEventAt(event, element));
+        },
+
+        // What ContextMenu.show reads from a pointer event, at the bottom left of the element
+        menuEventAt(event, element) {
+            const box = element.getBoundingClientRect();
+            return {
+                pageX: box.left + window.scrollX,
+                pageY: box.bottom + window.scrollY,
+                stopPropagation: () => event.stopPropagation(),
+                preventDefault: () => event.preventDefault()
+            };
+        },
+
+        // Shift+F10 or the Menu key on the dataset name
+        onNameKeydown(event, ds) {
+            if (event.key !== 'ContextMenu' && !(event.key === 'F10' && event.shiftKey)) return;
+            event.preventDefault();
+            this.openRowMenu(event, ds);
+        },
+
+        // A menu closed with Escape (or a click elsewhere) gives the focus back to its opener,
+        // unless one of its items opened a dialog, which has the focus now
+        onRowMenuHide() {
+            this.rowMenuOpen = false;
+            const opener = this._rowMenuOpener;
+            this._rowMenuOpener = null;
+            const active = document.activeElement;
+            const lost = !active || active === document.body || !!active.closest('[role="menubar"], [role="menu"]');
+            if (opener && opener.isConnected && lost && !hasOpenOverlay()) opener.focus();
         },
 
         onPageChange(event) {
@@ -1109,6 +1168,18 @@ export default {
 
     .ds-name {
         font-weight: bold;
+        color: inherit;
+        text-decoration: none;
+        overflow-wrap: anywhere;
+    }
+
+    /* The stretched link of the name covers its cell */
+    .ds-table :deep(.ds-name-cell) {
+        position: relative;
+    }
+
+    .ds-name:hover {
+        text-decoration: underline;
     }
 
     .ds-tagline {

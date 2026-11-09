@@ -4,7 +4,8 @@
     <div id="map" role="region" aria-label="Map" @mouseover="pointerInside = true" @mouseleave="pointerInside = false"
          @focusin="focusInside = true" @focusout="focusInside = false">
         <DialogHost :dialogs="dialogs" />
-        <div ref="map-container" class="map-container" :class="{
+        <!-- Focusable from code (tabindex -1): a focus in the photo popup comes back here when it closes -->
+        <div ref="map-container" class="map-container" tabindex="-1" :class="{
             'cursor-pointer': selectSingle,
             'cursor-crosshair': selectPolygon
         }">
@@ -89,7 +90,7 @@
         <MapSettingsDialog v-if="mapSettingsDialogOpen" :basemaps="basemaps" :selected-basemap="selectedBasemap"
                            :unit-pref="currentUnitPref" @close="mapSettingsDialogOpen = false"
                            @basemap-changed="handleBasemapChanged" @units-changed="handleUnitsChanged" />
-        <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" />
+        <MapFilePopup ref="filePopup" :map="map" @open-item="file => $emit('openItem', file)" @dismiss="onFilePopupDismissed" />
         <MapToolbar v-if="zones" :zones="zones" :show-back="standalone && !!dataset" :copy-link="!!linkTarget && !!dataset"
                     :display-options="!standalone"
                     :split-toggle="!standalone || !!view"
@@ -558,6 +559,12 @@ export default {
             const shots = hit && hit.feature.get('features');
             if (shots) this.openShot(shots[0].file, e.coordinate);
             shotLayer.changed();
+        },
+
+        // The user closed the photo popup (Escape, its Close button): the footprint goes. The
+        // overlay stack gives a focus that was in the popup back to the map
+        onFilePopupDismissed: function () {
+            if (this.fileLayers) this.fileLayers.clearFootprints();
         },
 
         // A clicked shot: panoramas open, photos and videos get the popup, photos their footprint

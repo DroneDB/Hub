@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { defineComponent } from 'vue';
+import { mount, flushPromises } from '@vue/test-utils';
 import Dialog from 'primevue/dialog';
+import Select from 'primevue/select';
 import PrimeVue from 'primevue/config';
 import Window from './HubWindow.vue';
 
@@ -95,5 +97,77 @@ describe('Window Enter', () => {
             expect(w.emitted('confirm')).toBeUndefined();
             w.unmount();
         }
+    });
+});
+
+describe('Window in the overlay stack (FR-XC-19)', () => {
+    const withSelect = () => defineComponent({
+        components: { Window, Select },
+        emits: ['close'],
+        data: () => ({ value: 'a', options: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }] }),
+        template: `<Window title="T" modal @close="$emit('close')">
+                       <Select v-model="value" input-id="pick" :options="options" option-label="label" option-value="value" />
+                   </Window>`
+    });
+    const escapeOn = target => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }));
+
+    it('closes on Escape from a closed Select, which stops the key itself (MAP-03)', async () => {
+        const w = mount(withSelect(), { attachTo: document.body, global: { plugins: [PrimeVue] } });
+        await flushPromises();
+        const combo = document.getElementById('pick');
+        combo.focus();
+        expect(combo.getAttribute('aria-expanded')).toBe('false');
+        escapeOn(combo);
+        expect(w.emitted('close')).toHaveLength(1);
+        w.unmount();
+    });
+
+    it('lets Escape close only the open Select list', async () => {
+        const w = mount(withSelect(), { attachTo: document.body, global: { plugins: [PrimeVue] } });
+        await flushPromises();
+        const select = w.findComponent(Select);
+        select.vm.show(true);
+        await flushPromises();
+        const combo = document.getElementById('pick');
+        combo.focus();
+        expect(combo.getAttribute('aria-expanded')).toBe('true');
+        escapeOn(combo);
+        // The Select hides on a timeout
+        await new Promise(resolve => setTimeout(resolve, 0));
+        await flushPromises();
+        expect(w.emitted('close')).toBeUndefined();
+        expect(combo.getAttribute('aria-expanded')).toBe('false');
+        w.unmount();
+    });
+
+    it('takes the focus from the opener and gives it back on close (AC-026)', async () => {
+        const opener = document.createElement('button');
+        document.body.appendChild(opener);
+        opener.focus();
+        const w = mount(Window, {
+            props: { id: 'edit', visible: true, title: 'T', confirmLabel: 'Save' },
+            slots: { default: '<input class="name">' },
+            attachTo: document.body, global: { plugins: [PrimeVue] }
+        });
+        await flushPromises();
+        // Test utils stub the Dialog's transition, whose enter hook emits show
+        await w.findComponent(Dialog).vm.$emit('show');
+        expect(document.activeElement.classList.contains('name')).toBe(true);
+        expect(document.activeElement.closest('[role="dialog"]').id).toBe('edit');
+        w.unmount();
+        expect(document.activeElement).toBe(opener);
+        opener.remove();
+    });
+
+    it('skips a field of a hidden tab panel', async () => {
+        const w = mount(Window, {
+            props: { visible: true, title: 'T' },
+            slots: { default: '<div style="display: none"><input class="hidden"></div><div><input class="shown"></div>' },
+            attachTo: document.body, global: { plugins: [PrimeVue] }
+        });
+        await flushPromises();
+        await w.findComponent(Dialog).vm.$emit('show');
+        expect(document.activeElement.classList.contains('shown')).toBe(true);
+        w.unmount();
     });
 });

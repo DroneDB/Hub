@@ -607,3 +607,22 @@ describe('the panels over the map', () => {
         expect(wrapper.find('.map-bottom-panel').element.parentElement).toBe(container);
     });
 });
+
+describe('the photo popup', () => {
+    it('closed by the user (Escape, Close) clears the footprint and leaves the focus to the overlay stack (MAP-20)', async () => {
+        await mountMap([]);
+        const outside = document.createElement('button');
+        document.body.appendChild(outside);
+        outside.focus();
+        const clear = vi.spyOn(wrapper.vm.fileLayers, 'clearFootprints');
+        wrapper.findComponent(Popup).vm.$emit('dismiss');
+        expect(clear).toHaveBeenCalledTimes(1);
+        expect(document.activeElement).toBe(outside);
+        outside.remove();
+    });
+
+    it('has a map container that can take the focus from code, as the popup gives it back there', async () => {
+        await mountMap([]);
+        expect(wrapper.find('.map-container').attributes('tabindex')).toBe('-1');
+    });
+});

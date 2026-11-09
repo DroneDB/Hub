@@ -13,7 +13,7 @@
                 <button v-if="popup.kind === 'video'" class="image-popup-btn" title="Play video" aria-label="Play video" @click="play">
                     <i style="margin: 0; height: auto" class="fa-solid fa-play" />
                 </button>
-                <button class="image-popup-btn image-popup-close" title="Close" aria-label="Close" @click="close">
+                <button class="image-popup-btn image-popup-close" title="Close" aria-label="Close" @click="dismiss">
                     <i style="margin: 0; height: auto" class="fa-solid fa-xmark" />
                 </button>
             </div>
@@ -48,11 +48,17 @@
  * Dragging the header moves the popup away from its point: the drag changes the overlay's
  * offset, so the popup still follows the point when the map pans or zooms.
  *
- *   <MapFilePopup ref="popup" :map="map" @open-item="..." />   then popup.show(file, coordinate)
+ *   <MapFilePopup ref="popup" :map="map" @open-item="..." @dismiss="..." />   then popup.show(file, coordinate)
  * and popup.closeUnlessIn(files) when the map shows other files.
+ *
+ * While it is shown (and its map tab is: a hidden tab leaves it open but takes it off the stack)
+ * it is an overlay of the overlay stack (composables/useOverlay): Escape
+ * closes it when it is the topmost overlay (a dialog above it closes first). `dismiss` tells
+ * the map that the user closed it (Escape, the Close button), and a focus inside it goes back
+ * to the map.
  */
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
-import { reactive, ref, nextTick, onBeforeUnmount } from 'vue';
+import { reactive, ref, nextTick, onMounted, onBeforeUnmount } from 'vue';
 import Overlay from 'ol/Overlay';
 import { pointLonLat } from '@/libs/ddb/pointGeom';
 import ddb from 'ddb';
@@ -60,13 +66,15 @@ import { thumbs } from 'ddb';
 import { hasThumbnail } from '@/libs/entryTypeCapabilities';
 import { useCopyText } from '@/composables/useCopyText';
 import { useTimeout } from '@/composables/useTimers';
+import { useOverlay } from '@/composables/useOverlay';
+import { useResizeObserver } from '@/composables/useEventListener';
 import { shouldRetry, retryDelayMs, stripRetryParam } from '@/libs/build/thumbRetryPolicy';
 
 const props = defineProps({
     /** The OpenLayers map (the overlay is added on first show) */
     map: { type: Object, default: null }
 });
-const emit = defineEmits(['openItem']);
+const emit = defineEmits(['openItem', 'dismiss']);
 
 const element = ref(null);
 const { copy, copied } = useCopyText();
@@ -78,6 +86,20 @@ const empty = () => ({
 const popup = reactive(empty());
 let overlay = null;
 let retryTimer = null;
+
+// Whether the popup has a box: the dataset's tabs hide the map tab with display: none, and
+// a popup there must not take Escape from the tab that is shown
+const rendered = ref(true);
+onMounted(() => useResizeObserver(element.value, entries => {
+    rendered.value = entries.some(entry => entry.contentRect.width > 0 || entry.contentRect.height > 0);
+}));
+
+useOverlay({
+    active: () => !!popup.kind && rendered.value,
+    container: () => element.value,
+    onEscape: e => { e.preventDefault(); dismiss(); },
+    returnTo: () => props.map?.getTargetElement?.() || null
+});
 
 // Where the popup sits from its point before it is dragged, in pixels
 const DEFAULT_OFFSET = [150, -150];
@@ -145,6 +167,12 @@ function close() {
     Object.assign(popup, empty());
     copied.value = false;
     if (overlay) overlay.setPosition(undefined);
+}
+
+// Closed by the user: the map clears the photo's footprint
+function dismiss() {
+    close();
+    emit('dismiss');
 }
 
 /**

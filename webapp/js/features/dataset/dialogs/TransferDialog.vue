@@ -31,8 +31,12 @@
                 <!-- Destination Path -->
                 <div class="mb-3">
                     <label for="transfer-dialog-destination-path" class="d-block mb-1 fw-semibold">Destination Path (optional)</label>
-                    <InputText id="transfer-dialog-destination-path" v-model="destPath" placeholder="Leave empty for root folder" fluid />
-                    <small class="help-text">Example: folder/subfolder</small>
+                    <div class="dest-path-row">
+                        <InputText id="transfer-dialog-destination-path" v-model="destPath" placeholder="Leave empty for root folder" fluid />
+                        <Button type="button" severity="secondary" icon="fa-solid fa-folder-open" :disabled="!destDataset || isTransferring"
+                                title="Browse folders" aria-label="Browse folders" data-browse @click="folderPickerOpen = true" />
+                    </div>
+                    <small class="help-text">A folder of the destination dataset: browse it, or type folder/subfolder</small>
                 </div>
 
                 <!-- Overwrite Checkbox -->
@@ -53,11 +57,16 @@
 
             <!-- Buttons -->
         </div>
+
+        <FolderPicker v-if="folderPickerOpen && destDataset" :dataset="destDataset" mode="folder" title="Select Destination Folder"
+                      :initial-path="destPath" @close="onFolderPicked" />
     </Window>
 </template>
 
 <script>
 import Window from '@/components/HubWindow.vue';
+import FolderPicker from '@/components/FolderPicker.vue';
+import Button from 'primevue/button';
 import PrimeMessage from 'primevue/message';
 import Select from 'primevue/select';
 import InputText from 'primevue/inputtext';
@@ -70,7 +79,7 @@ import { transferModeOf } from '@/libs/dataset/transferMode';
 
 export default {
     components: {
-        Window, PrimeMessage, Select, InputText, Checkbox, ProgressBar
+        Window, FolderPicker, Button, PrimeMessage, Select, InputText, Checkbox, ProgressBar
     },
 
     props: {
@@ -109,7 +118,8 @@ export default {
             progress: 0,
             statusMessage: "",
             errorMessage: null,
-            transferredCount: 0
+            transferredCount: 0,
+            folderPickerOpen: false
         };
     },
 
@@ -141,6 +151,11 @@ export default {
             }));
         },
 
+        // The chosen destination dataset, whose folders the picker browses
+        destDataset: function () {
+            return this.destOrg && this.destDs ? reg.Organization(this.destOrg).Dataset(this.destDs) : null;
+        },
+
         canTransfer: function () {
             return !this.isTransferring && this.destOrg && this.destDs;
         },
@@ -150,7 +165,11 @@ export default {
         }
     },
 
+    // The destination starts in the current organization: its datasets load with the list of
+    // organizations, and it is dropped if the user may not write it
     mounted: async function () {
+        this.destOrg = this.sourceOrg;
+        const datasets = this.loadDatasets(this.sourceOrg);
         try {
             // Load organizations - getOrganizations returns Organization instances
             const orgInstances = await reg.orgs.getOrganizations();
@@ -159,11 +178,16 @@ export default {
             this.organizations = orgInstances
                 .map(orgInstance => orgInstance.org)
                 .filter(org => org.permissions?.canWrite === true);
-
+            if (this.destOrg === this.sourceOrg && !this.organizations.some(org => org.slug === this.sourceOrg)) {
+                this.destOrg = null;
+                this.destDs = null;
+                this.datasets = [];
+            }
         } catch (e) {
             console.error("Error loading organizations:", e);
             this.errorMessage = "Failed to load organizations: " + e.message;
         }
+        await datasets;
     },
 
     methods: {
@@ -184,6 +208,8 @@ export default {
             try {
                 const org = reg.Organization(orgSlug);
                 const datasetsRaw = await org.datasets();
+                // Another organization was chosen meanwhile
+                if (this.destOrg !== orgSlug) return;
 
                 // Map datasets to extract the display name from properties.meta.name.data or use slug
                 this.datasets = datasetsRaw.map(ds => ({
@@ -239,6 +265,12 @@ export default {
             }
         },
 
+        // FolderPicker: { path, entry }, or null when cancelled
+        onFolderPicked(result) {
+            this.folderPickerOpen = false;
+            if (result) this.destPath = result.path || '';
+        },
+
         close: function (buttonId) {
             if (this.isTransferring) return; // Prevent closing during transfer
             this.$emit('close', buttonId);
@@ -250,6 +282,16 @@ export default {
 <style scoped>
 .transfer-dialog {
     min-width: min(31.25rem, var(--window-content-width, 100%));
+}
+
+.dest-path-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+}
+
+.dest-path-row :deep(.p-inputtext) {
+    flex: 1 1 auto;
 }
 
 .help-text {
