@@ -11,25 +11,38 @@
                 <Message v-if="noticeText" severity="info" :closable="false" class="login-notice">{{ noticeText }}</Message>
                 <Card>
                     <template #content>
-                        <div class="login-form">
-                            <IconField>
-                                <InputIcon class="fa-solid fa-user" />
-                                <InputText v-model="username" placeholder="Username" aria-label="Username" autocomplete="off"
-                                           autocorrect="off" autocapitalize="none" fluid @keyup.enter="login" />
-                            </IconField>
-                            <IconField>
-                                <InputIcon class="fa-solid fa-key" />
-                                <Password v-model="password" placeholder="Password" aria-label="Password" :feedback="false"
-                                          toggle-mask fluid input-class="w-100" @keyup.enter="login" />
-                            </IconField>
-                            <Button label="Login" :loading="loggingIn" class="w-100" size="large" @click="login" />
-                        </div>
+                        <Form ref="formRef" :resolver="resolver" class="login-form" aria-label="Sign in" @submit="submit(signIn, $event)">
+                            <template #default="$form">
+                                <!-- Why the sign-in failed, inside the card, above the fields (FR-ACC-05) -->
+                                <Message v-if="formError" severity="error" :closable="false" role="alert" class="login-error">{{ formError }}</Message>
+                                <div class="login-field">
+                                    <IconField>
+                                        <InputIcon class="fa-solid fa-user" />
+                                        <InputText ref="usernameInput" name="username" placeholder="Username" aria-label="Username"
+                                                   autocomplete="username" autocorrect="off" autocapitalize="none" fluid
+                                                   :readonly="busy" :invalid="!!errorOf($form, 'username')"
+                                                   :aria-invalid="errorOf($form, 'username') ? 'true' : undefined"
+                                                   :aria-describedby="errorOf($form, 'username') ? 'login-username-error' : undefined" />
+                                    </IconField>
+                                    <FieldError id="login-username-error" :message="errorOf($form, 'username')" />
+                                </div>
+                                <div class="login-field">
+                                    <IconField>
+                                        <InputIcon class="fa-solid fa-key" />
+                                        <PasswordInput name="password" input-id="login-password" placeholder="Password" aria-label="Password"
+                                                       autocomplete="current-password" :readonly="busy" :invalid="!!errorOf($form, 'password')"
+                                                       :describedby="errorOf($form, 'password') ? 'login-password-error' : ''" />
+                                    </IconField>
+                                    <FieldError id="login-password-error" :message="errorOf($form, 'password')" />
+                                </div>
+                                <Button type="submit" label="Login" :loading="busy" class="w-100" size="large" />
+                            </template>
+                        </Form>
                     </template>
                 </Card>
                 <div v-if="showRegistrationLink" style="margin-top:1rem">If you don't have an account, you can register for free on <a
                     class="d-inline-block py-1" target="_blank" href="https://dronedb.app/register/">dronedb.app</a></div>
             </div>
-            <Message v-if="error" severity="error" :closable="false" class="login-error">{{ error }}</Message>
         </div>
     </div>
 </template>
@@ -38,13 +51,19 @@
 import Message from 'primevue/message';
 import Button from 'primevue/button';
 import InputText from 'primevue/inputtext';
-import Password from 'primevue/password';
+import Form from '@primevue/forms/form';
 import Card from 'primevue/card';
 import IconField from 'primevue/iconfield';
 import InputIcon from 'primevue/inputicon';
 import ProgressSpinner from 'primevue/progressspinner';
 import reg from '@/libs/api/sharedRegistry';
 import { xAuthAvailable, getXAuthToken } from '@/libs/api/xauth';
+import PasswordInput from '@/components/PasswordInput.vue';
+import FieldError from '@/components/FieldError.vue';
+import { createResolver } from '@/libs/forms/resolver';
+import { useHubForm } from '@/composables/useHubForm';
+import { usernameProblem, loginPasswordProblem } from '@/libs/accountProblems';
+import { isBadRequest, isUnauthorized } from '@/libs/ddb/apiError';
 import { mapStores } from 'pinia';
 import { useAuthStore } from '@/stores/auth';
 import { EXPIRED_TEXT, NOTICE_QUERY, Notice, homeLocation, isAppPath, withoutNotice } from '@/libs/authRoutes';
@@ -52,16 +71,24 @@ import { EXPIRED_TEXT, NOTICE_QUERY, Notice, homeLocation, isAppPath, withoutNot
 export default {
     name: 'LoginPage',
     components: {
-        Message, Button, InputText, Password, Card, IconField, InputIcon, ProgressSpinner
+        Message, Button, InputText, Card, IconField, InputIcon, ProgressSpinner, Form, PasswordInput, FieldError
+    },
+    setup: function () {
+        // One form: Enter and the button are one guarded submit (FR-ACC-04), the fields are checked
+        // before any request (FR-ACC-05), and the validators are the ones of libs/accountProblems
+        const form = useHubForm({
+            fields: ['username', 'password'],
+            // A refusal of the credentials says one thing, whichever of the two is wrong: an
+            // `errors` member of the answer is not shown at a field either
+            fieldErrors: false,
+            formMessage: e => (isBadRequest(e) || isUnauthorized(e) ? 'Incorrect username or password.' : (e && e.message) || 'Cannot sign in.')
+        });
+        const resolver = createResolver({ username: usernameProblem, password: loginPasswordProblem });
+        return { ...form, resolver };
     },
     data: function () {
         return {
-            error: "",
-
-            loggingIn: false,
-            xAuthInProgress: false,
-            username: "",
-            password: ""
+            xAuthInProgress: false
         }
     },
     computed: {
@@ -83,6 +110,7 @@ export default {
         }
     },
     mounted: async function () {
+        if (!this.xAuthInProgress) this.focusUsername();
         if (this.xAuthInProgress) {
             try {
                 await this.authStore.login(null, null, getXAuthToken());
@@ -91,6 +119,7 @@ export default {
                 console.error(e);
             }
             this.xAuthInProgress = false;
+            this.focusUsername();
         }
     },
     methods: {
@@ -100,19 +129,16 @@ export default {
             const redirect = this.$route.query.redirect;
             this.$router.replace(isAppPath(redirect) ? withoutNotice(redirect) : homeLocation());
         },
-        login: async function (e) {
-            if (e && e.preventDefault) e.preventDefault();
-            this.loggingIn = true;
-            this.error = "";
-
-            try {
-                await this.authStore.login(this.username, this.password);
-                this.redirectAfterLogin();
-            } catch (e) {
-                this.error = e.message;
-            }
-
-            this.loggingIn = false;
+        // The sign-in starts with the focus in Username (FR-ACC-07)
+        focusUsername: async function () {
+            await this.$nextTick();
+            this.$refs.usernameInput?.$el?.focus();
+        },
+        // The request of the form (useHubForm calls it once, with the checked values); a failure
+        // reaches the form's message (the credentials are refused) or a field
+        signIn: async function (values) {
+            await this.authStore.login(values.username.trim(), values.password);
+            this.redirectAfterLogin();
         }
     }
 }
@@ -142,6 +168,10 @@ export default {
         gap: 1rem;
     }
 
+    .login-field {
+        text-align: left;
+    }
+
     .login-loading {
         display: flex;
         justify-content: center;
@@ -149,7 +179,7 @@ export default {
     }
 
     .login-error {
-        margin-top: 1rem;
+        text-align: left;
     }
 
     .login-notice {

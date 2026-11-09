@@ -35,6 +35,16 @@ describe('httpClient error messages', () => {
         expect(error.status).toBe(409);
     });
 
+    it('keeps the errors member of a ValidationProblemDetails body on the error (D-047)', async () => {
+        respondWith(400, { type: 'https://tools.ietf.org/html/rfc9110#section-15.5.1', title: 'One or more validation errors occurred.',
+            status: 400, errors: { currentPassword: ['The current password is incorrect.'], newPassword: ['Too short.'] } },
+        'application/problem+json; charset=utf-8');
+        const error = await client().send('/users/changepwd', { method: 'POST' }).catch(e => e);
+        expect(error.status).toBe(400);
+        expect(error.message).toBe('One or more validation errors occurred.');
+        expect(error.errors).toEqual({ currentPassword: ['The current password is incorrect.'], newPassword: ['Too short.'] });
+    });
+
     it('still reads the legacy { error } body', async () => {
         respondWith(400, { error: 'Invalid slug', noRetry: true }, 'application/json');
         const error = await client().send('/x').catch(e => e);
