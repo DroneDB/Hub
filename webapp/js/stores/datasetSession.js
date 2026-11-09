@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * State shared by the dataset page and the header toolbar: the selection, the active
- * tab, the bulk download, the settings request. The toolbar reads the page's state
+ * tab, the bulk download, the settings request, whether the user may write the dataset. The toolbar reads the page's state
  * instead of a copy kept in step through events.
  */
 import { defineStore } from 'pinia';
@@ -18,6 +18,8 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
     const settingsRequests = ref(0);
     // The dataset did not load (not found, no access, sign in): the toolbar offers nothing on it
     const unavailable = ref(false);
+    // The user may write the dataset (the page's permissions): the header's actions follow them
+    const canWrite = ref(false);
 
     /** @param {Array<object>} files */
     function setSelectedFiles(files) {
@@ -43,16 +45,22 @@ export const useDatasetSessionStore = defineStore('datasetSession', () => {
         unavailable.value = !!value;
     }
 
+    /** @param {boolean} value */
+    function setCanWrite(value) {
+        canWrite.value = !!value;
+    }
+
     /** Leaving the dataset: nothing selected, no tab, no archive in progress, nothing refused. */
     function reset() {
         selectedFiles.value = [];
         activeTab.value = null;
         activeBulkDownload.value = false;
         unavailable.value = false;
+        canWrite.value = false;
     }
 
     return {
-        selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable,
-        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, reset
+        selectedFiles, activeTab, activeBulkDownload, settingsRequests, unavailable, canWrite,
+        setSelectedFiles, setActiveTab, setActiveBulkDownload, requestSettings, setUnavailable, setCanWrite, reset
     };
 });

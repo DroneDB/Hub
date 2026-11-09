@@ -19,18 +19,22 @@
                     :title="updateTitle" :aria-label="updateLabel" @click="updateNotesOpen = true">
                 <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
             </Button>
-            <Button v-if="showDownload && onFilesTab && !unavailable" severity="secondary" size="small" text :title="downloadTitle" aria-label="Download"
-                    :disabled="isDownloading || downloadBlocked || activeBulkDownload" @click="handleDownload">
-                <i class="fa-solid fa-download" />
+            <!-- The dataset actions: label, icon, permission, enabled state and what they run come
+                 from the explorer's action registry (FR-XC-14); the header places them -->
+            <ActionButton v-if="showDownload && onFilesTab && datasetActions.download.visible" severity="secondary" size="small" text
+                          :label="datasetActions.download.label" :disabled="!datasetActions.download.enabled"
+                          :disabled-reason="datasetActions.download.disabledReason" @click="datasetActions.download.run()">
+                <i :class="datasetActions.download.icon" aria-hidden="true" />
                 <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
-            </Button>
-            <Button v-if="showShare && onFilesTab && !unavailable && selectedFiles.length === 1" severity="secondary" size="small" text :title="shareTitle" aria-label="Share"
-                    @click="handleShare">
-                <i class="fa-solid fa-share-nodes" />
-            </Button>
-            <Button v-if="showSettings && !unavailable" severity="secondary" size="small" text title="Settings" aria-label="Settings" @click="handleSettings">
-                <i class="fa-solid fa-wrench" />
-            </Button>
+            </ActionButton>
+            <ActionButton v-if="showShare && onFilesTab && datasetActions['share-embed'].visible" severity="secondary" size="small" text
+                          :label="datasetActions['share-embed'].label" @click="datasetActions['share-embed'].run()">
+                <i :class="datasetActions['share-embed'].icon" aria-hidden="true" />
+            </ActionButton>
+            <ActionButton v-if="showSettings && datasetActions.settings.visible" severity="secondary" size="small" text
+                          :label="datasetActions.settings.label" @click="datasetActions.settings.run()">
+                <i :class="datasetActions.settings.icon" aria-hidden="true" />
+            </ActionButton>
 
             <ConfirmDialog v-if="downloadConfirmOpen"
                            title="Download"
@@ -97,10 +101,11 @@
 </template>
 
 <script>
-import ddb, { utils } from 'ddb';
+import { utils } from 'ddb';
 import reg from '@/libs/api/sharedRegistry';
 import { Features } from '@/libs/features';
 import Alert from '@/components/HubAlert';
+import ActionButton from '@/components/ActionButton.vue';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import ShareEmbed from '@/features/dataset/ShareEmbed.vue';
 import { lazyComponent } from '@/libs/lazyComponent';
@@ -120,6 +125,10 @@ import { useDatasetSessionStore } from '@/stores/datasetSession';
 import { loginLocation, PREFERENCES_QUERY } from '@/libs/authRoutes';
 import { currentLocation, currentPath } from '@/libs/routeQuery';
 import { downloadFromDataset, notifyDownloadError } from '@/libs/datasetDownloads';
+import { resolveAction } from '@/libs/dataset/explorerActions';
+
+// The dataset actions of the header, in the registry (libs/dataset/explorerActions.js)
+const HEADER_ACTIONS = Object.freeze(['download', 'share-embed', 'settings']);
 
 // Opened from the user menu only: its code loads the first time it is shown
 // Lazy: the release notes need the markdown renderer, which only admins who open them should load
@@ -129,6 +138,7 @@ const PreferencesDialog = lazyComponent(() => import(/* webpackChunkName: "accou
 export default {
     name: 'HubHeader',
     components: {
+        ActionButton,
         Alert,
         ConfirmDialog,
         ShareEmbed,
@@ -146,13 +156,12 @@ export default {
     },
     data: function () {
 
-        const loggedIn = reg.isLoggedIn();
-
         return {
             params: this.$route.params,
+            // Where the dataset actions go (a dataset page); who may use them is the registry's rule
             showDownload: !!this.$route.params.ds,
             showShare: !!this.$route.params.ds,
-            showSettings: loggedIn && !!this.$route.params.ds && !this.$route.params.encodedPath,
+            showSettings: !!this.$route.params.ds && !this.$route.params.encodedPath,
             showBackToOrg: false,
             orgInfoCache: {},
             isDownloading: false,
@@ -181,7 +190,24 @@ export default {
         },
         ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
         // `unavailable`: the dataset did not load (ResourceState), so it has no Download, Share or Settings
-        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload', 'unavailable']),
+        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload', 'unavailable', 'canWrite']),
+        // Download, Share/Embed and Settings as the registry resolves them for the dataset and the
+        // selection (the 'header' surface: shown where they apply, Download disabled with its reason)
+        datasetActions: function () {
+            const ctx = {
+                getSelectedEntries: () => this.selectedFiles,
+                canWrite: this.canWrite,
+                signedIn: this.loggedIn,
+                unavailable: this.unavailable,
+                downloadInProgress: () => this.isDownloading || this.activeBulkDownload,
+                emit: (event, ...args) => {
+                    if (event === 'downloadItems') this.downloadConfirmOpen = true;
+                    else if (event === 'shareEmbed') this.shareFile = args[0];
+                    else if (event === 'settings') useDatasetSessionStore().requestSettings();
+                }
+            };
+            return Object.fromEntries(HEADER_ACTIONS.map(id => [id, resolveAction(id, ctx, 'header')]));
+        },
         storageBarColor: function () {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 'var(--ddb-success)';
             const pct = this.storageInfo.usedPercentage * 100;
@@ -269,31 +295,6 @@ export default {
                 return `Are you sure you want to download ${this.selectedFiles.length} selected file${this.selectedFiles.length !== 1 ? 's' : ''}?`;
             }
             return 'Are you sure you want to download the entire dataset?';
-        },
-        downloadIsBulk: function () {
-            // Whole-dataset download or multi-file selection is always bulk.
-            if (this.selectedFiles.length !== 1) return true;
-            const sel = this.selectedFiles[0];
-            // Single selection counts as bulk only when it is a directory.
-            if (sel && sel.entry) return ddb.entry.isDirectory(sel.entry);
-            // Conservative fallback: treat as bulk when entry metadata is missing.
-            return true;
-        },
-        downloadBlocked: function () {
-            return !this.loggedIn
-                && reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS)
-                && this.downloadIsBulk;
-        },
-        downloadTitle: function () {
-            if (this.activeBulkDownload) return 'A download archive is being prepared. Please wait for it to complete.';
-            if (this.downloadBlocked) return 'Login required to download multiple files or the entire dataset';
-            if (this.selectedFiles.length === 1) return `Download ${ddb.pathutils.basename(this.selectedFiles[0].path)}`;
-            if (this.selectedFiles.length > 0) return `Download ${this.selectedFiles.length} file${this.selectedFiles.length !== 1 ? 's' : ''}`;
-            return 'Download';
-        },
-        shareTitle: function () {
-            if (this.selectedFiles.length === 1) return `Share ${ddb.pathutils.basename(this.selectedFiles[0].path)}`;
-            return 'Share';
         },
         // Download/Share toolbar actions are only meaningful on the file-listing
         // tabs (Files explorer, or the mobile FileBrowser). They are hidden on
@@ -383,7 +384,7 @@ export default {
 
             this.showDownload = !!params.ds;
             this.showShare = !!params.ds;
-            this.showSettings = reg.isLoggedIn() && !!this.$route.params.ds;
+            this.showSettings = !!this.$route.params.ds;
 
             // Off the dataset page there is no selection, tab or archive in progress
             if (!params.ds) useDatasetSessionStore().reset();
@@ -497,10 +498,6 @@ export default {
             this.openPreferences(typeof tab === 'string' && tab ? tab : undefined);
             this.$router.replace({ path, query: rest, hash }).catch(() => { });
         },
-        handleDownload: function () {
-            this.downloadConfirmOpen = true;
-        },
-
         handleDownloadConfirmClose: async function (action) {
             this.downloadConfirmOpen = false;
 
@@ -531,15 +528,6 @@ export default {
             } finally {
                 this.isDownloading = false;
             }
-        },
-
-        handleSettings: function () {
-            useDatasetSessionStore().requestSettings();
-        },
-
-        // The button is shown for one selected file or folder only
-        handleShare: function () {
-            this.shareFile = this.selectedFiles[0];
         },
 
         handleCloseShareEmbed: function () {

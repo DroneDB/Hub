@@ -98,32 +98,6 @@ function propertiesItem(ctx) {
     };
 }
 
-function downloadItem(ctx) {
-    const isBulkSelection = () => {
-        const sel = ctx.getSelectedEntries();
-        if (sel.length === 0) return false;
-        if (sel.length > 1) return true;
-        // single selection: bulk if it's a directory
-        return ddb.entry.isDirectory(sel[0].entry);
-    };
-    const isBulkBlocked = () =>
-        !reg.isLoggedIn() &&
-        reg.features.get(Features.DISABLE_ANONYMOUS_BULK_DOWNLOADS) &&
-        isBulkSelection();
-
-    return {
-        label: 'Download',
-        icon: 'fa-solid fa-download',
-        group: 'share',
-        isVisible: () => ctx.getSelectedEntries().length > 0,
-        isEnabled: () => !isBulkBlocked(),
-        click: () => {
-            if (isBulkBlocked()) return;
-            ctx.emit('downloadItems', ctx.getSelectedEntries());
-        }
-    };
-}
-
 function buildItem(ctx) {
     return {
         label: 'Build',
@@ -455,7 +429,7 @@ function buildActionMenuItems(ctx) {
         actionMenuItem('rename', ctx),
         setThumbnailItem(ctx),
         actionMenuItem('share-embed', ctx),
-        downloadItem(ctx),
+        actionMenuItem('download', ctx),
         actionMenuItem('copy', ctx),
         actionMenuItem('cut', ctx),
         actionMenuItem('paste', ctx),
