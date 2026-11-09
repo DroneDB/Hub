@@ -1,5 +1,5 @@
 <template>
-    <ViewerShell id="potree" v-model:error="error" dark :loading="loading" loading-text="Loading point cloud...">
+    <ViewerShell id="potree" v-model:error="error" dark :loading="loading" :load-error="loadError" loading-text="Loading point cloud...">
         <DialogHost :dialogs="dialogs" />
 
         <div class="potree-container" :class="{ loading, 'sidebar-open': sidebarOpen }">
@@ -70,7 +70,7 @@ import { HUB_VERSION } from '@/libs/hubUpdateChecker';
 
 defineOptions({ name: 'PotreeViewer' });
 
-const { entry, dataset, canWrite, canDelete, loading, error, entryLoaded } = useViewerEntry({
+const { entry, dataset, canWrite, canDelete, loading, error, loadError, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.POINTCLOUD], typeLabel: 'a point cloud', title: 'Point Cloud'
 });
 const dialogs = useDialogs();

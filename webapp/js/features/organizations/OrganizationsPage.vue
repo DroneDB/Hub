@@ -1,7 +1,7 @@
 <template>
     <div id="organizations">
 
-        <div class="org-page-header">
+        <div v-if="!loadKind" class="org-page-header">
             <div class="org-header-layout">
                 <div class="org-identity">
                     <div class="d-flex align-items-center gap-3">
@@ -29,7 +29,7 @@
         </div>
 
         <!-- Which organizations, and how they are shown: the search and Show all filter the list and the map -->
-        <ListToolbar v-model:search="searchQuery" search-label="Search organizations">
+        <ListToolbar v-if="!loadKind" v-model:search="searchQuery" search-label="Search organizations">
             <template #start>
                 <div class="d-flex align-items-center gap-2">
                     <ToggleSwitch v-model="showAll" input-id="organizations-show-all" />
@@ -44,8 +44,11 @@
             </template>
         </ListToolbar>
 
+        <!-- The list did not load: sign in (a visitor without a session), or no access; no header, cards or actions -->
+        <ResourceState v-if="loadKind" :kind="loadKind" resource="page" />
+
         <!-- Skeleton loading state -->
-        <div v-if="showSkeleton" class="org-cards-area">
+        <div v-else-if="showSkeleton" class="org-cards-area">
             <Card v-for="i in 4" :key="i" class="mb-3">
                 <template #content>
                     <div class="d-flex justify-content-between align-items-center">
@@ -126,7 +129,7 @@
         </div>
 
         <!-- Sticky paginator -->
-        <div v-if="!showSkeleton && view === 'list'" class="org-pagination">
+        <div v-if="!loadKind && !showSkeleton && view === 'list'" class="org-pagination">
             <Paginator :rows="Number(itemsPerPage)" :total-records="filteredOrganizations.length"
                        :first="(currentPage - 1) * itemsPerPage"
                        :rows-per-page-options="[5, 10, 25, 50, 100]" @page="onPageChange" />
@@ -147,6 +150,7 @@
 
 <script>
 import EmptyState from '@/components/EmptyState.vue';
+import ResourceState from '@/components/ResourceState.vue';
 import VisibilityTag from '@/components/VisibilityTag.vue';
 import SortSelect from '@/components/SortSelect.vue';
 import ViewSelect from '@/components/ViewSelect.vue';
@@ -173,7 +177,7 @@ import Tag from 'primevue/tag';
 import Skeleton from 'primevue/skeleton';
 import ToggleSwitch from 'primevue/toggleswitch';
 import Paginator from 'primevue/paginator';
-import { isUnauthorized } from '@/libs/ddb/apiError';
+import { loadErrorKind } from '@/libs/ddb/apiError';
 import { Visibility } from 'ddb';
 
 // Typing in the search box asks the server once the user pauses
@@ -192,6 +196,7 @@ export default {
     name: 'OrganizationsPage',
     components: {
         EmptyState,
+        ResourceState,
         SortSelect,
         ViewSelect,
         ListToolbar,
@@ -219,6 +224,8 @@ export default {
         const settings = getOrgPageSettings();
         return {
             error: "",
+            // The list did not load: sign in, no access (ResourceState, FR-XC-13)
+            loadError: null,
             organizations: [],
             // The list is being asked; `loaded` once a first answer came
             loading: true,
@@ -252,6 +259,10 @@ export default {
     },
 
     computed: {
+        // The page state of a list that did not load (loadErrorKind), or null
+        loadKind: function () {
+            return loadErrorKind(this.loadError);
+        },
         readyOnly: function () {
             return HubOptions.readOnlyOrgs;
         },
@@ -376,11 +387,16 @@ export default {
 
                 if (isLatest()) {
                     this.organizations = tmp.map(item => organizationRow(item.org));
+                    this.loadError = null;
                     listed = true;
                 }
             } catch (e) {
-                // A 401 is handled by reg.onUnauthorized (end the session, sign in)
-                if (isLatest() && !isUnauthorized(e)) this.$notify.error(e.message);
+                // A 401 to a visitor without a session (D-048) or a 403: the page state in place of the
+                // list (with a session, a 401 has already sent the user to Login); other errors are a toast
+                if (isLatest()) {
+                    if (loadErrorKind(e)) this.loadError = e;
+                    else this.$notify.error(e.message);
+                }
             }
             if (!isLatest()) return false;
             this.loading = false;

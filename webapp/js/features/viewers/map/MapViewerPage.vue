@@ -1,8 +1,12 @@
 <template>
-    <ViewerShell v-model:error="error" class="map-viewer" :loading="loading || preparing">
-        <div v-if="shown" class="viewer-layout">
-            <ViewBar v-if="!embed" :name="name" :dirty="dirty" :saved="!!saved" :can-write="canWrite" :busy="busy"
+    <ViewerShell v-model:error="error" class="map-viewer" :loading="loading || preparing" :load-error="loadError"
+                 :name="name || null">
+        <!-- The view bar of the shell: the name of the view, its unsaved mark and Save -->
+        <template v-if="shown" #bar>
+            <ViewBar :name="name" :dirty="dirty" :saved="!!saved" :can-write="canWrite" :busy="busy"
                      @save="save" @save-as-new="saveAsNew" />
+        </template>
+        <div v-if="shown" class="viewer-layout">
             <div class="viewer-map-area">
                 <MapCore :files="layers.files.value" :view="state" :changed-paths="layers.changedPaths.value" :dataset="dataset"
                          standalone :can-write="canWrite" :can-delete="!!canDelete"
@@ -11,11 +15,6 @@
                          @update:view="onMapUpdate" @add-layer="layers.add"
                          @remove-layer="layers.remove" @repick="layers.repick" @save="save" @vue:mounted="pickOnMount" />
             </div>
-        </div>
-        <div v-else-if="!loading && error" class="viewer-failed">
-            <router-link :to="{ name: 'ViewDataset', params: { org: dataset.org, ds: dataset.ds } }">
-                <i class="fa-solid fa-arrow-left" /> Back to the dataset
-            </router-link>
         </div>
         <DialogHost :dialogs="dialogs" />
     </ViewerShell>
@@ -50,7 +49,7 @@ const route = useRoute();
 // The view needs the hashes of the layers to save, the layers need the view: one is set after the other exists
 const hashOf = shallowRef(null);
 const {
-    dataset, loading, error, canWrite, canDelete, state, setState, saved, dirty, shareNote, name, pageTitle, identity,
+    dataset, loading, error, loadError, canWrite, canDelete, state, setState, saved, dirty, shareNote, name, pageTitle, identity,
     baseEntry, busy, pickOnLoad, linkTarget, save, saveAsNew
 } = useSavedView({ route, router: useRouter(), dialogs, embed, hashOf });
 const layers = useViewLayers({ dataset, state, setState, baseEntry, savedData: () => saved.value?.data ?? null, dialogs, embed });
@@ -97,9 +96,5 @@ function pickOnMount() {
     flex: 1;
     min-height: 0;
     position: relative;
-}
-
-.viewer-failed {
-    padding: 1rem;
 }
 </style>

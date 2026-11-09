@@ -1,6 +1,6 @@
 <template>
     <component :is="viewer" v-if="viewer" :entry="entry" :dataset="dataset" />
-    <ViewerShell v-else v-model:error="error" dark :loading="loading" loading-text="Loading model..." />
+    <ViewerShell v-else v-model:error="error" dark :loading="loading" :load-error="loadError" loading-text="Loading model..." />
 </template>
 
 <script setup>
@@ -22,7 +22,7 @@ defineOptions({ name: 'ModelViewer' });
 const Bm3dViewer = defineAsyncComponent(() => import(/* webpackChunkName: "model-bm3d" */ './Bm3dViewer.vue'));
 const LegacyNexusViewer = defineAsyncComponent(() => import(/* webpackChunkName: "model-legacy" */ './LegacyNexusViewer.vue'));
 
-const { entry, dataset, loading, error } = useViewerEntry({
+const { entry, dataset, loading, error, loadError } = useViewerEntry({
     types: [ddb.entry.type.MODEL], typeLabel: 'a 3D model', title: 'Model'
 });
 

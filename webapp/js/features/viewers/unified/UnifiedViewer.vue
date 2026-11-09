@@ -1,5 +1,5 @@
 <template>
-    <ViewerShell id="unified-viewer" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading"
+    <ViewerShell id="unified-viewer" v-model:error="error" v-model:settings-open="showSettings" dark :loading="loading" :load-error="loadError"
                  :ready="ready" settings-button="bottom-right" settings-title="Display settings" settings-id="unified-settings">
         <template #loading>
             <LoadingSpinner :label="loadingText" />
@@ -86,7 +86,7 @@ import { MeasureTool } from './measureTool';
 defineOptions({ name: 'UnifiedViewer' });
 
 // Type checks are the viewer's own (several types; .3tz indexed as generic)
-const { entry, dataset, loading, error, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
+const { entry, dataset, loading, error, loadError, entryLoaded } = useViewerEntry({ title: '3D Viewer' });
 const { settings, resetSettings } = useViewerSettings(PREF.UNIFIED_VIEWER, PREF_DEFAULTS[PREF.UNIFIED_VIEWER]);
 const notify = useNotify();
 

@@ -28,3 +28,21 @@ describe('the status tests of an ApiError', () => {
         expect(isNotFound('404')).toBe(false);
     });
 });
+
+describe('loadErrorKind (FR-XC-13)', () => {
+    it('gives the page state of a primary resource that did not load', async () => {
+        const { loadErrorKind, LoadErrorKind, InvalidLinkError } = await import('./apiError');
+        expect(loadErrorKind(new ApiError('nf', 404))).toBe(LoadErrorKind.NOT_FOUND);
+        expect(loadErrorKind(new ApiError('denied', 403))).toBe(LoadErrorKind.NO_ACCESS);
+        expect(loadErrorKind(new ApiError('who', 401))).toBe(LoadErrorKind.SIGN_IN);
+        expect(loadErrorKind(new InvalidLinkError('bad link'))).toBe(LoadErrorKind.INVALID_LINK);
+        expect(LoadErrorKind).toEqual({ NOT_FOUND: 'not-found', NO_ACCESS: 'no-access', SIGN_IN: 'sign-in', INVALID_LINK: 'invalid-link' });
+    });
+
+    it('gives none for an error that says nothing about the resource: the page shows its message', async () => {
+        const { loadErrorKind } = await import('./apiError');
+        for (const e of [new ApiError('network', 0), new ApiError('server', 500), new ApiError('bad', 400), new Error('x'), null, undefined, 'x']) {
+            expect(loadErrorKind(e)).toBeNull();
+        }
+    });
+});

@@ -116,6 +116,9 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
 
     const loading = ref(true);
     const error = ref('');
+    // The error the view did not load with, for ViewerShell's page states (a missing file, no access, ...)
+    /** @type {import('vue').ShallowRef<unknown>} */
+    const loadError = shallowRef(null);
     const busy = ref(false);
     /** @type {import('vue').ShallowRef<ViewState|null>} */
     const state = shallowRef(null);
@@ -232,10 +235,13 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
 
     // ---- Load ------------------------------------------------------------------------------
 
+    // Why the base file did not load, as useViewerEntry caught it
+    const entryError = () => viewerEntry.loadError.value ?? new Error(viewerEntry.error.value);
+
     async function loadSaved() {
         const { view, problem } = await /** @type {NonNullable<typeof savedLookup>} */ (savedLookup);
         if (!view || problem) throw new Error(problem ?? UNKNOWN_VIEW);
-        if (!(await viewerEntry.entryLoaded)) throw new Error(viewerEntry.error.value);
+        if (!(await viewerEntry.entryLoaded)) throw entryError();
         const restored = restoredState();
         saved.value = view;
         loadedId.value = restored?.savedId ?? view.id;
@@ -243,7 +249,7 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
     }
 
     async function loadFile() {
-        if (!(await viewerEntry.entryLoaded) || !entry.value) throw new Error(viewerEntry.error.value);
+        if (!(await viewerEntry.entryLoaded) || !entry.value) throw entryError();
         const base = { path: entry.value.path, hash: entry.value.hash || '' };
         const baseIsGeoraster = isGeoraster(entry.value);
         const add = addPathsOf(route.query.add);
@@ -259,6 +265,7 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
         persist();
         return true;
     }, e => {
+        loadError.value = e;
         error.value = e.message;
         return false;
     }).finally(() => { loading.value = false; });
@@ -410,7 +417,7 @@ export function useSavedView({ route, router, dialogs, embed = false, hashOf }) 
     });
 
     return {
-        dataset, loading, error, loaded, canWrite, canDelete, state, setState, saved, isNew, dirty, shareNote, name, pageTitle, identity,
+        dataset, loading, error, loadError, loaded, canWrite, canDelete, state, setState, saved, isNew, dirty, shareNote, name, pageTitle, identity,
         baseEntry, busy, pickOnLoad, linkTarget, save, saveAsNew
     };
 }

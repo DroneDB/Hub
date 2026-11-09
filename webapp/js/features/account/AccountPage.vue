@@ -12,7 +12,7 @@
                 <!-- User Info Section -->
                 <Card class="account-card">
                     <template #content>
-                        <h3><i class="fa-solid fa-user" /> User Information</h3>
+                        <h2><i class="fa-solid fa-user" /> User Information</h2>
                         <dl class="info-grid">
                             <div class="info-item">
                                 <dt>Username</dt>
@@ -37,7 +37,7 @@
                 <!-- Storage Section -->
                 <Card class="account-card">
                     <template #content>
-                        <h3><i class="fa-solid fa-database" /> Storage</h3>
+                        <h2><i class="fa-solid fa-database" /> Storage</h2>
                         <div class="storage-bar-container">
                             <div class="storage-details">
                                 <span class="used">{{ formatBytes(storageUsed) }} used</span>
@@ -211,12 +211,14 @@ export default {
     margin-bottom: 1rem;
 }
 
-#account .account-card h3 {
+/* The card titles are the page's second level (under the h1), at the size they always had */
+#account .account-card h2 {
     margin: 0 0 1rem 0;
+    font-size: var(--ddb-font-size-md);
     color: var(--ddb-text);
 }
 
-#account .account-card h3 i {
+#account .account-card h2 i {
     margin-right: 0.5rem;
 }
 

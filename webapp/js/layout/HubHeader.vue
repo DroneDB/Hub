@@ -1,5 +1,5 @@
 <template>
-    <div id="header">
+    <header id="header">
         <a :href="homeUrl" class="logo">
             <img v-if="appLogo" :src="appLogo" :alt="appName || 'Home'">
             <template v-else>
@@ -9,7 +9,7 @@
             </template>
         </a>
 
-        <div class="right">
+        <nav class="right" aria-label="Main">
 
             <Button v-if="showBackToOrg" severity="secondary" size="small" text title="Back to organization"
                     aria-label="Back to organization" @click="goToOrganization">
@@ -19,16 +19,16 @@
                     :title="updateTitle" :aria-label="updateLabel" @click="updateNotesOpen = true">
                 <i class="fa-solid fa-circle-arrow-up" aria-hidden="true" />
             </Button>
-            <Button v-if="showDownload && onFilesTab" severity="secondary" size="small" text :title="downloadTitle" aria-label="Download"
+            <Button v-if="showDownload && onFilesTab && !unavailable" severity="secondary" size="small" text :title="downloadTitle" aria-label="Download"
                     :disabled="isDownloading || downloadBlocked || activeBulkDownload" @click="handleDownload">
                 <i class="fa-solid fa-download" />
                 <span v-if="selectedFiles.length > 1" style="line-height: 1;" class="ms-1">{{ selectedFiles.length }}</span>
             </Button>
-            <Button v-if="showShare && onFilesTab && selectedFiles.length === 1" severity="secondary" size="small" text :title="shareTitle" aria-label="Share"
+            <Button v-if="showShare && onFilesTab && !unavailable && selectedFiles.length === 1" severity="secondary" size="small" text :title="shareTitle" aria-label="Share"
                     @click="handleShare">
                 <i class="fa-solid fa-share-nodes" />
             </Button>
-            <Button v-if="showSettings" severity="secondary" size="small" text title="Settings" aria-label="Settings" @click="handleSettings">
+            <Button v-if="showSettings && !unavailable" severity="secondary" size="small" text title="Settings" aria-label="Settings" @click="handleSettings">
                 <i class="fa-solid fa-wrench" />
             </Button>
 
@@ -90,10 +90,10 @@
                 <i class="fa-solid fa-user" />
             </Button>
             <Menu id="user_menu" ref="userMenu" :model="userMenuItems" :popup="true" :pt="userMenuPt" />
-        </div>
+        </nav>
 
         <ShareEmbed v-if="shareFile" :file="shareFile" @close="handleCloseShareEmbed" />
-    </div>
+    </header>
 </template>
 
 <script>
@@ -180,7 +180,8 @@ export default {
             };
         },
         ...mapState(useAuthStore, { username: 'username', loggedIn: 'isLoggedIn', isAdmin: 'isAdmin', featuresVersion: 'featuresVersion' }),
-        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload']),
+        // `unavailable`: the dataset did not load (ResourceState), so it has no Download, Share or Settings
+        ...mapState(useDatasetSessionStore, ['selectedFiles', 'activeTab', 'activeBulkDownload', 'unavailable']),
         storageBarColor: function () {
             if (!this.storageInfo || this.storageInfo.usedPercentage == null) return 'var(--ddb-success)';
             const pct = this.storageInfo.usedPercentage * 100;

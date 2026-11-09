@@ -1,5 +1,5 @@
 <template>
-    <ViewerShell v-model:error="error" class="markdown" :loading="loading">
+    <ViewerShell v-model:error="error" class="markdown" :loading="loading" :load-error="loadError">
         <!-- No entry when it did not load (a file of another type): ViewerShell shows the error -->
         <div v-if="!loading && entry" class="md-container">
             <div v-if="editing" class="edit-container">
@@ -46,7 +46,7 @@ import { renderMarkdown, datasetFileUrls } from '@/libs/markdown';
 
 defineOptions({ name: 'MarkdownViewer' });
 
-const { entry, dataset, canWrite, loading, error, entryLoaded } = useViewerEntry({
+const { entry, dataset, canWrite, loading, error, loadError, entryLoaded } = useViewerEntry({
     types: [ddb.entry.type.MARKDOWN], typeLabel: 'markdown', title: 'Markdown'
 });
 const dialogs = useDialogs();

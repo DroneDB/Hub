@@ -43,14 +43,17 @@ export function isAppPath(path) {
 /**
  * What the app does when the server rejects a request with 401 (registered with
  * `reg.onUnauthorized`): end a session the server no longer accepts, then sign in
- * and come back. Nothing happens on the Login page itself.
+ * and come back. A visitor without a session stays on the page, which shows the
+ * "sign in" state of its primary resource (ResourceState, D-048); a private route
+ * sends them to Login through the route guard. Nothing happens on the Login page itself.
  * @param {import('vue-router').Router} router
  * @param {{ isLoggedIn: boolean, logout: () => void }} auth
  */
 export function handleUnauthorized(router, auth) {
     const route = router.currentRoute.value;
     if (route.name === 'Login' || route.name === 'LoginHome') return;
-    if (auth.isLoggedIn) auth.logout();
+    if (!auth.isLoggedIn) return;
+    auth.logout();
     // The address as it is now: a map writes its layers without a navigation, so the route's
     // fullPath may be the address the page opened with
     router.push(loginLocation(currentPath())).catch(() => { });

@@ -28,13 +28,14 @@ function fakeView() {
 }
 
 describe('Organizations.fetchOrganizations', () => {
-    it('leaves a rejected session to the app handler (no error box)', async () => {
+    it('keeps a 401 for the sign-in state (no error box): the app handler signs a session out', async () => {
         reg.orgs.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Token expired', 401)));
         const vm = fakeView();
 
         await Organizations.methods.fetchOrganizations.call(vm);
 
         expect(vm.$notify.error).not.toHaveBeenCalled();
+        expect(vm.loadError.status).toBe(401);
     });
 
     it('shows other errors', async () => {
@@ -109,6 +110,15 @@ describe('handleUnauthorized', () => {
         expect(r.push).toHaveBeenCalledWith({ name: 'Login', query: { redirect: '/r/o/d/view/abc/map?t=1&layer=a' } });
     });
 
+    it('leaves a visitor without a session on the page, which shows the sign-in state (D-048)', async () => {
+        const { handleUnauthorized } = await import('@/libs/authRoutes');
+        const r = router('/r/acme/private-ds');
+        const auth = { isLoggedIn: false, logout: vi.fn() };
+        handleUnauthorized(r, auth);
+        expect(r.push).not.toHaveBeenCalled();
+        expect(auth.logout).not.toHaveBeenCalled();
+    });
+
     it('does nothing on the Login page', async () => {
         const { handleUnauthorized } = await import('@/libs/authRoutes');
         const r = router('/login');
@@ -161,6 +171,31 @@ describe('Public organizations (D-003)', () => {
             .toBe("No organizations yet: you don't own or belong to any, and none is public.");
         expect(wrapper.text()).not.toContain('enable Show all');
         expect(wrapper.find('[data-org-empty-create]').exists()).toBe(true);
+    });
+
+    it('shows a visitor without a session the sign-in state, with no cards and no Create (D-048)', async () => {
+        globalThis.HubOptions = {};
+        localStorage.clear();
+        reg.orgs.getOrganizations = vi.fn(() => Promise.reject(new ApiError('Unauthorized', 401)));
+        window.history.replaceState({}, '', '/r');
+        const LinkStub = { props: ['to'], template: '<a :data-to="JSON.stringify(to)"><slot /></a>' };
+        wrapper = mount(Organizations, {
+            global: {
+                plugins: [PrimeVue],
+                mocks: { $router: { push: vi.fn() }, $notify: { error: vi.fn() } },
+                stubs: { OrganizationDialog: true, OrganizationMembersDialog: true, MessageDialog: true, DialogHost: true, Paginator: true, RouterLink: LinkStub }
+            }
+        });
+        await flushPromises();
+        expect(wrapper.find('h1').text()).toBe('Sign in to open this page');
+        expect(wrapper.findAll('h1')).toHaveLength(1);
+        expect(wrapper.text()).not.toContain('No organizations');
+        expect(wrapper.text()).not.toContain('Create Organization');
+        expect(wrapper.find('[aria-label="Create organization"]').exists()).toBe(false);
+        expect(wrapper.find('.org-cards-area').exists()).toBe(false);
+        const links = wrapper.findAll('a').map(a => [a.text(), JSON.parse(a.attributes('data-to'))]);
+        expect(links).toEqual([['Sign in', { name: 'Login', query: { redirect: '/r' } }]]);
+        window.history.replaceState({}, '', '/');
     });
 
     it('offers no create action in the empty list when organizations are read-only', async () => {
