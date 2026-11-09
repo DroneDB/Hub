@@ -67,7 +67,7 @@ export function useMapFeatures(props, fileEvents = {}) {
     });
     const plantHealth = usePlantHealth({ dataset, rasterLayer, entry: () => null });
     const raster = useRasterAnalysis({
-        dataset, map, measureControls, rasterLayer,
+        dataset, map, measureControls, rasterLayer, currentUnitPref,
         vizParamsByPath: plantHealth.vizParamsByPath,
         refreshRasterLayers: () => plantHealth.refreshRasterLayers,
         onRasterProfileHover: () => undefined

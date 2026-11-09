@@ -28,7 +28,7 @@ describe('3D viewer helpers', () => {
 
     it('writes areas on the area scale of the map: m² below 1 ha, ha below 100 km², then km²', () => {
         const f = measureFormatters(() => 1, () => 'm', () => 'metric');
-        expect(f.area({ area: 9999 })).toBe('9999 m²');
+        expect(f.area({ area: 9999 })).toBe('9,999 m²');
         expect(f.area({ area: 15000 })).toBe('1.5 ha');
         expect(f.area({ area: 1.5e8 })).toBe('150 km²');
     });
@@ -37,7 +37,7 @@ describe('3D viewer helpers', () => {
         const f = measureFormatters(() => 1, () => 'm', () => 'imperial');
         expect(f.length({ length: 100 })).toBe('328.08 ft');
         expect(f.length({ length: 0.1 })).toBe('3.9 in');
-        expect(f.area({ area: 100 })).toBe('1076.39 ft²');
+        expect(f.area({ area: 100 })).toBe('1,076.39 ft²');
         expect(f.area({ area: 8093.7128448 })).toBe('2 acres');
         expect(f.area({ area: 0.0129032 })).toBe('20.0 in²');
     });

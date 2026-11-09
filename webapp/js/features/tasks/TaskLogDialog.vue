@@ -2,7 +2,7 @@
     <Window id="task-log" :visible="visible" modal :title="`Log - ${title}`" fixed-position
             width="48rem" max-width="95vw" height="auto"
             @update:visible="$emit('update:visible', $event)" @show="onShow">
-        <pre ref="logContainer" class="task-log">{{ logText || 'No log output.' }}</pre>
+        <pre ref="logContainer" class="task-log">{{ shownText || 'No log output.' }}</pre>
         <template #footer>
             <!-- Toggles on the left -->
             <div class="d-flex align-items-center gap-3 me-auto">
@@ -26,6 +26,10 @@
 import Window from '@/components/HubWindow.vue';
 import Button from 'primevue/button';
 import ToggleSwitch from 'primevue/toggleswitch';
+import { utcClockToLocal } from '@/libs/format';
+
+// The "[HH:mm:ss]" the Registry writes at the start of a log line, in UTC (LogRingBuffer)
+const UTC_LINE_TIME = /^\[(\d{2}:\d{2}:\d{2})\]/gm;
 
 /**
  * Presentational task log viewer dialog with auto-refresh and auto-scroll.
@@ -36,6 +40,8 @@ import ToggleSwitch from 'primevue/toggleswitch';
  * Auto-refresh: polls every 2s for active tasks only (no polling for terminal).
  * Auto-scroll: scrolls to bottom on new content when user is near the bottom.
  * Both default to enabled and reset on each dialog open.
+ * The time at the start of each line, which the Registry writes in UTC, shows in local time, as
+ * the dates of the task table do (libs/format.js).
  */
 export default {
     name: 'TaskLogDialog',
@@ -57,6 +63,12 @@ export default {
             autoRefresh: true,
             autoScroll: true
         };
+    },
+
+    computed: {
+        shownText() {
+            return this.logText.replace(UTC_LINE_TIME, (_, clock) => `[${utcClockToLocal(clock)}]`);
+        }
     },
 
     watch: {

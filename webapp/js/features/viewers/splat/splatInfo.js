@@ -10,17 +10,17 @@
 import { measureFormatters } from '@/features/viewers/unified/sceneUtils';
 import { UP_AXES, ESTIMATE_LABELS } from './upAxis';
 import { isVec3 } from './measureMath';
+import { formatNumber, UNKNOWN } from '@/libs/format';
 
-const UNKNOWN = 'Unknown';
 /** An estimated up within this angle of a world axis is named by the axis (cos 8 degrees). */
 const AXIS_COS = 0.99;
 
 /** @param {unknown} v @returns {v is number} */
 const isCount = v => typeof v === 'number' && Number.isFinite(v) && v >= 0;
 
-/** The number with thousands separators (1,234,567), or "Unknown". @param {unknown} count */
+/** The number with the group separators of the browser's locale (1,234,567 in en), or "Unknown". @param {unknown} count */
 export function formatSplatCount(count) {
-    return isCount(count) ? Math.round(count).toLocaleString('en-US') : UNKNOWN;
+    return isCount(count) ? formatNumber(Math.round(count), 'count') : UNKNOWN;
 }
 
 const SH_NAMES = ['0 (flat colour)', '1', '2', '3 (full)'];

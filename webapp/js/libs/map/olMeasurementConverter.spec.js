@@ -26,7 +26,7 @@ function importOne(feature, unitPref = 'imperial') {
 describe('importMeasurements tooltip text', () => {
     it('recalculates a saved area in the current units instead of keeping its saved text', () => {
         const f = importOne(featureOf('Polygon', ROOF, { measurementType: 'area', tooltipText: '0.03 acres' }));
-        expect(f.get('tooltipText')).toMatch(/^\d+(\.\d+)? ft²$/);
+        expect(f.get('tooltipText')).toMatch(/^\d{1,3}(,\d{3})*(\.\d+)? ft²$/);
         expect(f.get('tooltipText')).toBe(measurementSizeText(f.getGeometry(), 'area', 'imperial'));
     });
 

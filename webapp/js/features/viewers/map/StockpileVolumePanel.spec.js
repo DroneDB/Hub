@@ -40,7 +40,8 @@ function render(props = {}, { embed = false, query = {} } = {}) {
 const text = id => wrapper.find(`[data-testid="${id}"]`).text();
 const materialOptions = () => wrapper.find('[data-testid="stockpile-material"]').findAll('option');
 // As the panel writes numbers: the browser locale, at most `digits` decimals
-const num = (n, digits = 2) => n.toLocaleString(undefined, { maximumFractionDigits: digits });
+// As libs/format.js writes numbers: in the browser's locale (navigator.language)
+const num = (n, digits = 2) => n.toLocaleString(navigator.language, { maximumFractionDigits: digits });
 
 beforeEach(() => { h.auth.isLoggedIn = true; });
 afterEach(() => wrapper?.unmount());

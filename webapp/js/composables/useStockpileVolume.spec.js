@@ -13,6 +13,7 @@ import Feature from 'ol/Feature';
 import { Vector as VectorSource } from 'ol/source';
 import { useStockpileVolume } from './useStockpileVolume';
 import { PREF, setPref, _resetPrefListenersForTests } from '@/libs/preferences';
+import { formatDensity, formatVolume } from '@/libs/format';
 
 const POLYGON = { type: 'Polygon', coordinates: [[[9, 45], [9.001, 45], [9.001, 45.001], [9, 45]]] };
 const VOLUME = { cutVolume: 100, fillVolume: 0, netVolume: 100, area2d: 50 };
@@ -96,6 +97,19 @@ beforeEach(() => {
 afterEach(() => {
     scope.stop();
     _resetPrefListenersForTests();
+});
+
+// FR-MAP-05: the label of the pile on the map writes its volume and density as the panel does
+describe('the label of a measured pile', () => {
+    afterEach(() => { delete navigator.language; });
+
+    it('writes the volume and the density with the formatter of the panel, in the browser locale', async () => {
+        Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
+        dataset.calculateStockpileVolume = async () => ({ ...VOLUME, cutVolume: 1234.567, netVolume: 1234.567 });
+        await measure('gravel');
+        expect(draft().get('tooltipText')).toBe(`${formatVolume(1234.567, 'metric')} - Gravel - ${formatDensity(1.68, 'metric')}`);
+        expect(draft().get('tooltipText')).toBe('1.234,57 m³ - Gravel - 1,68 t/m³');
+    });
 });
 
 describe('weight and cost of a measured pile', () => {

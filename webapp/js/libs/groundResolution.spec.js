@@ -28,7 +28,7 @@ describe('footprintGroundSize', () => {
 
 describe('formatGroundResolution', () => {
     it('shows the pixel size in cm with the ground extent and area', () => {
-        expect(formatGroundResolution(footprint(90, 88), 1800, 1760)).toBe('5.0 cm/px\n90 x 88 m (7920 m²)');
+        expect(formatGroundResolution(footprint(90, 88), 1800, 1760)).toBe('5.0 cm/px\n90 x 88 m (7,920 m²)');
     });
 
     it('shows both sides of a pixel that is not square on the ground', () => {

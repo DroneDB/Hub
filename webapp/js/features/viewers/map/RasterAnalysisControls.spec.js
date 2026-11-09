@@ -53,7 +53,7 @@ describe('RasterAnalysisControls area statistics', () => {
         await render({ areaStats: STATS });
         expect(statRows()).toEqual([
             'Min: 196.96 m', 'Max: 197.71 m', 'Mean: 197.21 m', 'Median: 197.19 m', 'Std dev: 0.17 m',
-            `Pixels: ${(9000).toLocaleString()}`, `No data: ${(1000).toLocaleString()}`
+            `Pixels: ${(9000).toLocaleString(navigator.language)}`, `No data: ${(1000).toLocaleString(navigator.language)}`
         ]);
     });
 

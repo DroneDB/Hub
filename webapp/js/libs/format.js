@@ -2,18 +2,271 @@
 /**
  * User-visible formatting: dates, durations, sizes, numbers, coordinates and
  * measures. Components format through this module only, so the app shows one format
- * per kind of value and a later i18n pass changes one file.
+ * per kind of value and a later i18n pass changes one file (FR-XC-08).
  *
- * Empty input (null, undefined, '', invalid date) returns `placeholder` ('' by default).
+ * Numbers and dates are written in the browser's locale (navigator.language, D-006): its
+ * decimal sign and its group separator, through Intl. A quantity has its number of
+ * decimals in PRECISION, and a typed number is read with parseNumber (D-025).
+ *
+ * A number put in a text field for the user to edit is written with formatInputNumber (the
+ * locale's decimal sign, no group separators), never with formatNumber: parseNumber reads a
+ * lone "." or "," as the decimal sign, so a grouped "1,234" would read back as 1.234.
+ *
+ * Empty input (null, undefined, '', invalid date) returns `placeholder`: '' by default for
+ * dates, EMPTY_CELL for numbers; a date or a fact that is not known shows UNKNOWN.
  */
-import { formatTimeAgo } from './utils';
-
-export { formatTimeAgo };
 
 /**
  * @typedef {Date|number|string|null|undefined} DateInput  a Date, epoch milliseconds or an ISO string
  * @typedef {{ placeholder?: string }} EmptyOption
  */
+
+/** What a date or a fact that is not known shows */
+export const UNKNOWN = 'Unknown';
+
+/** What an empty numeric table cell shows (an en dash) */
+export const EMPTY_CELL = '\u2013';
+
+/**
+ * The locale numbers and dates are written and read in: the browser's (D-006); the runtime's
+ * default without a navigator.
+ * @returns {string|undefined}
+ */
+export function displayLocale() {
+    return (typeof navigator !== 'undefined' && navigator.language) || undefined;
+}
+
+/**
+ * The number of decimals of each quantity, the one table every view uses, so the same quantity
+ * reads the same in a panel, a map label, a list and a chart.
+ */
+export const PRECISION = Object.freeze({
+    /** a number of things: pixels, points, files */
+    count: 0,
+    /** a length in m or ft */
+    length: 2,
+    /** a length in km or mi */
+    longLength: 3,
+    /** an area in m², ha, km², ft² or acres */
+    area: 2,
+    /** a volume in m³ or yd³ */
+    volume: 2,
+    /** a weight in t or short tons */
+    weight: 2,
+    /** a bulk density in t/m³ or ST/yd³ */
+    density: 3,
+    /** an elevation in m or ft */
+    elevation: 2,
+    /** a ground speed in km/h or mph */
+    speed: 1,
+    /** a temperature in °C, °F or K */
+    temperature: 1,
+    /** a percentage */
+    percent: 1,
+    /** a size in KB, MB, GB... */
+    bytes: 2,
+    /** a value without a unit (an index, a band value) */
+    value: 3
+});
+
+/** @typedef {keyof typeof PRECISION} Quantity */
+
+/** @type {Map<string, Intl.NumberFormat>} */
+const numberFormats = new Map();
+
+/** One Intl.NumberFormat per locale and options, kept: map labels format on every frame */
+function numberFormat(/** @type {Intl.NumberFormatOptions} */ options) {
+    const locale = displayLocale();
+    const key = `${locale}|${JSON.stringify(options)}`;
+    let format = numberFormats.get(key);
+    if (!format) {
+        try {
+            format = new Intl.NumberFormat(locale, options);
+        } catch {
+            // A locale the runtime does not know
+            format = new Intl.NumberFormat(undefined, options);
+        }
+        numberFormats.set(key, format);
+    }
+    return format;
+}
+
+/** @param {number|Quantity} digits @returns {number} */
+const decimalsOf = digits => (typeof digits === 'number' ? digits : PRECISION[digits] ?? PRECISION.value);
+
+/**
+ * A number in the browser's locale, with group separators: "59,090,002.25" in en, "59.090.002,25"
+ * in it. Non-numbers pass through as text; no number (null, undefined, '', NaN, Infinity) is the
+ * placeholder.
+ * @param {unknown} value
+ * @param {number|Quantity} [digits]  the decimals, or the quantity whose decimals (PRECISION) apply
+ * @param {{ placeholder?: string, trim?: boolean, significant?: number, grouping?: boolean }} [options]
+ *   trim: no trailing zeros ("1.5", not "1.50"); significant: at most this many significant
+ *   digits instead of `digits` decimals; grouping false: no group separators (a coordinate)
+ */
+export function formatNumber(value, digits = PRECISION.value, { placeholder = EMPTY_CELL, trim = false, significant, grouping = true } = {}) {
+    if (value === null || value === undefined || value === '') return placeholder;
+    if (typeof value !== 'number') return String(value);
+    if (!Number.isFinite(value)) return placeholder;
+    /** @type {Intl.NumberFormatOptions} */
+    let options;
+    let shown = value || 0;
+    if (significant) {
+        options = { maximumSignificantDigits: significant };
+    } else {
+        const decimals = decimalsOf(digits);
+        options = { minimumFractionDigits: trim ? 0 : decimals, maximumFractionDigits: decimals };
+        // No "-0.00" for a small negative value rounded to zero
+        if (Math.abs(shown) < 0.5 * Math.pow(10, -decimals)) shown = 0;
+    }
+    return numberFormat({ useGrouping: grouping, ...options }).format(shown);
+}
+
+/**
+ * A number to put in a text field the user edits: the browser's decimal sign, no group separators,
+ * no trailing zeros ("1234,5" in it, "1234.5" in en), so parseNumber reads it back as it is. ''
+ * for no number.
+ * @param {unknown} value
+ * @param {number|Quantity} [digits]  at most this many decimals
+ */
+export function formatInputNumber(value, digits = 10) {
+    return formatNumber(value, digits, { trim: true, grouping: false, placeholder: '' });
+}
+
+/** The decimal sign and the group separator of the browser's locale */
+function separators() {
+    const parts = numberFormat({ useGrouping: true }).formatToParts(12345.6);
+    return {
+        decimal: parts.find(p => p.type === 'decimal')?.value ?? '.',
+        group: parts.find(p => p.type === 'group')?.value ?? ','
+    };
+}
+
+/**
+ * Numbers already written (formatNumber), one after the other: joined by ", ", or by "; " in a
+ * locale whose decimal sign is a comma ("45,5; 9,25"), so the list stays readable.
+ * @param {string[]} texts
+ */
+export function joinNumberTexts(texts) {
+    return texts.join(separators().decimal === ',' ? '; ' : ', ');
+}
+
+/**
+ * Numbers written one after the other, each with formatNumber, joined by joinNumberTexts.
+ * @param {unknown[]} values
+ * @param {number|Quantity} [digits]
+ * @param {{ placeholder?: string, trim?: boolean, grouping?: boolean }} [options]
+ */
+export function formatNumberList(values, digits, options) {
+    return joinNumberTexts(values.map(v => formatNumber(v, digits, options)));
+}
+
+// Grouped digits, "," standing for the group separator: groups of three ("1,234", "12,345,678"), or
+// the Indian grouping of en-IN and hi-IN, groups of two before the last three ("12,34,567")
+const groupedDigits = (/** @type {string} */ group) =>
+    new RegExp(`^(\\d{1,3}(\\${group}\\d{3})+|\\d{1,2}(\\${group}\\d{2})+\\${group}\\d{3})$`);
+
+// Group separators that are never a decimal sign: an apostrophe or a right single quotation mark
+// (de-CH writes 1’234.5)
+const APOSTROPHES = /['\u2019]/g;
+
+/**
+ * The digits of a number written with `decimal` and `group`, as JavaScript reads them ("1234.5"),
+ * or null when the text is not written so.
+ * @param {string} text  without sign or spaces
+ * @param {string} decimal
+ * @param {string} group
+ */
+function plainDigits(text, decimal, group) {
+    const at = text.indexOf(decimal);
+    const [whole, fraction] = at < 0 ? [text, ''] : [text.slice(0, at), text.slice(at + 1)];
+    if (!/^\d*$/.test(fraction)) return null;
+    let digits = whole;
+    if (whole.includes(group)) {
+        if (!groupedDigits(group).test(whole)) return null;
+        digits = whole.split(group).join('');
+    } else if (!/^\d*$/.test(whole)) {
+        return null;
+    }
+    if (!digits && !fraction) return null;
+    return `${digits || '0'}.${fraction || '0'}`;
+}
+
+/**
+ * The number a user typed, by the rule of D-025: a lone "." or "," with no other separator is the
+ * decimal sign, so "12.5" and "12,5" are 12.5 in every locale; any other text is read with the
+ * browser's locale first ("1.234,5" is 1234.5 in it, "1,234.5" in en, "12,34,567.5" in en-IN), then
+ * with the other convention. Spaces and apostrophes (group separators in fr and de-CH) are ignored,
+ * and a leading + or - is the sign. NaN when the text is not a number.
+ * @param {unknown} text
+ * @returns {number}
+ */
+export function parseNumber(text) {
+    if (typeof text === 'number') return Number.isFinite(text) ? text : NaN;
+    if (typeof text !== 'string') return NaN;
+    const { decimal, group } = separators();
+    // \s includes the no-break spaces some locales group digits with
+    let t = text.replace(/\s/g, '').replace(APOSTROPHES, '');
+    // Any other group separator than "." and "," is only ever a group separator
+    if (group !== '.' && group !== ',' && !/\s/.test(group)) t = t.split(group).join('');
+    let sign = 1;
+    const signed = /^([+\-\u2212])(.*)$/.exec(t);
+    if (signed) {
+        sign = signed[1] === '+' ? 1 : -1;
+        t = signed[2];
+    }
+    if (!t || !/^[\d.,]+$/.test(t)) return NaN;
+
+    const separatorCount = (t.match(/[.,]/g) ?? []).length;
+    let digits;
+    if (separatorCount <= 1) {
+        digits = plainDigits(t.replace(',', '.'), '.', ',');
+    } else {
+        const [localeDecimal, localeGroup] = decimal === ',' ? [',', '.'] : ['.', ','];
+        digits = plainDigits(t, localeDecimal, localeGroup) ?? plainDigits(t, localeGroup, localeDecimal);
+    }
+    return digits === null ? NaN : sign * Number(digits);
+}
+
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+/**
+ * A size in bytes, in binary units (1 KB = 1024 bytes) with at most `decimals` decimals:
+ * "0 B", "1 KB", "1.46 MB", "1,5 GB" in it.
+ * @param {number|null|undefined} bytes
+ * @param {{ decimals?: number, placeholder?: string }} [options]
+ */
+export function formatBytes(bytes, { decimals = PRECISION.bytes, placeholder = EMPTY_CELL } = {}) {
+    if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return placeholder;
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const i = Math.max(0, Math.min(BYTE_UNITS.length - 1, Math.floor(Math.log(Math.abs(bytes)) / Math.log(k))));
+    return `${formatNumber(bytes / Math.pow(k, i), Math.max(0, decimals), { trim: true })} ${BYTE_UNITS[i]}`;
+}
+
+/**
+ * Format a timestamp as a human-readable relative time string.
+ * This is the single source of truth for "time ago" formatting across the app.
+ * @param {number|null|undefined} ms - Millisecond timestamp (e.g., `Date.now()` or `new Date(str).getTime()`)
+ * @returns {string} e.g. "just now", "5 minutes ago", "3 months ago", "2 years ago"
+ */
+export function formatTimeAgo(ms) {
+    if (ms == null) return '';
+    const diff = Date.now() - ms;
+    const absDiff = Math.abs(diff);
+    const suffix = diff >= 0 ? 'ago' : 'from now';
+    const minutes = Math.floor(absDiff / 60000);
+    const hours = Math.floor(absDiff / 3600000);
+    const days = Math.floor(absDiff / 86400000);
+    const months = Math.floor(days / 30);
+    const years = Math.floor(days / 365);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ${suffix}`;
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ${suffix}`;
+    if (days < 30) return `${days} day${days > 1 ? 's' : ''} ${suffix}`;
+    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ${suffix}`;
+    return `${years || 1} year${years > 1 ? 's' : ''} ${suffix}`;
+}
 
 /**
  * The word that agrees with count: singular for 1, the plural form (singular + "s" unless
@@ -33,14 +286,28 @@ export function pluralize(count, singular, plural = `${singular}s`) {
  * @param {string} [plural]
  */
 export function countOf(count, singular, plural) {
-    return `${count} ${pluralize(count, singular, plural)}`;
+    return `${formatNumber(count, PRECISION.count, { trim: true })} ${pluralize(count, singular, plural)}`;
 }
 
-/** @param {DateInput} value @returns {Date|null} */
+/**
+ * The date of a value, or null when there is none: no value, a text that is not a date, or the
+ * epoch 0 that a file without a date reports (a capture time of 0 is not known, not 1970).
+ * @param {DateInput} value @returns {Date|null}
+ */
 function toDate(value) {
-    if (value === null || value === undefined || value === '') return null;
+    if (value === null || value === undefined || value === '' || value === 0) return null;
     const d = value instanceof Date ? value : new Date(value);
-    return isNaN(d.getTime()) ? null : d;
+    const ms = d.getTime();
+    return isNaN(ms) || ms === 0 ? null : d;
+}
+
+/** @param {Intl.DateTimeFormatOptions} options */
+function dateTimeFormat(options) {
+    try {
+        return new Intl.DateTimeFormat(displayLocale(), options);
+    } catch {
+        return new Intl.DateTimeFormat(undefined, options);
+    }
 }
 
 /**
@@ -50,21 +317,53 @@ function toDate(value) {
  */
 export function formatDate(value, { placeholder = '' } = {}) {
     const d = toDate(value);
-    return d ? d.toLocaleDateString() : placeholder;
+    return d ? dateTimeFormat({ year: 'numeric', month: 'numeric', day: 'numeric' }).format(d) : placeholder;
 }
 
 /**
- * Locale date and time with 2-digit fields, e.g. "10/20/2026, 02:05 PM".
+ * Locale date and time with 2-digit fields, in local time: "10/20/2026, 02:05 PM" in en-US,
+ * "20/10/2026, 14:05" in it. Every date of the app is written so (Modified, Capture Time, Created).
  * @param {DateInput} value
  * @param {EmptyOption & { seconds?: boolean }} [options]
  */
 export function formatDateTime(value, { placeholder = '', seconds = false } = {}) {
     const d = toDate(value);
     if (!d) return placeholder;
-    return new Intl.DateTimeFormat(undefined, {
+    return dateTimeFormat({
         year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {})
     }).format(d);
+}
+
+/**
+ * Locale time of day with 2-digit fields, in local time: "02:05:09 PM" in en-US, "14:05:09" in it.
+ * @param {DateInput} value
+ * @param {EmptyOption & { seconds?: boolean }} [options]
+ */
+export function formatTime(value, { placeholder = '', seconds = true } = {}) {
+    const d = toDate(value);
+    if (!d) return placeholder;
+    return dateTimeFormat({ hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}) }).format(d);
+}
+
+const UTC_CLOCK = /^(\d{2}):(\d{2}):(\d{2})$/;
+
+/**
+ * A UTC time of day ("HH:mm:ss", as the Registry writes the lines of a task log) in local time
+ * (formatTime): the latest such moment that is not after `now` (a log line is never in the future).
+ * The text as it is when it is not a time of day.
+ * @param {string} clock  "HH:mm:ss" in UTC
+ * @param {Date} [now]
+ */
+export function utcClockToLocal(clock, now = new Date()) {
+    const m = UTC_CLOCK.exec(clock);
+    if (!m) return clock;
+    const [h, min, s] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    if (h > 23 || min > 59 || s > 59) return clock;
+    let ms = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, min, s);
+    // A minute of slack for a server clock that runs a little ahead
+    if (ms > now.getTime() + 60000) ms -= 86400000;
+    return formatTime(ms, { seconds: true });
 }
 
 /**
@@ -93,17 +392,6 @@ export function formatDuration(ms, options) {
 }
 
 /**
- * A number with a fixed number of decimals; non-numbers pass through as text.
- * @param {unknown} value
- * @param {number} [digits]
- * @param {{ placeholder?: string }} [options]  placeholder defaults to '-'
- */
-export function formatNumber(value, digits = 3, { placeholder = '-' } = {}) {
-    if (value === null || value === undefined || value === '') return placeholder;
-    return typeof value === 'number' ? value.toFixed(digits) : String(value);
-}
-
-/**
  * Degrees, minutes, seconds: 45°30'00.00" N.
  * @param {number} degrees  decimal degrees
  * @param {'lat'|'lon'} axis
@@ -117,7 +405,20 @@ export function toDms(degrees, axis) {
     return `${d}°${m < 10 ? '0' : ''}${m}'${s < 10 ? '0' : ''}${s.toFixed(2)}" ${dir}`;
 }
 
-const round2 = v => Math.round(v * 100) / 100;
+/** A value rounded to the decimals of `digits` (a number of decimals or a quantity) */
+const roundTo = (/** @type {number} */ v, /** @type {number|Quantity} */ digits) => {
+    const f = Math.pow(10, decimalsOf(digits));
+    return Math.round(v * f) / f;
+};
+
+/**
+ * A value and its unit, as the measuring functions return them: `value` rounded to the decimals of
+ * the quantity, `text` the value in the browser's locale (no trailing zeros) and the unit.
+ * @param {number} v @param {string} unit @param {number|Quantity} digits
+ * @returns {{ value: number, unit: string, text: string }}
+ */
+const quantityParts = (v, unit, digits) =>
+    ({ value: roundTo(v, digits), unit, text: `${formatNumber(v, digits, { trim: true })} ${unit}` });
 const FEET_PER_M = 3.28084;
 const M2_PER_ACRE = 4046.8564224;
 // A square foot is 0.09290304 m² by definition
@@ -159,32 +460,29 @@ export function areaScale(squareMeters, units = 'metric') {
 }
 
 /**
- * Measured area in the user's units (see areaScale): "640 m²", "1.5 ha", "1200 ft²", "3.71 acres".
+ * Measured area in the user's units (see areaScale): "640 m²", "1.5 ha", "1,200 ft²", "3.71 acres".
  * @param {number} squareMeters
  * @param {'metric'|'imperial'|string} [units]
- * @returns {{ value: number, unit: string, text: string }}  value rounded to 2 decimals
+ * @returns {{ value: number, unit: string, text: string }}  value rounded to PRECISION.area decimals
  */
 export function areaParts(squareMeters, units = 'metric') {
     const { factor, unit } = areaScale(squareMeters, units);
-    const value = round2(squareMeters * factor);
-    return { value, unit, text: `${value} ${unit}` };
+    return quantityParts(squareMeters * factor, unit, 'area');
 }
 
 /**
- * Measured length in the user's units: m up to 100 m, then km; feet for imperial.
+ * Measured length in the user's units: m below 1 km (PRECISION.length decimals), then km
+ * (PRECISION.longLength decimals); feet for imperial. "110.4 m", "1.235 km", "3.28 ft"
  * @param {number} meters
  * @param {'metric'|'imperial'|string} [units]
- * @returns {{ value: number, unit: string, text: string }}  value rounded to 2 decimals
+ * @returns {{ value: number, unit: string, text: string }}  value rounded to the decimals of its unit
  */
 export function lengthParts(meters, units = 'metric') {
-    let value, unit;
-    if (units === 'metric') {
-        [value, unit] = meters > 100 ? [meters / 1000, 'km'] : [meters, 'm'];
-    } else {
-        [value, unit] = [meters * FEET_PER_M, 'ft'];
-    }
-    value = round2(value);
-    return { value, unit, text: `${value} ${unit}` };
+    if (units !== 'metric') return quantityParts(meters * FEET_PER_M, 'ft', 'length');
+    // On the value as it would show in metres, so 999.996 m is "1 km", not "1,000 m"
+    return Math.abs(roundTo(meters, 'length')) >= 1000
+        ? quantityParts(meters / 1000, 'km', 'longLength')
+        : quantityParts(meters, 'm', 'length');
 }
 
 /** @param {number} squareMeters @param {string} [units] */
@@ -200,8 +498,8 @@ export const formatLength = (meters, units) => lengthParts(meters, units).text;
  */
 export function formatSpeed(metersPerSecond, units = 'metric') {
     return units === 'imperial'
-        ? `${(metersPerSecond * 2.23694).toFixed(1)} mph`
-        : `${(metersPerSecond * 3.6).toFixed(1)} km/h`;
+        ? `${formatNumber(metersPerSecond * 2.23694, 'speed')} mph`
+        : `${formatNumber(metersPerSecond * 3.6, 'speed')} km/h`;
 }
 
 const INCHES_PER_M = 39.3701;
@@ -213,17 +511,17 @@ const FEET_PER_MILE = 5280;
  * @param {number} meters
  * @param {'metric'|'imperial'|string} [units]
  * @param {number} [decimals]
- * @returns {{ value: string, unit: string, text: string }}
+ * @returns {{ value: string, unit: string, text: string }}  value: the number as formatNumber writes it
  */
-export function fixedLengthParts(meters, units = 'metric', decimals = 2) {
+export function fixedLengthParts(meters, units = 'metric', decimals = PRECISION.length, { grouping = true } = {}) {
     const [v, unit] = units === 'imperial' ? [meters * FEET_PER_M, 'ft'] : [meters, 'm'];
-    const value = v.toFixed(decimals);
+    const value = formatNumber(v, decimals, { grouping });
     return { value, unit, text: `${value} ${unit}` };
 }
 
 // Values in the unit given by factor (per metre), joined: "5.0", "4.3 x 6.2"
-function joinSides(sidesMeters, factor, decimals) {
-    return sidesMeters.map(s => (s * factor).toFixed(decimals)).join(' x ');
+function joinSides(/** @type {number[]} */ sidesMeters, /** @type {number} */ factor, /** @type {number} */ decimals) {
+    return sidesMeters.map(s => formatNumber(s * factor, decimals)).join(' x ');
 }
 
 // Pixel sides that differ by less than this are shown as one value
@@ -274,7 +572,7 @@ export function formatExtent(widthMeters, heightMeters, units = 'metric') {
  */
 export function formatLandArea(squareMeters, units = 'metric') {
     const { factor, unit, landDecimals } = areaScale(squareMeters, units);
-    return `${(squareMeters * factor).toFixed(landDecimals)} ${unit}`;
+    return `${formatNumber(squareMeters * factor, landDecimals)} ${unit}`;
 }
 
 // A cubic yard and a short ton by definition
@@ -315,6 +613,33 @@ export function bulkUnits(units = 'metric') {
 }
 
 /**
+ * A quantity of a pile of material, given metric, in the user's units with the decimals of
+ * PRECISION (no trailing zeros); the placeholder for no number.
+ * @param {'volume'|'weight'|'density'} kind
+ * @param {unknown} metric  m³, t or t/m³
+ * @param {string} [units]
+ * @param {string} [placeholder]
+ */
+function bulkText(kind, metric, units, placeholder = EMPTY_CELL) {
+    if (typeof metric !== 'number' || !Number.isFinite(metric)) return placeholder;
+    const { factor, unit } = bulkUnits(units)[kind];
+    return `${formatNumber(metric * factor, kind, { trim: true })} ${unit}`;
+}
+
+/**
+ * A volume in m³ in the user's units: "1,234.5 m³", "1,614.69 yd³". The stockpile panel and the
+ * label of the pile on the map write it so.
+ * @param {unknown} cubicMeters @param {string} [units] @param {EmptyOption} [options]
+ */
+export const formatVolume = (cubicMeters, units, { placeholder } = {}) => bulkText('volume', cubicMeters, units, placeholder);
+
+/** A weight in tonnes in the user's units: "2,074.2 t", "2,286.43 ST". @param {unknown} tonnes @param {string} [units] @param {EmptyOption} [options] */
+export const formatWeight = (tonnes, units, { placeholder } = {}) => bulkText('weight', tonnes, units, placeholder);
+
+/** A bulk density in t/m³ in the user's units: "1.68 t/m³", "1.416 ST/yd³". @param {unknown} tonnesPerCubicMeter @param {string} [units] @param {EmptyOption} [options] */
+export const formatDensity = (tonnesPerCubicMeter, units, { placeholder } = {}) => bulkText('density', tonnesPerCubicMeter, units, placeholder);
+
+/**
  * An amount of money in a currency, as the locale writes it: "$1,234.50", "€1,234.50".
  * An unknown currency code is written after the number.
  * @param {number} amount
@@ -322,9 +647,9 @@ export function bulkUnits(units = 'metric') {
  */
 export function formatMoney(amount, currency) {
     try {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+        return new Intl.NumberFormat(displayLocale(), { style: 'currency', currency }).format(amount);
     } catch {
-        return `${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${currency}`.trim();
+        return `${formatNumber(amount, 2, { trim: true })} ${currency}`.trim();
     }
 }
 

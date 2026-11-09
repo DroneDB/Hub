@@ -133,7 +133,7 @@ describe('resolution row', () => {
 
     it('shows the ground resolution of a georaster', () => {
         const props = tidyProperties(buildAllProperties({ entry }));
-        expect(props.resolution).toBe('5.0 cm/px\n91 x 89 m (8119 m²)');
+        expect(props.resolution).toBe('5.0 cm/px\n91 x 89 m (8,119 m²)');
         expect(props.geotransform).toBeUndefined();
     });
 
@@ -181,6 +181,17 @@ describe('coordinates row', () => {
         const file = pointEntry([11.2, 46.1, 300.456]);
         expect(buildAllProperties(file, 'imperial').coordinates).toBe('EPSG:4326 11.2, 46.1, 985.75ft');
         expect(buildCopyableValues(file).coordinates.text).toBe('46.1, 11.2, 300.46');
+    });
+
+    it('writes every part in the browser locale, without group separators, "; " between them where the decimal sign is a comma', () => {
+        Object.defineProperty(navigator, 'language', { value: 'it-IT', configurable: true });
+        try {
+            expect(buildAllProperties(pointEntry([9.1234, 45.678, 1234.5])).coordinates).toBe('EPSG:4326 9,1234; 45,678; 1234,50m');
+        } finally {
+            delete navigator.language;
+        }
+        expect(buildAllProperties(pointEntry([500000.123456789, 4500000.5, 1234.5])).coordinates)
+            .toBe('EPSG:4326 500000.12345679, 4500000.5, 1234.50m');
     });
 
     it('has no altitude part for a 2D point', () => {

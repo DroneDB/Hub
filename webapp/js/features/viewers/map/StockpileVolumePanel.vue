@@ -182,7 +182,7 @@
 import AnalysisPanel from './AnalysisPanel.vue';
 import StockpileBaseMethodsDialog from './StockpileBaseMethodsDialog.vue';
 import AnalysisTargetSelect from './AnalysisTargetSelect.vue';
-import { areaScale, bulkUnits, DEFAULT_CURRENCY, formatMoney } from '@/libs/format';
+import { areaScale, bulkUnits, DEFAULT_CURRENCY, EMPTY_CELL, formatDensity, formatMoney, formatNumber, formatVolume, formatWeight } from '@/libs/format';
 import { CUSTOM_MATERIAL_SLUG, shownMaterialValue, storedMaterialValue } from '@/libs/stockpileMaterials';
 import { BASE_METHOD, BASE_METHODS } from '@/libs/stockpileBase';
 import { PREFERENCES_QUERY } from '@/libs/authRoutes';
@@ -329,34 +329,31 @@ export default {
         }
     },
     methods: {
-        _fmt(n, digits = 2) {
-            return Number(n).toLocaleString(undefined, { maximumFractionDigits: digits });
+        // Every number through the one formatter (libs/format.js), so the panel and the label of the
+        // pile on the map write the same quantity the same way
+        _fmt(n, quantity) {
+            return formatNumber(Number(n), quantity, { trim: true });
         },
         formatVolume(v) {
-            if (v == null || !isFinite(v)) return '-';
-            const { factor, unit } = this.units.volume;
-            return `${this._fmt(v * factor)} ${unit}`;
+            return formatVolume(v, this.unitPref);
         },
         formatArea(v) {
-            if (v == null || !isFinite(v)) return '-';
+            if (v == null || !isFinite(v)) return EMPTY_CELL;
             const { factor, unit } = areaScale(v, this.unitPref);
-            return `${this._fmt(v * factor)} ${unit}`;
+            return `${this._fmt(v * factor, 'area')} ${unit}`;
         },
         formatElevation(v) {
-            if (v == null || !isFinite(v)) return '-';
-            return this.isImperial ? `${this._fmt(v * 3.28084)} ft` : `${this._fmt(v)} m`;
+            if (v == null || !isFinite(v)) return EMPTY_CELL;
+            return this.isImperial ? `${this._fmt(v * 3.28084, 'elevation')} ft` : `${this._fmt(v, 'elevation')} m`;
         },
         formatTons(t) {
-            if (t == null || !isFinite(t)) return '-';
-            const { factor, unit } = this.units.weight;
-            return `${this._fmt(t * factor)} ${unit}`;
+            return formatWeight(t, this.unitPref);
         },
         formatDensity(d) {
-            const { factor, unit } = this.units.density;
-            return `${this._fmt(d * factor, 3)} ${unit}`;
+            return formatDensity(d, this.unitPref);
         },
         formatCost(c) {
-            if (!c || !isFinite(c.amount)) return '-';
+            if (!c || !isFinite(c.amount)) return EMPTY_CELL;
             return formatMoney(c.amount, c.currency || DEFAULT_CURRENCY);
         },
         // The Preferences window opens on the materials (HubHeader reads the query and removes it).

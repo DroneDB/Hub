@@ -13,8 +13,8 @@
                             {{ beautify(key) }}
                         </td>
                         <td>
-                            <div v-if="key === 'captureTime' && val">
-                                {{ new Date(val) }}
+                            <div v-if="key === 'captureTime'">
+                                {{ formatCaptureTime(val) }}
                             </div>
                             <div v-else-if="key === 'bands' && Array.isArray(val)">
                                 {{ val.map(b => b && b.colorInterp ? b.colorInterp : '').join(", ") }}
@@ -36,7 +36,7 @@
             </table>
         </div>
         <div v-else-if="typeof tObj === 'number'">
-            {{ tObj.toLocaleString() }}
+            {{ formatValue(tObj) }}
         </div>
         <div v-else>
             {{ tObj !== undefined && tObj !== null ? tObj : '-' }}
@@ -47,6 +47,7 @@
 <script>
 import { clone, sortObjectKeys } from '@/libs/utils';
 import { tidyProperties, beautifyKey, isUrl } from '@/libs/propertiesUtils';
+import { formatDateTime, formatNumber, UNKNOWN } from '@/libs/format';
 /**
  * ObjTable - Recursive JSON/object-to-HTML-table renderer (Semantic UI table markup).
  *
@@ -84,6 +85,16 @@ export default {
         this.processObject();
     },
     methods: {
+        // A number in the browser's locale, at most 3 decimals (libs/format.js)
+        formatValue(value) {
+            return formatNumber(value, 'value', { trim: true });
+        },
+
+        // As every date is written (FR-EXP-26); a capture time that is not known (missing or 0) is "Unknown"
+        formatCaptureTime(value) {
+            return formatDateTime(value, { placeholder: UNKNOWN, seconds: true });
+        },
+
         processObject() {
             try {
                 // Handle null or undefined input

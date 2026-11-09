@@ -84,7 +84,7 @@
                 </Column>
                 <Column field="createdDate" header="Created" :sortable="true" v-bind="columnFrom('xl')">
                     <template #body="slotProps">
-                        {{ formatDateTime(slotProps.data.createdDate) }}
+                        {{ formatCreated(slotProps.data.createdDate) }}
                     </template>
                 </Column>
                 <Column header="Actions" :pt="{ bodyCell: { style: 'text-align: center' }, columnHeaderContent: { style: 'display: flex; justify-content: center' } }">
@@ -243,7 +243,7 @@ import InputIcon from 'primevue/inputicon';
 import IconField from 'primevue/iconfield';
 import reg from '@/libs/api/sharedRegistry';
 import { bytesToSize } from '@/libs/utils';
-import { formatDateTime } from '@/libs/format';
+import { formatDateTime, UNKNOWN } from '@/libs/format';
 import { deleteConfirmation } from '@/libs/deleteConfirmation';
 import { isUnauthorized } from '@/libs/ddb/apiError';
 import { columnFrom } from '@/libs/responsiveColumns';
@@ -390,7 +390,10 @@ export default {
             }
         },
 
-        formatDateTime,
+        // The date the user was created; a user created before the Registry stored it has none: "Unknown"
+        formatCreated(date) {
+            return formatDateTime(date, { placeholder: UNKNOWN });
+        },
 
         getStoragePercentage(user) {
             if (!user.storageQuota) return 0;
