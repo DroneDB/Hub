@@ -100,7 +100,8 @@ describe('UsersPage page size', () => {
         expect(rowNames()).toHaveLength(25);
     });
 
-    it('keeps the rows per page that the user chose after a reload', async () => {
+    // Two mounts of a table of 50 rows: slow under a parallel run, where the default 5 s test timeout is what failed
+    it('keeps the rows per page that the user chose after a reload', { timeout: 30000 }, async () => {
         await render();
         wrapper.vm.onPage({ first: 0, rows: 50, page: 0, pageCount: 2 });
         await flushPromises();

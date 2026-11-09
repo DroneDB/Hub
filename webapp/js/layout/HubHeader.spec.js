@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import PrimeVue from 'primevue/config';
@@ -222,12 +222,15 @@ describe('HubHeader user menu: Preferences', () => {
             items.find(i => i.label === 'Preferences').command();
             await loaded();
         }
-        // The window is a lazy chunk: the import resolves after a few turns of the event loop
-        const loaded = () => vi.waitFor(() => expect(preferencesWindow()).not.toBeNull());
+        // The window is a lazy chunk. Its first import transforms the SFC and its dependencies, which can take
+        // seconds when the whole suite runs in parallel: load it once, up front, with a generous hook timeout,
+        // so that the tests only wait for the (then cached) async component to render.
+        beforeAll(async () => { await import('@/features/account/PreferencesDialog.vue'); }, 60000);
+        const loaded = () => vi.waitFor(() => expect(preferencesWindow()).not.toBeNull(), { timeout: 5000, interval: 10 });
         beforeEach(() => { wrapper = null; });
         afterEach(() => { wrapper?.unmount(); wrapper = null; document.body.innerHTML = ''; });
 
-        it('opens from the menu item, without leaving the page', async () => {
+        it('opens from the menu item, without leaving the page', { timeout: 20000 }, async () => {
             const items = await menuItems({ accountManagement: false });
             expect(preferencesWindow()).toBeNull();
             items.find(i => i.label === 'Preferences').command();
