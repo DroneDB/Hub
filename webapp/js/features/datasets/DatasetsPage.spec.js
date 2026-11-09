@@ -624,3 +624,22 @@ describe('DatasetsPage keyboard (ORG-01)', () => {
         }
     });
 });
+
+describe('DatasetsPage, an import that failed (FR-UPL-12)', () => {
+    const { handleImportClose } = DatasetsPage.methods;
+
+    it('shows the reason from the task error, and drops the placeholder row of the dataset the rollback deletes', () => {
+        const reason = 'The file is not a ZIP, TAR, 7z or RAR archive';
+        const vm = {
+            importDialogOpen: true,
+            datasets: [{ slug: 'imp', isTemporary: true }, { slug: 'other' }],
+            reloadDatasets: vi.fn(),
+            $notify: { error: vi.fn(), success: vi.fn(), info: vi.fn() }
+        };
+        handleImportClose.call(vm, 'done', { slug: 'imp', success: false, error: reason });
+        expect(vm.$notify.error).toHaveBeenCalledWith(reason, { summary: 'Import failed', life: 'long' });
+        expect(vm.datasets.map(d => d.slug)).toEqual(['other']);
+        expect(vm.importDialogOpen).toBe(false);
+        expect(vm.$notify.success).not.toHaveBeenCalled();
+    });
+});

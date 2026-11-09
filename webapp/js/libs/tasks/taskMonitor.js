@@ -16,12 +16,20 @@
  *   'tasksUpdated' - the store snapshot changed: a task was added or deleted, or changed state or
  *                    progress (buildManager derives the build state of each file from it). The
  *                    first fetch of a dataset always fires it, even for an empty list.
+ *   'datasetGone'  - the server answered 404 to the task list: the dataset is not there any more (an
+ *                    import that was cancelled or failed has rolled back and deleted it, FR-UPL-05,
+ *                    D-004). Fires once, with { dataset, error }, and the dataset is not polled again.
+ *                    The Hub never deletes the dataset: the page shows the not-found state.
+ * A gone dataset ends its tasks for every reader: isGone() says so, hasActiveTasks() is false, and
+ * useHeavyTask rejects a task that it still saw running ("The dataset was deleted."). The last list
+ * stays readable (getTasks, getTask), frozen.
  */
 import { nextPollDelay } from './pollingPolicy';
 import { openEventStream } from '@/libs/sse';
 import emitter from '@/libs/eventBus';
 import { UPLOAD_ACTIVITY_EVENT } from '@/libs/upload/uploadEvents';
 import { datasetKey, isActiveState } from './taskStates';
+import { isNotFound } from '@/libs/ddb/apiError';
 
 const TAKE        = 200;
 // After the event stream fails, polling alone for this long before trying it again
@@ -35,7 +43,7 @@ let uploading = false;
 // Stable identity of a dataset for store keys and event matching (libs/tasks/taskStates)
 export { datasetKey };
 
-const stores = new Map(); // datasetKey -> { tasks: Map, loaded, timerId, dataset, refs, _started }
+const stores = new Map(); // datasetKey -> { tasks: Map, loaded, gone, timerId, dataset, refs, _started }
 
 function getStore(dataset) {
     const k = datasetKey(dataset);
@@ -45,7 +53,9 @@ function getStore(dataset) {
             // loaded: the server returned the list at least once. Until then `tasks` is empty
             // because nothing was fetched, not because the dataset has no tasks
             tasks: new Map(), loaded: false, timerId: null, dataset, refs: 0, _started: false, _lastSig: null,
-            idleStreak: 0, stream: null, streamUp: false, streamFailedAt: 0
+            idleStreak: 0, stream: null, streamUp: false, streamFailedAt: 0,
+            // gone: the task list answered 404, the dataset was deleted (see 'datasetGone')
+            gone: false
         };
         stores.set(k, ent);
     }
@@ -59,6 +69,8 @@ function peekStore(dataset) {
 }
 
 function hasActive(ent) {
+    // A deleted dataset runs nothing any more, whatever its last list said
+    if (ent.gone) return false;
     for (const t of ent.tasks.values()) {
         if (isActiveState(t.state)) return true;
     }
@@ -80,6 +92,7 @@ function computeSignature(ent) {
 
 async function _fetch(ent) {
     const ds = ent.dataset;
+    if (ent.gone) return;
     try {
         const arr = await ds.getTasks({ take: TAKE }) || [];
 
@@ -97,6 +110,16 @@ async function _fetch(ent) {
             ent.idleStreak++;
         }
     } catch (err) {
+        if (isNotFound(err)) {
+            // The dataset was deleted (a rolled back import): nothing left to poll
+            if (!ent.gone) {
+                ent.gone = true;
+                _clearTimer(ent);
+                _closeStream(ent);
+                emit('datasetGone', { dataset: ds, error: err });
+            }
+            return;
+        }
         console.error('taskMonitor: fetch failed', err);
     }
 }
@@ -105,7 +128,7 @@ async function _fetch(ent) {
 
 function _scheduleTick(ent) {
     _clearTimer(ent);
-    if (!ent._started) return;
+    if (!ent._started || ent.gone) return;
     _updateStream(ent);
     const delay = nextPollDelay({
         hidden: isHidden(), active: hasActive(ent), idleStreak: ent.idleStreak, pushed: ent.streamUp
@@ -286,13 +309,21 @@ const TaskMonitor = {
         return ent.tasks.get(taskId) || null;
     },
 
-    /** Does this dataset have any active tasks? */
+    /**
+     * Whether the server answered 404 to this dataset's task list: the dataset was deleted (a rolled
+     * back import) and its tasks will not change any more.
+     */
+    isGone(dataset) {
+        return peekStore(dataset)?.gone === true;
+    },
+
+    /** Does this dataset have any active tasks? (never a dataset that is gone) */
     hasActiveTasks(dataset) {
         const ent = peekStore(dataset);
         return ent ? hasActive(ent) : false;
     },
 
-    /** Subscribe to events (tasksUpdated). */
+    /** Subscribe to events (tasksUpdated, datasetGone). */
     on(event, fn) {
         (this._listeners[event] || (this._listeners[event] = [])).push(fn);
     },

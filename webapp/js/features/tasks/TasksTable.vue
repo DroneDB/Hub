@@ -103,7 +103,7 @@
                                 :loading="slotProps.data.taskId === downloadingTaskId"
                                 :disabled="slotProps.data.taskId === downloadingTaskId"
                                 @click="$emit('download-result', slotProps.data)" />
-                        <Button v-if="isActive(slotProps.data.state)" size="small" severity="secondary"
+                        <Button v-if="canCancel(slotProps.data)" size="small" severity="secondary"
                                 icon="fa-solid fa-stop" title="Cancel" aria-label="Cancel" @click="$emit('cancel', slotProps.data)" />
                         <Button v-if="slotProps.data.state === 'Failed'" size="small" severity="secondary"
                                 icon="fa-solid fa-rotate-right" title="Retry" aria-label="Retry" @click="$emit('retry', slotProps.data)" />
@@ -185,6 +185,16 @@ export default {
     },
 
     methods: {
+        /**
+         * Whether the row offers Cancel: an active task, unless the Registry says that it cannot be
+         * cancelled (`cancellable` false: a committed task, whose rollback would lose its output;
+         * FR-XC-27). The action is hidden then, not disabled. A Registry that does not send the
+         * field (an older one) keeps Cancel for every active task.
+         */
+        canCancel(task) {
+            return this.isActive(task.state) && task.cancellable !== false;
+        },
+
         /**
          * What the Progress column renders for a row: 'waiting', 'failed', 'bar' or 'none'.
          * A build that succeeded without building, its entry waiting for files, shows

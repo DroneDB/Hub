@@ -115,3 +115,19 @@ describe('TasksPage refused (403)', () => {
         expect(vm.$router.push).toHaveBeenCalledWith({ name: 'Organizations', query: { notice: 'denied:AdminTasks' } });
     });
 });
+
+describe('TasksPage cancel question', () => {
+    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', () => {
+        const vm = { cancellingTask: { ...TASK, toolId: 'import-dataset' }, taskTools: [], toolTitle: () => 'Import dataset' };
+        const props = TasksPage.computed.cancelDialog.call(vm);
+        expect(props).toMatchObject({ title: 'Cancel Task', confirmText: 'Cancel Task', cancelText: "Don't Cancel", confirmButtonClass: 'danger' });
+        expect(props.warningMessage).toBe('The files imported so far are deleted, and so is the dataset that this import created.');
+    });
+
+    it('asks the plain question for another task', () => {
+        const vm = { cancellingTask: { ...TASK, path: 'a.tif' }, taskTools: [], toolTitle: () => 'Build' };
+        const props = TasksPage.computed.cancelDialog.call(vm);
+        expect(props.warningMessage).toBeUndefined();
+        expect(props.message).toContain('<strong>Build</strong> (path: a.tif) will be stopped.');
+    });
+});

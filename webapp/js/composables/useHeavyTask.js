@@ -12,13 +12,20 @@
  * status is fetched on the terminal state only, and log lines while the task is tracked.
  * Everything stops when the owning component (effect scope) goes away: a task still
  * running then never settles its promise, and the poller is released.
+ * A task whose dataset is deleted while it runs (a cancelled or failed import rolls back and
+ * deletes the dataset it created, FR-UPL-05, D-004) rejects with DATASET_GONE_MESSAGE and
+ * `datasetGone: true`, once: its state can never be read again.
  */
 import { ref, getCurrentScope, onScopeDispose } from 'vue';
 import taskMonitor from '@/libs/tasks/taskMonitor';
 import { isTerminalState } from '@/libs/tasks/taskStates';
+import { isNotFound } from '@/libs/ddb/apiError';
 import { notify } from '@/libs/notify';
 
 const DEFAULT_POLL_MS = 2000;
+
+/** Why a tracked task ended without a terminal state: its dataset is not there any more */
+export const DATASET_GONE_MESSAGE = 'The dataset was deleted.';
 
 /**
  * @typedef {object} HeavyTaskOptions
@@ -83,11 +90,25 @@ export function useHeavyTask() {
                 if (disposed) return;
                 try {
                     let summary = taskMonitor.getTask(dataset, taskId);
+                    let gone = taskMonitor.isGone(dataset);
                     // Not in the shared store yet: ask the API directly
-                    if (!summary) {
+                    if (!summary && !gone) {
                         try { summary = (await dataset.getTasks({ skip: 0, take: 200 }) || []).find(t => t.taskId === taskId); }
-                        catch { /* ignore */ }
+                        catch (e) { gone = isNotFound(e); }
                         if (disposed) return;
+                    }
+                    // The dataset was deleted: the task's last known state is all there is. A terminal
+                    // one settles as usual below; any other would never change, so the task ends here
+                    if (gone && !(summary && isTerminalState(summary.state))) {
+                        endTask(taskId);
+                        const entry = { ...(heavyTasks.value[taskId] || { taskId }), error: DATASET_GONE_MESSAGE, datasetGone: true };
+                        setTask(taskId, entry);
+                        if (showToast) notify.error(DATASET_GONE_MESSAGE, { summary: 'Task failed', life: 'long' });
+                        const err = /** @type {Error & { task?: object, datasetGone?: boolean }} */ (new Error(DATASET_GONE_MESSAGE));
+                        err.task = entry;
+                        err.datasetGone = true;
+                        reject(err);
+                        return;
                     }
                     if (!summary) {
                         // lifetime: paired (endTask clears timers[taskId], also on dispose)
@@ -174,7 +195,7 @@ export function useHeavyTask() {
      * @param {any} dataset the ddb Dataset
      * @param {string} toolId
      * @param {HeavyTaskOptions} [options]
-     * @returns {Promise<any>} the final entry; rejects when Failed/Deleted
+     * @returns {Promise<any>} the final entry; rejects when Failed/Deleted, or when the dataset is deleted
      */
     async function runHeavyTask(dataset, toolId, options = {}) {
         const submit = await dataset.submitTask(toolId, {

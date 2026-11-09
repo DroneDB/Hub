@@ -3,11 +3,13 @@
  * - a tick that is mid-await when the host unmounts must not reschedule itself
  * - unmounting releases the shared taskMonitor reference
  * - tracking the same task twice reuses the in-flight poll
+ * - a task whose dataset is deleted (404) settles once, with "The dataset was deleted."
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { effectScope } from 'vue';
 import { useHeavyTask } from './useHeavyTask';
 import taskMonitor from '@/libs/tasks/taskMonitor';
+import { ApiError } from '@/libs/ddb/apiError';
 
 let dsSeq = 0;
 
@@ -146,5 +148,94 @@ describe('terminal state', () => {
 
         expect(dataset.getTaskLog).toHaveBeenCalledTimes(calls);
         expect(taskMonitor.getTasks(dataset)).toHaveLength(0);
+    });
+});
+
+describe('a dataset deleted while its task runs (FR-UPL-05, D-004)', () => {
+    const notFound = () => new ApiError('Not found', 404);
+
+    it('rejects once with "The dataset was deleted." when the list answers 404 after a Processing summary', async () => {
+        let deleted = false;
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => {
+                if (deleted) throw notFound();
+                return [{ taskId: 't1', toolId: 'import-dataset', state: 'Processing', progressPercent: 40 }];
+            }),
+        });
+        const host = makeHost();
+        const seen = [];
+
+        const result = host.trackHeavyTask(dataset, 't1', { notify: false, onProgress: e => seen.push(e.state) });
+        const settled = vi.fn();
+        result.then(settled, settled);
+        await vi.advanceTimersByTimeAsync(0);
+        expect(seen).toEqual(['Processing']);
+
+        // The rollback deletes the dataset: the monitor's next poll answers 404
+        deleted = true;
+        await vi.advanceTimersByTimeAsync(20000);
+
+        await expect(result).rejects.toMatchObject({ message: 'The dataset was deleted.', datasetGone: true });
+        expect(settled).toHaveBeenCalledTimes(1);
+        expect(host.heavyTasks.value.t1).toMatchObject({ error: 'The dataset was deleted.', datasetGone: true });
+
+        // Polling stopped and the monitor was released
+        const lists = dataset.getTasks.mock.calls.length;
+        const logs = dataset.getTaskLog.mock.calls.length;
+        await vi.advanceTimersByTimeAsync(130000);
+        expect(dataset.getTasks).toHaveBeenCalledTimes(lists);
+        expect(dataset.getTaskLog).toHaveBeenCalledTimes(logs);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(taskMonitor.getTasks(dataset)).toHaveLength(0);
+        host.$unmount();
+    });
+
+    it('rejects a task that was never listed when the dataset answers 404', async () => {
+        const dataset = makeDataset({ getTasks: vi.fn(async () => { throw notFound(); }) });
+        const host = makeHost();
+
+        const result = host.trackHeavyTask(dataset, 't1', { notify: false });
+        result.catch(() => {});
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).rejects.toThrow('The dataset was deleted.');
+        await vi.advanceTimersByTimeAsync(130000);
+        expect(vi.getTimerCount()).toBe(0);
+        host.$unmount();
+    });
+
+    it('keeps the terminal state that it saw before the dataset went: the task error, not the deletion', async () => {
+        const message = 'The source is not reachable';
+        let deleted = false;
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => {
+                if (deleted) throw notFound();
+                return [{ taskId: 't1', toolId: 'import-dataset', state: 'Failed', error: message }];
+            }),
+            getTask: vi.fn(async () => { throw notFound(); }),
+        });
+        const host = makeHost();
+        const result = host.trackHeavyTask(dataset, 't1', { notify: false });
+        result.catch(() => {});
+        deleted = true;
+        await vi.advanceTimersByTimeAsync(0);
+
+        await expect(result).rejects.toThrow(message);
+        host.$unmount();
+    });
+
+    it('does not end the task on another failure of the list, which keeps polling', async () => {
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const dataset = makeDataset({
+            getTasks: vi.fn(async () => { throw new ApiError('Server error', 500); }),
+        });
+        const host = makeHost();
+        const settled = vi.fn();
+        host.trackHeavyTask(dataset, 't1', { notify: false }).then(settled, settled);
+        await vi.advanceTimersByTimeAsync(10000);
+
+        expect(settled).not.toHaveBeenCalled();
+        host.$unmount();
+        log.mockRestore();
     });
 });

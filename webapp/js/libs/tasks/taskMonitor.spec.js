@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import taskMonitor, { datasetKey } from './taskMonitor';
+import { ApiError } from '@/libs/ddb/apiError';
 
 let dsSeq = 0;
 
@@ -229,5 +230,92 @@ describe('acquire/release refcounting', () => {
         // A resurrected entry would make the next release() a no-op and leak the timer.
         taskMonitor.release(dataset);
         expect(taskMonitor.getTask(dataset, 't1')).toBeNull();
+    });
+});
+
+describe('datasetGone event (FR-UPL-05, D-004)', () => {
+    const listeners = [];
+
+    afterEach(() => {
+        for (const [evt, fn] of listeners.splice(0)) taskMonitor.off(evt, fn);
+    });
+
+    function watch(event) {
+        const seen = [];
+        const fn = (d) => seen.push(d);
+        taskMonitor.on(event, fn);
+        listeners.push([event, fn]);
+        return seen;
+    }
+
+    it('fires once when the task list answers 404, the dataset having been deleted by a rollback', async () => {
+        const dataset = makeDataset();
+        const error = new ApiError('Not found', 404);
+        dataset.getTasks.mockRejectedValue(error);
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const seen = watch('datasetGone');
+
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(seen).toHaveLength(1);
+        expect(seen[0]).toEqual({ dataset, error });
+        // Not read again once it is gone, and not reported as a failed fetch
+        expect(dataset.getTasks).toHaveBeenCalledTimes(1);
+        expect(log).not.toHaveBeenCalled();
+        log.mockRestore();
+    });
+
+    it('does not fire for another failure, which keeps polling', async () => {
+        const dataset = makeDataset();
+        dataset.getTasks.mockRejectedValue(new ApiError('Server error', 500));
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const seen = watch('datasetGone');
+
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(seen).toHaveLength(0);
+        expect(dataset.getTasks).toHaveBeenCalledTimes(2);
+        log.mockRestore();
+    });
+
+    it('ends the running tasks of a dataset that answers 404 after a Processing list, once', async () => {
+        const dataset = makeDataset();
+        dataset.getTasks.mockResolvedValueOnce([makeTask({ state: 'Processing' })]);
+        const seen = watch('datasetGone');
+
+        await taskMonitor.forceRefresh(dataset);
+        expect(taskMonitor.hasActiveTasks(dataset)).toBe(true);
+        expect(taskMonitor.isGone(dataset)).toBe(false);
+
+        dataset.getTasks.mockRejectedValue(new ApiError('Not found', 404));
+        await taskMonitor.forceRefresh(dataset);
+        await taskMonitor.forceRefresh(dataset);
+
+        expect(seen).toHaveLength(1);
+        expect(taskMonitor.isGone(dataset)).toBe(true);
+        // Nothing runs in a deleted dataset; the last list stays readable, frozen
+        expect(taskMonitor.hasActiveTasks(dataset)).toBe(false);
+        expect(taskMonitor.getTask(dataset, 't1')).toMatchObject({ state: 'Processing' });
+        expect(dataset.getTasks).toHaveBeenCalledTimes(2);
+    });
+
+    it('is not gone for a dataset it does not know', () => {
+        expect(taskMonitor.isGone(makeDataset())).toBe(false);
+    });
+
+    it('stops the polling of a dataset that is gone', async () => {
+        vi.useFakeTimers();
+        try {
+            const dataset = makeDataset();
+            dataset.getTasks.mockRejectedValue(new ApiError('Not found', 404));
+            taskMonitor.acquire(dataset);
+            await vi.advanceTimersByTimeAsync(130000);
+            expect(dataset.getTasks).toHaveBeenCalledTimes(1);
+            taskMonitor.release(dataset);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

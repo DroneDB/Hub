@@ -191,6 +191,23 @@ describe('cancelTask', () => {
         expectRefreshed(vm);
     });
 
+    it('tells an import that its files and the dataset it created are deleted (FR-UPL-05)', async () => {
+        const vm = cancelVm(Promise.resolve({ deleted: true }));
+        await cancelTask.call(vm, fixedTask(8, { state: 'Processing', toolId: 'import-dataset' }));
+        expect(vm.confirm).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Cancel Task', danger: true,
+            warningMessage: 'The files imported so far are deleted, and so is the dataset that this import created.'
+        }));
+    });
+
+    it('asks the plain question for a task that is not an import', async () => {
+        const vm = cancelVm(Promise.resolve({ deleted: true }));
+        await cancelTask.call(vm, fixedTask(9, { state: 'Processing', toolId: 'build' }));
+        const question = vm.confirm.mock.calls[0][0];
+        expect(question).toMatchObject({ title: 'Cancel Task', danger: true });
+        expect(question.warningMessage).toBeUndefined();
+    });
+
     it('does nothing when the cancel is not confirmed', async () => {
         const vm = cancelVm(Promise.resolve({ deleted: true }));
         vm.confirm = vi.fn(() => Promise.resolve(false));

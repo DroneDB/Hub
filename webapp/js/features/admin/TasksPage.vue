@@ -33,9 +33,7 @@
 
         <!-- Cancel task confirmation -->
         <ConfirmDialog v-if="cancelDialogOpen"
-                       title="Cancel Task"
-                       :message="`Are you sure you want to cancel this task?<br/><strong>${toolTitle(cancellingTask.toolId, taskTools)}</strong>${cancellingTask.path ? ' on ' + cancellingTask.path : ''} will be stopped.`"
-                       confirm-text="Cancel Task" cancel-text="Don't Cancel" confirm-button-class="danger"
+                       v-bind="cancelDialog"
                        @close="handleCancelDialogClose" />
 
         <!-- Delete task confirmation -->
@@ -56,6 +54,7 @@ import reg from '@/libs/api/sharedRegistry';
 import { isForbidden } from '@/libs/ddb/apiError';
 import { deniedLocation } from '@/libs/authRoutes';
 import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
+import { cancelDialogProps } from '@/libs/tasks/cancelConfirmation';
 import { confirmDialogProps } from '@/libs/deleteConfirmation';
 
 /**
@@ -99,6 +98,12 @@ export default {
     },
 
     computed: {
+        // The cancel question; an import says that its files (and the dataset it created) are deleted (FR-UPL-05)
+        cancelDialog() {
+            const task = this.cancellingTask;
+            if (!task) return { message: '' };
+            return cancelDialogProps(task, this.toolTitle(task.toolId, this.taskTools));
+        },
         // The concluded task leaves the history with its results
         deleteDialog() {
             const task = this.deletingTask;

@@ -9,7 +9,7 @@ import { ref, h, defineComponent, onMounted, effectScope } from 'vue';
 import PrimeVue from 'primevue/config';
 import { createPinia, setActivePinia } from 'pinia';
 
-const h_ = vi.hoisted(() => ({ dataset: null, showError: null, loggedIn: true }));
+const h_ = vi.hoisted(() => ({ dataset: null, showError: null, loggedIn: true, gone: null }));
 
 vi.mock('vue-router', () => ({ useRoute: () => ({ params: { org: 'r3sharing', ds: 'brighton-beach' } }) }));
 vi.mock('@/libs/api/sharedRegistry', () => ({
@@ -19,6 +19,14 @@ vi.mock('@/libs/api/sharedRegistry', () => ({
         getUsername: () => 'r3sharingu2',
         features: { value: () => null, get: () => false }
     }
+}));
+// The shared task poller tells when the dataset is deleted while the page is open
+vi.mock('@/libs/tasks/taskMonitor', () => ({
+    default: {
+        on: (event, fn) => { if (event === 'datasetGone') h_.gone = fn; },
+        off: (event, fn) => { if (event === 'datasetGone' && h_.gone === fn) h_.gone = null; }
+    },
+    datasetKey: ds => ds.baseApi
 }));
 vi.mock('@/libs/build/buildManager', () => ({
     default: { registerDataset: vi.fn(), unregisterDataset: vi.fn(), loadBuilds: () => Promise.resolve() }
@@ -67,7 +75,7 @@ const stubs = {
 let wrapper;
 let pinia;
 async function open(infoResult) {
-    h_.dataset = { info: vi.fn(() => infoResult), metaGet: vi.fn(() => Promise.resolve([])) };
+    h_.dataset = { baseApi: 'r3sharing/brighton-beach', info: vi.fn(() => infoResult), metaGet: vi.fn(() => Promise.resolve([])) };
     document.body.insertAdjacentHTML('beforeend', '<div id="app"></div>');
     wrapper = mount(ViewDataset, { global: { stubs, plugins: [pinia] } });
     await flushPromises();
@@ -202,5 +210,38 @@ describe('ViewDataset keyboard shortcuts', () => {
         popup.unmount();
         target.remove();
         scope.stop();
+    });
+});
+
+describe('ViewDataset when the dataset is deleted while it is open (FR-UPL-05, D-004)', () => {
+    const OPEN = [{ path: '', type: 1, properties: { permissions: { canRead: true } } }];
+
+    it('shows the not found state in place of the panels, as for a dataset that is not there', async () => {
+        await open(Promise.resolve(OPEN));
+        expect(wrapper.find('.panel').exists()).toBe(true);
+
+        h_.gone({ dataset: h_.dataset, error: new ApiError('Not found', 404) });
+        await flushPromises();
+
+        expect(wrapper.find('h1').text()).toBe('Dataset not found');
+        expect(wrapper.find('.panel').exists()).toBe(false);
+        expect(h_.showError).not.toHaveBeenCalled();
+        expect(useDatasetSessionStore().unavailable).toBe(true);
+    });
+
+    it('ignores the loss of another dataset', async () => {
+        await open(Promise.resolve(OPEN));
+        h_.gone({ dataset: { baseApi: 'r3sharing/other' }, error: new ApiError('Not found', 404) });
+        await flushPromises();
+        expect(wrapper.find('.panel').exists()).toBe(true);
+        expect(wrapper.find('.resource-state').exists()).toBe(false);
+    });
+
+    it('stops listening when the page is left', async () => {
+        await open(Promise.resolve(OPEN));
+        expect(h_.gone).toBeTypeOf('function');
+        wrapper.unmount();
+        wrapper = null;
+        expect(h_.gone).toBeNull();
     });
 });

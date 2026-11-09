@@ -71,6 +71,7 @@ import { permissionsOf } from '@/libs/datasetPermissions';
 import { loadErrorKind } from '@/libs/ddb/apiError';
 import { isFileBuilt } from '@/libs/build/buildHelpers';
 import BuildManager from '@/libs/build/buildManager';
+import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import { downloadFromDataset, downloadBuildArtifact, notifyDownloadError } from '@/libs/datasetDownloads';
 import { useSplatDownloads } from '@/features/viewers/splat/useSplatDownloads';
 import { splatDownloadsOf, splatExportOffered } from '@/features/viewers/splat/splatDownloads';
@@ -423,7 +424,17 @@ watch(listing.files, () => session.setSelectedFiles(listing.selected.value), { d
 watch(canWrite, value => session.setCanWrite(value), { immediate: true });
 watch(() => session.settingsRequests, () => actions.settings());
 
+// The dataset was deleted while the page is open (an import that was cancelled or failed rolled
+// back and deleted the dataset it created, FR-UPL-05, D-004): the same page state as a dataset that
+// is not there when it is opened. The Hub deletes nothing itself.
+function onDatasetGone({ dataset: gone, error: e }) {
+    if (datasetKey(gone) !== datasetKey(dataset) || loadError.value) return;
+    loadError.value = e;
+    session.setUnavailable(true);
+}
+
 onMounted(() => {
+    taskMonitor.on('datasetGone', onDatasetGone);
     document.getElementById('app').classList.add('fullpage');
     setTitle(params.ds);
     loadViews();
@@ -433,6 +444,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    taskMonitor.off('datasetGone', onDatasetGone);
     document.getElementById('app').classList.remove('fullpage');
     BuildManager.unregisterDataset(dataset);
     session.setUnavailable(false);

@@ -185,6 +185,7 @@ import { useHeavyTask } from '@/composables/useHeavyTask';
 import { useTaskFormatting } from '@/composables/useTaskFormatting';
 import taskMonitor, { datasetKey } from '@/libs/tasks/taskMonitor';
 import { cancelTaskOutcome } from '@/libs/tasks/cancelOutcome';
+import { cancelConfirmation } from '@/libs/tasks/cancelConfirmation';
 import TasksTable from '@/features/tasks/TasksTable.vue';
 import TaskLogDialog from '@/features/tasks/TaskLogDialog.vue';
 import DialogHost from '@/components/DialogHost.vue';
@@ -775,11 +776,8 @@ export default {
         // ---- per-task actions ----
 
         async cancelTask(task) {
-            const what = `<strong>${escapeHtml(this.toolTitle(task.toolId, this.tools))}</strong>${task.path ? ` (path: ${escapeHtml(task.path)})` : ''}`;
-            if (!await this.confirm({
-                title: 'Cancel Task', danger: true, confirmText: 'Cancel Task', cancelText: "Don't Cancel",
-                message: `Are you sure you want to cancel this task?<br/>${what} will be stopped.`
-            })) return;
+            // An import says that its files (and the dataset it created) are deleted (FR-UPL-05)
+            if (!await this.confirm(cancelConfirmation(task, this.toolTitle(task.toolId, this.tools)))) return;
             try {
                 const result = await cancelTaskOutcome(this.dataset, task.taskId);
                 if (result.outcome === 'alreadyEnded')
